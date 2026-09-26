@@ -8,7 +8,14 @@ the whole point of this gate is confirming a REAL file/test exists, not
 just that some string matches some other string."""
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
+import pytest
+
 from qa_tools.common.validate_requirements import _linked_test_exists, _python_symbol_exists, validate
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def _valid_entry(**overrides):
@@ -633,3 +640,61 @@ def test_omitting_it_entirely_is_still_valid():
     """The overwhelming majority of requirements have no hole, and must
     not have to say so."""
     assert validate([_valid_entry()]) == []
+
+
+class TestNoHyphenWrapArtifacts:
+    """A line break taken AT a hyphen silently inserts a space.
+
+    Both of these files are folded YAML - every scalar uses `>` and
+    neither has a single literal `|` block - so a line break inside a
+    scalar becomes a SPACE when the file is read. Break a line at an
+    existing hyphen and `read-committed-history` is stored as
+    `read- committed-history`, which is not what anybody wrote and not
+    what any reader wants to see.
+
+    Found 2026-09-27: fifty of them across the register, left behind by
+    ad hoc `textwrap.fill()` calls in session scripts, whose default
+    `break_on_hyphens=True` does exactly this. Four were introduced the
+    same night by my own. There is no committed writer to fix, which is
+    why this is a gate rather than a change to a tool.
+
+    NO ALLOWLIST IS NEEDED, and that is the point of checking the RAW
+    text rather than the parsed strings. English really does use a
+    suspended hyphen - "meta-, ctrl- and shift-click" is correct and
+    appears in this register - but that is a hyphen followed by a real
+    space on one line, which this pattern cannot match. A hyphen at the
+    END of a line followed by a word has no legitimate form here.
+    """
+
+    FILES = ("requirements.yaml", "CHANGELOG.yaml")
+    #: A word character, a hyphen, a line break, indentation, a word
+    #: character. `.`, `)` and `]` are included before the hyphen so a
+    #: path or a parenthetical is caught too.
+    PATTERN = re.compile(r"([A-Za-z0-9_.)\]])-\n(\s+)([A-Za-z0-9_])")
+
+    @pytest.mark.parametrize("name", FILES)
+    def test_no_scalar_is_wrapped_at_a_hyphen(self, name):
+        raw = (ROOT / name).read_text()
+        found = []
+        for m in self.PATTERN.finditer(raw):
+            line = raw[: m.start()].count("\n") + 1
+            found.append(f"{name}:{line} ...{m.group(1)}- / {m.group(3)}...")
+        assert not found, (
+            "a line is wrapped at a hyphen, so the folded text will carry a "
+            "space that nobody wrote - join the token onto one line:\n  "
+            + "\n  ".join(found))
+
+    @pytest.mark.parametrize("name", FILES)
+    def test_the_file_really_is_folded_throughout(self, name):
+        """Guards the guard. The test above is only sound while every
+        scalar is folded - in a literal `|` block a line break is
+        PRESERVED, so joining those lines would change the content
+        rather than repair it. If a literal block is ever added, this
+        fails and the rule above needs narrowing to exclude it."""
+        raw = (ROOT / name).read_text()
+        literal = [i + 1 for i, line in enumerate(raw.split("\n"))
+                   if re.search(r":\s*\|[-+]?\s*$", line)]
+        assert not literal, (
+            f"{name} now has a literal block at line(s) {literal} - "
+            f"test_no_scalar_is_wrapped_at_a_hyphen assumes folded scalars "
+            f"throughout and must be narrowed to skip it")

@@ -2453,8 +2453,7 @@ requirements:
         its only occurrences in the built page are this register's own
         prose about the field. This entry first recorded 244 of 257: the
         13 missing were table-level checks with no column to render
-        under, and routing them to the two supply/table-level pseudo-
-        columns the same day closed that gap.
+        under, and routing them to the two supply/table-level pseudo-columns the same day closed that gap.
 
   - id: REQ-QAC-025
     title: No check ships without a plain-English explanation
@@ -3246,8 +3245,7 @@ requirements:
       - THE SYSTEM SHALL NOT require the datasets in a collection to
         share an arrival identifier.
       - WHERE several datasets arrived together as one delivery, THE
-        SYSTEM SHALL record the delivery they shared, so that a whole-
-        collection delivery stays distinguishable from several
+        SYSTEM SHALL record the delivery they shared, so that a whole-collection delivery stays distinguishable from several
         coincidental ones.
       - THE SYSTEM SHALL present a dataset's arrival history without
         reference to any other dataset's arrivals.
@@ -4633,8 +4631,7 @@ requirements:
         delivery - and a pipeline that is only safe because today's data
         happens to be synthetic is the exact thing Keith rejected for
         deploy-pages.yml. Deleting and regenerating is the same act
-        stated honestly, which is why it is acceptable and re-running-
-        as-migration would not have been.
+        stated honestly, which is why it is acceptable and re-running-as-migration would not have been.
       - >
         WIDENED on 2026-09-23 (Keith) from "qa_results is keyed per
         dataset, and today's history is regenerated" to cover the
@@ -6048,8 +6045,7 @@ requirements:
         qa_tools/cp/build_cp_warehouses.py,
         qa_tools/cp/run_evidently_cp.py, qa_tools/cp/dataset_stats.py
         (which embeds the whole manifest entry into committed results),
-        qa_tools/common/acceptance_sync.py, tests-js/supply-
-        history.test.js, and the dashboard template's own supply-history
+        qa_tools/common/acceptance_sync.py, tests-js/supply-history.test.js, and the dashboard template's own supply-history
         logic. CLAUDE.md's standing shape-change lesson: assert at the
         last transform before the user, not the first one after the
         source."
@@ -7556,8 +7552,7 @@ requirements:
         evaluation path.
     non_functional_requirements:
       - The authored calendar is a real once-a-year human task, and
-        somebody will forget. The runway warning and the exhausted-
-        schedule failure in REQ-PIPE-053 are that risk's mitigation, and
+        somebody will forget. The runway warning and the exhausted-schedule failure in REQ-PIPE-053 are that risk's mitigation, and
         this requirement is not safe without them.
       - The calendar is a governance artefact, not just config - Thread
         C's own words, "the dates ARE the supplier agreement, and QA
@@ -7655,8 +7650,7 @@ requirements:
         business day to the 1st", which a day-of-month rule does not
         express.
       - "Rejected runtime derivation from a holiday library (Keith's own
-        counter-proposal), and rejected derive-at-runtime-then-freeze-
-        the-computed-due-date. Neither loses on library quality - Keith
+        counter-proposal), and rejected derive-at-runtime-then-freeze-the-computed-due-date. Neither loses on library quality - Keith
         was right that holiday packages are year-keyed, so a later
         gazette amendment does not silently rewrite a settled past date.
         They lose because the dates ARE the agreement: a calendar
@@ -7765,8 +7759,7 @@ requirements:
         authored-date calendar, and is an ERROR on a cadence-rule one
         rather than an ignored key. A dataset naming a daily calendar
         participates in every period the rule generates; silently
-        ignoring months there is exactly the kind of accepted-and-
-        discarded config that produces a dataset expecting something
+        ignoring months there is exactly the kind of accepted-and-discarded config that produces a dataset expecting something
         other than what its author wrote."
       - "Rejected naming the participation field participatesIn, which a
         2026-09-22 draft of Thread C's config sketch invented before
@@ -7967,8 +7960,7 @@ requirements:
         differs between VERSIONS (authoring a new effective-dated
         version is the sanctioned way to change a schedule), and a
         missing previous commit (a shallow checkout is not a finding).
-        A changelog entry on the version clears it - this is a say-what-
-        you-did gate, not a freeze, which is what Thread E actually
+        A changelog entry on the version clears it - this is a say-what-you-did gate, not a freeze, which is what Thread E actually
         asks for."
       - "[BUILD] Decided the organising sentence is also asked
         DIRECTLY, not only enforced through the specific rules. Each
@@ -8630,8 +8622,7 @@ requirements:
         this element is present for months at a time."
       - "Decided an exhausted schedule renders as a DISTINCT state
         outside green/amber/red (Keith, 2026-09-23). Rejected RED, which
-        Thread C's own delta table had implied via cannot-run-becomes-
-        red: a supplier's clean dataset would read red because WE forgot
+        Thread C's own delta table had implied via cannot-run-becomes-red: a supplier's clean dataset would read red because WE forgot
         to type next year's dates, which is an attribution error - our
         config task undone, presented as their data gone bad - and the
         fastest way to teach people that red does not mean what it says.
@@ -12153,8 +12144,7 @@ requirements:
         THE SYSTEM SHALL NOT modify or remove an entry once written, and
         SHALL express every reversal as a new entry.
       - >
-        THE SYSTEM SHALL record a re-file as ONE entry carrying a from-
-        slot, a to-slot and one reason, and SHALL NOT express it as a
+        THE SYSTEM SHALL record a re-file as ONE entry carrying a from-slot, a to-slot and one reason, and SHALL NOT express it as a
         demotion followed by a promotion.
       - >
         THE SYSTEM SHALL hold each dataset's entries such that reading
@@ -12192,8 +12182,7 @@ requirements:
         requirement owns that tree rather than to this one.
       - >
         Do NOT resolve anything about an entry by walking git history.
-        CLAUDE.md records the real incident where changelog.py's per-
-        commit git walk cost 13 seconds on twelve commits and scaled
+        CLAUDE.md records the real incident where changelog.py's per-commit git walk cost 13 seconds on twelve commits and scaled
         with diff size; a decision log read on every dashboard build is
         exactly that shape again.
       - >
@@ -12284,8 +12273,7 @@ requirements:
         an audit trail with anonymous entries is worse than none,
         because it looks complete.
       - >
-        Decided a re-file is ONE atomic entry, rejecting the demote-
-        then-promote composition (Thread B, TS-11, settled 2026-09-22).
+        Decided a re-file is ONE atomic entry, rejecting the demote-then-promote composition (Thread B, TS-11, settled 2026-09-22).
         Under the composed version a reader a year later has to infer
         that two entries were one act, so "why is this supply in Q3?"
         becomes a correlation exercise. Note this survived un-decide
@@ -12294,14 +12282,12 @@ requirements:
         reasons.
       - >
         Decided the actor shape is actor: {kind: human | rule, id:
-        <email | principal | rule name>} (Thread G), because auto-
-        promotions share the log and a reader must be able to tell a
+        <email | principal | rule name>} (Thread G), because auto-promotions share the log and a reader must be able to tell a
         person from a rule without inferring it from the id's format.
       - >
         Recorded as a boundary rather than a decision: this requirement
         owns the RECORD. The GitHub Issues write CHANNEL, the backlog
-        drain, the concurrency configuration and the conflicting-
-        decision resolution are delivery sprint 12's, and are named in
+        drain, the concurrency configuration and the conflicting-decision resolution are delivery sprint 12's, and are named in
         REQ-GHUB-082 and its own open questions so the seam is explicit
         rather than discovered.
       - >
@@ -12378,9 +12364,7 @@ requirements:
     moscow: must
     status: not_started
     source: >
-      Keith, plans/supply-model.md delivery sprint 11 and Thread B's QA-
-      gates-promotion decision (settled 2026-09-21). Scoped by delivery-
-      scoper, batch 4, 2026-09-26.
+      Keith, plans/supply-model.md delivery sprint 11 and Thread B's QA-gates-promotion decision (settled 2026-09-21). Scoped by delivery-scoper, batch 4, 2026-09-26.
     signed_off:
       by: Keith
       date: "2026-09-26"
@@ -12391,8 +12375,7 @@ requirements:
         SHALL promote that supply into its period's schema.
       - >
         THE SYSTEM SHALL take the status this gate reads from EVERY
-        check that contributes to that dataset's status - its own table-
-        level and column-level checks, the cross-table checks it
+        check that contributes to that dataset's status - its own table-level and column-level checks, the cross-table checks it
         participates in whether or not it is the dataset they are filed
         under, and any other scope that folds into the dataset's status
         - and SHALL NOT gate on a subset of them.
@@ -12470,8 +12453,7 @@ requirements:
       - >
         CI must never touch data/, and this one legitimately does - so
         it belongs in the orchestrator's own run step, beside
-        dataset_stats, never in the dashboard build or any read-
-        committed-history path.
+        dataset_stats, never in the dashboard build or any read-committed-history path.
       - >
         Verify at the layer a reader sees, not just at the data layer.
         CLAUDE.md's shape-change rule was written after a status change
@@ -12482,8 +12464,7 @@ requirements:
       - >
         Decided QA GATES promotion on STATUS, settled 2026-09-21
         (Keith): amber and green auto-promote, red never does. A supply
-        that cannot be loaded at all is already red, so the failed-to-
-        load case needs no extra rule.
+        that cannot be loaded at all is already red, so the failed-to-load case needs no extra rule.
       - >
         Decided a queue of red supplies waiting on a person is the
         CORRECT OUTPUT of the gate, not an obstruction. Thread B records
@@ -12532,8 +12513,7 @@ requirements:
         not exist.
       - >
         Rejected a "rejected" or "not promoted" LABEL inside the period
-        schema, in favour of isolation by schema (Thread B). Schema-per-
-        period beat the per-run databases precisely because dbt and Soda
+        schema, in favour of isolation by schema (Thread B). Schema-per-period beat the per-run databases precisely because dbt and Soda
         have no run_id-scoped WHERE; they equally have no "and not
         rejected". A filter every query must remember to apply is a
         false-green generator.
@@ -12544,8 +12524,7 @@ requirements:
         the ambiguity that ships as a subset: REQ-QAC-037 landed the
         same morning and makes a cross-table check fold into the status
         of EVERY dataset it reads, not only the one it is filed under. A
-        gate reading table-level checks alone would therefore auto-
-        promote a supply while a cross-table check about it was failing
+        gate reading table-level checks alone would therefore auto-promote a supply while a cross-table check about it was failing
         - a false green in the dangerous direction, and the same shape
         as the defect CLAUDE.md's own status-rollup rule was written
         after. Stated as "every check that contributes" rather than as a
@@ -12672,8 +12651,7 @@ requirements:
         At 30 datasets the difference between "nobody has looked" and
         "someone looked and put it back" is the difference between a
         queue an operator can work and one they stop trusting. This is a
-        presentation consequence as much as a data one, and REQ-
-        DASH-070's aggregated element is where it lands.
+        presentation consequence as much as a data one, and REQ-DASH-070's aggregated element is where it lands.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075]
     decisions:
       - >
@@ -12716,8 +12694,7 @@ requirements:
         at all.
       - >
         Decided UN-DECIDE is a real operation (Keith, 2026-09-22, in his
-        own words: "I think undecide is an operation"). Demote-to-
-        staging means "put this back in the queue for someone to look at
+        own words: "I think undecide is an operation"). Demote-to-staging means "put this back in the queue for someone to look at
         again", which is genuinely different from rejecting it.
       - >
         Decided the stickiness rule is therefore REQUIRED rather than
@@ -12747,8 +12724,7 @@ requirements:
         Rejecting something already in a period is what an operator
         means by "this should never have gone in", and making them
         demote first turns one intention into two entries a later reader
-        has to recognise as one act - the same argument that made a re-
-        file atomic in REQ-PIPE-074. The cost, accepted knowingly:
+        has to recognise as one act - the same argument that made a re-file atomic in REQ-PIPE-074. The cost, accepted knowingly:
         "reject" now covers two situations rather than one, refusing
         something staged and pulling something back out of a period, so
         Thread B's narrower definition - decided against promoting
@@ -12994,9 +12970,7 @@ requirements:
         a future slot is the forward cascade arriving by the recovery
         path.
       - >
-        Decided a held supply is NOT QA'd (supply_holds.py). The single-
-        table checks could run without a period, but drift and previous-
-        period comparison cannot, so partial QA produces a verdict that
+        Decided a held supply is NOT QA'd (supply_holds.py). The single-table checks could run without a period, but drift and previous-period comparison cannot, so partial QA produces a verdict that
         has to be thrown away once the slot is known - or worse, a GREEN
         one sitting in history against no period at all.
       - >
@@ -13148,8 +13122,7 @@ requirements:
         Decided a mixed-period delivery FANS OUT, one QA run per period,
         rather than composing tables from different periods into one
         run. Keith's own first instinct was table-by-table composition
-        picking a different period schema per table; he changed to fan-
-        out on the argument that the composed run produces a meaningless
+        picking a different period schema per table; he changed to fan-out on the argument that the composed run produces a meaningless
         comparison - August's clients against November's notifications.
         His words: "we don't want to be munging things across period
         schemas".
@@ -13211,8 +13184,7 @@ requirements:
         when an early supply may arrive; it is the wrong name for the
         ordinary state where the period is open and a dataset simply has
         not been seen. That state had no name at all, which is why it
-        was being reported as a missing table. It is now `awaiting-
-        supply`, chosen to pair against "awaiting a decision" so an
+        was being reported as a missing table. It is now `awaiting-supply`, chosen to pair against "awaiting a decision" so an
         operator can see which side the ball is on - waiting on the
         supplier, or waiting on us. Rejected `not-yet-supplied` (loses
         that pairing), `supply-outstanding` ("outstanding" already means
@@ -13220,8 +13192,7 @@ requirements:
         about who is expected to act).
       - >
         TWO NEAR-COLLISIONS FLAGGED AT SIGN-OFF rather than discovered
-        later, neither of them an actual clash today. `awaiting-
-        decision` sits beside outstanding.py's own phrase "an obligation
+        later, neither of them an actual clash today. `awaiting-decision` sits beside outstanding.py's own phrase "an obligation
         awaiting a decision", which describes a CLOSED unfilled slot - a
         different situation. And `overdue-supply` sits beside
         arrival_classification's `late`, which describes a supply that
@@ -13248,8 +13219,7 @@ requirements:
         residual and is explicitly a CATCH-ALL rather than a competing
         rule, since the original wording and `awaiting-supply` both
         applied to an open slot that is not yet due. THE PRECEDENT IS
-        THIS MODULE'S OWN: `missing-reference-period` versus `no-prior-
-        period` already draws this distinction on the TIME axis, for the
+        THIS MODULE'S OWN: `missing-reference-period` versus `no-prior-period` already draws this distinction on the TIME axis, for the
         reason its docstring gives - "Without that carve-out every new
         dataset starts life red on all its drift checks, which is how
         people learn to ignore a signal." Rejected making the unpromoted
@@ -13276,8 +13246,7 @@ requirements:
         remains of "data it did not contain" is the trivial reading,
         that the delivery did not bring it - equally true of every other
         table the delivery did not bring, all of which are read from the
-        period without objection. A second reason it has expired: REQ-
-        PIPE-078 means an ambiguous table is held and not checked either
+        period without objection. A second reason it has expired: REQ-PIPE-078 means an ambiguous table is held and not checked either
         way, so the rule's only surviving effect was on cross-table
         checks that READ it, where refusing treated "brought two" as
         worse than "brought none". The block stays where it belongs -
@@ -13305,8 +13274,7 @@ requirements:
     moscow: must
     status: not_started
     source: >
-      REQ-PIPE-066's four unmet criteria (9, 10, 11 and 12) and REQ-
-      PIPE-067's criterion 4, all deferred to the promotion sprint
+      REQ-PIPE-066's four unmet criteria (9, 10, 11 and 12) and REQ-PIPE-067's criterion 4, all deferred to the promotion sprint
       because the classifier had no filings to measure against. Scoped
       by delivery-scoper, batch 4, 2026-09-26.
     signed_off:
@@ -13342,8 +13310,7 @@ requirements:
       - >
         This legitimately CHANGES PUBLISHED NUMBERS. Today's history
         measures 0 early / 240 on time / 112 late; the new derivation
-        will produce different numbers and the seeded regenerate-and-
-        diff proves nothing here. REQ-PIPE-066 flagged this before the
+        will produce different numbers and the seeded regenerate-and-diff proves nothing here. REQ-PIPE-066 flagged this before the
         work started, and it should be said to Keith again at sign-off
         rather than discovered in a diff.
       - >
@@ -13385,8 +13352,7 @@ requirements:
         immutability is the one place this design would knowingly say
         something untrue.
       - >
-        Decided recomputation is LOCAL to the supply that moved - a re-
-        file changes one supply's verdict and nothing replays a history,
+        Decided recomputation is LOCAL to the supply that moved - a re-file changes one supply's verdict and nothing replays a history,
         because a design that needed to would stop being usable once a
         daily feed has years behind it.
       - >
@@ -13415,8 +13381,7 @@ requirements:
       Keith, 2026-09-26, batch 4 scoping input (b): "we're going to have
       to work out how demotion fits in and keeps as-at-T stable." Thread
       B names the tension and nobody resolved it; Thread H wrinkle 1
-      corrected the underlying rule and Thread K settled the as-
-      corrected default. Scoped by delivery-scoper, batch 4, 2026-09-26.
+      corrected the underlying rule and Thread K settled the as-corrected default. Scoped by delivery-scoper, batch 4, 2026-09-26.
     signed_off:
       by: Keith
       date: "2026-09-26"
@@ -13544,8 +13509,7 @@ requirements:
         committed, and the dashboard build must reach it without
         touching data/.
       - >
-        Verify with a real sequence, not a unit: promote, demote, re-
-        promote a different supply, then ask the same as-at date three
+        Verify with a real sequence, not a unit: promote, demote, re-promote a different supply, then ask the same as-at date three
         times across the sequence and assert the three answers. A
         single-event test passes against an implementation that reads
         only the latest event.
@@ -13627,8 +13591,7 @@ requirements:
         scope was explicitly declined the same day. And on DuckDB the
         move is O(rows) under a single-writer lock (REQ-PIPE-068), so
         demoting a large table stalls other writers for its duration,
-        where on PostgreSQL it is instant. Demotion is rare and human-
-        initiated, so this is a note for whoever builds it - keep the
+        where on PostgreSQL it is instant. Demotion is rare and human-initiated, so this is a note for whoever builds it - keep the
         move in its own transaction rather than inside a longer one -
         rather than a reason not to do it.
       - >
@@ -13677,8 +13640,7 @@ requirements:
         ONE YET (Keith, 2026-09-26, after being shown that his first
         answer here - one instant is enough - contradicted REQ-PIPE-074
         criterion 2, which he had signed two hours earlier and which
-        requires both). The distinction that settled it: the as-
-        corrected view this requirement builds needs only one instant,
+        requires both). The distinction that settled it: the as-corrected view this requirement builds needs only one instant,
         so the second is not machinery, it is INSURANCE. What it buys is
         the bitemporal reconstruction - "what would 30 June have said,
         as we understood it in July?" - which Keith deferred to batch 6
@@ -13699,8 +13661,7 @@ requirements:
         log confidently naming it and every as-at answer quietly wrong,
         which is exactly the "wrong in a way nobody notices for months"
         failure this requirement's NFR warns about. Keith reasoned to
-        the shape himself including the constraint that made it non-
-        obvious - the dashboard never talks to the warehouse, so the
+        the shape himself including the constraint that made it non-obvious - the dashboard never talks to the warehouse, so the
         check cannot happen at render time. FIRST DRAFTED AS A FULL
         CENSUS of every physical table per period, embedded for the
         dashboard to compare against. He corrected that: "it just needs
@@ -13799,8 +13760,7 @@ requirements:
         suspect they are confused. SCOPE NOTE, REVERSED THE SAME
         AFTERNOON (Keith): this session first carved the CODE out -
         element ids, the ?asof= query parameter - on the grounds that
-        renaming a URL parameter breaks every saved link for no reader-
-        facing gain. Keith overrode that on consistency ("happy to
+        renaming a URL parameter breaks every saved link for no reader-facing gain. Keith overrode that on consistency ("happy to
         rename the element ids and URL params - for consistency", then
         "ditto any variable names or functions", then "happy to do it as
         part of the build of 081"), so criteria 23-26 carry it. The link
@@ -14134,8 +14094,7 @@ requirements:
         here - so sprint 11 can build the shared implementation and the
         TUI adapter but not the GitHub one. Neither route being primary,
         this is now simply the order they are built in rather than an
-        awkwardness to accept, and criterion 11's one-implementation-
-        plus-adapters shape is what makes the second
+        awkwardness to accept, and criterion 11's one-implementation-plus-adapters shape is what makes the second
         adapter cheap when sprint 12 lands. Rejected folding sprint 12's
         channel into this batch, which would pull Thread H's concurrency
         and conflict rules forward and make sprint 11 considerably
@@ -14454,8 +14413,7 @@ requirements:
         Both checked rather than recalled.
       - >
         IDEMPOTENCE is non-negotiable: a daily sweep must not open a new
-        ticket every day for the same late supply. This is the marker-
-        and-drain discipline the decision path already establishes, not
+        ticket every day for the same late supply. This is the marker-and-drain discipline the decision path already establishes, not
         a new mechanism.
       - >
         This computation needs NO data access - only the schedule and
@@ -14478,8 +14436,7 @@ requirements:
         in a milder form, because any push at all keeps it alive, and it
         adds no new mechanism.
       - >
-        One ticket per overdue SLOT, or one per overdue DATASET? Per-
-        slot is precise and can flood after an outage; per-dataset
+        One ticket per overdue SLOT, or one per overdue DATASET? Per-slot is precise and can flood after an outage; per-dataset
         matches today's one-issue-per-dataset model and needs the slot
         named in the body instead.
     decisions:
@@ -14492,9 +14449,7 @@ requirements:
       - >
         Decided DETECTION and ACTION are separated before choosing a
         mechanism, because they are not the same problem. Lateness is
-        ALREADY derived client-side as a pure function of schedule, as-
-        of date and fill state - that is what produces the red-with-no-
-        data reading today. Nothing new needs computing; what is missing
+        ALREADY derived client-side as a pure function of schedule, as-of date and fill state - that is what produces the red-with-no-data reading today. Nothing new needs computing; what is missing
         is the ACTOR that turns a derived state into a durable event.
       - >
         Recorded against the QA-run-triggered option: it would ride on
@@ -14588,13 +14543,11 @@ requirements:
         labelling has its own requirement, and it is worth asking
         whether a warehouse consumer sees any label at all.
       - >
-        The mechanism already exists: this is the logical-name-to-
-        physical-table indirection REQ-PIPE-035 establishes, aimed one
+        The mechanism already exists: this is the logical-name-to-physical-table indirection REQ-PIPE-035 establishes, aimed one
         schema further back, and reference_view() is already built and
         tested as a real cross-schema VIEW rather than a copy.
       - >
-        At ~30 datasets with a quarterly cadence, a persistent non-
-        supplier could accumulate a chain of substitutions across
+        At ~30 datasets with a quarterly cadence, a persistent non-supplier could accumulate a chain of substitutions across
         several periods. Whether a substitution may itself point at a
         substituted period is a real question, and an unbounded chain
         means a query silently reaching years back.
@@ -14798,8 +14751,7 @@ requirements:
     source: >
       Keith, 2026-09-24, in his own words: "no one could look at it and
       go, oh, it's green and it's good. No, it's green. And then next to
-      it, it should say carry forward or something." plans/supply-
-      model.md delivery sprint 25, folded into batch 4 2026-09-26.
+      it, it should say carry forward or something." plans/supply-model.md delivery sprint 25, folded into batch 4 2026-09-26.
       Scoped by delivery-scoper, batch 4, 2026-09-26.
     acceptance_criteria:
       - >
@@ -14835,8 +14787,7 @@ requirements:
         experience is that anything landing in the nodata bucket
         vanishes from every rollup above it.
       - >
-        At 30 datasets the Tier 2 row is already carrying an exhausted-
-        schedule marker and an outstanding-decisions count. A third
+        At 30 datasets the Tier 2 row is already carrying an exhausted-schedule marker and an outstanding-decisions count. A third
         annotation competing for one row is how a row stops being
         readable - so where this goes needs the dashboard UX pass rather
         than being decided here.
@@ -15050,8 +15001,7 @@ requirements:
         recognition cannot place the file, a rehearsal says what
         recognition made of it and proceeds anyway, because a rehearsal
         against an unrecognised file is a legitimate thing to want -
-        checking a CSV a supplier just emailed is the case the local-
-        file mode was built for. Rejected letting the operator name the
+        checking a CSV a supplier just emailed is the case the local-file mode was built for. Rejected letting the operator name the
         dataset when no pattern claims the file, which is the permissive
         fallback this project refuses elsewhere and would make the
         pattern gate advisory; the fix for a file nothing claims is the
