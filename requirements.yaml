@@ -12510,3 +12510,91 @@ requirements:
         an oversight. Also rejected a slot-level bar that lapses once a
         person fills the slot, as a third rule to explain for a case the
         first two already cover.
+
+  - id: REQ-PIPE-077
+    title: A delivery whose tables land in different periods runs QA and never auto-promotes
+    date_written: "2026-09-26"
+    story: >
+      As a data engineer operating this pipeline, I want a catch-up drop
+      carrying two periods' tables to be checked and then stopped short
+      of promotion, so that a shape the filing rules were never designed
+      for comes to me with its QA results in hand, rather than being
+      filed automatically and found later.
+    moscow: should
+    status: not_started
+    source: >
+      plans/supply-model.md Thread H second chaos pass #4 and test
+      scenarios TS-33a/TS-33b, settled with Keith 2026-09-22. Assigned
+      to delivery sprint 11 because it is a promotion rule rather than
+      an assignment one. Scoped by delivery-scoper, batch 4, 2026-09-26.
+    signed_off:
+      by: Keith
+      date: "2026-09-26"
+    acceptance_criteria:
+      - >
+        WHERE one delivery's attributed supplies are filed to slots in
+        MORE THAN ONE PERIOD, THE SYSTEM SHALL run QA on that delivery
+        and SHALL NOT promote any of its supplies automatically.
+      - >
+        THE SYSTEM SHALL determine that condition from the set of
+        PERIODS its supplies are filed to, and SHALL NOT determine it
+        from the number of distinct slots.
+      - >
+        WHERE one delivery's supplies are filed to several slots within
+        ONE period, THE SYSTEM SHALL promote automatically on the
+        ordinary green-or-amber rule.
+      - >
+        WHEN this gate withholds a delivery, THE SYSTEM SHALL present it
+        among the items awaiting a person, naming the periods involved.
+      - >
+        THE SYSTEM SHALL NOT prevent a person from promoting any of
+        those supplies.
+      - >
+        THE SYSTEM SHALL record the gate's action in the decision log
+        with the rule as the actor.
+    non_functional_requirements:
+      - >
+        TS-33b is the important half and must be tested explicitly. An
+        implementation keyed on SLOTS passes the positive case and fails
+        the negative one, blocking auto-promotion on every healthy
+        multi-table delivery, because per-table slots mean an ordinary
+        six-table Child Protection delivery already spans six slots.
+        Without the negative case the bug ships, since the positive case
+        alone looks like it works.
+      - >
+        At 30 datasets a gate that fires on healthy traffic is a gate
+        that gets disabled. This one should fire on genuinely rare
+        shapes only, and the frequency is worth measuring against real
+        committed history once filings exist rather than assumed.
+      - >
+        Cheap layer, rare shape - so it should cost nothing to evaluate.
+        It is a set comparison over a delivery's own filings, needing no
+        data access.
+    dependencies: [REQ-PIPE-075, REQ-PIPE-035]
+    decisions:
+      - >
+        Decided the condition is different PERIODS, not different SLOTS,
+        and the wording is load-bearing rather than pedantic (Thread H,
+        2026-09-22). Per-table slots mean a normal six-table delivery
+        already lands in six different slots, so a rule phrased on slots
+        trips on every healthy delivery.
+      - >
+        Decided this MOSTLY COLLAPSES into the duplicate-file hold and
+        exists as a backstop for the residual case. A catch-up drop
+        containing both August's and November's cp_clients is two files
+        matching one dataset's pattern, which REQ-PIPE-059 already
+        holds. The residual - August's cp_clients alongside November's
+        cp_notifications - are different tables, so the hold never fires
+        and each is assigned independently with no ambiguity. Keith,
+        2026-09-22: "that's a bit of a weird shape... but just in case
+        it happens".
+      - >
+        Decided the gate stops AUTO-promotion only, not QA and not a
+        person. QA still runs because its results are exactly what the
+        person's decision will be made on.
+      - >
+        Recorded because it dissolves a question that would otherwise be
+        asked: nothing ever reads a declared period, so a mixed-period
+        delivery is recognised with nothing read from any file - two
+        tables land at the same instant and claim different periods
+        because their slots were in different states.
