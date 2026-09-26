@@ -15,6 +15,8 @@ import os
 import re
 import subprocess
 
+from psycopg import conninfo
+
 from qa_tools.common import supply_db
 
 ENGINE_TAG = "dbt-core 1.12 + dbt-duckdb"
@@ -33,22 +35,35 @@ def parse_threshold(spec: str | None) -> float | None:
     return float(m.group(1)) if m else None
 
 
-def run_dbt(db_path: str, command: str, select: list[str], target_path: str,
+def run_dbt(command: str, select: list[str], target_path: str,
             profiles_dir: str, project_dir: str, root: str,
             run_schema: str | None = None) -> None:
-    """`db_path` is dbt's own SCRATCH database, not the supply database
-    (REQ-PIPE-068): dbt writes, DuckDB gives a writer an exclusive lock,
-    and these calls fan out over a process pool. The supply database is
-    ATTACHed read-only by the profile instead, and `run_schema` is the
-    view schema this run's sources resolve through - so a bare table
-    name in a model or a checks file means exactly one arrival's rows,
-    which is what the retired per-run database files used to deliver."""
+    """Run dbt against the one PostgreSQL database.
+
+    `db_path` IS GONE from this signature (REQ-PIPE-087). It used to name
+    dbt's own scratch DuckDB file, which existed because dbt writes and
+    DuckDB gives a writer an exclusive lock over the whole file while
+    these calls fan out over a process pool. PostgreSQL has no such
+    contention, so dbt writes into its own schema in the same database
+    and there is no second database to name.
+
+    `run_schema` is unchanged and still load-bearing: it is the view
+    schema this run's sources resolve through, so a bare table name in a
+    model or a checks file means exactly one arrival's rows.
+    """
     env = dict(os.environ)
-    env["DBT_DB_PATH"] = db_path
-    # Absolute, and always set, so profiles.yml never has to guess where
-    # the supply database is - including on a worker whose own database
-    # came from MOTHMAN_SUPPLY_DB.
-    env["DBT_SUPPLY_DB"] = str(supply_db.supply_db_path())
+    # PARSED WITH psycopg's OWN conninfo PARSER, not a regex. dbt-postgres
+    # wants discrete host/port/user/dbname fields and this project holds
+    # one DSN, and the three forms that DSN legitimately takes - a URL, a
+    # keyword string, and a unix socket as `?host=/tmp` - are exactly
+    # where a hand-rolled parser gets one wrong.
+    info = conninfo.conninfo_to_dict(supply_db.supply_db_dsn())
+    env["DBT_PG_HOST"] = info.get("host", "localhost")
+    env["DBT_PG_PORT"] = str(info.get("port", 5432))
+    env["DBT_PG_USER"] = info.get("user", "")
+    env["DBT_PG_PASSWORD"] = info.get("password", "")
+    env["DBT_PG_DBNAME"] = info.get("dbname", "")
+    env["DBT_PG_SCHEMA"] = supply_db.DBT_SCHEMA
     if run_schema:
         env["DBT_RUN_SCHEMA"] = run_schema
     env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"

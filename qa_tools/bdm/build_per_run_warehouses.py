@@ -42,7 +42,7 @@ TABLE = "birth_registrations"
 DATASET_ID = "birth-registrations"
 
 
-def build_one(run_id: str, csv_path: str, run_date: str, db_path: str | None = None,
+def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
               contract_path: str = CONTRACT_PATH, ordinal: int = 0,
               received_at=None, delivery_name: str = "",
               log_dir=None) -> str | None:
@@ -85,7 +85,7 @@ def build_one(run_id: str, csv_path: str, run_date: str, db_path: str | None = N
     key = supply_db.arrival_key(arrival)
     delivery_name = delivery_name or run_id
 
-    conn = supply_db.connect(path=db_path)
+    conn = supply_db.connect(dsn=dsn)
     try:
         supply_db.ensure_schemas(conn)
         rows = None
@@ -102,10 +102,14 @@ def build_one(run_id: str, csv_path: str, run_date: str, db_path: str | None = N
             staging_csv = str(supply_db.staging_csv(physical))
             df.to_csv(staging_csv, index=False)
             try:
-                conn.execute(
-                    f'CREATE OR REPLACE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" AS '
-                    "SELECT * FROM read_csv_auto(?, header=true, nullstr=?)",
-                    [staging_csv, DUCKDB_NULLSTR])
+                # DuckDB reads the file and says what is in it;
+                # PostgreSQL stores it (REQ-PIPE-087). The retired engine
+                # did both in one CREATE TABLE AS, which is why this is
+                # now a call rather than a statement - the inference and
+                # the storage are two engines.
+                supply_db.load_csv_into(
+                    conn, supply_db.STAGING_SCHEMA, physical,
+                    staging_csv, DUCKDB_NULLSTR)
             finally:
                 os.remove(staging_csv)
             # CREATE OR REPLACE on the PHYSICAL name above is not the
@@ -143,7 +147,7 @@ def build_one(run_id: str, csv_path: str, run_date: str, db_path: str | None = N
     return physical
 
 
-def build_all(raw_dir: str = RAW_DIR, db_path: str | None = None,
+def build_all(raw_dir: str = RAW_DIR, dsn: str | None = None,
                deliveries_dir=None, receipts_dir=None) -> list[str]:
     """Stage every recognised arrival.
 
@@ -163,7 +167,7 @@ def build_all(raw_dir: str = RAW_DIR, db_path: str | None = None,
         for ordinal, filename in enumerate(sorted(names), start=1):
             physical = build_one(
                 arrival.run_id, str(arrival.path / filename), run_date,
-                db_path=db_path,
+                dsn=dsn,
                 # AN ORDINAL, NOT THE FILENAME. A supplier's filename
                 # must never reach a SQL identifier - DuckDB's
                 # parameter binding covers values, not identifiers -

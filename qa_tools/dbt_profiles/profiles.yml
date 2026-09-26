@@ -1,20 +1,29 @@
-# Real dbt-duckdb connection profile - no secrets, just a local file path,
-# so this is committed rather than gitignored like a normal profiles.yml
-# with credentials would be.
+# Real dbt-postgres connection profile. Still committed rather than
+# gitignored, and the reason SURVIVED the move off DuckDB even though the
+# old reason ("no secrets, just a local file path") did not: every value
+# is an env_var reference, so the file holds the SHAPE of a connection
+# and none of its content. The password, host and database name arrive
+# from the environment at invocation time.
 #
-# DBT_DB_PATH is dbt's own SCRATCH database for one run, set per
-# invocation by qa_tools/common/dbt_common.py's run_dbt(). dbt writes -
-# its staging models, and the --store-failures audit tables - and
-# DuckDB gives a writer an exclusive lock over the whole file, so
-# pointing dbt at the supply database would stall every parallel reader
-# (REQ-PIPE-068, and the lock behaviour was verified by real experiment
-# rather than taken from docs).
+# Every DBT_PG_* variable is set per invocation by
+# qa_tools/common/dbt_common.py's run_dbt(), which parses them out of
+# MOTHMAN_SUPPLY_DSN with psycopg's own conninfo parser rather than a
+# regex - that handles the URL form, the keyword form, and the
+# unix-socket form (`?host=/tmp`) identically, and a hand-written parser
+# would get one of the three wrong.
 #
-# DBT_SUPPLY_DB is the one supply database, ATTACHed READ-ONLY as
-# `supply`. dbt_project/models/staging/sources.yml resolves the `raw`
-# source through it, into the per-run view schema DBT_RUN_SCHEMA names -
-# so a bare table name in a model means exactly one arrival's rows,
-# which is what the retired per-run database files used to deliver.
+# WHAT IS GONE, and why it is worth knowing if you read the old file:
+# dbt used to be pointed at a small DuckDB scratch file of its OWN, with
+# the supply database ATTACHed read-only, purely because DuckDB gives a
+# writer an exclusive lock over the whole file and these calls fan out
+# over a process pool. PostgreSQL has no such contention, so dbt now
+# writes into its own SCHEMA in the one database - which is what the
+# ATTACH arrangement was imitating (REQ-PIPE-087).
+#
+# DBT_PG_SCHEMA is dbt's own schema, never a supply schema. Named rather
+# than defaulted: dbt would otherwise use `public`, and a dbt model
+# sitting in `public` beside real supply schemas is exactly the
+# ambiguity the four-kinds-of-schema design removes.
 #
 # This one profile is shared by both datasets (one dbt_project/), even
 # though its name ("birth_registrations") predates Child Protection.
@@ -24,10 +33,11 @@ birth_registrations:
   target: dev
   outputs:
     dev:
-      type: duckdb
-      path: "{{ env_var('DBT_DB_PATH') }}"
+      type: postgres
+      host: "{{ env_var('DBT_PG_HOST') }}"
+      port: "{{ env_var('DBT_PG_PORT') | int }}"
+      user: "{{ env_var('DBT_PG_USER') }}"
+      password: "{{ env_var('DBT_PG_PASSWORD', '') }}"
+      dbname: "{{ env_var('DBT_PG_DBNAME') }}"
+      schema: "{{ env_var('DBT_PG_SCHEMA') }}"
       threads: 1
-      attach:
-        - path: "{{ env_var('DBT_SUPPLY_DB') }}"
-          alias: supply
-          read_only: true

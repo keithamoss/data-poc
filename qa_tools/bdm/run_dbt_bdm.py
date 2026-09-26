@@ -247,12 +247,10 @@ def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
 
 
 def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
-    # dbt's own SCRATCH database, not the supply database - see
-    # qa_tools/common/supply_db.py for why the one writer gets a file of
-    # its own and ATTACHes the supply database read-only (REQ-PIPE-068).
-    # Its staging models and --store-failures audit tables land here, and
-    # the connection opened further down reads them from here too.
-    db_path = str(supply_db.dbt_scratch_db(run_id))
+    # No scratch database any more (REQ-PIPE-087): dbt writes its
+    # staging models and its --store-failures audit tables into its own
+    # SCHEMA in the one PostgreSQL database, and the connection opened
+    # further down reads them from there through a search_path.
     # A single `dbt build` (build the model, then run its tests) instead of
     # separate `dbt run` + `dbt test` subprocess calls - dbt-core's fixed
     # per-invocation startup cost (~2.4s just for `dbt --version`, before
@@ -274,7 +272,7 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     # uniqueness for free - the same property the retired
     # data/duckdb_runs/ layout used to give it.
     target_path = str(supply_db.dbt_target_path(run_id))
-    run_dbt(db_path, "build", ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
+    run_dbt("build", ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
             PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
             run_schema=supply_db.run_schema(run_id))
 
@@ -284,9 +282,8 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         run_results = json.load(f)
 
     nodes = test_nodes(manifest)
-    # The supply database comes along READ-ONLY, because dbt's
-    # staging models are views over it - see connect_dbt_scratch().
-    conn = supply_db.connect_dbt_scratch(run_id)
+    # Unqualified names resolve to dbt's own schema - see connect_dbt().
+    conn = supply_db.connect_dbt()
     n_total = conn.execute("SELECT COUNT(*) FROM stg_birth_registrations").fetchone()[0]
 
     results = []

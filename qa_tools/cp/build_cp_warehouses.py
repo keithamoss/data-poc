@@ -34,7 +34,7 @@ CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
 TABLES = [d.table for d in hierarchy.datasets_in_collection("child-protection")]
 
 
-def add_table_to_run(run_id: str, table: str, csv_path: str, db_path: str | None = None,
+def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = None,
                       raw_dir: str = CP_RAW_DIR, contract_path: str = CONTRACT_PATH,
                       ordinal: int = 0, received_at=None, dataset_id: str = "",
                       delivery_name: str = "", log_dir=None) -> str | None:
@@ -88,7 +88,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, db_path: str | None
     delivery_name = delivery_name or run_id
     dataset_id = dataset_id or table
 
-    conn = supply_db.connect(path=db_path)
+    conn = supply_db.connect(dsn=dsn)
     try:
         supply_db.ensure_schemas(conn)
         rows = None
@@ -109,10 +109,14 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, db_path: str | None
             staging_csv = str(supply_db.staging_csv(physical))
             df.to_csv(staging_csv, index=False)
             try:
-                conn.execute(
-                    f'CREATE OR REPLACE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" AS '
-                    "SELECT * FROM read_csv_auto(?, header=true, nullstr=?)",
-                    [staging_csv, DUCKDB_NULLSTR])
+                # DuckDB reads the file and says what is in it;
+                # PostgreSQL stores it (REQ-PIPE-087). The retired engine
+                # did both in one CREATE TABLE AS, which is why this is
+                # now a call rather than a statement - the inference and
+                # the storage are two engines.
+                supply_db.load_csv_into(
+                    conn, supply_db.STAGING_SCHEMA, physical,
+                    staging_csv, DUCKDB_NULLSTR)
             finally:
                 os.remove(staging_csv)
             rows = len(df)
@@ -139,7 +143,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, db_path: str | None
     return physical
 
 
-def build_all(raw_dir: str = CP_RAW_DIR, db_path: str | None = None,
+def build_all(raw_dir: str = CP_RAW_DIR, dsn: str | None = None,
                deliveries_dir=None, receipts_dir=None) -> list[str]:
     """Stage every recognised arrival - see the BDM counterpart for why
     `raw_dir` is kept but no longer read."""
@@ -175,7 +179,7 @@ def build_all(raw_dir: str = CP_RAW_DIR, db_path: str | None = None,
                 # ours.
                 if add_table_to_run(
                         run_id, table, os.path.join(str(arrival.path), filename),
-                        db_path=db_path, raw_dir=raw_dir,
+                        dsn=dsn, raw_dir=raw_dir,
                         ordinal=ordinal if len(filenames) > 1 else 0,
                         received_at=arrival.received_at, dataset_id=dataset_id,
                         delivery_name=arrival.delivery_name) is not None:

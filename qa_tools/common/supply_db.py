@@ -248,6 +248,135 @@ def connect(read_only: bool = False, dsn: str | None = None) -> SupplyConnection
     return SupplyConnection(raw)
 
 
+# ---------------------------------------------------------------------------
+# Reading what arrives - DuckDB's one remaining job (REQ-PIPE-087)
+#
+# A supplier sends a file. DuckDB reads it and says what is in it;
+# PostgreSQL stores it. That split is the whole of DuckDB's role now, and
+# it is kept rather than replaced for a specific reason: `read_csv_auto`
+# with an explicit `nullstr` is what already decides what an empty cell
+# means in this project, and csv_io.py owns that decision after a real
+# bug where "N/A" became NULL. Reading the CSV with pandas and inserting
+# the frame would quietly move that decision somewhere else.
+#
+# ROWS STREAM OVER THE CONNECTION, never a server-side file read
+# (criterion 6). `COPY ... FROM '<path>'` is refused to a non-superuser
+# by PostgreSQL - measured, not assumed - and would in any case require
+# the database to share a filesystem with whatever staged the file, which
+# is false the moment this runs against Aurora.
+# ---------------------------------------------------------------------------
+
+#: DuckDB's inferred types to PostgreSQL's. Most names agree, which is
+#: why this map is short - it holds the ones that do NOT, and anything
+#: absent is passed through unchanged so a type this has never seen
+#: fails loudly in PostgreSQL rather than being silently coerced to text.
+_PG_TYPE = {
+    "DOUBLE": "double precision",
+    "FLOAT": "real",
+    "HUGEINT": "numeric",
+    "UHUGEINT": "numeric",
+    "UBIGINT": "numeric",
+    "UINTEGER": "bigint",
+    "USMALLINT": "integer",
+    "UTINYINT": "smallint",
+    "TINYINT": "smallint",
+    "BLOB": "bytea",
+    "TIMESTAMP_NS": "timestamp",
+    "TIMESTAMP WITH TIME ZONE": "timestamptz",
+}
+
+#: How many rows to pull from DuckDB at a time while streaming. Large
+#: enough that the per-batch overhead disappears, small enough that a
+#: population-scale file does not have to fit in memory - this project's
+#: own synthetic_data_generator produces millions of rows.
+_COPY_BATCH = 10_000
+
+
+def _pg_type(duck_type: str) -> str:
+    upper = duck_type.upper()
+    if upper.startswith("DECIMAL"):
+        return upper.replace("DECIMAL", "numeric")
+    return _PG_TYPE.get(upper, duck_type)
+
+
+def load_csv_into(conn: SupplyConnection, schema: str, table: str,
+                  csv_path: str | os.PathLike, nullstr: str) -> int:
+    """Read a CSV with DuckDB and land it in PostgreSQL. Returns the row count.
+
+    REPLACES WHAT IS THERE, which is not the overwrite this design
+    forbids: the physical name carries the arrival, so replacing it
+    re-loads the same arrival rather than losing an earlier one. That is
+    REQ-PIPE-060 criterion 15 - what is already present is replaced
+    rather than trusted, because a table with no load record is unloaded
+    whatever the catalogue says.
+
+    NO PARTIAL TABLE SURVIVES A FAILURE. The create and the copy run
+    inside one transaction, so a file that turns out to be malformed
+    half way through leaves nothing behind rather than a truncated table
+    - which criterion 5 requires and which the retired engine got for
+    free from `CREATE TABLE AS SELECT` being one statement.
+    """
+    import duckdb  # the one place this project still needs it
+
+    _ident(table, "table name")
+    duck = duckdb.connect(":memory:")
+    try:
+        # CTAS INTO A TEMP TABLE, not a view, and not for tidiness:
+        # DuckDB refuses a prepared parameter in CREATE VIEW ("Unexpected
+        # prepared parameter. This type of statement can't be prepared!")
+        # while accepting one in CREATE TABLE AS - which is the form the
+        # retired code used, so this keeps a proven call shape rather
+        # than interpolating a path into SQL.
+        duck.execute(
+            "CREATE TEMP TABLE arriving AS "
+            "SELECT * FROM read_csv_auto(?, header=true, nullstr=?)",
+            [str(csv_path), nullstr])
+        columns = [(name, _pg_type(dtype)) for name, dtype, *_ in
+                   duck.execute("DESCRIBE arriving").fetchall()]
+        if not columns:
+            raise SupplyDbError(f"{csv_path} produced no columns")
+        ddl = ", ".join(f'"{name}" {dtype}' for name, dtype in columns)
+
+        raw = conn.raw
+        with raw.transaction():
+            raw.execute(f'DROP TABLE IF EXISTS "{schema}"."{table}"')
+            raw.execute(f'CREATE TABLE "{schema}"."{table}" ({ddl})')
+            result = duck.execute("SELECT * FROM arriving")
+            copied = 0
+            with raw.cursor() as cur:
+                with cur.copy(f'COPY "{schema}"."{table}" FROM STDIN') as copy:
+                    while True:
+                        batch = result.fetchmany(_COPY_BATCH)
+                        if not batch:
+                            break
+                        for row in batch:
+                            copy.write_row(row)
+                        copied += len(batch)
+        return copied
+    finally:
+        duck.close()
+
+
+def connect_dbt(read_only: bool = True) -> SupplyConnection:
+    """A connection whose UNQUALIFIED names are dbt's own models.
+
+    Replaces the retired connect_dbt_scratch(), and keeps the one
+    property its callers actually relied on: `SELECT ... FROM
+    stg_birth_registrations` resolves without qualification. It got that
+    from opening dbt's own scratch database; it gets it here from a
+    search_path, which is the same idea with one fewer database in it.
+
+    STILL READ-ONLY BY DEFAULT for the same reason as before - the caller
+    is reading dbt's output to evaluate it, and a reader that can write
+    is a reader that can corrupt what it is measuring.
+    """
+    conn = connect(read_only=read_only)
+    # SET is allowed inside a read-only session; it changes name
+    # resolution, not data.
+    conn.raw.execute(f'SET search_path TO "{DBT_SCHEMA}", public')
+    return conn
+
+
 def _redact(dsn: str) -> str:
     """A DSN in an error message, without its password.
 

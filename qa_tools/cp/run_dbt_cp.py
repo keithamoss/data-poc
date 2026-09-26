@@ -211,9 +211,9 @@ def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
 
 
 def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
-    # dbt's own SCRATCH database - see the BDM counterpart and
-    # qa_tools/common/supply_db.py (REQ-PIPE-068).
-    db_path = str(supply_db.dbt_scratch_db(run_id))
+    # No scratch database any more (REQ-PIPE-087) - see the BDM
+    # counterpart and qa_tools/common/supply_db.py. dbt writes into its
+    # own schema in the one PostgreSQL database.
     # A single `dbt build` (build the 6 models, then run their tests)
     # instead of separate `dbt run` + `dbt test` calls - dbt-core's fixed
     # per-invocation startup cost was being paid twice per run for no
@@ -228,7 +228,7 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # DBT_PROJECT_DIR/target/, for real parallel-test safety
     # (plans/running-thoughts.md #12).
     target_path = str(supply_db.dbt_target_path(run_id))
-    run_dbt(db_path, "build", CP_MODELS + CP_SINGULAR_TESTS, target_path, PROFILES_DIR,
+    run_dbt("build", CP_MODELS + CP_SINGULAR_TESTS, target_path, PROFILES_DIR,
             DBT_PROJECT_DIR, ROOT, run_schema=supply_db.run_schema(run_id))
 
     with open(os.path.join(target_path, "manifest.json")) as f:
@@ -242,9 +242,8 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # the tool actually ran).
     nodes = test_nodes(manifest)
 
-    # The supply database comes along READ-ONLY, because dbt's
-    # staging models are views over it - see connect_dbt_scratch().
-    conn = supply_db.connect_dbt_scratch(run_id)
+    # Unqualified names resolve to dbt's own schema - see connect_dbt().
+    conn = supply_db.connect_dbt()
     n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM stg_{t}").fetchone()[0] for t in cp_common.TABLES}
 
     results = []

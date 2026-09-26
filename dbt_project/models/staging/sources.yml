@@ -17,7 +17,14 @@ sources:
     # A logical name has a view only where exactly one staged table
     # claims it, so a duplicated or missing supply is ABSENT here
     # rather than silently resolving to whichever version sorted first.
-    database: supply
+    #
+    # NO `database:` KEY ANY MORE (REQ-PIPE-087). It used to say
+    # `supply`, naming the DuckDB database ATTACHed under that alias.
+    # There is one PostgreSQL database now and dbt connects straight to
+    # it, so the source resolves inside the profile's own dbname -
+    # leaving the key in, pointing at an alias that no longer exists,
+    # would fail with a message about a missing database rather than
+    # about a stale config.
     schema: "{{ env_var('DBT_RUN_SCHEMA') }}"
     description: >
       Runs loaded straight from the generator's CSVs, tagged with
