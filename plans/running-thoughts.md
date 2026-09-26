@@ -2981,15 +2981,39 @@ Belongs with batch 5's check work.
          a period, which is why trying to express it as a period-level
          reason code kept feeling wrong.
 
-         **AND IT COLLAPSES WITH SOMETHING ALREADY EXPECTED.**
-         `CLAUDE.md` names a coming fourth asset shape - "QA of one-off
-         data extractions for individual projects, which has supplies
-         but no cadence at all". A pre-agreement dataset has exactly
-         that shape: supplies, no cadence. So this is not a new concept
-         to invent, it is the same one appearing in a different guise,
-         and whatever serves one should serve both. `plans/
-         running-thoughts.md` #23/#29 (the file-per-dataset shape,
-         triggered by adding more datasets) is the adjacent piece.
+         **IT IS NOT THE SAME AS ONE-OFF EXTRACTIONS - this session
+         collapsed the two and Keith corrected it.** The claim was that
+         a pre-agreement dataset and `CLAUDE.md`'s coming fourth asset
+         shape ("QA of one-off data extractions for individual projects,
+         which has supplies but no cadence at all") were one concept in
+         two guises. **"Supplies but no cadence" is true of both and is
+         a SURFACE feature; it is not what distinguishes them.** Keith's
+         own distinction:
+
+         | | Sample / pre-agreement | One-off extraction |
+         |---|---|---|
+         | Where the data lives | a `sample` schema IN THE WAREHOUSE | pointed at ON DISK |
+         | Has a future | graduates into a real dataset | done once, never graduates |
+         | What the QA is for | developing the checks | a verdict on the artifact |
+
+         **AND THE `sample` SCHEMA EARNS ITS PLACE FOR A REASON BEYOND
+         STORAGE: it makes "do not factor this into anything"
+         STRUCTURAL rather than a flag.** Nothing in the period
+         machinery looks at `sample`, so no rollup, status calculation
+         or lateness check has to remember to skip it - exclusion holds
+         by construction. Same reasoning as `qa_results/`'s reserved
+         `_raw`/`_cross-table` scopes and as `delivery_boundary`
+         refusing to default: build the guarantee into the shape rather
+         than leaving a rule to hold in mind. It also means the
+         warehouse has FOUR kinds of schema, not three - `staging`,
+         `rejected`, the period schemas, and `sample`.
+
+         **ONE ECHO TO SETTLE, not decided: does sample-data QA write to
+         `qa_results/`?** It is the same tension as this evening's
+         rehearsal-run decision, where a rehearsal is NOT offered the
+         save because `qa_results/` is what the dashboard publishes. A
+         record of check development may well be worth keeping, and it
+         must not appear in any rollup.
 
          **THE PRECEDENT KEITH NAMED IS REAL AND WORTH COPYING.**
          `contract/people.yaml` already carries `placeholder: true` for
