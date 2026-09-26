@@ -3700,27 +3700,48 @@ Belongs with batch 5's check work.
     re-indenting four long function bodies under `with`, which is not a
     4am change - it is small, real, and should be its own commit.
 
-48. **[todo, 2026-09-27]** **[Testing & dev tooling]** Keith: a real command that takes a fresh checkout to a populated, QA'd warehouse.
+48. **[done, 2026-09-27]** **[Testing & dev tooling]** A real command that takes a fresh checkout to a populated, QA'd warehouse - plus the SessionStart hook that was `plans/tooling.md` #11.
 
-    His words: "when we start a new Claude code session, or indeed when
-    a human checks out the repository and starts a new dev container or
-    uses it locally, we have a way to generate the synth data and run a
-    command to populate the warehouse with something with QA checks -
-    the stuff we're doing now through tests, but doing it at startup or
-    when a human chooses to run a command, via the TUI."
+    Keith: "we have a way to generate the synth data and run a command
+    to populate the warehouse with something with QA checks - the stuff
+    we're doing now through tests, but doing it at startup or when a
+    human chooses to run a command, via the TUI." Both entry points,
+    one implementation, and he chose that shape explicitly.
 
-    Today a fresh checkout has an empty database and the only thing that
-    puts real rows in it is the test suite, as a side effect. That is
-    backwards: the tests should exercise the same path a person uses,
-    not BE the path.
+    `qa_tools/common/bootstrap.py` is the implementation;
+    `mothman pipeline bootstrap` and the TUI's own main-menu entry both
+    call it. It lives in `qa_tools/common/` rather than `cli/` so the
+    startup path and the human path cannot drift.
 
-    Two entry points for one piece of work, and they should share an
-    implementation rather than drift: a `mothman` command a human runs
-    (and reaches from the TUI), and something that runs at session or
-    dev-container start. Related: `plans/tooling.md` #11 already scopes
-    a `.claude/settings.json` SessionStart hook for the other setup
-    steps, and this belongs with it rather than beside it.
+    **Idempotent by asking the DATABASE, not a marker file.** A marker
+    survives a database that was dropped, and then the one command whose
+    job is to guarantee data is the one confidently doing nothing. A
+    second run takes 1.7 seconds and says how many staged tables it
+    found, with `--force` named in the message so the next person does
+    not work it out by hand. Verified against a genuinely empty
+    database: populated 43 staged tables and 3,359 real check results
+    from nothing.
 
-    Worth deciding when it is built: whether "populate" is idempotent
-    and cheap enough to run unconditionally at startup, or whether it
-    detects an already-populated database and does nothing.
+    **The hook does NOT populate, and that is the judgement call.**
+    Bootstrap takes minutes over both collections; a session start that
+    blocks that long is one people disable, and then none of the rest of
+    the setup runs either. So `.claude/hooks/session-start.sh` makes the
+    environment ready in a few seconds and REPORTS whether there is data,
+    naming the command. It covers dbt_utils, node modules, Chromium, and
+    the two DSNs via `$CLAUDE_ENV_FILE`.
+
+    **It also fixes the thing that actually kept biting.** PostgreSQL is
+    the one item on that list that is a SERVER rather than a build
+    artifact, and it does not survive the container - this session
+    restarted it three times, and the first time the ROLE was gone too,
+    which PostgreSQL reports as "password authentication failed". The
+    hook starts the cluster and creates the role and database if they
+    are missing.
+
+    Still open, and deliberately not done here: whether CI should call
+    bootstrap. Under Keith's 2026-09-27 rule GitHub Actions never reaches
+    a database, and once the dashboard build moves out of Actions the
+    only database CI needs is the per-worker one `conftest.py` already
+    creates - so there may be nothing for bootstrap to do there. Worth
+    confirming when the publishing move lands rather than wiring it
+    speculatively.

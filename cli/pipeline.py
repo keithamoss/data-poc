@@ -190,3 +190,36 @@ def regenerate_history_command(collection: str, sequential: bool, yes: bool) -> 
                 f"dataset nor a reserved name: {', '.join(strays)}")
 
     console.print("Committed history regenerated under the per-dataset model.", style="green")
+
+
+@pipeline_group.command("bootstrap")
+@click.option("--collection", type=click.Choice(["bdm", "cp", "all"]), default="all",
+              help="Which collection to populate - bdm = civil-registration, "
+                   "cp = child-protection. Default: both.")
+@click.option("--force", is_flag=True,
+              help="Rebuild even if this environment already holds staged supplies. "
+                   "Safe - the pipeline is seeded and deterministic - just not free.")
+@click.option("--sequential", is_flag=True,
+              help="Run the checks one at a time instead of in parallel.")
+def bootstrap_command(collection: str, force: bool, sequential: bool) -> None:
+    """Take an empty environment to one with data and QA results in it.
+
+    Run this after cloning, on a fresh dev container, or whenever a
+    database has been dropped. It is IDEMPOTENT: if this environment
+    already holds staged supplies it does nothing and says so, so it
+    is safe to run unconditionally at startup.
+
+    The same function backs the TUI's own menu entry and CI's
+    populate-a-throwaway-database step, so none of the three can drift
+    from the others.
+    """
+    from qa_tools.common.bootstrap import bootstrap
+
+    result = bootstrap(collection=collection, force=force, sequential=sequential,
+                        on_step=lambda msg: console.print(f"{msg}...", style="dim"))
+    if not result.populated:
+        console.print(result.reason, style="yellow")
+        return
+    console.print(
+        f"Populated: {result.staged_after} staged table(s) in this environment.",
+        style="green")

@@ -1187,7 +1187,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     rather than guard it, so a test would document a hack that no longer
     exists. The autouse fixture is itself the standing guarantee.
 
-11. **[todo, 2026-09-19]** **[Testing & dev tooling]** A real
+11. **[done, 2026-09-27]** **[Testing & dev tooling]** A real
     `.claude/settings.json` with a SessionStart hook, so a fresh session
     doesn't start from a half-configured sandbox. Keith's own ask,
     2026-09-19, after watching this session rediscover the same three
@@ -1234,6 +1234,22 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     the documentation half (read and run setup BEFORE running the
     suite, rather than diagnosing failures backwards) landed as its own
     `CLAUDE.md` convention bullet the same day, at Keith's explicit ask.
+
+
+    **BUILT 2026-09-27**, as `.claude/hooks/session-start.sh` plus a
+    real `.claude/settings.json`. It covers the three artifacts above
+    and a FOURTH this item predates: a running PostgreSQL, with its role
+    and database created if missing. That one is not a build artifact
+    but a server, it does not survive the container, and its absence
+    reports as "password authentication failed" rather than as anything
+    about a missing role - this session restarted it three times before
+    the hook existed.
+
+    It deliberately does NOT populate the warehouse. `mothman pipeline
+    bootstrap` (plans/running-thoughts.md #48) takes minutes, and a
+    session start that blocks that long is one people disable - so the
+    hook reports whether there is data and names the command instead.
+    Synchronous rather than async for now, so nothing races it.
 
 12. **[todo, 2026-09-19]** **[Testing & dev tooling]**
     **Priority: HIGH - to FIX, not just to record (2026-09-19, Keith's own

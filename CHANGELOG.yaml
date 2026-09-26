@@ -163,6 +163,23 @@ releases:
               more, so setting this up means pointing it at a real
               server. The README says how, including one trap worth
               knowing: the database needs a password even locally.
+      - category: New
+        items:
+          - headline: One command to set up a fresh checkout
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman pipeline bootstrap` generates the synthetic data
+              and runs every check over it, so a new clone has something
+              to look at. Run it as often as you like - if there is
+              already data there it says so and stops. It is on the
+              mothman menu too.
+          - headline: A new session sets itself up
+            components: ["Testing & dev tooling"]
+            description: >
+              Starting a session now starts the database, creates its
+              login if missing, installs what the tests need, and tells
+              you whether the warehouse has anything in it. Previously
+              you found all of that out from failing tests.
       - category: Improved
         items:
           - headline: Schema names you can actually read
