@@ -13174,3 +13174,817 @@ requirements:
         with the supply, the dashboard's JS never recomputes
         classification, so the duplicated-logic surface shrinks rather
         than grows.
+
+  - id: REQ-PIPE-081
+    title: "\"As at T\" is answered from filing events, so a later decision cannot silently rewrite an earlier view"
+    date_written: "2026-09-26"
+    story: >
+      As manager of the data team, asked in September what we held as at
+      30 June, I want that answer worked out from the decisions we
+      actually made and when we made them, so that a correction in
+      August changes the June answer only where it genuinely should -
+      and whoever asks can see which decision changed it.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-26, batch 4 scoping input (b): "we're going to have
+      to work out how demotion fits in and keeps as-at-T stable." Thread
+      B names the tension and nobody resolved it; Thread H wrinkle 1
+      corrected the underlying rule and Thread K settled the as-
+      corrected default. Scoped by delivery-scoper, batch 4, 2026-09-26.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL answer "as at T" with the supply most recently
+        PROMOTED into that slot on or before T, and SHALL NOT answer it
+        with the supply that most recently ARRIVED on or before T.
+      - >
+        THE SYSTEM SHALL treat a supply demoted, rejected or re-filed
+        out of a slot on or before T as not occupying that slot at T.
+      - >
+        THE SYSTEM SHALL derive every "as at T" answer from the decision
+        log alone, and SHALL NOT derive it from the warehouse's current
+        contents.
+      - >
+        THE SYSTEM SHALL record, on every filing entry, both the instant
+        the decision took effect and the instant it was recorded, so
+        that the filing state as understood at any earlier instant
+        remains computable.
+      - >
+        THE SYSTEM SHALL present the as-corrected view by default.
+      - >
+        WHERE a decision has changed what an earlier date now shows, THE
+        SYSTEM SHALL say so and SHALL name the decision that changed it.
+      - >
+        THE SYSTEM SHALL NOT treat a slot as claimable again because a
+        later decision emptied it.
+      - >
+        THE SYSTEM SHALL stop filtering the as-of view on a run's
+        arrival date.
+      - >
+        WHEN a supply is demoted, THE SYSTEM SHALL return its physical
+        table to the staging schema, so that a period schema holds
+        exactly the supplies currently promoted into it and nothing
+        else.
+      - >
+        THE SYSTEM SHALL perform that move and its decision-log entry
+        such that neither can be observed without the other, and SHALL
+        NOT leave the table present in both schemas or in neither.
+      - >
+        THE SYSTEM SHALL answer "as at T" for the dashboard's readers,
+        and SHALL NOT claim to answer it for a consumer querying a
+        period schema directly in SQL.
+      - >
+        THE SYSTEM SHALL record, at the point a run holds a live
+        warehouse connection, which physical tables each period schema
+        actually holds, and SHALL commit that census to history
+        alongside that run's results.
+      - >
+        THE SYSTEM SHALL check each "as at T" answer against that
+        committed census, and SHALL NOT read the warehouse to do so.
+      - >
+        IF the decision log names a physical table the census does not
+        hold, THEN THE SYSTEM SHALL report it prominently to a reader of
+        the dashboard, naming the period and the table, and SHALL still
+        publish.
+      - >
+        THE SYSTEM SHALL raise that same disagreement as a build WARNING
+        that does not fail the build.
+      - >
+        WHERE the warehouse supports moving a table between schemas as a
+        catalogue operation, THE SYSTEM SHALL use it, and SHALL fall
+        back to copying the table and dropping the original only where
+        it does not.
+      - >
+        THE SYSTEM SHALL determine which of those two it can use from a
+        declared capability of the warehouse it is connected to, and
+        SHALL NOT determine it by attempting the catalogue operation and
+        treating any failure as absence of support.
+      - >
+        THE SYSTEM SHALL produce the same observable outcome by either
+        route - the table present in exactly one schema, and the
+        decision recorded - so that nothing downstream can tell which
+        was used.
+    non_functional_requirements:
+      - >
+        Cost of the replay: this is a fold over one dataset's decision
+        log, and it is evaluated on every dashboard build and
+        potentially on every as-of change in the browser. Per-dataset
+        layout and an events-since-last-state shape keep it linear in
+        that dataset's own history rather than the asset's.
+      - >
+        The log is the only thing that can answer this, so its
+        durability IS this requirement's durability. It must be
+        committed, and the dashboard build must reach it without
+        touching data/.
+      - >
+        Verify with a real sequence, not a unit: promote, demote, re-
+        promote a different supply, then ask the same as-at date three
+        times across the sequence and assert the three answers. A
+        single-event test passes against an implementation that reads
+        only the latest event.
+      - >
+        This is the requirement most likely to be quietly wrong in a way
+        nobody notices for months, because a wrong answer looks like a
+        plausible answer. It deserves a property-style test over
+        generated event sequences rather than only worked examples.
+    dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-DASH-041]
+    decisions:
+      - >
+        Decided the composition rule was WRONG as originally written and
+        is corrected here (Thread H wrinkle 1). Thread A said "as at T:
+        the latest version whose ARRIVAL is <= T", described as
+        transaction time; it is not, and two different timestamps were
+        conflated. The worked example: a supply arrives Monday, is
+        rejected, and is promoted Friday as the best available - asking
+        "as at Wednesday" under the old rule includes it, when on
+        Wednesday it was sitting rejected in staging. The view showed
+        data that was not there.
+      - >
+        Decided the live dashboard defaults to AS-CORRECTED (Thread K,
+        2026-09-21). The deciding argument: this design spent a whole
+        session eliminating cases where the system says something
+        untrue, and as-published deliberately preserves a falsehood
+        already identified and fixed.
+      - >
+        Decided the AS-PUBLISHED view is the SNAPSHOT archive rather
+        than a toggle. dashboard/snapshots/*.html.gz is already a
+        frozen, self-contained copy openable years later, immutable in a
+        way a recomputed view can never be, and it needs no new
+        mechanism.
+      - >
+        Decided "stable" cannot mean "the answer never changes", because
+        the as-corrected default deliberately changes it. THE SCOPER'S
+        OWN READING, and the thing Keith should react to: stable means
+        DETERMINISTIC AND ACCOUNTED FOR - the answer is a pure function
+        of the log, it moves only when a new decision is recorded, and
+        the log names which decision moved it. Reproducing the answer as
+        it would have been computed at a past instant is a different
+        property, which the two timestamps make POSSIBLE without this
+        requirement building it.
+      - >
+        Decided, consequently, that this requirement records what a
+        reconstruction path would need and does not build one. Whether
+        to build it at all is already deferred to batch 6 by Keith's own
+        call, 2026-09-22 - "let's settle that when we get to batch six"
+        - on the grounds that snapshots already answer the question.
+      - >
+        REVERSED 2026-09-26 (Keith): A DEMOTED SUPPLY'S PHYSICAL TABLE
+        RETURNS TO STAGING. The scoper had decided it stays in the
+        period schema, with demotion expressed as a change of what the
+        period resolves to, on two grounds - that period schemas already
+        hold several versions and pick the newest, so it costs nothing
+        structurally, and that it is what keeps a warehouse-side "as at
+        T" answerable. Keith's position is the simpler invariant: THE
+        DATABASE SHOULD MATCH THE AGREED STATE 1:1, so a period schema
+        holds exactly what is promoted into it. BOTH ARGUMENTS AGAINST
+        THE MOVE WERE TESTED AND FAILED. This session argued a physical
+        move can fail halfway; Keith pointed out transactions, and he is
+        right twice over - PostgreSQL's ALTER TABLE ... SET SCHEMA is a
+        catalog-only operation that does not rewrite data at all, and
+        DuckDB, which cannot do SET SCHEMA (verified: "Not implemented
+        Error: T_AlterObjectSchemaStmt", 1.5.5), has transactional DDL,
+        so CREATE TABLE AS plus DROP inside one transaction is atomic -
+        verified by rolling one back and seeing the source table intact.
+        This session also argued a move makes physical location a SECOND
+        SOURCE OF TRUTH that can disagree with the log; that does not
+        hold either, because the REQ-PIPE-034 defect it was drawn from
+        was a derivation READING the catalogue as the source, not the
+        catalogue being MAINTAINED to match it. Nothing derives a
+        decision from the catalogue, so the warehouse is a projection
+        rather than an authority - and Keith's own census check, added
+        to this requirement the same afternoon, is precisely what
+        detects the projection drifting. WHAT IT COSTS, recorded rather
+        than waved past. A warehouse-side "as at T" becomes permanently
+        IMPOSSIBLE rather than merely unbuilt - the data is no longer
+        there to resolve against - which is acceptable only because that
+        scope was explicitly declined the same day. And on DuckDB the
+        move is O(rows) under a single-writer lock (REQ-PIPE-068), so
+        demoting a large table stalls other writers for its duration,
+        where on PostgreSQL it is instant. Demotion is rare and human-
+        initiated, so this is a note for whoever builds it - keep the
+        move in its own transaction rather than inside a longer one -
+        rather than a reason not to do it.
+      - >
+        Decided claimability uses an EVER-FILLED high-water mark rather
+        than current fill state. THE SCOPER'S OWN CALL, from a gap found
+        while scoping: monotonic filling says a slot stops being
+        claimable once a LATER slot has been filled, and if that is
+        evaluated against CURRENT state then demoting the later slot
+        makes the earlier one claimable again - reopening the exact
+        cascade the monotonic rule exists to close, by a path nobody
+        designed. Recorded as a rule rather than left to the
+        implementation to settle.
+      - >
+        Rejected same-day granularity as a requirement here. With as-of
+        meaning end of day, a supply promoted 14:00 and demoted 22:00
+        shows only its final state; that was accepted 2026-09-22 because
+        snapshots cover it, and a time element on the as-of control is
+        already its own sprint.
+      - >
+        "AS AT T" IS DELIVERED FOR THE DASHBOARD ONLY, AND THE WAREHOUSE
+        SIDE IS STATED AS OUT OF SCOPE RATHER THAN OMITTED (Keith,
+        2026-09-26). There are two consumers and the threads only ever
+        discuss one. The dashboard reads committed history and is
+        answered here. A downstream analyst querying a period schema in
+        SQL reads whatever that period currently holds, and nothing
+        resolves it as at a past instant - so "reproduce last June's
+        extract" is delivered for the dashboard and not for SQL. AMENDED
+        LATER THE SAME AFTERNOON, and the amendment matters: when this
+        was first written it said the warehouse answer remained
+        POSSIBLE, because a demoted supply's table stayed in its period
+        schema. Keith then reversed that - demotion now returns the
+        table to staging - so the warehouse-side answer is FORECLOSED
+        rather than merely unbuilt. The data is no longer there to
+        resolve against. That is a real consequence of an invariant he
+        chose deliberately, not an oversight, and it is written here so
+        nobody later reads the earlier framing and assumes the option
+        survives. Recorded as a stated limit because sprint 25's own
+        framing says this whole area is FOR downstream consumers, which
+        makes the omission the kind that reads as an oversight later.
+        Rejected extending this requirement to cover the warehouse,
+        which needs a time-travel mechanism over period schemas and is
+        real work of its own; rejected raising it as a separate
+        requirement now, since nothing in this batch depends on it.
+      - >
+        BOTH INSTANTS STAY ON EVERY ENTRY, AND NOTHING READS THE SECOND
+        ONE YET (Keith, 2026-09-26, after being shown that his first
+        answer here - one instant is enough - contradicted REQ-PIPE-074
+        criterion 2, which he had signed two hours earlier and which
+        requires both). The distinction that settled it: the as-
+        corrected view this requirement builds needs only one instant,
+        so the second is not machinery, it is INSURANCE. What it buys is
+        the bitemporal reconstruction - "what would 30 June have said,
+        as we understood it in July?" - which Keith deferred to batch 6
+        and which would need a migration to add later if the field were
+        dropped now. So REQ-PIPE-074 stands unamended and this
+        requirement records why a field it never reads is nonetheless
+        required. Rejected amending 074 to one instant, and rejected
+        keeping both while forbidding them to differ, which adds a rule
+        to enforce for a case nothing can currently produce.
+      - >
+        THE LOG'S ANSWER IS CHECKED AGAINST THE WAREHOUSE, VIA A
+        COMMITTED CENSUS (Keith, 2026-09-26, his own proposal). The log
+        is authoritative for WHICH table a period resolves to, and
+        nothing verifies that the table is still there - so a table
+        dropped by a botched migration, a schema rebuilt from a stale
+        backup or a manual clean-up would leave the log confidently
+        naming it and every as-at answer quietly wrong, which is
+        precisely the "wrong in a way nobody notices for months" failure
+        this requirement's own NFR warns about. Keith reasoned to the
+        shape himself, including the constraint that made it non-
+        obvious: the dashboard never talks to the warehouse, so the
+        census has to be embedded. That is this project's established
+        pattern rather than a new one - the same rule that produced
+        dataset_stats.json, where anything needing a live connection is
+        computed once by whichever orchestrator already holds one and
+        committed to history. THIS DOES NOT CONTRADICT CRITERION 3: that
+        forbids DERIVING the answer from the warehouse's contents, and
+        this VERIFIES an answer the log derived. Note the near
+        neighbour: REQ-PIPE-068 criterion 5 records which physical table
+        each RUN read, which is per-run provenance and cannot answer a
+        per-period census.
+      - >
+        A MISMATCH IS SHOUTED ON THE PAGE AND WARNS IN CI, RATHER THAN
+        FAILING THE BUILD (Keith, 2026-09-26, and he found the flaw in
+        the option first offered him). The version proposed was "a
+        visible error on the dashboard AND a failure in the build", and
+        his question - how would that work when a failed build means the
+        dashboard is not built - is fatal to it. deploy-pages.yml
+        builds, gates, then deploys; a failed gate means no deploy, so
+        the PREVIOUSLY published page stays up unchanged, still serving
+        as-at answers from a log that names a missing table, with no
+        warning on it. Failing the build makes the problem LESS visible
+        to the people who would act on it. The two goals separate
+        cleanly - readers need the page to say something, which requires
+        deploying; the team needs a signal, which is what a gate is for
+        - and the WARNING_EXIT channel already in `mothman check` does
+        both, as it does for the stale-deferral report added the same
+        day. Rejected deploying and failing CI anyway, which leaves a
+        red run nothing in the repo can clear until the warehouse is
+        fixed; rejected suppressing the affected answers, which removes
+        information that is mostly still correct.
+      - >
+        THE SCHEMA MOVE USES THE CATALOGUE OPERATION WHERE IT EXISTS AND
+        A COPY WHERE IT DOES NOT (Keith, 2026-09-26), because the cost
+        of demotion differs by an order of magnitude between the two
+        engines this has to support. PostgreSQL's ALTER TABLE ... SET
+        SCHEMA is catalogue-only - it moves indexes, constraints and
+        owned sequences with the table and does not rewrite data - so a
+        demotion is instant whatever the table's size. DuckDB does not
+        implement it at all (verified 2026-09-26 against 1.5.5: "Not
+        implemented Error: T_AlterObjectSchemaStmt", and ALTER TABLE ...
+        RENAME TO a schema-qualified name is a parser error), so there
+        the move is CREATE TABLE AS plus DROP - O(rows), under DuckDB's
+        single-writer lock. THE CAPABILITY IS DECLARED, NOT DISCOVERED
+        BY TRYING. Attempting the catalogue operation and treating any
+        failure as "not supported" would swallow a genuine error - a
+        permissions failure, a name collision, a lock timeout - and
+        silently do something slower and different instead, which is
+        this project's own no-permissive-fallback stance and the same
+        shape as the silent drops CLAUDE.md records elsewhere. The
+        warehouse adapter states what it can do; an unknown warehouse is
+        a failure rather than a default, exactly as delivery_boundary.py
+        treats a source that states nothing. Both routes must be
+        indistinguishable downstream, which is what keeps this an
+        optimisation rather than two behaviours.
+
+  - id: REQ-GHUB-082
+    title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
+    date_written: "2026-09-26"
+    story: >
+      As an operator deciding what goes into a quarter, I want to
+      promote, reject, demote or re-file from the GitHub ticket I am
+      already working, and from the terminal when I am already there, so
+      that a decision is a comment rather than a deployment and neither
+      route can do something the other cannot.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-26, batch 4 scoping input (a), correcting Thread
+      B's own earlier framing: "GitHub is the primary operator surface,
+      the TUI is the second route." Thread G settled GitHub Issues as
+      the write path 2026-09-22. Scoped by delivery-scoper, batch 4,
+      2026-09-26.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL accept promote, reject, demote and re-file as
+        structured decisions raised on a dataset's own GitHub ticket.
+      - >
+        THE SYSTEM SHALL offer those same four operations in the mothman
+        TUI.
+      - >
+        THE SYSTEM SHALL write an identical decision-log entry whichever
+        route raised the decision, and SHALL NOT give either route an
+        operation the other lacks.
+      - >
+        THE SYSTEM SHALL take the actor from the authenticated author of
+        a GitHub-raised decision, and SHALL NOT accept an actor stated
+        in the body of that input.
+      - >
+        IF the person raising a decision cannot be identified, THEN THE
+        SYSTEM SHALL refuse it and SHALL say so on the ticket.
+      - >
+        THE SYSTEM SHALL treat GitHub as the input channel and the
+        committed log as the record, and SHALL NOT read current filing
+        state back out of an issue.
+      - >
+        WHEN a decision has been applied, THE SYSTEM SHALL report its
+        outcome on the ticket that raised it.
+      - >
+        WHEN the target slot of a re-file already holds a promoted
+        supply, THE SYSTEM SHALL require explicit confirmation and SHALL
+        supersede what is there.
+      - >
+        THE SYSTEM SHALL collect a reason at the point a decision is
+        raised, wherever the log requires one.
+      - >
+        THE SYSTEM SHALL NOT add a control to the dashboard for any of
+        these operations.
+      - >
+        THE SYSTEM SHALL expose the four operations through one
+        implementation, with each route as an adapter onto it.
+    non_functional_requirements:
+      - >
+        SECURITY, and this is the one that needs a real answer before it
+        ships: this repository is PUBLIC, so anybody with a GitHub
+        account can comment on a ticket. Promotion changes what
+        downstream consumers read, which is a materially larger write
+        than the existing /accept badge. Either the workflow restricts
+        the acting author to a known set, or this is accepted as a PoC
+        risk with eyes open - it should not be discovered later.
+      - >
+        COMPATIBILITY: the TUI route is the only one that works with no
+        network and no GitHub reachability. On a government network
+        where a third-party domain may not be reachable, "second route"
+        may be the only route, which is a stronger argument for it than
+        convenience.
+      - >
+        MAINTAINABILITY: two surfaces expressing one set of operations
+        is two things to keep in step. One implementation with thin
+        adapters, plus a test asserting both routes produce the same
+        entry for the same decision, is what stops them drifting.
+      - >
+        OPERABILITY at 30 datasets: a quarterly promotion round is up to
+        30 decisions raised in a short window, each currently triggering
+        a rebuild, a deploy and a snapshot. That cost is real and is
+        discussed in this requirement's open questions rather than
+        assumed away.
+      - >
+        The gh CLI needs authentication, which is automatic inside a
+        GitHub Actions job and a one-time gh auth login locally - the
+        same one-time-setup shape as playwright install chromium, and
+        worth documenting where the other one is.
+    dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-GHUB-027]
+    open_questions:
+      - >
+        Where is the boundary with delivery sprint 12? Sprint 12 owns
+        the GitHub write path, the backlog drain, the concurrency
+        configuration and the last-wins conflict rule - all already
+        settled in Thread H and deliberately NOT restated as criteria
+        here. The practical consequence is that sprint 11 alone can
+        build the TUI route and the shared implementation but not the
+        GitHub one, which reverses the primary/second ordering in BUILD
+        order even though it does not reverse it in design. Keith's
+        call: fold sprint 12's channel into this batch, or accept that
+        ordering for one sprint.
+      - >
+        Who may act? Options: anyone who can comment on a public issue
+        (today's behaviour for /accept); an allowlist derived from
+        contract/people.yaml; or repository collaborators only. This is
+        the one question in the batch with a real security consequence.
+      - >
+        "Promote" ALREADY MEANS SOMETHING ELSE IN THIS TUI, and the
+        collision is live rather than hypothetical. cli/common.py's
+        promote() copies a run's tool output from a temporary directory
+        into committed qa_results/, and the QA wizard prompts "Promote
+        this run into the real, permanent qa_results/ history?" -
+        wording that also appears three times in the committed demo
+        recording the dashboard plays. Adding a second, different
+        Promote to the same TUI is precisely the collision plans/supply-
+        model.md's own concept inventory warns about for the word
+        "delivery". Rename the existing one, or name this one
+        differently.
+    decisions:
+      - >
+        Decided GitHub is the PRIMARY operator surface and the TUI is
+        the second route (Keith, 2026-09-26), correcting Thread B's own
+        earlier paragraph, which read as though the TUI were the main
+        way an operator promotes. Recorded on the requirement and not
+        only in the thread, because a scoper reading Thread B alone
+        would have built the TUI as the primary surface - which is
+        exactly what nearly happened.
+      - >
+        Decided the dashboard stays READ-ONLY and anything requiring a
+        write goes through GitHub Issues (Keith, 2026-09-22, stated as a
+        standing principle rather than a choice for this feature).
+      - >
+        Decided this is NOT new architecture.
+        qa_tools/common/ticket_sync.py already opens one qa-ticket issue
+        per dataset and was extended to amber in 2026-09-18 precisely so
+        a real accept mechanism had somewhere to write a decision.
+        Promote, reject, demote and re-file are the same shape of write
+        landing on machinery that exists.
+      - >
+        Decided GitHub also settles identity and structure for free:
+        GitHub authenticates the comment author, so the actor is known
+        without inventing an SSO story for the separated environments,
+        and issue forms give structured input so a decision carries its
+        supply id, action and reason rather than being free prose a
+        workflow has to parse hopefully.
+      - >
+        Decided this is NOT PoC-only (Keith, 2026-09-22). A draft
+        speculated the mechanism might be replaced in production by
+        whatever the platform provides; that speculation was wrong and
+        is corrected rather than left to mislead - GitHub will exist in
+        the real separated environments, and both the principle and the
+        mechanism carry through.
+      - >
+        Decided a re-file into an occupied slot SUPERSEDES what is there
+        and does NOT trip the filled-slot rule (Keith, 2026-09-22). The
+        filled-slot rule does not apply to a human's deliberate act,
+        since applying it would stop re-filing doing what it is for -
+        but the confirmation is required, because two supplies claiming
+        one slot produces an ambiguous "version for period P" lookup
+        downstream.
+
+  - id: REQ-PIPE-083
+    title: "An overdue slot becomes a ticket, once, whether or not anything else arrives"
+    date_written: "2026-09-26"
+    story: >
+      As an operator responsible for a quarterly asset where nothing has
+      arrived for weeks, I want an overdue slot to raise a ticket by
+      itself, so that the absence of data is something that shows up in
+      my work queue rather than something I have to go looking for.
+    moscow: should
+    status: not_started
+    source: >
+      plans/supply-model.md delivery sprint 25, Keith 2026-09-24, who
+      flagged "WHAT DETECTS LATENESS, and what acts on it" as an
+      explicit open decision for when it is scoped. Folded into batch 4
+      by Keith, 2026-09-26. Scoped by delivery-scoper, batch 4,
+      2026-09-26.
+    acceptance_criteria:
+      - >
+        WHEN a dataset's slot is past due and unfilled, THE SYSTEM SHALL
+        raise a durable ticket for that slot.
+      - >
+        THE SYSTEM SHALL raise at most one ticket per slot, however many
+        times the overdue condition is observed.
+      - >
+        THE SYSTEM SHALL derive overdue-ness from the schedule and
+        filing state alone, with no access to anything under data/.
+      - >
+        THE SYSTEM SHALL detect an overdue slot for a dataset that has
+        had no delivery at all.
+      - >
+        THE SYSTEM SHALL name, on that ticket, the responses available
+        to a person.
+      - >
+        WHEN a slot ceases to be overdue, THE SYSTEM SHALL record the
+        outcome on that ticket and SHALL NOT close it automatically.
+      - >
+        THE SYSTEM SHALL scope a detection failure for one dataset to
+        that dataset, and SHALL NOT stop detection for any other.
+    non_functional_requirements:
+      - >
+        RELIABILITY is the whole requirement. Both obvious mechanisms
+        have a named, verified failure: detection riding on a QA run is
+        weakest exactly when it matters, because a dataset that never
+        arrives produces no run of its own and at 30 datasets on a
+        quarterly asset there are long stretches where nothing arrives;
+        and a scheduled GitHub workflow in a PUBLIC repository is
+        automatically disabled after 60 days without repository
+        activity, which is exactly the quiet stretch it exists to cover.
+        Both checked rather than recalled.
+      - >
+        IDEMPOTENCE is non-negotiable: a daily sweep must not open a new
+        ticket every day for the same late supply. This is the marker-
+        and-drain discipline the decision path already establishes, not
+        a new mechanism.
+      - >
+        This computation needs NO data access - only the schedule and
+        promotion state - so unlike most of this pipeline it is not
+        excluded from CI by the never-touch-data rule. That widens the
+        options rather than settling them.
+      - >
+        At 30 datasets, a sweep that opens a ticket per overdue slot can
+        open a lot of tickets at once after an outage. Whether that is
+        one ticket per slot or one per dataset is a real noise question,
+        and the existing ticket model is one issue per dataset.
+    dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-GHUB-027]
+    open_questions:
+      - >
+        What actually fires it? Neither of the two candidates Keith
+        named survives its own objection intact. A third exists and is
+        worth putting to him: the EXISTING ticket-sync workflow, which
+        already runs on the same triggers as the pipeline and already
+        opens one issue per dataset - it inherits the quiet-repo problem
+        in a milder form, because any push at all keeps it alive, and it
+        adds no new mechanism.
+      - >
+        One ticket per overdue SLOT, or one per overdue DATASET? Per-
+        slot is precise and can flood after an outage; per-dataset
+        matches today's one-issue-per-dataset model and needs the slot
+        named in the body instead.
+    decisions:
+      - >
+        Decided the trigger for the no-supply case is LATENESS, and it
+        goes through GitHub Issues like every other decision (Keith,
+        2026-09-24, correcting an earlier reading that had it
+        deliberately bypassing the Issues channel). There is no special
+        write path.
+      - >
+        Decided DETECTION and ACTION are separated before choosing a
+        mechanism, because they are not the same problem. Lateness is
+        ALREADY derived client-side as a pure function of schedule, as-
+        of date and fill state - that is what produces the red-with-no-
+        data reading today. Nothing new needs computing; what is missing
+        is the ACTOR that turns a derived state into a durable event.
+      - >
+        Recorded against the QA-run-triggered option: it would ride on
+        some other dataset's run happening, and the mechanism would be
+        weakest exactly when it matters most.
+      - >
+        Recorded against the cron option, with a verified source:
+        GitHub's own documentation states that in a PUBLIC repository,
+        scheduled workflows are automatically disabled after 60 days
+        with no repository activity, and this repo is public. Checked
+        against docs.github.com on 2026-09-24 rather than recalled.
+      - >
+        Recorded as the reason this is its own requirement rather than
+        part of the substitution action beside it: the detector is what
+        makes the action reachable, it has its own failure modes, and
+        Keith flagged its mechanism as an open decision in its own
+        right.
+
+  - id: REQ-PIPE-084
+    title: "A period whose supply never arrives resolves to the last good one, by a person's decision"
+    date_written: "2026-09-26"
+    story: >
+      As someone querying the warehouse for the current period, I want a
+      period nobody supplied to resolve to the last good supply rather
+      than to an empty table, so that my query returns something
+      defensible instead of breaking, and so that the substitution was a
+      decision somebody made rather than a silent default.
+    moscow: should
+    status: not_started
+    source: >
+      plans/supply-model.md delivery sprint 25, Keith 2026-09-24: "a
+      data set's been red and no data supplied all throughout the
+      cycle", and the best something we have is the last GREEN supply.
+      Folded into batch 4 by Keith, 2026-09-26, so the set of
+      dispositions closes in one go. Scoped by delivery-scoper, batch 4,
+      2026-09-26.
+    acceptance_criteria:
+      - >
+        WHEN a person decides a slot's supply will not arrive, THE
+        SYSTEM SHALL make that period resolve, for that table, to the
+        most recent GREEN supply of an earlier period.
+      - >
+        THE SYSTEM SHALL implement that resolution as an indirection in
+        the period's own schema, and SHALL NOT copy the data.
+      - >
+        THE SYSTEM SHALL make the indirection visible to anything
+        querying the period by the table's logical name.
+      - >
+        THE SYSTEM SHALL count that slot as filled.
+      - >
+        THE SYSTEM SHALL record the decision in the decision log with
+        the operator, the period pointed at, and a reason.
+      - >
+        WHEN a slot resolves this way, THE SYSTEM SHALL re-run QA for
+        that period so every check reading that table is re-evaluated.
+      - >
+        IF no earlier GREEN supply exists, THEN THE SYSTEM SHALL refuse
+        the decision and SHALL say why.
+      - >
+        IF a supply for that slot arrives after the decision, THEN THE
+        SYSTEM SHALL hold it for a person, SHALL NOT replace the
+        indirection automatically, and SHALL NOT discard it.
+      - >
+        THE SYSTEM SHALL allow the decision to be reversed by a later
+        recorded decision.
+      - >
+        THE SYSTEM SHALL accept this decision from the same operator
+        routes as every other filing decision.
+    non_functional_requirements:
+      - >
+        This is for DOWNSTREAM CONSUMERS rather than for reporting
+        (Keith, 2026-09-24, correcting an earlier reading that had it
+        the other way round). It is about people and systems querying
+        the warehouse who need SOMETHING to resolve for the current
+        period. That orientation should drive the verification too -
+        assert against a real SQL query over the period's logical name,
+        not only against the dashboard.
+      - >
+        PRIVACY AND CORRECTNESS: this deliberately makes a period return
+        data that is not from that period. In a real deployment that is
+        last quarter's child-protection records answering a query about
+        this quarter. It is defensible only while it is unmistakably
+        labelled at every point of consumption, which is why the
+        labelling has its own requirement, and it is worth asking
+        whether a warehouse consumer sees any label at all.
+      - >
+        The mechanism already exists: this is the logical-name-to-
+        physical-table indirection REQ-PIPE-035 establishes, aimed one
+        schema further back, and reference_view() is already built and
+        tested as a real cross-schema VIEW rather than a copy.
+      - >
+        At ~30 datasets with a quarterly cadence, a persistent non-
+        supplier could accumulate a chain of substitutions across
+        several periods. Whether a substitution may itself point at a
+        substituted period is a real question, and an unbounded chain
+        means a query silently reaching years back.
+    dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-035]
+    open_questions:
+      - >
+        THE NAME IS STILL OPEN and is the one thing blocking the whole
+        requirement's vocabulary. Every id, field name, log action and
+        dashboard chip in this requirement and the one beside it depends
+        on it. backfill is taken, patch and rollback were rejected by
+        Keith himself, carry-forward collides with road-testing item 3.
+        Candidates that survive a repo-wide check: SUBSTITUTED, STAND-
+        IN, INHERITED.
+      - >
+        May a substituted period itself be substituted from - i.e. can
+        the chain be longer than one hop? Refusing it bounds the reach
+        at one period; allowing it matches what a persistent non-
+        supplier actually produces.
+      - >
+        Does the substituted period get its own row of check results, or
+        borrow the previous period's? Keith's own open question,
+        2026-09-24. Physically it is a real view with real check results
+        against it, which argues for its own row; but its own row of
+        green results is the reading he specifically warned about.
+    decisions:
+      - >
+        Decided this is a DATABASE action rather than a QA one - Keith's
+        own framing, "less about QA and more about database stuff":
+        create a view in that period's schema, for that table, pointing
+        at the previous period's table.
+      - >
+        Decided it DOES trigger a re-QA of that table, and his reasoning
+        is worth keeping rather than just the outcome (Keith,
+        2026-09-24): the carried-forward table has dependents, and
+        cross-table checks that read it need re-evaluating against what
+        the period now actually resolves to. Not re-QAing would leave
+        every dependent check holding a verdict about an empty period.
+      - >
+        Decided the slot COUNTS AS FILLED, which matters because it
+        closes the slot to the assignment rule and stops the period
+        reading as overdue.
+      - >
+        Decided a late arrival AFTER the decision is HELD for a person
+        (Keith, 2026-09-24). It does not silently replace the view and
+        it does not get discarded - a human decides, which keeps this a
+        real decision rather than a default any later event can undo.
+      - >
+        Decided it is a DISPOSITION OF A SLOT, not of a supply, and that
+        is why it is not a mode of promotion or rejection. Promotion and
+        rejection both act on a supply that exists; this acts on the
+        absence of one. The sprint list records this explicitly because
+        "promotion and rejection" reads like a complete set of outcomes
+        and is not.
+      - >
+        Rejected "rollback" and "patch" as names (Keith, 2026-09-24) -
+        both misleading, since nothing is being reverted and nothing is
+        being repaired. Also rejected "carry forward" as the settled
+        name, because plans/road-testing.md item 3 uses the same phrase
+        for an unrelated scheduling property.
+      - >
+        FOUND WHILE SCOPING and recorded so it is not re-proposed:
+        "backfill", one of Keith's own two alternatives, is ALREADY A
+        LIVE TERM OF ART in this project - plans/running-thoughts.md #24
+        is "Backfill a newly-added check across every historical
+        supply", and Thread B itself says "the same composition
+        machinery serves backfill". Choosing it would recreate exactly
+        the collision sprint 25's own note exists to avoid.
+
+  - id: REQ-DASH-085
+    title: "A period standing in on an earlier one never reads as an ordinary green"
+    date_written: "2026-09-26"
+    story: >
+      As a data team leader glancing at the register, I want a period
+      whose data came from an earlier period to say so right next to its
+      status, so that I cannot look at it and think this quarter's data
+      arrived and was fine.
+    moscow: should
+    status: not_started
+    source: >
+      Keith, 2026-09-24, in his own words: "no one could look at it and
+      go, oh, it's green and it's good. No, it's green. And then next to
+      it, it should say carry forward or something." plans/supply-
+      model.md delivery sprint 25, folded into batch 4 2026-09-26.
+      Scoped by delivery-scoper, batch 4, 2026-09-26.
+    acceptance_criteria:
+      - >
+        WHERE a period's table resolves to an earlier period's supply,
+        THE SYSTEM SHALL render a qualifier alongside that dataset's
+        status everywhere that status appears.
+      - >
+        THE SYSTEM SHALL use the existing status-plus-qualifier
+        vocabulary, and SHALL NOT introduce a new value into the status
+        vocabulary.
+      - >
+        THE SYSTEM SHALL state, on drill-down, which period the data
+        actually came from, who decided it and why.
+      - >
+        THE SYSTEM SHALL distinguish the qualifier by label as well as
+        by appearance, and SHALL NOT rely on colour alone.
+      - >
+        THE SYSTEM SHALL render this from committed history alone, with
+        no access to anything under data/.
+      - >
+        THE SYSTEM SHALL render with zero console errors in a real
+        browser.
+    non_functional_requirements:
+      - >
+        This is the same status-plus-qualifier pattern the model already
+        uses - the "no data" qualifier on an overdue dataset, and a
+        check that could not run. Same pattern, new qualifier, rather
+        than a new visual language.
+      - >
+        It must not become a fourth quiet status. REQ-DASH-041
+        explicitly forbade one, the vocabulary is shared with the Python
+        side through status-cases.json, and REQ-PIPE-053's own
+        experience is that anything landing in the nodata bucket
+        vanishes from every rollup above it.
+      - >
+        At 30 datasets the Tier 2 row is already carrying an exhausted-
+        schedule marker and an outstanding-decisions count. A third
+        annotation competing for one row is how a row stops being
+        readable - so where this goes needs the dashboard UX pass rather
+        than being decided here.
+      - >
+        Verify at the render layer in a real browser, and in both
+        toolchains, per this project's standing rule for anything
+        touching the template.
+    dependencies: [REQ-PIPE-084, REQ-DASH-041, REQ-DASH-070]
+    open_questions:
+      - >
+        The qualifier's WORD depends on the name still open on the
+        requirement beside this one, so this requirement's visible text
+        cannot be settled until that is.
+      - >
+        Does the substituted period show its own row of check results,
+        or the previous period's? Keith's own open question, and it
+        decides whether this is a badge on an existing row or a distinct
+        row shape.
+    decisions:
+      - >
+        Decided this is a QUALIFIER on an existing status, not a new
+        status, following the vocabulary the model already uses
+        elsewhere and the explicit prohibition REQ-DASH-041 established
+        the same week.
+      - >
+        Decided it appears everywhere the status appears rather than
+        only on drill-down, because the whole point Keith made is about
+        what someone sees at a glance - a qualifier only visible after a
+        click does not prevent the misreading it exists to prevent.
+      - >
+        Recorded as the reason this is separate from the action
+        requirement beside it: the action is a database change for
+        downstream consumers, and the labelling is a dashboard change
+        for readers. They have different owners, different tests and
+        different toolchains, and bundling them would hide a UI question
+        inside a warehouse requirement.
