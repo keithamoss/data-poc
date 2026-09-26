@@ -103,34 +103,68 @@ def bdm_delivery_dirs(bdm_raw_dir):
     return Path(bdm_raw_dir) / "deliveries", Path(bdm_raw_dir) / "receipts"
 
 
+#: The PostgreSQL the SUITE connects to. Points at a server somebody else
+#: is running - a dev container, a CI service container, or a local
+#: install - never one this suite starts (REQ-TEST-095 criterion 1). A
+#: suite that starts its own server tests a server nobody deploys.
+TEST_DSN_ENV = "MOTHMAN_TEST_DSN"
+
+
 @pytest.fixture(scope="session")
-def supply_db_path(tmp_path_factory):
-    """ONE SUPPLY DATABASE PER TEST WORKER, which is the isolation
-    REQ-PIPE-068's own NFR asks for in as many words.
+def supply_dsn(worker_id):
+    """ONE SUPPLY DATABASE PER TEST WORKER, in a real PostgreSQL.
 
-    Isolation used to fall out of a database per run; that requirement
-    removes the database per run, so something has to replace it
-    deliberately. Criterion 7 forbids one database per RUN and says
-    nothing about workers, and `tmp_path_factory` is already per-worker
-    under xdist - so this inherits the separation the retired
-    data/duckdb_runs/ layout used to give for free.
+    WHY A WHOLE DATABASE rather than a schema set per worker: the code
+    under test creates and drops SCHEMAS as its ordinary business -
+    staging, rejected, one per period, one per run - so a worker confined
+    to a schema would have to have every one of those names rewritten,
+    and the thing being tested would no longer be the thing that runs.
+    A database is the boundary that needs no cooperation from the code.
 
-    Set through the environment rather than by monkeypatching a module
-    attribute, because that is how the real thing is configured and
-    because a session-scoped fixture cannot use `monkeypatch` anyway.
+    IT FAILS RATHER THAN SKIPS when there is nowhere to connect
+    (criterion 2). A skip is how a suite quietly stops testing: the run
+    goes green, the count drops, and nobody reads the count. This is the
+    same reasoning as the never-silently-skip rule the arrival pin in
+    tests/test_asset_time_semantics.py carries.
+
+    Dropped and recreated at session start rather than cleaned up at the
+    end, which is deliberate: a crashed run leaves its database behind to
+    look at, and the next run does not care what it finds.
     """
     import os
 
+    import psycopg
+
+    admin = os.environ.get(TEST_DSN_ENV)
+    if not admin:
+        raise pytest.UsageError(
+            f"{TEST_DSN_ENV} is not set. This suite needs a real PostgreSQL to "
+            f"connect to and deliberately does not start one - see README's "
+            f"Development section. A dev container and CI each supply it; "
+            f"locally, point it at your own server, e.g. "
+            f"{TEST_DSN_ENV}=postgresql://user:pass@localhost:5432/postgres")
+
+    name = f"mothman_test_{worker_id}"
+    with psycopg.connect(admin, autocommit=True) as conn:
+        # FORCE, because a leftover connection from a crashed run would
+        # otherwise block the drop and fail the whole session with an
+        # error about something the person did not do.
+        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        conn.execute(f'CREATE DATABASE "{name}"')
+
+    info = psycopg.conninfo.conninfo_to_dict(admin)
+    info["dbname"] = name
+    dsn = psycopg.conninfo.make_conninfo(**info)
+
     from qa_tools.common import supply_db
 
-    path = tmp_path_factory.mktemp("supply") / "supply.duckdb"
-    before = os.environ.get(supply_db.SUPPLY_DB_ENV)
-    os.environ[supply_db.SUPPLY_DB_ENV] = str(path)
-    yield str(path)
+    before = os.environ.get(supply_db.SUPPLY_DSN_ENV)
+    os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
+    yield dsn
     if before is None:
-        os.environ.pop(supply_db.SUPPLY_DB_ENV, None)
+        os.environ.pop(supply_db.SUPPLY_DSN_ENV, None)
     else:
-        os.environ[supply_db.SUPPLY_DB_ENV] = before
+        os.environ[supply_db.SUPPLY_DSN_ENV] = before
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -211,7 +245,7 @@ def real_committed_history(_committed_history_is_off_limits):
 
 
 @pytest.fixture(scope="session")
-def bdm_duckdb_dir(supply_db_path, bdm_raw_dir):
+def bdm_duckdb_dir(supply_dsn, bdm_raw_dir):
     """bdm_raw_dir's same two runs, staged into this worker's supply
     database via the real build_all() - the exact loading code path the
     real pipeline uses, not a hand-rolled copy of it.
@@ -228,7 +262,7 @@ def bdm_duckdb_dir(supply_db_path, bdm_raw_dir):
 
     build_all(deliveries_dir=Path(bdm_raw_dir) / "deliveries",
                receipts_dir=Path(bdm_raw_dir) / "receipts")
-    return supply_db_path
+    return supply_dsn
 
 
 # The run_ids recognition will assign these two deliveries - see
@@ -314,7 +348,7 @@ def cp_delivery_dirs(cp_raw_dir):
 
 
 @pytest.fixture(scope="session")
-def cp_duckdb_dir(supply_db_path, cp_raw_dir):
+def cp_duckdb_dir(supply_dsn, cp_raw_dir):
     """cp_raw_dir's same two runs, staged into this worker's supply
     database via the real build_all(). Shares one database with the BDM
     fixture above, which is the point rather than a compromise - the
@@ -335,4 +369,4 @@ def cp_duckdb_dir(supply_db_path, cp_raw_dir):
     build_all(raw_dir=cp_raw_dir,
                deliveries_dir=Path(cp_raw_dir) / "deliveries",
                receipts_dir=Path(cp_raw_dir) / "receipts")
-    return supply_db_path
+    return supply_dsn

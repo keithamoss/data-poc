@@ -1,25 +1,37 @@
 """qa_tools/common/supply_db.py - one database, and one place where a
 logical table name becomes a physical table (REQ-PIPE-068).
 
-Every test here is against a REAL DuckDB database in tmp_path rather
-than a mock, because the whole point of the module is what DuckDB
-actually does with schemas, views and locks - a mock would assert that
-the code calls the functions it calls, which is not the claim.
+Every test here is against a REAL PostgreSQL rather than a mock, because
+the whole point of the module is what the database actually does with
+schemas and views - a mock would assert that the code calls the functions
+it calls, which is not the claim.
+
+THE ENGINE CHANGED UNDER THIS FILE (REQ-PIPE-087) and two things moved
+with it. The database comes from conftest's per-worker fixture instead of
+a file in tmp_path, so each test resets its schemas rather than getting a
+fresh file. And the class that used to assert DuckDB's locking now
+asserts the opposite property - that a writer does NOT exclude readers -
+because that is the fact the new design rests on, and the old one was
+load-bearing for a workaround that has been removed.
 """
 from __future__ import annotations
 
-import multiprocessing as mp
-import time
-
-import duckdb
+import psycopg
 import pytest
 
+import dbsupport
 from qa_tools.common import supply_db
 
 
 @pytest.fixture
-def db(tmp_path, monkeypatch):
-    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(tmp_path / "supply.duckdb"))
+def db(supply_dsn):
+    """An empty supply database, on this worker's own PostgreSQL.
+
+    `supply_dsn` is conftest's session fixture, so the environment is
+    already pointing here; what each test needs is the schemas back to
+    empty, which is what a fresh file used to provide.
+    """
+    dbsupport.reset_supply_db()
     conn = supply_db.connect()
     supply_db.ensure_schemas(conn)
     yield conn
@@ -28,9 +40,11 @@ def db(tmp_path, monkeypatch):
 
 def _stage(conn, table: str, run_id: str, rows: int = 1) -> str:
     physical = supply_db.staged_table(table, run_id)
+    # generate_series, not DuckDB's range() - the same one-column table of
+    # integers, spelled the way PostgreSQL spells it.
     conn.execute(
         f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" AS '
-        f"SELECT * FROM range({rows}) t(id)")
+        f"SELECT * FROM generate_series(0, {rows - 1}) AS t(id)")
     return physical
 
 
@@ -56,7 +70,7 @@ class TestOneNameResolvesToOneTable:
         # Absent means the NAME does not resolve - not that it resolves
         # to nothing. A check against it must fail loudly rather than
         # pass over zero rows, which is the false-green direction.
-        with pytest.raises(duckdb.CatalogException):
+        with pytest.raises(psycopg.errors.UndefinedTable):
             db.execute(f'SELECT * FROM "{res.schema}"."cp_clients"')
 
 
@@ -70,14 +84,14 @@ class TestAmbiguityIsAbsenceRatherThanAChoice:
         # both are staged.
         db.execute(
             f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."cp_clients__007b" AS '
-            "SELECT * FROM range(9) t(id)")
+            "SELECT * FROM generate_series(0, 8) AS t(id)")
         res = supply_db.create_run_views(
             db, "run_007", supply_db.candidates_in(
                 db, supply_db.STAGING_SCHEMA, ["cp_clients"]))
         assert res.resolved == {}
         assert res.ambiguous == {
             "cp_clients": ["cp_clients__007", "cp_clients__007b"]}
-        with pytest.raises(duckdb.CatalogException):
+        with pytest.raises(psycopg.errors.UndefinedTable):
             db.execute(f'SELECT * FROM "{res.schema}"."cp_clients"')
 
     def test_it_never_picks_the_first_one(self, db):
@@ -269,44 +283,80 @@ class TestWhereItRefusesToGuess:
         with pytest.raises(supply_db.SupplyDbError):
             supply_db.staged_table("cp clients; drop", "run_001")
 
-    def test_opening_a_database_that_does_not_exist_read_only_says_so(self, tmp_path, monkeypatch):
-        """DuckDB's own message for this is about a file, which is not
-        what the reader was looking for."""
-        monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(tmp_path / "nope.duckdb"))
-        with pytest.raises(supply_db.SupplyDbError, match="nothing has been staged"):
-            supply_db.connect(read_only=True)
+    def test_an_unset_dsn_is_an_error_naming_the_variable(self, monkeypatch):
+        """There is no default and no file to fall back to, so the only
+        useful thing to say is which variable is missing."""
+        monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV, raising=False)
+        with pytest.raises(supply_db.SupplyDbError, match=supply_db.SUPPLY_DSN_ENV):
+            supply_db.connect()
+
+    def test_an_unreachable_database_says_so_and_names_the_host(self, monkeypatch):
+        """REQ-PIPE-087 criterion 12: loud, naming where it tried, and
+        never falling back to anything else."""
+        monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV,
+                           "postgresql://nobody@127.0.0.1:1/absent")
+        with pytest.raises(supply_db.SupplyDbError, match="cannot reach the supply database"):
+            supply_db.connect()
+
+    def test_a_password_never_reaches_the_error_message(self, monkeypatch):
+        """This repository is public and its errors reach Actions logs."""
+        monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV,
+                           "postgresql://bob:hunter2@127.0.0.1:1/absent")
+        with pytest.raises(supply_db.SupplyDbError) as exc:
+            supply_db.connect()
+        assert "hunter2" not in str(exc.value)
+        assert "***" in str(exc.value)
+
+    def test_an_identifier_too_long_for_postgres_is_refused(self):
+        """Postgres truncates past 63 bytes SILENTLY, which turns a
+        staged table's arrival suffix into a collision rather than an
+        error. The retired engine had no such limit, so nothing in this
+        project used to have to care."""
+        with pytest.raises(supply_db.SupplyDbError, match="63-byte identifier limit"):
+            supply_db._ident("x" * 64, "table name")
 
 
-def _reader(path, out):
-    try:
-        conn = duckdb.connect(path, read_only=True)
-        conn.execute("SELECT 1").fetchall()
-        time.sleep(1.5)
-        conn.close()
-        out.put("ok")
-    except Exception as exc:  # pragma: no cover - the failure is the signal
-        out.put(f"{type(exc).__name__}: {exc}")
+class TestAWriterDoesNotExcludeReaders:
+    """The property the new design rests on, and the exact reverse of what
+    this file used to assert.
 
-
-class TestTheConcurrencyTheDesignRestsOn:
-    """The reason the view schema is built serially and every check
-    opens read-only. Asserted rather than assumed, because the whole
-    fan-out design rests on it and `duckdb.org` is blocked from this
-    environment - a real run is the better primary source anyway.
+    Under the retired engine a single writer took an exclusive lock over
+    the whole database file and shut out every reader, which is why the
+    fan-out opened read-only and why dbt got a scratch database of its
+    own. Both workarounds are gone (REQ-PIPE-087), so the fact they were
+    working around is worth pinning in the other direction - otherwise
+    somebody reintroduces a workaround for a problem that no longer
+    exists.
     """
 
-    def test_many_readers_can_open_one_database_at_once(self, tmp_path):
-        path = str(tmp_path / "supply.duckdb")
-        conn = duckdb.connect(path)
-        conn.execute("CREATE TABLE t AS SELECT 1 AS id")
-        conn.close()
-        out = mp.Queue()
-        procs = [mp.Process(target=_reader, args=(path, out)) for _ in range(3)]
-        for p in procs:
-            p.start()
-        for p in procs:
-            p.join(30)
-        assert [out.get() for _ in procs] == ["ok", "ok", "ok"]
+    def test_a_reader_sees_committed_rows_while_another_connection_holds_one_open(self, db):
+        _stage(db, "birth_registrations", "run_001", rows=3)
+        writer = supply_db.connect()
+        reader = supply_db.connect(read_only=True)
+        try:
+            physical = supply_db.staged_table("birth_registrations", "run_001")
+            # A real open write transaction on one connection...
+            with writer.raw.transaction():
+                writer.raw.execute(
+                    f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."held_open" (x int)')
+                # ...while the other reads, rather than blocking on a lock.
+                rows = reader.execute(
+                    f'SELECT count(*) FROM "{supply_db.STAGING_SCHEMA}"."{physical}"'
+                ).fetchall()
+            assert rows[0][0] == 3
+        finally:
+            reader.close()
+            writer.close()
+
+    def test_a_read_only_connection_cannot_write(self, db):
+        """read_only stopped being about parallelism and started being
+        about what it says - so it has to actually refuse."""
+        reader = supply_db.connect(read_only=True)
+        try:
+            with pytest.raises(Exception):
+                reader.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."nope" (x int)')
+        finally:
+            reader.close()
 
 
 class TestWhatARunReadIsRecorded:
