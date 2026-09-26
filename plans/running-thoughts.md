@@ -2369,3 +2369,54 @@ from REQ-PIPE-060 onward. The old field could not have computed it,
 because it never knew when we received anything.
 
 Belongs with batch 5's check work.
+
+45. **[todo, 2026-09-26]** **[Pipeline & publishing]** Add PostgreSQL to this PoC, so the warehouse can be tested like for like with production.
+
+    **Keith's own ask, 2026-09-26**, raised while settling how demotion
+    moves a table out of a period schema (`REQ-PIPE-081`). The design
+    question turned on an engine difference, and neither the design nor
+    the tests can currently see it.
+
+    **The concrete thing that prompted it, measured the same hour:**
+
+    - PostgreSQL's `ALTER TABLE ... SET SCHEMA` is a CATALOGUE-ONLY
+      operation. The table's data files never move; indexes,
+      constraints and owned sequences come with it. A demotion is
+      instant whatever the table's size.
+    - DuckDB does not implement it AT ALL. Verified against the
+      installed 1.5.5: `ALTER TABLE a.t SET SCHEMA b` raises
+      `Not implemented Error: T_AlterObjectSchemaStmt`, and
+      `ALTER TABLE a.t RENAME TO b.t` is a parser error. So on DuckDB
+      the same move is `CREATE TABLE AS SELECT` plus `DROP` - O(rows),
+      under DuckDB's single-writer lock (`REQ-PIPE-068`).
+
+    Both are safe - DuckDB's DDL is transactional, verified by rolling
+    a copy-and-drop back and finding the source table intact - but they
+    are an order of magnitude apart in cost, and `REQ-PIPE-081` now
+    carries criteria requiring the catalogue operation where it exists
+    and the copy where it does not, chosen from a DECLARED capability
+    rather than by trying and catching.
+
+    **Which is the point: that branch has no test on the fast side.**
+    Everything here runs on DuckDB, so the PostgreSQL path would be
+    written from documentation and never executed. This project's own
+    standing lesson is that a green data layer says nothing about an
+    untested transform downstream; an untested ENGINE path is the same
+    shape, one layer lower.
+
+    **What it would cost, roughly, and worth scoping properly rather
+    than assuming:** a second warehouse adapter behind whatever
+    interface `supply_db` settles on; a Postgres service in
+    `test.yml` (GitHub Actions offers one as a service container);
+    the dbt and Soda profiles gaining a second target; and a decision
+    about whether the whole suite runs twice or only the
+    warehouse-touching part does, which is the runtime question -
+    `plans/tooling.md` #24 already records the suite at ~200s with
+    the e2e module as 85% of the gate.
+
+    **Not just about this one branch.** `plans/wider.md` still has
+    warehouse choice open, and the real deployment is two cloud
+    environments that will not be running DuckDB. Every place the
+    design leans on DuckDB behaviour - the single-writer lock, the
+    view-over-physical-tables resolution, schema-per-period itself -
+    is currently unverified against the engine it will actually meet.
