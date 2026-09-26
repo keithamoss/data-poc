@@ -14325,6 +14325,13 @@ requirements:
       - >
         THE SYSTEM SHALL accept this decision from the same operator
         routes as every other filing decision.
+      - >
+        IF any later period stands on a supply, THEN THE SYSTEM SHALL
+        refuse to demote it, and SHALL name every period that blocks
+        the demotion.
+      - >
+        THE SYSTEM SHALL NOT change what any period resolves to as a
+        side effect of a decision taken about a different period.
     non_functional_requirements:
       - >
         This is for DOWNSTREAM CONSUMERS rather than for reporting
@@ -14484,6 +14491,47 @@ requirements:
         the resolver; rejected closing the dangling problem by
         REFUSING demotion while a view depends on it, which is a strong
         invariant but makes one period's decision constrain another's.
+      - >
+        DEMOTING A SUPPLY THAT LATER PERIODS STAND ON IS REFUSED
+        OUTRIGHT, AND THE OPERATOR DEALS WITH THOSE PERIODS FIRST
+        (Keith, 2026-09-26, reversing his own earlier rejection of this
+        once he saw what the alternative actually does).
+        THE FINDING THAT FORCED IT, verified against real PostgreSQL
+        16.13 rather than reasoned about: a view binds to the OBJECT,
+        not to the name, so when a demotion moves the physical table
+        out of its period schema THE DEPENDENT VIEW FOLLOWS IT.
+        `pg_get_viewdef` after the move reads `FROM
+        staging.cp_case_workers_v1`, and the view still returns rows.
+        So a later period would go on silently serving data a person
+        had just decided was not in effect, with no error anywhere -
+        a false green, and the direction this project has been burned
+        in. "Do nothing" is therefore not a neutral option, which is
+        what changed the answer. One guardrail does already exist and
+        is worth knowing: PostgreSQL REFUSES to `DROP` a table while a
+        view depends on it ("cannot drop table ... because other
+        objects depend on it"), so destruction is protected even though
+        silent re-pointing is not - and the rule chosen here is the
+        same shape as the engine's own.
+        WHAT IT COSTS, recorded rather than glossed: withdrawing one
+        supply can mean unpicking several periods by hand first, which
+        is real work and could be painful where a persistent
+        non-supplier has left four periods standing on one February.
+        Rejected re-resolving the dependants automatically to the next
+        real supply back, which keeps every period showing its best
+        real answer but makes demotion an operation that silently
+        changes other periods; rejected dropping the dependent views so
+        those periods go quiet, which is the most literal reading but
+        loses an answer a previous real supply could still have given.
+        Both were rejected for the same reason, which criterion 18
+        above now states in general: a decision about one period must
+        not change what another period resolves to.
+        WHERE IT IS ENFORCED: this requirement creates the dependency,
+        but the refusal is the shape `REQ-GHUB-082` criteria 19 to 21
+        already describe - refuse on the route that raised it, name
+        what makes it impermissible, report it. Note also that
+        demotion itself belongs to `REQ-PIPE-076` criterion 5 and
+        `REQ-PIPE-081` criterion 9, both SIGNED, so both may want a
+        pointer to this constraint.
   - id: REQ-DASH-085
     title: "A period standing in on an earlier one never reads as an ordinary green"
     date_written: "2026-09-26"

@@ -2906,17 +2906,23 @@ Belongs with batch 5's check work.
        to specify is when the view is created and what it points at,
        not how to report its absence.
 
-       **AND IT LEAVES ONE REAL OPEN QUESTION, recorded rather than
-       assumed: what happens to an inherited view when the supply it
-       points at is DEMOTED?** Keith chose real views over both
-       virtual assembly (which reflects demotion for free) and over
-       refusing demotion while a view depends on it, so neither of
-       those answers is available. The rule the rest of his choices
-       IMPLY is re-resolution - resolution is "the last real supply at
-       or before this period", so when one stops being real the views
-       aimed at it follow the same rule to the next one back - but
-       that is an inference from the shape rather than something he
-       has said, and it should be put to him rather than built.
+       **THE DEMOTION QUESTION IS ANSWERED, and the answer reversed
+       Keith's own earlier position once the real behaviour was
+       tested.** A PostgreSQL view binds to the OBJECT, not the name,
+       so a demotion that moves the physical table out of its period
+       schema takes the dependent view WITH it - verified on 16.13:
+       `pg_get_viewdef` afterwards reads `FROM
+       staging.cp_case_workers_v1` and the view still returns rows.
+       A later period would therefore go on silently serving data
+       somebody had just decided was not in effect. So "do nothing"
+       was never neutral, and that is what changed the answer.
+       **Demotion of a supply any later period stands on is REFUSED
+       OUTRIGHT, naming the periods that block it**, and the operator
+       deals with those first. Same shape as the engine's own
+       behaviour, which already refuses to `DROP` a table a view
+       depends on. Recorded on `REQ-PIPE-084` with the rejected
+       alternatives and the general rule it rests on - a decision
+       about one period must not change what another resolves to.
 
     **LOCKING THE ENGINE VERSION - what is actually achievable, checked
     rather than assumed (2026-09-26).**
