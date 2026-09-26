@@ -372,7 +372,7 @@ one when this line suggests it matters.
 - **#22** `investigate` 2026-09-25 - What the test suite actually touches in the real trees, measured - and what a structural guarantee would cost.
   - *touches:* `tests/conftest.py`, `dashboard/qa-reporting-dashboard.template.html`, `tests/test_dashboard_e2e.py`
 - **#23** `investigate` 2026-09-25 - Making a duplicate YAML key loud at READ time - researched, built, and reverted unbuilt.
-- **#24** `todo` 2026-09-26 - The e2e module is 85% of the gate, and a third of it is deliberate sleeping - profiled, with three fixes ranked and...
+- **#24** `in-progress` 2026-09-27 - The e2e module was 85% of the gate and a third of it was deliberate sleeping - two of the three ranked fixes are now...
   - *touches:* `tests/test_dashboard_e2e.py`
 - **#25** `todo` 2026-09-26 - mothman never deletes its own temp directories - 4,218 of them, 1.3GB, found while tidying /tmp.
   - *touches:* `cli/common.py`, `cli/cp.py`, `cli/bdm.py`, `cli/pipeline.py`

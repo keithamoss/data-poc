@@ -2588,7 +2588,7 @@ new dependency and a different API across those 29 sites. It is not
 installed here, so its merge-override behaviour is UNVERIFIED - worth
 testing before anyone treats it as the easy option.
 
-24. **[todo, 2026-09-26]** **[Testing & dev tooling]** The e2e module is 85% of the gate, and a third of it is deliberate sleeping - profiled, with three fixes ranked and none applied.
+24. **[in-progress, 2026-09-27]** **[Testing & dev tooling]** The e2e module was 85% of the gate and a third of it was deliberate sleeping - two of the three ranked fixes are now applied, 250s -> 185s.
 
     **Measured 2026-09-26** (Keith's own question: "anything we can
     do to speed up the e2e tests? is running them via pytest the
@@ -2645,6 +2645,46 @@ testing before anyone treats it as the easy option.
 
     1+2 together are ~250s -> ~160s, taking the whole gate from ~5min
     to ~3.5. 3 could roughly halve it again.
+
+    **APPLIED 2026-09-27: fixes 1 and 2. Measured 249.66s -> 184.84s,
+    148 tests passing both before and after** - 26% off this module and
+    the estimate above was about right ABOUT THE MODULE.
+
+    **The SUITE gained less, and the gap is the interesting part:
+    325s -> 294s, so 31 of the 65 seconds showed up.** The rest was
+    never on the critical path. `--dist loadfile` pins this file to one
+    worker while everything else runs beside it, so the module only
+    costs the suite what it costs BEYOND the slowest of the others -
+    and now that it is 185s it is no longer clearly the longest pole.
+    Worth stating because the module figure is the flattering one and
+    the suite figure is the one anybody actually waits for.
+
+    Fix 1 needed one line in the TEMPLATE to be worth doing properly.
+    `render()` now bumps a `data-render-count` attribute, and `_goto()`
+    waits on it instead of sleeping. Without that there is no real
+    signal that a render finished, and every alternative is a different
+    guess. The fiddly part is that a goto to a new path RELOADS (the
+    counter resets, so wait for "rendered at all") while a goto changing
+    only the fragment does NOT (the counter persists, so wait for
+    "rendered AGAIN") - waiting for the wrong one either returns
+    instantly on a stale render or hangs. `window.__e2eMark` tells them
+    apart: set before navigating, it survives a hash change and not a
+    reload.
+
+    Fix 2 was mechanical once the scope changed - `tmp_path_factory` and
+    `pytest.MonkeyPatch.context()` in place of the function-scoped
+    `tmp_path`/`monkeypatch`, which a class-scoped fixture cannot
+    request. The profile after fix 1 showed exactly where it was going:
+    ten setups at ~6.5s each, which is three now.
+
+    **Fix 3 (let the module parallelise) is still open** and is still
+    the biggest remaining win, ~150s -> ~50s on four cores. The blocker
+    is unchanged: the session build fixture has to be made worker-safe
+    first (item #10). Worth knowing before picking it up: the profile
+    now has a 15.5s single test that is CORRECT (the masthead proving
+    it does not tick) and a 12.9s session build paid once - parallelism
+    helps neither, so the realistic ceiling is lower than the arithmetic
+    suggests.
 
     **On the runner itself: keep pytest.** Playwright's Python docs
     document the pytest plugin as the supported path and recommend

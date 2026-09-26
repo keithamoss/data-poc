@@ -189,6 +189,13 @@ releases:
               you found all of that out from failing tests.
       - category: Improved
         items:
+          - headline: The browser tests stopped waiting around
+            components: ["Testing & dev tooling"]
+            description: >
+              They used to pause half a second after every page load on
+              the off chance it had finished rendering. They now wait
+              for the page to say it has, which takes a quarter off the
+              time the checks need and removes a source of flakiness.
           - headline: Schema names you can actually read
             components: ["Pipeline & publishing"]
             description: >

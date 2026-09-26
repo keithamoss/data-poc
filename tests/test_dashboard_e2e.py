@@ -101,11 +101,43 @@ def _state_to_path(state: dict) -> str:
 
 
 def _goto(page, html_path: Path, state: dict | None = None, as_of: str | None = None):
+    """Navigate, and wait for the page to have actually RENDERED.
+
+    This used to end in `page.wait_for_timeout(500)`. With 126 call
+    sites that was over a minute of the gate spent asleep, and it was
+    wrong in both directions at once - slower than needed locally, and
+    too short on a loaded runner, which is how time-dependent flakes get
+    written. The template now bumps `data-render-count` at the end of
+    every render (the only thing that reads it is this function), so
+    there is a real condition to wait on.
+
+    THE FIDDLY PART IS TELLING THE TWO NAVIGATIONS APART. A goto to a
+    different path reloads the document, which resets the counter - so
+    the right condition is "has rendered at all". A goto that changes
+    only the fragment does NOT reload, so the counter keeps its value
+    and the right condition is "has rendered AGAIN". Waiting for the
+    wrong one of those either returns instantly on a stale render or
+    hangs forever. `window.__e2eMark` distinguishes them: set before
+    navigating, it survives a same-document hash change and does not
+    survive a reload.
+    """
     url = f"file://{html_path.resolve()}"
     query = f"?asof={as_of}" if as_of else ""
     fragment = f"#{_state_to_path(state)}" if state else ""
+    try:
+        before = page.evaluate(
+            "() => { window.__e2eMark = true;"
+            "        return Number(document.documentElement.dataset.renderCount || 0); }")
+    except Exception:
+        before = 0  # no document yet - the first navigation of this page
     page.goto(url + query + fragment)
-    page.wait_for_timeout(500)
+    page.wait_for_function(
+        """(before) => {
+             const n = Number(document.documentElement.dataset.renderCount || 0);
+             if (!n) return false;
+             return !window.__e2eMark || n > before;
+           }""",
+        arg=before)
 
 
 class TestBuiltDashboardRenders:
@@ -380,9 +412,19 @@ class TestReleaseNotesPanel:
         assert not emoji, f"per-component emoji is back in the release notes: {emoji}"
 
 
-@pytest.fixture
-def dashboard_html_with_ticket(built_dashboard_html, tmp_path, monkeypatch) -> Path:
-    """Item 76's UI-integration follow-up (plans/qa-pipeline.md,
+@pytest.fixture(scope="class")
+def dashboard_html_with_ticket(built_dashboard_html, tmp_path_factory) -> Path:
+    """CLASS-SCOPED (2026-09-27) because it rebuilds the dashboard, and
+    that costs ~6.5s every time. Function-scoped it was paid once per
+    TEST; the three fixtures of this shape accounted for about 65s of a
+    230s module. Nothing here mutates the built file, so one per class
+    is the same guarantee for a fraction of the cost.
+
+    It takes `tmp_path_factory` and its own `MonkeyPatch.context()`
+    rather than `tmp_path`/`monkeypatch`, which are function-scoped and
+    cannot be requested from a class-scoped fixture.
+
+    Item 76's UI-integration follow-up (plans/qa-pipeline.md,
     2026-09-18): a second built HTML, alongside the shared built_
     dashboard_html fixture, with a real (fake-for-the-test) open ticket
     injected via OPEN_TICKETS_JSON - the file only deploy-pages.yml's
@@ -407,6 +449,7 @@ def dashboard_html_with_ticket(built_dashboard_html, tmp_path, monkeypatch) -> P
     here)."""
     from dashboard import embed_dashboard_data as edd
 
+    tmp_path = tmp_path_factory.mktemp("ticket")
     (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
     (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
 
@@ -418,9 +461,10 @@ def dashboard_html_with_ticket(built_dashboard_html, tmp_path, monkeypatch) -> P
         "updatedAt": "2026-09-18T00:00:00Z",
     }]))
     out_html = tmp_path / "dashboard_with_ticket.html"
-    monkeypatch.setattr(edd, "OPEN_TICKETS_JSON", tickets_path)
-    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
-    edd.embed()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(edd, "OPEN_TICKETS_JSON", tickets_path)
+        mp.setattr(edd, "DASHBOARD_HTML", out_html)
+        edd.embed()
     return out_html
 
 
@@ -489,8 +533,8 @@ def _real_amber_bdm_runs() -> list[tuple[str, str]]:
     return usable
 
 
-@pytest.fixture
-def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path, monkeypatch) -> Path:
+@pytest.fixture(scope="class")
+def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path_factory) -> Path:
     """running-thoughts.md #6 ("read-only tension: accepting/rejecting
     amber supplies") - same real-fake-injection shape as dashboard_html_
     with_ticket above (a real gh call only deploy-pages.yml can make
@@ -514,6 +558,7 @@ def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path, monkeypa
     """
     from dashboard import embed_dashboard_data as edd
 
+    tmp_path = tmp_path_factory.mktemp("amber")
     (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
     (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
 
@@ -541,9 +586,10 @@ def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path, monkeypa
         ],
     }]))
     out_html = tmp_path / "dashboard_with_amber_decisions.html"
-    monkeypatch.setattr(edd, "QA_COMMENTS_JSON", comments_path)
-    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
-    edd.embed()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(edd, "QA_COMMENTS_JSON", comments_path)
+        mp.setattr(edd, "DASHBOARD_HTML", out_html)
+        edd.embed()
     return {"html": out_html, "accept": accept_id, "reject": reject_id, "neither": neither_id}
 
 
@@ -2468,8 +2514,8 @@ class TestOutstandingDecisions:
             f"no arrival verdict on Tier 2 carries the qualifier as of {newest}")
 
 
-@pytest.fixture
-def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path, monkeypatch) -> Path:
+@pytest.fixture(scope="class")
+def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path_factory) -> Path:
     """A second built HTML whose Child Protection datasets arrive on
     their OWN schedules (REQ-DASH-041).
 
@@ -2487,6 +2533,7 @@ def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path, monke
     """
     from dashboard import embed_dashboard_data as edd
 
+    tmp_path = tmp_path_factory.mktemp("divergent")
     (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
     (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
 
@@ -2520,12 +2567,13 @@ def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path, monke
     doctored.write_text(json.dumps(data))
 
     out_html = tmp_path / "dashboard_divergent.html"
-    monkeypatch.setattr(edd, "TARGETS", [
-        ("REAL_BIRTH_REG_DATA", str(Path(edd.ROOT) / "reports" / "birth_registrations_dashboard.json")),
-        ("REAL_CP_DATA", str(doctored)),
-    ])
-    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
-    edd.embed()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(edd, "TARGETS", [
+            ("REAL_BIRTH_REG_DATA", str(Path(edd.ROOT) / "reports" / "birth_registrations_dashboard.json")),
+            ("REAL_CP_DATA", str(doctored)),
+        ])
+        mp.setattr(edd, "DASHBOARD_HTML", out_html)
+        edd.embed()
     return out_html
 
 

@@ -3247,7 +3247,19 @@ function describeRoute(){
 
 function render(){
   const view = document.getElementById("view");
-  const done = r => { describeRoute(); return r; };
+  // A RENDER COUNTER, for tests to wait on rather than sleep through.
+  // The e2e suite used to follow every navigation with a fixed 500ms
+  // wait - 126 call sites, over a minute of the gate spent sleeping,
+  // and simultaneously too slow locally and too short on a loaded
+  // runner, which is how time-dependent flakes are born. This is the
+  // one signal that says a render actually finished; nothing in the
+  // page reads it.
+  const done = r => {
+    describeRoute();
+    const el = document.documentElement;
+    el.dataset.renderCount = String((Number(el.dataset.renderCount) || 0) + 1);
+    return r;
+  };
   if(STATE.tier==="exec") return done(renderExec(view));
   if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return done(renderPlans(view)); }
   if(STATE.tier==="demo") return done(renderDemo(view));

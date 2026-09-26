@@ -692,6 +692,18 @@ Rough layout:
   -> **~220s/1905 tests (2026-09-26, REQ-PIPE-038's re-key)**. Flat
   against the entry above on 33 more tests. JS suite 346 tests in ~24s.
 
+  -> **~294s/2007 tests (2026-09-27, after the e2e sleep/fixture fixes)**.
+  Up ~74s on 102 more tests since the entry above - and the growth is
+  real rather than a regression: this day added the PostgreSQL switch's
+  own tests plus four new modules. Two things worth knowing. The
+  `mothman check` total is ~5m53s, of which pytest is 294s. And the e2e
+  module itself went 249.66s -> 184.84s (plans/tooling.md #24), which
+  moved the SUITE only 325s -> 294s: `--dist loadfile` pins that file to
+  one worker while the rest run beside it, so it only costs the suite
+  what it costs beyond the slowest of the others. The module figure is
+  the flattering one; this log should carry the suite figure.
+  Measured on a real PostgreSQL, which every run from here needs.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
