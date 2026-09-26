@@ -13663,6 +13663,16 @@ requirements:
       - >
         THE SYSTEM SHALL expose the four operations through one
         implementation, with each route as an adapter onto it.
+      - >
+        THE SYSTEM SHALL accept a filing decision only from an actor named
+        in contract/people.yaml, and SHALL refuse one from anybody else
+        and say so on the ticket.
+      - >
+        THE SYSTEM SHALL rename the TUI's existing qa_results/ promotion
+        to "Save to history", across its prompt, its success panel, its
+        function name and the committed demo recording, so that
+        "Promote" in this tool means the supply operation and nothing
+        else.
     non_functional_requirements:
       - >
         SECURITY, and this is the one that needs a real answer before it
@@ -13695,35 +13705,6 @@ requirements:
         same one-time-setup shape as playwright install chromium, and
         worth documenting where the other one is.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-GHUB-027]
-    open_questions:
-      - >
-        Where is the boundary with delivery sprint 12? Sprint 12 owns
-        the GitHub write path, the backlog drain, the concurrency
-        configuration and the last-wins conflict rule - all already
-        settled in Thread H and deliberately NOT restated as criteria
-        here. The practical consequence is that sprint 11 alone can
-        build the TUI route and the shared implementation but not the
-        GitHub one, which reverses the primary/second ordering in BUILD
-        order even though it does not reverse it in design. Keith's
-        call: fold sprint 12's channel into this batch, or accept that
-        ordering for one sprint.
-      - >
-        Who may act? Options: anyone who can comment on a public issue
-        (today's behaviour for /accept); an allowlist derived from
-        contract/people.yaml; or repository collaborators only. This is
-        the one question in the batch with a real security consequence.
-      - >
-        "Promote" ALREADY MEANS SOMETHING ELSE IN THIS TUI, and the
-        collision is live rather than hypothetical. cli/common.py's
-        promote() copies a run's tool output from a temporary directory
-        into committed qa_results/, and the QA wizard prompts "Promote
-        this run into the real, permanent qa_results/ history?" -
-        wording that also appears three times in the committed demo
-        recording the dashboard plays. Adding a second, different
-        Promote to the same TUI is precisely the collision plans/supply-
-        model.md's own concept inventory warns about for the word
-        "delivery". Rename the existing one, or name this one
-        differently.
     decisions:
       - >
         Decided GitHub is the PRIMARY operator surface and the TUI is
@@ -13766,7 +13747,66 @@ requirements:
         but the confirmation is required, because two supplies claiming
         one slot produces an ambiguous "version for period P" lookup
         downstream.
-
+      - >
+        WHO MAY ACT: AN ALLOWLIST IN contract/people.yaml (Keith,
+        2026-09-26, settling the one question in this batch with a real
+        security consequence). This repository is public, so anybody
+        with a GitHub account can comment on a ticket, and promotion
+        changes what downstream consumers read - a materially larger
+        write than the existing /accept badge. The file already exists
+        and already carries the identity this system uses: an `email`
+        matching git_identity.py's run_by, and a `github:` handle that
+        ticket_sync.py already assigns real tickets to. So the allowlist
+        is the set of people who have a `github:` entry, which is the
+        same reason the Monty Python placeholder entries deliberately
+        have none. Rejected repository-collaborator permission, which
+        GitHub can answer with no new config but couples who may decide
+        a data question to who may push code - a conflation that is
+        wrong now and worse in the separated production environments.
+        Rejected accepting it as a PoC risk, which was a real option and
+        is the status quo for /accept, but /accept moves a badge and
+        this moves data.
+      - >
+        THE BUILD ORDER IS ACCEPTED AS SPRINT 11 THEN 12, EVEN THOUGH
+        THE PRIMARY SURFACE ARRIVES SECOND (Keith, 2026-09-26). Sprint
+        12 owns the GitHub write path - the backlog drain, the
+        concurrency configuration and the last-wins conflict rule, all
+        settled in Thread H and deliberately not restated as criteria
+        here - so sprint 11 can build the shared implementation and the
+        TUI adapter but not the GitHub one. Design ordering is
+        unchanged; only build ordering reverses, and criterion 11's one-
+        implementation-plus-adapters shape is what makes the second
+        adapter cheap when sprint 12 lands. Rejected folding sprint 12's
+        channel into this batch, which would pull Thread H's concurrency
+        and conflict rules forward and make sprint 11 considerably
+        larger for one sprint's worth of ordering.
+      - >
+        THE TUI'S EXISTING "PROMOTE" IS RENAMED TO "SAVE TO HISTORY",
+        RATHER THAN THIS OPERATION BEING NAMED SOMETHING ELSE (Keith,
+        2026-09-26, after asking whether the TUI's meaning was still
+        needed at all). IT IS STILL NEEDED, and the answer to that
+        question is the reason for the split: cli/common.py's promote()
+        copies a QA run's tool output from the wizard's throwaway tmp
+        directory into committed qa_results/, which is the dashboard's
+        only source of truth - a run not saved never reaches the
+        dashboard at all, and a saved one is permanent history that is
+        never pruned. But it is a decision about RESULTS, not about
+        DATA: it touches no warehouse, and publishing still needs a
+        commit and push, which the success panel already says in as many
+        words. So the two operations are on different axes and neither
+        is redundant. The word goes to the supply sense because that is
+        where it is load-bearing across the whole model, and because
+        landed_on_accepted.py's may_auto_promote() already claims it in
+        Python - the TUI's usage is the newer collision, not the
+        incumbent. The costs are eleven call sites across cli/bdm.py and
+        cli/cp.py, and a re-record of dashboard/demos/qa_wizard.cast via
+        scripts/dev/record_cast.py, where the old wording appears three
+        times. Rejected naming the supply operation differently, which
+        would leave the supply model's own promote/demote vocabulary not
+        matching what the tool calls it; rejected leaving two Promotes
+        disambiguated by context, which is exactly the collision
+        plans/supply-model.md's concept inventory warns about for the
+        word "delivery".
   - id: REQ-PIPE-083
     title: "An overdue slot becomes a ticket, once, whether or not anything else arrives"
     date_written: "2026-09-26"
