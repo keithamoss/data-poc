@@ -2543,10 +2543,103 @@ Belongs with batch 5's check work.
     filename, which 404s, where the default path requests `.gz`, which
     exists. Hence the local-file install above.
 
-    **STILL UNVERIFIED, and the next thing to do:** no tool has
-    actually been RUN against Postgres here - the evidence above is
-    engine behaviour and dependency resolution, not a real `dbt build`,
-    `soda scan` or `datacontract test`. That is the biggest remaining
-    unknown and should come before scoping. Aurora's divergences from
-    vanilla PostgreSQL and the Dev Container PostgreSQL feature are
-    also unread; both domains are now allow-listed.
+    **ALL FOUR TOOLS WERE THEN RUN FOR REAL AGAINST THAT POSTGRES,
+    2026-09-26**, in an isolated scratch environment so the repo's own
+    `pyproject.toml`/`uv.lock` were untouched. The fixture mirrored the
+    supply model's real shape: a period schema, a physical versioned
+    table inside it, a per-run schema of views over it, and two planted
+    defects.
+
+    - **dbt-postgres: works.** A real `dbt build` read through the
+      per-run view schema, passed `unique` and `not_null`, and
+      correctly FAILED the planted `accepted_values` violation. `dbt
+      run` then materialised its model.
+    - **Soda Core: works.** A real scan found both planted defects (a
+      NULL birth weight, an invalid `sex`) and passed the other two
+      checks.
+    - **datacontract-cli: works.** Every schema and physical-type check
+      passed against the live Postgres, and the required-field check
+      caught the NULL.
+    - **Evidently: nothing to prove.** It reads CSVs directly and never
+      touches a warehouse.
+
+    **THREE CONCRETE CHANGES THE TOOLS THEMSELVES FORCE**, each found
+    by running rather than by reading:
+
+    - **Soda has no `add_postgres_connection`.** DuckDB is a SPECIAL
+      CASE in Soda's own API (`add_duckdb_connection` takes a live
+      connection object); Postgres goes through
+      `add_configuration_yaml_str`/`_file` with host, port, database
+      and schema. So `run_soda_bdm.py`/`run_soda_cp.py` change shape
+      rather than swapping a string.
+    - **The dbt profile gets SIMPLER, and its whole current
+      arrangement was a DuckDB workaround.** Today it points dbt at a
+      scratch DuckDB FILE and `ATTACH`es the supply database read-only,
+      purely because DuckDB gives a writer an exclusive lock over the
+      file. On Postgres there is no lock: dbt writes its models into
+      its own schema in the SAME database, and the attach disappears.
+    - **An empty password is treated as UNSET by datacontract-cli**
+      (`missing_env_DATACONTRACT_POSTGRES_PASSWORD`), and it takes
+      credentials from environment variables rather than from the
+      contract. Fine, and worth knowing before someone spends an hour
+      on it.
+
+    **THE MIGRATION SURFACE IS MUCH SMALLER THAN THE GREP SUGGESTS.**
+    59 files MENTION duckdb, but only NINE non-test modules actually
+    open it: `qa_tools/common/supply_db.py`,
+    `qa_tools/common/asset_time.py`, `qa_tools/{bdm,cp}/dataset_stats.py`,
+    `qa_tools/{bdm,cp}/run_soda_*.py`, `qa_tools/cp/run_datacontract_cp.py`,
+    `pipeline/load.py` and `pipeline/aggregate_values.py`, plus the dbt
+    profile and 12 test modules. **Two of the four QA tools -
+    datacontract-cli and Evidently - read the arriving CSV directly and
+    never touch the warehouse at all**, so they are not part of the
+    migration unless we decide to point them at what landed, which is a
+    design choice rather than a forced change.
+
+    **ALL FOUR TOOLS WILL RUN AGAINST POSTGRES, WHICH ENLARGES THE
+    MIGRATION RATHER THAN SHRINKING IT (Keith, 2026-09-26).** His own
+    model: the pipeline loads the CSV, Parquet or whatever arrived into
+    PostgreSQL FIRST, and then every QA tool checks what is in the
+    database. That is NOT how it works today, and the difference was
+    found while scoping this:
+
+    - dbt and Soda read the WAREHOUSE, through the per-run view schema.
+    - datacontract-cli and Evidently read the ARRIVING CSV straight off
+      disk (`type: local`, `format: csv`, and
+      `read_csv_explicit_nulls`). datacontract-cli's own internal
+      DuckDB, which `run_datacontract_cp.py` mentions, is its engine
+      for reading that file - nothing to do with this project's
+      warehouse.
+
+    So two tools check the file as delivered and two check the rows as
+    loaded, they are different subjects, and nothing reconciles them.
+    A load coerces types, turns sentinels into NULLs - this repo has
+    had exactly that bug, `"N/A"` becoming NULL - or rejects rows.
+
+    **A BUILT REQUIREMENT ALREADY IMPLIED KEITH'S MODEL**, which is the
+    strongest argument for it: `REQ-PIPE-068` criterion 2 says route
+    every read of supply data through the per-run schema and "SHALL NOT
+    query a physical table directly from any check, tool invocation or
+    downstream reader". Two of the four tools bypass that by reading a
+    file, so this is an existing inconsistency with something marked
+    `built` rather than a new question.
+
+    **THE BOUNDARY TO KEEP INSIDE THAT MODEL.** A class of checks can
+    only be made on the FILE and is destroyed by loading: encoding,
+    delimiter, header row, column order, ragged or malformed rows,
+    duplicate headers. And a genuinely bad file fails the load
+    outright, which is itself a QA signal already modelled by
+    `REQ-PIPE-060` and `mothman supply failures`. So: load first, all
+    four tools check the warehouse, plus a small explicit set of
+    file-shape checks at load time that never pretend to be data
+    checks.
+
+    **CORRECTION TO THE SURFACE ESTIMATE ABOVE**, recorded rather than
+    quietly edited: this entry first said datacontract-cli and
+    Evidently were not part of the migration because they never touch
+    the warehouse. Keith's decision puts them back in. It is four tools
+    to repoint, not two.
+
+    **STILL UNREAD:** Aurora's divergences from vanilla PostgreSQL, and
+    the Dev Container PostgreSQL feature. Both domains are now
+    allow-listed.
