@@ -80,6 +80,24 @@ import psycopg
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
+#: How long a statement will WAIT FOR A LOCK before giving up, and why
+#: this exists at all: a DROP or an ALTER needs an exclusive lock, and
+#: PostgreSQL's default is to wait forever for one. Forever is the worst
+#: possible answer for a pipeline - it is indistinguishable from slow,
+#: it holds its own locks while it waits, and nothing in a log says why.
+#:
+#: Found the hard way rather than anticipated (2026-09-27): a QA tool
+#: left a connection IDLE IN TRANSACTION holding a read lock on a staged
+#: table, and the next load's DROP TABLE blocked behind it for six
+#: minutes until the run was killed. With this set, that same situation
+#: fails in seconds with a message naming the lock.
+#:
+#: Thirty seconds is chosen to be far longer than any legitimate wait in
+#: this pipeline (every lock here is taken and released inside one
+#: statement) and far shorter than a person's patience.
+LOCK_TIMEOUT_ENV = "MOTHMAN_LOCK_TIMEOUT_MS"
+DEFAULT_LOCK_TIMEOUT_MS = 30_000
+
 #: PostgreSQL's own hard limit on an identifier, and the reason it is
 #: checked here rather than discovered later: Postgres TRUNCATES a
 #: longer name silently, where DuckDB accepted any length. A truncated
@@ -243,9 +261,28 @@ def connect(read_only: bool = False, dsn: str | None = None) -> SupplyConnection
     except psycopg.Error as exc:
         raise SupplyDbError(
             f"cannot reach the supply database at {_redact(target)}: {exc}") from exc
+    # NEVER WAIT FOREVER FOR A LOCK - see LOCK_TIMEOUT_ENV. Set before
+    # anything else this connection does, so even the first statement is
+    # covered.
+    raw.execute(f"SET lock_timeout = {_lock_timeout_ms()}")
     if read_only:
         raw.execute("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")
     return SupplyConnection(raw)
+
+
+def _lock_timeout_ms() -> int:
+    raw = os.environ.get(LOCK_TIMEOUT_ENV)
+    if raw is None:
+        return DEFAULT_LOCK_TIMEOUT_MS
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise SupplyDbError(
+            f"{LOCK_TIMEOUT_ENV} must be a whole number of milliseconds, "
+            f"got {raw!r}") from exc
+    if value < 0:
+        raise SupplyDbError(f"{LOCK_TIMEOUT_ENV} cannot be negative: {value}")
+    return value
 
 
 # ---------------------------------------------------------------------------

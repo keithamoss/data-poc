@@ -151,6 +151,23 @@ def supply_dsn(worker_id):
         # error about something the person did not do.
         conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
         conn.execute(f'CREATE DATABASE "{name}"')
+        # REAP CONNECTIONS A QA TOOL LEAVES IDLE IN A TRANSACTION, which
+        # is a real thing that happens rather than a precaution. Found
+        # 2026-09-27: a datacontract-cli SQL rule left its connection
+        # open after `test()` returned, holding a read lock on a staged
+        # table, and the next load's DROP TABLE blocked behind it until
+        # the whole run was killed. supply_db sets a lock_timeout so that
+        # now fails loudly instead of hanging - this removes the cause as
+        # well as the symptom, so the suite does not spend its time
+        # proving the timeout works.
+        #
+        # ON THE DATABASE, not on our own connections: the leaking
+        # connection is the TOOL'S, opened by its own driver, so nothing
+        # we set on a connection we opened would reach it. A production
+        # deployment wants this too, set by whoever administers the
+        # database rather than by the application.
+        conn.execute(
+            f'ALTER DATABASE "{name}" SET idle_in_transaction_session_timeout = \'15s\'')
 
     info = psycopg.conninfo.conninfo_to_dict(admin)
     info["dbname"] = name

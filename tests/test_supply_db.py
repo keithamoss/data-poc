@@ -316,6 +316,46 @@ class TestWhereItRefusesToGuess:
             supply_db._ident("x" * 64, "table name")
 
 
+class TestItNeverWaitsForeverForALock:
+    """The failure mode this class exists for is a HANG, which is worse
+    than an error: it is indistinguishable from slow, it holds its own
+    locks while it waits, and nothing in a log says why.
+
+    Real incident, 2026-09-27, and the reason this test exists: a QA tool
+    left its connection idle in a transaction holding a read lock on a
+    staged table, and the next load's DROP TABLE blocked behind it for
+    six minutes until the run was killed by hand. PostgreSQL's default
+    lock_timeout is 0, meaning wait forever.
+    """
+
+    def test_a_statement_blocked_on_a_lock_fails_instead_of_hanging(self, db, monkeypatch):
+        import psycopg
+
+        monkeypatch.setenv(supply_db.LOCK_TIMEOUT_ENV, "1000")
+        db.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."lock_probe" (x int)')
+
+        # A reader behaving exactly like the tool that caused this: a
+        # SELECT inside a transaction it never commits, so ACCESS SHARE
+        # is held indefinitely.
+        leaker = psycopg.connect(supply_db.supply_db_dsn())
+        try:
+            leaker.execute(f'SELECT * FROM "{supply_db.STAGING_SCHEMA}"."lock_probe"')
+            writer = supply_db.connect()
+            try:
+                with pytest.raises(psycopg.errors.LockNotAvailable):
+                    writer.execute(
+                        f'DROP TABLE "{supply_db.STAGING_SCHEMA}"."lock_probe" CASCADE')
+            finally:
+                writer.close()
+        finally:
+            leaker.close()
+
+    def test_a_nonsense_timeout_is_refused_rather_than_ignored(self, monkeypatch):
+        monkeypatch.setenv(supply_db.LOCK_TIMEOUT_ENV, "soon")
+        with pytest.raises(supply_db.SupplyDbError, match="whole number of milliseconds"):
+            supply_db.connect()
+
+
 class TestAWriterDoesNotExcludeReaders:
     """The property the new design rests on, and the exact reverse of what
     this file used to assert.
