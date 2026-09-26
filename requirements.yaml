@@ -13877,8 +13877,8 @@ requirements:
       - >
         COMPATIBILITY: the TUI route is the MORE AVAILABLE of the two,
         not an offline one. It needs the database and nothing else;
-        the GitHub route needs the database AND a reachable third-
-        party domain. On a government network where that domain may
+        the GitHub route needs the database AND a reachable third-party
+        domain. On a government network where that domain may
         not be reachable at all, the terminal may be the only route
         that works, which is a stronger argument for it than
         convenience. What this NFR no longer claims, deliberately:
@@ -14220,9 +14220,10 @@ requirements:
         and this replaces the open question that stood here (Keith,
         2026-09-26, plans/running-thoughts.md #45). Where "the instant
         its entry is appended" falls had four candidate answers and
-        none was chosen: pending-until-it-lands, judge-locally-and-
-        void-on-arrival, refuse-to-decide-on-a-stale-clone, or accept-
-        detect-and-report. A database has one serialisation point and
+        none was chosen: pending-until-it-lands,
+        judge-locally-and-void-on-arrival,
+        refuse-to-decide-on-a-stale-clone, or accept-detect-and-report.
+        A database has one serialisation point and
         a transaction, so that instant is a single well-defined thing
         and the gap between judging a decision and landing it does not
         exist. REJECTED with it: last-wins, which decision 12 had
@@ -14237,8 +14238,8 @@ requirements:
         points a period at ANOTHER period's supply, so like
         inheritance it answers how a period gets filled when no supply
         for it arrives - not what to do with one that has. REJECTED:
-        putting it in the queue alongside promote/reject/demote/re-
-        file (drafted that way first), and offering it from both
+        putting it in the queue alongside promote/reject/demote/re-file
+        (drafted that way first), and offering it from both
         places, which is two entry points onto one operation to keep
         consistent.
       - >
@@ -14932,3 +14933,2153 @@ requirements:
         is the answer on screen rather than the record; rejected leaving
         today's behaviour, which is simplest and is what makes the
         mixing possible.
+  - id: REQ-PIPE-087
+    title: "PostgreSQL is the one warehouse engine, and DuckDB keeps only the job of reading what arrives"
+    date_written: "2026-09-26"
+    story: >
+      As whoever maintains this pipeline, I want the warehouse to be
+      the engine production actually runs, so that every property this
+      design leans on is exercised rather than read from
+      documentation, and a supply's whole life happens in one place.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26), given to
+      delivery-scoper as the first of three items in the batch-5
+      brief, alongside plans/supply-model.md Threads B, H, J and K.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL hold all supply data in one PostgreSQL
+        database, and SHALL NOT hold any of it in a DuckDB file.
+      - >
+        THE SYSTEM SHALL provide four kinds of schema in that database
+        - one staging schema, one rejected schema, one schema per
+        period, and one `sample` schema for data received before any
+        supply is agreed.
+      - >
+        THE SYSTEM SHALL exclude the `sample` schema from every
+        period, slot, lateness, promotion, rollup and status
+        computation by construction, and SHALL NOT rely on a flag, a
+        filter or a convention to exclude it.
+      - >
+        THE SYSTEM SHALL load an arriving file into the staging schema
+        before any QA tool runs against that supply.
+      - >
+        THE SYSTEM SHALL read arriving CSV, Parquet and any other
+        delivered file format with DuckDB, and SHALL NOT use DuckDB as
+        a warehouse.
+      - >
+        THE SYSTEM SHALL stream a load over the database connection,
+        and SHALL NOT require the database server to read a file from
+        a filesystem.
+      - >
+        WHERE a DuckDB extension is needed to read an arriving format,
+        THE SYSTEM SHALL install it from a file vendored in this
+        repository, and SHALL NOT require reaching
+        extensions.duckdb.org at run time.
+      - >
+        THE SYSTEM SHALL send every read, every write and every schema
+        operation to the cluster's writer endpoint, and SHALL NOT send
+        a check to a reader endpoint.
+      - >
+        THE SYSTEM SHALL declare, for this engine, that a table can be
+        moved between schemas as a catalogue operation, so that the
+        move REQ-PIPE-081 requires is chosen from a declared
+        capability rather than attempted and caught.
+      - >
+        THE SYSTEM SHALL take connection details from configuration
+        read at run time, and SHALL NOT commit a credential to this
+        repository.
+      - >
+        THE SYSTEM SHALL give dbt its own schema in the same database
+        as the supply data, and SHALL NOT attach a separate scratch
+        database for it.
+      - >
+        IF the database is unreachable, THEN THE SYSTEM SHALL fail
+        loudly, naming the environment and the host it tried, and
+        SHALL NOT fall back to a local file, an in-memory database or
+        a previous result.
+    non_functional_requirements:
+      - >
+        Everything here is reached through `mothman` and nothing else
+        - the standing constraint, not a migration. Any new script
+        added in this work gets its subcommand in the same change.
+      - >
+        PACKAGING IS RESOLVED FOR REAL rather than estimated (uv lock,
+        2026-09-26): dbt-core 1.12.5, dbt-postgres 1.11.0,
+        soda-core-postgres 3.5.6, datacontract-cli[postgres] 1.2.2 and
+        evidently 0.7.23 all have a Postgres path and nothing needs
+        updating. The resolution is SMALLER and cleaner - 160 packages
+        against the current lock's 190 - and pyproject.toml's
+        `override-dependencies = ["duckdb>=1.5"]` is no longer needed,
+        because it exists only to reconcile soda-core-duckdb's
+        `duckdb<1.1.0` with datacontract-cli[duckdb]'s newer pin, and
+        both extras go.
+      - >
+        TWO DRIVERS, not one: dbt-postgres and soda-core-postgres use
+        psycopg2-binary, datacontract-cli[postgres] uses psycopg 3.
+        They coexist - different package and import names - but that
+        is two connection-string dialects to keep straight.
+      - >
+        Soda has no `add_postgres_connection`. DuckDB is a SPECIAL
+        CASE in Soda's own API; Postgres goes through
+        `add_configuration_yaml_str`/`_file` with host, port, database
+        and schema, so run_soda_bdm.py and run_soda_cp.py change shape
+        rather than swapping a string.
+      - >
+        datacontract-cli takes credentials from environment variables
+        rather than from the contract, and treats an EMPTY password as
+        unset (missing_env_DATACONTRACT_POSTGRES_PASSWORD). Worth
+        knowing before somebody spends an hour on it.
+      - >
+        COMPATIBILITY on a government network: this session's own
+        proxy allows extensions.duckdb.org over https only while
+        DuckDB downloads extensions over plain HTTP, so the default
+        path 403s and pointing `custom_extension_repository` at the
+        https host fails differently (DuckDB then asks for the
+        un-gzipped filename, which 404s). A vendored local-file
+        install works and is the answer for a network that cannot
+        reach the host at all - the same treatment dashboard/vendor/
+        already gives the asciinema player.
+      - >
+        PORTABILITY: evaluating this PoC on someone else's machine now
+        needs a PostgreSQL. Keith's own answer, 2026-09-26: they run
+        their own local or dockerised one. That is a real reduction in
+        how cheaply this repo can be handed to somebody, and it is
+        accepted knowingly.
+      - >
+        SCALE, measured rather than reasoned (real PostgreSQL 16.13,
+        2026-09-26): a decade of daily periods is 3,650 schemas and
+        15,013 relations, created in 11.4 s; counting them in
+        pg_namespace is 2 ms; querying one period's own table is 0.5
+        ms; pg_dump of the whole thing is 3.5 s for a 3 MB dump; and
+        the database is 94 MB with zero rows in it, of which ~50 MB is
+        catalogue - roughly 14 KB per schema-plus-table before a
+        single row exists. No cliff anywhere near this design's scale.
+        Re-measure if a dataset ever needs a period per HOUR.
+      - >
+        A CEILING WORTH KNOWING: `max_locks_per_transaction` bounds
+        how many objects ONE transaction may touch, and creating 3,650
+        schemas inside a single DO block died after about 380 with
+        `out of shared memory`. Promotion is transactional by design
+        and six tables is nowhere near it, but any future
+        do-the-whole-delivery-in-one-transaction idea at 30 datasets
+        with several versions each should know the ceiling exists.
+      - >
+        `max_connections` VARIES BY DB INSTANCE CLASS on Aurora rather
+        than being a fixed number, so it is a sizing decision. The
+        figure to size against is 30 datasets checked in parallel with
+        each of four tools opening its own connection.
+      - >
+        PRIVACY: in a real deployment staging, the period schemas and
+        `sample` all hold real Birth Registrations and Child
+        Protection data in a real database. The `sample` schema is the
+        sharpest case, because it holds a prospective supplier's data
+        before any supply agreement exists - so the access question
+        arrives before the governance does.
+      - >
+        COST: Aurora Serverless v2 scales in half-ACU steps and can
+        pause to zero, and AWS names development and testing
+        explicitly as a low-minimum-capacity use case. A quarterly
+        asset is idle for most of every quarter, so a provisioned
+        instance sitting at idle between deliveries is the wrong
+        shape.
+      - >
+        AURORA IS NOT VANILLA POSTGRESQL - different storage layer,
+        its own divergences - so this is a separate compatibility
+        question rather than a version number to match. Two concrete
+        consequences already known: there is NO true superuser
+        (rds_superuser is the most privileged role, and everything
+        this design does is within it), and extensions are an
+        allowlist published per Aurora version rather than
+        install-anything.
+      - >
+        MAINTAINABILITY: qa_tools/dbt_profiles/profiles.yml is
+        committed today and its own header explains why - no secrets,
+        just a local file path. With Postgres there are credentials,
+        so that reasoning expires and something has to own how they
+        reach dbt, Soda and datacontract-cli in each environment.
+    dependencies: [REQ-PIPE-068]
+    open_questions:
+      - >
+        THE PRE-AGREEMENT DATASET LIFECYCLE the `sample` schema exists
+        FOR is deliberately not scoped here. What it needs at minimum,
+        from #45: a dataset may exist without a calendar; its supplies
+        may be QA'd without being filed to a period; the dashboard
+        says plainly that it is in development rather than
+        green-and-good or red; and there is a GRADUATION, the moment
+        it gains a calendar and starts owing supplies. Whether it
+        joins this batch or goes with the project-extraction asset
+        shape is Keith's call. This requirement provides only the
+        schema and the by-construction exclusion.
+      - >
+        THE COMMITTED SAMPLE-QA TREE NEEDS RE-TESTING against
+        REQ-PIPE-089. Keith settled on 2026-09-26 that sample QA is
+        committed to the repository in its own top-level tree, never
+        in qa_results/, because check development is real work whose
+        record should survive graduation - and that was decided hours
+        BEFORE qa_results/ itself stopped being committed. The
+        argument for it (a separate tree makes pollution structurally
+        impossible) maps cleanly onto a separate schema or a scope
+        column, so the conclusion may survive with a different
+        mechanism. Its NAME was never fixed either - `qa_sample/` was
+        a suggestion only.
+      - >
+        STILL GENUINELY UNREAD, and both bear on the version anchor
+        REQ-PIPE-093 asserts: Aurora 16.8's own extension allowlist,
+        and Aurora's major-version support timeline (how long 16
+        remains available), which is the counter-argument for 17.7.
+    decisions:
+      - >
+        ONE ENGINE, AND IT IS POSTGRESQL (Keith, 2026-09-26). Staging,
+        rejected and the period schemas all live there. Rejected
+        splitting them across two engines - cross-engine views do not
+        exist, and REQ-PIPE-068 criterion 7 already requires one
+        database - and rejected it as worse than either end state
+        rather than as a close call.
+      - >
+        DuckDB KEEPS A ROLE, but not as a warehouse: reading arriving
+        deliveries in CSV, Parquet and whatever else turns up.
+        Verified both ways - `read_csv_auto` inferred
+        BIGINT/VARCHAR/DATE correctly, and the load path is DuckDB to
+        a typed frame to Postgres COPY, which needs no extension at
+        all.
+      - >
+        Rejected the ATTACH-to-Postgres route as the DEFAULT load path
+        even though it works and writes a CSV straight into a Postgres
+        table with types preserved: it needs DuckDB's `postgres`
+        extension, which a government network may not be able to
+        fetch. Vendoring the extension is the fallback that makes it
+        available, not the reason to depend on it.
+      - >
+        EVERY PROPERTY THE SUPPLY MODEL LEANS ON WAS MEASURED against
+        a real PostgreSQL 16.13 stood up in the session sandbox,
+        2026-09-26, rather than cited: ALTER TABLE ... SET SCHEMA is
+        catalogue-only (identical relfilenode 16404 and
+        pg_relation_size 1,818,624 before and after moving a
+        50,000-row table, and its index moved with it); DDL is
+        transactional (a SET SCHEMA inside BEGIN/ROLLBACK left the
+        table where it started); a per-run schema of VIEWS over
+        physical tables in other schemas works, and DROP SCHEMA ...
+        CASCADE discards the views while the physical rows survive;
+        cross-schema joins work, so Child Protection's cross-table
+        checks are fine; and two sessions wrote at once with no lock
+        wait.
+      - >
+        DUCKDB'S SINGLE-WRITER LOCK IS GONE, which is the constraint
+        REQ-PIPE-068 was shaped around and the reason its tests pin
+        one database per worker. That is what makes the dbt profile
+        simplify rather than merely change: today it points dbt at a
+        scratch DuckDB FILE and ATTACHes the supply database read-only
+        purely because a DuckDB writer takes an exclusive lock over
+        the file.
+      - >
+        ALL FOUR TOOLS WERE RUN FOR REAL against that Postgres,
+        2026-09-26, in an isolated scratch environment that left the
+        repo's own pyproject.toml and uv.lock untouched, against a
+        fixture mirroring the supply model's real shape - a period
+        schema, a physical versioned table inside it, a per-run schema
+        of views over it, and two planted defects. dbt-postgres read
+        through the view schema and correctly failed the planted
+        accepted_values violation; Soda Core found both planted
+        defects; datacontract-cli passed every schema and
+        physical-type check and caught the NULL; Evidently reads CSVs
+        and had nothing to prove.
+      - >
+        CLIENT-SIDE COPY IS REQUIRED, verified by experiment rather
+        than cited: as a plain role, `COPY staging.t FROM
+        '/path/file.csv'` fails with "Only roles with privileges of
+        the pg_read_server_files role may COPY from a file", while
+        COPY ... FROM STDIN succeeds. On Aurora it is moot anyway,
+        because there is no server filesystem to put a file on.
+      - >
+        THE READER ENDPOINT IS EXPLICITLY REJECTED as an optimisation
+        rather than left as an obvious idea for somebody to try.
+        Aurora's primary handles all DDL and DML with up to 15
+        read-only replicas, so the reader endpoint looks like free
+        capacity for the checks - and the agreed shape is load THEN
+        check, so a check served by a lagging replica can miss rows
+        just loaded or find the per-run view schema not yet there.
+        That is a FALSE GREEN, the direction this project has already
+        been burned in. Worth knowing alongside it: the cluster and
+        reader endpoints survive failover where instance endpoints do
+        not, and during a failover the reader endpoint may briefly
+        point at the new primary.
+      - >
+        THE `sample` SCHEMA EARNS ITS PLACE FOR A REASON BEYOND
+        STORAGE: it makes "do not factor this into anything"
+        STRUCTURAL rather than a flag. Nothing in the period machinery
+        looks at it, so no rollup, status calculation or lateness
+        check has to remember to skip it. Same reasoning as
+        qa_results/'s reserved `_raw`/`_cross-table` scopes and as
+        delivery_boundary.py refusing to default - build the guarantee
+        into the shape rather than leaving a rule to hold in mind.
+      - >
+        THE WAREHOUSE THEREFORE HAS FOUR KINDS OF SCHEMA, not three.
+        Recorded because Thread B settles three (period, one global
+        staging, one global rejected) with its own departures from
+        Keith's operational system called out, and a later session
+        could read a fourth as a mistake.
+      - >
+        SEQUENCING: this item is a PREREQUISITE rather than a
+        nice-to-have (Keith, 2026-09-26). Sprint 11 is what seven
+        other sprints are blocked on, and sprint 11 waits on this.
+        Nothing in the supply sprints is built, so changing
+        requirements now costs requirement edits rather than code.
+  - id: REQ-QAC-088
+    title: "Every QA tool checks what is in the warehouse, not the file that arrived"
+    date_written: "2026-09-26"
+    story: >
+      As whoever maintains this pipeline, I want all four tools
+      checking the rows that actually landed, so that two tools can
+      never quietly disagree about their subject and nothing a load
+      did to the data goes unexamined.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26) - his own
+      model, that the pipeline loads what arrived into PostgreSQL
+      FIRST and then every QA tool checks what is in the database.
+      Given to delivery-scoper as part of the batch-5 brief.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL run every QA tool against the warehouse,
+        through the per-run view schema REQ-PIPE-068 establishes.
+      - >
+        THE SYSTEM SHALL NOT read supply data from a file for any data
+        check.
+      - >
+        THE SYSTEM SHALL resolve a drift or trend check's reference
+        from the warehouse, and SHALL NOT read a reference supply from
+        a file on disk.
+      - >
+        THE SYSTEM SHALL close REQ-PIPE-068 criterion 2's outstanding
+        exception, so that no tool reads a physical table or a
+        delivered file directly.
+      - >
+        WHERE a question can only be asked of the file as delivered,
+        THE SYSTEM SHALL NOT express it as a data check here.
+      - >
+        THE SYSTEM SHALL record each tool's results in the same shape
+        as it does today, so that nothing downstream distinguishes a
+        result by which source the tool read.
+      - >
+        WHERE repointing a tool changes a recorded verdict, THE SYSTEM
+        SHALL account for that change against the data the load
+        produced, and SHALL NOT accept it as incidental.
+    non_functional_requirements:
+      - >
+        CI never runs any of this. Every one of these tool invocations
+        needs a live warehouse connection, so it belongs to the
+        pipeline run, never to a read-committed-history path.
+      - >
+        DETERMINISM AND THE DIFF: this repo is seeded so regenerating
+        and diffing recorded verdicts is a real correctness check -
+        the technique that proved 6,545 verdicts identical when
+        REQ-PIPE-068 landed. It is the right check here too, with one
+        honest caveat: some verdicts SHOULD change, because a load
+        coerces types and turns sentinels into NULLs, and this repo
+        has had exactly that bug ("N/A" becoming NULL). So the diff is
+        a review list to account for, not a pass/fail gate.
+      - >
+        PERFORMANCE: 30 datasets checked in parallel, four tools each
+        opening its own connection, is the concurrency figure. Two of
+        the four tools are being given a database connection they
+        never had, so the connection count roughly doubles.
+      - >
+        MAINTAINABILITY: three of the four tools are configured
+        differently for Postgres than for DuckDB (Soda's configuration
+        YAML rather than a live connection object, dbt's profile
+        losing its attach, datacontract-cli's credentials coming from
+        the environment), so this is real code in each tool's own
+        runner rather than one shared string.
+      - >
+        TESTING: the real integration tests for all four tools, both
+        collections, now need a real PostgreSQL - which is what
+        REQ-TEST-095 supplies.
+    dependencies: [REQ-PIPE-087, REQ-PIPE-068]
+    decisions:
+      - >
+        LOAD FIRST, ALL FOUR TOOLS CHECK THE WAREHOUSE (Keith,
+        2026-09-26, agreeing with this session's proposal). Today dbt
+        and Soda read the warehouse through the per-run view schema
+        while datacontract-cli and Evidently read the arriving CSV
+        straight off disk, so two tools check the file as delivered
+        and two check the rows as loaded, they are different subjects,
+        and nothing reconciles them. A load coerces types, turns
+        sentinels into NULLs or rejects rows.
+      - >
+        A BUILT REQUIREMENT ALREADY IMPLIED IT, which is the strongest
+        argument for it: REQ-PIPE-068 criterion 2 requires every read
+        of supply data to go through the per-run schema and forbids
+        querying a physical table directly from any check, tool
+        invocation or downstream reader. Two of four tools bypass that
+        by reading a file - so this is an existing inconsistency with
+        something marked `built`, not a new question.
+      - >
+        RECORDED AS A CORRECTION rather than quietly edited: #45 first
+        estimated that datacontract-cli and Evidently were NOT part of
+        the migration because they never touch the warehouse. Keith's
+        decision puts them back. It is four tools to repoint, not two,
+        and the migration is larger than the grep suggested rather
+        than smaller.
+      - >
+        datacontract-cli's own internal DuckDB - which
+        run_datacontract_cp.py mentions - is its engine for reading a
+        file and has nothing to do with this project's warehouse.
+        Recorded because it reads like a DuckDB dependency to remove
+        and is not.
+      - >
+        THE FILE-SHAPE BOUNDARY IS NOT A HEDGE, and it is why
+        REQ-QAC-096 exists instead of this criterion being softened: a
+        class of check can only be made on the FILE and is destroyed
+        by loading - encoding, delimiter, header row, column order,
+        ragged rows, duplicate headers. "Check everything in the
+        warehouse" on its own would silently drop them.
+  - id: REQ-PIPE-089
+    title: "QA results live in the database, in a metadata schema of their own, and qa_results/ stops being committed"
+    date_written: "2026-09-26"
+    story: >
+      As manager of the data team, I want two years of QA results to
+      be a query rather than a walk of a file tree, so that "every
+      failure of this check since we started" is one question, and the
+      repository stops carrying the data it was never meant to hold.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26) - his own
+      question, whether qa_results/ needs an equivalent in the
+      database, answered yes, with the schema's shape deliberately
+      left for the scoper to put as options rather than decide cold.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL record every QA run's results in the
+        warehouse database, in a schema reserved for QA metadata.
+      - >
+        THE SYSTEM SHALL record, for each result, every fact the
+        committed history records today - the dataset, the tool, the
+        check's identity, its verdict, the run and the period - and
+        SHALL NOT drop any fact the dashboard renders today.
+      - >
+        THE SYSTEM SHALL keep each tool's own unmodified output
+        alongside those resolved records, retrievable per run and per
+        tool.
+      - >
+        THE SYSTEM SHALL answer "every result for this check across
+        all history" without reading any other check's results.
+      - >
+        THE SYSTEM SHALL keep the records that span datasets, and the
+        facts that describe a run rather than a dataset,
+        distinguishable from a dataset's own results.
+      - >
+        THE SYSTEM SHALL record who ran each run and when, on every
+        run.
+      - >
+        THE SYSTEM SHALL give the dashboard build a role with read
+        access to that schema alone, and SHALL NOT give the publisher
+        any access to supply data.
+      - >
+        THE SYSTEM SHALL stop committing qa_results/ to the
+        repository, and SHALL remove the tree rather than leaving it
+        in place to go stale.
+      - >
+        THE SYSTEM SHALL rebuild the dashboard's own result documents
+        from that schema, with no tool re-run.
+      - >
+        THE SYSTEM SHALL keep code, contract/*.yaml, the hand-authored
+        check definitions, plans/*.md, CHANGELOG.yaml and
+        dashboard/snapshots/*.html.gz in the repository.
+      - >
+        THE SYSTEM SHALL either migrate today's committed history into
+        that schema or regenerate it, and SHALL NOT leave the two as
+        parallel sources of the same verdicts.
+      - >
+        IF a result cannot be recorded, THEN THE SYSTEM SHALL fail the
+        run loudly, and SHALL NOT complete a run whose results were
+        recorded nowhere.
+      - >
+        THE SYSTEM SHALL make a run's results observable only once
+        that run's results are complete, so that a partial run is
+        never indistinguishable from a finished one.
+    non_functional_requirements:
+      - >
+        SCALE is the reason `verified` wants real columns. Today's 60
+        runs already carry 6,545 recorded verdicts; the target is ~30
+        datasets on the quarterly asset over years, times four tools,
+        times hundreds of checks. Index for the two questions actually
+        asked: this dataset's latest results, and one check across all
+        of history.
+      - >
+        raw_output IS THE BULK, and must not be dragged into a query
+        that only wants verdicts. CLAUDE.md records the real cost of
+        walking it: 225 MB and 5.3 M lines of diff output for one
+        dataset's twelve commits, fixed largely by narrowing the
+        pathspec away from the verbose tool payloads.
+      - >
+        PRIVACY IMPROVES, and it is worth recording as a gain rather
+        than a side effect: per-check failing-value aggregates and
+        free operator prose stop being committed to a PUBLIC
+        repository. REQ-PIPE-074's own privacy NFR names a permanent
+        disclosure with no removal path; moving off git removes the
+        no-removal-path half of that.
+      - >
+        AUDITABILITY LOSES `git log` and `git diff` over QA history,
+        which Keith has said he will give up.
+        dashboard/snapshots/*.html.gz remain the durable,
+        credential-free record of what was actually published - they
+        were always the mechanism for that, not qa_results/.
+      - >
+        RETENTION BECOMES POSSIBLE FOR THE FIRST TIME. It is
+        explicitly out of scope today because git cannot forget, and
+        that reason is gone. This requirement does not set a policy;
+        it makes one available, and the question is now real rather
+        than unaskable.
+      - >
+        COMPLIANCE: a multi-agency asset can now express per-agency
+        access to QA history as real grants, where a public repository
+        gave everyone everything. That is a genuine gain for the real
+        deployment and a new thing to configure correctly.
+      - >
+        MAINTAINABILITY, a straight win: build_results_from_history.py
+        exists as a SECOND code path reproducing the live run's
+        output, verified byte-identical. With a database the run
+        writes and the reader reads, so the duplication that needed
+        verifying largely stops existing.
+      - >
+        RELIABILITY: one transaction per run, or an explicit
+        run-complete marker. A half-written run that reads as complete
+        is the false-green shape this project keeps finding.
+      - >
+        PERFORMANCE of the dashboard build: it becomes a set of
+        queries rather than a directory walk, and the build must not
+        degrade into reading all of history per dataset to render the
+        current view.
+    dependencies: [REQ-PIPE-087]
+    open_questions:
+      - >
+        THE SCHEMA'S SHAPE IS DELIBERATELY UNSETTLED - Keith's
+        explicit call was to have the options put to him rather than
+        decided cold. Four forks are relayed as question set A: how
+        `verified` is shaped (a row per result with real columns, a
+        document per run, or columns plus a JSONB side-car for
+        tool-specific extras); where `raw_output` lives (the same
+        table, a separate table keyed by run, or outside the database
+        entirely since nothing queries inside it); whether a RUN is a
+        first-class table everything keys to, and whether the
+        `dataset_stats` and `tables_read` pseudo-tools become real
+        tables or stay documents; and what retention policy, if any,
+        to take now that one is possible.
+      - >
+        WHAT ELSE LEAVES THE REPOSITORY IS NOT SETTLED, and the brief
+        only names qa_results/ and the decision log. Five other
+        committed records exist for exactly the reason this
+        requirement removes: the delivery log (REQ-PIPE-069 criterion
+        4 requires it queryable as SQL from the committed files and
+        FORBIDS a second copy in the warehouse), load records
+        (REQ-PIPE-060 criterion 20), outstanding holds (REQ-PIPE-078
+        criterion 4), the processing marker, and the scenario map
+        (REQ-GEN-045 criterion 4). Relayed as question set B. Nothing
+        in this requirement moves any of them, and leaving them behind
+        is a coherent answer - it is just not one anybody has given.
+      - >
+        Whether REQ-PIPE-038's criteria - which specify the committed
+        tree's per-dataset keying, built and signed eleven days before
+        this - are retired, or restated as properties the database
+        layout must keep. The property they bought (reading one
+        dataset's history costs nothing in another's) is strictly
+        better served by a table with an index, so this is bookkeeping
+        rather than a design fork.
+    decisions:
+      - >
+        qa_results/ NEEDS AN EQUIVALENT IN THE DATABASE (Keith's own
+        question, 2026-09-26). What it holds today is deliberately two
+        things side by side - `raw_output`, each tool's native
+        payload, and `verified`, the resolved dashboard-ready check
+        records - plus the `dataset_stats` and `tables_read`
+        pseudo-tools and run_by/run_timestamp. That split maps cleanly
+        onto columns for `verified` and JSONB for `raw_output`.
+      - >
+        NORMALISING `verified` BUYS WHAT A FILE TREE CANNOT DO: "every
+        failure of this check over two years" becomes a WHERE clause
+        instead of the tree walk qa_results_reader.py performs today.
+      - >
+        THE FOUR REASONS THE REPOSITORY HOLDS qa_results/ TODAY, and
+        which of them survive: (1) the CI rule - the dashboard is
+        built by GitHub Actions, CI must not touch the warehouse, so
+        what it renders must already be in files. This is the
+        load-bearing one, and REQ-PIPE-092 removes it. (2) Permanence
+        - git on a public remote, readable in ten years with no
+        infrastructure. Given up, and cheaply, because
+        dashboard/snapshots/*.html.gz already does that job. (3)
+        Auditability with NO credentials - anyone can read the whole
+        history with `git log`. Given up knowingly (Keith,
+        2026-09-26). (4) Zero infrastructure - the PoC gets evaluated
+        on other people's machines. Answered: they run their own local
+        or dockerised PostgreSQL.
+      - >
+        REASON 1 WAS REALLY A CHAIN, and seeing it as one is what
+        opened the question: the dashboard is a static site, so it is
+        built by CI, so it must not touch the warehouse, so what it
+        renders must be in files, so the files are committed. The
+        honest answer to "why does the repository hold data" was
+        therefore "because the publisher is GitHub Actions, and GitHub
+        Actions is the wrong place to hold warehouse credentials."
+      - >
+        ONE DATABASE WITH ROLES FOR ISOLATION, NOT A SEPARATE METADATA
+        DATABASE (Keith, 2026-09-26, and he got there by pushing back
+        on an argument this session had overstated). The claim that a
+        separate database means the publisher's credentials "literally
+        cannot" read supply data was overstated - it is a GRANT, not a
+        wall - and his own push settled it: the loader must have
+        supply-write credentials anyway, so what separation buys is
+        least privilege per component rather than isolation of the
+        data, and a ROLE in one database buys the same. Against a
+        second database is something concrete: REQ-PIPE-075 criterion
+        9's ordering rule collapses into a single transaction only
+        while the log and the tables share a database, and a separate
+        metadata database hands that rule back.
+      - >
+        Rejected keeping qa_results/ committed as well, as a
+        belt-and-braces export. Two sources of truth for the same
+        verdicts is exactly what REQ-PIPE-074 criterion 1 forbids for
+        decisions, and the same argument applies to results.
+      - >
+        WHAT STAYS IN THE REPOSITORY EITHER WAY (Keith, 2026-09-26):
+        code, contract/*.yaml, the hand-authored check definitions
+        (dbt `meta:`, Soda `attributes:`, the ODCS
+        `customProperties:`), plans/*.md, CHANGELOG.yaml and
+        dashboard/snapshots/*.html.gz. The build still needs a
+        checkout.
+  - id: REQ-PIPE-090
+    title: "The activity feed comes from recorded timestamps, and the walk of git history goes away"
+    date_written: "2026-09-26"
+    story: >
+      As a reader of the register, I want "who QA'd what, when" to
+      come from what each run actually recorded, so that the feed
+      states a fact rather than inferring one from commits, and the
+      build stops paying to walk the repository's history.
+    moscow: should
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26) - named there
+      as a straight win of moving qa_results/ into the database, since
+      changelog.py's git-history walk disappears entirely.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL build the activity feed from the timestamps
+        recorded with each run, and SHALL NOT resolve any of them by
+        walking git history.
+      - >
+        THE SYSTEM SHALL name each event's actor from the identity
+        recorded with that run.
+      - >
+        THE SYSTEM SHALL remove the git-history walk rather than
+        leaving it in place as an unused fallback.
+      - >
+        THE SYSTEM SHALL order the feed by the instant each run
+        happened.
+      - >
+        THE SYSTEM SHALL NOT present a commit sha or a commit date as
+        the moment a result became visible.
+      - >
+        THE SYSTEM SHALL keep the feed grouped by run rather than by
+        anything derived from a commit.
+    non_functional_requirements:
+      - >
+        PERFORMANCE is the whole point, and the number is on the
+        record: _committed_at_by_run_timestamp() once spawned one `git
+        show` per commit that ever touched a dataset's qa_results/
+        subtree, diffing each commit's entire changed tree - 13 s for
+        one dataset's twelve commits, 225 MB and 5.3 M lines of raw
+        diff. It was fixed to 0.7 s, and CLAUDE.md's own standing
+        lesson is that this class of logic scales with real repository
+        growth rather than with row counts. This requirement removes
+        the class rather than tuning it.
+      - >
+        OBSERVABILITY: run_by and the run timestamp keep doing exactly
+        what they do today, so nothing about attribution weakens - it
+        stops being inferred, which is stronger.
+    dependencies: [REQ-PIPE-089]
+    decisions:
+      - >
+        THE GIT WALK DISAPPEARS ENTIRELY and this is a straight win
+        with no counter-argument (#45): CLAUDE.md records it as a real
+        performance bug, and a database has actual timestamps rather
+        than inferring them from commits.
+      - >
+        committed_at and commit_sha were resolved by a git walk for a
+        specific reason - a commit made locally can be rebased before
+        it reaches the shared branch, rewriting its SHA and committer
+        date, so the run could not self-record them. With no commit in
+        the publication path, the problem and the fields both go.
+      - >
+        THE GROUPING SURVIVES ITS OWN REASONING, recorded so it is not
+        re-derived wrongly. Today's group-by-run_timestamp exists
+        because one commit can legitimately bundle several datasets'
+        events. The commit disappears; grouping by run is still
+        correct, because a run is the thing each event describes.
+      - >
+        PER-EVENT ENVIRONMENT ATTRIBUTION IS NOT NEEDED here: each
+        environment has its own database and its own dashboard, so the
+        honest unit is the page-level statement REQ-DASH-094 requires,
+        not a label on every event.
+  - id: REQ-PIPE-091
+    title: "The decision log is a table in the metadata schema, and a filing decision and its entry are one transaction"
+    date_written: "2026-09-26"
+    story: >
+      As an operator filing a supply, I want the decision I take and
+      the entry recording it to be one indivisible act against one
+      shared log, so that permissibility is judged against what is
+      actually true at that instant rather than against a copy of the
+      log that may already be out of date.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26), settling
+      REQ-PIPE-074's own open question earlier than planned - and
+      then, later the same evening, removing the committed export that
+      first answer assumed. Given to delivery-scoper as part of the
+      batch-5 brief.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL hold the decision log in the metadata schema
+        REQ-PIPE-089 establishes, as the single system of record for
+        every filing decision.
+      - >
+        THE SYSTEM SHALL write a decision's entry and apply that
+        decision's effect on the warehouse in one transaction, such
+        that neither can be observed without the other.
+      - >
+        THE SYSTEM SHALL judge whether a decision is permitted against
+        the log as it stands inside that transaction.
+      - >
+        THE SYSTEM SHALL serialise decisions acting on the same
+        supply, and SHALL NOT let two of them be judged against the
+        same state.
+      - >
+        THE SYSTEM SHALL prevent an entry being modified or removed
+        once written, by a restriction the database itself enforces
+        rather than by a convention or a review gate.
+      - >
+        THE SYSTEM SHALL refuse a decision with no identified actor,
+        and SHALL NOT substitute a default, a placeholder or an
+        "unknown" identity.
+      - >
+        THE SYSTEM SHALL record every fact REQ-PIPE-074 requires of an
+        entry - the actor and whether it is a person or a rule, the
+        instant the decision took effect, the instant it was recorded,
+        the action, the supply, the slots involved and a reason.
+      - >
+        IF the database is unreachable, THEN THE SYSTEM SHALL refuse
+        the decision and say so, and SHALL NOT queue it locally for
+        later application.
+      - >
+        THE SYSTEM SHALL answer what a period resolved to as at any
+        past instant from that table alone.
+      - >
+        THE SYSTEM SHALL let a reader with no write access read the
+        whole decision history.
+      - >
+        THE SYSTEM SHALL read one dataset's decisions at a cost
+        independent of how much history every other dataset has.
+    non_functional_requirements:
+      - >
+        SECURITY cuts both ways and both should be stated. The log
+        stops being world-readable on a public repository, which
+        removes REQ-PIPE-074's permanent-public-disclosure risk for
+        free operator prose. It also stops being readable without
+        credentials, which is the audit property being given up.
+      - >
+        APPEND-ONLY NOW HAS TO BE ENFORCED BY GRANTS, not by a
+        `mothman check` gate over committed files. A role that can
+        UPDATE or DELETE here defeats the entire artifact, and
+        Postgres grants are fiddly in exactly the ways that matter -
+        default privileges, the PUBLIC schema, role inheritance.
+      - >
+        AVAILABILITY: no database, no decision, deliberately (Keith,
+        2026-09-26). The offline promise is dropped on the reasoning
+        that a filing decision acts on the warehouse, and in
+        production the engineer is inside the network where Aurora
+        lives - so Aurora is plausibly MORE reachable than GitHub.
+      - >
+        RELIABILITY: a decision must never be half-applied. One
+        transaction is the mechanism, and it is what satisfies
+        REQ-PIPE-075 criterion 9 rather than implementing it.
+      - >
+        SCALE: one entry per filing decision, plus one per automatic
+        promotion, plus one per automatic inheritance at a period's
+        birth (REQ-PIPE-098). At 30 datasets on a quarterly asset that
+        is hundreds a year, which is nothing; on a daily asset with
+        non-participating weekends it is roughly 104 per dataset per
+        year. Small, and worth knowing before anything renders the
+        whole log.
+      - >
+        Do not resolve anything about an entry by walking git history
+        - REQ-PIPE-074's own NFR, and it now holds by construction
+        rather than by discipline.
+    dependencies: [REQ-PIPE-089, REQ-PIPE-074]
+    open_questions:
+      - >
+        WHETHER A READER WITH NO DATABASE ACCESS NEEDS A ROUTE TO THE
+        LOG AT ALL. The committed export is gone and the argument for
+        dropping it is sound: the dashboard, which is what actually
+        reads the log, now runs where the database is. What that
+        argument does not cover is a reader who is neither the
+        dashboard nor an operator - an auditor, or somebody asked a
+        year later why a supply was rejected. Criterion 10 already
+        requires the log to be readable with no WRITE access, so the
+        answer may simply be a read-only grant plus the dashboard. If
+        it has to be something a person can be handed with no database
+        access whatsoever, that is a further requirement and nobody
+        owns it.
+      - >
+        Whether each entry carries the environment it was taken in -
+        belt and braces where each environment has its own database,
+        but it makes a misrouted decision visible rather than silent
+        (Keith raised it himself, #45). Relayed as question set D.
+      - >
+        REQ-PIPE-074 IS SIGNED and this requirement contradicts its
+        criterion 11 (commit the log, and do not hold it only in the
+        warehouse), criterion 13 (readable by the dashboard build with
+        no access to anything under data/) and criterion 14 (one file
+        per decision under that dataset's directory), plus three of
+        its NFRs. It needs Keith's own amendment rather than a
+        reinterpretation by whoever builds this.
+    decisions:
+      - >
+        THE DECISION LOG LIVES IN THE DATABASE (Keith, 2026-09-26),
+        earlier than his own planned sequencing, because the switch's
+        requirements describe "the warehouse" and whether the log is
+        inside that is a scope boundary a scoper cannot draw for
+        itself.
+      - >
+        WHAT DECIDED IT: the log has two consumers with different
+        needs, and one artifact was never going to serve both. The
+        SYSTEM, deciding what is promoted, needs atomicity and
+        currency - a database wins outright, because judging
+        permissibility and appending become one act. The AUDIT TRAIL -
+        "why is this supply in Q3", asked a year later, possibly by
+        somebody external - needs permanence and readability WITHOUT
+        credentials, and survival of the database being restored from
+        backup; files win outright. Under the later premise the
+        system's need is served and the audit need is knowingly given
+        up.
+      - >
+        Rejected keeping committed files as the system of record,
+        which is simpler and offline-capable but leaves REQ-GHUB-082
+        criterion 18's ambiguity needing one of four unsatisfying
+        workarounds - pending-until-it-lands,
+        judge-and-void-on-arrival, refuse-on-a-stale-clone,
+        accept-and-detect. Every one of them is a way of coping with
+        the absence of a serialisation point.
+      - >
+        Rejected queueing a decision locally and applying it on
+        reconnect: that is pending-until-it-lands under another name
+        and carries the same "not final until it lands" property.
+      - >
+        REQ-GHUB-082 CRITERION 18'S OPEN QUESTION RESOLVES. A database
+        has one serialisation point, so "the filing state at the
+        instant its entry is appended" is exact rather than undefined,
+        and the four workarounds are moot. That was one of the two
+        things holding 082 unsigned.
+      - >
+        REQ-PIPE-075 CRITERION 9 STAYS TRUE AND ITS MECHANISM
+        COLLAPSES: "write the entry only after the tables are durably
+        present" is automatic inside one transaction rather than an
+        ordering rule somebody has to implement and test.
+      - >
+        REQ-PIPE-074'S ONE-FILE-PER-DECISION DECISION LOSES ITS
+        REASONING, and that must not be cited as though it still
+        applies. It was argued entirely from git merge conflicts
+        between two write routes appending to the same end of a file.
+        Nothing merges here.
+      - >
+        REQ-PIPE-074 CRITERION 1'S "no second record" gets its
+        cleanest reading yet under this premise: with no export there
+        is genuinely one record. The reconciliation sentence that
+        criterion would otherwise need - that an export is a derived
+        publication, regenerated and never hand-edited - is only
+        required if question set B brings the export back.
+      - >
+        THE GITHUB-ACTIONS CONCURRENCY HAZARD LARGELY DISSOLVES AND
+        THE BACKLOG DRAIN DOES NOT, recorded because the analysis
+        behind it was fact-checked against GitHub's own documentation
+        at Keith's request and would otherwise read as still applying.
+        Thread H settled that a workflow applying decisions needs
+        `cancel-in-progress: false`, which is necessary and NOT
+        sufficient: GitHub holds only ONE pending run per concurrency
+        group, so with A running, B pending and C arriving, B is
+        REPLACED and its decision silently dropped. Under this
+        requirement no workflow applies a decision at all - something
+        inside the environment polls the ticket - so that specific
+        hazard goes with it. What survives is the real fix: each pass
+        DRAINS THE BACKLOG, reading every unprocessed decision since a
+        marker rather than only the triggering event, so a coalesced
+        or cancelled trigger costs nothing. That belongs to delivery
+        sprint 12 and REQ-GHUB-082, and it is now load-bearing for a
+        poller rather than for a workflow.
+      - >
+        NO INBOUND CONNECTION FROM GITHUB TO THE DATABASE, EVER - but
+        the environment DOES have outbound access, so the GitHub route
+        inverts: something inside the secure environment polls the
+        ticket and applies the decision, rather than a workflow
+        reaching in. Posting the outcome comment back is outbound too,
+        so it is the same channel.
+      - >
+        THE DECISION LOG HAS NO COMMITTED EXPORT - THE DATABASE IS THE
+        ONLY RECORD (Keith, 2026-09-26), settling a contradiction
+        plans/running-thoughts.md #45 carried between two settlements
+        of the same evening, hours apart and both reading as final.
+        His own reasoning is what resolves it rather than a
+        preference: the export existed so that something WITHOUT
+        database access could read the log, and that something was the
+        dashboard build running in GitHub Actions. Once the build runs
+        inside the environment where the database is reachable,
+        nothing is left that needs it. REJECTED: keeping a regenerated
+        export of the decision log alone, which would have restored a
+        credential-free audit record at the cost of re-creating
+        exactly the committed-operational-records shape this batch
+        exists to remove. CONSEQUENCE to carry rather than discover
+        later: REQ-PIPE-074's criteria 11, 13 and 14 are now
+        contradicted outright rather than merely strained.
+  - id: REQ-PIPE-092
+    title: "The dashboard is built where the data is, and GitHub never reaches the database"
+    date_written: "2026-09-26"
+    story: >
+      As Keith, I want the publisher to run inside the environment
+      that holds the data, so that a static dashboard can be built
+      from a real database without ever asking a service GitHub
+      operates to hold warehouse credentials.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26, 22:15-22:20) -
+      "open to having the dashboard build run inside the environment
+      and NEVER in GitHub", with all four of the harder consequences
+      answered the same conversation.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL build the dashboard inside the environment
+        that holds the database.
+      - >
+        THE SYSTEM SHALL NOT connect to the database from a GitHub
+        Actions job, and SHALL NOT require GitHub to hold a database
+        credential.
+      - >
+        THE SYSTEM SHALL produce the same single-file static artifact
+        it produces today, openable from a plain file:// path with no
+        live external dependency.
+      - >
+        THE SYSTEM SHALL run the real-browser render gate against the
+        built artifact where the build runs.
+      - >
+        THE SYSTEM SHALL publish only an artifact that passed that
+        gate.
+      - >
+        THE SYSTEM SHALL keep writing the snapshot archive, so that a
+        self-contained copy of what was published stays readable years
+        later with nothing but a browser.
+      - >
+        THE SYSTEM SHALL name, in the artifact itself, the environment
+        it was built from.
+      - >
+        IF the database is unreachable when a build is attempted, THEN
+        THE SYSTEM SHALL fail without publishing, and SHALL leave the
+        previously published dashboard in place.
+      - >
+        THE SYSTEM SHALL keep every gate that needs no database
+        runnable without one, so that configuration, requirements,
+        changelog, hierarchy, schedule, sprint, check-lifecycle and JS
+        gates still run where no data is reachable.
+      - >
+        THE SYSTEM SHALL have exactly one publish path, and SHALL NOT
+        offer a second, ad hoc way to publish.
+      - >
+        THE SYSTEM SHALL invoke the build and the publish through
+        mothman.
+    non_functional_requirements:
+      - >
+        SECURITY: this REMOVES a credential from CI rather than adding
+        one. The publisher needs a role that can read the metadata
+        schema and nothing else, which is REQ-PIPE-089's own
+        criterion.
+      - >
+        HOSTING IN PRODUCTION, answered rather than left open (Keith,
+        2026-09-26): private GitHub Pages on GitHub Enterprise, an S3
+        static site behind a security/auth layer, or dumped into
+        SharePoint. For the PoC he is happy with public Pages as it
+        stands. The current wiring was always going to need replacing,
+        because in production this page describes real data quality
+        for two government agencies and only works publicly today
+        because the data is synthetic.
+      - >
+        COMPATIBILITY: the environment now needs Chromium for the
+        render gate. Keith's own answer is to build it into the
+        requirements and pyproject.toml - the same one-time-setup
+        shape `playwright install chromium` already has.
+      - >
+        AVAILABILITY: build availability couples to the database, and
+        Aurora Serverless v2's scale-to-zero is exactly what a
+        quarterly asset wants. Keith has accepted that coupling
+        explicitly. Committed files always build; a paused database
+        does not.
+      - >
+        OBSERVABILITY: "what was published when" is answered today by
+        a deterministic rebuild from committed history, or by Pages'
+        own deployment history tied to the commit SHA each deployment
+        was built from. Neither survives unchanged, which makes the
+        snapshot archive the primary answer - and that is an argument
+        for Thread K's automatic-snapshot-on-every-publish decision
+        landing with this work rather than later.
+      - >
+        COST: compute inside the environment for every build, plus
+        whatever hosts the result. Today's Pages deploy is free,
+        zero-ops and HTTPS-included, which is a real thing being given
+        up.
+      - >
+        THE NEVER-TOUCH-DATA RULE'S OWN WORDING becomes "the publisher
+        runs where the data is, and GitHub never does" - same intent,
+        different mechanism. That wording is repeated in CLAUDE.md, in
+        docs/project-context-for-agents.md and in around twenty
+        requirements' NFRs and criteria, so the amendment is a real
+        editing job with a real risk of leaving contradictory copies
+        behind.
+    dependencies: [REQ-PIPE-089, REQ-PIPE-091]
+    open_questions:
+      - >
+        HOW THE BUILT ARTIFACT REACHES ITS HOST IN THE PoC, given
+        public Pages stays. Three real routes, relayed as question set
+        C: the environment pushes the artifact and a workflow deploys
+        what it did not build; the environment uploads to an S3 static
+        site now rather than later; or the built HTML is committed,
+        which re-creates the exact thing the 2026-09-16
+        template/output split made structurally impossible.
+      - >
+        REQ-PIPE-005 CRITERION 1 - "There is no local publish command
+        - only CI can deploy" - is BUILT and SIGNED, and this
+        requirement contradicts it outright. Thread A's prose was the
+        part the brief flagged; the signed requirement is the part
+        that actually has to be amended or retired, and that is
+        Keith's call, not a rewording.
+      - >
+        Whether publishing is a step of `mothman pipeline run` or its
+        own command, and what triggers it inside an environment with
+        no scheduler - the same no-cron problem REQ-PIPE-083 is
+        already stuck on.
+    decisions:
+      - >
+        A THIRD OPTION NEITHER PARTY HAD ON THE TABLE (2026-09-26):
+        the rule Keith actually wrote is not "committed files are
+        required", it is that a pipeline must not be one accident away
+        from being pointed at something real. A build running INSIDE
+        the environment can query PostgreSQL legitimately, produce the
+        same static artifact, and commit nothing.
+      - >
+        IT MAKES THE PER-ENVIRONMENT PROBLEM VANISH, which is the
+        argument that survives longest. A database is per-environment
+        and git is SHARED, so there is no single decision log - there
+        is one per environment - while a committed export lives in a
+        repository, which has no environment. Three hazards follow
+        from that mismatch: whose export gets committed when a
+        developer running locally would otherwise commit toy decisions
+        over the real ones; which environment's dashboard one export
+        path describes; and REQ-GHUB-082 criterion 17 getting a real
+        job back because an export genuinely can lag. Each environment
+        building and publishing its own dashboard from its own
+        database is exactly what "entirely separate instances, each
+        with its own dashboard" already describes.
+      - >
+        GIVING UP PERMANENCE IS CHEAPER THAN IT LOOKS, because
+        dashboard/snapshots/*.html.gz ALREADY DOES THAT JOB -
+        committed, self-contained, openable in ten years with nothing
+        but a browser. Snapshots were always the mechanism for the
+        durable-readable property, not qa_results/.
+      - >
+        THE MOVE IS PROBABLY REQUIRED ANYWAY RATHER THAN A COST. In
+        production this dashboard describes real data quality for two
+        government agencies; public GitHub Pages is almost certainly
+        the wrong place for it, and it only works today because the
+        data is synthetic.
+      - >
+        ALL FOUR "WHAT GETS HARDER" ITEMS WERE PUT TO KEITH AND
+        ANSWERED (2026-09-26 22:20): hosting, Chromium for the render
+        gate, build availability coupling to a paused database, and
+        evaluation on someone else's machine. None of them blocks
+        this.
+      - >
+        THREAD A'S "CI IS THE ONLY PUBLISH PATH" IS RETIRED AS WORDED,
+        and what it protected is kept by criteria 5, 9 and 10 - one
+        gated path, no manual local publish, and no artifact published
+        without passing the gate. "CI is the only publish path" stops
+        needing to be a RULE, because publishing becomes a pipeline
+        step where the data lives.
+      - >
+        WHAT IS ACTUALLY LOST, stated plainly: `git log` and `git
+        diff` over QA history, which Keith has said he will give up,
+        and the public dashboard, which production probably does not
+        want.
+  - id: REQ-PIPE-093
+    title: "Every operation states which environment it acts against, and there is no default"
+    date_written: "2026-09-26"
+    story: >
+      As an operator who works across a local database, dev,
+      non-production and production, I want to have to say which one I
+      am acting against, so that a real operation never goes quietly
+      nowhere and a local habit never quietly reaches production.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26) - his own
+      question about an operator doing local development against their
+      own PostgreSQL versus being hooked into dev, non-prod or prod
+      Aurora, named there as "a requirement-shaped gap nothing owns".
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL require the environment to be stated for
+        every operation that connects to a database.
+      - >
+        IF no environment is stated, THEN THE SYSTEM SHALL refuse the
+        operation and say so, and SHALL NOT fall back to a default, a
+        last-used value or the local environment.
+      - >
+        THE SYSTEM SHALL refuse an environment name it does not know,
+        and SHALL NOT treat it as a new one.
+      - >
+        THE SYSTEM SHALL resolve connection details from the stated
+        environment, and SHALL NOT read them from anything committed
+        to this repository.
+      - >
+        THE SYSTEM SHALL name the stated environment in its own output
+        before doing anything that writes.
+      - >
+        WHERE the stated environment is production, THE SYSTEM SHALL
+        require a further deliberate confirmation before any filing
+        operation.
+      - >
+        THE SYSTEM SHALL declare, in a committed file, the PostgreSQL
+        major version this project targets.
+      - >
+        WHEN connecting, THE SYSTEM SHALL compare the server's own
+        reported version against that declaration, and SHALL fail when
+        the major disagrees.
+      - >
+        THE SYSTEM SHALL read that version from a setting every
+        PostgreSQL offers, and SHALL NOT call a function that exists
+        only on Aurora.
+      - >
+        THE SYSTEM SHALL record the environment on every QA run it
+        records.
+    non_functional_requirements:
+      - >
+        THE PRECEDENT IS THIS PROJECT'S OWN, twice over:
+        delivery_boundary.py treats a source stating nothing as a
+        FAILURE rather than a default, and git_identity.py hard-errors
+        on an unset identity rather than substituting a placeholder.
+        mothman is the single entry point, so that is where this
+        belongs.
+      - >
+        THE SHARP PART IS THE DEFAULT. Defaulting to production
+        invites a fat-fingered real change; defaulting to local is
+        WORSE, because an operator runs what they believe is a real
+        operation and nothing tells them it went nowhere.
+      - >
+        WHAT IS ACTUALLY PINNABLE, checked rather than assumed: Aurora
+        pins the engine version you choose and is THE ANCHOR; a CI
+        service container and a Dev Container pin exactly by image
+        tag; a local non-production install gets whatever its package
+        manager gives; a Claude Code cloud session gets whatever the
+        image shipped. Two of five pin exactly - and the MAJOR is
+        already aligned between the two that cannot, 16.13 here
+        against the runner's 16.15, both from Ubuntu 24.04's own
+        repository.
+      - >
+        THE ANCHOR IS AURORA POSTGRESQL 16.8 LTS, and one fact decides
+        it: Ubuntu 24.04 ships ONLY postgresql-16 - there is no
+        postgresql-17 package at all - and apt.postgresql.org, which
+        carries other majors, is blocked by this session's egress
+        policy. Anchoring on 17.7 would leave a cloud session
+        permanently a major behind, which destroys the alignment. The
+        counter-argument, recorded rather than waved off: 17 buys
+        roughly another year of runway before end of life.
+      - >
+        STAYING ON AN LTS MINOR REQUIRES AUTO MINOR VERSION UPGRADE TO
+        BE DISABLED, which is a setting rather than a default. And DO
+        NOT HARDCODE THE VERSION FROM THE DOCS - availability is
+        region-specific and AWS's own instruction is to query it with
+        `aws rds describe-db-engine-versions --engine
+        aurora-postgresql`.
+      - >
+        AURORA HAS TWO VERSION NUMBERS - the PostgreSQL engine version
+        and an Aurora version from aurora_version(). Gate on
+        current_setting('server_version_num'), which exists
+        everywhere; aurora_version() does NOT exist on vanilla
+        PostgreSQL, so a check must not call it unguarded.
+      - >
+        MINOR DRIFT WITHIN A MAJOR IS SAFE for what this design leans
+        on: catalogue-only SET SCHEMA, transactional DDL, schema
+        resolution and concurrent writers are all major-version
+        properties, and minors are bug and security fixes.
+      - >
+        SECURITY: three tools take credentials three ways, and IAM
+        database authentication is a ROTATING PASSWORD - the token IS
+        the password, is at least ~1 KB, and has a 15-minute lifetime.
+        It is only used at connection time, so long runs are fine, but
+        dbt, Soda and datacontract-cli each open their own connection,
+        so a static environment variable cannot serve them and
+        something has to mint per connection. AWS also flags that a
+        driver or tool truncating a ~1 KB password breaks
+        authentication.
+      - >
+        AURORA 16 IS NOT VANILLA 16, so the version gate establishes
+        alignment of the number and not of the behaviour. That remains
+        a separate compatibility question.
+    dependencies: [REQ-PIPE-087]
+    open_questions:
+      - >
+        HOW THE ENVIRONMENT IS STATED, and what production's extra
+        friction actually is - relayed as question set D. A mandatory
+        flag on every command, a mandatory environment variable, or
+        both with the flag winning; and typing the environment's name
+        back, a separate explicit flag, or a per-environment setting
+        that says which ones need confirming.
+      - >
+        Whether the decision log carries the environment on each entry
+        (question set D), and whether a minor-version mismatch warns
+        or is silent while only a major fails.
+      - >
+        Where the declared version lives - contract/data-asset.yaml, a
+        new committed file of its own, or alongside .python-version,
+        which is the precedent this borrows from.
+    decisions:
+      - >
+        NO DEFAULT ENVIRONMENT, AND AN UNSTATED ONE IS AN ERROR
+        (Keith, 2026-09-26). FOUR things need the environment, not
+        one: the connection details, trivially; SAFETY, because an
+        operator promoting or demoting must know whether they are
+        touching prod, which deserves different friction from local;
+        the DASHBOARD saying which environment it shows, or a
+        screenshot of dev QA is indistinguishable from prod QA; and
+        the version assertion, which is per-environment by definition.
+      - >
+        DECLARE A MAJOR, ASSERT IT, ACCEPT MINOR DRIFT, AND ANCHOR ON
+        AURORA. Aurora's available engine versions lag upstream, so
+        the number is whatever Aurora offers and everything else
+        follows it - choosing 17 locally and finding Aurora on 16 is
+        the avoidable mistake.
+      - >
+        THE PRECEDENT FOR GATING IT is this repo's own
+        .python-version, added after a silent runner-versus-local
+        divergence burned eight commits of red CI. Identical failure
+        mode: a version difference nothing asserts, invisible locally.
+      - >
+        Worth doing anyway, and recorded here because it belongs with
+        the assertion: give CI a PINNED SERVICE CONTAINER rather than
+        the runner's preinstalled PostgreSQL, so CI and the Dev
+        Container are byte-identical and the cloud session is the only
+        outlier, aligned on major and asserted. That is REQ-TEST-095's
+        criterion.
+  - id: REQ-DASH-094
+    title: "The dashboard says which environment's QA it is showing"
+    date_written: "2026-09-26"
+    story: >
+      As someone who might be handed a screenshot of this dashboard in
+      a briefing, I want the page to say which environment it
+      describes, so that a picture of development QA can never be
+      mistaken for production's.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26) - one of the
+      four things he named as needing environment awareness, with his
+      own reason: "a screenshot of dev QA is indistinguishable from
+      prod QA - the kind of thing that ends up in a briefing".
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL state, on the page itself, which
+        environment's data it was built from.
+      - >
+        THE SYSTEM SHALL show that statement without a reader having
+        to open a panel, click, or scroll.
+      - >
+        WHERE the environment is not production, THE SYSTEM SHALL make
+        that visually distinct as well as labelled, and SHALL NOT rely
+        on colour alone.
+      - >
+        THE SYSTEM SHALL carry that statement into the snapshot
+        archive, so an archived copy still says which environment it
+        described.
+      - >
+        THE SYSTEM SHALL take the statement from what the build
+        recorded, and SHALL NOT let a reader change it.
+      - >
+        IF the artifact carries no environment, THEN THE SYSTEM SHALL
+        say so plainly rather than rendering as though it were
+        production.
+      - >
+        THE SYSTEM SHALL render with zero console errors in a real
+        browser.
+    non_functional_requirements:
+      - >
+        The bar Keith has set for UX is polish to the point where it
+        stops being visible. A permanent environment banner is exactly
+        the kind of thing that becomes noise at 30 datasets if it is
+        loud - it has to be unmissable in a screenshot and quiet in
+        daily use.
+      - >
+        The page already has a precedent for a standing honesty
+        statement: the footer says which datasets are backed by real
+        computation and which are illustrative. This is the same kind
+        of claim about the whole page rather than about one row.
+      - >
+        Label as well as appearance, never colour alone -
+        REQ-DASH-085's own rule, for accessibility and because a
+        screenshot may be printed in greyscale.
+      - >
+        Renders from the artifact alone with no live lookup, the same
+        as every other embedded const.
+    dependencies: [REQ-PIPE-093, REQ-PIPE-092]
+    decisions:
+      - >
+        Separated from REQ-PIPE-093 deliberately, following the
+        precedent REQ-DASH-085 set against REQ-PIPE-084: the action is
+        a pipeline change and the labelling is a dashboard change,
+        with different owners, different tests and different
+        toolchains, and bundling them hides a UI question inside a
+        warehouse requirement.
+      - >
+        ONE PAGE-LEVEL STATEMENT RATHER THAN PER-EVENT ATTRIBUTION:
+        each environment has its own database and its own dashboard,
+        so every row on a given page comes from the same environment
+        and labelling each one would be noise.
+  - id: REQ-TEST-095
+    title: "Every environment supplies a PostgreSQL the suite connects to, and the suite never starts one"
+    date_written: "2026-09-26"
+    story: >
+      As a developer or a CI run, I want the tests to use whatever
+      PostgreSQL is already reachable, so that one strategy works on a
+      laptop, in a dev container, on a GitHub runner and in a cloud
+      session that has no Docker at all.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26) - the
+      test-strategy half of the PostgreSQL switch, including his own
+      question about whether GitHub Actions can run Docker and whether
+      a Claude Code session can run a Dev Container.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL take a connection string for a PostgreSQL
+        that already exists, and SHALL NOT start, install or
+        containerise a database as part of running the tests.
+      - >
+        IF no connection string is supplied, THEN THE SYSTEM SHALL
+        fail with a message naming what to set, and SHALL NOT skip the
+        affected tests silently.
+      - >
+        THE SYSTEM SHALL isolate parallel test workers from each
+        other, so that the parallel default continues to hold.
+      - >
+        THE SYSTEM SHALL provide a development container supplying a
+        PostgreSQL pinned to the declared version.
+      - >
+        THE SYSTEM SHALL give CI a pinned PostgreSQL service
+        container, reached over a mapped port on localhost, rather
+        than the runner's preinstalled server.
+      - >
+        THE SYSTEM SHALL wait for that database to accept connections
+        before the suite starts.
+      - >
+        THE SYSTEM SHALL NOT require Docker anywhere in the test path.
+      - >
+        THE SYSTEM SHALL document the one-time setup for a fresh
+        machine alongside the existing dbt, npm and browser steps.
+      - >
+        THE SYSTEM SHALL keep each test's assertions true whether or
+        not a gitignored artifact happens to exist on the machine
+        running it.
+    non_functional_requirements:
+      - >
+        RUNTIME, and it should be measured rather than estimated: the
+        full `mothman check` is ~5 minutes today (295 s), of which
+        ~85% is one real-browser test file pinned to a single worker,
+        and `--no-pytest` is ~45 s. Adding a real database to the
+        warehouse-touching tests will move that number, and whether
+        the WHOLE suite runs against Postgres or only the
+        warehouse-touching part is the real runtime decision.
+      - >
+        NO DOCKER IN A DEFAULT CLAUDE CODE CLOUD SESSION, BY POLICY -
+        and this is now settled on evidence rather than inference.
+        `docker info` fails, starting a daemon is refused by the
+        safety classifier, Anthropic's published docs are silent, and
+        two issues on anthropics/claude-code asking for exactly this
+        are BOTH CLOSED - #53430 as NOT PLANNED and #29515 outright. A
+        concrete warning worth having before somebody tries: #53430
+        reports that attempting to start the daemon FROM A SETUP
+        SCRIPT crashes the environment, and the setup script is the
+        obvious lever to reach for.
+      - >
+        CI IS UNLIKE A CLOUD SESSION IN HAVING DOCKER and LIKE it in
+        already having PostgreSQL. ubuntu-latest resolves to Ubuntu
+        24.04, which ships Docker Server 28.0.4 with Compose and
+        Buildx, and PostgreSQL 16.15 with the service disabled by
+        default. Note how close that is to the 16.13 every measurement
+        in #45 ran against.
+      - >
+        THE ONE REAL TRADE-OFF IS PINNING: a service container pins
+        the exact image where the runner's preinstalled server moves
+        whenever GitHub refreshes runner images. Since the whole point
+        of this exercise is testing against the engine production
+        runs, pin where it counts and take a connection string
+        everywhere, including CI, so the suite cannot tell the
+        difference.
+      - >
+        THIS REPO HAS NO .devcontainer/ AT ALL TODAY, so that is a new
+        file set rather than an edit - and four details in the
+        official template are worth carrying over deliberately rather
+        than copying. `network_mode: service:db` on the app service
+        means Postgres is at localhost:5432 and NOT db:5432, which is
+        the first thing to get wrong. Port forwarding belongs in
+        devcontainer.json's forwardPorts and not in compose's ports,
+        which the template says will not forward from a Codespace. Its
+        `image: postgres:latest` must be PINNED. And it mounts the
+        volume at /var/lib/postgresql where the conventional path is
+        /var/lib/postgresql/data, a known wart.
+      - >
+        MAINTAINABILITY: this adds a dev container, a pinned image tag
+        and an engine major to keep current, plus one more thing a
+        fresh session must do before reading a red suite as a
+        regression. CLAUDE.md's own up-front-setup bullet is where
+        that belongs, and plans/tooling.md #11's SessionStart hook is
+        the eventual fix.
+      - >
+        A FRESHLY-CLONED CONTAINER HAS NO data/ AND NO DEEP GIT
+        HISTORY, and both have produced real red CI here: a test
+        asserting a gitignored tree exists, and a test resolving
+        HEAD~2 against a fetch-depth-1 checkout. A database is a third
+        thing of that shape, and the cheapest check is the same one -
+        reproduce the CI condition locally before pushing.
+    dependencies: [REQ-PIPE-087]
+    open_questions:
+      - >
+        Whether a test worker gets its own DATABASE or its own set of
+        SCHEMAS in a shared one. One database per worker is today's
+        shape, inherited from DuckDB's single-writer lock; on
+        PostgreSQL both work, and concurrent writers are no longer a
+        constraint. Worth deciding deliberately rather than
+        inheriting, since it is the difference between N
+        create-database calls and one.
+      - >
+        Whether the whole suite runs against PostgreSQL or only the
+        warehouse-touching part - the runtime question #45 names and
+        does not answer.
+    decisions:
+      - >
+        ONE STRATEGY WORKS IN EVERY ENVIRONMENT, and that is what
+        settles it: the suite takes a CONNECTION STRING and never
+        starts anything. The Dev Container's compose `db` service
+        supplies one, CI supplies one, a developer's local install
+        supplies one, and a cloud session starts its own with initdb
+        plus pg_ctl on a spare port - which is exactly what every
+        measurement in #45 ran against, needing no container and no
+        privileges. Same shape as PLAYWRIGHT_CHROMIUM_PATH, which this
+        repo already uses for exactly this reason.
+      - >
+        REJECTED A STRATEGY THAT STARTS ITS OWN DATABASE, and the
+        reasoning is worth keeping because it changed underneath the
+        conclusion. The first version of this argument said Docker was
+        IMPOSSIBLE in a cloud session; that was corrected to "withheld
+        by default, and permittable" once the refusal turned out to be
+        a policy decision, which is a weaker claim a recommendation
+        should not rest on. The public record then landed between the
+        two - Anthropic has been asked twice and declined both times -
+        so the conclusion survives on better ground: a strategy that
+        uses whatever is already reachable works in all four
+        environments, where one that insists on starting its own works
+        in two and turns on a permission decision in the third.
+        Testcontainers is rejected for exactly that reason.
+      - >
+        DEV CONTAINERS ARE NOT VS CODE ONLY - the spec at
+        containers.dev has a reference CLI (devcontainer up/exec) and
+        Codespaces and JetBrains implement it - so a dev container is
+        a legitimate supported path. It just cannot be the ONLY one,
+        because this project's own development environment cannot run
+        it.
+      - >
+        THE ROUTE FOR DEVELOPMENT IS DOCKER COMPOSE RATHER THAN A
+        FEATURE. A community PostgreSQL Feature exists but is
+        third-party, and every template the spec maintainers publish
+        uses compose with `app` and `db` services. Note there is no
+        plain python-postgres template -
+        ghcr.io/devcontainers/templates/postgres IS the Python one.
+      - >
+        THE CI FORM IS DECIDED BY SOMETHING test.yml ALREADY DOES: a
+        job running INSIDE a container reaches a service by its label,
+        and a job running DIRECTLY ON THE RUNNER must map the port and
+        connect via localhost. test.yml runs directly on the runner,
+        so it is the second form, and the service needs
+        POSTGRES_PASSWORD plus a health check (pg_isready) or the
+        suite starts before the database is accepting connections.
+  - id: REQ-QAC-096
+    title: "File-shape checks run at load time and are recorded as checks in their own right"
+    date_written: "2026-09-26"
+    story: >
+      As whoever maintains this pipeline, I want the questions that
+      can only be asked of the file as delivered to be asked before
+      the rows are loaded, and recorded as real checks with names and
+      history, so that loading does not silently destroy a whole class
+      of QA.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26) - the second
+      of the three items in the batch-5 brief, and the producing half
+      of the gap he spotted himself: the agreed load-first shape adds
+      file checks and nothing said where their results go.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL evaluate an explicit, named set of checks
+        about the file as delivered, at load time, before its rows
+        reach the warehouse.
+      - >
+        THE SYSTEM SHALL limit that set to questions loading answers
+        or destroys, including at least encoding, delimiter, header
+        row, column order, ragged or malformed rows, and duplicate
+        headers.
+      - >
+        THE SYSTEM SHALL NOT express a question about the DATA as a
+        file check.
+      - >
+        THE SYSTEM SHALL give each file check a globally unique check
+        id, on the same terms as every other check in this project.
+      - >
+        THE SYSTEM SHALL carry each file check's lifecycle metadata in
+        its own definition, and SHALL gate it in CI on the same terms
+        as the other four tools' definitions.
+      - >
+        THE SYSTEM SHALL hold each file check's authored prose to
+        docs/check-authoring-rules.md.
+      - >
+        THE SYSTEM SHALL record file-check results as a fifth tool, in
+        a scope of their own, and SHALL NOT record them among a
+        dataset's data-check results.
+      - >
+        THE SYSTEM SHALL NOT fold a file check's verdict into the
+        status of any data check.
+      - >
+        THE SYSTEM SHALL record each file-check result against the
+        delivery and the individual file it examined, so that a reader
+        can tell which file was wrong when a delivery carried several.
+      - >
+        IF a file cannot be read at all, THEN THE SYSTEM SHALL record
+        that through the existing load-failure mechanism rather than
+        as a file-check result, and SHALL NOT create a table for it.
+      - >
+        THE SYSTEM SHALL record file-check results wherever QA results
+        are recorded, so that they share that history's addressing,
+        retention and access rules.
+      - >
+        THE SYSTEM SHALL NOT let a file check's presence satisfy any
+        rule about a table having active checks.
+      - >
+        IF any file check fails for a file a delivery carried, THEN
+        THE SYSTEM SHALL NOT auto-promote the supply that file became,
+        and SHALL leave it awaiting a person's decision.
+      - >
+        THE SYSTEM SHALL have the promotion gate read file-check
+        results as an input in their own right, alongside the
+        dataset's data-check status, and SHALL NOT achieve that by
+        folding them into that status.
+    non_functional_requirements:
+      - >
+        The existing check-lifecycle gate requires a check_id, an
+        introduction date, a description and a changelog, and
+        separately requires failure_indicates. A fifth tool must be
+        brought INTO that gate rather than exempted from it - an
+        ungated fifth tool is how a corpus of 257 consistent checks
+        acquires an inconsistent corner.
+      - >
+        COST AT SCALE: this set is evaluated on every arrival for
+        every dataset, so it must be answerable while the file is
+        being read once, not by a second pass over the data.
+      - >
+        RELIABILITY: a file check must never be the reason a load does
+        not happen unless the file genuinely cannot be read. A gate
+        that blocks ingestion on a cosmetic finding is a gate that
+        gets disabled.
+      - >
+        A genuinely bad file failing the load outright is itself a QA
+        signal, and it is already modelled - REQ-PIPE-060 and `mothman
+        supply failures` carry it, so this needs no new mechanism for
+        that case.
+      - >
+        AUDITABILITY: these results are part of a run's history like
+        any other, so they inherit whatever REQ-PIPE-089 settles about
+        storage and retention rather than getting their own
+        arrangement.
+    dependencies: [REQ-PIPE-087, REQ-PIPE-089]
+    open_questions:
+      - >
+        Exactly which checks are in the initial set, and whether that
+        list is configuration or code. The six named in criterion 2
+        are the ones #45 names, and the boundary rule - answered or
+        destroyed by loading - is what decides any candidate.
+      - >
+        WHETHER A FAILED FILE CHECK ALSO GATES QA ITSELF, not just
+        promotion. Keith's own words settling the promotion half:
+        "yes, a failed load-time file check gates promotion...possibly
+        even QA". The "possibly" is genuine and unresolved. FOR gating
+        QA: running four real tools over rows loaded from a file
+        already known to be malformed spends real time producing
+        verdicts about data whose shape is in doubt. AGAINST: the rows
+        DID load, so the data checks have a real subject, and their
+        verdicts are exactly what tells an operator how bad the damage
+        is - which is what a person deciding whether to promote needs
+        most. A file that cannot be read at all never reaches QA
+        anyway, by criterion 10.
+    decisions:
+      - >
+        THE AGREED SHAPE IS LOAD FIRST, ALL FOUR TOOLS CHECK THE
+        WAREHOUSE, PLUS A SMALL EXPLICIT SET OF FILE-SHAPE CHECKS AT
+        LOAD TIME THAT NEVER PRETEND TO BE DATA CHECKS (Keith,
+        2026-09-26). The boundary is what makes it work and it is not
+        a hedge: a class of checks can only be made on the FILE and is
+        destroyed by loading, so "check everything in the warehouse"
+        on its own would silently drop them.
+      - >
+        THEY ARE LABELLED AS WHAT THEY ARE - statements about the
+        FILE, not about the data. A reader must never have to work out
+        which subject a check was about.
+      - >
+        THE COST IS ACCEPTED KNOWINGLY: this becomes a FIFTH tool in
+        the QA results, so its checks need check_ids, lifecycle
+        metadata and prose held to docs/check-authoring-rules.md,
+        exactly like the other four tools' 257 checks.
+      - >
+        THE MODEL ALREADY HAS BOTH SHAPES TO COPY for a distinct
+        scope, so this needs no new concept: `_cross-table` is a
+        distinct scope under a collection (REQ-QAC-037), and
+        REQ-PIPE-079's
+        awaiting-supply/overdue-supply/awaiting-decision reason codes
+        are already about the SUPPLY rather than the data.
+      - >
+        Keith's own ordering was that this be scoped AFTER the Aurora
+        work. It is in the same batch because all three items touch
+        what a period resolves to and what the dashboard says about
+        it, and go through one sign-off session rather than three.
+      - >
+        A FAILED FILE CHECK GATES PROMOTION (Keith, 2026-09-26),
+        settling what this requirement was drafted without an answer
+        to. REJECTED: never gating, which lets a supply carrying a
+        known-bad file auto-promote on its data status alone; and
+        making the supply merely amber, which still auto-promotes and
+        so is not a gate. WHAT THIS DOES NOT DO, because it would undo
+        criterion 8: a file check's verdict is still never folded into
+        a data check's status. The gate reads file checks as a
+        SEPARATE input (criterion 14), which is also what stops
+        REQ-PIPE-075 criterion 2 - the gate SHALL read every check
+        contributing to the dataset's status - being silently narrowed
+        by a fifth scope that sits outside that status.
+  - id: REQ-DASH-097
+    title: "A file-level failure reads as a claim about the file, never as a verdict on the data"
+    date_written: "2026-09-26"
+    story: >
+      As a data team leader looking at a dataset that holds no data
+      for this period, I want the page to tell me the file we were
+      sent could not be trusted, so that I am neither left guessing at
+      a quiet gap nor misled into thinking the data itself was checked
+      and failed.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26) - the gap he
+      spotted in the load-first design and then settled: yes, the
+      load-time file checks reach the dashboard, as their own scope,
+      never folded into the data checks' status.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL show file-check results as their own scope,
+        distinct from a dataset's data checks, wherever that dataset's
+        QA is shown.
+      - >
+        THE SYSTEM SHALL NOT fold a file check's verdict into the
+        status shown for that dataset's data checks.
+      - >
+        WHERE a dataset holds no data for a period because a load
+        failed, THE SYSTEM SHALL say so, and SHALL NOT leave the
+        period looking quietly empty.
+      - >
+        THE SYSTEM SHALL word a file-level failure as a statement
+        about the file that arrived, and SHALL NOT word it as a count
+        of records violating a rule.
+      - >
+        THE SYSTEM SHALL let a reader reach each individual file check
+        and its authored prose from that scope, on the same terms as
+        any other check.
+      - >
+        THE SYSTEM SHALL distinguish the scope by label as well as by
+        appearance, and SHALL NOT rely on colour alone.
+      - >
+        THE SYSTEM SHALL show a file check's history over time on the
+        same terms as any other check.
+      - >
+        THE SYSTEM SHALL NOT introduce a new value into the status
+        vocabulary.
+      - >
+        THE SYSTEM SHALL render with zero console errors in a real
+        browser.
+    non_functional_requirements:
+      - >
+        AT 30 DATASETS a fifth scope per dataset is real navigation
+        cost. It has to aggregate rather than adding a permanent panel
+        to every dataset - CLAUDE.md's own warning that a design fine
+        at 2 datasets routinely fails at 30, and that per-dataset
+        banners become noise.
+      - >
+        THE GAP THIS CLOSES IS REAL AND MEASURABLE TODAY: a failed
+        load surfaces only in `mothman supply failures`, which is
+        terminal-only, so the dashboard shows a dataset quietly
+        holding no data for that period with no explanation - the
+        confusing quiet state this project has already spent real
+        effort on.
+      - >
+        The status vocabulary must not gain a value - REQ-DASH-041's
+        prohibition. This is a scope, not a status.
+      - >
+        Renders from what the build recorded, with no live data access
+        of its own.
+    dependencies: [REQ-QAC-096]
+    open_questions:
+      - >
+        Whether a file-check failure is visible at the glancing level
+        (a dataset row) or only on drill-down. REQ-DASH-085's own
+        decision argues for the former - a qualifier only visible
+        after a click does not prevent the misreading it exists to
+        prevent - and the counter-argument is the noise NFR above.
+        Worth Keith's reaction rather than a scoper's call.
+    decisions:
+      - >
+        AGREED ANSWER (Keith, 2026-09-26): yes, they reach the
+        dashboard, as THEIR OWN SCOPE, never folded into the data
+        checks' status. A red saying "the file had ragged rows" is a
+        different KIND of claim from "14 records violate the
+        contract", and merging them recreates the two-subjects
+        confusion the load-first decision exists to resolve.
+      - >
+        Separated from REQ-QAC-096 on the same grounds REQ-DASH-085
+        was separated from REQ-PIPE-084: the check is pipeline work
+        and the labelling is dashboard work, with different owners,
+        tests and toolchains.
+  - id: REQ-PIPE-098
+    title: "A dataset that does not participate in a period stands on its most recent supply, by a view created when the period is born"
+    date_written: "2026-09-26"
+    story: >
+      As someone querying the warehouse for the current quarter, I
+      want an annual dataset that is not due this quarter to resolve
+      to the supply that is still current, so that a dataset nobody
+      owes anything for does not read as a missing table.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26) - the third
+      item in the batch-5 brief, found while naming REQ-PIPE-084 from
+      his own question about datasets on the quarterly asset that
+      deliver only once a year.
+    acceptance_criteria:
+      - >
+        WHEN a period's schema is first created, THE SYSTEM SHALL
+        create, for each dataset the schedule says does not
+        participate in that period, a view resolving that dataset's
+        logical name to its most recent promoted supply.
+      - >
+        THE SYSTEM SHALL create such a view only at that moment, and
+        SHALL NOT create one later by any automatic rule.
+      - >
+        THE SYSTEM SHALL treat the creation of a period's schema as a
+        distinguishable, recorded event, so that "first created" is a
+        fact rather than an inference from the schema being present.
+      - >
+        THE SYSTEM SHALL create a period's schema either on the first
+        promotion into it or on an explicit instruction to open it,
+        and SHALL NOT require an arrival before a period can exist.
+      - >
+        THE SYSTEM SHALL determine non-participation from the schedule
+        alone, and SHALL NOT infer it from the absence of a supply.
+      - >
+        THE SYSTEM SHALL record the reason the schedule states for
+        that non-participation alongside the view.
+      - >
+        THE SYSTEM SHALL treat such a slot as not owed, and SHALL NOT
+        report it as awaiting a supply, as overdue, or as a missing
+        table.
+      - >
+        THE SYSTEM SHALL record each automatic inheritance in the
+        decision log with the rule as the actor.
+      - >
+        IF a dataset does not participate and has no earlier promoted
+        supply to stand on, THEN THE SYSTEM SHALL create no view,
+        SHALL say why, and SHALL NOT fabricate an empty table.
+      - >
+        THE SYSTEM SHALL attribute an inherited period's check results
+        to the run that earned them, and SHALL NOT re-run QA to
+        produce a second set.
+      - >
+        THE SYSTEM SHALL keep inheritance distinct from substitution,
+        so that a period standing in by a person's decision and a
+        period nobody owed a supply for are never the same state.
+      - >
+        THE SYSTEM SHALL NOT change what any other period resolves to
+        when creating these views.
+    non_functional_requirements:
+      - >
+        CORRECTNESS DEPENDS ON THE RECORDED-BIRTH EVENT, and today
+        there is nothing to hang it on: ensure_period_schema() is a
+        bare CREATE SCHEMA IF NOT EXISTS that returns the schema name
+        and no indication of whether it created anything, and its only
+        real caller is a test. Without criterion 3 the "only at birth"
+        rule is unenforceable and will be re-derived as "whenever we
+        notice", which is the continuous sweep this design explicitly
+        rejects.
+      - >
+        NOTHING DOWNSTREAM CONSUMES THE CONFIG THIS RESTS ON TODAY.
+        `delivery_months:` already subsets a calendar (cp-case-workers
+        is [February, August]) and not_expected_periods() already
+        requires a reason per such period, and the only reader of
+        either in the whole repository is one test assertion. So this
+        is a real gap with real evidence rather than a refinement.
+      - >
+        SCALE: a period's birth creates up to one object and one log
+        entry per dataset - up to 30 on the quarterly asset, and
+        roughly 104 a year for a daily dataset that does not
+        participate at weekends. Small, and both worth knowing before
+        anything renders the whole log or counts objects per schema.
+        The measured catalogue cost is ~14 KB per schema-plus-table
+        before a single row exists.
+      - >
+        NO BACKGROUND SWEEP, and that is the point rather than a
+        simplification: "automatic where valid", applied continuously,
+        has no trigger - something would have to keep re-scanning for
+        newly-valid inheritances, which is the same no-cron problem
+        REQ-PIPE-083 is already stuck on.
+      - >
+        A view binds to the OBJECT rather than the name on PostgreSQL,
+        so every inherited view is a real dependency on a promoted
+        physical table - which is what makes REQ-PIPE-084 criterion
+        11's refusal load-bearing and REQ-PIPE-099's un-inherit
+        necessary.
+    dependencies: [REQ-PIPE-087, REQ-PIPE-084, REQ-PIPE-049]
+    open_questions:
+      - >
+        WHETHER AN INHERITED PERIOD SHOWS THE EARLIER RUN'S RESULTS
+        ATTRIBUTED, or shows no results at all with a plain statement
+        that nothing was owed. Criterion 10 assumes the first,
+        following REQ-PIPE-084's own decision that a substituted
+        period references the original run's results rather than
+        re-running. Relayed as question set E, because it is the fork
+        most likely to change REQ-DASH-100.
+    decisions:
+      - >
+        CREATION IS AUTOMATIC ONLY AT THE MOMENT A PERIOD SCHEMA IS
+        BORN, and only where the schedule says the dataset does not
+        participate (Keith, 2026-09-26, narrowing his own first
+        answer: "it feels like the automatic inheritance should only
+        happen when the schema is first created... any other
+        inheritance would be per-dataset and by operator command").
+        The narrowing is the better rule because pinned to schema
+        birth it is one well-defined moment with complete information,
+        and after that the schema changes only by deliberate act.
+      - >
+        THAT LINE IS WHAT MAKES AUTOMATION SAFE, because it means
+        inheritance is never a judgement: a dataset that does not
+        participate INHERITS, while one that participates and has not
+        delivered is awaiting-supply, then overdue, then possibly
+        SUBSTITUTED by a person. Different states, no overlap.
+      - >
+        TWO TRIGGERS, and the second is not a convenience but the only
+        thing covering a real case: automatic creation falls out
+        naturally at the first promotion into a period, but a quarter
+        where only annual datasets are due may see NO arrivals, so the
+        schema would never exist and a consumer querying that period
+        gets nothing. Hence an explicit command to OPEN a period.
+      - >
+        THE STANDING-IN TABLE IS A REAL VIEW IN THE PERIOD SCHEMA
+        rather than a resolution performed at read time
+        (REQ-PIPE-084's own decision, Keith's own lean: a complete set
+        of tables and views in each period schema is nicer for a human
+        looking at the database directly and easier for machines).
+        EVERY PERIOD SCHEMA THEREFORE HOLDS A COMPLETE SET, one object
+        per dataset.
+      - >
+        WHICH IS WHY THIS NEEDS NO NEW REASON CODE, and the item
+        shrank the same evening it was found: `missing-table` recovers
+        its real meaning, because an annual dataset standing on
+        February HAS an object in Q3. What was left to specify was
+        when the view is created and what it points at, not how to
+        report its absence. Recorded because the first version of this
+        item was about a missing reason code, and a later session
+        reading only that would build the wrong thing.
+      - >
+        Rejected folding this into REQ-PIPE-084, which would merge an
+        automatic structural state with a deliberate human decision -
+        the very distinction REQ-DASH-085 exists to keep visible. The
+        word `inherited` was deliberately NOT spent on 084 for this
+        reason, even though Keith leaned toward it there first.
+      - >
+        CHAINS NEVER FORM BY CONSTRUCTION, carried over from
+        REQ-PIPE-084: a period may reach any earlier period that
+        received a real supply, so there is no traversal to implement
+        and no cycle to prevent. The inherited case is what settled it
+        - an annual dataset delivering in February needs Q4 to stand
+        on Q1, three periods back but a single hop.
+      - >
+        RESULTS ARE REFERENCED RATHER THAN RE-RUN, following
+        REQ-PIPE-084's own decision: the bytes are identical, so a
+        re-run would record duplicate results in history that only
+        grows, and would put a row of fresh green results under a
+        period where nothing arrived.
+      - >
+        A NEWLY-ADDED DATASET WITH NO EARLIER SUPPLY IS NOT THIS
+        REQUIREMENT'S PROBLEM, and Keith's reframing of it is better
+        than the edge case it looked like. His first answer stands as
+        the rule - you would not add a dataset to config until you
+        knew a supply was about to arrive, because config is the
+        statement of what is OWED - and the real answer for the case
+        where somebody does anyway is a PRE-AGREEMENT lifecycle stage
+        and the `sample` schema, which nothing in this model has yet
+        and which is deliberately unscoped (see REQ-PIPE-087's own
+        open question). Criterion 9 refuses rather than inventing a
+        state.
+      - >
+        INHERITANCE STANDS ON THE MOST RECENT PROMOTED SUPPLY, NOT THE
+        MOST RECENT GREEN ONE (Keith, 2026-09-26), confirming
+        criterion 1 as drafted and deliberately NOT copying
+        REQ-PIPE-084 criterion 1's rule for substitution. The two
+        situations differ: a substitution replaces a supply that WAS
+        owed and never came, where a person choosing a stand-in can
+        reasonably be held to a green one, whereas inheritance shows
+        what the dataset actually last delivered - and a period that
+        held an amber supply held an amber supply. REJECTED: most
+        recent green, which reads as the safer option and is not,
+        because it silently skips past the real most-recent state and
+        can leave a non-participating dataset standing on nothing at
+        all where its last green supply is far behind or never
+        existed.
+  - id: REQ-PIPE-099
+    title: "Inherit and un-inherit are operator actions, and un-inherit is what frees a blocked withdrawal"
+    date_written: "2026-09-26"
+    story: >
+      As an operator, I want to make a period stand on an earlier
+      supply, and to undo it, so that a withdrawal blocked by later
+      periods is something I can clear rather than a deadlock, and an
+      inheritance nobody wants can be removed.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26), from three
+      questions he asked about how an operator actually works this -
+      in his own words, "a TUI command to create one of these
+      inherited VIEWS in a schema, and then an equivalent to, like,
+      un-inherit".
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL offer inherit and un-inherit as operator
+        actions, for one dataset and one period at a time.
+      - >
+        THE SYSTEM SHALL record each of them in the decision log, with
+        the operator, the period, what that period now stands on, and
+        a reason.
+      - >
+        WHEN a period is un-inherited, THE SYSTEM SHALL remove that
+        period's view for that dataset, so that nothing in that period
+        depends any longer on the supply it stood on.
+      - >
+        THE SYSTEM SHALL NOT re-create a view a person has removed.
+      - >
+        THE SYSTEM SHALL let a demotion, rejection or re-file that was
+        refused because later periods stood on the supply proceed once
+        those periods have been un-inherited.
+      - >
+        THE SYSTEM SHALL require the operator to re-inherit each
+        affected period explicitly afterwards, and SHALL NOT restore
+        any of them automatically.
+      - >
+        THE SYSTEM SHALL offer these actions outside the queue of
+        supplies awaiting a decision.
+      - >
+        THE SYSTEM SHALL offer them from every operator route that
+        offers any other filing decision, and SHALL NOT give one route
+        an operation the other lacks.
+      - >
+        IF a period is one the schedule says the dataset DOES
+        participate in, THEN THE SYSTEM SHALL refuse to inherit it,
+        and SHALL say that a supply is owed for that period.
+      - >
+        THE SYSTEM SHALL require an explicit confirmation before
+        un-inheriting, on every route.
+    non_functional_requirements:
+      - >
+        THESE DO NOT BELONG IN THE AWAITING-DECISION QUEUE (Keith,
+        2026-09-26): that queue is shaped for supplies awaiting a
+        decision and has no entry for "Q3 has no view for
+        cp-case-workers". So they live elsewhere in the TUI, and
+        REQ-GHUB-082 criterion 14's queue is not the place.
+      - >
+        MORE TOIL THAN A SELF-HEALING STORY, AND MORE HONEST: they
+        chose to un-inherit, so they choose what replaces it. Worth
+        stating as a deliberate cost rather than a gap, because the
+        first version of this design assumed the system would
+        re-inherit automatically.
+      - >
+        SAFETY: un-inherit is the one operation that makes a period
+        stop resolving to anything at all, so it deserves the
+        confirmation a re-file gets, and against production the extra
+        friction REQ-PIPE-093 requires.
+      - >
+        At 30 datasets a withdrawal may be blocked by several periods
+        at once, so the refusal has to name all of them and the
+        un-inherit flow has to be workable for several in a row
+        without becoming a bulk operation - REQ-PIPE-075's
+        no-bulk-promote reasoning applies to anything that ends up
+        recorded as somebody's decision.
+    dependencies: [REQ-PIPE-098, REQ-PIPE-084, REQ-GHUB-082]
+    open_questions:
+      - >
+        REQ-GHUB-082 NAMES FOUR OPERATIONS ACROSS FIVE CRITERIA and
+        knows nothing of substitute, inherit or un-inherit. Its own
+        decision records the count as now SEVEN and defers the
+        widening to its pending rewrite; two of the three new ones are
+        this requirement's, so that rewrite has to land before either
+        route can offer them. Flagged rather than assumed, because 082
+        is unsigned and five of its criteria are already pending
+        rewrite for other reasons.
+      - >
+        Whether re-inheriting after a withdrawal is a distinct
+        operation from inheriting - the acts are identical and the
+        reasons differ, and REQ-PIPE-074's re-file decision is the
+        precedent for preferring one atomic entry over a composition.
+    decisions:
+      - >
+        INHERIT AND UN-INHERIT ARE REAL OPERATOR ACTIONS (Keith,
+        2026-09-26). He was never describing derived state, and that
+        is what dissolves the deadlock the hard-refuse rule would
+        otherwise have: an automatic view is nothing you can "deal
+        with first", where an un-inherit is.
+      - >
+        UN-INHERIT NEEDS NO SUPPRESSION FLAG - AND THE FIRST REASONING
+        GIVEN FOR THAT WAS WRONG, corrected within the hour and
+        recorded here so the wrong version is not re-derived. It first
+        said the next automatic pass would re-inherit the periods
+        against the previous real supply. Under the narrowed rule
+        there IS no next pass, so nothing re-creates the view and
+        there is nothing to suppress. The conclusion survives on
+        better ground, but its consequence is different and is real
+        WORK rather than self-healing.
+      - >
+        A DEMOTION, REJECTION OR RE-FILE THAT LATER PERIODS STAND ON
+        IS REFUSED OUTRIGHT, naming the periods that block it
+        (REQ-PIPE-084 criteria 11 and its own decisions). This
+        requirement does not restate that refusal; it supplies the
+        operation that clears it, which is what makes the refusal
+        workable rather than a deadlock.
+      - >
+        MY OWN CALL, FOR KEITH TO REACT TO: inherit is REFUSED for a
+        period the schedule says the dataset does participate in. That
+        situation is what SUBSTITUTED is for, and allowing both would
+        give one situation two mechanisms and two names - the
+        distinction REQ-DASH-085 exists to keep visible.
+      - >
+        THE OPERATION COUNT IS NOW SEVEN, not four: promote, reject,
+        demote, re-file, substitute, inherit and un-inherit. Recorded
+        on REQ-GHUB-082 as a decision rather than edited into its
+        criteria, so the widening happens once, alongside the
+        decision-log rewrite it is already unsigned pending.
+      - >
+        `inherit` and `un-inherit` live elsewhere in the TUI rather
+        than in REQ-GHUB-082 criterion 14's queue - Keith's own
+        settlement, 2026-09-26, and one of the six rewrites to 082 he
+        approved.
+  - id: REQ-DASH-100
+    title: "A period standing on a supply nobody owed never reads as an ordinary green"
+    date_written: "2026-09-26"
+    story: >
+      As a data team leader glancing at the register, I want a quarter
+      where a dataset was not due to say so, and to say which supply
+      it is standing on, so that I neither read it as this quarter's
+      data arriving fine nor as something missing.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/running-thoughts.md #45 (2026-09-26) - the display
+      half of the "inherited" item, and the reason the word was
+      reserved rather than spent on REQ-DASH-085.
+    acceptance_criteria:
+      - >
+        WHERE a period's table resolves to a supply from a period the
+        dataset did not participate in, THE SYSTEM SHALL render a
+        qualifier alongside that dataset's status everywhere that
+        status appears.
+      - >
+        THE SYSTEM SHALL use the word inherited for that qualifier,
+        distinctly from substituted.
+      - >
+        THE SYSTEM SHALL NOT introduce a new value into the status
+        vocabulary.
+      - >
+        THE SYSTEM SHALL state, on drill-down, which period the data
+        came from and the schedule's own stated reason for the dataset
+        not participating in this one.
+      - >
+        THE SYSTEM SHALL NOT report an inherited period as awaiting a
+        supply, as overdue, or as missing a table.
+      - >
+        THE SYSTEM SHALL distinguish the qualifier by label as well as
+        by appearance, and SHALL NOT rely on colour alone.
+      - >
+        THE SYSTEM SHALL distinguish an inherited period from a
+        substituted one on the page, and SHALL NOT present an
+        automatic structural state and a person's decision in the same
+        terms.
+      - >
+        THE SYSTEM SHALL render with zero console errors in a real
+        browser.
+    non_functional_requirements:
+      - >
+        AT 30 DATASETS, SEVERAL OF THEM ANNUAL, a quarterly view may
+        show many inherited rows at once - so this qualifier has to
+        survive being the COMMON case rather than the exception, which
+        is the opposite of REQ-DASH-085's substituted qualifier and
+        the thing most likely to make it noise.
+      - >
+        Follows REQ-DASH-085's own vocabulary rule: a qualifier on an
+        existing status, never a new status value, and REQ-DASH-041's
+        prohibition applies.
+      - >
+        Renders from what the build recorded, with no live data access
+        of its own.
+    dependencies: [REQ-PIPE-098, REQ-DASH-085]
+    open_questions:
+      - >
+        Whether an inherited row carries the earlier run's verdicts
+        attributed, or shows no verdicts at all alongside a plain
+        statement that nothing was owed. This follows whatever
+        question set E settles on REQ-PIPE-098, and it changes what
+        this row actually shows.
+    decisions:
+      - >
+        THE WORD `inherited` WAS DELIBERATELY RESERVED FOR THIS and
+        not spent on REQ-PIPE-084/REQ-DASH-085 (Keith, 2026-09-26). He
+        leaned toward `inherited` for substitution first and then
+        found the reason not to - some datasets on the quarterly asset
+        deliver only once a year, and that is a different state:
+        automatic and structural, for a dataset that owed nothing,
+        where substituted is a person's decision about a supply that
+        was owed and never came.
+      - >
+        TODAY AN ANNUAL DATASET'S ABSENCE FROM Q3 SURFACES AS
+        `missing-table`, indistinguishable from a real fault when
+        February's data is current and correct. That is the misreading
+        this exists to prevent, and it is a present-tense defect
+        rather than a hypothetical.
+      - >
+        Separated from REQ-PIPE-098 on the same grounds REQ-DASH-085
+        was separated from REQ-PIPE-084: the database change and the
+        labelling have different owners, tests and toolchains.
