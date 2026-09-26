@@ -8921,6 +8921,60 @@ requirements:
       - "CI and any read-committed-history path may never open or query anything under data/, so recognition belongs to the pipeline run, never to the dashboard build."
     dependencies: [REQ-GEN-043, REQ-PIPE-058]
     decisions:
+      - >
+        A TRANSPORT WITH NO OBSERVABLE BOUNDARY GETS NO INVENTED ONE
+        (Keith, 2026-09-26), settled against the real deployment shape
+        rather than the PoC's. This requirement, delivery_boundary.py
+        and docs/aws-event-driven-mvp-design.md all assume a
+        per-delivery prefix - that doc says in as many words that
+        "separate table files land under one `cp/<run_id>/` prefix
+        over time". Keith's answer is that a real supplier will upload
+        to a flat `cp/`, six objects, one after another, and will not
+        be creating a prefix per delivery.
+      - >
+        WHAT THAT MEANS, and it is a real change of shape rather than
+        a configuration value: for such a transport there IS no
+        delivery, because none is observable. Each object is its own
+        arrival and its own supply, filed to its own slot, and THE
+        PERIOD becomes the unit that converges - which REQ-PIPE-079
+        already provides, since QA runs against the period and
+        re-evaluates a cross-table check as each table it reads lands.
+        Rejected a plumbing Lambda that moves objects into a
+        per-batch prefix: it relocates the question rather than
+        answering it, because something still has to decide what
+        closes a batch, and both candidate rules are ones this design
+        has already rejected - an expected-set rule needs a clock for
+        the table that never comes, and a quiet-period rule is the
+        arrival-proximity guess delivery_boundary.py calls out by
+        name. Rejected grouping on a filename token, which is weaker
+        than the supplier-declared PERIOD Thread B rejected but is
+        still trusting their naming for something load-bearing.
+      - >
+        THE FLAPPING OBJECTION IS ANSWERED BY NAMING WHY A TABLE IS
+        ABSENT, not by a boundary. Six separate arrivals would, under
+        the old single `missing-table` reason, turn every cross-table
+        check red for the duration of an upload - the transient red
+        REQ-PIPE-036 rejected per-table triggering to avoid. It does
+        not, once absence is distinguished: a slot that is open and
+        not past due reads `awaiting-supply` and is NOT red, so
+        nothing flaps, and a slot still empty when the window closes
+        goes red and stays red, which is the durable signal
+        delivery-triggering was for. REQ-PIPE-079 carries those
+        states.
+      - >
+        STILL UNBUILT AND UNOWNED, said plainly because this
+        requirement is `built` and a decision recorded on it could
+        otherwise read as delivered. delivery_boundary.py implements
+        exactly one boundary, DIRECTORY, and refuses a source that
+        states nothing - which is correct and is what should happen
+        today. A boundary-less transport mode is a real piece of work
+        that no requirement in the register currently owns, and it
+        wants scoping before the AWS MVP is built against the
+        per-prefix assumption. qa_tools/cp/completion_tracker.py is
+        unaffected but becomes unnecessary for this transport: it
+        answers "have all six arrived for delivery X" and takes a
+        delivery_id, which is precisely what a flat prefix does not
+        supply.
       - "Decided a delivery is an OBSERVED TRANSPORT UNIT - one folder drop, one S3 prefix, one SFTP session - and that this is categorically different from the supplier-declared manifest Thread B rejected. Nobody is asserting anything; we are noticing what arrived together. The distinction is worth keeping sharp, because a format that read a declaration of intent would reintroduce the rejected design by a back door."
       - "Decided the delivery boundary comes from the TRANSPORT and must be stated PER SOURCE. A source that cannot express one - six unrelated S3 PUTs with no common prefix - needs a boundary arranged as a plumbing step: a folder convention, a trigger file, a batch endpoint. That is an operational transport arrangement rather than asking a supplier to classify their data, and TS-17 requires it be an explicit configuration failure rather than a silent guess at grouping."
       - "Decided our own receipt record doubles as the completeness marker, which is what makes a mid-upload delivery distinguishable from a short one. The files are the supplier's side of the boundary and a directory being watched while still uploading looks exactly like a partial delivery; the receipt is ours and is written when the arrival is complete. This falls out of the format REQ-GEN-043 already built rather than being new machinery."
