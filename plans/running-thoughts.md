@@ -981,6 +981,91 @@ to the exact right file/line/folder with zero console errors.
     the mechanism. True whether or not the two decision kinds converge.
 
 
+55. **[investigate, 2026-09-27]** **[Pipeline & publishing]** **[Docs & process]** How is CONFIGURATION organised once there are two data assets, sample datasets, project extractions and ad hoc QA?
+
+    Keith raised this himself at the end of 2026-09-27, in his own
+    words, and explicitly said it needs a conversation rather than a
+    decision: "how we manage this repository and the data assets and
+    data sets and checks configuration when there's two separate data
+    assets, the quarterly one and the daily one, plus this notion of
+    sample data we can QA, plus the project extractions we can QA, plus
+    other ad hoc things we QA - whether we manage the configuration all
+    in the one repository, which I guess is doable, whether we somehow
+    inject the configuration."
+
+    **WHY THIS IS NOW THE OPEN QUESTION ABOUT THE REPOSITORY, rather
+    than one question among several.** His own standing rule of the same
+    day - the repository holds CONFIGURATION, NOT STATE - answers what
+    the repository is *for*. REQ-PIPE-089 is taking the last big body of
+    committed state out of it. What that rule deliberately does not
+    answer is how the remaining configuration is ORGANISED once there is
+    more than one of everything, and that is all this is.
+
+    **THE FIVE SHAPES IT HAS TO HOLD**, which is what makes it harder
+    than "one repo or many":
+
+    1. **Two data assets**, quarterly and daily, each managed by a
+       different team in a strictly separated cloud environment, each
+       with its own deployment, database and dashboard. CLAUDE.md
+       already records the settled part: the asset is a DEPLOYMENT'S
+       IDENTITY, not a row in the data. Roughly 30 datasets on the
+       quarterly asset alone.
+    2. **Sample datasets** (REQ-PIPE-106, signed 2026-09-27) - no
+       calendar, real checks, and structurally ordinary in every other
+       way: same hierarchy, several at once, cross-table checks among
+       them.
+    3. **Project extractions** (delivery sprint 29) - supplies and no
+       cadence, ever, one dashboard per extraction.
+    4. **Ad hoc QA**, which he named here and which nothing has scoped
+       at all yet.
+    5. **The check definitions themselves**, which are the largest
+       hand-authored body in the tree and the thing most likely to be
+       shared between assets rather than duplicated per asset.
+
+    **WHAT THE TREE LOOKS LIKE TODAY, so the starting point is a fact
+    rather than an impression.** `contract/data-asset.yaml` is ONE file
+    describing ONE asset: a single `data_asset_id`, one `timezone`, the
+    named `calendars`, and one `hierarchy` of agencies -> collections ->
+    datasets. Beside it sit per-collection contract and Soda files, plus
+    `environments.yaml` and `people.yaml`. So the current answer is
+    "one repository, one asset, singular by construction" - the file
+    would have to change shape or multiply either way, and that is the
+    concrete thing any option has to say something about.
+
+    **TWO PRECEDENTS ALREADY IN THE TREE, worth knowing before the
+    conversation rather than discovering during it.**
+
+    - **Configuration does not have to be hand-authored.** REQ-PIPE-106
+      settled that a project extraction's dataset configuration is
+      GENERATED from the recipe file arriving beside the package, and
+      criterion 2 already permits it - it requires that a missing
+      calendar be DECLARED, not that a human type it. So "inject the
+      configuration" is not a new idea needing a new mechanism; one
+      corner of the system already works that way.
+    - **REQ-PIPE-107** (drafted 2026-09-27, unsigned) is the guard that
+      refuses to act against a database belonging to another asset or
+      environment. It is directly load-bearing here: the more
+      configuration is shared between assets, the more the guard is what
+      stops a shared checkout writing to the wrong one. Worth deciding
+      that requirement's own open question - whether "environment" is a
+      chosen name or something derived - with this conversation rather
+      than before it.
+
+    **THE ADJACENT QUESTION THIS IS NOT.**
+    `plans/publishing-and-history.md` item 6 is about CODE architecture -
+    how many near-identical modules per dataset. This is about
+    CONFIGURATION architecture. They will inform each other and they are
+    not the same question, and conflating them is how one of them gets
+    answered by accident.
+
+    **Not scoped, not started, and deliberately not decided here.** The
+    options he named are worth writing down as the starting set rather
+    than treated as exhaustive: everything in one repository; a
+    repository per asset; one repository of shared checks with per-asset
+    configuration injected at deploy time. Nobody has argued any of them
+    yet.
+
+
 ## Also flagged, queued separately (not part of the "running thoughts"
 batch above, but landed in the same conversation)
 
