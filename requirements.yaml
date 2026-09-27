@@ -15549,6 +15549,46 @@ requirements:
         THE SYSTEM SHALL make a run's results observable only once
         that run's results are complete, so that a partial run is
         never indistinguishable from a finished one.
+      - >
+        THE SYSTEM SHALL record every load outcome - which staged
+        table, from which delivery, loaded or failed, when, and why
+        where it failed - in that same database rather than as a
+        committed file, and SHALL keep it distinguishable from a QA
+        verdict.
+      - >
+        THE SYSTEM SHALL keep the load record's GATE behaviour
+        unchanged across the move: a staged table with no recorded
+        load is not resolvable by any run's views, so an interrupted
+        load still leaves a table nothing can read.
+      - >
+        THE SYSTEM SHALL record each delivery - what arrived, our own
+        receipt instant, which dataset each file was attributed to,
+        what was contested, what is held, and what could not be placed
+        - in that same database, as the ONE copy of that record.
+      - >
+        THE SYSTEM SHALL answer "what is outstanding right now" - every
+        held supply and every failed load awaiting a person - from
+        those records, without reading anything under data/ and
+        without a second copy of them anywhere.
+      - >
+        THE SYSTEM SHALL record how far processing has reached in that
+        same database, so that resuming after an interruption reads
+        the same position it would have read from the committed
+        marker.
+      - >
+        THE SYSTEM SHALL stop committing processing_log/ and
+        delivery_log/ to the repository, and SHALL remove both rather
+        than leaving them in place to go stale.
+      - >
+        THE SYSTEM SHALL give the dashboard build read access to the
+        recorded QA results, load outcomes, delivery records and
+        processing marker, and to nothing else - never to any schema
+        holding supply rows.
+      - >
+        THE SYSTEM SHALL migrate the existing committed delivery and
+        load records into that database rather than discarding them,
+        and SHALL NOT leave the committed copies as a parallel source
+        of the same facts.
     non_functional_requirements:
       - >
         SCALE is the reason `verified` wants real columns. Today's 60
@@ -15605,39 +15645,97 @@ requirements:
     dependencies: [REQ-PIPE-087]
     open_questions:
       - >
-        THE SCHEMA'S SHAPE IS DELIBERATELY UNSETTLED - Keith's
-        explicit call was to have the options put to him rather than
-        decided cold. Four forks are relayed as question set A: how
-        `verified` is shaped (a row per result with real columns, a
+        THE SCHEMA'S SHAPE IS STILL UNSETTLED, and deliberately so -
+        Keith's explicit call was to have the options put to him
+        rather than decided cold. Two of the original four forks are
+        now answered and recorded in `decisions` (where `raw_output`
+        lives; what retention policy to take). THREE REMAIN: how
+        `verified` is shaped - a row per result with real columns, a
         document per run, or columns plus a JSONB side-car for
-        tool-specific extras); where `raw_output` lives (the same
-        table, a separate table keyed by run, or outside the database
-        entirely since nothing queries inside it); whether a RUN is a
-        first-class table everything keys to, and whether the
-        `dataset_stats` and `tables_read` pseudo-tools become real
-        tables or stay documents; and what retention policy, if any,
-        to take now that one is possible.
-      - >
-        WHAT ELSE LEAVES THE REPOSITORY IS NOT SETTLED, and the brief
-        only names qa_results/ and the decision log. Five other
-        committed records exist for exactly the reason this
-        requirement removes: the delivery log (REQ-PIPE-069 criterion
-        4 requires it queryable as SQL from the committed files and
-        FORBIDS a second copy in the warehouse), load records
-        (REQ-PIPE-060 criterion 20), outstanding holds (REQ-PIPE-078
-        criterion 4), the processing marker, and the scenario map
-        (REQ-GEN-045 criterion 4). Relayed as question set B. Nothing
-        in this requirement moves any of them, and leaving them behind
-        is a coherent answer - it is just not one anybody has given.
-      - >
-        Whether REQ-PIPE-038's criteria - which specify the committed
-        tree's per-dataset keying, built and signed eleven days before
-        this - are retired, or restated as properties the database
-        layout must keep. The property they bought (reading one
-        dataset's history costs nothing in another's) is strictly
-        better served by a table with an index, so this is bookkeeping
-        rather than a design fork.
+        tool-specific extras; whether a RUN is a first-class table
+        everything else keys to; and whether the `dataset_stats` and
+        `tables_read` pseudo-tools become real tables or stay
+        documents. None of them changes WHAT this requirement
+        promises - criteria 2, 3, 4 and 5 hold whichever way each
+        goes - but all three change what gets built, so they are put
+        to him before building rather than after.
     decisions:
+      - >
+        SCOPE, SETTLED 2026-09-27: four records move - the QA results,
+        the load outcomes, the delivery record, and the processing
+        marker. Keith's own answer, given after two corrections to
+        the question he was first asked.
+
+        THE FIRST CORRECTION: he answered "qa_results plus load
+        records, holds and the marker", and HOLDS ARE NOT A SEPARATE
+        RECORD. A hold is derived at recognition and persisted as a
+        FIELD INSIDE each delivery record - outstanding.py reads them
+        back out of delivery_log/ - so "move holds, leave the
+        delivery log" could not both hold. Moving the delivery record
+        is what moving holds means.
+
+        THE SECOND: the question claimed REQ-PIPE-069 criterion 4
+        forbade a warehouse copy of the delivery record. True that
+        morning, false by the time it was asked - that criterion was
+        amended earlier the same day to say ONE COPY with the
+        warehouse as where the record lives, and REQ-PIPE-060
+        criterion 20 likewise went from "in committed history" to
+        "durably". Both amendments were already pointing here.
+      - >
+        FILINGS AND IN-FLIGHT OBSERVATIONS GO TO A FOLLOW-UP
+        (REQ-PIPE-104), not into this requirement - Keith's own call,
+        2026-09-27, having first asked what they were. They are the
+        same kind of thing and belong in the database for the same
+        reason; what separates them is that NEITHER HAS DATA TODAY.
+        `filings/` exists as code with recording switched off (his
+        call, 2026-09-25) and is gitignored; `observations/in_flight/`
+        is live code called on every run that writes nothing, because
+        a synthetic delivery is never mid-upload. So this requirement
+        keeps the records that have real history to migrate, and the
+        sibling takes the two that only have a destination.
+
+        Rejected: leaving both on disk. The no-state rule would then
+        ship with two exceptions already scheduled to break it -
+        REQ-PIPE-062 turning filing recording on would immediately
+        start writing committed state again.
+      - >
+        `raw_output` STAYS IN THE DATABASE, ALL OF IT (Keith,
+        2026-09-27, choosing "keep everything, prune raw_output
+        later"). It is the bulk and nothing queries inside it, so the
+        tempting move is to put it outside the database or expire it
+        early - and it is the evidence behind every verdict, which is
+        what an audit of a government data asset actually asks for.
+        Keeping it now and pruning later is reversible; discarding it
+        is not. The NFR about not dragging it into verdict queries
+        stands, and is a matter of where it sits and how it is
+        indexed rather than whether it is kept.
+      - >
+        NO RETENTION POLICY IS SET HERE (Keith, 2026-09-27: "leave it,
+        but record that it is now askable"). Retention was impossible
+        while history lived in git, because git cannot forget; this
+        requirement makes it possible and deliberately declines to
+        choose. A real period has to come from what an audit requires
+        of a government data asset, which is a question for the
+        agency rather than for this PoC. What changes is that the
+        question is now answerable at all.
+      - >
+        THE EXISTING DELIVERY AND LOAD RECORDS ARE MIGRATED, NOT
+        REGENERATED, by this requirement (criterion 21) - and note
+        that Keith separately chose REGENERATION for the delivery log
+        in a different context, when it gains automated-vs-human,
+        route and operator fields. That work is parked until this one
+        lands (plans/running-thoughts.md #52), so the order is:
+        migrate what exists here, regenerate with the new fields
+        there. Doing it the other way round would regenerate into a
+        tree this requirement then deletes.
+      - >
+        REQ-PIPE-038's FATE IS NOT DECIDED HERE. It re-keyed the
+        committed tree per dataset eleven days before this retires
+        the tree, and whether its criteria are retired or restated is
+        REQ-DOCS-101 criterion 10's job - the requirement that owns
+        the whole sweep of clauses this switch falsifies. Recorded
+        rather than left as an open question on both, so neither
+        waits on the other.
       - >
         qa_results/ NEEDS AN EQUIVALENT IN THE DATABASE (Keith's own
         question, 2026-09-26). What it holds today is deliberately two
@@ -17934,3 +18032,118 @@ requirements:
         deleted. `run_id_from_path()` was the only route by which a
         user-supplied filename could become a run id, which is
         criterion 4 enforced by absence rather than by a rule.
+
+  - id: REQ-PIPE-104
+    title: "Filings and in-flight observations are recorded in the database, never as committed files"
+    date_written: "2026-09-27"
+    story: >
+      As the person running this pipeline, I want the two remaining
+      records the system writes about its own work - where each supply
+      was filed, and what each run saw still arriving - to land in the
+      database like everything else, so that turning either of them on
+      does not start committing state to the repository again.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-27, splitting these out of REQ-PIPE-089's scope
+      after asking what they were: "option 1 but also filings/ and
+      observations/in_flight/ - but explain what those are first",
+      then choosing to take them as a follow-up rather than widening
+      089. What separates them from 089's four records is that
+      NEITHER HAS ANY DATA TODAY, so there is nothing to migrate and
+      nothing waiting on them.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL record where each supply was filed - the
+        dataset, the supply, the slot, and which branch of the filing
+        rule put it there - in the warehouse database rather than as
+        a committed file.
+      - >
+        THE SYSTEM SHALL keep that record WRITE-ONCE, so that a supply
+        already filed is left exactly as it was and is never
+        re-derived against a schedule that has moved on.
+      - >
+        THE SYSTEM SHALL record what each run observed still arriving
+        - the collection, when the run looked, and the filenames it
+        saw - in that same database, as an observation about the RUN
+        rather than a claim about the delivery.
+      - >
+        THE SYSTEM SHALL keep recording filenames rather than a count,
+        so that a list growing across runs reads as an upload in
+        progress and one that does not move reads as a delivery that
+        died.
+      - >
+        THE SYSTEM SHALL write nothing where nothing was in flight,
+        so that the ordinary run leaves no observation at all.
+      - >
+        THE SYSTEM SHALL let the dashboard build read both records,
+        and SHALL NOT give it access to any schema holding supply
+        rows.
+      - >
+        THE SYSTEM SHALL remove filings/ and observations/ from the
+        repository and from .gitignore, so that neither path can
+        quietly come back into use.
+      - >
+        THE SYSTEM SHALL leave no code path that writes either record
+        to disk.
+    non_functional_requirements:
+      - >
+        NEITHER RECORD HAS DATA TO MIGRATE, and that is the whole
+        reason this is a separate requirement rather than part of
+        REQ-PIPE-089. `filings/` is code with recording switched off
+        (Keith, 2026-09-25) and is gitignored; `observations/in_flight/`
+        is live code called by both orchestrators on every run that
+        has never written a file, because a synthetic delivery is
+        never mid-upload. So this requirement builds a destination,
+        not a migration - and it must stay correct for the day a real
+        feed makes both of them start producing.
+      - >
+        IN-FLIGHT OBSERVATIONS CHURN, which no other record here
+        does. An in-flight delivery's file list legitimately differs
+        run to run and that difference IS the signal. As committed
+        files that was awkward - the one write-many record among
+        write-once ones; as rows it is ordinary, and the awkwardness
+        should not be carried across in the table's shape.
+      - >
+        A FILENAME IS POTENTIALLY IDENTIFYING in a Birth Registrations
+        or Child Protection context, which is why in_flight_log
+        records names and never contents. That line does not move
+        because the storage does, and it becomes easier to hold: a
+        database can grant per-agency access where a public
+        repository gave everyone everything.
+    dependencies: [REQ-PIPE-089]
+    open_questions:
+      - >
+        Whether REQ-PIPE-062's "turn filing recording on" is done by
+        this requirement or remains its own step. The two are
+        adjacent - this builds the destination, that decides when
+        real filings start being written - and doing both here would
+        change behaviour REQ-PIPE-062 owns.
+    decisions:
+      - >
+        A FOLLOW-UP RATHER THAN PART OF REQ-PIPE-089 (Keith,
+        2026-09-27). He asked for all six records to move and then
+        chose to split them this way once it was clear the two here
+        have no data: 089 keeps the records with real history to
+        migrate, and this one takes the two that only need a
+        destination. Rejected: leaving both on disk, which would ship
+        the no-state-in-the-repository rule with two exceptions
+        already scheduled to break it, since REQ-PIPE-062 turning
+        filing recording on would immediately start writing committed
+        state again.
+      - >
+        A FILING IS NOT A QA RESULT and the separation survives the
+        move. It is decided BEFORE any check runs, by a rule with no
+        human in it, and it outlives a supply that never produces a
+        verdict at all. The reason it is stored rather than
+        recomputed is that "why is this supply here" must be
+        answerable a year later, and recomputing it then gives a
+        different answer because the slot state it was decided
+        against has moved on.
+      - >
+        AN IN-FLIGHT OBSERVATION IS ABOUT THE RUN, not the delivery,
+        and that framing is what made it recordable at all. A record
+        saying "delivery X is in flight" is a permanent claim about
+        something never accepted; "the run at 14:32 saw these" is a
+        fact about something that genuinely happened. Moving it into
+        the database must not quietly re-subject it to the delivery.
