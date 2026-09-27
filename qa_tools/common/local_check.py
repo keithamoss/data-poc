@@ -39,6 +39,24 @@ from datetime import datetime, timezone
 from qa_tools.common.supply_db import normalise_ident_part
 
 
+#: How much of a source filename a run id carries.
+#:
+#: FIFTEEN IS ARITHMETIC, not taste. A staged table is named
+#: `<table>__<arrival>` with an optional `__<ordinal>`, inside
+#: PostgreSQL's 63-byte identifier limit. This asset's longest logical
+#: table is `birth_registrations` (19), so the arrival segment has
+#: 63 - 19 - 2 - 3 = 39 bytes. A run id costs `adhoc_` (6) plus `_`
+#: plus a 16-character timestamp before any stem at all, leaving 16 -
+#: and 15 is that with a byte of margin.
+#:
+#: Twenty was the first answer and was one byte too many: it produced
+#: a 64-byte table name for exactly the common case, so the digest in
+#: supply_db.arrival_segment() would have fired on every ad-hoc check
+#: of a normally-named delivery, which is the unreadability this was
+#: meant to remove.
+MAX_STEM = 15
+
+
 def run_id_from_path(path: str, prefix: str = "adhoc") -> str:
     """A real, sortable, collision-resistant run_id for an ad hoc local
     check - not a synthetic manifest entry, so there's no existing
@@ -66,10 +84,40 @@ def run_id_from_path(path: str, prefix: str = "adhoc") -> str:
     `adhoc_births_5f_jan_...`. supply_db._ident() refuses anything
     unsafe, so if this normalisation is ever wrong the failure is loud
     and names this function.
+
+    THE STEM IS CAPPED (Keith, 2026-09-27: "why are the ad hoc ids so
+    long?"). It used to be the whole filename, which was thirty of the
+    fifty-three characters in
+    `adhoc_birth_registrations_2026_09_20_20260927t041329z` - and for
+    this project's own deliveries that filename already carries the
+    dataset name and a date, so the staged table name said
+    `birth_registrations` twice, carried two dates, and came to 74
+    bytes against PostgreSQL's 63-byte limit.
+
+    THE STEM RATHER THAN THE WHOLE ID, because capping the id would
+    eat the timestamp, and the timestamp is what makes a repeat check
+    of the same file a different run. What the cap costs is some
+    distinctness between two files whose names agree for the first
+    twenty characters AND are checked in the same second; the prefix
+    already separates the two files one command handles, so that is a
+    remote collision rather than a live one.
+
+    supply_db.arrival_segment() still bounds a long id with a digest
+    if one arrives from elsewhere - this stops the ordinary case
+    needing it.
     """
     stem = os.path.splitext(os.path.basename(path.rstrip("/")))[0]
+    # A NAME WITH NOTHING USABLE IN IT IS NOT AN ERROR HERE. `!!!.csv`
+    # is a file somebody can really hand this, and the timestamp alone
+    # is a perfectly good run id - normalise_ident_part() raises on an
+    # empty result because its other caller has no such fallback.
+    try:
+        stem = normalise_ident_part(stem)[:MAX_STEM].strip("_")
+    except ValueError:
+        stem = ""
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return normalise_ident_part(f"{prefix}_{stem}_{timestamp}")
+    parts = [prefix, stem, timestamp] if stem else [prefix, timestamp]
+    return normalise_ident_part("_".join(parts))
 
 
 

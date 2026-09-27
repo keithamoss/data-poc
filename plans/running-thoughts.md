@@ -3933,3 +3933,55 @@ Belongs with batch 5's check work.
 
     Sits naturally alongside #50's environment work and after
     REQ-PIPE-089; not started.
+
+52. **[todo, 2026-09-27]** **[Pipeline & publishing]** A supply someone receives and checks BY HAND leaves no arrival record, so only automated deliveries exist as far as the delivery log and the dashboard are concerned.
+
+    Keith's own observation, 2026-09-27: "let's think about whether a
+    user using real local dev / S3 data should actually write a
+    delivery to the log... I feel like they should because without it
+    only automated deliveries get a delivery log entry, not ones we
+    receive and process manually... and without deliveries being
+    logged it would impact what's shown in the dashboard, right?"
+
+    **He is right on the fact.** `delivery_log.record()` is called
+    from exactly two places - `orchestrate_bdm.run_pipeline()` and
+    `orchestrate_cp.run_pipeline_cp()` - each over the deliveries
+    recognised on disk. Every ad-hoc route (`--file`, `--folder`,
+    `--table`, S3, and the TUI's Local files mode) goes through
+    `run_single()`, which never records one. So a supply a person was
+    emailed, downloaded and checked is real work that happened and
+    leaves no trace in the arrival record, while the same supply
+    arriving in `data/deliveries/` leaves a full one.
+
+    And yes to the dashboard: `arrival_history` is built from that
+    log, so a hand-processed supply is missing from the arrival
+    history both datasets' pages show.
+
+    **Three things make this more than a one-line fix, which is why it
+    is here rather than done.**
+
+    1. **The prune would delete it again.** `mothman pipeline run`
+       prunes the delivery log against `delivery.survey().received` -
+       the deliveries actually on disk - so a record for a file that
+       was never in `data/deliveries/` is removed on the next pipeline
+       run. Any fix has to either file the ad-hoc supply as a real
+       delivery, or teach the prune what a hand-received record is.
+    2. **`--commit` is the line, probably.** A local-only check
+       deliberately writes no `qa_results/` history; logging an
+       arrival for one would leave an arrival with no QA against it,
+       which is worse than neither. Recording only on `--commit`
+       keeps the two records in step.
+    3. **Privacy, which REQ-PIPE-069 already thought about.** The
+       delivery log records real filenames and is committed to a
+       public repository. A generated delivery's name is ours; a name
+       a person's file happens to carry is not, and this would be the
+       first route by which an operator's own filename becomes a
+       published string.
+
+    **The tidiest answer may be to file it as a real delivery rather
+    than to special-case the log** - an ad-hoc supply IS a receipt, we
+    just received it by hand, so `delivery.write_delivery()` at the
+    point of check would make it an arrival like any other and every
+    downstream reader would need no change. That also answers the
+    prune. Worth putting to Keith against the simpler "record only,
+    skip the prune" option before building either.

@@ -652,10 +652,13 @@ def arrival_segment(received_at) -> str:
     return _bounded(normalise_ident_part(text))
 
 
-#: Long enough to stay readable, short enough that the longest logical
-#: table name plus `__` plus this plus an ordinal suffix clears
-#: PostgreSQL's 63-byte identifier limit with room to spare.
-_MAX_SEGMENT = 32
+#: The most a run-id arrival segment may be. Derived, not chosen:
+#: this asset's longest logical table is `birth_registrations` (19),
+#: a staged name is `<table>__<arrival>__<ordinal>`, and PostgreSQL's
+#: identifier limit is 63 - so 63 - 19 - 2 - 3 = 39. Kept in step with
+#: local_check.MAX_STEM, which is sized so an ordinary ad-hoc run id
+#: lands inside this and needs no digest at all.
+_MAX_SEGMENT = 39
 
 
 def _bounded(segment: str) -> str:

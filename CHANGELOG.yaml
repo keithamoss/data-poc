@@ -217,6 +217,13 @@ releases:
               directory first, along with the reference you compared
               it against. Both are now read from wherever you point
               at, and the reference is loaded like any other supply.
+          - headline: Shorter names for an ad-hoc check
+            components: ["Pipeline & publishing"]
+            description: >
+              Checking a file you point at built a name from the whole
+              filename plus the time, which for an ordinary delivery
+              repeated the dataset name and carried two dates. It now
+              keeps the recognisable start and the time.
           - headline: Drift will not answer from a stale file
             components: ["QA checks & contract"]
             description: >
