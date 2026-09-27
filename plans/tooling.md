@@ -2798,6 +2798,16 @@ testing before anyone treats it as the easy option.
     OUTCOME rather than Soda's internals, so it still says whether the
     invariant holds if a future release changes this.
 
+    **A confirming detail worth knowing, because it inverts the usual
+    rule.** CI was GREEN throughout - `.env` is gitignored, so on a
+    freshly-cloned runner Soda's reload finds no file and has nothing
+    to override, and `MOTHMAN_TEST_DSN` comes from the workflow. So
+    this is the mirror image of the trap CLAUDE.md already records
+    (a test that asserts a gitignored path exists passes locally and
+    fails in CI): here a gitignored file's ABSENCE made CI immune to a
+    real fault that only a developer's machine could show. A green CI
+    said nothing about it either way.
+
     **The method lesson, which is the same one the lock hunt taught:**
     two plausible causes were in hand, both were genuinely broken, and
     fixing both changed nothing. What found it was instrumenting the
