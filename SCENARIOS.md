@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**3 of 15 scenarios marked for injection have data behind them today.** 51 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**4 of 15 scenarios marked for injection have data behind them today.** 51 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -369,7 +369,12 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 
 **What it demonstrates.** The matched files are attributed and processed; the unmatched ones are reported as unrecognised artefacts at **warning** level. Critically, the supply is **NOT** silently treated as complete - the warning is the only thing standing between this and a promoted, green, HALF supply. Had the resupplies matched, this would instead be the duplicate-match hold of TS-34, which is louder still.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_run_014` |
+| Period | 2026-Q1 |
+| Set the as-of date to | 2026-02-01 |
 
 ### TS-39 - A split extract, once patterns are regexes
 
@@ -914,7 +919,14 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "demonstrates": "The matched files are attributed and processed; the unmatched ones are reported as unrecognised artefacts at **warning** level. Critically, the supply is **NOT** silently treated as complete - the warning is the only thing standing between this and a promoted, green, HALF supply. Had the resupplies matched, this would instead be the duplicate-match hold of TS-34, which is louder still.",
    "breaksAs": null,
    "config": null,
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_run_014"
+    ],
+    "period": "2026-Q1",
+    "asOf": "2026-02-01"
+   }
   },
   {
    "id": "TS-39",

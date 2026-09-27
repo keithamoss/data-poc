@@ -72,6 +72,15 @@ class ExtraArrival:
     at: str
     severity: str | None = None
     note: str = ""
+    #: Which named transform to apply to this arrival's FILE SET, for a
+    #: collection whose delivery carries several files. `None` leaves it
+    #: as the generator built it.
+    #:
+    #: A NAME RATHER THAN A CALLABLE, so the table below stays data that
+    #: can be read, diffed and reviewed - three of these scenarios are
+    #: about what a delivery's file set looks like, and a lambda in a
+    #: declaration is the point at which a table stops being one.
+    file_shape: str | None = None
 
 
 @dataclass(frozen=True)
@@ -137,6 +146,82 @@ class Placement:
         }
 
 
+#: The named transforms an arrival's `file_shape` can ask for.
+#:
+#: EACH ONE IS A SHAPE, NOT AN OUTCOME (criterion 6). "cp_clients cannot
+#: be parsed" is a fact about the bytes that arrived; that it is recorded
+#: red, that its slot stays unfilled and that every check depending on it
+#: reads red naming it are all the PIPELINE's answers, and generating any
+#: of them here would have the pipeline's own tests asserting agreement
+#: with this file.
+FILE_SHAPES: dict[str, str] = {
+    "one_file_unreadable":
+        "cp_clients.csv arrives as an extract that goes ragged partway and cannot "
+        "be parsed at all, while the other "
+        "five load cleanly - Keith's own case from real operational experience, and "
+        "the one he called 'a really important one'.",
+    "one_table_only":
+        "a delivery carrying a single table, which is what a corrected resupply of "
+        "one table actually looks like - it is that dataset's own supply arriving "
+        "late, not a resupply 'within' an earlier delivery.",
+    "unmatched_resupply":
+        "the six expected files plus two resupplies whose names match no pattern at "
+        "all - a renamed extract from an upstream system. The danger is that the "
+        "supply looks complete.",
+}
+
+def unreadable(content: str) -> str:
+    """The same extract, gone wrong partway through - ragged rows.
+
+    CHECKED AGAINST THE REAL READER RATHER THAN ASSUMED, and the first
+    attempt failed that check. It was an unterminated quote, which reads
+    like obvious rubbish and which `read_csv_explicit_nulls()` parses
+    quite happily into an empty two-column table - so the scenario would
+    have demonstrated an empty supply with nonsense columns, not a
+    supply that cannot be loaded at all. A row carrying more fields than
+    the header does raise, with `Expected N fields in line M, saw K`.
+
+    KEEPS THE REAL HEADER AND THE REAL FIRST ROWS, because that is what
+    a truncated or mis-delimited export actually looks like: a file that
+    starts out fine. A file of obvious rubbish would be caught by
+    anything, including a person glancing at it.
+    """
+    lines = content.splitlines()
+    if len(lines) < 3:
+        return content
+    keep = lines[:max(2, len(lines) // 2)]
+    widest = max(line.count(",") for line in keep) + 3
+    return "\n".join([*keep, ",".join(str(i) for i in range(widest))]) + "\n"
+
+
+def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]:
+    """One delivery's file set, as the named shape wants it.
+
+    UNKNOWN NAMES RAISE. A shape somebody mistyped would otherwise leave
+    the delivery exactly as it was, and the scenario would quietly not be
+    in the history - which is the failure criterion 4 exists to prevent,
+    arriving by a different route.
+    """
+    if shape is None:
+        return files
+    if shape not in FILE_SHAPES:
+        raise CannotPlace(
+            f"unknown file shape {shape!r} - known shapes are "
+            f"{', '.join(sorted(FILE_SHAPES))}")
+    out = dict(files)
+    if shape == "one_file_unreadable":
+        out["cp_clients.csv"] = unreadable(files["cp_clients.csv"])
+    elif shape == "one_table_only":
+        out = {"cp_clients.csv": files["cp_clients.csv"]}
+    elif shape == "unmatched_resupply":
+        # NAMES NOTHING CLAIMS. Not a variant of a real name - a
+        # different convention entirely, which is what an upstream system
+        # changing its export looks like.
+        out["CLIENTS_EXTRACT_FINAL.csv"] = files["cp_clients.csv"]
+        out["placements (2).csv"] = files["cp_placements.csv"]
+    return out
+
+
 def resolve(injection: Injection, periods: Sequence) -> Placement:
     """Which real period this injection lands in.
 
@@ -179,6 +264,7 @@ def resolve(injection: Injection, periods: Sequence) -> Placement:
             "at": extra.at,
             "severity": extra.severity,
             "note": extra.note,
+            "file_shape": extra.file_shape,
         })
     return Placement(
         scenario_id=injection.scenario_id,
@@ -278,17 +364,32 @@ def check_suppressed_days_are_empty(placements: Sequence[Placement], recognised)
 
 
 def write_placements(placements: Sequence[Placement],
-                     path: Path | str | None = None) -> Path:
+                     path: Path | str | None = None,
+                     merge: bool = False) -> Path:
     """Record where every scenario landed (criterion 7).
 
-    ONE FILE, REWRITTEN WHOLE. A placement is a fact about the history
-    that exists right now, and a regeneration replaces that history
-    entirely - so merging into what was there before would leave
+    ONE FILE, REWRITTEN WHOLE PER DATASET. A placement is a fact about
+    the history that exists right now, and a regeneration replaces that
+    history entirely - so keeping what was there before would leave
     coordinates pointing at supplies that no longer exist.
+
+    `merge` KEEPS OTHER DATASETS' PLACEMENTS, and is what lets the two
+    generators run independently: `mothman bdm generate-synthetic-data`
+    rewrites Birth Registrations' scenarios and must not delete Child
+    Protection's, which it knows nothing about. Records for the datasets
+    being written are replaced outright either way, so a scenario that
+    moved does not leave its old coordinate behind.
     """
     target = Path(path or PLACEMENTS_PATH)
     target.parent.mkdir(parents=True, exist_ok=True)
     records = []
+    if merge and target.is_file():
+        mine = {p.dataset for p in placements}
+        try:
+            existing = json.loads(target.read_text()).get("placements") or []
+        except (OSError, json.JSONDecodeError):
+            existing = []
+        records.extend(r for r in existing if r.get("dataset") not in mine)
     for placement in placements:
         record = placement.as_record()
         for also in _ALSO.get(placement.scenario_id, ()):
@@ -312,6 +413,60 @@ _ALSO: dict[str, tuple[str, ...]] = {}
 #: Wednesday" depends entirely on the cadence, the due time and the
 #: claim-window size, and a different window gives a different and
 #: equally correct answer.
+#:
+#: TS-14 IS NOT HERE FOR THE SAME UNDERLYING REASON AS TS-12, which is
+#: what makes the pair worth reading together. Its shape is a corrected
+#: `cp_clients` arriving ALONE weeks later, and that delivery was written
+#: correctly - one file, its own receipt, recognised as clients' own
+#: supply arriving late. The run then died the same way TS-12's did, on
+#: `cp_placements` this time: a run resolves its views from the tables
+#: THIS ARRIVAL carried, so five of the six are simply absent and dbt's
+#: models ref() all six.
+#:
+#: `supply_db.borrow_views()` exists for exactly this - "a delivery
+#: carrying one re-sent table cannot be checked on its own... the run's
+#: schema simply gets a VIEW onto each table the earlier run already
+#: resolved" - and nothing calls it from the ordinary path. So the two
+#: scenarios are one gap wearing two faces: A DELIVERY THAT DOES NOT
+#: CARRY ALL SIX TABLES CANNOT BE QA'D AT ALL TODAY, whether a table is
+#: missing because it never came or because it could not be read.
+#:
+#: TS-12 IS NOT HERE EITHER, AND THE REASON IS THE MOST USEFUL THING
+#: THIS REQUIREMENT HAS FOUND SO FAR. It was injected on 2026-09-28 and
+#: it worked exactly as written at the arrival layer - a real Child
+#: Protection extract going ragged partway, `cp_clients FAILED to load
+#: (ParserError: Expected 10 fields in line 265, saw 12)`, recorded for
+#: human action, no table staged. Then the RUN died: dbt could not find
+#: `qa_cp_run_011.cp_clients`, the whole run was recorded INCOMPLETE,
+#: and the five tables that HAD loaded produced no results at all.
+#:
+#: The register expects the opposite - the five staged, QA'd and green,
+#: `cp_clients` red, and every check depending on it red with a chip
+#: naming the blocker. REQ-PIPE-035 already defers red-for-unrun to the
+#: promotion sprint, saying no check's verdict is produced through it
+#: yet; what it does NOT say, and what this found, is that one
+#: unloadable table takes the whole delivery's QA down with it. Keith
+#: called TS-12 "a really important one" from real operational
+#: experience, and it is: today a supplier sending one bad file loses
+#: the QA on five good ones.
+#:
+#: Not injected until that is built, because a history with an
+#: INCOMPLETE run in it is one the dashboard cannot be built from - the
+#: scenario would break the thing it exists to be visible on.
+#:
+#: TS-34 IS NOT HERE, AND IT IS NOT AN OVERSIGHT. It wants eight files
+#: where six are expected - a second cp_clients and a second
+#: cp_placements, each matching its dataset's own pattern, so neither can
+#: be placed. Child Protection's arrival patterns are EXACT filenames
+#: (`cp_clients\.csv`), so two files in one directory can never both
+#: match one of them: the duplicate-match hold the scenario is about
+#: cannot arise for this collection as configured. Attempted anyway on
+#: 2026-09-28, and the files were reported as matching NO pattern, which
+#: is TS-38's scenario wearing TS-34's name - a shape that demonstrates
+#: the wrong thing is worse than one not yet injected. Widening a
+#: pattern is a real behaviour change with a gate of its own about
+#: exactly this ambiguity, so it is Keith's call rather than a
+#: workaround.
 #:
 #: THE ONES THAT NEED A DIFFERENT DUE TIME ARE NOT HERE YET. TS-3c, TS-3d
 #: and TS-10 all need the supply for day D due 22:00 on D-1, which no
@@ -357,6 +512,20 @@ INJECTIONS: tuple[Injection, ...] = (
             ExtraArrival(0, "14:00", None, "the on-time arrival, two days after the outage"),
         ),
         suppress=(-2, -1),
+    ),
+    Injection(
+        scenario_id="TS-38",
+        dataset_id="cp-clients",
+        anchor=-3,
+        config="quarterly, Feb/May/Aug/Nov. The current files match their patterns "
+               "and the resupplies of two of them do not - a renamed extract from "
+               "an upstream system.",
+        arrivals=(
+            ExtraArrival(0, "09:00", None,
+                          "six matching files plus two whose names match no pattern "
+                          "at all - the danger being that the supply looks complete",
+                          file_shape="unmatched_resupply"),
+        ),
     ),
 )
 

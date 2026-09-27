@@ -85,7 +85,7 @@ before this was actually built).
 from __future__ import annotations
 import json
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -93,9 +93,9 @@ import pandas as pd
 from qa_tools.common import hierarchy
 from generator.anchor_date import get_anchor_date
 from generator import dirty as dirty_mod
-from generator import delivery_names
-from generator.resupply import MAX_ATTEMPTS, DatasetProvider, run_slot_chain
-from qa_tools.common import asset_time, delivery, schedule
+from generator import delivery_names, scenario_injection
+from generator.resupply import MAX_ATTEMPTS, Delivery, DatasetProvider, run_slot_chain
+from qa_tools.common import arrivals, asset_time, delivery, schedule
 
 # Which dataset's calendar this collection is scheduled against. All six
 # CP tables arrive together as one supply, so any of them names the same
@@ -522,6 +522,45 @@ def _previous_delivery_names() -> list[str]:
         book = json.load(f)
     return [e["delivery"] for e in book.get(DATASET_ID, []) if e.get("delivery")]
 
+def _injected_chain(provider: DatasetProvider, injection, period, seed: int):
+    """The arrivals ONE injected scenario needs, in place of the
+    ordinary chain (REQ-GEN-044) - the Child Protection counterpart to
+    generate_runs.py's own, and see that one's docstring for why an
+    injected slot does not go through run_slot_chain().
+
+    Each arrival after the first is CHURNED from the one before, which
+    for this collection means the whole six-table payload moves on
+    together - a corrected resupply of one table is still taken from a
+    collection that did not stand still.
+    """
+    deliveries = []
+    payload = provider.generate(period.date, seed=seed, n_rows=0, id_offset=0)
+    for n, extra in enumerate(injection.arrivals):
+        if n:
+            payload = provider.churn(payload, seed=seed + 900 + n,
+                                      run_date=period.date, id_offset=0)
+        this = payload
+        if extra.severity:
+            this = provider.dirty(payload, severity=extra.severity,
+                                   seed=seed + 800 + n, previous_row_count=None)
+        deliveries.append(Delivery(
+            received_date=period.date + timedelta(days=extra.day_offset),
+            severity=extra.severity, payload=this))
+    return deliveries
+
+
+def _plan_injections(periods):
+    """Where every Child Protection scenario lands, resolved BEFORE
+    anything is written (REQ-GEN-044 criterion 4)."""
+    mine = scenario_injection.for_dataset(DATASET_ID)
+    scenario_injection.no_two_scenarios_share_a_period(mine, {DATASET_ID: periods})
+    resolved = [(injection, scenario_injection.resolve(injection, periods))
+                for injection in mine]
+    by_period = {placement.period: (injection, placement)
+                 for injection, placement in resolved}
+    return resolved, by_period
+
+
 def main() -> None:
     print(f"Generating base Child Protection collection (population={POPULATION_N:,}, seed={BASE_SEED})...")
     pop = generate_population(POPULATION_N, seed=BASE_SEED)
@@ -548,16 +587,23 @@ def main() -> None:
     # duplication.
     periods = schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())[-len(RUN_PLAN):]
 
+    # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4).
+    resolved_injections, injected_by_period = _plan_injections(periods)
+
     for i, ((_, severity), period) in enumerate(zip(RUN_PLAN, periods), start=1):
         snapshot_date = period.date
         slot_id = f"cp_slot_{i:02d}"
         seed = BASE_SEED + i
 
-        deliveries = list(run_slot_chain(
-            provider, snapshot_date, seed, id_offset=0, n_rows=0,
-            first_severity=severity, previous_row_count=None,
-            delay_days=_CP_DELAY_DAYS, delay_weights=_CP_DELAY_WEIGHTS,
-        ))
+        injected = injected_by_period.get(period.name)
+        if injected is not None:
+            deliveries = _injected_chain(provider, injected[0], period, seed)
+        else:
+            deliveries = list(run_slot_chain(
+                provider, snapshot_date, seed, id_offset=0, n_rows=0,
+                first_severity=severity, previous_row_count=None,
+                delay_days=_CP_DELAY_DAYS, delay_weights=_CP_DELAY_WEIGHTS,
+            ))
         entries = _cp_manifest_entries_for_slot(deliveries, slot_id, period.name, len(manifest), seed)
 
         for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
@@ -573,8 +619,20 @@ def main() -> None:
                 df = delivery_obj.payload[name]
                 cols = [c for c in df.columns if not c.startswith("_")]
                 csvs[f"{name}.csv"] = df[cols].to_csv(index=False)
-            entry["received_at"] = _cp_received_at(
-                delivery_obj.payload, delivery_obj.received_date, f"received_at for {entry['run_id']}")
+            if injected is not None:
+                # THE SCENARIO'S OWN FILE SET AND ITS OWN INSTANT. Three
+                # of these scenarios ARE a file set - an unreadable
+                # table, a duplicate match, a rename nothing claims - so
+                # shaping the delivery is the whole injection rather
+                # than a detail of it.
+                extra = injected[0].arrivals[n - 1]
+                csvs = scenario_injection.apply_file_shape(extra.file_shape, csvs)
+                entry["received_at"] = asset_time.isoformat(
+                    asset_time.wall_clock(delivery_obj.received_date, extra.at))
+            else:
+                entry["received_at"] = _cp_received_at(
+                    delivery_obj.payload, delivery_obj.received_date,
+                    f"received_at for {entry['run_id']}")
 
             # AND AS A REAL DELIVERY (REQ-GEN-043). All six tables in
             # ONE directory, because they arrive together as one
@@ -585,6 +643,11 @@ def main() -> None:
             dname = delivery_names.delivery_name(snapshot_date, seed, attempt=n, taken=taken_names)
             taken_names.add(dname)
             entry["delivery"] = dname
+            if injected is not None:
+                # The delivery NAME, resolved to a real run id from
+                # recognition below - see scenario_injection's own
+                # resolve_run_ids() for why not this manifest's id.
+                injected[1].arrivals[n - 1]["delivery"] = dname
             delivery.write_delivery(
                 dname, csvs,
                 received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]),
@@ -610,6 +673,16 @@ def main() -> None:
     # the pipeline had read it since arrivals became recognised rather
     # than declared, so the only thing it could still do was tempt
     # somebody to wire it back up.
+    if resolved_injections:
+        placed = [placement for _, placement in resolved_injections]
+        recognised = arrivals.arrivals_for(
+            hierarchy.dataset(DATASET_ID).collection_id, "cp_run_",
+            DELIVERIES_DIR, RECEIPTS_DIR)
+        scenario_injection.check_suppressed_days_are_empty(placed, recognised)
+        scenario_injection.resolve_run_ids(placed, recognised)
+        written = scenario_injection.write_placements(
+            placed, merge=True)
+        print(f"Recorded {len(placed)} injected scenario placement(s) -> {written}")
     _write_bookkeeping(manifest)
     n_red_slots = sum(1 for _, sev in RUN_PLAN if sev == "red")
     print(f"\nWrote {len(manifest)} deliveries across {len(RUN_PLAN)} scheduled slots "

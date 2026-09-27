@@ -278,3 +278,126 @@ class TestNothingSaysScenarioOnTheDashboard:
             assert not found, (
                 f"{name} carries scenario id(s) {sorted(found)} - an injected "
                 f"scenario must not be marked as one in what the dashboard renders")
+
+
+class TestTheChildProtectionScenariosAreReallyThere:
+    """REQ-GEN-044 criterion 1, against the real generated delivery tree.
+
+    SKIPPED RATHER THAN FAILED WHERE `data/` IS ABSENT, which is not
+    laziness: a freshly-cloned CI runner has no generated history at
+    all, and a test asserting a gitignored path exists is green locally
+    and red on the runner every time - this repo has already shipped
+    that mistake twice.
+    """
+
+    @staticmethod
+    def _tree():
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent / "data" / "deliveries"
+        if not root.is_dir():
+            pytest.skip("no generated delivery tree - run `mothman cp generate-synthetic-data`")
+        return root
+
+    @staticmethod
+    def _files_of(scenario_id: str, tree):
+        from qa_tools.common import arrivals, scenario_map
+
+        placement = scenario_map.read_placements().get(scenario_id)
+        if placement is None or not placement.supplies:
+            pytest.skip(f"{scenario_id} is not placed in this history")
+        by_run = {a.run_id: a for a in arrivals.arrivals_for("child-protection", "cp_run_")}
+        return [sorted(f.name for f in (tree / by_run[run].delivery_name).iterdir())
+                for run in placement.supplies if run in by_run]
+
+    def test_the_unreadable_shape_is_genuinely_unreadable(self, tmp_path):
+        """TS-12's shape, tested WITHOUT injecting it.
+
+        The scenario is not in the history - one unloadable table takes
+        the whole run down today, so injecting it produces an INCOMPLETE
+        run the dashboard cannot be built from (see
+        scenario_injection's own note). The SHAPE is right and stays
+        tested, so the day the pipeline can survive it, injecting is one
+        line.
+
+        AGAINST THE REAL READER, not Python's own `csv` module, which is
+        why the first version of this shape was wrong: `csv` parses an
+        unterminated quote quite happily into an empty table, so a test
+        using it passed while the file was perfectly loadable.
+        """
+        from qa_tools.common.csv_io import read_csv_explicit_nulls
+
+        good = "a,b,c\n1,2,3\n4,5,6\n7,8,9\n"
+        shaped = si.apply_file_shape("one_file_unreadable", {"cp_clients.csv": good})
+        path = tmp_path / "cp_clients.csv"
+        path.write_text(shaped["cp_clients.csv"])
+        with pytest.raises(Exception) as exc:
+            read_csv_explicit_nulls(str(path), {})
+        assert "fields" in str(exc.value) or "parse" in str(exc.value).lower(), exc.value
+
+    def test_the_unreadable_shape_keeps_the_real_header_and_first_rows(self):
+        """A file of obvious rubbish would be caught by anyone glancing
+        at it. What this has to imitate is an export that starts out
+        fine and goes wrong partway."""
+        good = "a,b,c\n1,2,3\n4,5,6\n7,8,9\n"
+        shaped = si.apply_file_shape("one_file_unreadable", {"cp_clients.csv": good})
+        assert shaped["cp_clients.csv"].startswith("a,b,c\n1,2,3")
+
+    def test_the_single_table_shape_is_a_single_table(self):
+        """TS-14's shape, tested WITHOUT injecting it - the same
+        position TS-12 is in, and for the same underlying reason.
+
+        A delivery carrying one table was written correctly and the RUN
+        then died on `cp_placements`, because a run resolves its views
+        from the tables THIS ARRIVAL carried and dbt's models ref() all
+        six. `supply_db.borrow_views()` exists for exactly this and
+        nothing calls it from the ordinary path. So a delivery that does
+        not carry all six cannot be QA'd at all today, whether a table
+        is missing because it never came or because it could not be
+        read.
+        """
+        files = {f"{t}.csv": "a,b\n1,2\n" for t in
+                 ("cp_clients", "cp_notifications", "cp_carers")}
+        shaped = si.apply_file_shape("one_table_only", files)
+        assert sorted(shaped) == ["cp_clients.csv"]
+
+    def test_the_renamed_resupplies_are_present_and_match_nothing(self):
+        """TS-38, which Keith called the most dangerous shape in the
+        register: the matched files are processed and the renamed ones
+        are not, so the supply is HALF and only a warning says so."""
+        from qa_tools.common import delivery
+
+        sets = self._files_of("TS-38", self._tree())
+        assert sets, "TS-38 placed no supply"
+        names = sets[0]
+        assert len(names) == 8, names
+        unmatched = [n for n in names if delivery.dataset_for_filename(n) is None]
+        assert len(unmatched) == 2, unmatched
+        matched = [n for n in names if delivery.dataset_for_filename(n) is not None]
+        assert len(matched) == 6, matched
+
+    def test_no_two_files_in_one_delivery_claim_one_dataset(self):
+        """Why TS-34 is absent, asserted rather than only written down.
+
+        Child Protection's arrival patterns are exact filenames, so the
+        duplicate-match hold cannot arise for this collection - an
+        attempt to inject it produced TS-38's scenario wearing TS-34's
+        name. If this ever stops holding, a pattern was widened and
+        TS-34 becomes injectable.
+        """
+        from collections import Counter
+
+        from qa_tools.common import delivery, hierarchy
+
+        tree = self._tree()
+        patterns = {d.dataset_id for d in hierarchy.datasets_in_collection("child-protection")}
+        for folder in sorted(tree.iterdir()):
+            if not folder.is_dir():
+                continue
+            claimed = Counter()
+            for f in folder.iterdir():
+                owner = delivery.dataset_for_filename(f.name)
+                if owner in patterns:
+                    claimed[owner] += 1
+            duplicates = {k: v for k, v in claimed.items() if v > 1}
+            assert not duplicates, f"{folder.name}: {duplicates}"

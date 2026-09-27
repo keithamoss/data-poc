@@ -420,6 +420,14 @@ button{font:inherit; color:inherit;}
    unfinished" rather than "this one has a shorter name". The critic
    that found it said .card was plain block flow; it is not, it has
    been flex column all along, and the only thing missing was this. */
+/* AND IT MUST STAY THE LAST CHILD for `margin-top:auto` to mean
+   anything, which is why the markers above it are rendered BEFORE it
+   rather than after. They used to follow it, and nobody saw the
+   consequence because no agency had ever had a marker: the moment
+   REQ-GEN-044 injected a scenario that produces an outstanding item,
+   one card's meta row sat 73px above its bottom edge and its
+   neighbour's sat at 19px. Reading order is unharmed - a note saying
+   something needs a person belongs above the counts, not below them. */
 .card-meta{display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:var(--ink-muted);
   margin-top:auto;}
 .card-meta b{color:var(--ink); font-weight:600;}
@@ -3640,8 +3648,15 @@ function outstandingItemHtml(item){
   const klass = item.blocking ? "blocking" : "review";
   const ambiguity = item.ambiguity
     ? `<div class="queue-detail"><i>${escHtml(item.ambiguity)}</i></div>` : "";
+  // THROUGH THE PAGE'S ONE WAY OF WRITING A DATE (REQ-DASH-071), which
+  // this was the last place not to do. It rendered the stored instant
+  // verbatim - `2026-09-28T06:10:22+08:00` - and nobody had seen it,
+  // because until REQ-GEN-044 injected a scenario that produces an
+  // outstanding item, the generated history had none and this line
+  // never ran. Found by the display-standard test the moment one
+  // appeared.
   const when = item.observedAt
-    ? `<span style="color:var(--ink-faint); font-size:11.5px;">${escHtml(String(item.observedAt))}</span>` : "";
+    ? `<span style="color:var(--ink-faint); font-size:11.5px;">${escHtml(fmtInstant(item.observedAt))}</span>` : "";
   return `<div class="queue-item ${klass}">
     <div class="queue-head">
       ${eventSeverityPill(item.severity,"sm")}
@@ -3783,9 +3798,9 @@ function renderExec(view){
       <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
       ${spark}
-      <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
       ${exhaustedMarker(ag.exhaustedCount, ag.status)}
       ${outstandingMarker("agency", ag.id)}
+      <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
     </a>`;
   }).join("");
   wireCards(grid);

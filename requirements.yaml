@@ -6743,9 +6743,29 @@ requirements:
         an already-filled slot. Criteria 1 (for those three), 2, 3, 4, 5,
         6 and 7.
 
-        NOT DONE - the Child Protection scenarios (TS-12, TS-13, TS-14,
-        TS-34, TS-38, and the quarterly TS-3a, TS-3b, TS-9), and criteria
-        8 to 11 with the three scenarios that depend on them.
+        DONE ALSO - one Child Protection scenario, TS-38, which is a
+        FILE SET rather than an arrival time: a catch-up delivery whose
+        renamed resupplies match no pattern at all. It already produces
+        the real system's own warning - "a renamed extract is a supply
+        on the floor" - which is the whole point of injecting it rather
+        than unit-testing it, since Keith calls it the most dangerous
+        shape in the register precisely because the failure is one of
+        ATTENTION.
+
+        NOT DONE - TS-12, TS-14 and TS-34, each with its own decision
+        below and none of them an oversight; TS-13 (six tables landing
+        seconds apart, which a directory delivery cannot express: it
+        carries one receipt for the whole directory); the quarterly
+        TS-3a, TS-3b and TS-9; and criteria 8 to 11 with the three
+        scenarios that depend on them.
+
+        THE THREE THAT WERE TRIED AND WITHDRAWN ARE THE RETURN ON THIS
+        WORK, not a shortfall in it. Each was injected, run against the
+        real pipeline, and taken out again because it demonstrated
+        something other than what it claims - and two of them turned out
+        to be one unbuilt capability seen from two directions. That is
+        the evidence Keith wanted from injecting rather than
+        unit-testing, arriving in the first session of it.
 
         TWO DEFECTS OF MY OWN, both found by running the real generator
         rather than by reading, and both worth keeping because each is a
@@ -6777,6 +6797,108 @@ requirements:
         not fixed here: `arrivedAt` is pinned by the arrival golden and
         read by the classification display, so changing what it means is
         a shape change with several consumers.
+
+      - >
+        AND TS-38 FOUND TWO REAL DEFECTS ON THE PAGE ITSELF, both fixed
+        here, and both of the same shape: a code path that had never
+        run because the generated history had never contained an
+        outstanding item.
+        THE TIMESTAMP ON AN OUTSTANDING ITEM WAS RAW.
+        `outstandingItemHtml()` rendered `item.observedAt` verbatim -
+        `2026-09-28T06:10:22+08:00` - where REQ-DASH-071 made
+        `fmtInstant()` the page's one way of writing a date. It goes
+        through it now, and the display-standard test caught it the
+        moment an item appeared.
+        AND THE AGENCY CARDS STOPPED LINING UP. `.card-meta` pins to the
+        bottom with `margin-top:auto`, which only works while it is the
+        LAST child, and the two markers were rendered after it - so the
+        card carrying an outstanding marker put its meta row 73px above
+        its bottom edge against its neighbour's 19px. The markers are
+        rendered before it now, which also reads better: a note saying
+        something needs a person belongs above the counts.
+        NEITHER WAS REACHABLE BEFORE, which is the argument for
+        injecting rather than unit-testing, made twice more.
+
+      - >
+        TS-14 IS THE SAME GAP AS TS-12 SEEN FROM THE OTHER SIDE, which is
+        what makes the pair worth reading together rather than as two
+        misses. Its shape is a corrected `cp_clients` arriving ALONE
+        weeks later, and the delivery was written correctly - one file,
+        its own receipt, recognised as clients' own supply arriving
+        late. The run then died on `cp_placements`: a run resolves its
+        views from the tables THIS ARRIVAL carried, so five of six are
+        absent and dbt's models ref() all six.
+        `supply_db.borrow_views()` exists for precisely this - "a
+        delivery carrying one re-sent table cannot be checked on its
+        own... the run's schema simply gets a VIEW onto each table the
+        earlier run already resolved" - and nothing calls it from the
+        ordinary path. So, stated once for both: A DELIVERY THAT DOES
+        NOT CARRY ALL SIX TABLES CANNOT BE QA'D AT ALL TODAY, whether a
+        table is missing because it never came or because it could not
+        be read. Both shapes stay, tested, for the sprint that wires
+        that up.
+
+      - >
+        TS-12 IS THE MOST USEFUL THING THIS REQUIREMENT HAS FOUND, and
+        it found it by being injected and then taken out again. The
+        shape worked exactly as written at the arrival layer - a real
+        Child Protection extract going ragged partway, `cp_clients
+        FAILED to load (ParserError: Expected 10 fields in line 265, saw
+        12)`, recorded for human action, no table staged. Then the RUN
+        died: dbt could not find `qa_cp_run_011.cp_clients`, the run was
+        recorded INCOMPLETE, and the five tables that HAD loaded
+        produced no results at all.
+        THE REGISTER EXPECTS THE OPPOSITE - five staged, QA'd and green,
+        `cp_clients` red, and every check depending on it red with a
+        chip naming the blocker. REQ-PIPE-035 already defers
+        red-for-unrun to the promotion sprint, saying no check's verdict
+        is produced through it yet. What that deferral does NOT say, and
+        what this found, is that one unloadable table takes the whole
+        delivery's QA down with it - so a supplier sending one bad file
+        today loses the QA on five good ones. Keith called TS-12 "a
+        really important one" from real operational experience, and it
+        is.
+        NOT INJECTED until that is built, because a history containing
+        an INCOMPLETE run is one the dashboard cannot be built from: the
+        scenario would break the thing it exists to be visible on. The
+        SHAPE stays, with its own tests, so injecting it is one line the
+        day the pipeline can survive it.
+
+      - >
+        TS-34 CANNOT BE INJECTED AS THE REGISTER WRITES IT, and finding
+        that out is itself worth the exercise. It wants eight files where
+        six are expected - a second `cp_clients` and a second
+        `cp_placements`, each matching its dataset's own pattern, so
+        neither can be placed. Child Protection's arrival patterns are
+        EXACT filenames (`cp_clients\.csv`), so two files in one
+        directory can never both match one of them: the duplicate-match
+        hold this scenario is about cannot arise for this collection as
+        configured.
+        ATTEMPTED ANYWAY, which is how it was found: the two extra files
+        were reported as matching NO pattern, which is TS-38's scenario
+        wearing TS-34's name. A shape that demonstrates the wrong thing
+        is worse than one not yet injected, so the injection was removed
+        rather than left looking done. Widening a pattern is a real
+        behaviour change - `mothman check`'s `patterns` gate exists for
+        exactly this ambiguity - so it is Keith's call. Asserted rather
+        than only written down: a test walks every delivery and fails if
+        two files ever claim one dataset, so the day a pattern widens,
+        TS-34 becomes injectable and something says so.
+
+      - >
+        THE "UNREADABLE" FILE WAS READABLE ON THE FIRST ATTEMPT, and the
+        correction is the same shape as the rest of this requirement's
+        defects: a shape has to be checked against the real reader, not
+        reasoned about. An unterminated quote looks like obvious rubbish
+        and `read_csv_explicit_nulls()` parses it quite happily into an
+        empty two-column table - so TS-12 would have demonstrated an
+        empty supply with nonsense columns rather than a supply that
+        cannot be loaded at all. What actually fails is a RAGGED file:
+        the real header, the real first rows, and then a row carrying
+        more fields than the header does, which raises `Expected 10
+        fields in line 265, saw 12`. That is also what a truncated or
+        mis-delimited export really looks like, where a file of obvious
+        rubbish would be caught by anyone glancing at it.
 
       - >
         THE REGISTER'S OWN CONFIG LINE FOR TS-1 SAYS "daily, due 12:00" AND

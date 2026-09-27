@@ -689,8 +689,7 @@ def main() -> None:
         # be written - see each function's own docstring.
         scenario_injection.check_suppressed_days_are_empty(placed, recognised)
         scenario_injection.resolve_run_ids(placed, recognised)
-        written = scenario_injection.write_placements(
-            [placement for _, placement in resolved_injections])
+        written = scenario_injection.write_placements(placed, merge=True)
         print(f"Recorded {len(resolved_injections)} injected scenario placement(s) "
               f"-> {written}")
     n_red_chains = sum(1 for _, sev in RUN_PLAN if sev == "red")

@@ -2645,21 +2645,31 @@ class TestOutstandingDecisions:
         """Criterion 13, at all three tiers.
 
         An empty element and a missing one look identical to a reader,
-        and both look identical to a panel that crashed. The real
-        committed history currently has nothing outstanding, so this is
-        the state a reader meets today - which makes it the one worth
-        holding to a browser-level assertion rather than a unit one.
+        and both look identical to a panel that crashed - so the panel
+        is ALWAYS present and always says which it is.
+
+        IT USED TO ASSERT THE QUIET WORDING EVERYWHERE, because the
+        generated history had nothing outstanding anywhere. REQ-GEN-044
+        injected TS-38, whose renamed resupplies are a real unattributed
+        artefact, and one tier now correctly reports it. That is the
+        scenario working rather than a regression, so what this holds is
+        the property that survives both states: the panel exists, and it
+        either names what is waiting or says nothing is - never neither.
         """
+        quiet = "Nothing is waiting for a person"
+        waiting = "waiting for a person"
+
         _goto(clean_page, built_dashboard_html)
         assert clean_page.locator(".notice-queue").count() == 1
-        assert "Nothing is waiting for a person" in clean_page.locator(
-            ".notice-queue").inner_text()
+        top = clean_page.locator(".notice-queue").inner_text()
+        assert quiet in top or waiting in top, top
 
         agency = clean_page.locator("#agency-grid .card").first
         agency.click()
         clean_page.wait_for_timeout(400)
-        assert "Nothing is waiting for a person" in clean_page.locator(
-            ".notice-queue").first.inner_text()
+        assert clean_page.locator(".notice-queue").count() >= 1
+        tier2 = clean_page.locator(".notice-queue").first.inner_text()
+        assert quiet in tier2 or waiting in tier2, tier2
 
     def test_the_quiet_state_is_not_dressed_as_a_data_verdict(
             self, clean_page, built_dashboard_html):
