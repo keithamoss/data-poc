@@ -189,6 +189,13 @@ releases:
               warehouse partway through a run, so they failed differently
               every time and left tables behind. Each one now stays where
               it was put.
+          - headline: A dbt build that failed no longer looks like one that worked
+            components: ["QA checks & contract"]
+            description: >
+              If dbt could not run, the previous run's results were still
+              on disk and got reported as this run's - a pass you could
+              not tell from a real one. A build that did not happen now
+              stops the run and tells you what dbt said.
       - category: New
         items:
           - headline: You need a PostgreSQL to run this

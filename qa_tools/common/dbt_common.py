@@ -27,6 +27,14 @@ FAILING_SAMPLE_LIMIT = 5
 _NUM_RE = re.compile(r"([\d.]+)")
 
 
+class DbtRunFailed(RuntimeError):
+    """A `dbt` invocation did not produce a result worth reading.
+
+    NOT RAISED FOR A FAILING TEST, which is the distinction the whole
+    class exists to draw - see run_dbt()'s own docstring.
+    """
+
+
 def parse_threshold(spec: str | None) -> float | None:
     if spec is None or spec.strip() == "!= 0":
         return None
@@ -81,7 +89,17 @@ def run_dbt(command: str, select: list[str], target_path: str,
     if run_schema:
         env["DBT_RUN_SCHEMA"] = run_schema
     env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
-    subprocess.run(
+    # STALE OUTPUT IS REMOVED BEFORE THE RUN, not trusted after it.
+    # target_path is per-run and persists, so a build that fails early
+    # leaves the PREVIOUS build's run_results.json in place and the
+    # caller reads that run's results as this run's - a false green
+    # produced by a build that never happened.
+    for artefact in ("run_results.json", "manifest.json"):
+        try:
+            os.remove(os.path.join(target_path, artefact))
+        except FileNotFoundError:
+            pass
+    completed = subprocess.run(
         # --target-path gives each run its OWN target/ subdirectory rather
         # than dbt's shared default - required for cross-run
         # parallelization (plans/performance.md #4): without this,
@@ -98,6 +116,48 @@ def run_dbt(command: str, select: list[str], target_path: str,
          "--target-path", target_path, "--select", *select, "--store-failures"],
         env=env, cwd=root, check=False, capture_output=True, text=True,
     )
+    _refuse_a_build_that_did_not_run(completed, target_path)
+
+
+def _refuse_a_build_that_did_not_run(completed, target_path: str) -> None:
+    """Raise unless dbt produced results this caller can honestly read.
+
+    `check=True` WOULD BE WRONG, and that is the whole difficulty: dbt
+    exits non-zero when a TEST FAILS, which is the ordinary outcome
+    this pipeline exists to record. The exit code cannot tell a failing
+    test from a model that could not run - `dbt build` returns 1 for
+    both - so the decision comes from run_results.json instead, where a
+    failing test carries status `fail` and a node that could not run
+    carries status `error`.
+
+    NO run_results.json AT ALL is the unambiguous case: dbt did not get
+    far enough to have an opinion, so there is nothing to parse and the
+    caller must not pretend otherwise.
+    """
+    import json
+
+    said = "\n".join(part.strip() for part in (completed.stdout, completed.stderr) if part and part.strip())
+    results_path = os.path.join(target_path, "run_results.json")
+    if not os.path.exists(results_path):
+        raise DbtRunFailed(
+            f"dbt exited {completed.returncode} without writing run_results.json, so "
+            f"this build produced nothing to read. dbt said:\n{said or '(nothing at all)'}")
+    try:
+        with open(results_path) as f:
+            results = json.load(f)["results"]
+    except (ValueError, KeyError, OSError) as exc:
+        raise DbtRunFailed(
+            f"dbt wrote a run_results.json this cannot read ({type(exc).__name__}: {exc}). "
+            f"dbt said:\n{said or '(nothing at all)'}") from exc
+    errored = [r for r in results if r.get("status") == "error"]
+    if errored:
+        names = ", ".join(sorted(r.get("unique_id", "?") for r in errored))
+        first = next((r.get("message") for r in errored if r.get("message")), "")
+        raise DbtRunFailed(
+            f"dbt could not run {len(errored)} node(s): {names}. "
+            f"A failing TEST is an ordinary result and does not come through here; an "
+            f"errored node means the build itself did not happen. "
+            f"{first}\ndbt said:\n{said or '(nothing at all)'}")
 
 
 def test_nodes(manifest: dict) -> dict[str, dict]:

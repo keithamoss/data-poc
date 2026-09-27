@@ -17450,3 +17450,93 @@ requirements:
         the same rule becomes a database grant. The clause that reads
         like an obstacle to the switch is actually the thing the
         switch implements properly.
+
+  - id: REQ-PIPE-102
+    title: "One arrival area, not two - data/cp_raw/ is retired"
+    date_written: "2026-09-27"
+    story: >
+      As the person running this pipeline, I want a Child Protection
+      supply to exist in exactly two places - the delivery it arrived
+      in, and the database it was staged into - so that nothing has to
+      keep a third copy in step, and so the repository stops
+      accumulating rows it never reviews.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-27, choosing "retire cp_raw entirely" from three
+      scoped options after asking why tools still restage from data/.
+      Found while chasing the suite flakiness that the Soda dotenv
+      fault (plans/tooling.md #26) was masking: the staging step copies
+      every delivered CP CSV into data/cp_raw/<run_id>/, and the reason
+      it did - run_datacontract_cp.py and run_evidently_cp.py reading
+      those CSVs directly - stopped being true when REQ-QAC-088 pointed
+      both at the warehouse. Birth Registrations never had the copy.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL stage a Child Protection file from where it
+        arrived, and SHALL NOT write a second copy of it anywhere in
+        the working tree.
+      - >
+        THE SYSTEM SHALL generate a synthetic Child Protection supply
+        as a delivery only, and SHALL NOT also write the same rows to a
+        separate raw directory.
+      - >
+        WHERE an ad-hoc check needs the other tables of a past run,
+        THE SYSTEM SHALL take them from that run's own arrival, and
+        SHALL NOT require a copy kept beside it.
+      - >
+        IF the warehouse cannot supply the rows a drift check needs,
+        THEN THE SYSTEM SHALL fail and say so, and SHALL NOT compute a
+        result from a file instead.
+      - >
+        THE SYSTEM SHALL leave no module referring to a cp_raw
+        directory, including constants nothing reads.
+    non_functional_requirements:
+      - >
+        NO LOSS OF THE AD-HOC PATHS. `mothman cp qa` keeps every mode
+        it has today - synthetic, local folder, single table, S3 - and
+        an operator browsing to their own folder of six CSVs is
+        unaffected. This is about the pipeline's own second copy, not
+        about what a person may point the tool at.
+      - >
+        THE DELIVERY TREE IS NOT STATE in the sense Keith's
+        configuration-not-state rule targets, and must not be swept up
+        with this: it is where a supplier's files land, the one thing
+        the database is a copy OF rather than the other way round.
+    dependencies: [REQ-QAC-088, REQ-GEN-043]
+    open_questions: []
+    decisions:
+      - >
+        THE FALLBACK GOES RATHER THAN BEING KEPT AND NARROWED.
+        run_evidently_cp's `_current_frame()` caught a bare `Exception`
+        and read the CSV, so a lock, a missing view or a wrong schema
+        produced a drift number computed from a file rather than an
+        error - a permissive fallback of exactly the kind this project
+        argues against elsewhere. Rejected: keeping it for the ad-hoc
+        paths, which do stage into the database like any other run, so
+        there is no case left where the rows are absent and the answer
+        is still trustworthy.
+      - >
+        THE OTHER FIVE TABLES COME FROM THE ARRIVAL, not from a
+        database-sourced view alias. Single-table mode needs a past
+        run's other five tables because CP's dbt models ref() all six;
+        its docstring called data/cp_raw/ "the only place this PoC
+        durably keeps CP table data", which stopped being true when
+        staging became durable. Both the delivery and the staged tables
+        can supply them, and the delivery is chosen because it needs no
+        new mechanism - aliasing another run's staged tables into this
+        run's views would be a second way of building a run's views,
+        for one ad-hoc path.
+      - >
+        THE GENERATOR'S OWN SECOND WRITE GOES TOO. generate_cp_runs.py
+        wrote each run to data/cp_raw/<run_id>/ AND as a real delivery,
+        which is the same duplication one step earlier. Keeping the
+        copy only in the generator would leave the tree looking
+        authoritative while nothing read it.
+      - >
+        REJECTED, and recorded because it is the smaller change someone
+        will propose again: removing the copy and leaving cp_raw in
+        place for the CLI. It leaves two arrival areas with one of them
+        silently half-populated - worse to reason about than either
+        end state, and the shape this project has already been bitten
+        by with dead parameters that look live.
