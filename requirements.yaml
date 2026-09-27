@@ -15494,6 +15494,9 @@ requirements:
       repository stops carrying the data it was never meant to hold.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26) - his own
       question, whether qa_results/ needs an equivalent in the
@@ -18123,6 +18126,9 @@ requirements:
       start committing state to the repository again.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     source: >
       Keith, 2026-09-27, splitting this out of REQ-PIPE-089's scope
       after asking what a filing was and how it differs from the
@@ -18258,6 +18264,9 @@ requirements:
       signal a supplier will never send.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     source: >
       Keith, 2026-09-27, scoping who writes a receipt - a question
       that arose from REQ-PIPE-104's in-flight observations and turned
@@ -18354,15 +18363,7 @@ requirements:
         genuinely not resupplied this period, which is the correct
         comparison in that case.
     dependencies: [REQ-PIPE-035, REQ-PIPE-036]
-    open_questions:
-      - >
-        Whether the local path should start writing receipts the same
-        way. Keith's call, 2026-09-27, was to leave the generator
-        writing files and receipt in one operation, because its job
-        is to produce a delivery that HAS arrived rather than to
-        simulate arrival mechanics. The cost is that the
-        receipt-writing path stays unexercised locally and therefore
-        as unverified as the rest of the AWS code.
+    open_questions: []
     decisions:
       - >
         DELIVERY-LEVEL COMPLETENESS IS DROPPED, NOT REPLACED (Keith,
@@ -18418,6 +18419,21 @@ requirements:
         round to processing rather than when we received - the same
         conflation REQ-PIPE-103 hit from the other direction and
         plans/running-thoughts.md #52 is parked on.
+      - >
+        THE GENERATOR KEEPS WRITING FILES AND RECEIPT IN ONE
+        OPERATION (Keith, 2026-09-27). Its job is to produce a
+        delivery that HAS arrived, not to simulate arrival mechanics,
+        and keeping it one step keeps the local pipeline fast and
+        deterministic. The cost, accepted: the receipt-writing path
+        this requirement specifies stays unexercised locally, so it
+        remains as unverified as the rest of the AWS ingest code.
+
+        Rejected: making the generator drop files for the real
+        receipt path to pick up, which would exercise the real
+        mechanism - the only way any of this gets tested without AWS
+        access - at the price of a slower, non-deterministic
+        generator. Also rejected: both, behind a flag, since the fast
+        path is the one everybody would run.
       - >
         AN ARRIVAL'S RUN READS THE NEWEST SUPPLY STAGED FOR THE
         PERIOD, NOT ONLY ITS OWN TABLE - Keith's own challenge,
