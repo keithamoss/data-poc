@@ -3879,3 +3879,57 @@ Belongs with batch 5's check work.
     colour alone cannot carry it, so each banner needs the
     environment's own label in text as well - which the config
     already has.
+
+51. **[todo, 2026-09-27]** **[QA checks & contract]** Author and manage checks from the TUI, including scaffolding a new dataset's checks from default policies for its data types.
+
+    Keith's own idea, 2026-09-27: "Allow the user to use the TUI to
+    edit checks for whatever tools we end up keeping. Could include an
+    initial 'scaffold up checks based on our default policies for data
+    types [on] a new dataset' (or new columns on an existing
+    dataset?) and then allow adding and editing and otherwise managing
+    them from the TUI."
+
+    **Why it is a bigger idea than it looks.** Adding a dataset today
+    means hand-editing an ODCS contract, a SodaCL file, a dbt
+    `schema.yml` and an Evidently dict - four files in three
+    languages, each with its own way of saying "this column must not
+    be null" - plus the hand-authored lifecycle metadata every check
+    carries (`check_id`, `introduced_date`, `description`,
+    `failure_indicates`) and the authoring rules in
+    `docs/check-authoring-rules.md`. At two datasets that is a
+    morning's work somebody does carefully. At thirty on the quarterly
+    asset it is the thing that decides whether the asset gets
+    onboarded at all.
+
+    **The scaffolding half is the valuable half, and it is really a
+    question about POLICY rather than about a UI.** "Default policies
+    for data types" means the project can state, once, what it always
+    wants: an identifier column gets uniqueness and not-null, a date
+    gets a plausible range, a categorical gets an allowed-value set
+    and drift, a free-text field gets length bounds and nothing else.
+    That is a real artefact - a policy file - and it is worth having
+    whether or not a TUI ever edits it, because it also answers "why
+    does this dataset have no check on that column" with something
+    better than nobody thought of it.
+
+    **Three things to settle before building, none decided here:**
+    - **What is authored and what is derived.** If the TUI writes
+      SodaCL and dbt YAML, those files stop being hand-authored and
+      become generated - which collides with them being the source of
+      truth today, and with the lifecycle metadata living inside them.
+      A policy file plus a generator, with the four tool files as
+      OUTPUT, is a coherent answer; so is a TUI that edits the four
+      files in place and never generates. Mixing them is the one
+      option that will hurt.
+    - **`check_id` is forever.** It keys committed history, so a
+      scaffolder minting ids has to mint them the way a person would
+      and never renumber. Related: `introduced_date` and `changelog`
+      are a check's own lifecycle record, which a generator would have
+      to preserve across regeneration rather than rewrite.
+    - **"Whatever tools we end up keeping"** is Keith's own phrasing
+      and worth taking literally - this is easier with fewer tools,
+      and it may be a reason to decide that question first rather
+      than scaffolding for four.
+
+    Sits naturally alongside #50's environment work and after
+    REQ-PIPE-089; not started.
