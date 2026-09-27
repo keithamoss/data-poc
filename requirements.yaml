@@ -16476,30 +16476,63 @@ requirements:
     dependencies: [REQ-PIPE-089, REQ-PIPE-091]
     open_questions:
       - >
-        IS REQ-PIPE-091 REALLY A DEPENDENCY? It is listed as one, and
-        the reason given on 2026-09-27 was that the dashboard renders
-        decisions. CHECKED, AND THE PREMISE DOES NOT HOLD TODAY: the
-        only decision rendering in the template is `AMBER_DECISIONS`,
-        which is accept/reject decisions synced from GitHub tickets by
-        `acceptance_sync.py`. That is a different record from
-        REQ-PIPE-074's FILING decision log, which is what REQ-PIPE-091
-        turns into a table. REQ-PIPE-074 is `not_started`, its display
-        is delivery sprint 21 (`todo`), and nothing in the template
-        reads it.
+        IS AN AMBER ACCEPT/REJECT THE SAME ACT AS A PROMOTION, or a
+        different act about the same supply? This replaces a question
+        that asked whether REQ-PIPE-091 is really a dependency, and the
+        replacement is the honest version of it.
 
-        WHY IT MATTERS RATHER THAN BEING A TIDY-UP: keeping it pulls
-        eleven more unsigned criteria into this piece of work, for
-        something the dashboard cannot show until that display work is
-        scoped and built. Dropping it abandons nothing - REQ-PIPE-091
-        keeps its own requirement, and the decision log still lands in
-        the schema REQ-PIPE-089 establishes, which is REQ-PIPE-091
-        criterion 1's own wording.
+        Keith settled the dependency on 2026-09-27: "both of those
+        things feel like decisions to me - they just happen in
+        different places, but should be show in the one log." That is a
+        product statement, and it makes REQ-PIPE-091 a real dependency
+        of this requirement - the dashboard renders accept/reject
+        badges today, and their source becomes that log.
 
-        Keith's call. Raised again rather than acted on, because he
-        chose to keep it after being asked once and a premise that
-        turns out to be wrong is worth putting back to him rather than
-        being decided by default.
+        WHAT IS STILL OPEN is narrower and belongs with him rather than
+        with analysis. REQ-PIPE-075 criterion 1 already promotes a green
+        OR AMBER supply into an empty slot, so amber is a promotion
+        case; and a person accepting an amber supply is, in plain
+        terms, deciding it may stand as the period's answer. Against
+        that, REQ-QAC-017 keeps an accepted run's pill amber and a
+        rejected run's pill amber too - his own call, 2026-09-19, "the
+        smaller, safer option" - which reads as acknowledging a verdict
+        rather than filing a supply.
+
+        It decides whether the log carries one entry type or two, which
+        is cheap either way: REQ-PIPE-074 criterion 2 already records
+        the actor, the instant and the subject, and REQ-GHUB-082
+        criterion 31 already distinguishes an automated actor from a
+        human one. See plans/running-thoughts.md #54 for the full
+        account, including a separate unconditional finding about
+        REQ-PIPE-074 criterion 11.
     decisions:
+      - >
+        REQ-PIPE-091 IS A REAL DEPENDENCY, and the reasoning here got
+        there the wrong way round twice before Keith corrected it
+        (2026-09-27).
+
+        This requirement twice recorded that the dependency rested on a
+        false premise: he had kept REQ-PIPE-091 because "the dashboard
+        renders decisions", and the only decision rendering in the
+        template is `AMBER_DECISIONS` - accept/reject comments synced
+        from GitHub tickets, not REQ-PIPE-074's filing log that 091
+        turns into a table.
+
+        HIS ANSWER: "both of those things feel like decisions to me -
+        they just happen in different places, but should be show in the
+        one log." Which makes the dependency real, because the
+        dashboard renders accept/reject badges and their source becomes
+        that log.
+
+        WHY THE CHECK COULD NOT HAVE CAUGHT IT, which is the part worth
+        keeping: the premise being tested was not "does the dashboard
+        read the filing log today" - it was "are these the same kind of
+        thing", and no amount of reading today's code answers that. A
+        product statement does not become false by being unimplemented.
+        The shape is already half-built for it: REQ-GHUB-082 is
+        literally "from GitHub or from the terminal, and both write the
+        same entry", one implementation with each route an adapter. The
+        amber accept/reject is simply not in its operation list yet.
       - >
         A PIPELINE RUN PUBLISHES ONLY WHEN ASKED - `--publish`, opt-in
         (Keith, 2026-09-27, settling it after trying opt-out first).

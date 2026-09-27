@@ -794,6 +794,140 @@ e2e.py`/`test_check_dashboard_renders.py` (22 passed), ruff clean, plus
 a manual real-browser walkthrough confirming all 3 link types resolve
 to the exact right file/line/folder with zero console errors.
 
+53. **[todo, 2026-09-27]** **[Pipeline & publishing]** Something in the AWS build has to poll GitHub for QA-ticket comments, because GitHub Actions no longer builds the dashboard.
+
+    Keith's own observation, 2026-09-27, while REQ-PIPE-092 was being
+    drafted: "now that GitHub Pages isn't doing any building of the
+    dashboard, we'll need a lambda in the AWS infra to poll GitHub
+    looking for comments - flag that as part of running thoughts for
+    the AWS build."
+
+    **The dependency being broken, stated plainly.** An accept/reject
+    decision is a real `/accept` or `/reject` comment on a dataset's own
+    QA ticket (REQ-QAC-017, built). `acceptance_sync.py` splits into a
+    real `gh` boundary - `fetch_all_ticket_comments()` - and pure
+    matching functions over already-fetched data. The `gh` call is made
+    by `deploy-pages.yml`, because that workflow already had a GitHub
+    token and was already building the dashboard, so fetching comments
+    there cost nothing extra.
+
+    REQ-PIPE-092 moves the build inside the environment and stops
+    GitHub Actions building anything. The environment has a database and
+    no GitHub token; the workflow has a token and no database. So the
+    one place that used to have both has stopped existing, and nothing
+    currently fetches those comments at all.
+
+    **Not urgent for the PoC, and worth saying why so it does not get
+    scoped as a crisis.** `embed_dashboard_data.py` already degrades:
+    with no `reports/qa_comments.json` it embeds an empty
+    `AMBER_DECISIONS` and the badges simply do not render. A local
+    build has always behaved that way. What breaks is the PUBLISHED
+    dashboard losing its decision badges, which matters as soon as
+    anybody relies on them.
+
+    **Three shapes, none of them decided here.** A Lambda on a schedule
+    that polls and writes into the metadata schema, which is Keith's own
+    suggestion and the one that fits the AWS MVP. A GitHub webhook
+    into something in the environment, which needs an inbound endpoint
+    the environment may not want. Or the environment polls GitHub
+    itself during a publish, which needs a token where we have just
+    finished removing credentials from one side and would be adding one
+    to the other.
+
+    **It bears on the unification question below** (see the decision-log
+    entry filed alongside this one): if an accept/reject is an entry in
+    the one decision log, then whatever polls GitHub is a WRITER to that
+    log rather than a producer of a side file the dashboard build reads.
+    That changes which of the three shapes is natural - a Lambda writing
+    to the database is very different from a Lambda writing a JSON file
+    into a build.
+
+
+54. **[investigate, 2026-09-27]** **[Pipeline & publishing]** An amber accept/reject and a filing decision are both decisions, and there are two logs.
+
+    Keith, 2026-09-27, when asked whether REQ-PIPE-091 really blocks
+    REQ-PIPE-092: "both of those things feel like decisions to me -
+    they just happen in different places, but should be show in the one
+    log."
+
+    **He is right, and this entry exists partly because I argued the
+    other way twice.** I checked whether the dashboard renders filing
+    decisions, found it does not - the only decision rendering is
+    `AMBER_DECISIONS`, from GitHub tickets - and reported the
+    dependency as resting on a false premise. The premise was not
+    false. It was that these are the same KIND of thing, which is a
+    product statement rather than a fact about today's code, and
+    checking today's code could not have tested it.
+
+    **WHAT EXISTS, so the overlap is visible rather than asserted.**
+
+    - **REQ-QAC-017, BUILT.** Amber requires an explicit human
+      decision per run, accept or reject (Keith's own call,
+      2026-09-19, option 3 of three). A real `/accept` or `/reject`
+      comment on the dataset's QA ticket; `acceptance_sync.py` matches
+      it to a run by arrival window so nobody types a run id; the
+      dashboard renders a badge. Deliberately read-only - no backend,
+      so no button.
+    - **REQ-PIPE-074, signed, not started.** Every FILING decision -
+      promote, reject, demote, re-file - as one append-only log that
+      refuses an anonymous entry.
+    - **REQ-GHUB-082, unsigned.** Already "from GitHub or from the
+      terminal, and both write the same entry": one implementation,
+      each route an adapter (C11), an identical entry whichever route
+      raised it (C3), the actor taken from the authenticated GitHub
+      author (C4). **The two-places-one-log shape is already the
+      design** - it just does not include the amber accept/reject,
+      whose operation list (C1) is promote, reject, demote, re-file,
+      substitute, inherit and un-inherit.
+
+    **THE REAL QUESTION THIS OPENS, and it is not a merge of two
+    mechanisms.** Is "accept this amber supply" the SAME ACT as
+    "promote this supply", or a different act that happens to be about
+    the same supply?
+
+    Two things say they may be the same. REQ-PIPE-075 C1 promotes a
+    green OR AMBER supply into an empty slot automatically, so amber is
+    already a promotion case. And a human accepting an amber supply is,
+    in plain terms, deciding it may stand as the period's answer.
+
+    One thing says they are not. REQ-QAC-017 has an ACCEPTED run's pill
+    stay amber, and a REJECTED run's pill stay amber too (Keith's own
+    call, 2026-09-19, "the smaller, safer option"). Neither repaints
+    anything. That reads as an ACKNOWLEDGEMENT of a quality verdict
+    rather than a filing action - "somebody has looked at this" - which
+    is a different fact from "this is what Q3 resolves to".
+
+    **Not resolved here, and it needs Keith rather than analysis,**
+    because it decides whether the answer is one entry type or two in
+    one log. Worth noting the log can carry both honestly: REQ-PIPE-074
+    C2 already records the actor, the instant, and the subject, and
+    REQ-GHUB-082 C31 already distinguishes an automated actor from a
+    human one. Widening the entry types is cheap; deciding they are the
+    same act is not.
+
+    **WHAT IT CHANGES IMMEDIATELY, whichever way it goes.** If an
+    accept/reject becomes an entry in the one log, then REQ-PIPE-091 IS
+    a real dependency of REQ-PIPE-092 - because the dashboard renders
+    accept/reject badges today, and their source would be that log. So
+    the dependency Keith kept stands, for this reason rather than the
+    one he first gave, and REQ-PIPE-092's own open question should be
+    closed by THIS entry rather than by dropping it.
+
+    It also changes item 53 above: whatever polls GitHub for comments
+    becomes a WRITER to the decision log rather than a producer of a
+    side file the dashboard build reads.
+
+    **And a separate, unconditional finding.** REQ-PIPE-074 C11 says
+    the log "SHALL commit the log to the repository, and SHALL NOT hold
+    it only in the warehouse". That is false twice over now -
+    REQ-PIPE-091 C1 makes the metadata schema the single system of
+    record, and the repository holds configuration rather than state.
+    074 is SIGNED, so that criterion needs the same treatment
+    REQ-PIPE-061's marker clauses got: restate what it protected - the
+    log is durable, readable, and not lost with one database - and drop
+    the mechanism. True whether or not the two decision kinds converge.
+
+
 ## Also flagged, queued separately (not part of the "running thoughts"
 batch above, but landed in the same conversation)
 
