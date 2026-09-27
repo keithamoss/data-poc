@@ -250,12 +250,12 @@ def _build_changelog_feed() -> list[dict]:
             feed.append({**entry, "label": label})
     # Newest-published-first ("recent activity", not "oldest first" -
     # build_changelog()'s own return order - its docstring explicitly
-    # leaves re-sorting to the UI). committed_at is the "recent
+    # leaves re-sorting to the UI). published_at is the "recent
     # activity" feed's actual subject (plans/publishing-and-history.md:
     # "who's committed/pushed what dataset's QA recently") - run_timestamp
     # stays on each entry for the UI to show alongside it, not as the
     # sort key.
-    feed.sort(key=lambda e: e["committed_at"] or "", reverse=True)
+    feed.sort(key=lambda e: e["published_at"] or "", reverse=True)
     return feed[:CHANGELOG_DEPTH]
 
 

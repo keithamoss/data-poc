@@ -16,7 +16,8 @@ and 22).
 - `run_by`/`run_timestamp` came straight from file content, unaffected
   by whatever happened to the commit that later carried it. THIS
   SURVIVES TOO: they are columns on `qa.run` now.
-- `committed_at`/`commit_sha` could NOT safely be self-recorded at
+- `committed_at`/`commit_sha` (as they were then called) could NOT
+  safely be self-recorded at
   commit time: a commit made locally can be rebased before it reaches
   the shared branch, rewriting its SHA and bumping its committer date -
   so a value recorded before push could be silently wrong, exactly in
@@ -50,12 +51,15 @@ from qa_tools.common import qa_store, supply_db
 
 def build_changelog(agency: str, dataset: str, conn=None) -> list[dict]:
     """One entry per real QA event for this (agency, dataset):
-    `{agency, dataset, run_timestamp, run_by, committed_at}`.
+    `{agency, dataset, run_timestamp, run_by, published_at}`.
 
-    `committed_at` is when the run COMPLETED - the moment its results
-    became visible to anything reading them. It used to be the commit
-    date of whatever push carried the files, which is the same
-    question asked of a mechanism that no longer exists.
+    `published_at` is when the run COMPLETED - the moment its results
+    became visible to anything reading them. It was called `committed_at`
+    and held the commit date of whatever push carried the files: the same
+    question asked of a mechanism that no longer exists. The NAME was the
+    last of that mechanism left (REQ-PIPE-090 criterion 5), and a field
+    called committed_at holding a completion time is exactly the kind of
+    thing a reader trusts and should not.
 
     Sorted by run_timestamp, oldest first - the feed's own UI can
     re-sort as it likes.
@@ -89,7 +93,7 @@ def build_changelog(agency: str, dataset: str, conn=None) -> list[dict]:
             "dataset": dataset,
             "run_timestamp": stamp,
             "run_by": run_by,
-            "committed_at": _iso(completed_at),
+            "published_at": _iso(completed_at),
         }
     return sorted(events.values(), key=lambda e: e["run_timestamp"])
 

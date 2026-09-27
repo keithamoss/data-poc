@@ -2,7 +2,7 @@
 
 IT USED TO DRIVE A REAL TEMP GIT REPO, because the mechanism worth
 testing was the git-history walk: a run's `run_by`/`run_timestamp` came
-from committed file content, and its `commit_sha`/`committed_at` had to
+from committed file content, and its commit sha and commit date had to
 be resolved by walking the branch those files actually landed on.
 
 REQ-PIPE-089 removed that walk, and the reason is worth keeping rather
@@ -67,7 +67,7 @@ def test_build_changelog_resolves_run_by_and_run_timestamp():
     assert event["dataset"] == "dataset-a"
     assert event["run_timestamp"] == "2026-01-01T09:00:00+00:00"
     assert event["run_by"] == "keith@example.com"
-    assert event["committed_at"] is not None, \
+    assert event["published_at"] is not None, \
         "an event with no landing time cannot be placed on a feed"
 
 
@@ -106,7 +106,7 @@ def test_build_changelog_orders_events_across_several_runs():
         "2026-01-01T09:00:00+00:00", "2026-01-08T09:00:00+00:00"]
     assert [e["run_by"] for e in events] == [
         "keith@example.com", "colleague@example.com"]
-    assert all(e["committed_at"] is not None for e in events)
+    assert all(e["published_at"] is not None for e in events)
 
 
 def test_an_unfinished_run_is_not_on_the_feed():
@@ -137,3 +137,38 @@ def test_the_commit_walk_is_gone():
     for name in ("git log", "git show", "subprocess", "commit_sha"):
         assert name not in source.split('"""', 2)[2], \
             f"{name!r} is back in changelog.py's code"
+
+
+class TestNoCommitSurvivesInTheFEED:
+    """REQ-PIPE-090 criteria 5 and 6. The git walk went with REQ-PIPE-089;
+    what remained was its VOCABULARY, and a field named for a mechanism
+    that no longer exists is worse than an absent one - a reader trusts
+    it."""
+
+    def test_the_instant_is_named_for_what_it_is(self):
+        """`committed_at` held a completion time, which made the name a
+        claim the value could not support."""
+        _event("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
+               "keith@example.com")
+        event = changelog.build_changelog("agency-a", "dataset-a")[0]
+        assert "published_at" in event
+        assert "committed_at" not in event
+        assert "commit_sha" not in event
+
+    def test_no_event_carries_anything_about_a_commit(self):
+        _event("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
+               "keith@example.com")
+        for event in changelog.build_changelog("agency-a", "dataset-a"):
+            assert not any("commit" in key for key in event), event
+
+    def test_the_feed_is_ordered_by_when_each_run_happened(self):
+        """Criterion 4. Ordered by the run's own instant rather than by
+        anything about how its results travelled, because nothing about
+        them travels now."""
+        _event("agency-a", "dataset-a", "run_02", "2026-01-08T09:00:00+00:00",
+               "b@example.com")
+        _event("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
+               "a@example.com")
+        events = changelog.build_changelog("agency-a", "dataset-a")
+        assert [e["run_timestamp"] for e in events] == [
+            "2026-01-01T09:00:00+00:00", "2026-01-08T09:00:00+00:00"]

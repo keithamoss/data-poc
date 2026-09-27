@@ -1501,11 +1501,17 @@ function groupChecksByCategory(checks){
    dashboard/embed_dashboard_data.py - same "placeholder here, real
    data only in the built output" treatment as everything else on this
    page. Each entry: {agency, dataset, label, run_timestamp, run_by,
-   commit_sha, committed_at} - run_timestamp is when the QA itself ran,
-   committed_at is when it actually landed on the shared branch (can
-   genuinely differ - see that module's own docstring for why
-   committed_at can't be safely self-recorded at commit time). Sorted
-   newest-committed-first, capped to the last 30 entries.
+   published_at}. Sorted newest first, capped to the last 30 entries.
+
+   IT USED TO CARRY commit_sha AND committed_at, and the difference is
+   worth stating because it was a real distinction that has stopped
+   existing. Results travelled through git, so "when the QA ran" and
+   "when it landed on the shared branch" could differ by days - and
+   neither could be self-recorded, since a commit made locally can be
+   rebased before it reaches the branch, rewriting its sha and its date.
+   REQ-PIPE-089 removed that journey: a result is visible the moment its
+   run completes, so published_at IS that completion, and there is no
+   commit in the path to name.
 
    RELEASE_NOTES — item 62's "🗒 Release notes" panel (plans/qa-
    pipeline.md, Phase 5h): "what changed about the PoC/tool itself over
@@ -4890,30 +4896,33 @@ function renderActivityPanel(){
   const intro = `<div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:14px;">
     Who published QA results for which dataset, and when — the last
     ${CHANGELOG_FEED.length} ${pluralize(CHANGELOG_FEED.length,"event")}, newest first.
-    "Published" is when the results actually landed on the shared branch,
-    which can be meaningfully later than when the QA itself ran.
   </div>`;
-  // A gap only gets its own line when it's actually notable (≥5 min) -
-  // for the common case (someone runs the pipeline and pushes within a
-  // couple of minutes) showing a near-zero gap would just be noise, not
-  // the "QA'd today but not published for days" signal this exists for.
+  // THE INTRO USED TO EXPLAIN that "Published" meant when the results
+  // landed on the shared branch, which could be meaningfully later than
+  // when the QA ran. It no longer can be: a result is visible the moment
+  // its run completes (REQ-PIPE-089), so there is one instant and nothing
+  // to distinguish it from.
+  //
+  // THE GAP NOTE WENT WITH IT (REQ-PIPE-090 criterion 6, Keith's own call
+  // to delete rather than repurpose). It computed the difference between
+  // run_timestamp and the landing time and rendered "QA ran 40 minutes
+  // earlier", for the "QA'd today but not published for days" signal.
+  // That signal cannot occur any more - both instants now describe the
+  // same run, so the gap was the run's own DURATION wearing a label that
+  // implied a publishing delay, which is misleading rather than merely
+  // redundant. Run duration may well be worth showing; it gets its own
+  // requirement and its own label rather than inheriting a field that
+  // used to mean something else.
   const rows = CHANGELOG_FEED.map(e=>{
-    const committedText = e.committed_at
-      ? `${fmtRelativeTime(e.committed_at)} (${fmtDate(new Date(e.committed_at))})`
-      : "commit not found in this checkout's history";
-    let gapNote = "";
-    if(e.committed_at && e.run_timestamp){
-      const gapMins = Math.round((new Date(e.committed_at)-new Date(e.run_timestamp))/60000);
-      if(gapMins>=5){
-        const gapText = gapMins<60 ? `${gapMins} ${pluralize(gapMins,"minute")}`
-          : `${Math.round(gapMins/60)} ${pluralize(Math.round(gapMins/60),"hour")}`;
-        gapNote = ` · QA ran ${gapText} earlier`;
-      }
-    }
+    // NO FALLBACK STRING. It used to read "commit not found in this
+    // checkout's history" for a run whose commit the git walk could not
+    // resolve. A run that has completed always has a completion instant,
+    // and one that has not completed is not on this feed at all.
+    const publishedText = `${fmtRelativeTime(e.published_at)} (${fmtDate(new Date(e.published_at))})`;
     return `<div class="snapshot-row">
         <div class="meta">
           <div class="date">${e.label}</div>
-          <div class="sub">published by ${e.run_by} — ${committedText}${gapNote}</div>
+          <div class="sub">published by ${e.run_by} — ${publishedText}</div>
         </div>
       </div>`;
   }).join("");

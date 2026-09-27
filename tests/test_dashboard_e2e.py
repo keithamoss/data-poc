@@ -2480,11 +2480,44 @@ class TestTheDisplayStandardHoldsInARealBrowser:
             self, clean_page, built_dashboard_html):
         """Criterion 13 / post-build-review #60. It used to say "Live ·
         updated 4s ago" and count up, so the number a reader saw was the
-        age of their own browser tab."""
+        age of their own browser tab.
+
+        THE INSTANT IS NO LONGER THE END OF THE LINE (REQ-PIPE-092
+        criteria 7 and 17), which is why the date pattern is no longer
+        anchored to it. The build stamp now also says WHICH environment
+        built the page and from which commit, because the build happens
+        wherever the database is reachable and a production build and a
+        developer's build are otherwise two identical-looking artifacts.
+        """
         _goto(clean_page, built_dashboard_html)
         first = clean_page.locator("#clock-text").inner_text()
         assert first.startswith("Built "), first
-        assert re.search(r"\d{1,2}:\d{2}(am|pm) \w+day, \d{1,2} \w+ \d{4}$", first), first
+        assert re.search(r"\d{1,2}:\d{2}(am|pm) \w+day, \d{1,2} \w+ \d{4}", first), first
+
+    def test_the_masthead_says_which_environment_and_commit_built_the_page(
+            self, clean_page, built_dashboard_html):
+        """REQ-PIPE-092 criteria 7 and 17, asserted AT THE RENDER LAYER
+        rather than on the embedded const - which is CLAUDE.md's own
+        standing lesson, that a correct data layer says nothing about a
+        template with its own transform.
+
+        A SHORT SHA IN THE LINE, THE FULL ONE IN THE TITLE: a reader
+        recognises seven characters and does not read forty.
+        """
+        _goto(clean_page, built_dashboard_html)
+        stamp = clean_page.locator("#clock-text")
+        text = stamp.inner_text()
+        assert " · " in text, f"the build stamp names no environment: {text}"
+
+        title = stamp.get_attribute("title") or ""
+        assert "Built in:" in title, title
+        assert "Commit:" in title, title
+        # The full sha is in the title and a short one in the line, so the
+        # line must NOT carry the whole forty characters.
+        commit = title.split("Commit:")[1].strip()
+        assert len(commit) >= 7, title
+        assert commit not in text, "the full sha is in the line rather than the title"
+        assert commit[:7] in text, f"the short sha is not in the line: {text}"
 
     def test_the_masthead_does_not_count_up_while_the_page_sits_there(
             self, clean_page, built_dashboard_html):

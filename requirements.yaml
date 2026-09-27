@@ -16288,10 +16288,47 @@ requirements:
       states a fact rather than inferring one from commits, and the
       build stops paying to walk the repository's history.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-09-27"
+    linked_tests:
+      - tests/test_changelog.py
+      - tests/test_embed_dashboard_data.py
+      - tests/test_dashboard_e2e.py
+    implemented_by:
+      - qa_tools/common/changelog.py::build_changelog
+      - dashboard/embed_dashboard_data.py::_build_changelog_feed
+      - dashboard/qa-reporting-dashboard.template.html::renderActivityPanel
+    evidence:
+      - >
+        FOUR OF THE SIX CRITERIA WERE ALREADY MET by REQ-PIPE-089's own
+        build, and the split is the useful part rather than the total.
+        C1-C4 landed when the git walk went: the feed is one SELECT over
+        `qa.run_visible`, the actor is that run's recorded `run_by`, the
+        walk is gone with a test asserting by name that `git log`, `git
+        show`, `subprocess` and `commit_sha` stay out of the module, and
+        the ordering is by the run's own instant.
+      - >
+        C5 AND C6 WERE NOT, AND BOTH SAT IN THE DASHBOARD TEMPLATE rather
+        than in the Python - which is why reading only the Python would
+        have reported this requirement as already done. The field was
+        still NAMED `committed_at` while holding a completion time; the
+        empty state still read "commit not found in this checkout's
+        history" for a state that can no longer occur; the panel's intro
+        still explained that publishing could lag the QA by days; and the
+        gap note still computed the difference between the two instants.
+      - >
+        THE GAP NOTE IS DELETED rather than repurposed (Keith's own call).
+        Both instants describe the same run now, so it was rendering the
+        run's own DURATION under a label implying a publishing delay -
+        misleading rather than merely redundant.
+      - >
+        tests/test_changelog.py 8 passed, including three new tests that
+        assert no event carries anything about a commit and that the
+        instant is named for what it is.
+        tests/test_embed_dashboard_data.py 12 passed.
+        TestTheDisplayStandardHoldsInARealBrowser 12 passed.
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26) - named there
       as a straight win of moving qa_results/ into the database, since
@@ -16644,7 +16681,58 @@ requirements:
       from a real database without ever asking a service GitHub
       operates to hold warehouse credentials.
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_publish.py
+      - tests/test_dashboard_e2e.py
+      - tests/test_environments.py
+    implemented_by:
+      - cli/dashboard.py::publish
+      - cli/dashboard.py::_publish
+      - cli/common.py::offer_to_publish
+      - cli/pipeline.py::run_command
+      - dashboard/embed_dashboard_data.py::embed
+      - dashboard/qa-reporting-dashboard.template.html::renderBuildStamp
+      - .github/workflows/validate-config.yml
+    evidence:
+      - >
+        VERIFIED END TO END with a real `--dry-run`: rebuild-results ->
+        build-data -> embed -> real-browser render gate -> prepare site ->
+        "would push 18 file(s) from _site to 'gh-pages'". BUILD_PROVENANCE
+        landed in the real built file as
+        {"environment":{"id":"sandbox",...},"commit":"4a445b3..."}.
+      - >
+        ONE PUBLISH PATH, asserted structurally rather than by reading:
+        `_publish` is the only function anywhere in `cli/` that passes
+        "push" to git, so a fourth entry point cannot quietly bring its
+        own. Three entry points to one function is criterion 10; three
+        functions that each push would not be, however carefully they
+        matched today.
+      - >
+        THE GATE'S ORDERING IS ASSERTED, not just its presence - a gate
+        after the push is not a gate. `_publish` also refuses a site
+        directory with no index.html, which is reachable by a caller
+        getting the order wrong and must not push an empty tree over a
+        real site.
+      - >
+        tests/test_publish.py 20 passed. npm test 351 passed.
+        TestTheDisplayStandardHoldsInARealBrowser 12 passed, including a
+        new render-layer test that the masthead names the environment and
+        carries the short sha in the line with the full one in the title.
+      - >
+        THREE THINGS CORRECTED WHILE TESTING, all mine and all worth
+        recording because each would have passed review: a `--dry-run` was
+        creating a committed snapshot; three tests matched the WORD "push"
+        in help text and prose rather than the git argument, one of which
+        would have forced deleting real history to make it pass; and one
+        asserted on click's UNSET sentinel default, which is truthy, so it
+        passed or failed for the wrong reason.
+      - >
+        WHAT IS NOT VERIFIABLE FROM HERE, stated rather than implied: the
+        published site does not update until the repository's Pages source
+        is switched from GitHub Actions to the gh-pages branch, which is a
+        settings change no tool in this session can make. Everything up to
+        and including the push is verified.
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26, 22:15-22:20) -
       "open to having the dashboard build run inside the environment

@@ -51,10 +51,17 @@ def _isolate_embed_data_targets(monkeypatch, tmp_path):
     monkeypatch.setattr(edd, "TARGETS", targets)
 
 
-def _entry(dataset, committed_at, run_timestamp="2026-01-01T00:00:00+00:00", run_by="a@b.com"):
+def _entry(dataset, published_at, run_timestamp="2026-01-01T00:00:00+00:00", run_by="a@b.com"):
+    """One feed entry as build_changelog() produces it.
+
+    IT USED TO CARRY commit_sha AND committed_at. Both went with the git
+    walk and its vocabulary (REQ-PIPE-089, REQ-PIPE-090): a result is
+    visible the moment its run completes, so there is no commit in the
+    path and `published_at` IS that completion.
+    """
     return {
         "agency": "some-agency", "dataset": dataset, "run_timestamp": run_timestamp,
-        "run_by": run_by, "commit_sha": "abc123", "committed_at": committed_at,
+        "run_by": run_by, "published_at": published_at,
     }
 
 
@@ -83,12 +90,12 @@ def test_build_changelog_feed_sorts_newest_committed_first(monkeypatch):
 
     feed = edd._build_changelog_feed()
 
-    assert [e["committed_at"] for e in feed] == [
+    assert [e["published_at"] for e in feed] == [
         "2026-01-03T09:00:00+00:00", "2026-01-02T09:00:00+00:00", "2026-01-01T09:00:00+00:00",
     ]
 
 
-def test_build_changelog_feed_puts_missing_committed_at_last(monkeypatch):
+def test_build_changelog_feed_puts_a_missing_instant_last(monkeypatch):
     monkeypatch.setattr(edd, "CHANGELOG_SOURCES", [("agency-a", "dataset-a", "Dataset A")])
     monkeypatch.setattr(edd, "build_changelog", lambda agency, dataset: [
         _entry("dataset-a", None),
@@ -97,8 +104,8 @@ def test_build_changelog_feed_puts_missing_committed_at_last(monkeypatch):
 
     feed = edd._build_changelog_feed()
 
-    assert feed[0]["committed_at"] == "2026-01-01T09:00:00+00:00"
-    assert feed[1]["committed_at"] is None
+    assert feed[0]["published_at"] == "2026-01-01T09:00:00+00:00"
+    assert feed[1]["published_at"] is None
 
 
 def test_build_changelog_feed_caps_to_changelog_depth(monkeypatch):
@@ -111,7 +118,7 @@ def test_build_changelog_feed_caps_to_changelog_depth(monkeypatch):
     feed = edd._build_changelog_feed()
 
     assert len(feed) == 2
-    assert feed[0]["committed_at"] == "2026-01-05T09:00:00+00:00"
+    assert feed[0]["published_at"] == "2026-01-05T09:00:00+00:00"
 
 
 def _run_embed_and_extract_ticket_status(monkeypatch, tmp_path, raw_issues=None):

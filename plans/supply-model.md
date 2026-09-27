@@ -1926,7 +1926,7 @@ which is how `clipDatasetToAsOf()` ended up filtering on arrival rather
 than promotion (Thread H), correct only because promotion did not yet
 exist.
 
-26. **[in-progress, 2026-09-26]** **[Pipeline & publishing]** **PostgreSQL is the
+26. **[done, 2026-09-27]** **[Pipeline & publishing]** **PostgreSQL is the
     warehouse, and the publisher moves inside the environment.** One engine
     holding staging, rejected, the period schemas and a `sample` schema, with
     DuckDB kept only as a reader of arriving files; all four QA tools checking
