@@ -18650,106 +18650,238 @@ requirements:
         that nobody builds on a premise already rejected.
 
   - id: REQ-PIPE-106
-    title: "A dataset can exist before any supply is agreed, and graduates when it gains a calendar"
+    title: "A dataset can exist before any supply is agreed, and some never gain a calendar at all"
     date_written: "2026-09-27"
     story: >
       As the person standing up a new dataset, I want to receive sample
       data and develop checks against it before any delivery schedule
       is agreed, so that the first real supply meets checks somebody
-      has already exercised - and so that a dataset still in
-      development never reads as a healthy one or as a failing one.
-    moscow: should
+      has already exercised - and as the person QA'ing a one-off
+      extraction for a project, I want the same thing permanently,
+      because that data has supplies and no cadence at all.
+    moscow: must
     status: not_started
     source: >
       Split out of REQ-PIPE-087 on 2026-09-27, Keith's own call, when
       an audit for that requirement's sign-off found its `sample`
       schema criteria unbuilt. His words on why splitting beats
       building the schema alone: the schema is nearly useless without
-      the lifecycle around it. The lifecycle itself is from
+      the lifecycle around it. The lifecycle is from
       plans/running-thoughts.md #45 (2026-09-26), where it was
-      deliberately left unscoped while 087 provided only the schema.
+      deliberately left unscoped. Widened the same day, again his
+      call, to cover the project-extraction asset shape as well as the
+      pre-agreement state - see the decisions.
     acceptance_criteria:
       - >
         THE SYSTEM SHALL let a dataset exist with no delivery calendar,
         and SHALL NOT report it as owing a supply.
+      - >
+        THE SYSTEM SHALL require that a dataset without a calendar say
+        so DELIBERATELY, in its own configuration, and SHALL go on
+        failing configuration that merely omits a calendar or names one
+        that does not exist.
+      - >
+        THE SYSTEM SHALL distinguish a dataset that has NOT YET agreed
+        a schedule from one that NEVER WILL - a one-off extraction for
+        a project - and SHALL NOT require the second to graduate.
       - >
         THE SYSTEM SHALL hold data received before any supply is agreed
         in a schema of its own, separate from staging, from rejected,
         and from every period.
       - >
         THE SYSTEM SHALL exclude that data from every period, slot,
-        lateness, promotion, rollup and status computation BY
-        CONSTRUCTION, and SHALL NOT rely on a flag, a filter or a
-        convention to exclude it.
+        lateness and promotion computation BY CONSTRUCTION, and SHALL
+        NOT rely on a flag, a filter or a convention to exclude it.
       - >
         THE SYSTEM SHALL run QA over such data without filing it to a
-        period, so that a check can be developed and exercised before
-        a schedule exists.
+        period, so that a check can be developed and exercised before a
+        schedule exists.
+      - >
+        THE SYSTEM SHALL report such a dataset's own checks with their
+        REAL verdicts - red, amber or green as the checks actually
+        found - because developing a check means seeing whether it
+        passes.
+      - >
+        THE SYSTEM SHALL label such a dataset as one whose schedule is
+        not agreed, alongside those verdicts and IN WORDS rather than
+        by colour alone, following the pattern the `nodata` and
+        `inactive` pills already set.
+      - >
+        THE SYSTEM SHALL exclude such a dataset's verdicts from every
+        collection-level and asset-level rollup, so that a dataset
+        nobody has agreed cannot turn an agreed one's status.
       - >
         THE SYSTEM SHALL keep the record of that QA distinguishable
         from the QA history of agreed supplies, so that check
         development never counts toward a dataset's real quality
         history.
       - >
-        THE SYSTEM SHALL say plainly on the dashboard that such a
-        dataset is IN DEVELOPMENT, and SHALL NOT render it as
-        green-and-good or as red.
-      - >
         WHEN a dataset gains a calendar, THE SYSTEM SHALL graduate it -
         from that point it owes supplies, is filed to periods, and is
         rolled up like any other - and SHALL record when it graduated.
+      - >
+        THE SYSTEM SHALL say what becomes of the data received before
+        graduation - whether it is filed to a period, discarded, or
+        left where it is - and SHALL NOT leave it in a state no rule
+        describes.
       - >
         THE SYSTEM SHALL keep the QA record made before graduation
         readable afterwards, because developing a check is real work
         whose record should survive the dataset growing up.
     non_functional_requirements:
       - >
-        BY CONSTRUCTION IS THE WHOLE POINT of criterion 3, and it is
+        BY CONSTRUCTION IS THE WHOLE POINT of criterion 5, and it is
         why this is a separate schema rather than a column. A flag can
         be forgotten in one WHERE clause out of thirty, and the
         failure is silent and in the dangerous direction: sample data
-        counting toward a real dataset's quality history, or a
-        development dataset appearing green on a dashboard somebody
-        makes a decision from. A schema nothing joins to cannot be
-        forgotten.
+        counting toward a real dataset's quality history, or an
+        unagreed dataset turning an agreed one's status.
       - >
-        THE THIRD AND FOURTH ASSET SHAPES ARE COMING, and this is the
-        first requirement that touches what they need. QA of one-off
-        data extractions for individual projects has supplies and no
-        cadence at all - which is exactly "a dataset with no
-        calendar", arrived at from a different direction. Whether this
-        generalises to that shape or stays a pre-agreement state is
-        worth deciding before building, not after.
+        THE CONFIGURATION GATE MUST NOT BE WEAKENED to make criterion 1
+        possible. `validate_schedule.py` currently treats a dataset
+        with no `calendar:` as a configuration error, deliberately:
+        without it a typo'd calendar name leaves a dataset silently
+        expecting nothing. A deliberate declaration (criterion 2) is
+        what separates the two; simply allowing absence would destroy a
+        gate that catches a real class of error.
+      - >
+        THE THIRD AND FOURTH ASSET SHAPES ARE WHY THIS IS A `must`. QA
+        of one-off extractions for individual projects has supplies and
+        no cadence at all, which is the same mechanism arrived at from
+        a different direction. Building only the pre-agreement state
+        and discovering the permanent one later means rework in the
+        rollups, the dashboard and the schedule gate at once.
     dependencies: [REQ-PIPE-087, REQ-PIPE-089]
     open_questions:
       - >
-        Whether this is a pre-agreement STATE that a dataset leaves,
-        or the same mechanism the project-extraction asset shape needs
-        permanently - a dataset that never gains a calendar because it
-        never will. Keith's own framing in #45 was the first; the
-        third asset shape suggests the second. It changes whether
-        graduation is the only exit.
+        HELD, AND THIS IS WHAT IT WAITS ON (Keith, 2026-09-27): the
+        PROJECT-EXTRACTION ASSET SHAPE has not been scoped, and this
+        requirement now claims to serve it. His call was to scope that
+        first rather than sign this.
+
+        WHY IT IS A REAL BLOCKER RATHER THAN TIDINESS. The widening to
+        "one mechanism, two exits" is what made this a `must` and what
+        added criteria 3 and 9. If the project-extraction shape turns
+        out to need something this does not - its own identity, its own
+        navigation at ~30-dataset scale, a different answer to
+        criterion 12's question about the data - then this is two
+        mechanisms rather than one, and the criteria written for both
+        are wrong for each.
+
+        WHAT IS SAFE TO ASSUME MEANWHILE: nothing. The pre-agreement
+        half stands on its own and could be built narrow, but building
+        it narrow is the alternative he rejected, so doing it anyway
+        while the widening is unresolved would be deciding this by
+        default.
+
+        Note this is ALSO why 087 could be signed while this could not:
+        087's criteria are met by what shipped, and the sample schema
+        it asked for moved here rather than being dropped.
     decisions:
       - >
+        HELD AT SIGN-OFF, NOT SIGNED (Keith, 2026-09-27), and the
+        reason is worth keeping because the requirement reads
+        buildable. It was presented for sign-off with three things
+        disclosed: it had no `delivery-scoper` pass, it had grown to
+        amend a configuration gate and touch the rollups, and it now
+        claims to serve an asset shape nobody has scoped. He held it on
+        the third.
+
+        Rejected: signing it and letting the dependency on
+        REQ-PIPE-089 buy time, which would have left a signed
+        requirement whose scope might be wrong. Also rejected: a
+        scoper pass first, which stress-tests criteria against the
+        current threads and cannot tell us whether the
+        project-extraction shape needs the same mechanism.
+      - >
         SPLIT FROM REQ-PIPE-087 RATHER THAN BUILT INSIDE IT (Keith,
-        2026-09-27). 087's criteria 2 and 3 asked for a `sample`
-        schema and its by-construction exclusion, and the audit for
-        087's sign-off found neither built. Building just the schema
-        was rejected: a schema nothing writes to and nothing reads is
-        the kind of thing a later sweep deletes as dead, and the
-        lifecycle is what makes it mean anything. Dropping it
-        entirely was also rejected - it would lose the record that
-        this was wanted.
+        2026-09-27). 087's criteria 2 and 3 asked for a `sample` schema
+        and its by-construction exclusion, and the audit for 087's
+        sign-off found neither built. Building just the schema was
+        rejected: a schema nothing writes to and nothing reads is what
+        a later sweep deletes as dead, and the lifecycle is what makes
+        it mean anything. Dropping it entirely was also rejected - it
+        would lose the record that this was wanted.
+      - >
+        ONE MECHANISM, TWO EXITS (Keith, 2026-09-27: "both, and say so
+        explicitly"). A dataset without a calendar either GRADUATES,
+        gaining one and joining the ordinary lifecycle, or STAYS that
+        way for ever because it is a one-off project extraction. Both
+        need the same things - no slots, no lateness, no rollup, QA
+        without filing - so building for one and discovering the other
+        means rework across the rollups, the dashboard and the schedule
+        gate.
+
+        This is what moved `moscow` from `should` to `must`: the
+        project-extraction asset shape is coming, not hypothetical.
+        Rejected: keeping this narrow and giving project extractions
+        their own requirement later, which would be two mechanisms
+        doing nearly the same thing.
+      - >
+        A DELIBERATE DECLARATION, NOT THE ABSENCE OF A CALENDAR (Keith,
+        2026-09-27). `validate_schedule.py` fails a dataset that names
+        no `calendar:`, and that gate earns its place: a typo'd
+        calendar name and a deliberate omission would otherwise be
+        indistinguishable, and the typo silently ships a dataset that
+        expects nothing.
+
+        Rejected: relaxing the gate so absence simply means "in
+        development". Also rejected: keeping datasets in development
+        OUTSIDE contract/data-asset.yaml entirely, which would put a
+        dataset in two possible places and make graduation a move
+        between them rather than a key gaining a value.
+      - >
+        REAL RED/AMBER/GREEN PLUS A LABEL, not a suppressed status and
+        not a fourth colour - Keith's own correction, 2026-09-27, to a
+        proposal made here that a dataset in development should have no
+        quality status at all: "why can't it be red/amber/green based
+        on the checks defined with also having an 'in development'
+        label next to it - like we do elsewhere for 'no data'?"
+
+        HE IS RIGHT AND THE PRECEDENT ALREADY EXISTS. The pill
+        vocabulary is already wider than three colours: `nodata` is a
+        temporary absence that may resolve tomorrow, and `inactive`
+        ("No rule defined") is a standing fact about the configuration
+        rather than the data - rendered in a disabled grey, struck
+        through, and, in the template's own words, "never distinguished
+        by colour alone - the label says it in words". So the design
+        already separates a verdict from a statement about
+        configuration, and already labels rather than recolours.
+
+        AND SUPPRESSING THE VERDICT WOULD DEFEAT THE PURPOSE. The
+        entire point of QA before a schedule exists is DEVELOPING
+        CHECKS, which means seeing whether they pass. A dataset with no
+        status tells the person doing that work nothing.
+
+        period_schema.py already carries the same reasoning for
+        brand-new datasets: nodata is kept for "nothing was owed"
+        precisely so that "every new dataset starts life red on all its
+        drift checks" does not happen, "which is how people learn to
+        ignore a signal".
+
+        WHAT THE REAL RISK WAS, and it is a rollup question rather than
+        a display one: an unagreed dataset's red turning a collection
+        or the asset red. Criterion 9 states that exclusion explicitly
+        rather than leaving it implied by criterion 5.
       - >
         THE QA RECORD IS DISTINGUISHED BY SCOPE INSIDE THE DATABASE,
         not by a committed tree of its own. Keith settled on
-        2026-09-26 that sample QA went in its own top-level tree,
-        never in qa_results/ - decided HOURS before qa_results/ itself
+        2026-09-26 that sample QA went in its own top-level tree, never
+        in qa_results/ - decided HOURS before qa_results/ itself
         stopped being committed, so the mechanism was obsolete almost
         immediately. The reasoning survives intact: a separate scope
         makes pollution of real quality history structurally
         impossible. He chose on 2026-09-27 to settle the mechanism as
         part of REQ-PIPE-089, while that schema is being designed, so
-        criterion 5 here states the property and 089 carries the
+        criterion 10 here states the property and 089 carries the
         column. The name `qa_sample/` was only ever a suggestion and
         goes with the tree.
+      - >
+        WHAT HAPPENS TO THE DATA AT GRADUATION IS NAMED AS A CRITERION
+        RATHER THAN ANSWERED HERE (criterion 12). An earlier draft of
+        this requirement covered the QA RECORD surviving graduation and
+        said nothing at all about the DATA, which is a gap somebody
+        would have hit while building. The three candidate answers -
+        file it to the first period, discard it, or leave it in its own
+        schema - are a real fork, and it belongs with the promotion
+        side rather than being guessed now.
