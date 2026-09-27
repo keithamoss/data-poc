@@ -9,7 +9,6 @@ collision, a dataset with no pattern, a pattern that will not compile).
 """
 from __future__ import annotations
 
-import json
 import re
 
 import pytest
@@ -165,6 +164,31 @@ class TestABadPatternIsANamedConfigError:
             arrival_patterns.compiled_patterns()
 
 
+def _corpus(conn, *filenames, delivery_name="d1"):
+    """A delivery record carrying these filenames, in the database.
+
+    The gate's corpus was a directory of committed JSON until
+    REQ-PIPE-089; these tests wrote one file each. Written straight to
+    the tables rather than through recognition, which is what they did
+    before too - the claim here is about the GATE, and building a real
+    recognition would need real arrival patterns, which is the very
+    thing under test.
+    """
+    from qa_tools.common import qa_store
+
+    conn.execute(
+        f'INSERT INTO "{qa_store.SCHEMA}".delivery '
+        "(name, received_at, received_instant, collections, held, anomalies) "
+        "VALUES (?, ?, ?, '[]', '[]', '[]')",
+        [delivery_name, "2026-09-01T09:00:00+08:00", "2026-09-01T09:00:00+08:00"])
+    for name in filenames:
+        conn.execute(
+            f'INSERT INTO "{qa_store.SCHEMA}".delivery_file '
+            "(delivery, filename, dataset_id, contested_by) VALUES (?, ?, NULL, NULL)",
+            [delivery_name, name])
+    return conn
+
+
 class TestTheConfigurationGate:
     """Criteria 7 and 8."""
 
@@ -193,54 +217,66 @@ class TestTheConfigurationGate:
         assert "cp-carers" in str(exc.value)
         assert "arrival_pattern" in str(exc.value)
 
-    def test_a_filename_two_datasets_claim_fails_and_names_both(self, monkeypatch, tmp_path):
+    def test_a_filename_two_datasets_claim_fails_and_names_both(
+            self, monkeypatch, clean_delivery_log):
         """The gate's message is read by somebody under pressure who
         writes these rarely - "conflict detected" sends them diffing
         seven regexes."""
         _patterns(monkeypatch, {"alpha": r"shared\.csv", "beta": r"shared\.csv"})
-        (tmp_path / "d1.json").write_text(json.dumps({"files": ["shared.csv"]}))
+        _corpus(clean_delivery_log, "shared.csv")
         with pytest.raises(validate_arrival_patterns.ArrivalPatternConfigError) as exc:
-            validate_arrival_patterns.validate(log_dir=tmp_path)
+            validate_arrival_patterns.validate(clean_delivery_log)
         message = str(exc.value)
         assert "shared.csv" in message
         assert "alpha" in message and "beta" in message
 
-    def test_it_says_when_it_has_no_corpus_rather_than_reporting_success(self, tmp_path):
+    def test_it_says_when_it_has_no_corpus_rather_than_reporting_success(
+            self, clean_delivery_log):
         """A check with no corpus is not a check that passed. It has
         one now - REQ-PIPE-069's delivery log, which fills as the
         pipeline runs - but an empty one still has to say so, because
         a fresh clone has no deliveries yet."""
-        line = validate_arrival_patterns.validate(log_dir=tmp_path / "nothing-here")
+        line = validate_arrival_patterns.validate(clean_delivery_log)
         assert "no delivery has been logged yet" in line
 
-    def test_the_real_corpus_is_the_committed_delivery_log(self, real_committed_history):
-        """The gate reads what REQ-PIPE-069 wrote, not data/ - which is
-        what lets it run in CI at all.
+    def test_no_database_is_reported_rather_than_counted_as_empty(self, monkeypatch):
+        """The gate reads what REQ-PIPE-069 wrote, and since
+        REQ-PIPE-089 that is a table. It still has to RUN where no
+        database is reachable - REQ-PIPE-092 criterion 9 - so it says
+        the duplicate-attribution half was skipped rather than
+        reporting a corpus of nothing.
 
-        One of the few tests that genuinely wants the REAL committed
-        tree, so it asks for it by name - conftest redirects those trees
-        for every other test, to stop a run writing into or pruning
-        project history."""
+        This replaces a test that asserted on the REAL committed tree
+        ("recorded filename(s)" from the 60 records in delivery_log/).
+        That corpus was state in the repository, which is what this
+        requirement removes.
+        """
+        from qa_tools.common import delivery_log, supply_db as db
+
+        def unreachable(*_a, **_k):
+            raise db.SupplyDbError("no database here")
+
+        monkeypatch.setattr(delivery_log, "records", unreachable)
         line = validate_arrival_patterns.validate()
-        assert "recorded filename(s)" in line, line
+        assert "NO DATABASE REACHABLE" in line, line
+        assert "OK" in line, "an unreachable database is not a gate failure"
 
-    def test_a_real_corpus_is_counted(self, tmp_path):
-        (tmp_path / "d1.json").write_text(json.dumps(
-            {"files": ["cp_clients.csv", "cp_carers.csv"]}))
-        line = validate_arrival_patterns.validate(log_dir=tmp_path)
+    def test_a_real_corpus_is_counted(self, clean_delivery_log):
+        _corpus(clean_delivery_log, "cp_clients.csv", "cp_carers.csv")
+        line = validate_arrival_patterns.validate(clean_delivery_log)
         assert "2 recorded filename(s)" in line
 
     def test_the_real_configuration_passes_its_own_gate(self):
         assert "OK" in validate_arrival_patterns.validate()
 
-    def test_a_filename_that_stopped_matching_is_not_a_failure(self, tmp_path):
+    def test_a_filename_that_stopped_matching_is_not_a_failure(
+            self, clean_delivery_log):
         """NOT a history gate, and that was rejected deliberately: one
         would force a dataset's old naming to be carried in its pattern
         for ever, punishing exactly the change that should be cheap -
         a supplier renaming their extract."""
-        (tmp_path / "d1.json").write_text(json.dumps(
-            {"files": ["an_old_naming_scheme_nobody_uses.csv"]}))
-        assert "OK" in validate_arrival_patterns.validate(log_dir=tmp_path)
+        _corpus(clean_delivery_log, "an_old_naming_scheme_nobody_uses.csv")
+        assert "OK" in validate_arrival_patterns.validate(clean_delivery_log)
 
 
 class TestTheTransportMatcherIsADifferentThing:

@@ -30,7 +30,6 @@ import sys
 
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
-from qa_tools.common import backlog
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common import trial
@@ -291,12 +290,6 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # belonging to a run happening right now in another process, so it
     # is now an explicit `mothman supply tidy`, run by someone who
     # knows nothing else is going.
-
-    # HOW FAR PROCESSING GOT (REQ-PIPE-061 criteria 6-8). The same
-    # global marker orchestrate_bdm.py advances, for the same reason:
-    # one arrival may span collections, so a per-collection marker
-    # could place such an arrival differently each time.
-    backlog.advance_past_staged()
 
     # Same rationale as orchestrate_bdm.py's identical block.
     dataset_stats_by_run = {}

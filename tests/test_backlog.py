@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from qa_tools.common import backlog, delivery
+from qa_tools.common import backlog, delivery, load_log
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,9 @@ def _a(name, instant, sequence):
 
 @pytest.fixture
 def marker(tmp_path):
+    """Retired with the marker itself (REQ-PIPE-089 criterion 18) and
+    kept only so the two retirement notes below read as belonging to
+    this file rather than arriving from nowhere."""
     return tmp_path / "marker" / "position.json"
 
 
@@ -128,72 +131,20 @@ class TestTheOrderDoesNotDependOnPresentationOrder:
 
 
 class TestDrainingTheBacklog:
-    """Criteria 6, 7 and 8."""
+    """RETIRED BY REQ-PIPE-089 criterion 18, and kept as a note so the
+    properties are findable rather than apparently dropped.
 
-    def test_a_run_with_no_marker_is_owed_everything(self, marker):
-        arrivals = [_a("a", "2026-01-01T09:00:00+08:00", 1),
-                     _a("b", "2026-02-01T09:00:00+08:00", 2)]
-        assert backlog.read_marker(marker) is None
-        assert backlog.pending(arrivals, None) == arrivals
+    Seven tests here drove the STORED MARKER: that a run with none was
+    owed everything, that it advanced only past what finished, that it
+    never moved backwards, that an unreadable one meant start from the
+    beginning, and that it could not be mistaken for a load record.
+    All five of those last describe a file that no longer exists.
 
-    def test_it_processes_everything_since_the_marker_not_just_the_newest(self, marker):
-        """The failure this prevents is a platform one: GitHub holds
-        only ONE pending run per concurrency group, so three rapid
-        triggers silently lose the middle one."""
-        arrivals = [_a(n, f"2026-0{i}-01T09:00:00+08:00", i)
-                     for i, n in enumerate(["a", "b", "c", "d"], start=1)]
-        backlog.advance(backlog.Position.of(arrivals[0]), marker)
-        owed = backlog.pending(arrivals, backlog.read_marker(marker))
-        assert [x.name for x in owed] == ["b", "c", "d"]
-
-    def test_the_marker_advances_only_past_what_finished(self, marker):
-        arrivals = [_a(n, f"2026-0{i}-01T09:00:00+08:00", i)
-                     for i, n in enumerate(["a", "b", "c"], start=1)]
-        # A run that finishes 'a', reaches 'b' and dies.
-        backlog.advance(backlog.Position.of(arrivals[0]), marker)
-        owed = backlog.pending(arrivals, backlog.read_marker(marker))
-        assert [x.name for x in owed] == ["b", "c"], (
-            "an optimistically-advanced marker turns a crash into a silently skipped supply")
-
-    def test_the_next_run_resumes_in_the_same_order(self, marker):
-        arrivals = [_a(n, f"2026-0{i}-01T09:00:00+08:00", i)
-                     for i, n in enumerate(["a", "b", "c", "d"], start=1)]
-        for entry in arrivals[:2]:
-            backlog.advance(backlog.Position.of(entry), marker)
-        first = [x.name for x in backlog.pending(arrivals, backlog.read_marker(marker))]
-        second = [x.name for x in backlog.pending(arrivals, backlog.read_marker(marker))]
-        assert first == second == ["c", "d"]
-
-    def test_the_marker_never_moves_backwards(self, marker):
-        late = _a("late", "2026-01-01T09:00:00+08:00", 1)
-        newer = _a("newer", "2026-06-01T09:00:00+08:00", 9)
-        backlog.advance(backlog.Position.of(newer), marker)
-        backlog.advance(backlog.Position.of(late), marker)
-        assert backlog.read_marker(marker) == backlog.Position.of(newer), (
-            "re-processing an older arrival is legitimate; undoing the high-water mark is not")
-
-    def test_an_unreadable_marker_means_start_from_the_beginning(self, marker):
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text("{not json")
-        assert backlog.read_marker(marker) is None, (
-            "re-processing something already done is idempotent; skipping something never done "
-            "is a lost supply")
-
-    def test_the_marker_is_not_read_as_a_load_record(self, tmp_path, clean_load_log):
-        """It used to live inside the processing log's TREE, where
-        load_log's own glob could pick it up. The load log is a table
-        since REQ-PIPE-089, so the collision is gone by construction -
-        this stays until criterion 18 removes the marker itself, at
-        which point it goes with it."""
-        from qa_tools.common import load_log
-
-        log_dir = tmp_path / "processing_log"
-        log_dir.mkdir()
-        load_log.record("d1", "cp-clients", "cp_clients__2026", load_log.LOADED,
-                         "2026-09-25T09:00:00+08:00")
-        backlog.advance(backlog.Position("2026-09-25T09:00:00+08:00", 1),
-                         log_dir / "marker" / "position.json")
-        assert [r.physical for r in load_log.records()] == ["cp_clients__2026"]
+    The two claims that were about PROCESSING rather than about the
+    marker live in TestHowFarProcessingGotIsDerived below: everything
+    not yet processed is owed, not just the newest arrival, and an
+    arrival reached but not finished stays owed.
+    """
 
 
 class TestAnExhaustedScheduleStillAcceptsSupplies:
@@ -224,7 +175,8 @@ class TestAnExhaustedScheduleStillAcceptsSupplies:
             "still an arrival, and refusing to record it is how the backlog stops being "
             "drainable once dates are added")
 
-    def test_it_is_still_written_to_the_committed_delivery_log(self, tmp_path, monkeypatch):
+    def test_it_is_still_written_to_the_delivery_log(
+            self, tmp_path, monkeypatch, clean_delivery_log):
         from qa_tools.common import arrivals, delivery_log, slots
 
         deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
@@ -233,9 +185,9 @@ class TestAnExhaustedScheduleStillAcceptsSupplies:
         monkeypatch.setattr(slots, "is_owed_supplies", lambda dataset_id: False)
 
         d = delivery.read_delivery("drop", deliveries, receipts)
-        log_dir = tmp_path / "delivery_log"
-        assert delivery_log.record(d, arrivals.recognise(d), log_dir) is not None
-        written = delivery_log.records(log_dir)
+        assert delivery_log.record(
+            d, arrivals.recognise(d), conn=clean_delivery_log) is not None
+        written = delivery_log.records(clean_delivery_log)
         assert [r["delivery"] for r in written] == ["drop"]
         assert written[0]["files"][0]["dataset_id"] == "cp-clients", (
             "what we thought it was is a RECOGNITION fact and does not depend on whether a slot "
@@ -275,46 +227,161 @@ class TestAPositionCannotBeInventedFromAMissingField:
 
 
 class TestTheMarkerIsGloballyCorrect:
-    """The bug: a global marker advanced over ONE collection's arrivals.
+    """RETIRED BY REQ-PIPE-089 criterion 18, and this one is worth
+    reading before anybody reintroduces a high-water mark.
 
-    Birth Registrations' newest arrival is seven weeks past Child
-    Protection's in the real data, so whichever orchestrator ran first
-    pushed the shared marker past every outstanding Child Protection
-    arrival. Latent only because nothing reads the marker for control
-    flow yet - and a committed record making an untrue claim is worse
-    than a slow one.
+    The bug it guarded: a GLOBAL marker advanced over ONE collection's
+    arrivals. Birth Registrations' newest arrival was seven weeks past
+    Child Protection's in the real data, so whichever orchestrator ran
+    first pushed the shared marker past every outstanding Child
+    Protection arrival. Latent only because nothing read the marker
+    for control flow.
+
+    It cannot recur, and not because of care. The question is now
+    asked of each arrival on its own, so there is no shared position
+    for one collection's progress to move on another's behalf. The
+    surviving half of the claim - that a delivery spanning collections
+    is not processed until BOTH halves have staged - is asserted in
+    TestHowFarProcessingGotIsDerived below.
     """
 
-    def test_it_stops_at_the_first_delivery_that_is_not_staged(self, tmp_path):
-        processed = {"first", "second"}
-        deliveries = [_a("first", "2026-01-01T09:00:00+08:00", 1),
-                       _a("second", "2026-02-01T09:00:00+08:00", 2),
-                       _a("third", "2026-03-01T09:00:00+08:00", 3),
-                       _a("fourth", "2026-04-01T09:00:00+08:00", 4)]
-        marker = tmp_path / "position.json"
-        backlog.advance_through(deliveries, lambda d: d.name in processed, marker)
-        assert backlog.read_marker(marker) == backlog.Position.of(deliveries[1])
 
-    def test_it_does_not_jump_a_gap(self, tmp_path):
-        """A marker claims EVERYTHING before it is finished, so it
-        cannot skip one that is not - the second of four failing means
-        the next run is owed all three again."""
-        deliveries = [_a(n, f"2026-0{i}-01T09:00:00+08:00", i)
-                       for i, n in enumerate(["a", "b", "c", "d"], start=1)]
-        marker = tmp_path / "position.json"
-        backlog.advance_through(deliveries, lambda d: d.name != "b", marker)
-        assert backlog.read_marker(marker) == backlog.Position.of(deliveries[0])
-        owed = backlog.pending(deliveries, backlog.read_marker(marker))
+class TestHowFarProcessingGotIsDerived:
+    """REQ-PIPE-089 criteria 18-20: the stored marker is DROPPED, and
+    the same question is answered by asking the load records.
+
+    KEITH'S CALL, 2026-09-27: "let's ditch it and just derive from load
+    records - that's much easier now it's all going to be in a
+    database." The reason is sharper than convenience. The marker
+    existed to AVOID A SCAN - over a file tree the only way to bound
+    replay cost was to store the position - and in a database an
+    indexed query over the load outcomes gives the same bound for
+    nothing.
+
+    AND DERIVING IS STRICTLY SAFER. A stored marker can disagree with
+    the load records, and it fails in the dangerous direction:
+    advanced past an arrival that was reached but not finished, it
+    turns a crash into a silently skipped supply. There is nothing to
+    advance and nothing to disagree.
+
+    Found while removing it, and worth recording: the marker was
+    WRITE-ONLY. Both orchestrators called `advance_past_staged()` after
+    their fan-out and nothing in the pipeline ever read it back.
+    """
+
+    @staticmethod
+    def _arrival(name, files):
+        from types import SimpleNamespace
+        return SimpleNamespace(name=name, files=tuple(files))
+
+    def test_an_arrival_with_every_file_loaded_is_processed(self, clean_load_log):
+        for physical in ("cp_clients__1", "cp_carers__1"):
+            load_log.record("monday", "cp-clients", physical, load_log.LOADED,
+                            "2026-09-01T09:00:00+08:00")
+        assert backlog.unprocessed(
+            [self._arrival("monday", ["cp_clients__1", "cp_carers__1"])]) == []
+
+    def test_an_arrival_reached_but_not_finished_is_still_owed(self, clean_load_log):
+        """Criterion 20, and the whole reason for deriving. A stored
+        marker advanced optimistically over this arrival would turn a
+        crash into a supply nobody ever looks at again."""
+        load_log.record("monday", "cp-clients", "cp_clients__1", load_log.LOADED,
+                        "2026-09-01T09:00:00+08:00")
+        owed = backlog.unprocessed(
+            [self._arrival("monday", ["cp_clients__1", "cp_carers__1"])])
+        assert [a.name for a in owed] == ["monday"]
+
+    def test_a_failed_load_leaves_the_arrival_owed(self, clean_load_log):
+        load_log.record("monday", "cp-clients", "cp_clients__1", load_log.FAILED,
+                        "2026-09-01T09:00:00+08:00", reason="not a CSV")
+        owed = backlog.unprocessed([self._arrival("monday", ["cp_clients__1"])])
+        assert [a.name for a in owed] == ["monday"]
+
+    def test_an_arrival_that_attributed_nothing_is_not_owed_for_ever(self, clean_load_log):
+        """A covering note and nothing else. There is nothing to stage
+        and no load record will ever appear, so treating it as owed
+        would block the queue permanently on a delivery that can never
+        satisfy it."""
+        assert backlog.unprocessed([self._arrival("just-a-note", [])]) == []
+
+    def test_a_gap_does_not_hide_the_arrivals_after_it(self, clean_load_log):
+        """The one place deriving BEATS the marker rather than matching
+        it. A high-water mark had to stop at the first unfinished
+        arrival, so one stuck supply made every later one look owed
+        again - re-processing three to get past one. Asking each
+        arrival its own question has no gap to stop at.
+        """
+        load_log.record("a", "cp-clients", "a__1", load_log.LOADED,
+                        "2026-09-01T09:00:00+08:00")
+        load_log.record("c", "cp-clients", "c__1", load_log.LOADED,
+                        "2026-09-03T09:00:00+08:00")
+        owed = backlog.unprocessed([
+            self._arrival("a", ["a__1"]),
+            self._arrival("b", ["b__1"]),
+            self._arrival("c", ["c__1"])])
+        assert [x.name for x in owed] == ["b"]
+
+    def test_everything_not_yet_processed_is_owed_not_just_the_newest(
+            self, clean_load_log):
+        """Criterion 6, carried over from the retired marker tests. The
+        failure it prevents is a platform one: GitHub holds only ONE
+        pending run per concurrency group, so three rapid triggers
+        silently lose the middle one. Draining needs no queueing
+        guarantee from anybody."""
+        load_log.record("a", "cp-clients", "a__1", load_log.LOADED,
+                        "2026-01-01T09:00:00+08:00")
+        owed = backlog.unprocessed([self._arrival(n, [f"{n}__1"])
+                                    for n in ("a", "b", "c", "d")])
         assert [x.name for x in owed] == ["b", "c", "d"]
 
-    def test_advance_past_staged_reads_the_global_list_not_one_collection(self):
-        """Asserted on the source, because the failure is a wrong
-        committed value rather than an exception: this must take no
-        per-collection arrival list at all."""
-        import inspect
+    def test_a_delivery_spanning_collections_waits_for_both_halves(
+            self, clean_load_log):
+        """The surviving half of the retired global-marker class. One
+        delivery, two collections, and half of it staged: not
+        processed, because half a delivery is not done."""
+        load_log.record("both", "cp-clients", "cp_clients__1", load_log.LOADED,
+                        "2026-01-01T09:00:00+08:00")
+        owed = backlog.unprocessed(
+            [self._arrival("both", ["cp_clients__1", "birth_registrations__1"])])
+        assert [x.name for x in owed] == ["both"]
 
-        signature = inspect.signature(backlog.advance_past_staged)
-        assert list(signature.parameters) == ["path"], (
-            "taking a collection's own arrivals is what skipped the other collection's - "
-            "the input has to be the global delivery list")
-        assert "survey()" in inspect.getsource(backlog.advance_past_staged)
+    def test_the_answer_is_stable_across_repeated_asks(self, clean_load_log):
+        """The retired marker guaranteed this by being a stored
+        high-water mark; a derivation has to be deterministic
+        instead."""
+        load_log.record("a", "cp-clients", "a__1", load_log.LOADED,
+                        "2026-01-01T09:00:00+08:00")
+        arrivals = [self._arrival(n, [f"{n}__1"]) for n in ("a", "b", "c")]
+        first = [x.name for x in backlog.unprocessed(arrivals)]
+        second = [x.name for x in backlog.unprocessed(arrivals)]
+        assert first == second == ["b", "c"]
+
+    def test_the_whole_answer_is_one_query(self, clean_load_log, monkeypatch):
+        """Criterion 19's cost bound, which the marker existed to give
+        and this has to give without it: one indexed read of the load
+        outcomes, not one per arrival."""
+        from qa_tools.common import load_log as module
+
+        calls = {"n": 0}
+        real = module.latest_by_table
+
+        def counting(*a, **k):
+            calls["n"] += 1
+            return real(*a, **k)
+
+        monkeypatch.setattr(module, "latest_by_table", counting)
+        backlog.unprocessed([self._arrival(f"d{n}", [f"d{n}__1"]) for n in range(20)])
+        assert calls["n"] == 1, (
+            f"asked the load log {calls['n']} times for 20 arrivals - the bound has to "
+            f"be one read, or the marker was buying something this does not")
+
+
+class TestTheStoredMarkerIsGone:
+    """Criterion 18, asserted rather than assumed: a mechanism removed
+    in one place and left in another is worse than either."""
+
+    def test_nothing_reads_or_writes_a_marker(self):
+        source = open(backlog.__file__).read()
+        for name in ("MARKER_PATH", "read_marker", "advance_through",
+                     "advance_past_staged", "processing_log"):
+            assert name not in source, f"{name} survived the marker's removal"

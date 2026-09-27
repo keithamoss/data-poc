@@ -44,14 +44,22 @@ item carries `actionable`. REQ-PIPE-064's own NFR warns that "a hold
 nobody can clear is indistinguishable from a bug", so the item says
 which it is rather than presenting a control that would do nothing.
 
-COMMITTED HISTORY ONLY. This feeds a dashboard build and may never
-open data/ or any warehouse - every fact it renders was already
-committed by the producing requirement, which is what makes it
-readable in CI. Four trees, and nothing else:
+RECORDED OBSERVATIONS ONLY. This feeds a dashboard build and may
+never read SUPPLY ROWS - every fact it renders is a recorded
+observation made by the producing requirement, never the
+extract itself. Keith's own line, 2026-09-27: a build may read
+recorded QA results, never actual data, and never anything else.
 
-    delivery_log/           held supplies, contested and unrecognised
+IT USED TO SAY "four trees, and nothing else", and two of them are
+now tables (REQ-PIPE-089 criteria 14, 16 and 22). That changes where
+the facts live and not which facts they are, which is why this module
+reaches them through `delivery_log` and `load_log` rather than
+opening a connection of its own: those two can only answer questions
+about records, and `supply_db.connect` can answer any question at all.
+
+    the delivery record     held supplies, contested and unrecognised
                             files, receipt-time anomalies
-    processing_log/         failed loads
+    the load record         failed loads
     observations/in_flight/ a delivery still being written when we
                             looked
     filings/                an assignment made under ambiguity
@@ -64,15 +72,12 @@ written by somebody who has forgotten why the shape is what it is.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from qa_tools.common import filing, hierarchy, in_flight_log, load_log
+from qa_tools.common import delivery_log, filing, hierarchy, in_flight_log, load_log
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-
-DELIVERY_LOG_DIR = ROOT / "delivery_log"
 
 #: Event severity. DELIBERATELY NOT the status vocabulary - there is no
 #: "green", no "amber" and no "red" here, because none of these is a
@@ -228,25 +233,21 @@ def _collection_agency(collection_id: str) -> str | None:
     return None
 
 
-def _delivery_records(log_dir: Path | None = None) -> list[dict]:
-    directory = Path(log_dir or DELIVERY_LOG_DIR)
-    if not directory.is_dir():
-        return []
-    out = []
-    for path in sorted(directory.glob("*.json")):
-        try:
-            out.append(json.loads(path.read_text()))
-        except (OSError, json.JSONDecodeError):
-            # Unreadable is skipped rather than fatal, the same reading
-            # in_flight_log.observations() takes: this is a report
-            # ABOUT something odd, and it should not take the page down.
-            continue
-    return out
+def _delivery_records(conn=None) -> list[dict]:
+    """Every delivery record.
 
+    The file version skipped one it could not parse rather than
+    failing, "the same reading in_flight_log.observations() takes: this
+    is a report ABOUT something odd, and it should not take the page
+    down". There is nothing left to be unparseable, so the tolerance
+    goes with the files rather than being kept as a comment about a
+    hazard that cannot occur.
+    """
+    return delivery_log.records(conn)
 
-def _from_deliveries(log_dir: Path | None = None) -> list[Item]:
+def _from_deliveries(conn=None) -> list[Item]:
     items: list[Item] = []
-    for record in _delivery_records(log_dir):
+    for record in _delivery_records(conn):
         delivery = record.get("delivery", "")
         received = record.get("received_at")
         # HELD SUPPLIES (REQ-PIPE-059). Blocking, and the most
@@ -432,7 +433,7 @@ def _sort_key(item: Item) -> tuple:
             item.kind, item.dataset_id or "", item.headline)
 
 
-def survey(delivery_log_dir: Path | None = None,
+def survey(conn=None,
             observations_dir: Path | None = None,
             filings_dir: Path | None = None) -> Outstanding:
     """Everything currently waiting for a person, from committed history.
@@ -441,7 +442,7 @@ def survey(delivery_log_dir: Path | None = None,
     A queue ordered by when things happened puts the thing somebody has
     to do today below six things they have already seen.
     """
-    items = (_from_deliveries(delivery_log_dir)
+    items = (_from_deliveries(conn)
               + _from_loads()
               + _from_filings(filings_dir)
               + _from_closed_slots(filings_dir)

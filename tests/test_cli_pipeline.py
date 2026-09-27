@@ -155,8 +155,27 @@ def test_run_without_snapshot_flag_only_syncs_local_copies(monkeypatch):
     assert "snapshot" not in calls
 
 
+def _log_one(conn, name):
+    """One delivery record, by the shortest real route.
+
+    Written through the module rather than as an INSERT, so these tests
+    keep exercising the writer they are about rather than a hand-rolled
+    copy of its schema.
+    """
+    from types import SimpleNamespace
+
+    from qa_tools.common import asset_time, delivery_log
+
+    return delivery_log.record(
+        SimpleNamespace(name=name, files=[], anomalies=[],
+                        received_at=asset_time.parse_instant(
+                            "2026-01-01T09:00:00+08:00", name)),
+        SimpleNamespace(by_dataset={}, contested={}, collections=[]),
+        conn=conn)
+
+
 def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
-        monkeypatch, tmp_path):
+        monkeypatch, tmp_path, clean_delivery_log):
     """A real incident, 2026-09-25, and the reason criterion 6 is built
     as a prune rather than a wipe.
 
@@ -175,10 +194,10 @@ def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
     import cli.pipeline as pipeline_cli
     from qa_tools.common import delivery, delivery_log
 
-    log_dir = tmp_path / "delivery_log"
-    log_dir.mkdir()
-    (log_dir / "monday.json").write_text('{"delivery": "monday", "files": []}')
-    monkeypatch.setattr(delivery_log, "DELIVERY_LOG_DIR", log_dir)
+    # A record for a delivery, straight into this worker's own database
+    # - REQ-PIPE-089 made the delivery log a table, so there is no
+    # directory to point anywhere and no file to hand-write.
+    _log_one(clean_delivery_log, "monday")
     # Nothing on disk, so a delivery still recorded is one the prune
     # has every reason to think is gone - the worst case for the log.
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "no-deliveries")
@@ -196,18 +215,19 @@ def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
     # there - what must never happen is the whole log going on a run
     # that rewrote nothing. Proven by pointing the deliveries at a real
     # tree instead:
-    assert not (log_dir / "monday.json").exists()
+    assert [r["delivery"] for r in delivery_log.records()] == []
 
 
-def test_a_delivery_still_present_keeps_its_record_across_a_run(monkeypatch, tmp_path):
+def test_a_delivery_still_present_keeps_its_record_across_a_run(
+        monkeypatch, tmp_path, clean_delivery_log):
     """The other half, and the one that actually guards the incident."""
     import cli.pipeline as pipeline_cli
     from qa_tools.common import delivery, delivery_log
 
-    log_dir = tmp_path / "delivery_log"
-    log_dir.mkdir()
-    (log_dir / "monday.json").write_text('{"delivery": "monday", "files": []}')
-    monkeypatch.setattr(delivery_log, "DELIVERY_LOG_DIR", log_dir)
+    # A record for a delivery, straight into this worker's own database
+    # - REQ-PIPE-089 made the delivery log a table, so there is no
+    # directory to point anywhere and no file to hand-write.
+    _log_one(clean_delivery_log, "monday")
 
     deliveries = tmp_path / "deliveries"
     (deliveries / "monday").mkdir(parents=True)
@@ -230,7 +250,7 @@ def test_a_delivery_still_present_keeps_its_record_across_a_run(monkeypatch, tmp
 
     result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
     assert result.exit_code == 0, result.output
-    assert (log_dir / "monday.json").exists(), \
+    assert [r["delivery"] for r in delivery_log.records()] == ["monday"], \
         "a run that rewrote nothing must not take the record with it"
 
 
@@ -248,12 +268,11 @@ def test_the_committed_history_trees_are_never_the_real_ones_in_a_test():
     from qa_tools.common import delivery_log, filing, in_flight_log
 
     root = delivery_log.ROOT
-    # load_log is absent since REQ-PIPE-089 moved the load record into
-    # the database. There is no tree of it left to point anywhere, and
-    # a test writing load records now writes them to its own worker's
-    # database, which cannot be the real one.
-    for module, name in ((delivery_log, "DELIVERY_LOG_DIR"),
-                          (in_flight_log, "OBSERVATIONS_DIR"),
+    # Neither load_log nor delivery_log is here since REQ-PIPE-089
+    # moved both records into the database. There is no tree of either
+    # left to point anywhere, and a test writing one now writes to its
+    # own worker's database, which cannot be the real one.
+    for module, name in ((in_flight_log, "OBSERVATIONS_DIR"),
                           (filing, "FILINGS_DIR")):
         current = getattr(module, name)
         assert root not in current.parents and current != root, (

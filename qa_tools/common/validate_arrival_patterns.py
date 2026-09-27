@@ -39,7 +39,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from qa_tools.common import arrival_patterns, delivery_log, hierarchy, slots
+from qa_tools.common import (
+    arrival_patterns, delivery_log, hierarchy, slots, supply_db)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -52,8 +53,8 @@ class ArrivalPatternConfigError(ValueError):
     "conflict detected" sends somebody diffing seven regexes."""
 
 
-def committed_filenames(log_dir: Path | None = None) -> list[str]:
-    """Every filename the committed delivery log has ever recorded.
+def committed_filenames(conn=None) -> list[str] | None:
+    """Every filename the delivery log has ever recorded.
 
     THE CORPUS, and REQ-PIPE-069 is what fills it. Read through that
     module rather than re-implemented here: two readers of one format
@@ -63,9 +64,21 @@ def committed_filenames(log_dir: Path | None = None) -> list[str]:
     Empty before any delivery has been logged, which the gate states
     rather than passes over - a check with no corpus is not a check
     that passed.
+
+    `None` WHERE THERE IS NO DATABASE TO ASK, which is new with
+    REQ-PIPE-089 and is the honest answer rather than a convenience.
+    This corpus used to be committed, so it was there in every
+    checkout and this gate ran in full anywhere. It is a table now, and
+    a gate runs in places a database is not reachable from - which
+    REQ-PIPE-092 criterion 9 requires to keep working. So the
+    duplicate-attribution half is skipped and the gate SAYS it was
+    skipped; an empty list would read as "checked, found nothing",
+    which is the one answer that would be a lie.
     """
     try:
-        found = delivery_log.records(log_dir)
+        found = delivery_log.records(conn)
+    except supply_db.SupplyDbError:
+        return None
     except delivery_log.DeliveryLogError as exc:
         raise ArrivalPatternConfigError(str(exc)) from exc
     names: set[str] = set()
@@ -98,7 +111,7 @@ def duplicate_attributions(filenames: list[str]) -> list[tuple[str, tuple[str, .
     return found
 
 
-def validate(log_dir: Path | None = None) -> str:
+def validate(conn=None) -> str:
     """Raises ArrivalPatternConfigError on a real problem; returns the
     line `mothman check` prints otherwise."""
     # Compiling every pattern is itself half the gate: a pattern that is
@@ -117,8 +130,8 @@ def validate(log_dir: Path | None = None) -> str:
             f"`arrival_pattern:` in contract/data-asset.yaml, so nothing it is sent can "
             f"ever be recognised as its own.")
 
-    filenames = committed_filenames(log_dir)
-    for name, claimants in duplicate_attributions(filenames):
+    filenames = committed_filenames(conn)
+    for name, claimants in duplicate_attributions(filenames or []):
         patterns = ", ".join(
             f"{d} ({compiled[d].pattern})" for d in claimants if d in compiled)
         problems.append(
@@ -129,9 +142,15 @@ def validate(log_dir: Path | None = None) -> str:
     if problems:
         raise ArrivalPatternConfigError("\n".join(problems))
 
-    corpus = (f"{len(filenames)} recorded filename(s)" if filenames
-              else "no delivery has been logged yet, so nothing to check for "
-                   "duplicate attribution - the log fills as the pipeline runs")
+    if filenames is None:
+        corpus = ("NO DATABASE REACHABLE, so duplicate attribution was not checked - "
+                  "the delivery log is a table since REQ-PIPE-089, and this half of "
+                  "the gate needs one")
+    elif filenames:
+        corpus = f"{len(filenames)} recorded filename(s)"
+    else:
+        corpus = ("no delivery has been logged yet, so nothing to check for "
+                  "duplicate attribution - the log fills as the pipeline runs")
     return (f"arrival pattern validation OK - {len(compiled)} dataset pattern(s), "
             f"{corpus}.")
 

@@ -208,6 +208,32 @@ class TestWhatWasActuallyLoaded:
         assert _run(["failures"]).exit_code == 0
 
 
+def _timeline(conn, tmp_path, drops):
+    """A real arrival history, recognised and recorded the real way.
+
+    TWO DELIVERY FAMILIES, matching how the real suppliers actually
+    send: Birth Registrations arrives on its own, and Child Protection
+    arrives as all six tables together. That second shape is what
+    makes "5 other dataset(s)" the right answer for any one of them,
+    and putting all seven in one delivery - which an earlier version
+    of this fixture did - quietly made it six.
+    """
+    from qa_tools.common import arrivals, delivery as delivery_mod, delivery_log
+
+    deliveries, receipts = tmp_path / "hist-deliveries", tmp_path / "hist-receipts"
+    cp_files = ("cp_clients.csv", "cp_carers.csv", "cp_case_workers.csv",
+                "cp_investigations.csv", "cp_notifications.csv", "cp_placements.csv")
+    for n in range(1, drops + 1):
+        day = f"2026-03-{n:02d}"
+        for name, files in (
+                (f"bdm-{n:02d}", {f"birth_registrations_{day}.csv": "a\n1\n"}),
+                (f"cp-{n:02d}", {f: "a\n1\n" for f in cp_files})):
+            delivery_mod.write_delivery(
+                name, files, f"{day}T09:00:00+08:00", deliveries, receipts)
+            d = delivery_mod.read_delivery(name, deliveries, receipts)
+            delivery_log.record(d, arrivals.recognise(d), conn=conn)
+
+
 class TestOneDatasetsOwnTimeline:
     """REQ-PIPE-034's own entry point - every new one gets a mothman
     subcommand in the same change."""
@@ -221,15 +247,24 @@ class TestOneDatasetsOwnTimeline:
         assert result.exit_code != 0
 
     def test_it_says_promoted_is_not_tracked_rather_than_leaving_it_blank(
-            self, real_committed_history):
+            self, clean_delivery_log, tmp_path):
         """Silence would read as "same as the latest arrival", which is
-        the conflation this requirement exists to split."""
+        the conflation this requirement exists to split.
+
+        IT USED TO READ THE REAL COMMITTED TREE, asserting on its 42
+        recorded arrivals. That corpus was state in the repository,
+        which REQ-PIPE-089 removes, so the test lays down its own -
+        the claim was never about the number.
+        """
+        _timeline(clean_delivery_log, tmp_path, drops=2)
         result = _run(["history", "--dataset", "birth-registrations", "--limit", "2"])
         assert result.exit_code == 0, result.output
         assert "not tracked yet" in result.output
-        assert "42 arrival(s)" in result.output
+        assert "2 arrival(s)" in result.output
 
-    def test_it_names_the_datasets_that_shared_a_delivery(self, real_committed_history):
+    def test_it_names_the_datasets_that_shared_a_delivery(
+            self, clean_delivery_log, tmp_path):
+        _timeline(clean_delivery_log, tmp_path, drops=3)
         result = _run(["history", "--dataset", "cp-clients", "--limit", "3"])
         assert result.exit_code == 0, result.output
         assert "5 other dataset(s)" in result.output, (

@@ -237,15 +237,16 @@ def _committed_history_is_off_limits(tmp_path_factory):
     that redirects one of these itself still overrides this and still
     restores to a temporary directory rather than to the real tree.
     """
-    from qa_tools.common import delivery_log, filing, in_flight_log
+    from qa_tools.common import filing, in_flight_log
 
     root = tmp_path_factory.mktemp("committed_history")
-    # load_log is NOT here any more: REQ-PIPE-089 moved the load record
-    # into the database, so there is no committed tree of it left to
-    # guard. Isolation for it comes from each worker having its own
-    # database, which is stronger than a redirected directory.
-    guarded = [(delivery_log, "DELIVERY_LOG_DIR", "delivery_log"),
-                (in_flight_log, "OBSERVATIONS_DIR", "observations"),
+    # NEITHER load_log NOR delivery_log is here any more: REQ-PIPE-089
+    # moved both records into the database, so there is no committed
+    # tree of either left to guard. Isolation comes from each worker
+    # having its own database, which is stronger than a redirected
+    # directory - a test cannot reach the real one at all, rather than
+    # being pointed away from it.
+    guarded = [(in_flight_log, "OBSERVATIONS_DIR", "observations"),
                 (filing, "FILINGS_DIR", "filings")]
     before = [(module, name, getattr(module, name)) for module, name, _ in guarded]
     for module, name, folder in guarded:
@@ -272,15 +273,29 @@ def real_committed_history(_committed_history_is_off_limits):
     from qa_tools.common import delivery_log, filing, in_flight_log
 
     root = delivery_log.ROOT
-    restore = [(delivery_log, "DELIVERY_LOG_DIR", delivery_log.DELIVERY_LOG_DIR),
-                (in_flight_log, "OBSERVATIONS_DIR", in_flight_log.OBSERVATIONS_DIR),
+    restore = [(in_flight_log, "OBSERVATIONS_DIR", in_flight_log.OBSERVATIONS_DIR),
                 (filing, "FILINGS_DIR", filing.FILINGS_DIR)]
-    delivery_log.DELIVERY_LOG_DIR = root / "delivery_log"
     in_flight_log.OBSERVATIONS_DIR = root / "observations" / "in_flight"
     filing.FILINGS_DIR = root / "filings"
     yield root
     for module, name, value in restore:
         setattr(module, name, value)
+
+
+@pytest.fixture
+def clean_delivery_log(supply_dsn):
+    """An empty delivery log for one test (REQ-PIPE-089 criterion 16).
+
+    Same reasoning as `clean_load_log` below, and the same deliberate
+    non-autouse: a test asserting on the WHOLE log has to empty it
+    first, and the staging fixtures legitimately leave records behind.
+    """
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="test-clean-delivery-log") as conn:
+        qa_store.ensure_schema(conn)
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".delivery CASCADE')
+        yield conn
 
 
 @pytest.fixture

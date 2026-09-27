@@ -39,7 +39,6 @@ dataset last supplied rather than by total history.
 """
 from __future__ import annotations
 
-import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -119,35 +118,30 @@ def _sequence_of(record: dict) -> int:
     return int(record.get("_sequence", 0))
 
 
-def _load(log_dir: Path | None = None) -> Iterator[dict]:
-    """Every committed delivery record, NEWEST FIRST, with its own
-    sequence attached from its filename.
+def _load(conn=None) -> Iterator[dict]:
+    """Every delivery record, NEWEST FIRST.
 
-    A GENERATOR, and that is the non-functional constraint rather than
-    a style choice. Built as a list first, and it read every record
+    A GENERATOR, and that is a non-functional constraint rather than a
+    style choice. Built as a list first, and it read every record
     before returning one - so last_arrived() "stopped at the first hit"
     over a list that had already cost the full walk. Measured: 60 of 60
-    records opened to answer a question that needs one. Yielding makes
-    the early exit real, which the test asserts by counting reads
-    rather than by trusting this paragraph.
+    records opened to answer a question that needs one.
+
+    IT USED TO BE A REVERSE-SORTED GLOB, and the early exit was real
+    because opening a file is what cost something. Rows come back from
+    one query now, so the exit saves parsing rather than I/O - the
+    property the test asserts still holds, and the honest way to make
+    this cheap at thirty datasets over years is a WHERE clause, which
+    is what `last_arrived` below should grow when the walk starts to
+    show. Recorded rather than done, because nothing measures as slow
+    yet and a guess is how an index that serves nothing gets added.
+
+    The `_sequence` this used to parse out of each filename is gone: it
+    was assigned here and read nowhere, and there are no filenames.
     """
-    directory = Path(log_dir or delivery_log.DELIVERY_LOG_DIR)
-    if not directory.is_dir():
-        return
-    for path in sorted(directory.glob("*.json"), reverse=True):
-        try:
-            record = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
-            raise delivery_log.DeliveryLogError(
-                f"{path} is in the delivery log and cannot be read ({exc}). A dataset's "
-                f"arrival history is built from these, so one that cannot be parsed is not "
-                f"something to pass over.") from exc
-        parts = path.stem.split("--")
-        record["_sequence"] = int(parts[1]) if len(parts) > 2 and parts[1].isdigit() else 0
-        yield record
+    yield from reversed(delivery_log.records(conn))
 
-
-def arrivals_of(dataset_id: str, log_dir: Path | None = None) -> list[Arrival]:
+def arrivals_of(dataset_id: str, conn=None) -> list[Arrival]:
     """One dataset's whole arrival history, oldest first.
 
     Presented WITHOUT reference to any other dataset (criterion 9):
@@ -156,28 +150,30 @@ def arrivals_of(dataset_id: str, log_dir: Path | None = None) -> list[Arrival]:
     here.
     """
     found: list[Arrival] = []
-    for record in _load(log_dir):
+    for record in delivery_log.records_carrying(dataset_id, conn=conn):
         found.extend(_arrivals_in(record, dataset_id))
     return sorted(found, key=lambda a: a.sort_key)
 
 
-def last_arrived(dataset_id: str, log_dir: Path | None = None) -> Arrival | None:
+def last_arrived(dataset_id: str, conn=None) -> Arrival | None:
     """This dataset's most recent arrival, INCLUDING one that could not
     be loaded (criterion 2).
 
-    Stops at the first delivery carrying the dataset rather than
-    reading them all, which is the non-functional constraint made
-    mechanical: the listing is already in receipt order, so the first
-    hit walking backwards IS the newest.
+    ONE DELIVERY IS READ, not the history up to it. The constraint
+    used to be met by walking backwards and stopping at the first hit;
+    it is now a WHERE on this dataset with a LIMIT, which does not
+    depend on how long ago the dataset last supplied. See
+    delivery_log.records_carrying() for why the early exit stopped
+    being worth anything once the records were rows.
     """
-    for record in _load(log_dir):
+    for record in delivery_log.records_carrying(dataset_id, limit=1, conn=conn):
         found = _arrivals_in(record, dataset_id)
         if found:
             return max(found, key=lambda a: a.sort_key)
     return None
 
 
-def last_promoted(dataset_id: str, log_dir: Path | None = None) -> None:
+def last_promoted(dataset_id: str, conn=None) -> None:
     """Always None, and deliberately so - see this module's docstring.
 
     A function that returns None is here rather than nothing at all
@@ -201,7 +197,7 @@ def load_outcome(supply_id: str, dataset_id: str, delivery: str) -> str | None:
     return None
 
 
-def delivery_companions(delivery: str, log_dir: Path | None = None) -> tuple[str, ...]:
+def delivery_companions(delivery: str, conn=None) -> tuple[str, ...]:
     """Every dataset that arrived in one delivery (criterion 8).
 
     The counterpart to the per-dataset view: it is what makes "the
@@ -209,7 +205,7 @@ def delivery_companions(delivery: str, log_dir: Path | None = None) -> tuple[str
     question about the DELIVERY rather than about any one dataset, so
     it does not belong on a dataset's own timeline.
     """
-    for record in _load(log_dir):
+    for record in _load(conn):
         if record.get("delivery") == delivery:
             return tuple(sorted({a.dataset_id for a in _arrivals_in(record, None)}))
     return ()

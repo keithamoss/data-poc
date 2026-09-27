@@ -38,7 +38,6 @@ from datetime import date
 from . import bdm_common
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
-from qa_tools.common import backlog
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common import trial
 from qa_tools.common.git_identity import get_run_by
@@ -428,14 +427,6 @@ def run_pipeline(sequential: bool = False) -> dict:
     # belonging to a run happening right now in another process, so it
     # is now an explicit `mothman supply tidy`, run by someone who
     # knows nothing else is going.
-
-    # HOW FAR PROCESSING GOT (REQ-PIPE-061 criteria 6-8). Advanced
-    # AFTER the fan-out and only over arrivals that are genuinely
-    # staged, so an interrupted run leaves the rest to the next one in
-    # the same order. The marker is global - one arrival may span
-    # collections - so both orchestrators advance the same one, and
-    # advance() never moves it backwards.
-    backlog.advance_past_staged()
 
     # Read back rather than threaded through _run_one's own return value -
     # parallel_orchestrate.run_manifest's contract is a flat list of check

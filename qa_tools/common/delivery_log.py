@@ -1,9 +1,18 @@
-"""One committed file per delivery, written once at recognition
-(REQ-PIPE-069).
+"""One record per delivery, written once at recognition (REQ-PIPE-069,
+moved into the database by REQ-PIPE-089 criteria 16 and 22).
 
-WHAT ARRIVED, AND WHAT WE THOUGHT IT WAS. Nothing else. The record of an
-arrival has to outlive the warehouse that held it and be readable
-without one, which is why it is committed rather than a table.
+WHAT ARRIVED, AND WHAT WE THOUGHT IT WAS. Nothing else.
+
+IT USED TO BE A COMMITTED FILE, and the argument for that was explicit:
+"the record of an arrival has to outlive the warehouse that held it and
+be readable without one". Keith gave that up deliberately on
+2026-09-26, and the reasoning is worth keeping rather than rediscovering
+as a regret. Permanence readable with no infrastructure is real and it
+is what `dashboard/snapshots/*.html.gz` has always been for - committed,
+self-contained, openable in ten years with nothing but a browser. The
+delivery log was never the mechanism for that; it was a second copy
+that happened to be durable, and the repository holds configuration
+rather than state.
 
 RECOGNITION HAPPENS BEFORE LOADING, and that ordering was got wrong once
 already: a file written at recognition cannot carry load outcomes,
@@ -36,100 +45,51 @@ recognition and the durable record loses it, so a supplier drifting
 over time is invisible unless somebody happened to be watching that
 run.
 
-PRIVACY, entered with eyes open rather than discovered later. This repo
-is public, so a recorded filename becomes a published string. A
-systematic extract name like `birth_registrations_2026-08-28.csv` is
-impersonal; a stray `notes_for_jenny_re_case_4471.docx` is not, and it
-is exactly the kind of file that lands in a delivery by accident.
-Contents are still never read and never recorded - the NAME is, and it
-is now durably committed rather than fleeting. Keith accepted that
-knowingly on 2026-09-24; redaction was raised as an alternative and not
-taken. Today's filenames are synthetic, and the real-deployment
-judgement should be made on real-deployment terms rather than inherited
-from this PoC.
+PRIVACY GOT BETTER, and this is the one place to say so concretely.
+This paragraph used to open "this repo is public, so a recorded
+filename becomes a published string", and it went on to accept, with
+eyes open, that a stray `notes_for_jenny_re_case_4471.docx` - exactly
+the kind of file that lands in a delivery by accident - would be
+committed to a public remote with no removal path, because git cannot
+forget. Keith accepted that knowingly on 2026-09-24 and declined
+redaction.
+
+It is no longer accepted, because it is no longer true. A filename
+recorded here reaches a database nobody outside the deployment can
+read, and a row can be deleted. Contents are still never read and
+never recorded. The real-deployment judgement should still be made on
+real-deployment terms rather than inherited from this PoC - but the
+half of it with no removal path is gone.
 """
 from __future__ import annotations
 
 import json
-import re
+from contextlib import contextmanager
 from pathlib import Path
 
-from qa_tools.common import asset_time
-from qa_tools.common import holds
+from qa_tools.common import holds, qa_store, supply_db
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
-#: Its own tree, beside the QA results rather than inside them: a
-#: delivery spans datasets and is not a QA result, and qa_results/ is
-#: keyed by agency and collection while a delivery may be for several
-#: (criterion 2).
-DELIVERY_LOG_DIR = ROOT / "delivery_log"
 
-#: A delivery's name is supplier-controlled and becomes a filename. The
-#: PoC's own names already contain spaces, so this is a real transform
-#: rather than a defensive formality.
-_UNSAFE = re.compile(r"[^0-9A-Za-z._-]+")
-
-
-class DeliveryLogError(RuntimeError):
+class DeliveryLogError(Exception):
     """Something that would corrupt the record rather than merely fail
     to write it."""
 
 
-def path_for(delivery, log_dir: Path | None = None) -> Path:
-    """This delivery's committed record.
-
-    THE NAME CARRIES THE RECEIPT INSTANT, and that is a performance
-    contract rather than decoration (REQ-PIPE-034's own non-functional
-    constraint). Answering "when did this dataset last arrive" must not
-    cost a walk of every arrival ever received - and with names that
-    sort arbitrarily, the only way to find the newest delivery holding
-    one dataset is to open all of them. Sorting by name here IS sorting
-    by receipt, so that walk runs newest-first and stops at the first
-    hit, bounded by deliveries since that dataset last supplied.
-
-    IT CARRIES THE INSTANT AND NOT THE RECEIPT SEQUENCE, and the
-    difference is a real defect this had for one evening. The sequence
-    is re-issued when the synthetic data is regenerated - the same
-    delivery, the same instant, a different number - so a filename
-    built from it produced a SECOND record for every delivery, and the
-    write-once guard below never fired because it only asked whether
-    THAT path existed. Measured: 120 records for 60 deliveries, and
-    every dataset's arrival history exactly doubled.
-
-    THE GENERAL RULE, because this will be reachable for again: a
-    write-once record whose filename encodes a MUTABLE value is not
-    write-once. The instant is a fact about the arrival; the sequence
-    is a fact about the receipt WE wrote, and only the first is stable.
-    Ordering ties are broken by the receipt's own sequence at the point
-    ordering is decided, which does not need it to be in this name.
-
-    Takes a Delivery rather than a name, because a name alone cannot
-    produce this filename.
-    """
-    directory = Path(log_dir or DELIVERY_LOG_DIR)
-    safe = _UNSAFE.sub("_", delivery.name).strip("._") or "unnamed"
-    return directory / f"{asset_time.arrival_key(delivery.received_at)}--{safe}.json"
+@contextmanager
+def _db(conn: supply_db.SupplyConnection | None):
+    """Reuse the caller's connection, or open one for the call."""
+    if conn is not None:
+        yield conn
+        return
+    with supply_db.connect(label="mothman:delivery-log") as opened:
+        qa_store.ensure_schema(opened)
+        yield opened
 
 
-def _existing_record(delivery_name: str, log_dir: Path | None = None) -> Path | None:
-    """This delivery's committed record under ANY filename.
-
-    Globbed on the delivery's own safe name rather than on a full path,
-    so a change to how records are named can never again defeat the
-    write-once rule silently.
-    """
-    directory = Path(log_dir or DELIVERY_LOG_DIR)
-    if not directory.is_dir():
-        return None
-    safe = _UNSAFE.sub("_", delivery_name).strip("._") or "unnamed"
-    for path in sorted(directory.glob(f"*--{safe}.json")):
-        return path
-    legacy = directory / f"{safe}.json"
-    return legacy if legacy.is_file() else None
-
-
-def record(delivery, recognition, log_dir: Path | None = None) -> Path | None:
+def record(delivery, recognition,
+           conn: supply_db.SupplyConnection | None = None) -> dict | None:
     """Commit what this delivery was, once.
 
     WRITTEN ONCE AND NEVER REWRITTEN (criterion 1). A delivery already
@@ -140,17 +100,14 @@ def record(delivery, recognition, log_dir: Path | None = None) -> Path | None:
     so the second call being a no-op is the ordinary case rather than a
     guard against a bug.
 
-    Returns the path written, or None where one already existed.
-    """
-    path = path_for(delivery, log_dir)
-    # WRITE-ONCE BY DELIVERY, not by path. Asking only whether this
-    # exact filename exists is what let a re-issued receipt sequence
-    # write a second record for a delivery already logged, so the guard
-    # now asks the question the criterion actually asks.
-    if _existing_record(delivery.name, log_dir) is not None:
-        return None
-    path.parent.mkdir(parents=True, exist_ok=True)
+    WRITE-ONCE BY DELIVERY NAME, which the primary key now enforces
+    rather than a pre-read. The file version had to glob for an
+    existing record under any filename, because a re-issued receipt
+    sequence produced a different filename for the same delivery and
+    wrote a second record; a primary key on the name cannot.
 
+    Returns the record written, or None where one already existed.
+    """
     attributed = {name: dataset_id
                   for dataset_id, names in recognition.by_dataset.items()
                   for name in names}
@@ -161,9 +118,10 @@ def record(delivery, recognition, log_dir: Path | None = None) -> Path | None:
         "delivery": delivery.name,
         # THE OFFSET IS PRESERVED (criterion 5). asset_time already
         # refuses a naive instant, and isoformat() carries the offset
-        # it was recorded with - normalising to UTC here would throw
-        # away which clock the receiving side was on, which is the
-        # whole point of REQ-PIPE-048.
+        # it was recorded with - normalising to UTC would throw away
+        # which clock the receiving side was on, which is the whole
+        # point of REQ-PIPE-048. The column beside it holds the same
+        # moment as an instant, for ordering.
         "received_at": delivery.received_at.isoformat(),
         "collections": list(recognition.collections),
         "files": [
@@ -182,17 +140,34 @@ def record(delivery, recognition, log_dir: Path | None = None) -> Path | None:
         # making them compute it from a file list is how a queue stops
         # being drained.
         "held": [{"dataset_id": h.dataset_id, "files": list(h.files)}
-                  for h in holds.holds_in(recognition)],
+                 for h in holds.holds_in(recognition)],
         # Recorded, never read. A receipt lookalike or a supplier's own
         # manifest is excluded from `files` on purpose, so this is the
         # only place their presence survives.
         "anomalies": list(delivery.anomalies),
     }
-    path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n")
-    return path
+
+    with _db(conn) as db:
+        written = db.execute(
+            f'INSERT INTO "{qa_store.SCHEMA}".delivery '
+            "(name, received_at, received_instant, collections, held, anomalies) "
+            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
+            [payload["delivery"], payload["received_at"], delivery.received_at,
+             json.dumps(payload["collections"]), json.dumps(payload["held"]),
+             json.dumps(payload["anomalies"])]).fetchall()
+        if not written:
+            return None
+        for entry in payload["files"]:
+            db.execute(
+                f'INSERT INTO "{qa_store.SCHEMA}".delivery_file '
+                "(delivery, filename, dataset_id, contested_by) VALUES (?, ?, ?, ?)",
+                [payload["delivery"], entry["filename"], entry["dataset_id"],
+                 json.dumps(entry["contested_by"]) if entry["contested_by"] else None])
+    return payload
 
 
-def prune(present: set[str] | frozenset[str], log_dir: Path | None = None) -> list[str]:
+def prune(present: set[str] | frozenset[str],
+          conn: supply_db.SupplyConnection | None = None) -> list[str]:
     """Remove records for deliveries that no longer exist.
 
     Criterion 6 asks that the log never describe a history that no
@@ -204,8 +179,8 @@ def prune(present: set[str] | frozenset[str], log_dir: Path | None = None) -> li
     is not theoretical: the first version cleared the whole log at the
     top of `mothman pipeline run`, and the test suite - which invokes
     that command with the real work stubbed out - deleted sixty
-    committed records on the next gate run. Nothing rewrote them,
-    because the thing that would have was the part being stubbed.
+    records on the next gate run. Nothing rewrote them, because the
+    thing that would have was the part being stubbed.
 
     Pruning reaches the same end state for every case that can actually
     arise. Records are write-once by criterion 1, so a record for a
@@ -214,64 +189,109 @@ def prune(present: set[str] | frozenset[str], log_dir: Path | None = None) -> li
     restore are exactly the ones for deliveries that are gone, which is
     what this removes.
 
-    Returns the names removed, because a silent delete of committed
-    files is the wrong shape even when it is correct.
+    THE UNREADABLE CASE IS GONE WITH THE FILES. The version this
+    replaces also removed records it could not parse, because a corrupt
+    JSON file is both unusable and unattributable to a delivery. A row
+    is either committed or it is not.
+
+    Returns the names removed, because a silent delete of durable
+    records is the wrong shape even when it is correct.
     """
-    directory = Path(log_dir or DELIVERY_LOG_DIR)
-    if not directory.is_dir():
-        return []
-    gone = []
-    for path in sorted(directory.glob("*.json")):
-        try:
-            name = json.loads(path.read_text()).get("delivery")
-        except (OSError, json.JSONDecodeError):
-            # Unreadable AND unattributable to a delivery: it cannot be
-            # checked against what is present, and it fails the gate
-            # that reads this log. Removing it is the only outcome that
-            # leaves the log in a state anything can use.
-            path.unlink()
-            gone.append(path.name)
-            continue
-        if name not in present:
-            path.unlink()
-            gone.append(name)
-    return gone
+    with _db(conn) as db:
+        gone = [row[0] for row in db.execute(
+            f'DELETE FROM "{qa_store.SCHEMA}".delivery WHERE NOT (name = ANY(?)) '
+            "RETURNING name", [list(present)]).fetchall()]
+    return sorted(gone)
 
 
-def records(log_dir: Path | None = None) -> list[dict]:
-    """Every committed delivery record, oldest receipt first.
+def records(conn: supply_db.SupplyConnection | None = None) -> list[dict]:
+    """Every delivery record, oldest receipt first.
 
-    A malformed one RAISES rather than being skipped, unlike the
-    in-flight observations: this is the corpus REQ-PIPE-058's collision
-    gate reads, and a gate that quietly ignores what it cannot parse is
-    a gate that passes for the wrong reason.
+    Returns the same dicts the committed files held, so every reader of
+    this corpus - REQ-PIPE-058's collision gate, the arrival history,
+    the outstanding queue - is unchanged by the move.
+
+    A malformed one used to RAISE rather than be skipped, because this
+    is a gate's corpus and a gate that quietly ignores what it cannot
+    parse passes for the wrong reason. There is nothing left to
+    malform.
     """
-    directory = Path(log_dir or DELIVERY_LOG_DIR)
-    if not directory.is_dir():
-        return []
-    out = []
-    for path in sorted(directory.glob("*.json")):
-        try:
-            out.append(json.loads(path.read_text()))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise DeliveryLogError(
-                f"{path} is in the delivery log and cannot be read ({exc}). This is "
-                f"REQ-PIPE-058's collision corpus, so a record that cannot be parsed "
-                f"is not something to pass over.") from exc
-    return sorted(out, key=lambda r: r.get("received_at", ""))
+    with _db(conn) as db:
+        deliveries = db.execute(
+            f'SELECT name, received_at, collections, held, anomalies '
+            f'FROM "{qa_store.SCHEMA}".delivery ORDER BY received_instant, name'
+        ).fetchall()
+        files: dict[str, list[dict]] = {}
+        for delivery, filename, dataset_id, contested in db.execute(
+                f'SELECT delivery, filename, dataset_id, contested_by '
+                f'FROM "{qa_store.SCHEMA}".delivery_file ORDER BY delivery, filename'
+        ).fetchall():
+            files.setdefault(delivery, []).append(
+                {"filename": filename, "dataset_id": dataset_id,
+                 "contested_by": contested})
+    return [{"delivery": name, "received_at": received_at,
+             "collections": collections, "files": files.get(name, []),
+             "held": held, "anomalies": anomalies}
+            for name, received_at, collections, held, anomalies in deliveries]
 
 
-def sql(log_dir: Path | None = None) -> str:
-    """A SELECT over the committed files themselves (criterion 4).
+def records_carrying(dataset_id: str, limit: int | None = None,
+                     conn: supply_db.SupplyConnection | None = None) -> list[dict]:
+    """The delivery records that carried one dataset, NEWEST FIRST.
 
-    DuckDB reads the JSON straight off disk, so the log is queryable
-    and joinable against the staging and period schemas with NOTHING
-    SYNCED and nothing duplicated. A second copy in the warehouse was
-    rejected as two records that can drift, for no gain.
+    THE NON-FUNCTIONAL CONSTRAINT, and it changed shape with the move.
+    REQ-PIPE-034 requires that "when did this dataset last arrive" cost
+    deliveries since IT last supplied rather than total history. Over
+    files that was a reverse-sorted glob with an early exit, measured
+    by counting opens. Over rows, an early exit out of a list the
+    database has already materialised saves parsing and nothing else -
+    so the bound has to move into the query, which is `limit` plus the
+    index on `delivery_file (dataset_id)`.
 
-    Returns SQL rather than running it, because running it would mean
-    opening a database, and the committed-history path may not.
+    That is strictly better than the bound it replaces: the old one was
+    "deliveries since this dataset last supplied", and this one does
+    not depend on how long ago that was.
     """
-    directory = Path(log_dir or DELIVERY_LOG_DIR)
-    return (f"SELECT delivery, received_at, collections, files, anomalies "
-            f"FROM read_json_auto('{directory}/*.json')")
+    sql_text = (f'SELECT d.name, d.received_at, d.collections, d.held, d.anomalies '
+                f'FROM "{qa_store.SCHEMA}".delivery d '
+                f'WHERE EXISTS (SELECT 1 FROM "{qa_store.SCHEMA}".delivery_file f '
+                f'              WHERE f.delivery = d.name AND f.dataset_id = ?) '
+                "ORDER BY d.received_instant DESC, d.name DESC")
+    params: list = [dataset_id]
+    if limit is not None:
+        sql_text += " LIMIT ?"
+        params.append(limit)
+    with _db(conn) as db:
+        found = db.execute(sql_text, params).fetchall()
+        if not found:
+            return []
+        names = [row[0] for row in found]
+        files: dict[str, list[dict]] = {}
+        for delivery, filename, ds_id, contested in db.execute(
+                f'SELECT delivery, filename, dataset_id, contested_by '
+                f'FROM "{qa_store.SCHEMA}".delivery_file WHERE delivery = ANY(?) '
+                "ORDER BY delivery, filename", [names]).fetchall():
+            files.setdefault(delivery, []).append(
+                {"filename": filename, "dataset_id": ds_id, "contested_by": contested})
+    return [{"delivery": name, "received_at": received_at, "collections": collections,
+             "files": files.get(name, []), "held": held, "anomalies": anomalies}
+            for name, received_at, collections, held, anomalies in found]
+
+
+def sql() -> str:
+    """A SELECT over the delivery record itself (criterion 4).
+
+    It used to hand back a DuckDB `read_json_auto` over the committed
+    files, so the log could be joined against the staging and period
+    schemas with nothing synced. The record is IN the warehouse now, so
+    the join needs no special reader at all - which is what that
+    criterion wanted and the file version could only approximate.
+
+    Still returns SQL rather than running it, because running it would
+    mean choosing a connection, and the callers that want this want to
+    hand it to a tool.
+    """
+    return (f'SELECT d.name AS delivery, d.received_at, d.collections, '
+            f'd.anomalies, f.filename, f.dataset_id, f.contested_by '
+            f'FROM "{qa_store.SCHEMA}".delivery d '
+            f'LEFT JOIN "{qa_store.SCHEMA}".delivery_file f ON f.delivery = d.name')

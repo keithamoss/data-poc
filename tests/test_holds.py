@@ -174,22 +174,23 @@ class TestTheHoldIsRecorded:
     matched, so a person can see exactly what it could not choose
     between."""
 
-    def test_the_delivery_record_names_the_held_dataset_and_its_files(self, dirs, tmp_path):
+    def test_the_delivery_record_names_the_held_dataset_and_its_files(
+            self, dirs, clean_delivery_log):
         _drop(dirs, "catch-up", {"birth_registrations_2026-08-01.csv": "a\n1\n",
                                   "birth_registrations_2026-08-02.csv": "a\n2\n"})
         d, found = _recognise(dirs, "catch-up")
-        path = delivery_log.record(d, found, log_dir=tmp_path / "log")
-        record = json.loads(path.read_text())
+        record = delivery_log.record(d, found, conn=clean_delivery_log)
         assert record["held"] == [{
             "dataset_id": "birth-registrations",
             "files": ["birth_registrations_2026-08-01.csv",
                        "birth_registrations_2026-08-02.csv"]}]
 
-    def test_a_delivery_with_no_hold_records_an_empty_list(self, dirs, tmp_path):
+    def test_a_delivery_with_no_hold_records_an_empty_list(
+            self, dirs, clean_delivery_log):
         _drop(dirs, "fine", {"birth_registrations_2026-08-01.csv": "a\n1\n"})
         [d] = delivery.list_deliveries(*dirs)
-        path = delivery_log.record(d, arrivals.recognise(d), log_dir=tmp_path / "log")
-        assert json.loads(path.read_text())["held"] == []
+        record = delivery_log.record(d, arrivals.recognise(d), conn=clean_delivery_log)
+        assert record["held"] == []
 
 
 class TestALaterDeliveryIsUnaffected:

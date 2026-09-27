@@ -18,8 +18,15 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture
-def logs(tmp_path):
-    return tmp_path / "delivery_log"
+def logs(clean_delivery_log):
+    """An empty delivery log on this worker's own database.
+
+    It was a temporary DIRECTORY until REQ-PIPE-089 moved the record
+    into the database; the name stays because every test here passes
+    it straight through, and what it means - "the log these records go
+    into" - has not changed.
+    """
+    return clean_delivery_log
 
 
 def _drop(tmp_path, logs, name, files, when, sequence):
@@ -35,7 +42,7 @@ def _drop(tmp_path, logs, name, files, when, sequence):
     (receipts / f"{name}.json").write_text(json.dumps(
         {"delivery": name, "received_at": when, "sequence": sequence}))
     d = delivery.read_delivery(name, deliveries, receipts)
-    delivery_log.record(d, arrivals.recognise(d), logs)
+    delivery_log.record(d, arrivals.recognise(d), conn=logs)
     return d
 
 
@@ -45,15 +52,15 @@ class TestADatasetsTimelineIsItsOwn:
     def test_one_datasets_arrival_does_not_imply_anothers(self, tmp_path, logs):
         _drop(tmp_path, logs, "monday", ["cp_clients.csv"],
                "2026-01-01T09:00:00+08:00", 1)
-        assert len(arrival_history.arrivals_of("cp-clients", logs)) == 1
-        assert arrival_history.arrivals_of("cp-carers", logs) == [], (
+        assert len(arrival_history.arrivals_of("cp-clients", conn=logs)) == 1
+        assert arrival_history.arrivals_of("cp-carers", conn=logs) == [], (
             "cp_carers was not in that delivery - a dataset that did not arrive must not "
             "gain a phantom arrival from sharing a directory with one that did")
 
     def test_each_arrival_carries_its_own_identifier_and_instant(self, tmp_path, logs):
         _drop(tmp_path, logs, "monday", ["cp_clients.csv"],
                "2026-01-01T09:00:00+08:00", 1)
-        [entry] = arrival_history.arrivals_of("cp-clients", logs)
+        [entry] = arrival_history.arrivals_of("cp-clients", conn=logs)
         assert entry.dataset_id == "cp-clients"
         assert entry.supply_id.startswith("cp-clients@")
         assert entry.received_at == "2026-01-01T09:00:00+08:00"
@@ -63,7 +70,7 @@ class TestADatasetsTimelineIsItsOwn:
         _drop(tmp_path, logs, "monday",
                ["cp_clients.csv", "cp_carers.csv", "cp_placements.csv"],
                "2026-01-01T09:00:00+08:00", 1)
-        ids = {arrival_history.arrivals_of(d, logs)[0].supply_id
+        ids = {arrival_history.arrivals_of(d, conn=logs)[0].supply_id
                for d in ("cp-clients", "cp-carers", "cp-placements")}
         assert len(ids) == 3, f"these three share an identifier: {ids}"
 
@@ -73,7 +80,7 @@ class TestADatasetsTimelineIsItsOwn:
         _drop(tmp_path, logs, "monday",
                ["cp_clients.csv", "cp_carers.csv", "cp_placements.csv"],
                "2026-01-01T09:00:00+08:00", 1)
-        found = arrival_history.arrivals_of("cp-clients", logs)
+        found = arrival_history.arrivals_of("cp-clients", conn=logs)
         assert len(found) == 1
         assert "carers" not in json.dumps(found[0].__dict__)
 
@@ -85,14 +92,14 @@ class TestTheSharedDeliveryIsStillRecorded:
         _drop(tmp_path, logs, "together",
                ["cp_clients.csv", "cp_carers.csv", "cp_placements.csv"],
                "2026-01-01T09:00:00+08:00", 1)
-        assert arrival_history.delivery_companions("together", logs) == (
+        assert arrival_history.delivery_companions("together", conn=logs) == (
             "cp-carers", "cp-clients", "cp-placements")
 
     def test_coincidental_arrivals_are_not_one_delivery(self, tmp_path, logs):
         _drop(tmp_path, logs, "one", ["cp_clients.csv"], "2026-01-01T09:00:00+08:00", 1)
         _drop(tmp_path, logs, "two", ["cp_carers.csv"], "2026-01-01T09:05:00+08:00", 2)
-        assert arrival_history.delivery_companions("one", logs) == ("cp-clients",)
-        assert arrival_history.delivery_companions("two", logs) == ("cp-carers",)
+        assert arrival_history.delivery_companions("one", conn=logs) == ("cp-clients",)
+        assert arrival_history.delivery_companions("two", conn=logs) == ("cp-carers",)
 
 
 class TestTheMostRecentArrival:
@@ -103,7 +110,7 @@ class TestTheMostRecentArrival:
                                           ("2026-03-01T09:00:00+08:00", 2),
                                           ("2026-02-01T09:00:00+08:00", 3)], start=1):
             _drop(tmp_path, logs, f"drop-{n}", ["cp_clients.csv"], when, seq)
-        assert arrival_history.last_arrived("cp-clients", logs).received_at \
+        assert arrival_history.last_arrived("cp-clients", conn=logs).received_at \
             == "2026-03-01T09:00:00+08:00"
 
     def test_a_supply_that_could_not_be_loaded_is_still_the_latest_arrival(
@@ -118,14 +125,14 @@ class TestTheMostRecentArrival:
         load_log.record("tuesday", "cp-clients", "cp_clients__20260102", load_log.FAILED,
                          "2026-01-02T09:05:00+08:00", reason="not a CSV")
 
-        latest = arrival_history.last_arrived("cp-clients", logs)
+        latest = arrival_history.last_arrived("cp-clients", conn=logs)
         assert latest.delivery == "tuesday"
         assert arrival_history.load_outcome(
             latest.supply_id, "cp-clients", "tuesday") == load_log.FAILED
         assert load_log.loaded_tables() == frozenset(), "no table exists for it"
 
     def test_nothing_recorded_means_none_rather_than_an_error(self, logs):
-        assert arrival_history.last_arrived("cp-clients", logs) is None
+        assert arrival_history.last_arrived("cp-clients", conn=logs) is None
 
 
 class TestPromotedIsNotAnswered:
@@ -139,87 +146,130 @@ class TestPromotedIsNotAnswered:
 
     def test_it_never_reports_an_arrival_as_promoted(self, tmp_path, logs):
         _drop(tmp_path, logs, "monday", ["cp_clients.csv"], "2026-01-01T09:00:00+08:00", 1)
-        assert arrival_history.last_arrived("cp-clients", logs) is not None
-        assert arrival_history.last_promoted("cp-clients", logs) is None, (
+        assert arrival_history.last_arrived("cp-clients", conn=logs) is not None
+        assert arrival_history.last_promoted("cp-clients", conn=logs) is None, (
             "answering the promoted question with the latest ARRIVAL is the exact "
             "conflation this requirement splits apart, and it reads fine until a red "
             "supply arrives")
 
 
 class TestItCostsLessThanTheWholeHistory:
-    """The non-functional constraint, measured rather than asserted."""
+    """The non-functional constraint, measured rather than asserted.
 
-    def test_finding_the_latest_stops_at_the_first_delivery_carrying_it(
-            self, tmp_path, logs):
+    IT USED TO COUNT FILE OPENS. `_load()` was a reverse-sorted glob
+    and `last_arrived()` stopped at the first delivery carrying the
+    dataset, so the bound was real and countable: one open out of
+    twelve. REQ-PIPE-089 made the records rows, and an early exit out
+    of a list the database has already built saves parsing and nothing
+    else - so the measurement had to move with the mechanism, or it
+    would have gone on passing while measuring nothing.
+
+    What it measures now is that the whole-log reader is NOT USED,
+    which is the honest form of the same claim: the bound is a WHERE
+    on this dataset plus a LIMIT, and anything reaching for
+    `delivery_log.records()` has abandoned it.
+    """
+
+    @staticmethod
+    def _watch_whole_log_reads(monkeypatch):
+        from qa_tools.common import delivery_log as module
+
+        reads = {"n": 0}
+        real = module.records
+
+        def counting(*args, **kwargs):
+            reads["n"] += 1
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(module, "records", counting)
+        return reads
+
+    def test_finding_the_latest_does_not_read_the_whole_log(
+            self, tmp_path, logs, monkeypatch):
         for n in range(1, 13):
             _drop(tmp_path, logs, f"drop-{n:02d}", ["cp_clients.csv"],
                    f"2026-01-{n:02d}T09:00:00+08:00", n)
 
-        opened = {"n": 0}
-        real = Path.read_text
+        reads = self._watch_whole_log_reads(monkeypatch)
+        found = arrival_history.last_arrived("cp-clients", conn=logs)
 
-        def counting(self, *args, **kwargs):
-            if self.suffix == ".json" and "delivery_log" in str(self):
-                opened["n"] += 1
-            return real(self, *args, **kwargs)
+        assert found.delivery == "drop-12"
+        assert reads["n"] == 0, (
+            "last_arrived() read the entire delivery log. Built eagerly this was 60 of "
+            "60 records against the real log; the bound has to be in the query, not in "
+            "a loop that stops early over a list already fetched in full.")
 
-        Path.read_text = counting
-        try:
-            arrival_history.last_arrived("cp-clients", logs)
-        finally:
-            Path.read_text = real
+    def test_a_dataset_that_has_not_supplied_recently_costs_no_more(
+            self, tmp_path, logs, monkeypatch):
+        """The case the old bound handled WORST and this one does not.
 
-        assert opened["n"] == 1, (
-            f"opened {opened['n']} of 12 records to find the newest arrival of a dataset "
-            f"that is in the newest delivery. Built eagerly this was 60 of 60 against the "
-            f"real log - the early exit has to be real, not described.")
-
-    def test_it_walks_only_back_to_that_datasets_own_last_supply(self, tmp_path, logs):
-        """A dataset that has not supplied recently costs more, and
-        that is the right bound: deliveries since IT last supplied,
-        never total history."""
+        Under the file version the cost was "deliveries since this
+        dataset last supplied", so a dataset quiet for a year walked a
+        year of records. An index on the dataset does not care how long
+        ago it was.
+        """
         _drop(tmp_path, logs, "old", ["cp_clients.csv"], "2026-01-01T09:00:00+08:00", 1)
         for n in range(2, 8):
             _drop(tmp_path, logs, f"newer-{n}", ["cp_carers.csv"],
                    f"2026-01-{n:02d}T09:00:00+08:00", n)
 
-        opened = {"n": 0}
-        real = Path.read_text
-
-        def counting(self, *args, **kwargs):
-            if self.suffix == ".json" and "delivery_log" in str(self):
-                opened["n"] += 1
-            return real(self, *args, **kwargs)
-
-        Path.read_text = counting
-        try:
-            found = arrival_history.last_arrived("cp-clients", logs)
-        finally:
-            Path.read_text = real
+        reads = self._watch_whole_log_reads(monkeypatch)
+        found = arrival_history.last_arrived("cp-clients", conn=logs)
 
         assert found.delivery == "old"
-        assert opened["n"] == 7, f"walked {opened['n']} records, expected all 7"
+        assert reads["n"] == 0, "a quiet dataset still cost a walk of the whole log"
+
+    def test_one_datasets_history_never_fetches_anothers(self, tmp_path, logs):
+        """The same bound on the whole-history question rather than the
+        latest-arrival one."""
+        _drop(tmp_path, logs, "mine", ["cp_clients.csv"], "2026-01-01T09:00:00+08:00", 1)
+        for n in range(2, 6):
+            _drop(tmp_path, logs, f"theirs-{n}", ["cp_carers.csv"],
+                   f"2026-01-{n:02d}T09:00:00+08:00", n)
+
+        from qa_tools.common import delivery_log as module
+        fetched = module.records_carrying("cp-clients", conn=logs)
+        assert [r["delivery"] for r in fetched] == ["mine"], (
+            "records_carrying() returned deliveries that did not carry this dataset - "
+            "the filter has to be in the query")
 
 
-class TestAgainstTheRealCommittedHistory:
+class TestTheWholeCorpusStillReadsBack:
     """Birth Registrations is the control: one table, one dataset, and
-    its committed runs prove this generalises rather than
+    a run of arrivals proves this generalises rather than
     special-casing Child Protection.
 
-    Asks for the REAL committed trees by name - conftest redirects them
-    for every other test, to stop a run writing into or pruning project
-    history.
+    IT USED TO ASSERT ON THE COMMITTED TREE - 42 recorded arrivals for
+    Birth Registrations, 18 for each Child Protection dataset, read out
+    of `delivery_log/` via the `real_committed_history` fixture. That
+    corpus was state in the repository, which REQ-PIPE-089 removes, so
+    the test builds its own. The claim was never about those particular
+    numbers; it was that a long history reads back per dataset, with
+    unique supply ids and no bleed between datasets.
     """
 
-    def test_birth_registrations_has_its_own_unbroken_timeline(self, real_committed_history):
-        found = arrival_history.arrivals_of("birth-registrations")
-        assert len(found) == 42, f"{len(found)} arrivals, expected the committed 42"
+    @staticmethod
+    def _corpus(tmp_path, logs, drops):
+        for n in range(1, drops + 1):
+            _drop(tmp_path, logs, f"extract-{n:02d}",
+                   # Birth Registrations' real arrival pattern wants the
+                   # date in the filename; an undated one is correctly
+                   # recognised as nothing and warned about.
+                   [f"birth_registrations_2026-01-{n:02d}.csv", "cp_clients.csv",
+                    "cp_carers.csv", "cp_placements.csv"],
+                   f"2026-01-{n:02d}T09:00:00+08:00", n)
+
+    def test_one_dataset_has_its_own_unbroken_timeline(self, tmp_path, logs):
+        self._corpus(tmp_path, logs, 20)
+        found = arrival_history.arrivals_of("birth-registrations", conn=logs)
+        assert len(found) == 20, f"{len(found)} arrivals, expected 20"
         assert all(a.dataset_id == "birth-registrations" for a in found)
         assert len({a.supply_id for a in found}) == len(found), "supply ids must be unique"
 
-    def test_each_cp_dataset_has_the_same_count_and_its_own_ids(self, real_committed_history):
-        counts = {d: arrival_history.arrivals_of(d)
+    def test_datasets_sharing_every_delivery_keep_their_own_ids(self, tmp_path, logs):
+        self._corpus(tmp_path, logs, 20)
+        counts = {d: arrival_history.arrivals_of(d, conn=logs)
                    for d in ("cp-clients", "cp-carers", "cp-placements")}
-        assert {len(v) for v in counts.values()} == {18}
+        assert {len(v) for v in counts.values()} == {20}
         ids = [v[0].supply_id for v in counts.values()]
         assert len(set(ids)) == 3, f"three datasets share one identifier: {ids}"

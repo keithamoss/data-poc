@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -284,6 +284,15 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".load_outcome (
     trial_run_id text
 );
 
+-- BRINGING AN OLDER DATABASE FORWARD. Bumping SCHEMA_VERSION makes
+-- ensure_schema re-run this script, and that is necessary but NOT
+-- sufficient: `CREATE TABLE IF NOT EXISTS` does nothing at all to a
+-- table that already exists, so a column added to the definition above
+-- never reaches a database created before it. Found by a real
+-- database refusing the index below on a column it had never heard of.
+-- Every column added from here needs its own ADD COLUMN IF NOT EXISTS.
+ALTER TABLE "{SCHEMA}".load_outcome ADD COLUMN IF NOT EXISTS trial_run_id text;
+
 --   a trial's own rows, for the delete that ends it
 CREATE INDEX IF NOT EXISTS load_outcome_trial
     ON "{SCHEMA}".load_outcome (trial_run_id) WHERE trial_run_id IS NOT NULL;
@@ -301,6 +310,57 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".dataset_stats (
     stats      jsonb NOT NULL,
     PRIMARY KEY (run_key, dataset_id)
 );
+
+-- WHAT ARRIVED (REQ-PIPE-089 criterion 16), carrying REQ-PIPE-069's
+-- write-once record across unchanged. THE ONE COPY: there is no
+-- committed delivery_log/ beside this, because two records of the same
+-- arrival are two records that can drift.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery (
+    name        text PRIMARY KEY,
+    -- BOTH, and each has a job. `received_at` is the exact text the
+    -- recognition recorded, offset and all - REQ-PIPE-069 criterion 5
+    -- protects that offset, because it says which clock the receiving
+    -- side was on, and timestamptz stores an instant rather than an
+    -- offset. `received_instant` is that instant, and is what ordering
+    -- uses: sorting the text is only correct while every writer shares
+    -- one offset.
+    received_at      text NOT NULL,
+    received_instant timestamptz NOT NULL,
+    collections jsonb NOT NULL DEFAULT '[]',
+    -- Derivable from the files below - two carrying one dataset_id -
+    -- and stated anyway, for the reason REQ-PIPE-059 criterion 4 gave:
+    -- the question a person opens this with is "what was held and what
+    -- could it not choose between", and making them compute it is how
+    -- a queue stops being drained.
+    held        jsonb NOT NULL DEFAULT '[]',
+    -- Recorded, never read. A receipt lookalike or a supplier's own
+    -- manifest is excluded from the files on purpose, so this is the
+    -- only place their presence survives.
+    anomalies   jsonb NOT NULL DEFAULT '[]',
+    recorded_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS delivery_receipt_order
+    ON "{SCHEMA}".delivery (received_instant);
+
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery_file (
+    delivery     text NOT NULL REFERENCES "{SCHEMA}".delivery ON DELETE CASCADE,
+    filename     text NOT NULL,
+    -- NULL where nothing claimed it, or where two datasets both did -
+    -- a contested file is attributed to NEITHER, and `contested_by`
+    -- says which two, because that is the difference between a record
+    -- somebody can act on and one that just says "no".
+    dataset_id   text,
+    contested_by jsonb,
+    PRIMARY KEY (delivery, filename)
+);
+
+--   "when did this dataset last arrive", across all deliveries. Real
+--   columns rather than a JSONB document for the same reason
+--   tables_read got them: this is the cross-record question worth
+--   being able to ask at thirty datasets over years.
+CREATE INDEX IF NOT EXISTS delivery_file_dataset
+    ON "{SCHEMA}".delivery_file (dataset_id);
 
 -- THE VISIBLE VIEWS carry criterion 13 for readers that come over a
 -- GRANT rather than through this module - which is how the dashboard

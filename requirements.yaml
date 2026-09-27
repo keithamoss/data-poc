@@ -3147,7 +3147,7 @@ requirements:
       - qa_tools/common/arrival_history.py::last_promoted
       - qa_tools/common/arrival_history.py::delivery_companions
       - qa_tools/common/arrival_history.py::load_outcome
-      - qa_tools/common/delivery_log.py::path_for
+      - qa_tools/common/delivery_log.py::records_carrying
       - qa_tools/common/asset_time.py::arrival_key
       - cli/supply.py::history_command
     unmet_criteria:
@@ -10495,10 +10495,7 @@ requirements:
       - qa_tools/common/delivery.py::read_receipt_record
       - qa_tools/common/delivery.py::survey
       - qa_tools/common/backlog.py::Position
-      - qa_tools/common/backlog.py::pending
-      - qa_tools/common/backlog.py::advance
-      - qa_tools/common/backlog.py::advance_through
-      - qa_tools/common/backlog.py::advance_past_staged
+      - qa_tools/common/backlog.py::unprocessed
       - qa_tools/common/arrivals.py::Arrival
     evidence:
       - >
@@ -10531,17 +10528,79 @@ requirements:
       - "WHERE two arrivals share a receipt instant, THE SYSTEM SHALL order them by the order their receipt records were written, and SHALL NOT order them by a delivery's name, by a directory listing or by sort stability."
       - "THE SYSTEM SHALL order arrivals by receipt instant across every collection, and SHALL NOT order them within one collection at a time."
       - "THE SYSTEM SHALL produce identical filings for a given set of arrivals whatever order they were presented in."
-      - "WHEN a run processes arrivals, THE SYSTEM SHALL process every arrival not yet processed since its recorded marker, rather than only the arrival that triggered the run."
-      - "THE SYSTEM SHALL advance its marker only past arrivals it has fully processed."
+      - >
+        WHEN a run processes arrivals, THE SYSTEM SHALL process every
+        arrival not yet processed, rather than only the arrival that
+        triggered the run.
+
+        AMENDED 2026-09-27 by REQ-PIPE-089 criterion 21. It said "not
+        yet processed SINCE ITS RECORDED MARKER", and there is no
+        marker any more. What the clause protects is unchanged - a run
+        drains the backlog rather than handling only its own trigger -
+        and whether it knows where to start from a stored position or
+        by asking the load records is a mechanism rather than a
+        requirement.
+      - >
+        THE SYSTEM SHALL NOT treat an arrival it has not fully
+        processed as processed.
+
+        AMENDED 2026-09-27 by REQ-PIPE-089 criterion 21. It said
+        "SHALL advance its marker only past arrivals it has fully
+        processed", naming a mechanism that no longer exists. The
+        property it protected is the whole point and is now stated
+        directly: an arrival reached but not finished stays owed, so a
+        crash costs a re-process rather than silently skipping a
+        supply. It is satisfied by construction rather than by
+        advancing carefully - the answer is derived per arrival from
+        the load records, so there is nothing to advance and nothing
+        to advance wrongly.
       - "IF a run is interrupted partway through a backlog, THEN THE SYSTEM SHALL leave every arrival it had not fully processed to the next run, in the same order."
       - "WHILE a dataset's schedule is exhausted, THE SYSTEM SHALL continue to accept and record that dataset's arrivals, so that the backlog files correctly once dates are added."
     non_functional_requirements:
       - "This is what makes REQ-PIPE-053's hard failure safe. That requirement's own decision says a backlog drains CORRECTLY once dates are added, filed to the right slots and classified against the right due instants rather than approximated - and it states plainly that the claim rests on this rule, which was written down without its dependency."
-      - "Replay cost must be bounded by the arrivals not yet processed, not by the total history. A rule requiring every arrival ever received to be re-read on every run is correct and does not survive years of a daily feed."
+      - "Replay cost must be bounded by the arrivals not yet processed, not by the total history. A rule requiring every arrival ever received to be re-read on every run is correct and does not survive years of a daily feed.
+
+        STILL TRUE, AND NOW MET DIFFERENTLY (REQ-PIPE-089 criterion
+        21, 2026-09-27). A stored marker was what bounded this while
+        the records were files, because answering per arrival meant
+        opening them. They are rows now, and one indexed read of the
+        load outcomes answers it for every arrival at once - so the
+        bound holds without a marker, and holds better: a high-water
+        mark had to stop at the first unfinished arrival, which made
+        one stuck supply re-present every later one."
       - "Determinism is a real correctness check here, not a preference: everything in this repo is seeded, so regenerating and diffing is how a refactor is proven behaviour-preserving. An order-dependent filing makes that check meaningless."
       - "Draining a backlog is idempotent and drop-safe by design, so a cancelled or failed run costs nothing beyond the delay. That property is what lets the pipeline stop depending on any platform's queueing guarantees."
     dependencies: [REQ-PIPE-057, REQ-PIPE-060]
     decisions:
+      - >
+        THE STORED MARKER IS GONE (REQ-PIPE-089 criterion 21,
+        2026-09-27, Keith's call). Criteria 6 and 7 and the
+        replay-cost constraint each say what they used to say and why
+        they changed; this records what the change cost and what it
+        bought, so the next person is not left reconstructing it from
+        three amendments.
+
+        WHAT IT COST: `backlog.read_marker`, `advance`,
+        `advance_through` and `advance_past_staged` are deleted, along
+        with `processing_log/marker/position.json`. `pending(arrivals,
+        marker)` becomes `unprocessed(arrivals)`, which derives the
+        same answer from the load records.
+
+        WHAT IT BOUGHT, beyond the repository holding no state: a
+        stored marker can DISAGREE with the load records, and it fails
+        in the dangerous direction - advanced past an arrival reached
+        but not finished, it turns a crash into a silently skipped
+        supply. There is nothing to advance now and nothing to
+        disagree. It also removes the high-water mark's one genuinely
+        poor case: having to stop at the first unfinished arrival
+        meant one stuck supply re-presented every later one.
+
+        FOUND WHILE REMOVING IT, and worth recording because it says
+        something about how this was verified: the marker was
+        WRITE-ONLY. Both orchestrators called `advance_past_staged()`
+        after their fan-out and nothing in the pipeline ever read it
+        back, so every property it had was a property nothing
+        depended on yet.
       - "Decided ALWAYS ASSIGN IN ARRIVAL-TIMESTAMP ORDER, never discovery order, with a defined tiebreak for identical instants (Thread H first chaos pass #2). The worked example: Tuesday's late file and Thursday's on-time file both land in one batch around Thursday 22:00. Thursday's processed first is correct; Tuesday's processed first falls inside Thursday's on-time window, files as Thursday, and Thursday's real file then hits a filled slot and is held. Same two files, opposite outcome, decided by loop order - non-determinism nothing would ever flag."
       - "Decided the receipt instant is the only ordering fact. A supplier-provided timestamp reflects their clock, their timezone and their bugs, and staging's whole justification is that it asserts only facts we can vouch for (TS-32). A delivery's name is arbitrary by design, so sorting by it would be inventing an order out of a supplier's naming habits."
       - "Decided each run DRAINS THE BACKLOG - reading everything unprocessed since a marker rather than only the triggering event. Settled for decision processing in Thread H's second pass, and it is the same discipline here rather than a second one. The reason it matters generally: GitHub holds only ONE pending run per concurrency group, so three rapid triggers silently lose the middle one, and the opt-in queueing mode was rejected by Keith as edition-gated. Draining works on any edition, at any volume, and survives a run failing for reasons that have nothing to do with concurrency."
