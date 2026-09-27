@@ -3842,3 +3842,40 @@ Belongs with batch 5's check work.
     load a supply nothing received), or at both; and whether a run
     should record which environment produced it, so a wrong one is
     findable afterwards rather than only preventable beforehand.
+
+    **SAY WHERE YOU ARE, everywhere, in colour** - Keith's own
+    addition, 2026-09-27: "maybe having clear banners in the
+    dashboard, CLI and TUI, showing what environment you're in, e.g.
+    light blue for local dev, green for dev, orange for non-prod, red
+    for prod."
+
+    This is the other half of the same problem and arguably the half
+    that does more work. A gate stops the action somebody was about
+    to take; a banner stops them forming the intention. All three
+    surfaces need it, and none has anything today - `mothman` reads
+    `MOTHMAN_ENVIRONMENT` and says nothing about it, and a built
+    dashboard looks identical whichever database it came from, which
+    is exactly how a screenshot of sandbox data gets mistaken for
+    production.
+
+    Two things to settle when this is scoped, neither of them
+    decided here:
+    - **The colours name FOUR tiers and the config has THREE.**
+      `contract/environments.yaml` today is `local`, `sandbox`,
+      `production`; Keith's list is local dev / dev / non-prod /
+      prod. So either the environment list grows to match a real
+      deployment ladder, or the colour becomes a property each
+      environment declares (a `tier:` or a literal `colour:`) rather
+      than a mapping hard-coded per surface. The second is almost
+      certainly right - it is the same reasoning that put `publishes`
+      in the file rather than in code - but it is his call.
+    - **Red has to survive being ordinary.** A banner that is always
+      there stops being read, which is the same failure this project
+      already names for per-dataset banners at thirty datasets. Worth
+      asking whether prod should be the LOUD one and the rest quiet,
+      rather than four equally-weighted stripes.
+
+    Accessibility is a real constraint rather than a nicety here:
+    colour alone cannot carry it, so each banner needs the
+    environment's own label in text as well - which the config
+    already has.
