@@ -18752,32 +18752,39 @@ requirements:
         and discovering the permanent one later means rework in the
         rollups, the dashboard and the schedule gate at once.
     dependencies: [REQ-PIPE-087, REQ-PIPE-089]
-    open_questions:
-      - >
-        HELD, AND THIS IS WHAT IT WAITS ON (Keith, 2026-09-27): the
-        PROJECT-EXTRACTION ASSET SHAPE has not been scoped, and this
-        requirement now claims to serve it. His call was to scope that
-        first rather than sign this.
-
-        WHY IT IS A REAL BLOCKER RATHER THAN TIDINESS. The widening to
-        "one mechanism, two exits" is what made this a `must` and what
-        added criteria 3 and 9. If the project-extraction shape turns
-        out to need something this does not - its own identity, its own
-        navigation at ~30-dataset scale, a different answer to
-        criterion 12's question about the data - then this is two
-        mechanisms rather than one, and the criteria written for both
-        are wrong for each.
-
-        WHAT IS SAFE TO ASSUME MEANWHILE: nothing. The pre-agreement
-        half stands on its own and could be built narrow, but building
-        it narrow is the alternative he rejected, so doing it anyway
-        while the widening is unresolved would be deciding this by
-        default.
-
-        Note this is ALSO why 087 could be signed while this could not:
-        087's criteria are met by what shipped, and the sample schema
-        it asked for moved here rather than being dropped.
     decisions:
+      - >
+        THE HOLD IS CLEARED (2026-09-27), and by the thing it asked
+        for rather than by waiving it. Keith scoped the
+        project-extraction asset shape the same day, over five rounds
+        of questions; it is written up as delivery sprint 29 in
+        `plans/supply-model.md`, owning no requirement yet because he
+        deprioritised building it - "write it all up as its own sprint
+        and we'll tackle it later."
+
+        THE THREE RISKS THE HOLD NAMED, each answered rather than
+        argued away. ITS OWN IDENTITY: an extraction's tables sit in
+        the ordinary agency -> collection -> dataset hierarchy,
+        declared by the recipe file that arrives beside the package,
+        so nothing new sits above or beside the existing tree. ITS OWN
+        NAVIGATION AT SCALE: one dashboard per extraction, and Keith
+        explicitly set aside the alternative that would have needed a
+        new concept above `agency`. A DIFFERENT ANSWER ON THE DATA AT
+        GRADUATION: the question dissolves, because graduation belongs
+        to the other exit and a project extraction never graduates -
+        criterion 12 is about the first exit only.
+
+        So it is one mechanism with two exits after all, and these
+        criteria survive the scoping unchanged. What the scoping ADDS
+        rather than changes: an extraction's dataset configuration is
+        generated from its recipe rather than hand-authored, which
+        criterion 2 already permits - it requires the omission be
+        DECLARED, not that a human type it.
+
+        STILL NOT SIGNED. Clearing the blocker is not the signature,
+        and the other two disclosures made at the original sign-off
+        stand: no `delivery-scoper` pass, and a scope that grew to
+        amend `validate_schedule.py` and touch the rollups.
       - >
         HELD AT SIGN-OFF, NOT SIGNED (Keith, 2026-09-27), and the
         reason is worth keeping because the requirement reads

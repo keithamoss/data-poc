@@ -2015,6 +2015,122 @@ exist.
     inheriting it would let an unchecked supply become a period's answer by
     default.
 
+29. **[todo, 2026-09-27]** **[Pipeline & publishing]** **The
+    project-extraction asset shape.** QA of one-off data extractions for
+    individual projects - the third asset shape `CLAUDE.md` has named
+    since 2026-09-21 ("supplies but no cadence at all") and nobody had
+    scoped. Scoped with Keith 2026-09-27 over five rounds of questions,
+    at his own ask, and then explicitly deprioritised: "write it all up
+    as its own sprint and we'll tackle it later."
+
+    **Owns:** nothing yet - the five requirements below are not drafted.
+
+    **THE MODEL, as his answers produce it.** Nine points, each his own
+    decision rather than an inference:
+
+    1. An extraction is a **package of files on disk**, local or S3 -
+       CSVs plus a recipe JSON. Format may change later; nothing should
+       assume CSV.
+    2. **The recipe is ours to define** (his call - "ours, we define
+       what a recipe must contain"). It declares the tables in this
+       extraction, the columns of each, the filter/cohort/date range
+       behind it, and the agency -> collection -> dataset placement.
+    3. The recipe **lives on disk beside the package and never enters
+       the database**. That changes only if extractions later load
+       straight to a database, which is not today.
+    4. **Each table is its own calendar-less dataset.** No cadence, no
+       slots, no lateness, no filing.
+    5. **Derived data products** - the tables packaged alongside the
+       extracted ones that have no checks yet - appear as datasets in
+       the same dashboard, carrying the in-development label with real
+       red/amber/green from whatever checks exist, and excluded from the
+       extraction's rollup.
+    6. **Checks are two layers**: a default set applied to every
+       extraction (his example: primary identifiers must not be null),
+       plus a customised layer derived from the recipe. They are
+       SEPARATE from the checks the recurring datasets already carry,
+       similar but not shared.
+    7. **One ephemeral PostgreSQL database per extraction**, on the
+       local server, driven by a human through the TUI. No CI anywhere
+       near it.
+    8. **One dashboard per extraction**, published to a shared
+       filesystem or S3, never retired, with no index. 30-40 a year.
+    9. A corrected re-send is **a new extraction** - no resupply
+       relationship, nothing links the two.
+
+    **WRITE THE REQUIREMENTS TOOL-AGNOSTICALLY.** Keith on which of the
+    four tools authors an extraction's checks: "it would depend on which
+    tools we stabilise on after this POC." So a requirement here states
+    what must be ASSERTED - every declared column arrived, primary
+    identifiers are non-null, the cohort's bounds hold - and names
+    neither dbt, Soda, datacontract-cli nor Evidently. This is a real
+    constraint on drafting, not a note: binding the tool now is the one
+    thing he asked not to do.
+
+    **THE DURABLE RECORD IS A STATIC FILE, WHICH MAKES POINT 8 CARRY
+    MORE THAN IT LOOKS.** The recipe never enters the database (point 3)
+    and the database is ephemeral (point 7), so the only lasting trace
+    of what an extraction DECLARED is whatever the built dashboard
+    renders. Showing the recipe's tables, columns and cohort is
+    therefore load-bearing rather than a nicety - leave it out and the
+    declaration is gone the moment the database is dropped.
+
+    **POINT 9 IS A REVERSAL, AND THE REASON IS WORTH KEEPING.** Keith
+    first chose a resupply relationship - same extraction, seen twice,
+    one dashboard showing what changed, which is exactly why the
+    resupply concept exists on the dataset side. It collides with points
+    7 and 8: a corrected package arriving three months later finds the
+    first attempt's database long gone and its dashboard a static file
+    that cannot be merged into. Three ways out were put to him -
+    re-running QA over both packages from disk, a non-ephemeral
+    per-extraction database, or the new dashboard merely linking back -
+    and he took a fourth, reversing to a new extraction. Recorded
+    because "why isn't a corrected extraction a resupply" is precisely
+    the question someone re-asks.
+
+    **REJECTED ALONG THE WAY**, so none of it is re-proposed:
+    - *A new concept above `agency`* to hold every extraction in one
+      dashboard. Keith raised it himself and set it aside: "there would
+      be some convenience to have them all in one dashboard, but then we
+      have to add a new concept above 'agency'." One dashboard per
+      extraction, existing hierarchy unchanged.
+    - *Deriving the hierarchy by convention* from the package or
+      extraction name, and *authoring it per extraction* the way a
+      contract is authored today. Both lose to point 2.
+    - *Recording the recipe in the database* so the dashboard could read
+      it back. Deferred with point 3, not refused - it becomes natural
+      if extractions ever load straight to a database.
+    - *A generated index page* listing every published extraction
+      dashboard. Declined for the PoC with the cost accepted out loud:
+      after five years that is 200 files in a directory with no way to
+      answer "which extractions did we QA for that project."
+    - *Reusing the recurring datasets' own checks.* His word was
+      SEPARATE - similar, but their own set.
+
+    **FIVE REQUIREMENTS, not drafted.** The package and the recipe
+    format; hierarchy and datasets derived from the recipe; the two
+    check layers; the ephemeral per-extraction database and its TUI
+    path; publishing to a configurable destination.
+
+    **WHAT THIS UNBLOCKS, and it is the reason the write-up came first.**
+    The pre-agreement lifecycle requirement was HELD on 2026-09-27
+    because it had widened to serve an asset shape nobody had scoped,
+    and it named three specific risks: that the extraction shape would
+    need its own identity, its own navigation at scale, or a different
+    answer on what becomes of the data at graduation. Points 2 and 4
+    answer the first (an extraction's datasets sit in the ordinary
+    hierarchy, declared by the recipe), point 8 and the rejected
+    new-concept-above-agency answer the second, and the third dissolves:
+    graduation belongs to the OTHER exit, and a project extraction never
+    graduates. Its criteria survive the scoping intact.
+
+    **Not scoped here, deliberately.** Lineage. Keith, 2026-09-27: not
+    checked today. `plans/wider.md` #9's older framing of "extraction"
+    is about the SHAPE of the checks - reconciliation to source totals,
+    extraction completeness, aggregation correctness, lineage - which is
+    a different subject from this sprint's lifecycle question and is
+    still parked where it is.
+
 **Not in these sprints, deliberately.** Adding two more datasets and
 making the data-asset level concrete (`plans/running-thoughts.md` #23)
 is sequenced AFTER this work - it is what makes the file-architecture
