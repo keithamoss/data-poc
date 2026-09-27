@@ -8770,9 +8770,10 @@ requirements:
     title: The as-of picker knows the real calendar, because it is embedded
     date_written: "2026-09-22"
     story: >
-      As a data owner picking a date, I want the picker to know the
-      quarters we actually agreed with our suppliers, so that asking for
-      a past quarter returns that quarter rather than silently nothing.
+      As someone viewing the dashboard, I want to pick a date in the
+      past and see what the QA results were at that time, so that I get
+      a real answer whatever delivery schedule the dataset follows,
+      instead of a blank page that looks like there was never any data.
     moscow: must
     status: not_started
     source: >
@@ -8785,31 +8786,35 @@ requirements:
       sprint 6. MOVED TO BATCH 6 on 2026-09-23, Keith's call, after
       delivery-architect found it depends on the unsigned REQ-DASH-041.
     acceptance_criteria:
-      - THE SYSTEM SHALL use that embedded sequence for the as-of
-        picker's period arithmetic.
-      - THE SYSTEM SHALL NOT reimplement schedule derivation in the
-        browser.
-      - IF a viewer picks a date the embedded sequence does not cover,
-        THEN THE SYSTEM SHALL say so plainly rather than render an empty
-        view.
-      - THE SYSTEM SHALL derive the embedded sequence from configuration
-        only, with no access to anything under data/.
-      - THE SYSTEM SHALL render with zero console errors in a real
-        browser.
       - THE SYSTEM SHALL embed each of the asset's named calendars' period
         sequences into the built dashboard, and SHALL identify which
         calendar each dataset uses.
+      - THE SYSTEM SHALL derive those embedded sequences from
+        configuration only, with no access to anything under data/.
+      - THE SYSTEM SHALL end each embedded sequence at the period the
+        present moment falls in on the asset's own clock, and SHALL NOT
+        embed a period that has not begun.
+      - THE SYSTEM SHALL use those embedded sequences for the as-of
+        picker's period arithmetic.
+      - THE SYSTEM SHALL NOT reimplement schedule derivation in the
+        browser.
       - WHEN a viewer opens the as-of panel, THE SYSTEM SHALL state, for
         each of the asset's named calendars, which period the selected
         date falls in.
       - THE SYSTEM SHALL keep the as-of selection in its query parameter
         as a calendar date, and SHALL NOT replace it with a period name.
       - THE SYSTEM SHALL bound the as-of date input to the range the
-        embedded sequences cover, so that an out-of-range date cannot be
-        chosen with the picker.
+        embedded sequences cover, so that neither a future date nor a
+        date before the asset's earliest period can be chosen with the
+        picker.
       - IF an as-of date outside that range arrives by URL, THEN THE
         SYSTEM SHALL say so plainly, state the covered range, and offer
         a one-click reset to the default.
+      - IF a viewer reaches a date the embedded sequences do not cover,
+        THEN THE SYSTEM SHALL say so plainly rather than render an empty
+        view.
+      - THE SYSTEM SHALL render with zero console errors in a real
+        browser.
     non_functional_requirements:
       - A schedule is CONFIG, not data, so this is a new embed that
         touches nothing about CLAUDE.md's CI-never-reads-data rule. That
@@ -8819,6 +8824,14 @@ requirements:
         roughly 1,800 period entries, which is negligible against a page
         already around 8MB - but it grows forever, so it should be
         measured rather than assumed.
+      - >
+        MEASURED, 2026-09-27, because the NFR above asks for a number
+        rather than an assumption: the asset's whole `calendars` block is
+        2,327 bytes of configuration today, and the quarterly calendar is
+        20 authored dates spanning 2023-02-01 to 2027-11-01. So the size
+        concern is not a live one at this asset's scale - but the
+        sequences lengthen with every day that passes, which is why it
+        stays worth re-measuring rather than being settled here.
       - Verify in a real browser, at the render layer. A correct Python
         derivation says nothing about a template with its own transform.
       - This is easy to discover late, and the symptom would be an
@@ -8826,6 +8839,70 @@ requirements:
         which looks like no data rather than like a bug.
     dependencies: [REQ-PIPE-051, REQ-DASH-041]
     decisions:
+      - >
+        NO FUTURE DATES ARE EMBEDDED OR PICKABLE, and the reasoning is
+        Keith's own question rather than a rule inherited from anywhere
+        (2026-09-27): "why would we be able to choose a date in the
+        future? nothing has happened yet, so why project forward?" The
+        as-of picker asks a question about the PAST - what did this look
+        like then - so a date with nothing behind it has no answer to
+        give. This REMOVES an open question rather than answering it:
+        there is no horizon to choose, because each sequence simply ends
+        at the period the present moment falls in. REJECTED, and it was
+        this session's own recommendation: generating each sequence to
+        the end of the following calendar year, which would have put an
+        arbitrary number in configuration and let a viewer pick a date
+        the data cannot speak about.
+      - >
+        THE CURRENT, OPEN PERIOD IS INCLUDED - it has begun, so it is
+        not a projection. Its start is in the past and its end in the
+        future, which is exactly the period a viewer asking about today
+        is in, and the dashboard already speaks about a "current
+        expected cycle".
+      - >
+        FUTURE AUTHORED DATES STAY IN CONFIGURATION AND ARE SIMPLY NOT
+        EMBEDDED, recorded because it looks like a contradiction and is
+        not. contract/data-asset.yaml authors the quarterly calendar
+        through 2027-11-01 on purpose, and `runway_warning_slots` exists
+        to warn when those future slots run low. Nothing is lost by
+        leaving them out of the browser: qa_tools/common/runway.py
+        already does that arithmetic in PYTHON, under REQ-PIPE-053,
+        which is where a question about what has not happened yet
+        belongs.
+      - >
+        A CONSEQUENCE TO CARRY RATHER THAN DISCOVER: a sequence that
+        ends "now" ends at BUILD time, so on a daily calendar the newest
+        pickable date is the date of the last build. That is tolerable
+        only because REQ-PIPE-092 rebuilds the dashboard from this
+        environment on every pipeline run, so a deployment that is
+        publishing results is also refreshing the range. A deployment
+        that stopped rebuilding would quietly lose its most recent days
+        from the picker, and criterion 9's plain message about the
+        covered range is what makes that visible rather than silent.
+      - >
+        THE SCOPER'S OWN FLAGGED CALL IS APPROVED (Keith, 2026-09-27,
+        "happy with this"): embed the period sequence for EVERY
+        schedule, not only the authored ones, and delete the
+        browser-side reimplementation entirely rather than leaving one
+        of its two branches alive. Recorded as approved because the
+        scoper deliberately went beyond plans/supply-model.md Thread C,
+        which only requires embedding authored lists, and asked for a
+        reaction at sign-off.
+      - >
+        THE CRITERIA WERE REORDERED AT SIGN-OFF (Keith, 2026-09-27, "fix
+        this"), not rewritten. Criterion 1 used to read "use THAT
+        embedded sequence" while the criterion introducing the embed sat
+        sixth, so the pronoun had no antecedent. The embed now comes
+        first and the render-layer criteria follow it.
+      - >
+        THE STORY WAS REWRITTEN AT SIGN-OFF (Keith, 2026-09-27) for
+        three reasons he gave: point of view moved from "a data owner"
+        to somebody viewing the dashboard, the phrase "the quarters we
+        actually agreed with our suppliers" went as jargon, and the
+        whole thing stopped being quarterly-specific. The requirement
+        serves every calendar the asset names, so a story that only
+        speaks about quarters describes a narrower system than the
+        criteria do.
       - Decided to embed the period sequence for EVERY schedule, not
         only authored ones, and delete the browser-side reimplementation
         entirely. Thread C only requires embedding authored lists, since
