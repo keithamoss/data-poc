@@ -35,9 +35,6 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     # production this is the same literal path run_datacontract_bdm.py/
     # run_evidently_bdm.py already default to, so all three must point at
     # the SAME tmp dir here for the same reason.
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", raw_dir)
     # One supply database, named by the environment - the three
     # module attributes this replaces pointed at a directory of
     # per-run DuckDB files (REQ-PIPE-068).
@@ -85,16 +82,21 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
     # file carries no such label.
     results = orchestrate_bdm.run_single(
         _DIRTY_RUN_ID, str(arrived_csv), "2026-01-02",
-        reference_run_id=_REF_RUN_ID, reference_csv=f"{_REF_RUN_ID}.csv", run_by="test@example.com")
+        reference_run_id=_REF_RUN_ID, run_by="test@example.com")
 
     assert results, "run_single() produced no real check results at all"
     assert all(r["run_id"] == _DIRTY_RUN_ID for r in results)
     assert all(r["check_id"] for r in results)
     failing = [r for r in results if r["status"] == "fail"]
     assert failing, "the real red-severity dirty run produced no failures via run_single()"
-    # The arrived file really landed at RAW_DIR/<run_id>.csv, not wherever
-    # it was originally downloaded to.
-    assert os.path.exists(os.path.join(raw_dir, f"{_DIRTY_RUN_ID}.csv"))
+    # THE ARRIVED FILE STAYED WHERE IT WAS (REQ-PIPE-102). This used
+    # to assert the opposite - that run_single() had copied it to
+    # RAW_DIR/<run_id>.csv - which was true and existed only so
+    # Evidently could resolve a bare filename. Nothing reads a file
+    # now, so nothing is copied.
+    assert arrived_csv.exists(), "the file handed in should be left alone, not moved"
+    assert not os.path.exists(os.path.join(raw_dir, f"{_DIRTY_RUN_ID}.csv")), \
+        "run_single() still copies the arriving file into a directory of its own"
 
 
 def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_present(

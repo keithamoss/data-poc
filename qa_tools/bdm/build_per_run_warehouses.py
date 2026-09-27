@@ -31,10 +31,6 @@ from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, r
 from qa_tools.common import arrivals, asset_time, load_log, supply_db
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-#: Where the ad-hoc `mothman bdm qa --local-file` path drops a file
-#: it was handed. NOT where build_all() looks - that reads the
-#: delivery tree (see its own docstring).
-RAW_DIR = os.path.join(ROOT, "data", "raw")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
 
 #: The one logical table this dataset supplies.

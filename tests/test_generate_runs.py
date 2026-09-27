@@ -42,15 +42,15 @@ def raw_dir(tmp_path_factory):
     and qa_tools.bdm.orchestrate_bdm read from/write to for real, purely
     as a side effect of testing (harmless in outcome, since generation
     is fully deterministic, but a real coupling between test execution
-    and production state that shouldn't exist). OUT_DIR is a plain
+    and production state that shouldn't exist). Each output is a plain
     module global generate_runs.main() reads at call time (not captured
-    into a default arg), so reassigning it here works - module-scoped,
+    into a default arg), so reassigning them here works - module-scoped,
     not the standard function-scoped `monkeypatch` fixture, which can't
     be depended on from a module-scoped fixture (a real ScopeMismatch),
     hence the manual save/restore instead."""
     root = tmp_path_factory.mktemp("bdm_gen")
     restore = generator_isolation.redirect(generate_runs, root)
-    yield Path(generate_runs.OUT_DIR)
+    yield Path(generate_runs.DELIVERIES_DIR)
     restore()
 
 
@@ -186,7 +186,7 @@ def test_no_run_id_carries_a_date(manifest):
 
 def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     """Real bug, found 2026-09-23 by checking rather than assuming:
-    redirecting generate_runs.OUT_DIR is no longer enough to isolate a
+    redirecting one of generate_runs' outputs is not enough to isolate a
     test run, because REQ-GEN-043 gave the generator a second and third
     output - the delivery tree and the receipts beside it - and both
     default to the real ones under data/.
@@ -232,7 +232,6 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     # would bring it into existence, which the comparison below catches
     # either way.
 
-    monkeypatch.setattr(generate_runs, "OUT_DIR", str(tmp_path / "raw"))
     monkeypatch.setattr(generate_runs, "DELIVERIES_DIR", tmp_path / "deliveries")
     monkeypatch.setattr(generate_runs, "RECEIPTS_DIR", tmp_path / "receipts")
     monkeypatch.setattr(generate_runs, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")

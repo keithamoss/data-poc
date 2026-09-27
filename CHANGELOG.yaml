@@ -206,11 +206,17 @@ releases:
           - headline: One copy of a supply, not three
             components: ["Pipeline & publishing"]
             description: >
-              A Child Protection supply was written to disk twice by
-              the generator and a third time by staging, for tools
-              that stopped reading it months ago. Birth Registrations
-              was written twice. Each now exists where it arrived and
-              in the database, and nowhere else.
+              A supply used to be written to disk two or three times -
+              as a delivery, as a flat copy beside it, and for Child
+              Protection again by staging. It now exists where it
+              arrived and in the database, and nowhere else.
+          - headline: A file you hand it is checked where it is
+            components: ["Pipeline & publishing"]
+            description: >
+              Checking a single file used to copy it into a working
+              directory first, along with the reference you compared
+              it against. Both are now read from wherever you point
+              at, and the reference is loaded like any other supply.
           - headline: Drift will not answer from a stale file
             components: ["QA checks & contract"]
             description: >

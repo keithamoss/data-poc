@@ -649,7 +649,46 @@ def arrival_segment(received_at) -> str:
     # what tells the two apart without the caller having to say.
     if any(c in text for c in ":-"):
         return arrival_key(received_at)
-    return normalise_ident_part(text)
+    return _bounded(normalise_ident_part(text))
+
+
+#: Long enough to stay readable, short enough that the longest logical
+#: table name plus `__` plus this plus an ordinal suffix clears
+#: PostgreSQL's 63-byte identifier limit with room to spare.
+_MAX_SEGMENT = 32
+
+
+def _bounded(segment: str) -> str:
+    """Keep a run-id segment distinct AND short enough to be a name.
+
+    DISTINCT IS NOT ENOUGH, which is what the first version of this
+    got wrong. Making the segment lossless fixed two ad-hoc runs
+    sharing a staged table and immediately broke `mothman bdm qa
+    --file`: run ids on that path look like
+    `adhoc_birth_registrations_2026_09_20_20260927t041329z`, and the
+    table name came to 74 bytes against PostgreSQL's limit of 63. The
+    loader's own guard refused rather than letting it truncate into a
+    collision - the right failure, and still a broken command.
+
+    Truncating alone would reintroduce exactly the collision this
+    segment exists to prevent, so what is dropped is replaced by a
+    digest of the whole thing. A short id passes through untouched,
+    because `run_001` is a name someone reads in a table listing and
+    should not pay for the long case.
+    """
+    # NEVER `__`, WHICH IS THE SEPARATOR. split_staged() reads a
+    # staged name as `<table>__<arrival>__<ordinal>`, so a segment
+    # containing a double underscore splits it in the wrong place -
+    # the arrival comes back truncated and the rest is read as an
+    # ordinal. Its docstring stated the invariant and nothing enforced
+    # it, which is how the first bounded segment shipped as
+    # `birth_registrations__adhoc_pytest_bdm_dirty__f5108854` and made
+    # a run's views resolve nothing.
+    segment = re.sub(r"_{2,}", "_", segment)
+    if len(segment) <= _MAX_SEGMENT:
+        return segment
+    digest = hashlib.sha256(segment.encode("utf-8")).hexdigest()[:8]
+    return f"{segment[:_MAX_SEGMENT - 9].rstrip('_')}_{digest}"
 
 
 def staged_table(table: str, received_at, ordinal: int = 0) -> str:

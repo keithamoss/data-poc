@@ -111,11 +111,11 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
     from pathlib import Path
 
     from fixture_ids import BDM_REF_RUN_ID
-    from qa_tools.bdm import build_per_run_warehouses, orchestrate_bdm
+    from qa_tools.bdm import orchestrate_bdm
 
-    raw = tmp_path / "raw"
-    raw.mkdir()
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(raw))
+    # NOTHING TO REDIRECT ON DISK (REQ-PIPE-102): run_single() stages
+    # the file where it is rather than copying it into a raw
+    # directory, so there is no longer one to point elsewhere.
     monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: None)
     for module_name in ("run_dbt_bdm", "run_soda_bdm", "run_datacontract_bdm", "run_evidently_bdm"):
         module = __import__(f"qa_tools.bdm.{module_name}", fromlist=[module_name])
@@ -128,7 +128,7 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
     # this suite is not allowed to do.
     candidates = sorted(Path(bdm_raw_dir).glob("*.csv"))
     assert candidates, f"the bdm_raw_dir fixture wrote no CSV at all: {bdm_raw_dir}"
-    arrived = raw / "lifecycle_arrival.csv"
+    arrived = tmp_path / "lifecycle_arrival.csv"
     shutil.copy(candidates[0], arrived)
 
     with supply_db.connect(read_only=True, label="test-before") as conn:
@@ -136,7 +136,7 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
 
     run_id = "lifecycle_run"
     orchestrate_bdm.run_single(
-        run_id, str(arrived), "2026-01-02", BDM_REF_RUN_ID, "", run_by="test@example.com")
+        run_id, str(arrived), "2026-01-02", BDM_REF_RUN_ID, run_by="test@example.com")
 
     with supply_db.connect(read_only=True, label="test-after") as conn:
         after = _schemas(conn)
@@ -183,3 +183,68 @@ def test_a_real_receipt_instant_still_names_the_table_exactly_as_before(db):
 
     assert db_mod.staged_table("cp_clients", "2026-08-01T01:00:00+00:00") == \
         "cp_clients__202608010100000000"
+
+
+def test_a_long_run_id_still_fits_a_postgres_identifier(db):
+    """Distinct is not enough - it has to fit.
+
+    Making the run-id arrival segment lossless (so two ad-hoc runs
+    stop sharing a staged table) made it LONG, and the ad-hoc run ids
+    are long to begin with: `adhoc_birth_registrations_2026_09_20_
+    20260927t041329z` produced a 74-byte table name against
+    PostgreSQL's 63-byte limit. The loader's own guard caught it and
+    refused rather than letting the name truncate into a collision,
+    which is the right failure - but a real `mothman bdm qa --file`
+    could not run at all.
+    """
+    from qa_tools.common import supply_db as db_mod
+
+    long_id = "adhoc_birth_registrations_2026_09_20_20260927t041329z"
+    name = db_mod.staged_table("birth_registrations", long_id)
+    assert len(name.encode()) <= 63, f"{name} is {len(name.encode())} bytes"
+
+    # AND STILL DISTINCT. Truncation alone would collide two ad-hoc
+    # runs of the same dataset on the same day, which is the bug this
+    # segment exists to prevent.
+    sibling = db_mod.staged_table(
+        "birth_registrations", "adhoc_birth_registrations_2026_09_20_20260927t041330z")
+    assert name != sibling, "two long run ids collapsed to one staged table"
+
+
+def test_a_short_run_id_is_left_readable(db):
+    """The common case must not pay for the long one - `run_001` is a
+    name a person reads in a table listing."""
+    from qa_tools.common import supply_db as db_mod
+
+    assert db_mod.staged_table("birth_registrations", "run_001") == \
+        "birth_registrations__run_001"
+
+
+def test_an_arrival_segment_never_contains_the_separator(db):
+    """`__` separates the parts of a staged table name, so a segment
+    containing one splits the name in the wrong place.
+
+    Found by running the real ad-hoc path: the bounded segment was
+    built as `<truncated>_<digest>`, the truncation ended on an
+    underscore, and the result was
+    `birth_registrations__adhoc_pytest_bdm_dirty__f5108854`.
+    split_staged() then read the arrival as `adhoc_pytest_bdm_dirty`
+    and the digest as an ORDINAL - so the run's views resolved
+    nothing and dbt failed on a table that had just been staged.
+    split_staged's own docstring states the invariant ("the arrival
+    key and ordinal are digits"); nothing enforced it.
+    """
+    from qa_tools.common import supply_db as db_mod
+
+    for run_id in ("adhoc_pytest_bdm_dirty_20260927t042417z",
+                   "adhoc_birth_registrations_2026_09_20_20260927t041329z",
+                   "run_001",
+                   "a__deliberately__doubled__id"):
+        segment = db_mod.arrival_segment(run_id)
+        assert "__" not in segment, f"{run_id!r} -> {segment!r} contains the separator"
+        physical = db_mod.staged_table("birth_registrations", run_id)
+        parsed = db_mod.split_staged(physical)
+        assert parsed is not None, f"{physical} does not parse as a staged table"
+        assert parsed[1] == segment, \
+            f"{physical} parsed its arrival as {parsed[1]!r}, not {segment!r}"
+        assert parsed[2] == "", f"{physical} parsed a spurious ordinal {parsed[2]!r}"

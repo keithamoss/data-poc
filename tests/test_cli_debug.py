@@ -83,22 +83,21 @@ def test_run_dbt_cp_calls_evaluate_dbt_cp(monkeypatch):
     assert seen["run_id"] == "cp_run_01"
 
 
-def test_run_datacontract_bdm_passes_the_manifest_csv_filename(monkeypatch):
+def test_run_datacontract_bdm_passes_only_the_run_id(monkeypatch):
     _patch_bdm_manifest(monkeypatch)
     import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
 
     seen = {}
 
-    def _fake_evaluate(run_id, csv_filename, run_timestamp):
+    def _fake_evaluate(run_id, run_timestamp):
         seen["run_id"] = run_id
-        seen["csv_filename"] = csv_filename
         return []
     monkeypatch.setattr(run_datacontract_bdm, "evaluate_datacontract_bdm", _fake_evaluate)
 
     result = _runner.invoke(debug_cli.debug_group, ["run-datacontract", "--collection", "bdm", "--run-id", "run_002"])
 
     assert result.exit_code == 0, result.output
-    assert seen == {"run_id": "run_002", "csv_filename": _BDM_MANIFEST[1]["csv_path"]}
+    assert seen == {"run_id": "run_002"}
 
 
 def test_run_datacontract_bdm_unknown_run_id_fails_clearly(monkeypatch):
@@ -133,9 +132,8 @@ def test_run_evidently_bdm_defaults_reference_to_manifests_first_entry(monkeypat
 
     seen = {}
 
-    def _fake_evaluate(run_id, csv_filename, run_timestamp, reference_run_id, reference_csv):
-        seen.update(run_id=run_id, csv_filename=csv_filename,
-                     reference_run_id=reference_run_id, reference_csv=reference_csv)
+    def _fake_evaluate(run_id, run_timestamp, reference_run_id):
+        seen.update(run_id=run_id, reference_run_id=reference_run_id)
         return []
     monkeypatch.setattr(run_evidently_bdm, "evaluate_evidently_bdm", _fake_evaluate)
 
@@ -144,7 +142,7 @@ def test_run_evidently_bdm_defaults_reference_to_manifests_first_entry(monkeypat
     assert result.exit_code == 0, result.output
     assert seen["run_id"] == "run_002"
     assert seen["reference_run_id"] == "run_001"
-    assert seen["reference_csv"] == _BDM_MANIFEST[0]["csv_path"]
+    assert "reference_csv" not in seen, "the reference is a run id now, not a file"
 
 
 def test_run_evidently_bdm_honours_an_explicit_reference_run_id(monkeypatch):
@@ -153,8 +151,8 @@ def test_run_evidently_bdm_honours_an_explicit_reference_run_id(monkeypatch):
 
     seen = {}
 
-    def _fake_evaluate(run_id, csv_filename, run_timestamp, reference_run_id, reference_csv):
-        seen.update(reference_run_id=reference_run_id, reference_csv=reference_csv)
+    def _fake_evaluate(run_id, run_timestamp, reference_run_id):
+        seen.update(reference_run_id=reference_run_id)
         return []
     monkeypatch.setattr(run_evidently_bdm, "evaluate_evidently_bdm", _fake_evaluate)
 
@@ -164,7 +162,7 @@ def test_run_evidently_bdm_honours_an_explicit_reference_run_id(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert seen["reference_run_id"] == "run_002"
-    assert seen["reference_csv"] == _BDM_MANIFEST[1]["csv_path"]
+    assert "reference_csv" not in seen, "the reference is a run id now, not a file"
 
 
 def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypatch):

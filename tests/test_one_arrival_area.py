@@ -189,15 +189,102 @@ def test_the_bdm_generator_writes_a_delivery_and_nothing_beside_it():
     del skip
 
 
-def test_the_bdm_raw_directory_is_still_the_ad_hoc_drop():
-    """The half that STAYS, pinned so a later sweep does not take it.
+def test_the_bdm_loader_has_no_raw_directory_at_all():
+    """THIS TEST USED TO ASSERT THE OPPOSITE, and recording that is the
+    point of the docstring.
 
-    data/raw/ is not a second copy of generated supplies any more, but
-    it is still where a file handed to `mothman bdm qa --local-file`
-    lands, and where run_single() normalises an arrived file to so the
-    tools can resolve a relative name against it.
+    The first pass at REQ-PIPE-102 kept data/raw/ "because it is where
+    a file handed to `mothman bdm qa --local-file` lands, and where
+    run_single() normalises an arrived file to so the tools can
+    resolve a relative name against it" - which described the code
+    accurately and got the REASON backwards. The directory existed to
+    serve relative-name resolution, relative-name resolution existed
+    to serve a CSV fallback, and the fallback existed for "a supply
+    checked without being staged", which run_single() never produces
+    because it stages before any tool runs. Keith pushed back ("I'd
+    rather it not" stay); the chain collapsed from the far end.
     """
     from qa_tools.bdm import build_per_run_warehouses
 
-    assert build_per_run_warehouses.RAW_DIR.endswith("raw"), \
-        "the ad-hoc drop directory is gone - --local-file has nowhere to put a file"
+    assert not hasattr(build_per_run_warehouses, "RAW_DIR"), \
+        "the loader still names a raw directory"
+
+
+# ---- data/raw/ goes too (Keith, 2026-09-27: "I'd rather it not" stay) ----
+#
+# The earlier version of this requirement kept data/raw/ on the grounds
+# that it was the ad-hoc drop directory. That was true of the code as it
+# stood and wrong about why. The directory existed to let Evidently
+# resolve a CSV by RELATIVE name; run_single() copied every arriving
+# file into it for that reason, and run_check_local_file() copied the
+# reference in for the same one. The fallback those served claimed to
+# be for "a supply checked without being staged", and run_single()
+# stages - it has to, because the other three tools read the warehouse.
+# The only genuinely unstaged thing was the REFERENCE, which CP already
+# stages and BDM did not.
+
+
+def test_no_module_still_names_a_raw_directory_in_code():
+    """The same AST check as cp_raw, for data/raw/. Prose recording the
+    history is exempt; a string the code evaluates is not."""
+    offenders = []
+    for path in SEARCHED:
+        tree = ast.parse(path.read_text())
+        skip = _docstrings(tree)
+        for node in ast.walk(tree):
+            # BOTH SPELLINGS. A literal "data/raw", and the
+            # os.path.join(ROOT, "data", "raw") form this repo
+            # actually uses - an earlier version of this test checked
+            # only the first and passed against code that still built
+            # the path from fragments.
+            if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and id(node) not in skip
+                    and node.value.rstrip("/").endswith("data/raw")):
+                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}: {node.value!r}")
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                    and node.func.attr == "join":
+                parts = [a.value for a in node.args
+                          if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+                if parts[-2:] == ["data", "raw"]:
+                    offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}: join(... 'data', 'raw')")
+    assert not offenders, "data/raw is retired; this code still names it:\n" + "\n".join(offenders)
+
+
+def test_nothing_resolves_a_csv_against_a_raw_directory():
+    """`_resolve_csv` was the reason the directory existed at all."""
+    from qa_tools.bdm import run_datacontract_bdm, run_evidently_bdm
+
+    for module in (run_datacontract_bdm, run_evidently_bdm):
+        assert not hasattr(module, "_resolve_csv"), \
+            f"{module.__name__} still resolves a bare filename against a raw directory"
+        assert not hasattr(module, "RAW_DIR"), \
+            f"{module.__name__}.RAW_DIR is retired but still exported"
+
+
+def test_the_bdm_drift_check_does_not_fall_back_to_a_file():
+    """The BDM counterpart of the CP check above."""
+    source = (ROOT / "qa_tools" / "bdm" / "run_evidently_bdm.py").read_text()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.ExceptHandler):
+            assert "csv" not in ast.dump(node).lower(), (
+                "run_evidently_bdm still reads a CSV from an exception handler")
+
+
+def test_staging_a_single_arrival_does_not_copy_it_first(tmp_path, supply_dsn, monkeypatch):
+    """run_single() copied every arriving file into data/raw/ before
+    staging it. The file it was handed is where it is."""
+    import inspect
+
+    from qa_tools.bdm import orchestrate_bdm
+
+    source = inspect.getsource(orchestrate_bdm.run_single)
+    # THE CODE, NOT THE COMMENTARY. An earlier version of this matched
+    # the whole source and tripped on the docstring explaining what
+    # RAW_DIR used to be for - prose this repo keeps on purpose.
+    code = "\n".join(line for line in source.splitlines()
+                      if not line.lstrip().startswith("#"))
+    code = code.split('"""')[0] + "".join(code.split('"""')[2:])
+    assert "RAW_DIR" not in code, \
+        "run_single still copies the arriving file into a raw directory"
+    assert "dest_path" not in code, \
+        "run_single still stages a copy rather than the file it was given"

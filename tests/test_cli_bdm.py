@@ -15,9 +15,6 @@ from click.testing import CliRunner
 
 import cli.bdm as bdm
 import cli.common as common
-import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
-import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
-import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
 
 _REF_RUN_ID = "pytest_bdm_ref"
 _DIRTY_RUN_ID = "pytest_bdm_dirty"
@@ -45,9 +42,6 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     from qa_tools.common import delivery
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", Path(raw_dir) / "deliveries")
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", Path(raw_dir) / "receipts")
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", raw_dir)
     # The warehouse used to be three module attributes pointing at a
     # directory of per-run DuckDB files. It is now one database, named
     # by MOTHMAN_SUPPLY_DB, which the supply_db_path fixture sets for
@@ -72,19 +66,14 @@ def _patch_delivery_dirs(monkeypatch, root):
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", Path(root) / "receipts")
 
 
-def test_raw_dir_reads_build_per_run_warehouses_live_not_a_frozen_import_time_copy(monkeypatch):
-    """Real regression coverage for the exact bug class orchestrate_bdm.
-    run_single()'s own docstring warns about (a module-level constant
-    bound once at import time silently ignoring a later monkeypatch) -
-    cli/bdm.py's own raw_dir() must re-read
-    build_per_run_warehouses.RAW_DIR fresh on every call, not cache it.
-
-    It used to check manifest_path() alongside it. That helper is gone
-    with the file it named (REQ-GEN-043) - nothing reads a generator
-    manifest any more, so a function whose whole job was to build a
-    path to one was only a way back to it."""
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", "/some/other/path")
-    assert bdm.raw_dir() == "/some/other/path"
+def test_the_cli_reports_where_the_generator_actually_wrote(monkeypatch):
+    """THE SUCCESSOR to a test of cli/bdm.py's raw_dir(), which is
+    retired with the directory (REQ-PIPE-102). The generator writes
+    one copy of a supply - the delivery - so that is what the command
+    reports having written.
+    """
+    assert not hasattr(bdm, "raw_dir"), "cli/bdm.py still exposes a raw_dir()"
+    assert "deliveries" in bdm.generated_output_dir()
 
 
 def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promoted(monkeypatch):
@@ -94,22 +83,21 @@ def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promo
     ]
 
     monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: [])
-    assert bdm.default_reference(manifest) == (
-        "run_001", "/x/BDM_20260101/birth_registrations_2026-01-01.csv")
+    assert bdm.default_reference(manifest) == "run_001"
 
 
 def test_default_reference_uses_last_promoted_run_when_it_is_still_a_recognised_arrival(monkeypatch):
-    """And hands back the arrival's OWN path, not one built from its
-    run_id - a supplier names its own files (REQ-GEN-043), so
-    f"{run_id}.csv" would point at nothing."""
+    """RETURNS A RUN ID AND NOTHING ELSE since REQ-PIPE-102. It used
+    to hand back the arrival's own path as well, for Evidently to read
+    as a file; Evidently reads the warehouse, so the run id is the
+    whole answer."""
     manifest = [{"run_id": "run_001",
                  "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"},
                 {"run_id": "run_050",
                  "csv_path": "/x/drop-4471/birth_registrations_2026-03-04.csv"}]
 
     monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: ["run_010", "run_050"])
-    assert bdm.default_reference(manifest) == (
-        "run_050", "/x/drop-4471/birth_registrations_2026-03-04.csv")
+    assert bdm.default_reference(manifest) == "run_050"
 
 
 def test_default_reference_falls_back_when_last_promoted_run_is_no_longer_recognised(monkeypatch):
@@ -121,8 +109,7 @@ def test_default_reference_falls_back_when_last_promoted_run_is_no_longer_recogn
                  "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"}]
 
     monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: ["run_999_no_longer_generated"])
-    assert bdm.default_reference(manifest) == (
-        "run_001", "/x/BDM_20260101/birth_registrations_2026-01-01.csv")
+    assert bdm.default_reference(manifest) == "run_001"
 
 
 def test_picker_choices_and_run_id_from_choice_round_trip():
@@ -179,9 +166,6 @@ def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
 
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", raw_copy / "deliveries")
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", raw_copy / "receipts")
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(raw_copy))
-    monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", str(raw_copy))
-    monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", str(raw_copy))
     # One supply database, named by the environment - the three
     # module attributes this replaces pointed at a directory of
     # per-run DuckDB files (REQ-PIPE-068).
@@ -267,7 +251,6 @@ def test_qa_command_unknown_run_id_is_a_real_clean_error(monkeypatch, bdm_raw_di
 
 
 def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_path, bdm_raw_dir):
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
     # Real deliveries already on disk - so there IS something to
     # overwrite, and the command must ask before it does.
     _patch_delivery_dirs(monkeypatch, bdm_raw_dir)
@@ -283,7 +266,6 @@ def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_pa
 
 
 def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch, tmp_path, bdm_raw_dir):
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
     _patch_delivery_dirs(monkeypatch, bdm_raw_dir)
     called = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))
@@ -297,7 +279,6 @@ def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch
 def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypatch, tmp_path):
     """No deliveries on disk yet - nothing to overwrite, so this
     shouldn't even ask."""
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
     _patch_delivery_dirs(monkeypatch, tmp_path)
     called = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))

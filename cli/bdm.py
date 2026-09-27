@@ -26,7 +26,7 @@ from qa_tools.bdm import build_per_run_warehouses, orchestrate_bdm
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.lambda_results_dir import BDM_MODULES, patch_write_qa_result_for_lambda
-from qa_tools.common.local_check import copy_into, run_id_from_path as local_run_id_from_path
+from qa_tools.common.local_check import run_id_from_path as local_run_id_from_path
 from qa_tools.common.qa_results_reader import list_run_ids
 
 from . import common
@@ -48,20 +48,15 @@ def s3_config() -> dict:
 
 
 def generated_output_dir() -> str:
-    """Where `generate-synthetic-data` leaves its output - see the CP
-    counterpart for why this is a per-dataset accessor."""
-    return raw_dir()
+    """Where `generate-synthetic-data` leaves its output.
 
+    THE DELIVERY TREE, since REQ-PIPE-102 - the generator writes one
+    copy of a supply and that is it. This used to return data/raw/,
+    which held a second flat copy of every generated run.
+    """
+    from generator import generate_runs
 
-def raw_dir() -> str:
-    """Read dynamically, at call time, off build_per_run_warehouses'
-    own module attribute - never bound to a module-level constant here.
-    A real bug class this project has hit more than once (see
-    orchestrate_bdm.run_single()'s own comment on the same pitfall): a
-    module-level constant captured at import time would silently ignore
-    a test (or any other caller) monkeypatching build_per_run_warehouses.
-    RAW_DIR afterwards."""
-    return build_per_run_warehouses.RAW_DIR
+    return str(generate_runs.DELIVERIES_DIR)
 
 
 
@@ -132,7 +127,7 @@ def default_reference(manifest: list[dict]) -> tuple[str, str]:
     only for run_ids the CURRENT RUN_PLAN still produces).
 
     "Still there" is asked of the RECOGNISED ARRIVALS, not of a
-    <run_id>.csv sitting in raw_dir() (REQ-GEN-043). A delivery's file
+    <run_id>.csv sitting in a raw directory (REQ-GEN-043). A delivery's file
     is named by the supplier, not after our run_id, so the old check
     asked a question the delivery tree cannot answer - and the path to
     hand downstream is the arrival's own, not one built from a run_id."""
@@ -141,9 +136,8 @@ def default_reference(manifest: list[dict]) -> tuple[str, str]:
         candidate = promoted[-1]
         entry = next((e for e in manifest if e["run_id"] == candidate), None)
         if entry is not None:
-            return candidate, entry["csv_path"]
-    first = manifest[0]
-    return first["run_id"], first["csv_path"]
+            return candidate
+    return manifest[0]["run_id"]
 
 
 def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
@@ -177,17 +171,11 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
     entry = manifest[idx]
 
     if reference_run_id is None:
-        reference_run_id, reference_csv = default_reference(manifest)
-    else:
-        # Resolved against the recognised arrivals, for the reason
-        # default_reference() gives - a supplier's filename is not
-        # f"{run_id}.csv", so there is nothing to build a path from.
-        reference_entry = next((e for e in manifest if e["run_id"] == reference_run_id), None)
-        if reference_entry is None:
-            raise click.ClickException(
-                f"Reference run {reference_run_id!r} isn't among the arrivals recognised on disk - "
-                f"run generate-synthetic-data first?")
-        reference_csv = reference_entry["csv_path"]
+        reference_run_id = default_reference(manifest)
+    elif not any(e["run_id"] == reference_run_id for e in manifest):
+        raise click.ClickException(
+            f"Reference run {reference_run_id!r} isn't among the arrivals recognised on disk - "
+            f"run generate-synthetic-data first?")
 
     csv_path = entry["csv_path"]
     tmp_dir = common.new_tmp_results_dir()
@@ -195,7 +183,7 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
 
     results = _run_single_preserving_manifest(
         run_id, csv_path, asset_time.local_date(entry["received_at"]).isoformat(),
-        reference_run_id, reference_csv, run_by=run_by,
+        reference_run_id, run_by=run_by,
         on_step=on_step,
     )
     return results, tmp_dir
@@ -224,8 +212,8 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
                           on_step=None) -> tuple[list[dict], str]:
     """The Local files QA source mode's real check-running body (plans/
     tooling.md #1 Phase 2) - folds in qa_tools/bdm/check_file.py's own
-    retired logic: copies the reference CSV into raw_dir() under a real
-    run_id (there's no synthetic manifest[0] to fall back on for a real,
+    retired logic: stages the reference CSV under a real run_id
+    (there's no synthetic manifest[0] to fall back on for a real,
     manually-downloaded file - a real reference is required, not
     defaulted), then reuses orchestrate_bdm.run_single(), same entry
     point both the Synthetic flow above and Thread B's Lambda handler
@@ -234,15 +222,21 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     run_date = run_date or asset_time.now().date().isoformat()
     run_id = run_id or local_run_id_from_path(csv_path)
     reference_run_id = local_run_id_from_path(reference_csv, prefix="ref")
-    reference_csv_filename = f"{reference_run_id}.csv"
-    copy_into(reference_csv, raw_dir(), reference_csv_filename)
 
     tmp_dir = common.new_tmp_results_dir()
     patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
 
+    # THE REFERENCE IS STAGED TOO (REQ-PIPE-102, 2026-09-27), which is
+    # what lets data/raw/ go. It used to be copied into that directory
+    # so Evidently could find it by name, leaving it the one supply in
+    # this flow that was checked against a file rather than the
+    # warehouse. Child Protection's own local-folder mode already
+    # staged both sides; this is BDM catching up.
+    build_per_run_warehouses.build_one(reference_run_id, reference_csv, run_date)
+
     results = _run_single_preserving_manifest(
         run_id, csv_path, run_date,
-        reference_run_id=reference_run_id, reference_csv=reference_csv_filename, run_by=run_by,
+        reference_run_id=reference_run_id, run_by=run_by,
         on_step=on_step,
     )
     return results, tmp_dir
@@ -439,7 +433,7 @@ def generate_synthetic_data_command(yes: bool) -> None:
         console.print("Not regenerated.", style="yellow")
         return
     generate_synthetic_data()
-    console.print(f"Generated -> {raw_dir()}", style="green")
+    console.print(f"Generated -> {generated_output_dir()}", style="green")
 
 
 def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bool) -> None:

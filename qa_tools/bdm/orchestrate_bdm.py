@@ -111,7 +111,7 @@ def _announce(on_step, label: str) -> None:
     if on_step is not None:
         on_step(label)
 
-def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str, reference_csv: str,
+def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str,
              on_step: Callable[[str], None] | None = None) -> list[dict]:
     run_id = entry["run_id"]
     # The real file inside the delivery that arrived (REQ-GEN-043),
@@ -120,7 +120,7 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
     print(f"--- {run_id} ---")
     try:
         return _run_one_inner(entry, run_id, csv_filename, run_timestamp, run_by,
-                               reference_run_id, reference_csv, on_step)
+                               reference_run_id, on_step)
     finally:
         # IN A finally, so a run that raised does not leave its schemas
         # behind for a later sweep to guess about.
@@ -128,7 +128,7 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
 
 
 def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: str,
-                    run_by: str, reference_run_id: str, reference_csv: str,
+                    run_by: str, reference_run_id: str,
                     on_step: Callable[[str], None] | None) -> list[dict]:
     results: list[dict] = []
     _announce(on_step, RUN_STEPS[0])
@@ -139,10 +139,11 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
         lambda: run_soda_bdm.evaluate_soda_bdm(run_id, run_timestamp)))
     _announce(on_step, RUN_STEPS[2])
     results.extend(_run_step(COLLECTION_ID, "datacontract-cli", run_id,
-        lambda: run_datacontract_bdm.evaluate_datacontract_bdm(run_id, csv_filename, run_timestamp)))
+        lambda: run_datacontract_bdm.evaluate_datacontract_bdm(run_id, run_timestamp)))
     _announce(on_step, RUN_STEPS[3])
     results.extend(_run_step(COLLECTION_ID, "Evidently", run_id,
-        lambda: run_evidently_bdm.evaluate_evidently_bdm( run_id, csv_filename, run_timestamp, reference_run_id=reference_run_id, reference_csv=reference_csv)))
+        lambda: run_evidently_bdm.evaluate_evidently_bdm(
+            run_id, run_timestamp, reference_run_id=reference_run_id)))
 
     # Computed and committed here, not by the dashboard-building layer -
     # this is the one point in the whole pipeline with a legitimate,
@@ -206,7 +207,7 @@ def _discard_this_runs_schemas(run_id: str) -> None:
 
 
 def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
-               reference_csv: str, run_by: str | None = None,
+               run_by: str | None = None,
                on_step: Callable[[str], None] | None = None) -> list[dict]:
     """The single-arrival counterpart to run_pipeline()'s full-manifest
     batch loop - built for the AWS event-driven MVP (plans/running-
@@ -219,26 +220,24 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
     full-batch rollup; a single invocation only ever writes this one
     run's own qa_results/ entry).
 
-    csv_path can be anywhere (e.g. Lambda's own /tmp) - run_datacontract_
-    bdm.evaluate_datacontract_bdm()/run_evidently_bdm.evaluate_evidently_
-    bdm() both resolve their csv_filename argument against the fixed
-    RAW_DIR module constant internally (a real constraint discovered
-    while building this, not something run_pipeline()'s manifest loop
-    ever had to work around, since every manifest entry's file already
-    lives there), so this copies the arrived file into RAW_DIR under
-    "<run_id>.csv" first and uses that relative name for every downstream
-    call - a real, deliberate normalization step, not a workaround for a
-    bug. reference_run_id/reference_csv have no manifest[0] to read here -
-    the caller must supply them, and reference_csv must already be a
-    filename that resolves under RAW_DIR (the design doc's own "open
-    question" on where a production reference run/file actually lives
-    once there's no manifest at all is still open - this assumes it's
-    already present, e.g. bundled with the Lambda deployment or fetched
-    separately before this is called).
+    csv_path can be anywhere (e.g. Lambda's own /tmp) and is STAGED
+    FROM THERE (REQ-PIPE-102, 2026-09-27). This used to copy it into
+    data/raw/ under "<run_id>.csv" first, and the docstring called that
+    "a real, deliberate normalization step, not a workaround for a
+    bug". The constraint it normalised for was real once: both
+    datacontract and Evidently resolved a BARE FILENAME against a
+    fixed RAW_DIR. Neither reads a file any more, so the copy
+    normalised nothing, and data/raw/ - which existed only to be the
+    thing bare names resolved against - has gone with it.
+
+    reference_run_id has no manifest[0] to read here, so the caller
+    must supply it, and the supply it names must have been staged -
+    which `mothman bdm qa --local-file` now does explicitly rather
+    than leaving the reference as a file on disk.
 
     THE ROW-COUNT-GROWTH CHECK'S "PREVIOUS RUN", AND WHY THIS NO LONGER
     TAKES previous_run_id/previous_csv (REQ-GEN-043). This used to WRITE
-    a synthetic two-entry manifest.json into RAW_DIR so that
+    a synthetic two-entry manifest.json into the raw directory so that
     run_evidently_bdm._previous_run_file() - which read that file - had
     something to read, with the preceding entry supplied by the caller.
     Two things changed. The check now resolves "the immediately
@@ -261,18 +260,17 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
     run_timestamp = asset_time.now().isoformat()
     run_by = run_by or get_run_by()
 
-    os.makedirs(build_per_run_warehouses.RAW_DIR, exist_ok=True)
-    csv_filename = f"{run_id}.csv"
-    dest_path = os.path.join(build_per_run_warehouses.RAW_DIR, csv_filename)
-    if os.path.abspath(csv_path) != os.path.abspath(dest_path):
-        with open(csv_path, "rb") as src, open(dest_path, "wb") as dst:
-            dst.write(src.read())
-
+    # STAGED FROM WHERE IT IS (REQ-PIPE-102, 2026-09-27). This used to
+    # copy the arriving file into data/raw/ first, and the reason was
+    # never staging - it was that run_evidently_bdm and
+    # run_datacontract_bdm resolved a BARE FILENAME against that
+    # directory. Both read the warehouse now, so the copy served
+    # nothing, and the directory it served has gone with it.
     # An arrival-shaped entry for this ONE file, carrying only what we
     # observed: which run, when we received it, where the file is. No
     # injected severity - that is generator bookkeeping and nothing in
     # the pipeline may read it (REQ-GEN-043).
-    entry = {"run_id": run_id, "run_index": 1, "csv_path": dest_path,
+    entry = {"run_id": run_id, "run_index": 1, "csv_path": csv_path,
               "received_at": asset_time.isoformat(
                   asset_time.start_of_day(date.fromisoformat(run_date))),
               "delivery": run_id}
@@ -287,9 +285,9 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
     # calling it. With one supply database there is nothing to rebind:
     # both paths open the same database and read through the run's own
     # view schema, which is what scoped the rows all along.
-    build_per_run_warehouses.build_one(run_id, dest_path, run_date)
+    build_per_run_warehouses.build_one(run_id, csv_path, run_date)
 
-    return _run_one(entry, run_timestamp, run_by, reference_run_id, reference_csv, on_step=on_step)
+    return _run_one(entry, run_timestamp, run_by, reference_run_id, on_step=on_step)
 
 
 
@@ -368,7 +366,6 @@ def run_pipeline(sequential: bool = False) -> dict:
     run_by = get_run_by()
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, run_by, reference_entry["run_id"],
-        reference_entry["csv_path"],
         sequential=sequential)
 
     # NOTHING TO SWEEP HERE ANY MORE (Keith, 2026-09-27). Each run

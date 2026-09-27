@@ -29,23 +29,21 @@ def _patch(monkeypatch, bdm_raw_dir, bdm_delivery_dirs):
     deliveries, receipts = bdm_delivery_dirs
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
-    monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", bdm_raw_dir)
     monkeypatch.setattr(run_evidently_bdm, "write_qa_result", lambda *a, **k: None)
 
 
-def _run(monkeypatch, bdm_raw_dir, bdm_delivery_dirs, run_id, csv_filename, run_timestamp, **kw):
+def _run(monkeypatch, bdm_raw_dir, bdm_delivery_dirs, run_id, run_timestamp, **kw):
     _patch(monkeypatch, bdm_raw_dir, bdm_delivery_dirs)
     return run_evidently_bdm.evaluate_evidently_bdm(
-        run_id, csv_filename, run_timestamp,
+        run_id, run_timestamp,
         reference_run_id=kw.get("reference_run_id", _REF_RUN_ID),
-        reference_csv=kw.get("reference_csv", _REF_CSV),
     )
 
 
 def test_reference_run_against_itself_has_no_psi_drift(monkeypatch, bdm_raw_dir, bdm_delivery_dirs):
     """run_id == reference_run_id is the real "first run, nothing to
     compare against yet" case status_for_psi() special-cases."""
-    results = _run(monkeypatch, bdm_raw_dir, bdm_delivery_dirs, _REF_RUN_ID, _REF_CSV, "2026-01-01T06:30:00Z")
+    results = _run(monkeypatch, bdm_raw_dir, bdm_delivery_dirs, _REF_RUN_ID, "2026-01-01T06:30:00Z")
 
     psi = next(r for r in results if r["check_name"] == "drift:PSI")
     assert psi["status"] == "pass"
@@ -61,7 +59,7 @@ def test_dirty_run_produces_a_real_row_count_drop_failure(monkeypatch, bdm_raw_d
     evaluate_evidently_bdm's row-count-growth check into a genuine
     "fail" via real Evidently RowCount metrics on both files, not a
     hand-computed stand-in."""
-    results = _run(monkeypatch, bdm_raw_dir, bdm_delivery_dirs, _DIRTY_RUN_ID, _DIRTY_CSV, "2026-01-02T06:30:00Z")
+    results = _run(monkeypatch, bdm_raw_dir, bdm_delivery_dirs, _DIRTY_RUN_ID, "2026-01-02T06:30:00Z")
 
     assert len(results) == 2, \
         "the dirty run has a real preceding arrival on disk - row-count-growth must run"
@@ -85,8 +83,7 @@ def test_evaluate_evidently_bdm_forwards_the_given_reference_not_the_module_defa
     _patch(monkeypatch, bdm_raw_dir, bdm_delivery_dirs)
 
     results = run_evidently_bdm.evaluate_evidently_bdm(
-        _DIRTY_RUN_ID, _DIRTY_CSV, "2026-01-02T06:30:00Z",
-        reference_run_id=_REF_RUN_ID, reference_csv=_REF_CSV,
+        _DIRTY_RUN_ID, "2026-01-02T06:30:00Z", reference_run_id=_REF_RUN_ID,
     )
     psi = next(r for r in results if r["check_name"] == "drift:PSI")
     assert psi["reference_run_id"] == _REF_RUN_ID

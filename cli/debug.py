@@ -100,8 +100,16 @@ def run_datacontract_command(collection: str, run_id: str) -> None:
     run_timestamp = asset_time.now().isoformat()
     if collection == "bdm":
         from qa_tools.bdm.run_datacontract_bdm import evaluate_datacontract_bdm
-        entry = _bdm_manifest_entry(run_id)
-        results = evaluate_datacontract_bdm(run_id, entry["csv_path"], run_timestamp)
+        # LOOKED UP AS A GUARD, not for a path (REQ-PIPE-102). The
+        # tool reads the run's own view schema and never a file, so
+        # nothing here needs the arrival's csv_path - but an
+        # unrecognised run id must still fail HERE, clearly, rather
+        # than several frames down inside a tool that has already
+        # written partial results into real history. Dropping this
+        # call did exactly that, and left two `does_not_exist/`
+        # directories in qa_results/ to prove it.
+        _bdm_manifest_entry(run_id)
+        results = evaluate_datacontract_bdm(run_id, run_timestamp)
     else:
         from qa_tools.cp.run_datacontract_cp import evaluate_datacontract_cp
         results = evaluate_datacontract_cp(run_id, run_timestamp)
@@ -119,10 +127,10 @@ def run_evidently_command(collection: str, run_id: str, reference_run_id: str | 
     run_timestamp = asset_time.now().isoformat()
     if collection == "bdm":
         from qa_tools.bdm.run_evidently_bdm import evaluate_evidently_bdm
-        entry = _bdm_manifest_entry(run_id)
+        _bdm_manifest_entry(run_id)  # a guard, as above
         ref_entry = _bdm_manifest_entry(reference_run_id) if reference_run_id else _bdm_manifest_first_entry()
-        results = evaluate_evidently_bdm(run_id, entry["csv_path"], run_timestamp,
-                                          reference_run_id=ref_entry["run_id"], reference_csv=ref_entry["csv_path"])
+        results = evaluate_evidently_bdm(run_id, run_timestamp,
+                                          reference_run_id=ref_entry["run_id"])
     else:
         from qa_tools.cp.run_evidently_cp import evaluate_evidently_cp
         reference_run_id = reference_run_id or _cp_manifest_first_run_id()

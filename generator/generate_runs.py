@@ -75,12 +75,11 @@ from qa_tools.common import asset_time, delivery, schedule
 # the cadence (REQ-GEN-042).
 DATASET_ID = "birth-registrations"
 
-OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 
 # WHERE THIS GENERATOR WRITES, all of it, redirectable the same way
-# OUT_DIR is (read at call time, never captured into a default arg).
+# (read at call time, never captured into a default arg).
 #
-# Redirecting OUT_DIR alone used to isolate a test run. REQ-GEN-043
+# Redirecting one output directory used to isolate a test run. REQ-GEN-043
 # gave the generator two more outputs - the delivery tree and the
 # receipts beside it - plus a shared bookkeeping file, and all three
 # defaulted to the real ones under data/. So the module's own
@@ -411,7 +410,6 @@ def _previous_delivery_names() -> list[str]:
     return [e["delivery"] for e in book.get(DATASET_ID, []) if e.get("delivery")]
 
 def main() -> None:
-    os.makedirs(OUT_DIR, exist_ok=True)
     provider: DatasetProvider = BirthRegistrationsProvider()
     manifest = []
     # Delivery names are arbitrary BY DESIGN, which means they can
@@ -499,7 +497,7 @@ def main() -> None:
     n_red_chains = sum(1 for _, sev in RUN_PLAN if sev == "red")
     print(f"\nWrote {len(manifest)} deliveries across {len(RUN_PLAN)} scheduled slots "
           f"({n_red_chains} of which went red and triggered a resupply chain) "
-          f"to {os.path.abspath(OUT_DIR)}")
+          f"to {os.path.abspath(DELIVERIES_DIR)}")
 
 
 if __name__ == "__main__":

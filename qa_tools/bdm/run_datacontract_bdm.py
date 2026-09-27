@@ -44,7 +44,6 @@ from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
-RAW_DIR = os.path.join(ROOT, "data", "raw")
 
 AGENCY_ID = bdm_common.AGENCY_ID
 COLLECTION_ID = bdm_common.COLLECTION_ID
@@ -86,27 +85,18 @@ CHECK_NAME_BY_ID = name_by_check_id(parse_contract_check_metadata(CONTRACT_PATH)
 
 
 
-def _resolve_csv(csv_path: str) -> str:
-    """A delivery's CSV, given either an absolute path or a name
-    relative to RAW_DIR.
 
-    Two real callers, two real shapes: the pipeline passes an absolute
-    path to a file inside a recognised delivery (REQ-GEN-043), while
-    `mothman bdm qa`'s local-file mode passes a bare filename it
-    dropped into RAW_DIR. os.path.join happens to do the right thing
-    for both, which is exactly why this is spelled out - a behaviour
-    that works by accident is one somebody later "fixes".
-    """
-    return csv_path if os.path.isabs(csv_path) else os.path.join(RAW_DIR, csv_path)
-
-def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
+def evaluate_datacontract_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     # THE WAREHOUSE, NOT THE FILE (REQ-QAC-088). This tool used to read
     # the supplier's CSV directly, which made it the one tool answering a
     # different question from the other three - they checked what had
-    # been loaded, it checked what had been sent. `csv_filename` is kept
-    # in the signature because callers pass it and other parts of this
-    # module still use it for reporting, but it no longer decides what is
-    # checked.
+    # been loaded, it checked what had been sent.
+    #
+    # `csv_filename` WAS KEPT IN THIS SIGNATURE and is now gone
+    # (REQ-PIPE-102): the comment here claimed "other parts of this
+    # module still use it for reporting", and nothing did - it was
+    # accepted and ignored, which is exactly the shape of the dead
+    # parameter that cost a test eighty seconds a run elsewhere.
     run = run_against_warehouse(CONTRACT_PATH, supply_db.run_schema(run_id))
 
     results = []
@@ -179,7 +169,7 @@ if __name__ == "__main__":
                 for a in arrivals.arrivals_for("civil-registration", "run_")
                 if "birth-registrations" not in a.held]
     for entry in manifest:
-        res = evaluate_datacontract_bdm(entry["run_id"], entry["csv_path"], datetime.now(timezone.utc).isoformat())
+        res = evaluate_datacontract_bdm(entry["run_id"], datetime.now(timezone.utc).isoformat())
         print(f"--- {entry['run_id']} ({entry['delivery']}) ---")
         for r in res:
             if r["status"] != "pass":

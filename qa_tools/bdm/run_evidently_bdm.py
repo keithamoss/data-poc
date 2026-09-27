@@ -26,14 +26,11 @@ import os
 
 from . import bdm_common
 from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
-from qa_tools.common.csv_io import load_null_values_by_column, read_csv_explicit_nulls
 from qa_tools.common.qa_results_writer import write_qa_result
 from .evidently_check_lifecycle import PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_ID
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-RAW_DIR = os.path.join(ROOT, "data", "raw")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
-_NULL_VALUES = load_null_values_by_column(CONTRACT_PATH).get("birth_registrations", {})
 
 AGENCY_ID = bdm_common.AGENCY_ID
 COLLECTION_ID = bdm_common.COLLECTION_ID
@@ -65,19 +62,6 @@ def _status_for_row_drop(rate_drop: float) -> str:
 
 
 
-def _resolve_csv(csv_path: str) -> str:
-    """A delivery's CSV, given either an absolute path or a name
-    relative to RAW_DIR.
-
-    Two real callers, two real shapes: the pipeline passes an absolute
-    path to a file inside a recognised delivery (REQ-GEN-043), while
-    `mothman bdm qa`'s local-file mode passes a bare filename it
-    dropped into RAW_DIR. os.path.join happens to do the right thing
-    for both, which is exactly why this is spelled out - a behaviour
-    that works by accident is one somebody later "fixes".
-    """
-    return csv_path if os.path.isabs(csv_path) else os.path.join(RAW_DIR, csv_path)
-
 def _previous_run_id(manifest: list[dict], run_id: str) -> str | None:
     """The immediately preceding run in manifest order, or None for the
     first run - unlike PSI's comparison against a fixed baseline run,
@@ -91,13 +75,6 @@ def _previous_run_id(manifest: list[dict], run_id: str) -> str | None:
         if entry["run_id"] == run_id:
             return manifest[i - 1]["run_id"] if i > 0 else None
     return None
-
-
-def _csv_path_of(manifest: list[dict], run_id: str) -> str:
-    for entry in manifest:
-        if entry["run_id"] == run_id:
-            return entry["csv_path"]
-    raise KeyError(f"{run_id} is not in this manifest")
 
 
 def _recorded_previous_count(manifest: list[dict], previous_run_id: str) -> int | None:
@@ -120,36 +97,53 @@ def _row_count_of(df) -> tuple[int, dict]:
     return int(result["metrics"][0]["value"]), result
 
 
-def _current_frame(run_id: str, csv_filename: str):
+def _current_frame(run_id: str):
     """This run's `sex` column, from the warehouse.
 
-    Falls back to the CSV only where the run has no view schema - the
-    ad-hoc local-file path, where somebody is checking a file that was
-    never staged. A staged run always reads the warehouse, which is the
-    whole point of REQ-QAC-088.
+    NO CSV FALLBACK (REQ-PIPE-102, 2026-09-27). There used to be one,
+    "for the ad-hoc local-file path where somebody is checking a file
+    that was never staged" - and that premise was simply not true:
+    `run_single()` calls `build_one()` before any tool runs, because
+    the other three read the warehouse and would have nothing to read
+    otherwise. The reference was the only genuinely unstaged thing,
+    and the local-file path stages that too now.
     """
     import pandas as pd
+    import psycopg
 
     from qa_tools.common import supply_db
 
-    try:
-        with supply_db.connect(read_only=True, label="mothman:evidently-bdm") as conn:
-            conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
+    schema = supply_db.run_schema(run_id)
+    with supply_db.connect(read_only=True, label="mothman:evidently-bdm") as conn:
+        conn.execute(f'SET search_path TO "{schema}"')
+        try:
             rows = conn.execute("SELECT sex FROM birth_registrations").fetchall()
-        return pd.DataFrame({"sex": [r[0] for r in rows]})
-    except Exception:
-        # A run with no staged view - the local-file path. Reading the
-        # file it was handed is correct there; there is nothing else.
-        return read_csv_explicit_nulls(_resolve_csv(csv_filename), _NULL_VALUES)[["sex"]]
+        except psycopg.errors.UndefinedTable as exc:
+            # NAME THE SCHEMA: PostgreSQL ignores a missing schema in
+            # search_path rather than complaining, so the bare error
+            # blames the table when a whole run's views are absent.
+            existing = supply_db.run_schemas(conn)
+            raise ValueError(
+                f"run {run_id!r} has no readable birth_registrations: schema "
+                f"{schema!r} {'exists but has no such view' if schema in existing else 'does not exist'}. "
+                f"Stage that supply before checking it.") from exc
+    return pd.DataFrame({"sex": [r[0] for r in rows]})
 
 
-def _reference_frame(reference_run_id: str, reference_csv: str):
+def _reference_frame(reference_run_id: str):
     """The reference distribution, rebuilt from what was RECORDED for
     that run rather than by finding its rows again.
 
     Its rows may be anywhere by now - staged, promoted into a period
     schema, or aged out - and none of that matters, because
     `dataset_stats` wrote its `sex` distribution down when it ran.
+
+    WHERE NOTHING WAS RECORDED, THE WAREHOUSE - never a file
+    (REQ-PIPE-102). An ad-hoc check names a reference run that has
+    never been through QA here, so there is no recording yet and its
+    rows were staged moments ago. Reading them is not the permissive
+    fallback this removed: that one answered a failed database read
+    from a copy on disk.
     """
     from qa_tools.common.evidently_common import (
         frame_from_value_counts, reference_value_counts,
@@ -158,15 +152,11 @@ def _reference_frame(reference_run_id: str, reference_csv: str):
     counts = reference_value_counts(AGENCY_ID, COLLECTION_ID, reference_run_id, "sex")
     if counts:
         return frame_from_value_counts(counts, "sex")
-    # No recorded stats: a reference that has never been through the
-    # pipeline here, which is real on the local-file path and on a
-    # first-ever run.
-    return read_csv_explicit_nulls(_resolve_csv(reference_csv), _NULL_VALUES)[["sex"]]
+    return _current_frame(reference_run_id)
 
 
-def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
-                                 reference_run_id: str = REFERENCE_RUN_ID,
-                                 reference_csv: str = f"{REFERENCE_RUN_ID}.csv") -> list[dict]:
+def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
+                                 reference_run_id: str = REFERENCE_RUN_ID) -> list[dict]:
     """THE CURRENT RUN COMES FROM THE WAREHOUSE; THE REFERENCE COMES
     FROM WHAT WAS RECORDED (REQ-QAC-088, 2026-09-27).
 
@@ -181,12 +171,16 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
     that reconstruction is exact rather than approximate, and for the
     categorical-only limit.
 
-    `csv_filename` and `reference_csv` are still accepted and are now
-    only a FALLBACK, for the ad-hoc local-file path where a supply has
-    been checked without being staged and has no recorded stats yet.
+    NO FILENAME PARAMETERS ANY MORE (REQ-PIPE-102, 2026-09-27). This
+    took `csv_filename` and `reference_csv` as a fallback for "a
+    supply checked without being staged", which is not a state that
+    occurs: run_single() stages before any tool runs. Keeping them
+    would have left two parameters naming a source nothing reads,
+    which is the trap `build_all(raw_dir=...)` had already sprung
+    once.
     """
-    reference = _reference_frame(reference_run_id, reference_csv)
-    current = _current_frame(run_id, csv_filename)
+    reference = _reference_frame(reference_run_id)
+    current = _current_frame(run_id)
     n_total = len(current)
 
     psi, psi_snapshot = compute_psi(current, reference, "sex")
@@ -230,10 +224,10 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
         current_count, row_count_snapshot = _row_count_of(current)
         previous_count = _recorded_previous_count(manifest, previous_run_id)
         if previous_count is None:
-            previous_count = _row_count_of(
-                read_csv_explicit_nulls(
-                    _resolve_csv(_csv_path_of(manifest, previous_run_id)),
-                    _NULL_VALUES))[0]
+            # NOTHING RECORDED FOR THE PREVIOUS RUN, so count its rows
+            # in the WAREHOUSE - never by re-reading a CSV
+            # (REQ-PIPE-102). Its rows were staged when it was checked.
+            previous_count = _row_count_of(_current_frame(previous_run_id))[0]
         raw_output["row_count"] = row_count_snapshot
         rate_drop = (previous_count - current_count) / previous_count if previous_count else 0.0
         results.append({
@@ -278,8 +272,8 @@ if __name__ == "__main__":
                 if "birth-registrations" not in a.held]
     ref = manifest[0]  # not the module-level REFERENCE_RUN_ID default - see orchestrate_bdm.py
     for entry in manifest:
-        res = evaluate_evidently_bdm(entry["run_id"], entry["csv_path"], datetime.now(timezone.utc).isoformat(),
-                                      reference_run_id=ref["run_id"], reference_csv=ref["csv_path"])
+        res = evaluate_evidently_bdm(entry["run_id"], datetime.now(timezone.utc).isoformat(),
+                                      reference_run_id=ref["run_id"])
         psi, growth = res[0], (res[1] if len(res) > 1 else None)
         growth_str = f"row_growth={growth['metric_value']:+.1f}%  status={growth['status']:5s}" if growth else "row_growth=n/a (first run)"
         print(f"{entry['run_id']:25s} PSI={psi['metric_value']}  status={psi['status']:5s}  |  {growth_str}")

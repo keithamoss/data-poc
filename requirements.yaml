@@ -17491,11 +17491,17 @@ requirements:
         Registrations' staging never kept a second copy, but its
         generator wrote one exactly as CP's did.
       - >
-        THE SYSTEM SHALL keep a directory for files a person hands to
-        an ad-hoc check, and SHALL NOT confuse it with a store of
-        generated supplies. `data/raw/` keeps this role for Birth
-        Registrations, which is why that directory stays where
-        `data/cp_raw/` goes.
+        THE SYSTEM SHALL check a file a person hands it from where
+        that file is, and SHALL NOT copy it into a directory of its
+        own first. REVISED 2026-09-27: an earlier version of this
+        criterion kept `data/raw/` as "the ad-hoc drop", which
+        described the code and mistook the reason - see the decisions
+        below. Both raw directories are now retired.
+      - >
+        WHERE an ad-hoc check needs a reference supply, THE SYSTEM
+        SHALL stage it like any other supply, and SHALL NOT leave it
+        as a file for one tool to read while the other three read the
+        warehouse.
       - >
         WHERE an ad-hoc check needs the other tables of a past run,
         THE SYSTEM SHALL take them from that run's own arrival, and
@@ -17505,8 +17511,9 @@ requirements:
         THEN THE SYSTEM SHALL fail and say so, and SHALL NOT compute a
         result from a file instead.
       - >
-        THE SYSTEM SHALL leave no module referring to a cp_raw
-        directory, including constants nothing reads.
+        THE SYSTEM SHALL leave no module referring to EITHER raw
+        directory, including constants nothing reads and parameters
+        nothing uses.
     non_functional_requirements:
       - >
         NO LOSS OF THE AD-HOC PATHS. `mothman cp qa` keeps every mode
@@ -17538,6 +17545,11 @@ requirements:
       - cli/cp.py::has_arrival
       - generator/generate_cp_runs.py::main
       - generator/generate_runs.py::main
+      - qa_tools/common/supply_db.py::_bounded
+      - qa_tools/bdm/run_evidently_bdm.py::_current_frame
+      - qa_tools/bdm/run_evidently_bdm.py::_reference_frame
+      - qa_tools/bdm/orchestrate_bdm.py::run_single
+      - cli/bdm.py::run_check_local_file
     evidence:
       - >
         2026-09-27: a full `mothman pipeline run` (both collections)
@@ -17582,13 +17594,39 @@ requirements:
         collection completes with its raw directory deleted and does
         not miss it.
       - >
-        data/raw/ STAYS AND data/cp_raw/ GOES, which is not an
-        inconsistency. The BDM directory has a second job CP's never
-        had - it is where `mothman bdm qa --local-file` drops a file
-        it was handed, and where run_single() normalises an arrived
-        file to so a relative name resolves. What is removed from both
-        is the same thing: a copy of a supply that already exists as a
-        delivery.
+        data/raw/ GOES TOO, and the first answer - that it stayed as
+        "the ad-hoc drop" - was wrong in an instructive way. It
+        described the code accurately and inverted the reason. The
+        directory existed to let Evidently resolve a BARE FILENAME
+        against a fixed RAW_DIR; run_single() copied every arriving
+        file in for that, and run_check_local_file() copied the
+        reference in for the same. The fallback all of that served was
+        documented as being "for the ad-hoc local-file path where a
+        supply has been checked without being staged" - a state that
+        does not occur, because run_single() stages before any tool
+        runs and the other three tools would have nothing to read
+        otherwise. Keith pushed back ("I would rather it not" stay)
+        and the chain collapsed from the far end.
+      - >
+        THE ONE GENUINE ASYMMETRY WAS THE REFERENCE, and fixing it is
+        what made the rest possible. CP's local-folder mode already
+        staged both the checked folder and the reference folder; BDM's
+        local-file mode staged only the checked file and left the
+        reference as a CSV, which is why one tool still needed to read
+        one. `run_check_local_file()` stages the reference now, so
+        both collections work the same way.
+      - >
+        A RUN-ID ARRIVAL SEGMENT MUST BE DISTINCT AND BOUNDED, learned
+        by breaking it. Making it lossless (so two ad-hoc runs stop
+        sharing a staged table) made it long, and ad-hoc run ids are
+        long: `adhoc_birth_registrations_2026_09_20_20260927t041329z`
+        produced a 74-byte table name against PostgreSQL's 63-byte
+        limit. The loader's existing guard refused rather than letting
+        it truncate into a collision, which is the right failure and
+        still a broken command. A short id passes through unchanged so
+        `run_001` stays readable; a long one is truncated and given a
+        digest of the whole, because truncation alone would
+        reintroduce the collision the segment exists to prevent.
       - >
         REJECTED, and recorded because it is the smaller change someone
         will propose again: removing the copy and leaving cp_raw in

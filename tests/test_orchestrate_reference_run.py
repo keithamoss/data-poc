@@ -58,9 +58,8 @@ class _FakeConn:
 def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatch, tmp_path):
     captured = {}
 
-    def fake_evaluate_evidently_bdm(run_id, csv_filename, run_timestamp, reference_run_id=None, reference_csv=None):
+    def fake_evaluate_evidently_bdm(run_id, run_timestamp, reference_run_id=None):
         captured["reference_run_id"] = reference_run_id
-        captured["reference_csv"] = reference_csv
         return []
 
     monkeypatch.setattr(orchestrate_bdm.run_dbt_bdm, "evaluate_dbt_bdm", lambda *a, **k: [])
@@ -89,11 +88,12 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     # hardcoded REFERENCE_RUN_ID default - the whole point being that
     # _run_one must forward exactly what it's given, not fall back.
     orchestrate_bdm._run_one(entry, "2099-01-05T00:00:00Z", "test@example.com",
-                              "run_01_2099-01-01", "run_01_2099-01-01.csv")
+                              "run_01_2099-01-01")
 
     assert captured["reference_run_id"] == "run_01_2099-01-01"
     assert captured["reference_run_id"] != orchestrate_bdm.run_evidently_bdm.REFERENCE_RUN_ID
-    assert captured["reference_csv"] == "run_01_2099-01-01.csv"
+    assert "reference_csv" not in captured, \
+        "the reference is forwarded as a run id now, not a filename (REQ-PIPE-102)"
 
 
 def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatch, tmp_path):
