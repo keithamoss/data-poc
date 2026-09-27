@@ -17677,6 +17677,10 @@ requirements:
         alone, and SHALL NOT build that name out of the supplied
         file's own name.
       - >
+        THE SYSTEM SHALL call such a run a TRIAL, in its run id, in
+        what it prints, and in this repository's own prose, and SHALL
+        NOT go on calling it ad-hoc.
+      - >
         THE SYSTEM SHALL apply this to every route by which a person
         supplies a file - a single file, a folder, one table on its
         own, and an object fetched from S3.
@@ -17726,6 +17730,19 @@ requirements:
         it the duplication Keith noticed
         (`birth_registrations__adhoc_birth_registrat_...`), which was
         only ever our own generated filenames echoing the table name.
+      - >
+        THE WORD IS `trial`, NOT `adhoc` (Keith, 2026-09-27: "not sure
+        I like the phrase adhoc now that we've made these changes").
+        It was accurate while these runs were a side channel that left
+        nothing behind; after this they are either a real arrival,
+        which needs no special word at all, or a deliberate
+        throwaway - and `trial` says what declining the prompt means
+        while staying honest that real dbt, Soda, datacontract-cli and
+        Evidently runs happened. Rejected: `dry run`, which implies
+        they did not; `scratch`, which describes the record rather
+        than the intent; `unfiled`, which is precise against this
+        model and defines the thing by what it is not. Same length as
+        `adhoc`, so no name-length arithmetic moves.
       - >
         SUB-SECOND PRECISION REPLACES THE STEM for an unfiled run.
         Second resolution plus a prefix was enough while the stem
