@@ -17646,7 +17646,7 @@ requirements:
       automatically - and I want to be able to try a file out without
       that happening.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-27. First the observation - "without deliveries
       being logged it would impact what's shown in the dashboard,
@@ -17681,6 +17681,11 @@ requirements:
         what it prints, and in this repository's own prose, and SHALL
         NOT go on calling it ad-hoc.
       - >
+        THE SYSTEM SHALL leave nothing in the database that outlives
+        a trial - no staged table, no resolution record, no load
+        record, no schema of any kind - so that declining to keep a
+        check costs nothing anywhere.
+      - >
         THE SYSTEM SHALL apply this to every route by which a person
         supplies a file - a single file, a folder, one table on its
         own, and an object fetched from S3.
@@ -17702,6 +17707,9 @@ requirements:
         AFTER everything already recorded - which its receipt instant
         of "now" does - and REQ-PIPE-057's run_id_guard must stay
         green across the change.
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     dependencies: [REQ-PIPE-069, REQ-PIPE-102]
     open_questions: []
     decisions:
@@ -17760,7 +17768,169 @@ requirements:
         but defining the thing by what it is not. Same length as
         `adhoc`, so no name-length arithmetic moves.
       - >
+        A TRIAL LEAVES NOTHING IN THE DATABASE, Keith's own condition
+        on approving this ("a trial must write NOTHING to the
+        database that survives the end of its run"), and it is
+        stricter than the run already was. A run discards its view
+        schema and dbt's when it finishes (REQ-PIPE-068), but its
+        STAGED TABLES are permanent by design - staging only ever
+        grows, one physical table per arrival - and so are its
+        `_resolutions` rows and its load records. For a filed supply
+        that is right: the arrival really happened. For a trial it is
+        exactly wrong, because the whole point of declining is that
+        nothing happened. So a trial's staged tables go with its
+        schemas, which is also what keeps `mothman supply` views and
+        the dashboard free of supplies nobody accepted.
+      - >
         SUB-SECOND PRECISION REPLACES THE STEM for an unfiled run.
         Second resolution plus a prefix was enough while the stem
         carried the distinctness; without it, two concurrent ad-hoc
         checks in the same second would collide.
+      - >
+        A SCHEMA OF ITS OWN, NOT A TRANSACTION TO ROLL BACK. Keith
+        asked the right question - "how are we safely preventing a
+        trial from writing anything? wrapping the whole thing in a
+        transaction that we rollback?" - and a transaction cannot do
+        it. That was MEASURED rather than assumed: work inside an open
+        transaction is invisible to every other connection, and dbt,
+        Soda, datacontract-cli and Evidently each open their own, so
+        staging uncommitted would leave all four looking at an empty
+        schema. dbt additionally builds its own models on its own
+        connection, which our rollback could never reach.
+
+        So a trial stages into `trial_<stamp>` and never touches
+        shared `staging` at all; its views are `qa_trial_<stamp>` and
+        dbt's `dbt_trial_<stamp>`, so ONE prefix finds everything it
+        created. The tidy-up is a single transaction of DROP SCHEMA
+        statements - PostgreSQL has transactional DDL, which is what
+        makes it either-all-or-none rather than a walk that can stop
+        halfway. A reference run is `trial_ref_<stamp>` for the same
+        reason: every trial schema then begins the same way.
+
+        REJECTED: DROPPING A TRIAL'S TABLES OUT OF SHARED STAGING BY
+        NAME, which is what the first implementation did. It works
+        and it is a best-effort walk, not a guarantee, and it leaves
+        a trial's rows sitting among real supplies for the length of
+        the run. What is honestly NOT guaranteed either way: `kill
+        -9` still leaves schemas behind. The design makes what is
+        left identifiable from its name alone and clearable by
+        `mothman supply tidy`, which the shared-staging version could
+        not offer.
+      - >
+        A FILE RECOGNITION CANNOT PLACE IS REFUSED, NOT FILED (Keith,
+        2026-09-27, choosing from three options). Recognition reads a
+        file's own NAME against its dataset's arrival pattern, and a
+        file somebody was emailed is often called something else -
+        `Births Jan.csv`, `extract (3).csv`. The refusal names the
+        file, says why, and offers the trial, which needs no
+        recognition because the command already says which dataset is
+        being checked.
+
+        REJECTED: RENAMING IT TO MATCH THE PATTERN, since the command
+        already says which dataset it is. Keeping would always work,
+        and the delivery tree would stop being a faithful copy of
+        what arrived - it would hold a file the supplier never sent.
+        Also rejected: FILING IT ANYWAY and letting it sit
+        unplaceable, which is honest about the arrival and splits the
+        check from it - a QA run attributed to nothing, which is the
+        exact failure the supply model exists to close.
+      - >
+        A PARTIAL RESUPPLY BORROWS THE OTHER TABLES RATHER THAN
+        RE-STAGING THEM. Child Protection's dbt models ref() all six
+        tables, so a one-table supply cannot be checked alone. The
+        code used to stage the other five under THIS run, which
+        recorded five tables as having arrived in a delivery that
+        carried one - invisible while these runs were a side channel
+        and untrue the moment one becomes a real delivery.
+        supply_db.borrow_views() gives the run a view onto each table
+        the earlier run already resolved, which is exactly what
+        "unchanged since last time" means.
+      - >
+        `--commit` IS THE KEEP FLAG rather than a new flag beside it.
+        It already meant "write this run into the real, permanent
+        history", and keeping is the same decision with two halves -
+        a run whose results are kept but whose arrival was never
+        recorded is the split this requirement closes. `--trial` is
+        its explicit opposite so a script can state either answer
+        rather than relying on a default it cannot see, and passing
+        both is refused rather than resolved.
+      - >
+        A TRIAL IS THE NON-INTERACTIVE DEFAULT. With no flag and no
+        terminal there is nobody to ask, and the two wrong answers
+        are not equally wrong: a trial that should have been kept
+        costs a re-run, and a delivery filed on somebody's behalf is
+        a public record of an arrival they did not agree to.
+      - >
+        THE REFERENCE IS ALWAYS A TRIAL, whichever way the supply
+        itself went. It is a known-good file the operator already
+        had; filing it would record an arrival that never happened,
+        and the delivery log is a claim about what actually arrived.
+      - >
+        A TRIAL'S LOAD RECORDS ARE WRITTEN SOMEWHERE DISPOSABLE
+        RATHER THAN SKIPPED. The load record is the gate that decides
+        which staged tables a run's views may resolve (REQ-PIPE-060
+        criterion 7 - physical presence is not readability), so
+        skipping it would mean either a trial whose views resolve
+        nothing or a trial running under a weaker rule than a real
+        run. They go to the trial's own scratch directory, removed
+        with its schemas. Once REQ-PIPE-089 moves the load log into
+        the database they will go into the trial schema and drop with
+        it, which is where this belongs.
+    linked_tests:
+      - tests/test_trial_runs.py
+      - tests/test_hand_filing.py
+      - tests/test_cli_bdm.py
+      - tests/test_cli_cp.py
+      - tests/test_run_schema_lifecycle.py
+    implemented_by:
+      - qa_tools/common/trial.py::trial_run_id
+      - qa_tools/common/trial.py::discard
+      - qa_tools/common/trial.py::schemas_of
+      - qa_tools/common/trial.py::orphan_schemas
+      - qa_tools/common/trial.py::log_dir
+      - qa_tools/common/hand_filing.py::file_supply
+      - qa_tools/common/hand_filing.py::check
+      - qa_tools/common/supply_db.py::staging_schema_for
+      - qa_tools/common/supply_db.py::ensure_staging
+      - qa_tools/common/supply_db.py::is_trial_run
+      - qa_tools/common/supply_db.py::borrow_views
+      - cli/common.py::file_or_trial
+      - cli/common.py::decide_keep
+      - cli/common.py::keep_from_flags
+      - cli/common.py::say_what_it_did
+      - cli/bdm.py::run_check_local_file
+      - cli/cp.py::run_check_local_folder
+      - cli/cp.py::run_check_single_table
+      - qa_tools/bdm/orchestrate_bdm.py::_discard_this_runs_schemas
+      - qa_tools/cp/orchestrate_cp.py::_discard_this_runs_schemas
+      - qa_tools/bdm/build_per_run_warehouses.py::build_one
+      - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+    evidence:
+      - >
+        2026-09-27: tests/test_trial_runs.py drives the REAL loader -
+        a trial stages real rows into `trial_<stamp>`, its views
+        resolve through `qa_trial_<stamp>`, shared staging is
+        unchanged throughout, and after discard() no schema of the
+        trial's remains and orphan_schemas() is empty.
+      - >
+        2026-09-27: tests/test_hand_filing.py files real deliveries
+        into an isolated tree - the run id comes back from
+        recognition (`run_001`, `cp_run_001`), the receipt is written
+        outside the delivery, the file is stored byte-for-byte, six
+        files make ONE delivery, the delivery log gets its record
+        immediately rather than at the next pipeline run, and an
+        unplaceable name is refused with nothing written.
+      - >
+        2026-09-27: at the command level,
+        test_qa_command_local_file_commit_files_a_real_delivery_and_promotes
+        (BDM) and
+        test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files
+        (CP) drive the real four-tool chain end to end and check the
+        filed delivery, the recognised id and what the command says
+        it did; their trial counterparts assert nothing was filed and
+        that the output never calls a filed run local-only.
+      - >
+        2026-09-27: qa_tools/common/local_check.py and its tests are
+        deleted. `run_id_from_path()` was the only route by which a
+        user-supplied filename could become a run id, which is
+        criterion 4 enforced by absence rather than by a rule.

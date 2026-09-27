@@ -101,7 +101,7 @@ def _current_frame(run_id: str):
     """This run's `sex` column, from the warehouse.
 
     NO CSV FALLBACK (REQ-PIPE-102, 2026-09-27). There used to be one,
-    "for the ad-hoc local-file path where somebody is checking a file
+    "for the local-file path where somebody is checking a file
     that was never staged" - and that premise was simply not true:
     `run_single()` calls `build_one()` before any tool runs, because
     the other three read the warehouse and would have nothing to read
@@ -139,8 +139,8 @@ def _reference_frame(reference_run_id: str):
     `dataset_stats` wrote its `sex` distribution down when it ran.
 
     WHERE NOTHING WAS RECORDED, THE WAREHOUSE - never a file
-    (REQ-PIPE-102). An ad-hoc check names a reference run that has
-    never been through QA here, so there is no recording yet and its
+    (REQ-PIPE-102). A hand-supplied check names a reference run that
+    has never been through QA here, so there is no recording yet and its
     rows were staged moments ago. Reading them is not the permissive
     fallback this removed: that one answered a failed database read
     from a copy on disk.

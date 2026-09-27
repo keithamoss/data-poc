@@ -7,8 +7,10 @@ from __future__ import annotations
 import json
 
 from qa_tools.common import tables_read
+from qa_tools.common import hand_filing
 import os
 import re
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from click.testing import CliRunner
@@ -298,12 +300,16 @@ def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypat
 # check_file.py's own standalone CLI logic folded into qa_command's
 # --file/--reference-file flags (mothman is the only entry point now).
 
-def test_qa_command_local_file_reports_real_failures_and_never_touches_real_qa_results(
+def test_qa_command_local_file_is_a_trial_when_nobody_said_to_keep_it(
         monkeypatch, tmp_path, bdm_raw_dir):
+    """REQ-PIPE-103 criteria 2 and 8. With no flag and no terminal there
+    is nobody to ask, and the two wrong answers are not equally wrong -
+    a trial that should have been kept costs a re-run; a delivery filed
+    on somebody's behalf is a public record of an arrival they did not
+    agree to."""
     raw_dir = str(tmp_path / "raw")
-    duckdb_dir = str(tmp_path / "duckdb_runs")
     os.makedirs(raw_dir)
-    _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir)
+    _patch_bdm_dirs(monkeypatch, raw_dir, None)
     fake_qa_results = tmp_path / "not_the_real_qa_results"
     monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
 
@@ -314,18 +320,60 @@ def test_qa_command_local_file_reports_real_failures_and_never_touches_real_qa_r
 
     assert result.exit_code == 1, result.output
     assert "fail" in result.output.lower()
-    assert "local-only check" in result.output
+    assert "nothing was filed and nothing was recorded" in _flat(result.output)
     assert not fake_qa_results.exists()
+    assert not (Path(raw_dir) / "deliveries").exists(), \
+        "a trial filed a delivery"
 
 
-def test_qa_command_local_file_commit_promotes_into_the_patched_qa_results_dir(
-        monkeypatch, tmp_path, bdm_raw_dir):
-    raw_dir = str(tmp_path / "raw")
-    duckdb_dir = str(tmp_path / "duckdb_runs")
-    os.makedirs(raw_dir)
-    _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir)
+def test_qa_command_local_file_commit_files_a_real_delivery_and_promotes(
+        monkeypatch, tmp_path, bdm_raw_dir, bdm_delivery_dirs):
+    """The other half of criterion 1: keeping files the supply as a
+    real delivery BEFORE anything runs, and the run's id comes back
+    from recognition rather than from the file's name.
+
+    THE FILE IS COPIED FIRST, and named to match the dataset's own
+    arrival pattern, because a name recognition cannot place is
+    refused outright (Keith, 2026-09-27) - the fixture's own
+    `pytest_bdm_ref.csv` is exactly such a name.
+    """
+    raw_dir = tmp_path / "raw"
+    (raw_dir).mkdir()
+    _patch_bdm_dirs(monkeypatch, str(raw_dir), None)
     fake_qa_results = tmp_path / "not_the_real_qa_results"
     monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
+    monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
+
+    supplied = tmp_path / "birth_registrations_2026-01-01.csv"
+    supplied.write_bytes(Path(bdm_raw_dir, f"{_REF_RUN_ID}.csv").read_bytes())
+
+    result = _runner.invoke(bdm.qa_command, [
+        "--file", str(supplied),
+        "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--commit",
+    ])
+
+    assert result.exit_code == 0, result.output
+    assert "Promoted" in result.output
+    # THE RUN IS AN ORDINARY ARRIVAL, first in an empty tree.
+    assert "recognised as run_001" in _flat(result.output)
+    assert "is a real arrival" in _flat(result.output)
+    assert (raw_dir / "deliveries").exists(), "keeping filed no delivery"
+    matches = list(fake_qa_results.glob(
+        f"{bdm.AGENCY_ID}/{bdm.COLLECTION_ID}/{tables_read.RAW_SCOPE}/*/dataset_stats.json"))
+    assert len(matches) == 1
+    with open(matches[0]) as f:
+        assert json.load(f)["run_by"] == "test@example.com"
+
+
+def test_qa_command_local_file_commit_refuses_a_name_recognition_cannot_place(
+        monkeypatch, tmp_path, bdm_raw_dir):
+    """Keith's own call over renaming the file to fit or filing it
+    unplaceable: a run's identity comes from recognising its files by
+    name, so a file we cannot place has no run to be."""
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    _patch_bdm_dirs(monkeypatch, str(raw_dir), None)
     monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(bdm.qa_command, [
@@ -334,13 +382,12 @@ def test_qa_command_local_file_commit_promotes_into_the_patched_qa_results_dir(
         "--commit",
     ])
 
-    assert result.exit_code == 0, result.output
-    assert "Promoted" in result.output
-    matches = list(fake_qa_results.glob(
-        f"{bdm.AGENCY_ID}/{bdm.COLLECTION_ID}/{tables_read.RAW_SCOPE}/*/dataset_stats.json"))
-    assert len(matches) == 1
-    with open(matches[0]) as f:
-        assert json.load(f)["run_by"] == "test@example.com"
+    assert result.exit_code != 0
+    assert "matches no dataset" in _flat(result.output)
+    assert "trial" in _flat(result.output), \
+        "the refusal must name the way forward, not just the problem"
+    assert not (raw_dir / "deliveries").exists()
+    assert not (raw_dir / "receipts").exists()
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -463,27 +510,33 @@ def test_run_check_s3_downloads_both_keys_then_delegates_to_local_file_mode(monk
 
     captured = {}
 
-    def _fake_run_check_local_file(csv_path, reference_csv, run_by, run_id=None, run_date=None, **kwargs):
+    def _fake_run_check_local_file(csv_path, reference_csv, run_by, run_id=None,
+                                    run_date=None, keep=None, **kwargs):
         captured["csv_path"] = csv_path
         captured["reference_csv"] = reference_csv
         captured["run_by"] = run_by
-        captured["run_id"] = run_id
-        return [{"status": "pass"}], "/tmp/fake-results"
+        captured["keep"] = keep
+        return ([{"status": "pass"}], "/tmp/fake-results",
+                hand_filing.Filed("", "trial_x", (csv_path,), None))
 
     monkeypatch.setattr(bdm, "run_check_local_file", _fake_run_check_local_file)
 
     _fake_client = MagicMock()
-    results, tmp_dir = bdm.run_check_s3(
+    results, tmp_dir, filed = bdm.run_check_s3(
         "my-bucket", "bdm/run_005.csv", "bdm/run_004.csv", "test@example.com",
-        run_id="s3_run_005", s3_client=_fake_client)
+        s3_client=_fake_client, keep=False)
 
     assert download_calls == ["bdm/run_005.csv", "bdm/run_004.csv"]
     assert captured["csv_path"].endswith("run_005.csv")
     assert captured["reference_csv"].endswith("run_004.csv")
     assert captured["run_by"] == "test@example.com"
-    assert captured["run_id"] == "s3_run_005"
+    # THE ANSWER IS WHAT TRAVELS DOWN, not a run id (REQ-PIPE-103) -
+    # S3 mode is still "download, then Local files mode", and the
+    # thing it must forward unchanged is the operator's decision.
+    assert captured["keep"] is False
     assert results == [{"status": "pass"}]
     assert tmp_dir == "/tmp/fake-results"
+    assert filed.delivery_name == ""
 
 
 def test_qa_command_s3_key_and_run_id_together_is_a_real_clean_error(monkeypatch):
@@ -534,13 +587,17 @@ def test_qa_command_s3_key_flag_mode_downloads_and_runs_real_checks(monkeypatch)
 
     captured = {}
 
-    def _fake_run_check_s3(bucket, key, reference_key, run_by, run_id=None, run_date=None, s3_client=None, **kwargs):
-        captured.update(bucket=bucket, key=key, reference_key=reference_key, run_by=run_by, run_id=run_id)
-        return [{"status": "pass"}], "/tmp/fake-results"
+    def _fake_run_check_s3(bucket, key, reference_key, run_by, run_id=None, run_date=None,
+                            s3_client=None, keep=None, **kwargs):
+        captured.update(bucket=bucket, key=key, reference_key=reference_key,
+                        run_by=run_by, run_id=run_id, keep=keep)
+        return ([{"status": "pass"}], "/tmp/fake-results",
+                hand_filing.Filed("", "trial_x", (key,), None))
 
     monkeypatch.setattr(bdm, "run_check_s3", _fake_run_check_s3)
 
     result = _runner.invoke(bdm.qa_command, [
+        "--trial",
         "--s3-key", "bdm/birth_registrations_2026-01-02.csv",
         "--s3-reference-key", "bdm/birth_registrations_2026-01-01.csv",
     ])
@@ -549,12 +606,12 @@ def test_qa_command_s3_key_flag_mode_downloads_and_runs_real_checks(monkeypatch)
     assert captured["bucket"] == "my-bucket"
     assert captured["key"] == "bdm/birth_registrations_2026-01-02.csv"
     assert captured["reference_key"] == "bdm/birth_registrations_2026-01-01.csv"
-    assert captured["run_by"] == "local-check:not-persisted"
-    # Hyphens become underscores (2026-09-27): a run id is a PostgreSQL
-    # schema name, and run_id_from_path normalises at mint rather than the
-    # schema being hex-encoded at the point of use. The S3 key's own date
-    # is still readable in it.
-    # CAPPED STEM (2026-09-27) - the recognisable start of the key's
-    # filename, not all of it. See tests/test_local_check.py's own
-    # TestTheStemIsCapped for the arithmetic.
-    assert captured["run_id"].startswith("s3_birth_registrat_")
+    assert captured["run_by"] == "trial:not-recorded"
+    # NO RUN ID FROM THE CALLER ANY MORE (REQ-PIPE-103). The command
+    # no longer mints one out of the key's filename - the decision
+    # taken inside run_check_s3() does, from recognition for a kept
+    # supply and from the clock for a trial. What the command passes
+    # down is the ANSWER, not an identity.
+    assert captured["run_id"] is None
+    assert captured["keep"] is False
+    assert "nothing was filed and nothing was recorded" in _flat(result.output)

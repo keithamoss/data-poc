@@ -28,7 +28,7 @@ from __future__ import annotations
 import os
 
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
-from qa_tools.common import arrivals, asset_time, load_log, supply_db
+from qa_tools.common import arrivals, asset_time, load_log, supply_db, trial
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
@@ -90,6 +90,13 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
     conn = supply_db.connect(dsn=dsn)
     try:
         supply_db.ensure_schemas(conn)
+        # WHERE THIS RUN'S SUPPLIES GO. Shared `staging` for a real
+        # arrival; a schema of the trial's own for a trial, so that
+        # declining to keep a check leaves nothing among real supplies
+        # even in principle (REQ-PIPE-103 criterion 6). Read from the
+        # run id rather than passed in - see supply_db.is_trial_run().
+        staging = supply_db.ensure_staging(conn, run_id)
+        log_dir = trial.log_dir(run_id, log_dir)
         rows = None
         try:
             null_values = load_null_values_by_column(contract_path).get(TABLE, {})
@@ -110,7 +117,7 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
                 # now a call rather than a statement - the inference and
                 # the storage are two engines.
                 supply_db.load_csv_into(
-                    conn, supply_db.STAGING_SCHEMA, physical,
+                    conn, staging, physical,
                     staging_csv, DUCKDB_NULLSTR)
             finally:
                 os.remove(staging_csv)
@@ -131,7 +138,7 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
             # (DependentObjectsStillExist). Dropping the views with it is
             # correct - the table failed to load, so a view onto it
             # resolves to nothing anyone should read.
-            conn.execute(f'DROP TABLE IF EXISTS "{supply_db.STAGING_SCHEMA}"."{physical}" CASCADE')
+            conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
             load_log.record_load(delivery_name, DATASET_ID, physical, load_log.FAILED,
                              asset_time.now().isoformat(),
                              reason=f"{type(exc).__name__}: {exc}", log_dir=log_dir)
@@ -144,15 +151,15 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
         load_log.record_load(delivery_name, DATASET_ID, physical, load_log.LOADED,
                          asset_time.now().isoformat(), row_count=rows, log_dir=log_dir)
         res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
-            conn, supply_db.STAGING_SCHEMA, [TABLE], arrival=key,
-            loaded=load_log.loaded_tables(log_dir)))
+            conn, staging, [TABLE], arrival=key,
+            loaded=load_log.loaded_tables(log_dir)), source_schema=staging)
         # Recorded at staging time, which is the only moment this is an
         # observed fact rather than a re-derivation.
         supply_db.record_resolution(conn, res)
     finally:
         conn.close()
 
-    print(f"{run_id}: {rows} rows -> {supply_db.STAGING_SCHEMA}.{physical}")
+    print(f"{run_id}: {rows} rows -> {staging}.{physical}")
     return physical
 
 

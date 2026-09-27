@@ -15,6 +15,7 @@ datacontract-cli/Evidently chain via orchestrate_cp.run_single(), just
 reached from a browsable questionary.path() prompt or --folder/
 --reference-folder flags instead of a positional folder argument."""
 from __future__ import annotations
+import dataclasses
 import os
 import sys
 import tempfile
@@ -28,7 +29,8 @@ from qa_tools.cp import build_cp_warehouses, cp_common, orchestrate_cp
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.lambda_results_dir import CP_MODULES, patch_write_qa_result_for_lambda
-from qa_tools.common.local_check import run_id_from_path as local_run_id_from_path
+from qa_tools.common import hand_filing
+from qa_tools.common import supply_db
 from qa_tools.common.qa_results_reader import list_run_ids
 
 from . import common
@@ -151,7 +153,19 @@ def default_reference(manifest: list[dict]) -> str:
     return manifest[0]["run_id"]
 
 
-def _load_delivery_from_folder(folder: str, run_id: str) -> None:
+def _require_all_six(folder: str) -> None:
+    """A CP delivery needs all 6 real tables - the cross-table checks
+    cannot run on a partial set. Checked BEFORE anything is filed
+    (REQ-PIPE-103), so an incomplete folder never becomes a delivery
+    record of an arrival that could not be checked."""
+    missing = [t for t in TABLES if not os.path.isfile(os.path.join(folder, f"{t}.csv"))]
+    if missing:
+        raise click.ClickException(
+            f"{folder} is missing: {', '.join(f'{t}.csv' for t in missing)} - "
+            f"a CP delivery needs all 6 real tables, the cross-table checks can't run on a partial set")
+
+
+def _load_delivery_from_folder(folder: str, run_id: str, received_at=None) -> None:
     """Loads all 6 real tables for one run_id from an arbitrary folder
     into that run's warehouse - the retired qa_tools/cp/check_delivery.py
     CLI's own _load_delivery() logic, folded in here verbatim (Phase 2).
@@ -159,13 +173,11 @@ def _load_delivery_from_folder(folder: str, run_id: str) -> None:
     delivery this run arrived in) and Local files mode
     (run_check_local_folder(), pointed at whatever folder the operator
     browsed to)."""
-    missing = [t for t in TABLES if not os.path.isfile(os.path.join(folder, f"{t}.csv"))]
-    if missing:
-        raise click.ClickException(
-            f"{folder} is missing: {', '.join(f'{t}.csv' for t in missing)} - "
-            f"a CP delivery needs all 6 real tables, the cross-table checks can't run on a partial set")
+    _require_all_six(folder)
     for table in TABLES:
-        build_cp_warehouses.add_table_to_run(run_id, table, os.path.join(folder, f"{table}.csv"))
+        build_cp_warehouses.add_table_to_run(
+            run_id, table, os.path.join(folder, f"{table}.csv"),
+            received_at=received_at)
 
 
 def _load_delivery(run_id: str) -> None:
@@ -216,7 +228,8 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
 
 def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
                             run_id: str | None = None, run_date: str | None = None,
-                            on_step=None) -> tuple[list[dict], str]:
+                            on_step=None, keep: bool | None = None
+                            ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """The Local files QA source mode's real check-running body (plans/
     tooling.md #1 Phase 2) - folds in qa_tools/cp/check_delivery.py's own
     retired logic: loads both folder and reference_folder's 6 real
@@ -226,26 +239,42 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
     flow above and Thread B's Lambda handler call. Returns (results,
     tmp_results_dir) - same tmp-dir-first Promote pattern as run_check()."""
     run_date = run_date or asset_time.now().date().isoformat()
-    run_id = run_id or local_run_id_from_path(folder)
-    reference_run_id = local_run_id_from_path(reference_folder, prefix="ref")
+    # THE WHOLE FOLDER IS ONE DELIVERY (REQ-PIPE-103). Its six files
+    # arrived together, and a delivery is the transport unit - filing
+    # one delivery per file would invent six arrivals out of one.
+    _require_all_six(folder)
+    filed = common.file_or_trial(
+        [os.path.join(folder, f"{t}.csv") for t in TABLES],
+        "child-protection", "cp_run_", keep=keep)
+    if run_id is not None and not filed.delivery_name:
+        filed = dataclasses.replace(filed, run_id=run_id)
+    run_id = filed.run_id
+    folder = os.path.dirname(filed.paths[0])
+    reference_run_id = common.reference_run_id()
 
     tmp_dir = common.new_tmp_results_dir()
     patch_write_qa_result_for_lambda(CP_MODULES, tmp_dir)
 
     _load_delivery_from_folder(reference_folder, reference_run_id)
-    _load_delivery_from_folder(folder, run_id)
+    _load_delivery_from_folder(folder, run_id, received_at=filed.received_at)
 
     entry = {"run_id": run_id, "dirty_severity": None,
-             "received_at": asset_time.isoformat(asset_time.start_of_day(date.fromisoformat(run_date)))}
-    results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by,
-                                        on_step=on_step)
-    return results, tmp_dir
+             "received_at": asset_time.isoformat(
+                 filed.received_at
+                 or asset_time.start_of_day(date.fromisoformat(run_date)))}
+    try:
+        results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id,
+                                            run_by=run_by, on_step=on_step)
+    finally:
+        common.discard_reference(reference_run_id)
+    return results, tmp_dir, filed
 
 
 def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_prefix: str, run_by: str,
                            run_id: str | None = None, run_date: str | None = None,
                            s3_client=None,
-                                on_step=None) -> tuple[list[dict], str]:
+                                on_step=None, keep: bool | None = None
+                                ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """The S3 QA source mode's real check-running body for Child
     Protection (plans/tooling.md #1 Phase 3) - a delivery here is all 6
     real table CSVs landing together under one shared S3 prefix
@@ -262,12 +291,13 @@ def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_
     s3_source.download_prefix(bucket, delivery_prefix, staging_dir, s3_client=s3_client)
     s3_source.download_prefix(bucket, reference_delivery_prefix, reference_staging_dir, s3_client=s3_client)
     return run_check_local_folder(staging_dir, reference_staging_dir, run_by, run_id=run_id, run_date=run_date,
-                                   on_step=on_step)
+                                   on_step=on_step, keep=keep)
 
 
 def run_check_single_table(table: str, file_path: str, run_by: str,
                             run_id: str | None = None, run_date: str | None = None,
-                            on_step=None) -> tuple[list[dict], str]:
+                            on_step=None, keep: bool | None = None
+                            ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """Single-table Child Protection QA (plans/tooling.md #1's own
     "Single-table Child Protection QA" design, Phase 3.5) - a real
     partial-resupply scenario (one table re-sent after a fix, the other
@@ -300,30 +330,53 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
             f"already on disk to source the other 5 tables from.")
 
     run_date = run_date or asset_time.now().date().isoformat()
-    run_id = run_id or local_run_id_from_path(file_path, prefix="table")
+    # ONE FILE IS A ONE-FILE DELIVERY (REQ-PIPE-103 criterion 7), which
+    # is what a partial resupply actually is: the supplier re-sent one
+    # table and nothing else.
+    filed = common.file_or_trial([file_path], "child-protection", "cp_run_", keep=keep)
+    if run_id is not None and not filed.delivery_name:
+        filed = dataclasses.replace(filed, run_id=run_id)
+    run_id = filed.run_id
+    file_path = filed.paths[0]
 
     tmp_dir = common.new_tmp_results_dir()
     patch_write_qa_result_for_lambda(CP_MODULES, tmp_dir)
 
     _load_delivery(other_tables_run_id)  # full 6-table warehouse, doubles as the Evidently reference
 
-    other_tables_dir = arrival_path(other_tables_run_id)
-    for other_table in (t for t in TABLES if t != table):
-        build_cp_warehouses.add_table_to_run(
-            run_id, other_table, os.path.join(other_tables_dir, f"{other_table}.csv"))
-    build_cp_warehouses.add_table_to_run(run_id, table, file_path)
+    build_cp_warehouses.add_table_to_run(run_id, table, file_path,
+                                          received_at=filed.received_at)
+    # THE OTHER FIVE ARE BORROWED, NEVER RE-STAGED (REQ-PIPE-103). They
+    # were staged when they really arrived, in the run this one is
+    # reading them from; staging them again under THIS arrival would
+    # record five tables as having arrived in a delivery that carried
+    # one. supply_db.borrow_views() gives the run a view onto each
+    # instead, which is exactly what "unchanged since last time"
+    # means.
+    with supply_db.connect(label="mothman:cp-single-table") as conn:
+        borrowed = supply_db.borrow_views(
+            conn, run_id, other_tables_run_id, [t for t in TABLES if t != table])
+    missing = sorted({t for t in TABLES if t != table} - set(borrowed))
+    if missing:
+        raise click.ClickException(
+            f"run {other_tables_run_id!r} has no resolved supply for "
+            f"{', '.join(missing)}, so the other tables cannot be read from it - "
+            f"CP's cross-table checks need all six.")
 
     entry = {"run_id": run_id, "dirty_severity": None,
-             "received_at": asset_time.isoformat(asset_time.start_of_day(date.fromisoformat(run_date)))}
+             "received_at": asset_time.isoformat(
+                 filed.received_at
+                 or asset_time.start_of_day(date.fromisoformat(run_date)))}
     results = orchestrate_cp.run_single(entry, reference_run_id=other_tables_run_id, run_by=run_by,
                                         on_step=on_step)
-    return results, tmp_dir
+    return results, tmp_dir, filed
 
 
 def run_check_s3_single_table(bucket: str, table: str, key: str, run_by: str,
                                run_id: str | None = None, run_date: str | None = None,
                                s3_client=None,
-                                on_step=None) -> tuple[list[dict], str]:
+                                on_step=None, keep: bool | None = None
+                                ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """Single-table Child Protection QA's S3 source mode (Phase 3.5) -
     downloads the one real table object (real boto3, via
     qa_tools.common.s3_source), then reuses run_check_single_table()
@@ -333,7 +386,7 @@ def run_check_s3_single_table(bucket: str, table: str, key: str, run_by: str,
     staging_dir = tempfile.mkdtemp(prefix="mothman-s3-")
     local_path = s3_source.download_key(bucket, key, staging_dir, s3_client=s3_client)
     return run_check_single_table(table, local_path, run_by, run_id=run_id, run_date=run_date,
-                                   on_step=on_step)
+                                   on_step=on_step, keep=keep)
 
 
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
@@ -387,6 +440,17 @@ def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_defaul
         common.report_promoted(dst)
     else:
         console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
+
+
+def _finish_supply(results: list[dict], filed, tmp_dir: str) -> None:
+    """Report a hand-supplied check, and do what the operator already
+    said (REQ-PIPE-103 criterion 8) - see cli/bdm.py's counterpart for
+    why there is no second question."""
+    console.print(report_table(results, filed.run_id))
+    if filed.delivery_name:
+        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, filed.run_id)
+        common.report_promoted(dst)
+    common.say_what_it_did(filed.run_id, filed.delivery_name)
 
 
 def run_qa_interactive(commit_default: bool = False) -> None:
@@ -461,13 +525,13 @@ def _run_qa_interactive_local_folder(run_by: str, commit_default: bool) -> None:
     if reference_folder is None:
         return
 
-    run_id = local_run_id_from_path(folder)
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {folder}...",
                   style="dim")
-    with common.chain_progress(run_id) as on_step:
-        results, tmp_dir = run_check_local_folder(folder, reference_folder, run_by, run_id=run_id,
-                                                   on_step=on_step)
-    _offer_promote(results, run_id, tmp_dir, commit_default)
+    with common.chain_progress(os.path.basename(folder.rstrip("/"))) as on_step:
+        results, tmp_dir, filed = run_check_local_folder(
+            folder, reference_folder, run_by, on_step=on_step,
+            keep=True if commit_default else None)
+    _finish_supply(results, filed, tmp_dir)
 
 
 def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
@@ -494,13 +558,13 @@ def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
     if reference_delivery is None:
         return
 
-    run_id = local_run_id_from_path(delivery, prefix="s3")
     console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                   f"for s3://{bucket}/{delivery}...", style="dim")
-    with common.chain_progress(run_id) as on_step:
-        results, tmp_dir = run_check_s3_delivery(bucket, delivery, reference_delivery, run_by,
-                                                  run_id=run_id, on_step=on_step)
-    _offer_promote(results, run_id, tmp_dir, commit_default)
+    with common.chain_progress(delivery.rstrip("/").rsplit("/", 1)[-1]) as on_step:
+        results, tmp_dir, filed = run_check_s3_delivery(
+            bucket, delivery, reference_delivery, run_by, on_step=on_step,
+            keep=True if commit_default else None)
+    _finish_supply(results, filed, tmp_dir)
 
 
 def _run_qa_interactive_single_table(run_by: str, commit_default: bool) -> None:
@@ -530,24 +594,24 @@ def _run_qa_interactive_single_table(run_by: str, commit_default: bool) -> None:
         key = common.select(f"Pick the {table} object to check:", keys, flag_hint=flag_hint)
         if key is None:
             return
-        run_id = local_run_id_from_path(key, prefix="table")
         console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                       f"for s3://{bucket}/{key} (table: {table})...", style="dim")
-        with common.chain_progress(run_id) as on_step:
-            results, tmp_dir = run_check_s3_single_table(bucket, table, key, run_by, run_id=run_id,
-                                                          on_step=on_step)
+        with common.chain_progress(key.rsplit("/", 1)[-1]) as on_step:
+            results, tmp_dir, filed = run_check_s3_single_table(
+                bucket, table, key, run_by, on_step=on_step,
+                keep=True if commit_default else None)
     else:
         file_path = common.path_prompt(f"Path to the {table} CSV you've already downloaded:", flag_hint=flag_hint)
         if file_path is None:
             return
-        run_id = local_run_id_from_path(file_path, prefix="table")
         console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {file_path} "
                       f"(table: {table})...", style="dim")
-        with common.chain_progress(run_id) as on_step:
-            results, tmp_dir = run_check_single_table(table, file_path, run_by, run_id=run_id,
-                                                       on_step=on_step)
+        with common.chain_progress(os.path.basename(file_path)) as on_step:
+            results, tmp_dir, filed = run_check_single_table(
+                table, file_path, run_by, on_step=on_step,
+                keep=True if commit_default else None)
 
-    _offer_promote(results, run_id, tmp_dir, commit_default)
+    _finish_supply(results, filed, tmp_dir)
 
 
 @click.group("cp")
@@ -608,10 +672,17 @@ def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bo
 @click.option("--s3-key", default=None,
               help="Single-table mode: an object key under the dataset's s3Source prefix for --table "
                    "(instead of --s3-delivery).")
-@click.option("--commit", is_flag=True, help="Write this run into the real, permanent qa_results/ history.")
+@click.option("--commit", is_flag=True,
+              help="Keep it: file the supply as a real delivery received now, and write "
+                   "this run into the real, permanent qa_results/ history.")
+@click.option("--trial", is_flag=True,
+              help="Run it as a TRIAL: the same four tools against the same rows, filed "
+                   "nowhere and recorded nowhere. The opposite of --commit, stated so a "
+                   "script never relies on a default it cannot see.")
 def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: str | None,
                reference_folder: str | None, s3_delivery: str | None, s3_reference_delivery: str | None,
-               table: str | None, table_file: str | None, s3_key: str | None, commit: bool) -> None:
+               table: str | None, table_file: str | None, s3_key: str | None, commit: bool,
+               trial: bool) -> None:
     """Run the real QA check chain against a Child Protection run - Synthetic (--run-id),
     Local files (--folder/--reference-folder), S3 (--s3-delivery/--s3-reference-delivery), or
     single-table (--table plus --file or --s3-key) source mode."""
@@ -626,20 +697,19 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
                 "--s3-delivery (those are full-delivery modes).")
         if (table_file is None) == (s3_key is None):
             raise click.ClickException("--table requires exactly one of --file or --s3-key.")
-        run_by = get_run_by() if commit else "local-check:not-persisted"
+        run_by = get_run_by() if commit else "trial:not-recorded"
+        keep = common.keep_from_flags(commit, trial)
         if table_file is not None:
-            local_run_id = local_run_id_from_path(table_file, prefix="table")
-            with common.chain_progress(local_run_id) as on_step:
-                results, tmp_dir = run_check_single_table(table, table_file, run_by,
-                                                           run_id=local_run_id, on_step=on_step)
+            with common.chain_progress(os.path.basename(table_file)) as on_step:
+                results, tmp_dir, filed = run_check_single_table(
+                    table, table_file, run_by, on_step=on_step, keep=keep)
         else:
             bucket = common.raw_bucket_name()
-            local_run_id = local_run_id_from_path(s3_key, prefix="table")
-            with common.chain_progress(local_run_id) as on_step:
-                results, tmp_dir = run_check_s3_single_table(bucket, table, s3_key, run_by,
-                                                              run_id=local_run_id, on_step=on_step)
-        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
-        return
+            with common.chain_progress(s3_key.rsplit("/", 1)[-1]) as on_step:
+                results, tmp_dir, filed = run_check_s3_single_table(
+                    bucket, table, s3_key, run_by, on_step=on_step, keep=keep)
+        _finish_supply(results, filed, tmp_dir)
+        sys.exit(1 if has_failures(results) else 0)
 
     if s3_delivery is not None:
         if run_id is not None or folder_path is not None:
@@ -650,13 +720,13 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
             raise click.ClickException(
                 "--s3-delivery requires --s3-reference-delivery (a known-good delivery prefix to compare against).")
         bucket = common.raw_bucket_name()
-        run_by = get_run_by() if commit else "local-check:not-persisted"
-        local_run_id = local_run_id_from_path(s3_delivery, prefix="s3")
-        with common.chain_progress(local_run_id) as on_step:
-            results, tmp_dir = run_check_s3_delivery(bucket, s3_delivery, s3_reference_delivery, run_by,
-                                                      run_id=local_run_id, on_step=on_step)
-        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
-        return
+        run_by = get_run_by() if commit else "trial:not-recorded"
+        with common.chain_progress(s3_delivery.rstrip("/").rsplit("/", 1)[-1]) as on_step:
+            results, tmp_dir, filed = run_check_s3_delivery(
+                bucket, s3_delivery, s3_reference_delivery, run_by, on_step=on_step,
+                keep=common.keep_from_flags(commit, trial))
+        _finish_supply(results, filed, tmp_dir)
+        sys.exit(1 if has_failures(results) else 0)
 
     if folder_path is not None:
         if run_id is not None:
@@ -665,13 +735,13 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         if reference_folder is None:
             raise click.ClickException(
                 "--folder requires --reference-folder (a known-good delivery folder to compare against).")
-        run_by = get_run_by() if commit else "local-check:not-persisted"
-        local_run_id = local_run_id_from_path(folder_path)
-        with common.chain_progress(local_run_id) as on_step:
-            results, tmp_dir = run_check_local_folder(folder_path, reference_folder, run_by,
-                                                       run_id=local_run_id, on_step=on_step)
-        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
-        return
+        run_by = get_run_by() if commit else "trial:not-recorded"
+        with common.chain_progress(os.path.basename(folder_path.rstrip("/"))) as on_step:
+            results, tmp_dir, filed = run_check_local_folder(
+                folder_path, reference_folder, run_by, on_step=on_step,
+                keep=common.keep_from_flags(commit, trial))
+        _finish_supply(results, filed, tmp_dir)
+        sys.exit(1 if has_failures(results) else 0)
 
     if run_id is None:
         if not (sys.stdin.isatty() and sys.stdout.isatty()):

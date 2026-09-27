@@ -52,7 +52,7 @@ def _current_frame(run_id: str):
     or a wrong schema produced a drift number computed from a file
     rather than an error - a plausible-looking answer to a question
     that had actually failed. Every path that reaches here stages into
-    the warehouse first, ad-hoc checks included, so there is no case
+    the warehouse first, hand-supplied checks included, so there is no case
     left where the rows are absent and a file would still be right.
     """
     import pandas as pd
@@ -98,8 +98,8 @@ def _reference_frame(reference_run_id: str):
     # NO RECORDING YET, SO READ THE WAREHOUSE - never a CSV
     # (REQ-PIPE-102 criterion 4). A recorded distribution is the
     # preferred source because it keeps working after the reference
-    # supply's own rows have aged out of staging; but an ad-hoc check
-    # against a folder of files creates a brand-new reference run that
+    # supply's own rows have aged out of staging; but a check against
+    # a folder somebody handed us creates a brand-new reference run that
     # has never been QA'd, so there is nothing recorded for it yet and
     # its rows are right there, freshly staged. Reading them is not the
     # permissive fallback this requirement removed - that one answered

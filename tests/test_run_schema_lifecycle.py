@@ -16,7 +16,7 @@ database, so a run dropping its own schema does not touch a sibling's.
 WHY IT IS WORTH FIXING RATHER THAN LEAVING. A blanket sweep cannot tell
 a schema left by an interrupted run from one belonging to a run that is
 happening right now in another process - so the tidy-up was a hazard to
-any concurrent ad-hoc check, and the window it was live for was the
+any check somebody was running right then, and the window it was the
 whole length of the batch. Discarding per run removes both: nothing
 sweeps what it did not create, and a schema exists for exactly as long
 as the run that reads through it.
@@ -150,7 +150,15 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
 
 
 def test_two_runs_over_the_same_files_do_not_share_a_staged_table(db):
-    """Two ad-hoc runs are two arrivals, whatever their names look like.
+    """Two runs with no receipt are two arrivals, whatever their names
+    look like.
+
+    THE IDS BELOW ARE HISTORICAL. `adhoc_`/`ref_` is the shape this
+    project minted before REQ-PIPE-103 replaced it with a run id from
+    recognition for a kept supply and `trial_<stamp>` for a trial.
+    They are kept verbatim because they are what actually reproduced
+    the bug, and because the rule they pin holds for any id, not just
+    the two shapes we happen to mint today.
 
     THE BUG, found 2026-09-27 and pre-existing rather than introduced:
     a run staged with no receipt falls back to its RUN ID as the
@@ -188,10 +196,11 @@ def test_a_real_receipt_instant_still_names_the_table_exactly_as_before(db):
 def test_a_long_run_id_still_fits_a_postgres_identifier(db):
     """Distinct is not enough - it has to fit.
 
-    Making the run-id arrival segment lossless (so two ad-hoc runs
-    stop sharing a staged table) made it LONG, and the ad-hoc run ids
-    are long to begin with: `adhoc_birth_registrations_2026_09_20_
-    20260927t041329z` produced a 74-byte table name against
+    Making the run-id arrival segment lossless (so two runs with no
+    receipt stop sharing a staged table) made it LONG, and the run
+    ids of the day were long to begin with:
+    `adhoc_birth_registrations_2026_09_20_20260927t041329z` produced
+    a 74-byte table name against
     PostgreSQL's 63-byte limit. The loader's own guard caught it and
     refused rather than letting the name truncate into a collision,
     which is the right failure - but a real `mothman bdm qa --file`
@@ -203,9 +212,9 @@ def test_a_long_run_id_still_fits_a_postgres_identifier(db):
     name = db_mod.staged_table("birth_registrations", long_id)
     assert len(name.encode()) <= 63, f"{name} is {len(name.encode())} bytes"
 
-    # AND STILL DISTINCT. Truncation alone would collide two ad-hoc
-    # runs of the same dataset on the same day, which is the bug this
-    # segment exists to prevent.
+    # AND STILL DISTINCT. Truncation alone would collide two runs of
+    # the same dataset on the same day, which is the bug this segment
+    # exists to prevent.
     sibling = db_mod.staged_table(
         "birth_registrations", "adhoc_birth_registrations_2026_09_20_20260927t041330z")
     assert name != sibling, "two long run ids collapsed to one staged table"
@@ -224,7 +233,7 @@ def test_an_arrival_segment_never_contains_the_separator(db):
     """`__` separates the parts of a staged table name, so a segment
     containing one splits the name in the wrong place.
 
-    Found by running the real ad-hoc path: the bounded segment was
+    Found by running the real hand-supplied path: the bounded segment was
     built as `<truncated>_<digest>`, the truncation ended on an
     underscore, and the result was
     `birth_registrations__adhoc_pytest_bdm_dirty__f5108854`.

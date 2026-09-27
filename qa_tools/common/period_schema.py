@@ -282,6 +282,17 @@ def create_overlay_views(conn, run_id: str, period_name: str,
     that the table is unreadable for this run - falling back to the
     promoted table would silently QA the delivery against data it did
     not contain, which reads green and means nothing.
+
+    "STAGING" IS THIS RUN'S OWN STAGING SCHEMA, not the shared
+    constant (REQ-PIPE-103). A trial stages into a schema of its own
+    and never writes into shared `staging` at all, so reading the
+    constant here would find none of its tables - and every one of
+    them would take the fall-through above to the period's PROMOTED
+    version. The trial would then report on data the operator never
+    handed us while appearing to check their file: a false green in
+    the dangerous direction, and silent. Nothing calls this function
+    yet; the line is here so that whoever wires it up inherits the
+    right behaviour instead of that bug.
     """
     promoted = dict(promoted or {})
     schema = supply_db.run_schema(run_id)
@@ -298,7 +309,8 @@ def create_overlay_views(conn, run_id: str, period_name: str,
             res.ambiguous[logical] = candidates
             continue
         if candidates:
-            physical, source_schema, origin = candidates[0], supply_db.STAGING_SCHEMA, FROM_STAGING
+            physical, source_schema, origin = (
+                candidates[0], supply_db.staging_schema_for(run_id), FROM_STAGING)
         else:
             physical, source_schema, origin = (newest(promoted.get(logical) or ()),
                                                 period, FROM_PERIOD)

@@ -106,7 +106,7 @@ class TestReadingTheRealCommittedHistory:
             ec.recorded_row_count(self.AGENCY, self.COLLECTION, "run_001")
 
     def test_an_unknown_run_reads_as_absent_rather_than_raising(self):
-        """Absence is ordinary - a run checked ad hoc and never staged
+        """Absence is ordinary - a run checked as a trial and never staged
         has no recorded stats, and the caller falls back."""
         assert ec.reference_value_counts(self.AGENCY, self.COLLECTION, "no_such_run", "sex") is None
         assert ec.recorded_row_count(self.AGENCY, self.COLLECTION, "no_such_run") is None

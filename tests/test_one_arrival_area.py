@@ -153,10 +153,10 @@ def test_no_module_still_exports_a_retired_constant(module_name):
 # BDM's STAGING never kept a second copy - that part was CP-only - but
 # its generator did exactly what CP's did: a flat `data/raw/<run_id>.csv`
 # per run AND a real delivery. The difference that matters is that
-# `data/raw/` keeps a live role CP's tree did not: it is where the
-# ad-hoc `mothman bdm qa --local-file` path drops a file it was handed,
-# and where run_single() normalises an arrived file to. So the flat
-# GENERATED copies go and the directory stays.
+# `data/raw/` looked at first as though it kept a live role CP's tree
+# did not - the drop directory for a file handed to
+# `mothman bdm qa --file`. It did not, and the next section records
+# why. So the flat GENERATED copies go and so does the directory.
 
 
 def test_the_bdm_generator_writes_a_delivery_and_nothing_beside_it():
@@ -213,7 +213,8 @@ def test_the_bdm_loader_has_no_raw_directory_at_all():
 # ---- data/raw/ goes too (Keith, 2026-09-27: "I'd rather it not" stay) ----
 #
 # The earlier version of this requirement kept data/raw/ on the grounds
-# that it was the ad-hoc drop directory. That was true of the code as it
+# that it was the drop directory for a hand-supplied file. That was
+# true of the code as it
 # stood and wrong about why. The directory existed to let Evidently
 # resolve a CSV by RELATIVE name; run_single() copied every arriving
 # file into it for that reason, and run_check_local_file() copied the

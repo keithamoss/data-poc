@@ -481,12 +481,21 @@ def tidy_command(yes: bool) -> None:
     run happening RIGHT NOW in another process. A person can.
 
     So this asks first, and names what it is about to drop.
+
+    A CRASHED TRIAL IS THE OTHER THING THIS CLEARS (REQ-PIPE-103). A
+    trial drops all of its schemas in one transaction when it ends,
+    so nothing is ever half-cleared - but `kill -9` still leaves the
+    lot, and a trial's staging schema is one of them. They are listed
+    here for the same reason and on the same terms: identifiable from
+    their names alone, and never dropped without being shown first.
     """
-    from qa_tools.common import supply_db
+    from qa_tools.common import supply_db, trial
 
     conn = supply_db.connect(label="mothman:supply-tidy")
     try:
-        leftovers = supply_db.run_schemas(conn) + supply_db.dbt_schemas(conn)
+        leftovers = sorted(set(
+            supply_db.run_schemas(conn) + supply_db.dbt_schemas(conn)
+            + trial.orphan_schemas(conn)))
         if not leftovers:
             console.print("[green]Nothing to tidy[/green] - no per-run schemas are left over.")
             return

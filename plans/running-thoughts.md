@@ -3934,54 +3934,102 @@ Belongs with batch 5's check work.
     Sits naturally alongside #50's environment work and after
     REQ-PIPE-089; not started.
 
-52. **[todo, 2026-09-27]** **[Pipeline & publishing]** A supply someone receives and checks BY HAND leaves no arrival record, so only automated deliveries exist as far as the delivery log and the dashboard are concerned.
+52. **[todo, 2026-09-27]** **[Pipeline & publishing]** A hand-filed supply records the moment somebody ran the tool as its receipt, and nothing anywhere says that is what it is.
 
-    Keith's own observation, 2026-09-27: "let's think about whether a
-    user using real local dev / S3 data should actually write a
-    delivery to the log... I feel like they should because without it
-    only automated deliveries get a delivery log entry, not ones we
-    receive and process manually... and without deliveries being
-    logged it would impact what's shown in the dashboard, right?"
+    Keith's own question, 2026-09-27, the same day REQ-PIPE-103
+    shipped: "when a human runs the TUI and writes a local/S3 file,
+    does it show in the log that it came from a human and not the
+    automated system? So we can look back and tell which are REAL
+    delivery times and which are 'whenever the human got around to
+    running the tool'?"
 
-    **He is right on the fact.** `delivery_log.record()` is called
-    from exactly two places - `orchestrate_bdm.run_pipeline()` and
-    `orchestrate_cp.run_pipeline_cp()` - each over the deliveries
-    recognised on disk. Every ad-hoc route (`--file`, `--folder`,
-    `--table`, S3, and the TUI's Local files mode) goes through
-    `run_single()`, which never records one. So a supply a person was
-    emailed, downloaded and checked is real work that happened and
-    leaves no trace in the arrival record, while the same supply
-    arriving in `data/deliveries/` leaves a full one.
+    **Two separate gaps, and the second is the serious one.**
 
-    And yes to the dashboard: `arrival_history` is built from that
-    log, so a hand-processed supply is missing from the arrival
-    history both datasets' pages show.
+    1. **Nothing in the record says a human filed it.** The delivery
+       log's payload has no field for it. The only signal is the
+       delivery's own directory name - `handfiled-2026-09-27T140512`,
+       from `hand_filing.HAND_FILED_PREFIX` - which is a naming
+       convention rather than data, so every reader has to know to
+       parse it and none of them do.
 
-    **Three things make this more than a one-line fix, which is why it
-    is here rather than done.**
+    2. **`received_at` is the moment the operator ran the command.**
+       `hand_filing.file_supply()` defaults it to `asset_time.now()`,
+       which is the honest reading of "our own receipt" as the model
+       defines it - never the supplier's own timestamp, never the
+       file's mtime. But for a hand-received supply it collapses two
+       genuinely different facts: when we took custody of the file,
+       and when this system first saw it. A file emailed on Monday
+       and checked on Thursday is recorded as arriving Thursday.
 
-    1. **The prune would delete it again.** `mothman pipeline run`
-       prunes the delivery log against `delivery.survey().received` -
-       the deliveries actually on disk - so a record for a file that
-       was never in `data/deliveries/` is removed on the next pipeline
-       run. Any fix has to either file the ad-hoc supply as a real
-       delivery, or teach the prune what a hand-received record is.
-    2. **`--commit` is the line, probably.** A local-only check
-       deliberately writes no `qa_results/` history; logging an
-       arrival for one would leave an arrival with no QA against it,
-       which is worse than neither. Recording only on `--commit`
-       keeps the two records in step.
-    3. **Privacy, which REQ-PIPE-069 already thought about.** The
-       delivery log records real filenames and is committed to a
-       public repository. A generated delivery's name is ours; a name
-       a person's file happens to carry is not, and this would be the
-       first route by which an operator's own filename becomes a
-       published string.
+    **Why gap 2 is not cosmetic.** `received_at` is load-bearing
+    everywhere downstream: arrivals are ordered by it, run ids are
+    positional over that order, the staged table is NAMED for it, and
+    lateness against a slot is measured from it. So a supply that was
+    actually on time reads as late, and one checked out of order gets
+    a run id that says it arrived after something it preceded.
 
-    **The tidiest answer may be to file it as a real delivery rather
-    than to special-case the log** - an ad-hoc supply IS a receipt, we
-    just received it by hand, so `delivery.write_delivery()` at the
-    point of check would make it an arrival like any other and every
-    downstream reader would need no change. That also answers the
-    prune. Worth putting to Keith against the simpler "record only,
-    skip the prune" option before building either.
+    **PARKED UNTIL REQ-PIPE-089 LANDS - Keith's own call, 2026-09-27**,
+    taken with the four decisions below already made, so this is a
+    sequencing choice rather than an unanswered question. Take arrival
+    time and run identity together, once QA results are rows and it is
+    visible what keys what. The cost of parking, stated so it is a
+    choice rather than a drift: until then the delivery log goes on
+    recording "whenever somebody ran the tool" as the arrival date.
+
+    **What he decided, so none of it has to be re-asked.**
+
+    1. **The operator is ASKED for the arrival date, and it is
+       REQUIRED** - not defaulted to now, not skippable. His words:
+       "let's ask the operator to provide the date time it arrived."
+       Rejected: defaulting silently (which is today's behaviour and
+       the whole problem), and defaulting-but-flagging-it-as-defaulted.
+    2. **The delivery log distinguishes automated from human**, and
+       also records WHICH ROUTE was used (file, folder, single table,
+       S3) and WHO did it - the operator's git identity, the same
+       value `run_by` already carries. Rejected: a free-text note from
+       the operator, which nothing could aggregate.
+    3. **The existing 60 records are REGENERATED from scratch**
+       rather than left with the fields absent or backfilled in place.
+       Coherent with 1 and 2 because every one of them was written by
+       the automated pipeline, so the new fields have unambiguous
+       values: not human, route "generated", arrival time the receipt
+       already on disk. The cost he accepted: the log stops knowing
+       when each delivery was FIRST SEEN, which is the one fact it
+       holds that the disk does not.
+    4. **The operator's date should become `received_at` itself, not
+       a second field beside it** - the goal, blocked today by the
+       item below.
+
+    **WHY IT IS BLOCKED, and this is the part worth not re-deriving.**
+    The entire cost of making the operator's date authoritative is ONE
+    thing: run ids are POSITIONAL. `arrivals.arrivals_for()` numbers
+    arrivals 1..N in receipt order, so a supply backdated into the
+    middle shifts every id after it. Everything else backdating
+    touches gets BETTER - the dashboard's arrival history and as-of
+    picker put the supply where it truly belongs, lateness against a
+    slot becomes the true answer, the staged table is simply named for
+    the earlier instant, and newest-wins resolution correctly lets a
+    backdated supply lose to a fresher one.
+
+    **Moving state into the database does not fix it, and Keith asked
+    exactly that.** It removes the cheap half - rewriting ~900
+    committed files, CI going red on the diff, `run_id_guard` firing
+    on a file comparison. It keeps the expensive half: `run_id` is an
+    identity that people and records point at. Once QA results are
+    rows they are keyed by it; a dashboard URL contains it; a ticket
+    says "cp_run_012 failed". Renumbering becomes an UPDATE, and an
+    UPDATE is LESS visible than a git diff, not more. So the move
+    makes this failure quieter rather than smaller, which is why
+    parking is not the same as ignoring.
+
+    **The real prerequisite already has a name.** `REQ-PIPE-057`
+    criterion 18 forbids deriving a run id from a position in a list
+    recognition can reorder, and is honestly recorded in that
+    requirement's own `unmet_criteria`. Assign a run id ONCE when a
+    delivery is filed, store it, never recompute - and then the
+    operator's arrival date is just a fact about an arrival, costing
+    nothing anywhere, with no second date field to explain for ever.
+
+    Sits directly on top of REQ-PIPE-103, which is built and which
+    meets its own criteria - this is the fact those criteria did not
+    ask about.

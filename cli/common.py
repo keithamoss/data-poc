@@ -22,6 +22,7 @@ from rich.panel import Panel
 from rich.text import Text
 from questionary import Style
 
+from qa_tools.common import hand_filing, supply_db, trial
 from qa_tools.common.qa_results_writer import QA_RESULTS_DIR
 # Both orchestrators define an identical RUN_STEPS; importing one keeps
 # this helper honest about the real step count rather than hardcoding 5.
@@ -271,3 +272,181 @@ def chain_progress(label: str):
             progress.update(task, completed=len(RUN_STEPS), description="Done")
 
     return _run()
+
+
+# ---------------------------------------------------------------------------
+# Keep it, or try it (REQ-PIPE-103)
+#
+# ONE QUESTION, ASKED BEFORE ANYTHING RUNS, deciding both halves of
+# what "keep" means: the supply is filed as a real delivery, AND its
+# results are recorded. Keith's own framing, 2026-09-27 - "do it in
+# the right order (file delivery then run check) but gate it behind a
+# 'do you want to commit this' that the operator can choose 'no' on".
+#
+# WHY NOT THE OLD ORDER. This flow used to run the checks into a
+# temporary directory and ask "Promote?" afterwards, which is a
+# reasonable shape for a decision about RESULTS and the wrong one for
+# a decision about an ARRIVAL: a supply filed after its check has run
+# needs a run id minted before recognition could assign one, so the
+# results end up keyed by an id recognition never gives out. Asking
+# first is what lets a kept supply be an ordinary arrival with nothing
+# to rename afterwards.
+# ---------------------------------------------------------------------------
+
+def describe_keep_choice(paths) -> str:
+    """What the operator is actually choosing between.
+
+    THE PUBLICATION CONSEQUENCE IS STATED, not buried (REQ-PIPE-103's
+    first non-functional constraint). This repository is public and
+    the delivery log records real file names; generated names entered
+    that with eyes open, and a supply somebody was emailed is the
+    first route by which a name we did not choose gets there. So the
+    names are shown, at the moment the choice is made, rather than
+    discovered later in a git history.
+    """
+    names = ", ".join(sorted(os.path.basename(str(p)) for p in paths))
+    return (f"Keep: file as a real delivery received now, and record the results.\n"
+            f"      These file names become part of this repository's public "
+            f"delivery log: {names}\n"
+            f"Trial: run the same four tools against the same rows and record "
+            f"nothing anywhere.")
+
+
+def decide_keep(paths, *, keep: bool | None) -> bool:
+    """Keep this supply, or run it as a trial?
+
+    `keep` IS THE FLAG'S ANSWER and stops the prompt entirely rather
+    than pre-filling it (criterion 3) - the same shape `confirm(yes=)`
+    already uses, so a scripted caller never needs a terminal.
+
+    A TRIAL IS THE NON-INTERACTIVE DEFAULT. With no flag and no
+    terminal there is nobody to ask, and the two wrong answers are not
+    equally wrong: a trial that should have been kept costs a re-run,
+    and a delivery filed on somebody's behalf is a public record of an
+    arrival they did not agree to.
+    """
+    if keep is not None:
+        return keep
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        console.print(
+            "Not a real terminal and no --keep/--trial given - running as a TRIAL, "
+            "which records nothing. Pass --keep to file this supply as a delivery.",
+            style="yellow")
+        return False
+    console.print(describe_keep_choice(paths))
+    return confirm("Keep this check?", yes=False, default=False)
+
+
+def file_or_trial(paths, collection_id: str, run_id_prefix: str,
+                   *, keep: bool | None) -> hand_filing.Filed:
+    """Turn a decision into a run. Returns what to check and under what
+    identity - a hand_filing.Filed either way, with an empty
+    `delivery_name` and `received_at` of None for a trial.
+
+    ONE RETURN SHAPE FOR BOTH, which is what keeps the two routes from
+    drifting apart downstream: a caller stages `filed.paths` under
+    `filed.run_id` at `filed.received_at` and never asks which of the
+    two things happened, except to say so at the end.
+
+    A KEPT SUPPLY'S RUN ID COMES BACK FROM RECOGNITION, exactly as it
+    would for a delivery that arrived on its own (criterion 1). A
+    trial's comes from the clock alone (criterion 4).
+
+    A FILE RECOGNITION CANNOT PLACE IS NOT FILED (Keith's own call,
+    2026-09-27, over renaming it to fit or filing it unplaceable). The
+    refusal explains itself and offers the trial, which needs no
+    recognition because the command already says which dataset is
+    being checked.
+    """
+    if not decide_keep(paths, keep=keep):
+        return _as_trial(paths)
+    try:
+        filed = hand_filing.file_supply(paths, collection_id, run_id_prefix)
+    except hand_filing.CannotFile as exc:
+        console.print(str(exc), style="yellow")
+        interactive = sys.stdin.isatty() and sys.stdout.isatty()
+        if not interactive or not confirm(
+                "Run it as a TRIAL instead?", yes=False, default=True):
+            raise click.ClickException(
+                "not filed. Rename the file to match the pattern, or pass "
+                "--trial to check it without filing.") from exc
+        return _as_trial(paths)
+    console.print(f"Filed as delivery {filed.delivery_name}, "
+                   f"recognised as {filed.run_id}.", style="green")
+    return filed
+
+
+def _as_trial(paths) -> hand_filing.Filed:
+    """A trial reads the operator's own files where they are. Nothing
+    is copied, because nothing is being recorded as having arrived."""
+    return hand_filing.Filed(delivery_name="", run_id=trial.trial_run_id(),
+                             paths=tuple(str(p) for p in paths), received_at=None)
+
+
+def reference_run_id() -> str:
+    """The disposable run a drift comparison needs.
+
+    ALWAYS A TRIAL, whichever way the supply itself went. The
+    reference is a known-good file the operator already had; filing it
+    would record an arrival that never happened, and this pipeline's
+    whole delivery log is a claim about what actually arrived. So it
+    is staged, compared against, and dropped.
+    """
+    return trial.trial_run_id(reference=True)
+
+
+def discard_reference(run_id: str) -> None:
+    """Give back what the reference borrowed.
+
+    NEVER FAILS THE COMMAND, for the reason the orchestrators' own
+    tidy-up gives: the results are already reported by the time this
+    runs, and `mothman supply tidy` clears whatever is left.
+    """
+    if not trial.is_trial(run_id):
+        return
+    try:
+        with supply_db.connect(label="mothman:discard-reference") as conn:
+            trial.discard(conn, run_id)
+    except Exception as exc:  # noqa: BLE001 - see the docstring
+        console.print(f"could not discard the reference run's schemas "
+                       f"({type(exc).__name__}: {exc}) - `mothman supply tidy` "
+                       f"clears leftovers.", style="yellow")
+
+
+def say_what_it_did(run_id: str, delivery_name: str) -> None:
+    """Criterion 8 - and its second half is the one worth keeping: a
+    run that filed a delivery must never be described as local-only."""
+    if delivery_name:
+        console.print(
+            f"Kept. {run_id} is a real arrival, filed as delivery "
+            f"{delivery_name}, and its results are recorded.", style="green")
+    else:
+        console.print(
+            f"Trial. {run_id} ran the same four tools against the same rows; "
+            f"nothing was filed and nothing was recorded.", style="dim")
+
+
+def keep_from_flags(commit: bool, trial_flag: bool) -> bool | None:
+    """The answer a non-interactive caller gave, or None for "ask"
+    (criterion 3).
+
+    `--commit` IS THE KEEP FLAG rather than a new one beside it. It
+    already meant "write this run into the real, permanent history",
+    and under REQ-PIPE-103 that is the same decision as filing the
+    supply - one act with two halves, not two choices that could
+    disagree. A run whose results are kept but whose arrival was never
+    recorded is exactly the split this requirement closes.
+
+    `--trial` IS ITS EXPLICIT OPPOSITE, so a script can state either
+    answer rather than relying on a default it cannot see.
+    """
+    if commit and trial_flag:
+        raise click.ClickException(
+            "--commit and --trial say opposite things. --commit files this supply "
+            "as a delivery and records the results; --trial runs the same checks "
+            "and records nothing.")
+    if commit:
+        return True
+    if trial_flag:
+        return False
+    return None

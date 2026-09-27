@@ -324,10 +324,15 @@ reachable interactively — bare `./mothman`, then Quality Assurance → pick a
 dataset → "Local files" — browsed via real filesystem tab-completion
 instead of typed paths.
 
-**Defaults to a throwaway, local-only check** — nothing gets written into
-this repo's real, committed `qa_results/` history unless you pass
-`--commit` (Keith's own explicit call: an ad hoc sanity check on your own
-pull usually isn't meant to become part of the permanent QA record).
+**Asks whether to keep it, and defaults to a TRIAL** (REQ-PIPE-103).
+Keeping files the supply as a real delivery received now — so the
+delivery log and the dashboard describe everything we actually
+received, not only what arrived automatically — and the run takes its
+id from recognition exactly as an automatic arrival would. Declining
+gives a trial: the same four tools against the same rows, filed
+nowhere and recorded nowhere, with every schema it touched dropped
+when the command ends. `--commit` and `--trial` state the answer for a
+script; with neither, and no terminal to ask, it runs as a trial.
 
 `mothman`'s **S3 QA source mode** (`plans/tooling.md` #1 Phase 3) covers the
 same real use case one step earlier — before you've pulled the file down

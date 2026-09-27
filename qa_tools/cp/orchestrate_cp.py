@@ -32,6 +32,7 @@ from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
 from qa_tools.common import backlog
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common import trial
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_reader import canonical_order
@@ -114,12 +115,16 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
 
 
 def _discard_this_runs_schemas(run_id: str) -> None:
-    """Give back what this run borrowed. Never fails the run - see the
-    BDM counterpart's own docstring."""
+    """Give back what this run borrowed, and everything a TRIAL
+    borrowed. Never fails the run - see the BDM counterpart's own
+    docstring for both."""
     try:
         conn = supply_db.connect(label="mothman:discard-run-schemas")
         try:
-            supply_db.drop_run_schemas(conn, run_id)
+            if trial.is_trial(run_id):
+                trial.discard(conn, run_id)
+            else:
+                supply_db.drop_run_schemas(conn, run_id)
         finally:
             conn.close()
     except Exception as exc:  # noqa: BLE001 - housekeeping never fails a finished run

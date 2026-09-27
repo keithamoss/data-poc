@@ -163,7 +163,7 @@ RUN_SCHEMA_PREFIX = "qa_"
 #: run_schema() be a readable identity instead of a hex encoding: a name
 #: that would need encoding is now a bug reported at its source, and
 #: whoever mints one normalises first (see
-#: local_check.run_id_from_path). A period name is the deliberate
+#: trial.trial_run_id and hand_filing). A period name is the deliberate
 #: exception and is normalised rather than refused, because it is
 #: authored config that should stay human - see period_schema.py.
 _SAFE_ID = re.compile(r"^[a-z0-9_]+$")
@@ -557,7 +557,7 @@ def normalise_ident_part(value: str) -> str:
     A COMPONENT rather than a whole identifier, and the name says so on
     purpose: the result can begin with a digit, which PostgreSQL will
     not accept unquoted on its own. Both callers prefix it - a run id
-    with `adhoc_`, a period schema with `period_` - so the letter is
+    with `trial_`, a period schema with `period_` - so the letter is
     always there by the time it is a real name. An earlier draft
     prefixed a bare `n` to make the guarantee unconditional and that was
     worse: `n2026_q3` is a name nobody can explain, solving a problem
@@ -605,11 +605,13 @@ def run_schema(run_id: str) -> str:
 
     So the invariant moved to where the id is BORN instead.
     `_ident()` refuses a run id that is not already a safe lowercase
-    identifier, and `local_check.run_id_from_path()` - the one place an
-    unsafe name can enter, since it builds an id from a user-supplied
-    filename - normalises before returning. Every other run id is minted
-    `run_001`-style and was always safe: all 60 in committed history
-    check out. That leaves this function an exact, readable identity,
+    identifier, and every mint normalises before returning: a real
+    arrival's id comes from recognition as `run_001`, and a trial's
+    from the clock via trial.trial_run_id(). The one route by which a
+    user-supplied FILENAME could become a run id was retired with
+    REQ-PIPE-103 - a hand-supplied file is now either filed as a
+    delivery, taking recognition's id, or run as a trial, taking the
+    clock's. All 60 ids in committed history check out. That leaves this function an exact, readable identity,
     and a future caller inventing `Run-001` fails loudly at the source
     rather than quietly getting a hex-encoded schema.
     """
@@ -624,6 +626,65 @@ def run_id_of(schema: str) -> str | None:
     return schema[len(RUN_SCHEMA_PREFIX):]
 
 
+#: A trial's own staging schema carries this prefix, and so - because
+#: a trial run id starts with it - do its view and dbt schemas, as
+#: `qa_trial_...` and `dbt_trial_...`. One prefix therefore finds
+#: everything a trial touched, which is what makes the sweep in
+#: qa_tools/common/trial.py possible without a record to consult.
+TRIAL_SCHEMA_PREFIX = "trial_"
+
+
+def is_trial_run(run_id: str) -> bool:
+    """Is this the id of a check nobody chose to keep?
+
+    READ FROM THE ID rather than passed down. A run id reaches the
+    loaders, the four tool runners and the tidy-up through a dozen
+    call sites, and a boolean travelling beside it is a boolean that
+    one of them will forget. The id itself cannot be forgotten.
+    """
+    return run_id.startswith(TRIAL_SCHEMA_PREFIX)
+
+
+def staging_schema_for(run_id: str) -> str:
+    """Which schema THIS run's supplies stage into.
+
+    A REAL ARRIVAL GOES INTO SHARED `staging` and stays there: staging
+    only ever grows, one physical table per arrival, because that is
+    the history the read-the-newest rule exists for.
+
+    A TRIAL GETS A SCHEMA OF ITS OWN, named for the run itself, and
+    that is the whole mechanism behind Keith's condition that a trial
+    "must write NOTHING to the database that survives the end of its
+    run" (2026-09-27). It cannot leave a stray table among real
+    supplies even in principle, and the tidy-up becomes DROP SCHEMA
+    rather than a walk over shared staging that can stop halfway.
+
+    A TRANSACTION CANNOT DO THIS JOB, which was measured rather than
+    assumed when Keith asked whether we could simply roll one back.
+    Work inside an open transaction is invisible to every other
+    connection, and dbt, Soda, datacontract-cli and Evidently each
+    open their own - so staging uncommitted would leave all four
+    looking at an empty schema. dbt additionally builds its own models
+    on its own connection, which our rollback could never reach.
+    """
+    return _ident(run_id, "run id") if is_trial_run(run_id) else STAGING_SCHEMA
+
+
+def ensure_staging(conn, run_id: str) -> str:
+    """The staging schema for this run, brought into existence first.
+
+    Shared `staging` is created by ensure_schemas() and always there;
+    a trial's own is created on demand here, because a trial is the
+    only run whose staging schema did not exist a moment ago. Returns
+    the name either way, so a caller has one line rather than a
+    branch.
+    """
+    schema = staging_schema_for(run_id)
+    if schema != STAGING_SCHEMA:
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+    return schema
+
+
 def arrival_segment(received_at) -> str:
     """The `__<arrival>` part of a staged table's name.
 
@@ -632,12 +693,14 @@ def arrival_segment(received_at) -> str:
     `2026-08-01T01:00:00+00:00` has to keep producing
     `202608010100000000` exactly as it always has.
 
-    A RUN ID DOES NOT (2026-09-27). Callers with no receipt - the
-    ad-hoc `--folder` and `--local-file` paths - fall back to passing
-    the run id, and arrival_key() keeps only the digits, which is
-    right for an instant and lossy for a name. It made
+    A RUN ID DOES NOT (2026-09-27). Callers with no receipt - a
+    TRIAL, or a Lambda arrival outside the delivery tree - fall back
+    to passing the run id, and arrival_key() keeps only the digits,
+    which is right for an instant and lossy for a name. It made
     `adhoc_cp_run_001_20260927t030150` and
-    `ref_cp_run_001_20260927t030150` the same arrival, so the two runs
+    `ref_cp_run_001_20260927t030150` the same arrival (those were the
+    id shapes of the day, before REQ-PIPE-103 replaced them), so the
+    two runs
     claimed one physical table - and because re-loading one does
     `DROP TABLE ... CASCADE`, staging the second silently destroyed
     the first run's views. Hidden for as long as the drift check read
@@ -655,9 +718,11 @@ def arrival_segment(received_at) -> str:
 #: The most a run-id arrival segment may be. Derived, not chosen:
 #: this asset's longest logical table is `birth_registrations` (19),
 #: a staged name is `<table>__<arrival>__<ordinal>`, and PostgreSQL's
-#: identifier limit is 63 - so 63 - 19 - 2 - 3 = 39. Kept in step with
-#: local_check.MAX_STEM, which is sized so an ordinary ad-hoc run id
-#: lands inside this and needs no digest at all.
+#: identifier limit is 63 - so 63 - 19 - 2 - 3 = 39. Every id minted
+#: today lands well inside it - `run_001` from recognition, and a
+#: trial's `trial_<stamp>` from the clock - so the digest below guards
+#: against an id arriving from somewhere unforeseen rather than being
+#: something the ordinary case pays for.
 _MAX_SEGMENT = 39
 
 
@@ -665,9 +730,9 @@ def _bounded(segment: str) -> str:
     """Keep a run-id segment distinct AND short enough to be a name.
 
     DISTINCT IS NOT ENOUGH, which is what the first version of this
-    got wrong. Making the segment lossless fixed two ad-hoc runs
-    sharing a staged table and immediately broke `mothman bdm qa
-    --file`: run ids on that path look like
+    got wrong. Making the segment lossless fixed two hand-supplied
+    runs sharing a staged table and immediately broke `mothman bdm qa
+    --file`: run ids on that path looked like
     `adhoc_birth_registrations_2026_09_20_20260927t041329z`, and the
     table name came to 74 bytes against PostgreSQL's limit of 63. The
     loader's own guard refused rather than letting it truncate into a
@@ -874,6 +939,55 @@ def create_run_views(conn, run_id: str, candidates: Mapping[str, Sequence[str]],
     return res
 
 
+def borrow_views(conn, run_id: str, from_run_id: str, tables) -> list[str]:
+    """Let one run read another run's supplies for the tables it was
+    not sent.
+
+    THE PARTIAL-RESUPPLY CASE, and the reason it needs saying. Child
+    Protection's dbt models ref() all six tables, so a delivery
+    carrying one re-sent table cannot be checked on its own - the
+    other five have to come from somewhere. Staging them under THIS
+    arrival is the obvious move and records something untrue: five
+    tables would appear to have arrived in a delivery that carried
+    one, in the shared staging history the whole supply model is
+    built on.
+
+    So nothing is staged. The run's schema simply gets a VIEW onto
+    each table the earlier run already resolved, which is exactly what
+    "the other five are unchanged since last time" means. Returns the
+    logical names it could borrow; a table the earlier run could not
+    resolve either is left absent rather than invented.
+
+    AND THE RESOLUTION RECORD FOLLOWS THE VIEWS, which the first
+    version of this got wrong. The record is what `tables_read`
+    publishes as "what this run read", and it is asked years later by
+    an audit - so a run whose schema holds six views while its record
+    names one is under-reporting a fact nobody can reconstruct once
+    the schema is dropped. The borrowed table is recorded as the
+    PHYSICAL version actually read, which is the earlier run's, not a
+    name invented for this one.
+    """
+    schema = run_schema(run_id)
+    earlier = resolution_for(conn, from_run_id).resolved
+    mine = resolution_for(conn, run_id)
+    borrowed = []
+    for logical in sorted(set(tables)):
+        physical = earlier.get(logical)
+        if not physical:
+            continue
+        conn.execute(
+            f'CREATE OR REPLACE VIEW "{schema}"."{_ident(logical, "table name")}" AS '
+            f'SELECT * FROM "{staging_schema_for(from_run_id)}"."{physical}"')
+        mine.resolved[logical] = physical
+        mine.ambiguous.pop(logical, None)
+        if logical in mine.absent:
+            mine.absent.remove(logical)
+        borrowed.append(logical)
+    if borrowed:
+        record_resolution(conn, mine)
+    return borrowed
+
+
 def drop_run_schema(conn, run_id: str) -> None:
     """Discard the run's schema once the run completes (criterion 1).
     Idempotent, because the interesting caller is a cleanup path that
@@ -888,15 +1002,22 @@ def run_schemas(conn) -> list[str]:
     listed here is an orphan - a run that was interrupted before it
     could discard its schema.
     """
-    # THE UNDERSCORE IS ESCAPED, and it matters more now the prefix is
-    # short. `_` is a single-character WILDCARD in SQL LIKE, so a bare
-    # `qa_%` would also match `qax...` - and with the old seven-character
-    # `qa_run_%` the literal text made a false match unlikely enough to
-    # go unnoticed. Three characters is not that forgiving.
+    return schemas_with_prefix(conn, RUN_SCHEMA_PREFIX)
+
+
+def schemas_with_prefix(conn, prefix: str) -> list[str]:
+    """Every schema in the database whose name starts with `prefix`.
+
+    THE UNDERSCORE IS ESCAPED, and it matters more now the prefixes are
+    short. `_` is a single-character WILDCARD in SQL LIKE, so a bare
+    `qa_%` would also match `qax...` - and with the old seven-character
+    `qa_run_%` the literal text made a false match unlikely enough to
+    go unnoticed. Three characters is not that forgiving.
+    """
     rows = conn.execute(
         "SELECT schema_name FROM information_schema.schemata "
         "WHERE schema_name LIKE ? ESCAPE '!'",
-        [RUN_SCHEMA_PREFIX.replace("_", "!_") + "%"]).fetchall()
+        [prefix.replace("_", "!_") + "%"]).fetchall()
     return sorted(r[0] for r in rows)
 
 
@@ -916,8 +1037,8 @@ def drop_run_schemas(conn, run_id: str) -> list[str]:
     IT ALSO REMOVES A HAZARD the sweep could not avoid. A blanket sweep
     cannot tell a schema left behind by an interrupted run from one
     belonging to a run happening right now in another process, so it
-    was liable to pull the floor out from under a concurrent ad-hoc
-    check. Dropping only what this run created cannot.
+    was liable to pull the floor out from under a check somebody was
+    running right now. Dropping only what this run created cannot.
 
     Returns what it dropped, and dropping a run that staged nothing is
     an ordinary no-op: a run that failed before staging still reaches
@@ -1017,11 +1138,7 @@ def dbt_schema(run_id: str) -> str:
 
 def dbt_schemas(conn) -> list[str]:
     """Every per-run dbt schema currently in the database."""
-    rows = conn.execute(
-        "SELECT schema_name FROM information_schema.schemata "
-        "WHERE schema_name LIKE ? ESCAPE '!'",
-        [DBT_SCHEMA_PREFIX.replace("_", "!_") + "%"]).fetchall()
-    return sorted(r[0] for r in rows)
+    return schemas_with_prefix(conn, DBT_SCHEMA_PREFIX)
 
 def scratch_dir() -> Path:
     """Where this database's file-shaped scratch lives.
@@ -1085,18 +1202,27 @@ _RESOLUTIONS = "_resolutions"
 def record_resolution(conn, res: Resolution) -> None:
     """Persist one run's resolution, replacing any earlier one for that
     run - re-staging an arrival re-decides it, and the latest decision
-    is the one that holds."""
+    is the one that holds.
+
+    IN THE RUN'S OWN STAGING SCHEMA, which for every real arrival is
+    the shared one and for a trial is the trial's (REQ-PIPE-103). A
+    trial's record of what it read therefore goes when its schema
+    does, rather than needing a second mechanism to remember to
+    delete it - and a mechanism that has to be remembered is one that
+    eventually is not.
+    """
+    schema = staging_schema_for(res.run_id)
     conn.execute(
-        f'CREATE TABLE IF NOT EXISTS "{STAGING_SCHEMA}"."{_RESOLUTIONS}" '
+        f'CREATE TABLE IF NOT EXISTS "{schema}"."{_RESOLUTIONS}" '
         "(run_id VARCHAR, logical VARCHAR, physical VARCHAR, state VARCHAR)")
     conn.execute(
-        f'DELETE FROM "{STAGING_SCHEMA}"."{_RESOLUTIONS}" WHERE run_id = ?', [res.run_id])
+        f'DELETE FROM "{schema}"."{_RESOLUTIONS}" WHERE run_id = ?', [res.run_id])
     rows = ([(res.run_id, k, v, "resolved") for k, v in res.resolved.items()]
             + [(res.run_id, k, p, "ambiguous") for k, ps in res.ambiguous.items() for p in ps]
             + [(res.run_id, k, None, "absent") for k in res.absent])
     for row in rows:
         conn.execute(
-            f'INSERT INTO "{STAGING_SCHEMA}"."{_RESOLUTIONS}" VALUES (?, ?, ?, ?)', list(row))
+            f'INSERT INTO "{schema}"."{_RESOLUTIONS}" VALUES (?, ?, ?, ?)', list(row))
 
 
 def resolution_for(conn, run_id: str) -> Resolution:
@@ -1107,9 +1233,10 @@ def resolution_for(conn, run_id: str) -> Resolution:
     res = Resolution(run_id=run_id, schema=run_schema(run_id))
     try:
         rows = conn.execute(
-            f'SELECT logical, physical, state FROM "{STAGING_SCHEMA}"."{_RESOLUTIONS}" '
+            f'SELECT logical, physical, state '
+            f'FROM "{staging_schema_for(run_id)}"."{_RESOLUTIONS}" '
             "WHERE run_id = ? ORDER BY logical, physical", [run_id]).fetchall()
-    except psycopg.errors.UndefinedTable:
+    except (psycopg.errors.UndefinedTable, psycopg.errors.InvalidSchemaName):
         # Nothing has been staged in this database yet, so the carrier
         # table does not exist. Same meaning as the retired engine's
         # CatalogException, handled the same way - a caller asking is

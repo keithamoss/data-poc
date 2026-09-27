@@ -172,7 +172,7 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
     `verified` is the caller's already-built list of fully-resolved
     check-result dicts for this tool+run (see this module's own
     docstring for why it exists alongside `raw_output`, not instead of
-    it) - optional only so tests/ad-hoc calls that don't care about it
+    it) - optional only so tests and one-off calls that don't care about it
     can omit it; every real `run_*.py` caller passes it.
 
     `run_by` (qa_tools/common/git_identity.py's get_run_by(), the local

@@ -39,6 +39,7 @@ from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
 from qa_tools.common import backlog
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common import trial
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_reader import canonical_order
@@ -194,11 +195,20 @@ def _discard_this_runs_schemas(run_id: str) -> None:
     report and move past - `mothman supply tidy` clears whatever is
     left. Turning a finished run into a failed one over housekeeping
     would be the worse outcome.
+
+    A TRIAL GIVES BACK MORE, because it staged into a schema of its
+    own rather than into shared staging (REQ-PIPE-103 criterion 6).
+    Read from the run id rather than passed in, so every route into
+    this function gets it without remembering to - which is the same
+    reason supply_db.is_trial_run() exists.
     """
     try:
         conn = supply_db.connect(label="mothman:discard-run-schemas")
         try:
-            supply_db.drop_run_schemas(conn, run_id)
+            if trial.is_trial(run_id):
+                trial.discard(conn, run_id)
+            else:
+                supply_db.drop_run_schemas(conn, run_id)
         finally:
             conn.close()
     except Exception as exc:  # noqa: BLE001 - see the docstring
@@ -208,7 +218,8 @@ def _discard_this_runs_schemas(run_id: str) -> None:
 
 def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
                run_by: str | None = None,
-               on_step: Callable[[str], None] | None = None) -> list[dict]:
+               on_step: Callable[[str], None] | None = None,
+               received_at=None) -> list[dict]:
     """The single-arrival counterpart to run_pipeline()'s full-manifest
     batch loop - built for the AWS event-driven MVP (plans/running-
     thoughts.md #5 Thread B / docs/aws-event-driven-mvp-design.md), called
@@ -248,10 +259,12 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
 
     So the parameters are gone rather than kept and ignored. For a run
     that is genuinely part of the recognised delivery history (the
-    Synthetic CLI flow), the check now works better than it did: the
+    Synthetic CLI flow, and since REQ-PIPE-103 a hand-received supply
+    the operator chose to keep), the check now works better than it
+    did: the
     real preceding arrival is found from disk without anyone passing
-    it. For a run that is NOT - an ad-hoc local file, an S3 key, a
-    Lambda arrival landing outside the delivery tree - the check is
+    it. For a run that is NOT - a TRIAL, or a Lambda arrival landing
+    outside the delivery tree - the check is
     silently SKIPPED, exactly as it already is for any genuinely-first
     run (_previous_run_file() returns None). That is the same real MVP
     simplification as before, reached by a different route: knowing what
@@ -270,9 +283,18 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
     # observed: which run, when we received it, where the file is. No
     # injected severity - that is generator bookkeeping and nothing in
     # the pipeline may read it (REQ-GEN-043).
+    #
+    # `received_at` IS THE REAL RECEIPT WHERE THERE IS ONE
+    # (REQ-PIPE-103). A supply the operator chose to keep was filed as
+    # a delivery a moment ago and has a receipt written by our own
+    # clock; staging it under the start of `run_date` instead would
+    # name its table for a different instant than its receipt says,
+    # and the two would disagree for ever. Where there is no receipt -
+    # a trial, a Lambda arrival outside the delivery tree - the start
+    # of the run date stands in, as it always did.
     entry = {"run_id": run_id, "run_index": 1, "csv_path": csv_path,
               "received_at": asset_time.isoformat(
-                  asset_time.start_of_day(date.fromisoformat(run_date))),
+                  received_at or asset_time.start_of_day(date.fromisoformat(run_date))),
               "delivery": run_id}
 
     # Stages the arrival and builds this run's views (REQ-PIPE-068).
@@ -285,7 +307,13 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
     # calling it. With one supply database there is nothing to rebind:
     # both paths open the same database and read through the run's own
     # view schema, which is what scoped the rows all along.
-    build_per_run_warehouses.build_one(run_id, csv_path, run_date)
+    # THE RECEIPT IS PASSED ON ONLY WHERE THERE REALLY IS ONE. With
+    # none, build_one() names the staged table after the RUN rather
+    # than after a day - which is what every caller without a receipt
+    # needs, because two runs sharing a run_date would otherwise claim
+    # one physical table in shared staging.
+    build_per_run_warehouses.build_one(run_id, csv_path, run_date,
+                                        received_at=received_at)
 
     return _run_one(entry, run_timestamp, run_by, reference_run_id, on_step=on_step)
 

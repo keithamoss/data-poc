@@ -14,6 +14,7 @@ datacontract-cli/Evidently chain via orchestrate_bdm.run_single(), just
 reached from a browsable questionary.path() prompt or --file/
 --reference-file flags instead of a positional CSV argument."""
 from __future__ import annotations
+import dataclasses
 import os
 import sys
 import tempfile
@@ -26,7 +27,7 @@ from qa_tools.bdm import build_per_run_warehouses, orchestrate_bdm
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.lambda_results_dir import BDM_MODULES, patch_write_qa_result_for_lambda
-from qa_tools.common.local_check import run_id_from_path as local_run_id_from_path
+from qa_tools.common import hand_filing
 from qa_tools.common.qa_results_reader import list_run_ids
 
 from . import common
@@ -209,7 +210,8 @@ def _run_single_preserving_manifest(*args, **kwargs) -> list[dict]:
 
 def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
                           run_id: str | None = None, run_date: str | None = None,
-                          on_step=None) -> tuple[list[dict], str]:
+                          on_step=None, keep: bool | None = None
+                          ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """The Local files QA source mode's real check-running body (plans/
     tooling.md #1 Phase 2) - folds in qa_tools/bdm/check_file.py's own
     retired logic: stages the reference CSV under a real run_id
@@ -217,11 +219,26 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     manually-downloaded file - a real reference is required, not
     defaulted), then reuses orchestrate_bdm.run_single(), same entry
     point both the Synthetic flow above and Thread B's Lambda handler
-    call. Returns (results, tmp_results_dir) - same tmp-dir-first Promote
-    pattern as run_check()."""
+    call.
+
+    THE DECISION COMES FIRST (REQ-PIPE-103). Keeping this supply files
+    it as a real delivery received now and gives the run an id from
+    recognition, before any check runs; declining gives a TRIAL, whose
+    id comes from the clock and which leaves nothing behind. Returns
+    `(results, tmp_results_dir, filed)` - the third is what the caller
+    needs to say which of the two it did.
+
+    THE REFERENCE IS ALWAYS A TRIAL, whichever way the supply went: it
+    is a known-good file the operator already had, and filing it would
+    record an arrival that never happened.
+    """
     run_date = run_date or asset_time.now().date().isoformat()
-    run_id = run_id or local_run_id_from_path(csv_path)
-    reference_run_id = local_run_id_from_path(reference_csv, prefix="ref")
+    filed = common.file_or_trial([csv_path], "civil-registration", "run_", keep=keep)
+    if run_id is not None and not filed.delivery_name:
+        filed = dataclasses.replace(filed, run_id=run_id)
+    run_id = filed.run_id
+    csv_path = filed.paths[0]
+    reference_run_id = common.reference_run_id()
 
     tmp_dir = common.new_tmp_results_dir()
     patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
@@ -234,17 +251,21 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     # staged both sides; this is BDM catching up.
     build_per_run_warehouses.build_one(reference_run_id, reference_csv, run_date)
 
-    results = _run_single_preserving_manifest(
-        run_id, csv_path, run_date,
-        reference_run_id=reference_run_id, run_by=run_by,
-        on_step=on_step,
-    )
-    return results, tmp_dir
+    try:
+        results = _run_single_preserving_manifest(
+            run_id, csv_path, run_date,
+            reference_run_id=reference_run_id, run_by=run_by,
+            on_step=on_step, received_at=filed.received_at,
+        )
+    finally:
+        common.discard_reference(reference_run_id)
+    return results, tmp_dir, filed
 
 
 def run_check_s3(bucket: str, key: str, reference_key: str, run_by: str,
                   run_id: str | None = None, run_date: str | None = None, s3_client=None,
-                  on_step=None) -> tuple[list[dict], str]:
+                  on_step=None, keep: bool | None = None
+                  ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """The S3 QA source mode's real check-running body (plans/tooling.md
     #1 Phase 3) - downloads key/reference_key (real boto3, via
     qa_tools.common.s3_source) into a fresh local staging dir, then
@@ -257,7 +278,7 @@ def run_check_s3(bucket: str, key: str, reference_key: str, run_by: str,
     local_path = s3_source.download_key(bucket, key, staging_dir, s3_client=s3_client)
     local_reference_path = s3_source.download_key(bucket, reference_key, staging_dir, s3_client=s3_client)
     return run_check_local_file(local_path, local_reference_path, run_by, run_id=run_id, run_date=run_date,
-                                 on_step=on_step)
+                                 on_step=on_step, keep=keep)
 
 
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
@@ -309,6 +330,23 @@ def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_defaul
         common.report_promoted(dst)
     else:
         console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
+
+
+def _finish_supply(results: list[dict], filed, tmp_dir: str) -> None:
+    """Report a hand-supplied check, and do what the operator already
+    said (REQ-PIPE-103 criterion 8).
+
+    NO SECOND QUESTION. The decision was taken before anything ran,
+    because a supply has to be filed BEFORE it can take its identity
+    from recognition - so asking "promote?" afterwards would be
+    offering a choice that was already made, with only half of it
+    still available.
+    """
+    console.print(report_table(results, filed.run_id))
+    if filed.delivery_name:
+        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, filed.run_id)
+        common.report_promoted(dst)
+    common.say_what_it_did(filed.run_id, filed.delivery_name)
 
 
 def run_qa_interactive(commit_default: bool = False) -> None:
@@ -377,13 +415,17 @@ def _run_qa_interactive_local_file(run_by: str, commit_default: bool) -> None:
     if reference_csv is None:
         return
 
-    run_id = local_run_id_from_path(csv_path)
+    # THE DECISION IS TAKEN INSIDE run_check_local_file(), before it
+    # stages anything - see its own docstring. So there is no run id
+    # to label the progress bar with yet, and the file's name is what
+    # the operator is actually watching.
+    keep = True if commit_default else None
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {csv_path}...",
                   style="dim")
-    with common.chain_progress(run_id) as on_step:
-        results, tmp_dir = run_check_local_file(csv_path, reference_csv, run_by, run_id=run_id,
-                                                 on_step=on_step)
-    _offer_promote(results, run_id, tmp_dir, commit_default)
+    with common.chain_progress(os.path.basename(csv_path)) as on_step:
+        results, tmp_dir, filed = run_check_local_file(csv_path, reference_csv, run_by,
+                                                        on_step=on_step, keep=keep)
+    _finish_supply(results, filed, tmp_dir)
 
 
 def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
@@ -409,13 +451,13 @@ def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
     if reference_key is None:
         return
 
-    run_id = local_run_id_from_path(key, prefix="s3")
+    keep = True if commit_default else None
     console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                   f"for s3://{bucket}/{key}...", style="dim")
-    with common.chain_progress(run_id) as on_step:
-        results, tmp_dir = run_check_s3(bucket, key, reference_key, run_by, run_id=run_id,
-                                         on_step=on_step)
-    _offer_promote(results, run_id, tmp_dir, commit_default)
+    with common.chain_progress(os.path.basename(key)) as on_step:
+        results, tmp_dir, filed = run_check_s3(bucket, key, reference_key, run_by,
+                                                on_step=on_step, keep=keep)
+    _finish_supply(results, filed, tmp_dir)
 
 
 @click.group("bdm")
@@ -463,10 +505,16 @@ def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bo
 @click.option("--s3-reference-key", default=None,
               help="S3 mode: a known-good reference object key to compare distribution drift against. "
                    "Required together with --s3-key.")
-@click.option("--commit", is_flag=True, help="Write this run into the real, permanent qa_results/ history.")
+@click.option("--commit", is_flag=True,
+              help="Keep it: file the supply as a real delivery received now, and write "
+                   "this run into the real, permanent qa_results/ history.")
+@click.option("--trial", is_flag=True,
+              help="Run it as a TRIAL: the same four tools against the same rows, filed "
+                   "nowhere and recorded nowhere. The opposite of --commit, stated so a "
+                   "script never relies on a default it cannot see.")
 def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str | None,
                reference_file: str | None, s3_key: str | None, s3_reference_key: str | None,
-               commit: bool) -> None:
+               commit: bool, trial: bool) -> None:
     """Run the real QA check chain against a Birth Registrations run - Synthetic (--run-id),
     Local files (--file/--reference-file), or S3 (--s3-key/--s3-reference-key) source mode."""
     if s3_key is not None:
@@ -478,26 +526,26 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
             raise click.ClickException(
                 "--s3-key requires --s3-reference-key (a known-good object key to compare against).")
         bucket = common.raw_bucket_name()
-        run_by = get_run_by() if commit else "local-check:not-persisted"
-        local_run_id = local_run_id_from_path(s3_key, prefix="s3")
-        with common.chain_progress(local_run_id) as on_step:
-            results, tmp_dir = run_check_s3(bucket, s3_key, s3_reference_key, run_by,
-                                             run_id=local_run_id, on_step=on_step)
-        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
-        return
+        run_by = get_run_by() if commit else "trial:not-recorded"
+        with common.chain_progress(os.path.basename(s3_key)) as on_step:
+            results, tmp_dir, filed = run_check_s3(bucket, s3_key, s3_reference_key, run_by,
+                                                    on_step=on_step,
+                                                    keep=common.keep_from_flags(commit, trial))
+        _finish_supply(results, filed, tmp_dir)
+        sys.exit(1 if has_failures(results) else 0)
 
     if file_path is not None:
         if run_id is not None:
             raise click.ClickException("Pass either --run-id (Synthetic mode) or --file (Local files mode), not both.")
         if reference_file is None:
             raise click.ClickException("--file requires --reference-file (a known-good CSV to compare against).")
-        run_by = get_run_by() if commit else "local-check:not-persisted"
-        local_run_id = local_run_id_from_path(file_path)
-        with common.chain_progress(local_run_id) as on_step:
-            results, tmp_dir = run_check_local_file(file_path, reference_file, run_by,
-                                                     run_id=local_run_id, on_step=on_step)
-        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
-        return
+        run_by = get_run_by() if commit else "trial:not-recorded"
+        with common.chain_progress(os.path.basename(file_path)) as on_step:
+            results, tmp_dir, filed = run_check_local_file(file_path, reference_file, run_by,
+                                                            on_step=on_step,
+                                                            keep=common.keep_from_flags(commit, trial))
+        _finish_supply(results, filed, tmp_dir)
+        sys.exit(1 if has_failures(results) else 0)
 
     if run_id is None:
         if not (sys.stdin.isatty() and sys.stdout.isatty()):

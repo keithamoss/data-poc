@@ -338,7 +338,7 @@ one when this line suggests it matters.
 ## plans/tooling.md
 
 - **#1** `done` 2026-09-19 - A real, unified CLI for running this whole PoC - Keith's own framing, this session: "my goal is a human only uses the...
-  - *touches:* `cli/pipeline.py`, `cli/app.py`, `cli/common.py`, `cli/banner.py`, `scripts/dev/tui_screenshot.py`, `cli/bdm.py` +25 more
+  - *touches:* `cli/pipeline.py`, `cli/app.py`, `cli/common.py`, `cli/banner.py`, `scripts/dev/tui_screenshot.py`, `cli/bdm.py` +24 more
 - **#2** `todo` 2026-09-19 - More Python code-quality tooling, beyond today's ruff (a deliberately lean rule set - real bugs only, not style, per CLAUDE.md's own framing)...
 - **#3** `todo` 2026-09-19 - A real code-reviewer agent (or agents) - genuinely distinct from delivery-critic (plans/wider.md #10), which only ever...
 - **#4** `todo` 2026-09-19 - A documentation-quality agent - a real, adjacent idea found while digging into cfisch3r/estimate's own real agent files...
@@ -397,7 +397,7 @@ one when this line suggests it matters.
   - *touches:* `qa_tools/common/leaderboard.py`, `contract/people.yaml`, `tests/test_leaderboard.py`
 - **#4** `investigate` 2026-09-18 - GitHub Issues -> Microsoft Teams integration (research first).
 - **#5** `done` 2026-09-19 - Staff adoption - two threads.
-  - *touches:* `qa_tools/common/local_check.py`, `tests/test_local_check.py`, `qa_tools/common/file_arrival.py`, `qa_tools/cp/completion_tracker.py`, `qa_tools/common/results_s3_sink.py`, `qa_tools/common/lambda_results_dir.py` +3 more
+  - *touches:* `qa_tools/common/file_arrival.py`, `qa_tools/cp/completion_tracker.py`, `qa_tools/common/results_s3_sink.py`, `qa_tools/common/lambda_results_dir.py`, `aws/cdk/app.py`, `qa_tools/common/git_identity.py` +1 more
 - **#6** `done` 2026-09-18 - Read-only tension: accepting/rejecting Amber supplies.
   - *touches:* `qa_tools/common/ticket_sync.py`, `qa_tools/common/acceptance_sync.py`
 - **#7** `done` 2026-09-18 - Business requirements page on the dashboard.
@@ -459,7 +459,7 @@ one when this line suggests it matters.
 - **#50** `todo` 2026-09-27 - Now that an environment decides which database a run writes to, nothing stops locally-messed-with synthetic data...
   - *touches:* `contract/environments.yaml`
 - **#51** `todo` 2026-09-27 - Author and manage checks from the TUI, including scaffolding a new dataset's checks from default policies for its data...
-- **#52** `todo` 2026-09-27 - A supply someone receives and checks BY HAND leaves no arrival record, so only automated deliveries exist as far as the...
+- **#52** `todo` 2026-09-27 - A hand-filed supply records the moment somebody ran the tool as its receipt, and nothing anywhere says that is what it...
 
 ## plans/post-build-review.md
 

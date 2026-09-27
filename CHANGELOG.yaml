@@ -114,8 +114,31 @@ releases:
       The warehouse is now PostgreSQL, and every QA tool checks what was
       loaded into it rather than the file that arrived.
     changes:
+      - category: New
+        items:
+          - headline: A file you were emailed can now become a real arrival
+            components: ["Pipeline & publishing"]
+            description: >
+              Check a supply you downloaded or were sent, and you are asked
+              whether to keep it. Keeping files it as a delivery received
+              now, so the arrival history and the dashboard show it the same
+              way they show anything that arrived on its own.
+          - headline: Or run a trial, which leaves nothing behind
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              Say no and you get a trial: the same four tools against the
+              same rows, with the same verdicts, and not a trace of it
+              anywhere afterwards. Experimenting with a file costs nothing.
+              Pass --commit or --trial to answer without being asked.
       - category: Improved
         items:
+          - headline: Run names you can actually read
+            components: ["Pipeline & publishing"]
+            description: >
+              A kept supply is numbered like every other arrival, and a
+              trial is named for the moment you ran it. The long names built
+              out of your own filename, which repeated the dataset name and
+              the date back at you, are gone.
           - headline: One database, and it is the one production runs
             components: ["Pipeline & publishing"]
             description: >

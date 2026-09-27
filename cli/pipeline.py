@@ -15,7 +15,7 @@ actually did, and what CP's own equivalent never had a script for
 either.
 
 Unlike `mothman bdm/cp qa` (single run, careful scratch-dir-then-Promote
-staging so an ad hoc check never touches real history uninvited), this
+staging so a hand-supplied check never touches real history uninvited), this
 command's whole point is the real batch regeneration - every run in the
 manifest, written straight to committed qa_results/ history, no staging.
 That's real pipeline behaviour, not a debug side effect - run this when

@@ -92,9 +92,9 @@ def bdm_raw_dir(tmp_path_factory):
     # AND AS REAL DELIVERIES (REQ-GEN-043) - the shape the pipeline
     # actually reads now. Two arrivals, arbitrary supplier-shaped names,
     # filenames matching the real arrivalPattern, receipts OUTSIDE the
-    # deliveries. The flat CSVs above stay because the ad-hoc
-    # `mothman bdm qa --local-file` path still drops a file into a raw
-    # directory; nothing reads a manifest from it any more.
+    # deliveries. The flat CSVs above stay because several tests want
+    # a plain file to hand `mothman bdm qa --file`, which is what an
+    # operator really has; nothing reads a manifest from them.
     deliveries = raw_dir / "deliveries"
     receipts = raw_dir / "receipts"
     for run_id, name, when, df in (
@@ -354,8 +354,9 @@ def cp_raw_dir(tmp_path_factory):
 
     def _write_run(run_id: str, run_date: str, tables: dict, delivery_name: str):
         """One arrival: the six CP tables landing together as ONE
-        delivery (REQ-GEN-043), plus the flat data/cp_raw/<run_id>/ copy
-        the ad-hoc `mothman cp qa --local-dir` path still browses."""
+        delivery (REQ-GEN-043), plus a flat per-run folder several
+        tests hand to `mothman cp qa --folder`, which is the shape an
+        operator really has."""
         run_dir = raw_dir / run_id
         run_dir.mkdir()
         files = {}

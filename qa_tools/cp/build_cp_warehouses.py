@@ -23,6 +23,7 @@ from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
 from qa_tools.common import load_log
 from qa_tools.common import supply_db
+from qa_tools.common import trial
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -91,6 +92,13 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
     conn = supply_db.connect(dsn=dsn)
     try:
         supply_db.ensure_schemas(conn)
+        # WHERE THIS RUN'S SUPPLIES GO. Shared `staging` for a real
+        # arrival; a schema of the trial's own for a trial, so that
+        # declining to keep a check leaves nothing among real supplies
+        # even in principle (REQ-PIPE-103 criterion 6). Read from the
+        # run id rather than passed in - see supply_db.is_trial_run().
+        staging = supply_db.ensure_staging(conn, run_id)
+        log_dir = trial.log_dir(run_id, log_dir)
         rows = None
         try:
             df = read_csv_explicit_nulls(csv_path,
@@ -107,7 +115,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
                 # now a call rather than a statement - the inference and
                 # the storage are two engines.
                 supply_db.load_csv_into(
-                    conn, supply_db.STAGING_SCHEMA, physical,
+                    conn, staging, physical,
                     staging_csv, DUCKDB_NULLSTR)
             finally:
                 os.remove(staging_csv)
@@ -120,7 +128,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
             # (DependentObjectsStillExist). Dropping the views with it is
             # correct - the table failed to load, so a view onto it
             # resolves to nothing anyone should read.
-            conn.execute(f'DROP TABLE IF EXISTS "{supply_db.STAGING_SCHEMA}"."{physical}" CASCADE')
+            conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
             load_log.record_load(delivery_name, dataset_id, physical, load_log.FAILED,
                              asset_time.now().isoformat(),
                              reason=f"{type(exc).__name__}: {exc}", log_dir=log_dir)
@@ -131,14 +139,14 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
         load_log.record_load(delivery_name, dataset_id, physical, load_log.LOADED,
                          asset_time.now().isoformat(), row_count=rows, log_dir=log_dir)
         res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
-            conn, supply_db.STAGING_SCHEMA, TABLES, arrival=key,
-            loaded=load_log.loaded_tables(log_dir)))
+            conn, staging, TABLES, arrival=key,
+            loaded=load_log.loaded_tables(log_dir)), source_schema=staging)
         # Recorded at staging time, which is the only moment this is an
         # observed fact rather than a re-derivation.
         supply_db.record_resolution(conn, res)
     finally:
         conn.close()
-    print(f"{run_id}: {table} -> {supply_db.STAGING_SCHEMA}.{physical}")
+    print(f"{run_id}: {table} -> {staging}.{physical}")
     return physical
 
 
