@@ -17634,3 +17634,100 @@ requirements:
         silently half-populated - worse to reason about than either
         end state, and the shape this project has already been bitten
         by with dead parameters that look live.
+
+  - id: REQ-PIPE-103
+    title: "A supply received by hand is an arrival like any other"
+    date_written: "2026-09-27"
+    story: >
+      As the person running this pipeline, I want a supply I was
+      emailed or fetched from S3 and checked by hand to be recorded as
+      an arrival, so that the delivery log and the dashboard describe
+      everything we actually received rather than only what arrived
+      automatically - and I want to be able to try a file out without
+      that happening.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-27. First the observation - "without deliveries
+      being logged it would impact what's shown in the dashboard,
+      right?" - then the design: "we should file an ad-hoc supply as a
+      real delivery, it's just like any other arrival", and then the
+      ordering that resolves the objection to it: "could we do it in
+      the right order (file delivery then run check) but gate it
+      behind a 'do you want to commit this' that the operator can
+      choose 'no' on so they can experiment with a file locally
+      without impacting anything?"
+    acceptance_criteria:
+      - >
+        WHERE an operator checks a supply they received by hand and
+        chooses to keep it, THE SYSTEM SHALL file it as a real
+        delivery with its own receipt before any check runs, and SHALL
+        take that run's identity from recognition exactly as it does
+        for a delivery that arrived on its own.
+      - >
+        THE SYSTEM SHALL ask before filing anything, and WHERE the
+        operator declines SHALL run the checks and write nothing that
+        outlives the command - no delivery, no receipt, no recorded
+        results.
+      - >
+        THE SYSTEM SHALL let a non-interactive caller state the answer
+        as a flag, and SHALL NOT prompt where one was given.
+      - >
+        THE SYSTEM SHALL name a run it did not file from the clock
+        alone, and SHALL NOT build that name out of the supplied
+        file's own name.
+      - >
+        THE SYSTEM SHALL apply this to every route by which a person
+        supplies a file - a single file, a folder, one table on its
+        own, and an object fetched from S3.
+      - >
+        THE SYSTEM SHALL say which of the two things it did, and SHALL
+        NOT describe a check as local-only in a run that filed a
+        delivery.
+    non_functional_requirements:
+      - >
+        THE OPERATOR'S OWN FILENAME BECOMES A PUBLISHED STRING once a
+        delivery is filed, because this repository is public and the
+        delivery log records real names (REQ-PIPE-069 entered this
+        with eyes open for generated names; this is the first route by
+        which a name we did not choose gets there). The prompt has to
+        make that consequence visible rather than burying it.
+      - >
+        NO RENUMBERING OF COMMITTED HISTORY. Run ids are positional
+        over arrivals ordered by receipt, so a filed supply must sort
+        AFTER everything already recorded - which its receipt instant
+        of "now" does - and REQ-PIPE-057's run_id_guard must stay
+        green across the change.
+    dependencies: [REQ-PIPE-069, REQ-PIPE-102]
+    open_questions: []
+    decisions:
+      - >
+        FILE FIRST, THEN CHECK - Keith's own ordering, and it is what
+        makes the rest fall out. A supply filed before the check is
+        recognised like any other, so its run id comes from
+        recognition and its staged table is named for its receipt
+        instant. The alternative considered and rejected was filing at
+        promote time, which would leave the check running against an
+        unfiled supply under a minted id, and the recorded results
+        keyed by an id recognition would never assign.
+      - >
+        THE PROMPT IS WHAT MAKES "ALWAYS FILE" SAFE. Filing
+        unconditionally was the first proposal and its real cost was
+        that trying a file out would leave permanent arrival records.
+        Asking first keeps the honest position - you did receive it -
+        without making experimentation expensive.
+      - >
+        THIS REMOVES THE AD-HOC NAME PROBLEM RATHER THAN PATCHING IT.
+        A filed supply needs no minted id at all, and an unfiled one
+        never reaches committed history, so the filename stem that
+        existed "for a human skimming qa_results/ later" is
+        unnecessary in both directions. REQ-PIPE-102 capped that stem
+        to 15 characters as damage control; this deletes it, and with
+        it the duplication Keith noticed
+        (`birth_registrations__adhoc_birth_registrat_...`), which was
+        only ever our own generated filenames echoing the table name.
+      - >
+        SUB-SECOND PRECISION REPLACES THE STEM for an unfiled run.
+        Second resolution plus a prefix was enough while the stem
+        carried the distinctness; without it, two concurrent ad-hoc
+        checks in the same second would collide.
