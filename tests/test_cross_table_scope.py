@@ -114,7 +114,7 @@ class TestTheScopeIsNotMistakenForARun:
         tables_read."""
         assert tr.CROSS_TABLE_SCOPE not in reader.incomplete_runs(AGENCY, COLLECTION)
 
-    def test_dataset_scoped_reads_do_not_pick_up_cross_table_results(self, real_committed_history):
+    def test_dataset_scoped_reads_do_not_pick_up_cross_table_results(self, deployment_history):
         from qa_tools.common.validate_check_lifecycle import collect_checks
 
         declared = set(tr.declared_by_check_id(collect_checks(None)))
@@ -128,19 +128,19 @@ class TestTheRebuildPathReadsTheScope:
     every cross-table check when the scope was first introduced -
     3,204 results live against 2,772 rebuilt, with nothing saying so."""
 
-    def test_the_committed_scope_holds_real_cross_table_results(self, real_committed_history):
+    def test_the_committed_scope_holds_real_cross_table_results(self, deployment_history, real_committed_history):
         found = reader.read_cross_table_results(AGENCY, COLLECTION)
         assert found, "no cross-table results in the committed scope"
         from qa_tools.common.validate_check_lifecycle import collect_checks
         declared = set(tr.declared_by_check_id(collect_checks(None)))
         assert all(r["check_id"] in declared for r in found)
 
-    def test_an_absent_scope_reads_as_nothing_rather_than_raising(self, tmp_path):
-        assert reader.read_cross_table_results(AGENCY, COLLECTION, tmp_path) == []
+    def test_an_absent_scope_reads_as_nothing_rather_than_raising(self, clean_qa_history):
+        assert reader.read_cross_table_results(AGENCY, COLLECTION) == []
 
     @pytest.mark.parametrize("module", ["qa_tools.cp.build_results_from_history",
                                          "qa_tools.bdm.build_results_from_history"])
-    def test_both_rebuild_paths_read_the_scope(self, module):
+    def test_both_rebuild_paths_read_the_scope(self, deployment_history, module):
         """Asserted structurally. A rebuild that omits this looks
         entirely healthy - it just publishes fewer checks than the run
         actually produced."""

@@ -197,6 +197,14 @@ def supply_dsn(worker_id):
     from qa_tools.common import soda_common, supply_db  # noqa: F401
 
     before = os.environ.get(supply_db.SUPPLY_DSN_ENV)
+    # THE DEPLOYMENT'S OWN DATABASE, remembered before this fixture
+    # points everything at the worker's. One fixture genuinely needs
+    # it: tests/test_dashboard_e2e.py builds the real dashboard, whose
+    # input is recorded QA history - a shared, read-only corpus that
+    # used to arrive with the checkout as committed files and is a
+    # populated database since REQ-PIPE-089. A worker's database is
+    # empty by design, so building from it produces an empty dashboard.
+    globals()["DEPLOYMENT_SUPPLY_DSN"] = before
     os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
     yield dsn
     if before is None:
@@ -280,6 +288,78 @@ def real_committed_history(_committed_history_is_off_limits):
     yield root
     for module, name, value in restore:
         setattr(module, name, value)
+
+
+@pytest.fixture
+def deployment_history(supply_dsn, monkeypatch):
+    """Read the DEPLOYMENT'S recorded QA history, not this worker's.
+
+    A handful of tests exist to check this repo's own real corpus -
+    "a real run has a recorded sex distribution", "BDM's run windows
+    are sorted and open-ended". That corpus used to arrive with the
+    checkout as committed `qa_results/` files, so every worker saw it
+    for free; REQ-PIPE-089 made it a database and a worker's is empty
+    by design.
+
+    READ-ONLY BY CONVENTION AND BY WHAT THESE TESTS DO - they assert on
+    a corpus, they do not build one. A test that WRITES must use its own
+    worker database, which is what every other test here gets.
+
+    It needs that database populated, which is
+    `mothman pipeline bootstrap` - see CLAUDE.md's setup section.
+    """
+    dsn = globals().get("DEPLOYMENT_SUPPLY_DSN")
+    if not dsn:
+        pytest.skip("no deployment database configured (MOTHMAN_SUPPLY_DSN)")
+    monkeypatch.setenv(supply_db_module().SUPPLY_DSN_ENV, dsn)
+    return dsn
+
+
+def supply_db_module():
+    from qa_tools.common import supply_db
+    return supply_db
+
+
+@pytest.fixture
+def clean_qa_history(supply_dsn):
+    """An empty QA history for one test (REQ-PIPE-089).
+
+    Per-test isolation used to come free from `tmp_path`, because each
+    test wrote its own little `qa_results/` tree. The history is a
+    schema now and a worker's database outlives any one test, so a
+    test reusing a run id - `run_1` is popular - sees whatever an
+    earlier test recorded under it.
+
+    Yields the connection, so a test that needs to mark a run complete
+    or look at a row directly has one to hand.
+    """
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="test-clean-qa-history") as conn:
+        qa_store.ensure_schema(conn)
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".run CASCADE')
+        yield conn
+
+
+@pytest.fixture
+def finish_runs():
+    """Attribute runs and mark them finished, so their results are
+    observable (criterion 13).
+
+    A helper rather than something automatic: a run becoming observable
+    is a real event with a real precondition - it has to say who ran
+    it - and a fixture that quietly completed every run would remove
+    the thing several tests are about.
+    """
+    from qa_tools.common.qa_results_writer import finish_run, open_run
+
+    def _finish(*run_ids, agency="a", collection="b",
+                when="2026-01-01T00:00:00+00:00", run_by="tests@example.gov.au"):
+        for run_id in run_ids:
+            open_run(agency, collection, run_id, when, run_by)
+            finish_run(run_id)
+
+    return _finish
 
 
 @pytest.fixture

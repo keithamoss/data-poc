@@ -512,3 +512,36 @@ def tidy_command(yes: bool) -> None:
         console.print(f"[green]Dropped {len(leftovers)} schema(s).[/green]")
     finally:
         conn.close()
+
+
+@supply_group.command("grant-publisher")
+@click.option("--role", default="mothman_publisher", show_default=True,
+              help="The role the dashboard build connects as.")
+@click.option("--password", default=None,
+              help="Set or rotate the role's password. Omitted, an existing "
+                   "role keeps the password it has.")
+def grant_publisher_command(role: str, password: str | None) -> None:
+    """Give the dashboard build a read-only role (REQ-PIPE-089 criteria 7, 23).
+
+    READ ON THE QA METADATA SCHEMA, AND NOTHING ELSE. Not "everything
+    except supply data" - a grant written as an exclusion has to be
+    revisited every time a schema is added, and the one nobody
+    revisits is the one that leaks. Every other schema is unreachable
+    because nothing was ever granted on it.
+
+    Run as somebody who can create a role. It is idempotent, so
+    re-running after a schema change re-applies the grants.
+    """
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="mothman:grant-publisher") as conn:
+        qa_store.ensure_schema(conn)
+        qa_store.ensure_publisher_role(conn, role, password)
+
+    console.print(f"[green]{role}[/green] may SELECT in schema "
+                  f"[cyan]{qa_store.SCHEMA}[/cyan], and holds nothing anywhere else.")
+    console.print("The dashboard build connects as this role; the pipeline does not.",
+                  style="dim")
+    if password is None:
+        console.print("No password set - pass --password to set or rotate one.",
+                      style="dim")

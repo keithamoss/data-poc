@@ -106,7 +106,23 @@ def _built_datasets():
 
 
 class TestEveryCommittedArrivalKeepsItsVerdict:
-    """The pin proper. 150 real arrivals across 7 datasets."""
+    """The pin proper. 162 real arrivals across 7 datasets.
+
+    IT WAS SILENTLY COVERING 150 OF THEM, found 2026-09-27 while
+    REQ-PIPE-089 moved QA history into the database - and the way it was
+    found is the point. The pin covered 18 Child Protection runs per
+    dataset while the corpus held 20, and it went on passing because
+    `_built_datasets()` reads `reports/*.json`, which is gitignored
+    build output: the reports in the working tree were stale in exactly
+    the same way as the pin. Rebuilding them from a real corpus made the
+    two disagree at once.
+
+    This class's own docstring already said it: "a pin that silently
+    stops covering things is worse than none - it goes green by
+    measuring less." It did, for both reasons at the same time. The
+    twelve missing arrivals are pinned now, with their instants, and
+    none of the 150 that were already covered moved.
+    """
 
     def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):
         """A pin that silently stops covering things is worse than none -
@@ -163,13 +179,18 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
 
     def test_the_distribution_is_the_one_that_was_measured(self):
         """A blunt backstop for the two tests above, readable without a
-        diff: 131 on time, 16 early, 3 late, measured 2026-09-23."""
+        diff: 131 on time, 28 early, 3 late, measured 2026-09-27.
+
+        It read "131 / 16 / 3, measured 2026-09-23" until the twelve
+        uncovered Child Protection arrivals were added - all twelve are
+        early, which is why only that figure moved.
+        """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"onTime": 131, "early": 16, "late": 3}
+        assert counts == {"onTime": 131, "early": 28, "late": 3}
 
 
 class TestTheClassificationBoundaries:

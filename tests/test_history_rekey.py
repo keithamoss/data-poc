@@ -37,14 +37,22 @@ def _verified(dataset_id: str, tail: str, run_id: str = "r1") -> dict:
 
 
 @pytest.fixture
-def tree(tmp_path):
-    """One run of one tool, spanning two datasets."""
+def tree(tmp_path, clean_qa_history, finish_runs):
+    """One run of one tool, spanning two datasets.
+
+    THE RUN IS FINISHED HERE, which REQ-PIPE-089 criterion 13 makes a
+    precondition rather than a detail: results are observable only once
+    their run says it completed, so a fixture that writes and stops is
+    correctly invisible to every reader below.
+    """
     write_qa_result(AGENCY, COLLECTION, "r1", "2026-09-26T10:00:00+08:00", "soda",
                      {"scanStartTimestamp": "2026-09-26T10:00:00", "hasErrors": False},
                      [_verified("cp-clients", "missing_count_soda"),
                       _verified("cp-carers", "missing_count_soda"),
                       _verified("cp-clients", "duplicate_count_soda")],
                      results_dir=tmp_path)
+    finish_runs("r1", agency=AGENCY, collection=COLLECTION,
+                when="2026-09-26T10:00:00+08:00", run_by="a@b.c")
     return tmp_path
 
 
@@ -118,11 +126,14 @@ class TestThePseudoToolsDescribeARun:
         written = [str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*.json")]
         assert written == [f"{AGENCY}/{COLLECTION}/_raw/r1/dataset_stats.json"]
 
-    def test_its_provenance_is_still_readable(self, tmp_path):
+    def test_its_provenance_is_still_readable(self, tmp_path, clean_qa_history,
+                                              finish_runs):
         write_qa_result(AGENCY, COLLECTION, "r1", "2026-09-26T10:00:00+08:00",
                          "dataset_stats", {"row_counts": {}}, run_by="a@b.c",
                          results_dir=tmp_path)
-        assert reader.read_run_provenance(AGENCY, COLLECTION, "r1", tmp_path) == {
+        finish_runs("r1", agency=AGENCY, collection=COLLECTION,
+                    when="2026-09-26T10:00:00+08:00", run_by="a@b.c")
+        assert reader.read_run_provenance(AGENCY, COLLECTION, "r1") == {
             "run_timestamp": "2026-09-26T10:00:00+08:00", "run_by": "a@b.c"}
 
     def test_both_pseudo_tools_are_named_as_run_scoped(self):
@@ -151,9 +162,9 @@ class TestReadingItBack:
         assert reader.read_one(AGENCY, COLLECTION, "r1", "soda", tree,
                                 dataset="cp-investigations") == []
 
-    def test_an_absent_collection_reads_as_nothing(self, tmp_path):
-        assert reader.list_run_ids(AGENCY, COLLECTION, tmp_path) == []
-        assert reader.read_qa_results(AGENCY, COLLECTION, tmp_path) == []
+    def test_an_absent_collection_reads_as_nothing(self, clean_qa_history):
+        assert reader.list_run_ids(AGENCY, COLLECTION) == []
+        assert reader.read_qa_results(AGENCY, COLLECTION) == []
 
 
 class TestCompletenessIsWhatThisDatasetActuallyOwes:

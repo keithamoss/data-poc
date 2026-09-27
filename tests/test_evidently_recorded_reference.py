@@ -90,22 +90,22 @@ class TestReadingTheRealCommittedHistory:
 
     AGENCY, COLLECTION = "registry-services", "civil-registration"
 
-    def test_a_real_run_has_a_recorded_sex_distribution(self):
+    def test_a_real_run_has_a_recorded_sex_distribution(self, deployment_history):
         counts = ec.reference_value_counts(self.AGENCY, self.COLLECTION, "run_001", "sex")
         assert counts, "run_001 has no recorded value_counts - the reference has nowhere to come from"
         assert all(isinstance(c, int) and c >= 0 for _, c in counts)
 
-    def test_a_real_run_has_a_recorded_row_count(self):
+    def test_a_real_run_has_a_recorded_row_count(self, deployment_history):
         assert ec.recorded_row_count(self.AGENCY, self.COLLECTION, "run_001") > 0
 
-    def test_the_recorded_count_and_distribution_agree(self):
+    def test_the_recorded_count_and_distribution_agree(self, deployment_history):
         """If these ever disagree, one of them is being computed from
         something other than the rows that landed."""
         counts = ec.reference_value_counts(self.AGENCY, self.COLLECTION, "run_001", "sex")
         assert sum(c for _, c in counts) == \
             ec.recorded_row_count(self.AGENCY, self.COLLECTION, "run_001")
 
-    def test_an_unknown_run_reads_as_absent_rather_than_raising(self):
+    def test_an_unknown_run_reads_as_absent_rather_than_raising(self, deployment_history):
         """Absence is ordinary - a run checked as a trial and never staged
         has no recorded stats, and the caller falls back."""
         assert ec.reference_value_counts(self.AGENCY, self.COLLECTION, "no_such_run", "sex") is None

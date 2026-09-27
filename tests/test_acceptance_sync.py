@@ -145,7 +145,7 @@ class TestBuildDecisions:
 
 
 class TestRunWindowsAgainstRealCommittedHistory:
-    def test_bdm_windows_are_real_sorted_and_open_ended(self):
+    def test_bdm_windows_are_real_sorted_and_open_ended(self, deployment_history):
         # The floor is DERIVED from the committed tree, not written down.
         # It used to be `> 50`, chosen when BDM's history was 352 runs;
         # cutting it to 30 deliveries on 2026-09-23 left 32 windows and
@@ -168,7 +168,7 @@ class TestRunWindowsAgainstRealCommittedHistory:
         assert dates == sorted(dates)
         assert windows[-1][2] is None
 
-    def test_every_cp_table_shares_the_same_real_collection_level_windows(self):
+    def test_every_cp_table_shares_the_same_real_collection_level_windows(self, deployment_history):
         """All 6 CP tables arrive together as one real collection
         delivery - qa_results/child-protection-family-support/
         child-protection/, not 6 separate per-table directories - so
@@ -179,7 +179,7 @@ class TestRunWindowsAgainstRealCommittedHistory:
         assert all(w for w in all_windows), "no real CP windows found - has committed history changed shape?"
         assert all(w == all_windows[0] for w in all_windows)
 
-    def test_an_unknown_dataset_id_returns_no_windows_rather_than_raising(self):
+    def test_an_unknown_dataset_id_returns_no_windows_rather_than_raising(self, deployment_history):
         assert acc._run_windows_for_dataset("not-a-real-dataset") == []
 
 

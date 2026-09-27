@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import re
+import os
 import subprocess
 import sys
 import urllib.parse
@@ -47,10 +48,66 @@ _BUILD_STEPS = [
 ]
 
 
+def _deployment_dsn():
+    import conftest
+    return getattr(conftest, "DEPLOYMENT_SUPPLY_DSN", None)
+
+
+@pytest.fixture(autouse=True)
+def reads_the_deployments_history(supply_dsn, monkeypatch):
+    """Point THIS FILE's own reads at the deployment's database.
+
+    The same reasoning as `built_dashboard_html` below, one level up.
+    Several helpers here - `_real_amber_bdm_runs`, `status_by_run`,
+    the as-of date bounds - ask the reader for real QA history IN
+    PROCESS, and since REQ-PIPE-089 that reader goes to whatever
+    `MOTHMAN_SUPPLY_DSN` names. conftest points it at this worker's
+    own empty database, correctly, for every test that WRITES.
+
+    Autouse and scoped to this file, because this whole module is
+    about the real built dashboard and none of it writes supply data.
+    Restored by monkeypatch after each test, so nothing leaks to
+    another file sharing the worker.
+    """
+    dsn = _deployment_dsn()
+    if dsn:
+        monkeypatch.setenv("MOTHMAN_SUPPLY_DSN", dsn)
+
+
 @pytest.fixture(scope="session")
-def built_dashboard_html() -> Path:
+def built_dashboard_html(supply_dsn) -> Path:
+    """The real dashboard, built by the real chain.
+
+    IT BUILDS AGAINST THE DEPLOYMENT'S DATABASE, NOT THE WORKER'S, and
+    that is the point rather than a shortcut. This fixture's input is
+    recorded QA HISTORY - a shared, read-only corpus. It used to arrive
+    with the checkout as committed `qa_results/` files, so every worker
+    saw the same thing for free; REQ-PIPE-089 made it a database, and a
+    worker's database is empty by design, so building from one produces
+    an empty dashboard and 147 errors that name a subprocess rather
+    than the cause.
+
+    NOTHING HERE WRITES TO IT. The five build steps read recorded
+    results and write `reports/` and the built HTML; `--dist loadfile`
+    keeps this file on one worker, so there is no concurrent build
+    either. Reading a shared corpus is what this always did.
+
+    It needs the deployment's database POPULATED, which is
+    `mothman pipeline bootstrap` - see CLAUDE.md's setup section. That
+    is a real new requirement for running the suite, not an accident.
+    """
+    dsn = _deployment_dsn()
+    if not dsn:
+        pytest.fail(
+            "no deployment database to build the dashboard from. Set "
+            "MOTHMAN_SUPPLY_DSN and run `mothman pipeline bootstrap` - since "
+            "REQ-PIPE-089 the dashboard's input is recorded QA history in a "
+            "database rather than a committed tree, so a checkout alone is no "
+            "longer enough.")
+
+    env = {**os.environ, "MOTHMAN_SUPPLY_DSN": dsn}
     for module in _BUILD_STEPS:
-        subprocess.run([sys.executable, "-m", *module], cwd=ROOT, check=True)
+        subprocess.run([sys.executable, "-m", *module], cwd=ROOT, check=True, env=env)
     assert DASHBOARD_HTML.exists()
     return DASHBOARD_HTML
 
@@ -525,9 +582,28 @@ def _real_amber_bdm_runs() -> list[tuple[str, str]]:
     with open(reports / "birth_registrations_dashboard.json") as f:
         dataset = _json.load(f)
 
-    amber = {run_id for run_id, status in status_by_run(dataset).items() if status == "amber"}
+    # THE DEPLOYMENT'S HISTORY, SET HERE rather than inherited from the
+    # autouse fixture above. This runs under a CLASS-scoped fixture,
+    # which pytest builds before any function-scoped one - so the env
+    # var that fixture sets is not in place yet, and these reads would
+    # go to the worker's empty database and find no amber run at all.
+    dsn = _deployment_dsn()
+    previous = os.environ.get("MOTHMAN_SUPPLY_DSN")
+    if dsn:
+        os.environ["MOTHMAN_SUPPLY_DSN"] = dsn
+    try:
+        amber = {run_id for run_id, status in status_by_run(dataset).items()
+                 if status == "amber"}
+        windows = list(_acc._run_windows_for_dataset("birth-registrations"))
+    finally:
+        if dsn:
+            if previous is None:
+                os.environ.pop("MOTHMAN_SUPPLY_DSN", None)
+            else:
+                os.environ["MOTHMAN_SUPPLY_DSN"] = previous
+
     usable: list[tuple[str, str]] = []
-    for run_id, start, end in _acc._run_windows_for_dataset("birth-registrations"):
+    for run_id, start, end in windows:
         if run_id in amber and start != end:
             usable.append((run_id, start.isoformat()))
     return usable
@@ -589,6 +665,14 @@ def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path_factory) 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(edd, "QA_COMMENTS_JSON", comments_path)
         mp.setattr(edd, "DASHBOARD_HTML", out_html)
+        # The deployment's history again, for the same reason as
+        # `_real_amber_bdm_runs` above: `embed()` runs IN PROCESS here
+        # rather than as a subprocess, and matching a comment to the
+        # amber run it was left against is a read of recorded QA
+        # results. Against the worker's empty database every comment
+        # matches nothing and no badge renders.
+        if _deployment_dsn():
+            mp.setenv("MOTHMAN_SUPPLY_DSN", _deployment_dsn())
         edd.embed()
     return {"html": out_html, "accept": accept_id, "reject": reject_id, "neither": neither_id}
 

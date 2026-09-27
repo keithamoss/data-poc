@@ -1,25 +1,47 @@
-"""
-Reads Phase 1's committed `qa_results/` tree back - the read side of
-plans/publishing-and-history.md Thread B/Phase 2. Lets the dashboard
-pipeline rebuild `reports/*.json` purely from committed history, with
-no real tool re-run and no live per-run DuckDB/CSV access needed.
+"""Reading QA history back (REQ-PIPE-089).
 
-Deliberately dumb: each committed file's own `verified` field (written
-by every `qa_tools/*/run_*.py` module via `qa_results_writer.py` - see
-that module's own docstring for why `verified` exists, not `raw_output`
-alone) already holds the fully-resolved, dashboard-ready check-result
-records for that tool+run, built once at run time when a live DB
-connection to that run's own per-run warehouse naturally exists. This
-module's only job is finding and concatenating those already-resolved
-records back into one flat list - not reshaping anything itself.
+IT USED TO WALK A COMMITTED FILE TREE. Every function here answered
+its question by globbing `qa_results/<agency>/<collection>/...` and
+opening JSON; the tree is gone and the same questions are now queries
+against the `qa` metadata schema. THE SIGNATURES ARE UNCHANGED, which
+is deliberate: ten callers read through this module, including both
+`build_results_from_history.py` modules whose whole job is to produce
+a file byte-identical to a live run's, and a reader swap that also
+changed the interface would have made "did the move preserve
+behaviour" impossible to answer by diffing.
+
+WHAT GOT BETTER RATHER THAN MERELY MOVED:
+
+  COMPLETENESS IS RECORDED, NOT INFERRED. `run_is_complete` used to
+  mean "all six expected files are present", which is a proxy - a run
+  that died after writing its last file looked complete. `qa.run` has
+  a `completed_at` that the orchestrator sets once every tool has
+  written, so the question has a real answer. The file-count check
+  survives as `missing_tools`, because "which tool did not write" is
+  still the useful diagnostic once a run IS known incomplete.
+
+  `qa_results_dir` IS ACCEPTED AND IGNORED. Every signature kept it
+  rather than dropping it, so that ten call sites did not all have to
+  change in the same commit as the storage. It is documented as dead
+  at each one; a later sweep can remove it.
+
+WHAT IT MAY READ, and the line is Keith's own (2026-09-27): a build
+may read recorded QA results, never actual data, and never anything
+else. Everything here goes through `qa_store`, which knows only about
+the metadata schema - no staging, rejected, promoted or period schema
+is reachable from this module at all.
 """
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 
+from qa_tools.common import qa_store, supply_db
+
 ROOT = Path(__file__).resolve().parent.parent.parent
+
+#: Retained so the handful of callers that still pass it keep working.
+#: Nothing reads it - the history is in the database.
 QA_RESULTS_DIR = ROOT / "qa_results"
 
 _DIGIT_RUN = re.compile(r"(\d+)")
@@ -64,6 +86,18 @@ TOOL_ORDER = ["dbt", "soda", "datacontract", "evidently"]
 EXPECTED_TOOLS = tuple(TOOL_ORDER) + ("dataset_stats", "tables_read")
 
 
+# Matches orchestrate_bdm.py's/orchestrate_cp.py's own _run_one()
+# construction order - keeps a history-rebuilt results list in the same
+# run-then-tool order a live orchestrator run always produced, so a diff
+# against a live run's own reports/*.json output is a real equivalence
+# check, not noise from an incidental reordering.
+TOOL_ORDER = ["dbt", "soda", "datacontract", "evidently"]
+
+#: Every tool a COMPLETE run records at collection level - the four
+#: real ones plus the two pseudo-tools (REQ-PIPE-036 criterion 12).
+EXPECTED_TOOLS = tuple(TOOL_ORDER) + ("dataset_stats", "tables_read")
+
+
 def expected_tools_for(dataset: str) -> tuple[str, ...]:
     """The tools a given DATASET owes a file, derived from the checks
     actually defined against it (REQ-PIPE-038, Keith 2026-09-26).
@@ -102,198 +136,329 @@ def _TOOL_OF_CHECK(check_id: str) -> str:
     return ""
 
 
-def _run_dirs(scope_dir: Path):
-    """Every RUN directory under one scope.
-
-    A RESERVED SCOPE IS A SIBLING OF A DATASET, not a run under one
-    (REQ-QAC-037, REQ-PIPE-038). `_cross-table/` and `_raw/` each hold
-    run directories of their own, so anything walking a COLLECTION has
-    to skip them or it reads a scope as a run - which shows up as a run
-    called "_raw" that is missing most of its files.
-    """
-    from qa_tools.common import tables_read as tables_read_mod
-
-    if not scope_dir.is_dir():
-        return []
-    return [d for d in scope_dir.iterdir()
-            if d.is_dir() and not tables_read_mod.is_reserved_scope(d.name)]
+def _conn(given=None):
+    """A connection to read through, opened if the caller has none."""
+    if given is not None:
+        return given, False
+    conn = supply_db.connect(label="mothman:qa-history")
+    qa_store.ensure_schema(conn)
+    return conn, True
 
 
-class PartialRunError(RuntimeError):
-    """A run whose results are on disk but incomplete."""
-
-
-def _raw_dir(agency: str, collection: str, qa_results_dir: Path | str) -> Path:
-    from qa_tools.common import tables_read as tables_read_mod
-
-    return Path(qa_results_dir) / agency / collection / tables_read_mod.RAW_SCOPE
-
-
-def _datasets_on_disk(agency: str, collection: str,
-                       qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[str]:
-    """The dataset scopes actually present under this collection.
-
-    Read from the tree rather than from the hierarchy config on
-    purpose: this answers "what did the runs write", and a dataset
-    added to the config yesterday has no history yet.
-    """
-    from qa_tools.common import tables_read as tables_read_mod
-
-    collection_dir = Path(qa_results_dir) / agency / collection
-    if not collection_dir.is_dir():
-        return []
-    return sorted(d.name for d in collection_dir.iterdir()
-                   if d.is_dir() and not tables_read_mod.is_reserved_scope(d.name))
+def _datasets_in(conn, agency: str, collection: str) -> list[str]:
+    return [row[0] for row in conn.execute(
+        f'SELECT DISTINCT dataset_id FROM "{qa_store.SCHEMA}".check_result_visible '
+        "WHERE agency_id = ? AND collection_id = ? AND dataset_id IS NOT NULL "
+        "ORDER BY dataset_id", [agency, collection]).fetchall()]
 
 
 def missing_tools(agency: str, collection: str, run_id: str,
-                   qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[str]:
+                  qa_results_dir=None, conn=None) -> list[str]:
     """What this run still owes, or [] where it owes nothing.
 
-    TWO SCOPES SINCE REQ-PIPE-038, and each answers a different half.
-    `_raw/` must hold all six files, because every invocation writes
-    its raw output there whatever its records say - that is the half
-    that catches a run which died between tools. Each DATASET must hold
-    the tools that define a check against it, which is the half that
-    catches a tool running but writing nothing.
+    STILL THE PER-TOOL DIAGNOSTIC it always was, and no longer the
+    definition of completeness - `qa.run.completed_at` is that now.
+    The distinction matters: this answers "which tool did not write",
+    which is what an operator wants once a run is known to have died,
+    and it answered "is this run finished" only because nothing better
+    existed.
 
     A dataset's owings are derived rather than fixed, so the five
     Child Protection datasets Evidently has no check for are not
     reported as permanently incomplete.
     """
-    raw_dir = _raw_dir(agency, collection, qa_results_dir) / run_id
-    missing = [f"_raw/{tool}" for tool in EXPECTED_TOOLS
-                if not (raw_dir / f"{tool}.json").exists()]
-    for dataset in _datasets_on_disk(agency, collection, qa_results_dir):
-        dataset_run = Path(qa_results_dir) / agency / collection / dataset / run_id
-        if not dataset_run.is_dir():
-            continue
-        missing += [f"{dataset}/{tool}" for tool in expected_tools_for(dataset)
-                     if not (dataset_run / f"{tool}.json").exists()]
-    return missing
+    conn, mine = _conn(conn)
+    try:
+        recorded = {row[0] for row in conn.execute(
+            f'SELECT DISTINCT tool FROM "{qa_store.SCHEMA}".tool_output '
+            "WHERE run_key = ?", [run_id]).fetchall()}
+        has_stats = bool(conn.execute(
+            f'SELECT 1 FROM "{qa_store.SCHEMA}".dataset_stats WHERE run_key = ?',
+            [run_id]).fetchall())
+        has_tables = bool(conn.execute(
+            f'SELECT 1 FROM "{qa_store.SCHEMA}".tables_read WHERE run_key = ?',
+            [run_id]).fetchall())
+        missing = [f"_raw/{tool}" for tool in TOOL_ORDER if tool not in recorded]
+        if not has_stats:
+            missing.append("_raw/dataset_stats")
+        if not has_tables:
+            missing.append("_raw/tables_read")
+
+        by_dataset: dict[str, set[str]] = {}
+        for dataset_id, tool in conn.execute(
+                f'SELECT DISTINCT dataset_id, tool FROM "{qa_store.SCHEMA}".check_result '
+                "WHERE run_key = ? AND dataset_id IS NOT NULL", [run_id]).fetchall():
+            by_dataset.setdefault(dataset_id, set()).add(tool)
+        for dataset in sorted(by_dataset):
+            missing += [f"{dataset}/{tool}" for tool in expected_tools_for(dataset)
+                        if tool not in by_dataset[dataset]]
+        return missing
+    finally:
+        if mine:
+            conn.close()
 
 
 def run_is_complete(agency: str, collection: str, run_id: str,
-                     qa_results_dir: Path | str = QA_RESULTS_DIR) -> bool:
-    return not missing_tools(agency, collection, run_id, qa_results_dir)
+                    qa_results_dir=None, conn=None) -> bool:
+    """Whether the run SAID it finished (REQ-PIPE-089 criterion 13).
+
+    It used to mean "all six expected files are present", which is a
+    proxy for the question rather than the question: a run that died
+    after writing its last file looked complete, and a run whose last
+    tool legitimately produced nothing looked broken. There is one
+    place that flips now.
+    """
+    conn, mine = _conn(conn)
+    try:
+        return bool(conn.execute(
+            f'SELECT 1 FROM "{qa_store.SCHEMA}".run_visible WHERE run_key = ?',
+            [run_id]).fetchall())
+    finally:
+        if mine:
+            conn.close()
 
 
 def incomplete_runs(agency: str, collection: str,
-                     qa_results_dir: Path | str = QA_RESULTS_DIR) -> dict[str, list[str]]:
+                    qa_results_dir=None, conn=None) -> dict[str, list[str]]:
     """Every run under this collection that failed partway, and what
     each is missing."""
-    out = {}
-    for run_id in list_run_ids(agency, collection, qa_results_dir):
-        missing = missing_tools(agency, collection, run_id, qa_results_dir)
-        if missing:
-            out[run_id] = missing
-    return out
+    conn, mine = _conn(conn)
+    try:
+        started = {row[0] for row in conn.execute(
+            f'SELECT run_key FROM "{qa_store.SCHEMA}".run '
+            "WHERE agency_id = ? AND collection_id = ? AND completed_at IS NULL",
+            [agency, collection]).fetchall()}
+        return {run_id: missing_tools(agency, collection, run_id, conn=conn)
+                for run_id in sorted(started, key=_natural_sort_key)}
+    finally:
+        if mine:
+            conn.close()
 
 
 def read_one(agency: str, collection: str, run_id: str, tool: str,
-             qa_results_dir: Path | str = QA_RESULTS_DIR,
-             dataset: str | None = None) -> list[dict]:
-    """The `verified` list from one committed `<tool>.json` file.
+             qa_results_dir=None, dataset: str | None = None, conn=None) -> list[dict]:
+    """One tool's `verified` records for one run.
 
-    With `dataset`, reads that one dataset's file. Without it, reads
-    EVERY dataset under the collection and concatenates in dataset
-    order - which is what a caller asking for "this run's dbt results"
-    meant before REQ-PIPE-038 split them, and still means.
+    With `dataset`, that one dataset's. Without it, every dataset under
+    the collection in dataset order - which is what a caller asking for
+    "this run's dbt results" meant before REQ-PIPE-038 split them, and
+    still means.
 
-    `[]` where nothing was written, which is ordinary rather than an
-    error: a tool with no check defined against a dataset writes that
-    dataset no file at all.
+    `[]` where nothing was recorded, which is ordinary rather than an
+    error: a tool with no check defined against a dataset records
+    nothing for it.
     """
-    if dataset is not None:
-        datasets = [dataset]
-    else:
-        datasets = _datasets_on_disk(agency, collection, qa_results_dir)
-    out: list[dict] = []
-    for name in datasets:
-        path = Path(qa_results_dir) / agency / collection / name / run_id / f"{tool}.json"
-        if not path.exists():
-            continue
-        with open(path) as f:
-            out.extend(json.load(f).get("verified") or [])
-    return out
+    conn, mine = _conn(conn)
+    try:
+        sql = (f'SELECT * FROM "{qa_store.SCHEMA}".check_result_visible '
+               "WHERE run_key = ? AND agency_id = ? AND collection_id = ? "
+               "AND tool = ? AND scope = ? AND supply_state = ?")
+        params = [run_id, agency, collection, tool,
+                  qa_store.DATASET_SCOPE, qa_store.AGREED]
+        if dataset is not None:
+            sql += " AND dataset_id = ?"
+            params.append(dataset)
+        return _records(conn.execute(sql + " ORDER BY dataset_id, id", params),
+                        run_id, _run_timestamp(conn, run_id))
+    finally:
+        if mine:
+            conn.close()
 
 
 def read_raw(agency: str, collection: str, run_id: str, tool: str,
-             qa_results_dir: Path | str = QA_RESULTS_DIR) -> dict | None:
-    """The whole committed envelope from `_raw/<run_id>/<tool>.json` -
-    `raw_output` plus its provenance fields - or None where that
-    invocation wrote nothing."""
-    path = _raw_dir(agency, collection, qa_results_dir) / run_id / f"{tool}.json"
-    if not path.exists():
-        return None
-    with open(path) as f:
-        return json.load(f)
+             qa_results_dir=None, conn=None) -> dict | None:
+    """The whole envelope one invocation recorded - `raw_output` plus
+    its provenance fields - or None where that invocation recorded
+    nothing.
+
+    The envelope is REASSEMBLED rather than stored as one: provenance
+    lives on the run and the payload on the tool output, which is what
+    stops a verdict query dragging megabytes it does not want.
+    """
+    conn, mine = _conn(conn)
+    try:
+        run = conn.execute(
+            f'SELECT run_timestamp, run_by FROM "{qa_store.SCHEMA}".run_visible '
+            "WHERE run_key = ?", [run_id]).fetchall()
+        if not run:
+            return None
+        if tool == "dataset_stats":
+            payload = qa_store.dataset_stats_for(conn, run_id, "")
+        elif tool == "tables_read":
+            resolved = qa_store.tables_read_for_run(conn, run_id)
+            payload = {"run_id": run_id, "resolved": resolved} if resolved else None
+        else:
+            payload = qa_store.tool_output_for(conn, run_id, tool)
+        if payload is None:
+            return None
+        timestamp, run_by = run[0]
+        return {"run_timestamp": _iso(timestamp), "run_by": run_by,
+                "raw_output": payload, "verified": None}
+    finally:
+        if mine:
+            conn.close()
 
 
 def list_run_ids(agency: str, collection: str,
-                  qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[str]:
-    """Every run_id committed under this agency/collection, sorted.
+                 qa_results_dir=None, conn=None) -> list[str]:
+    """Every COMPLETE run recorded under this agency/collection, sorted.
 
-    Listed from `_raw/` since REQ-PIPE-038, because that is the one
-    scope every run writes to: a dataset directory is missing a run
-    entirely if no tool had anything to say about that table, so a
-    listing taken from one dataset would silently lose runs.
+    Only complete ones, which is criterion 13 and is a change: the file
+    version listed whatever had a directory, so a run that died halfway
+    appeared in a rebuild with however much of itself had landed.
     """
-    return sorted((p.name for p in _run_dirs(_raw_dir(agency, collection, qa_results_dir))),
-                   key=_natural_sort_key)
+    conn, mine = _conn(conn)
+    try:
+        return sorted(
+            (row["run_key"] for row in qa_store.runs_for(conn, agency, collection)),
+            key=_natural_sort_key)
+    finally:
+        if mine:
+            conn.close()
 
 
 def read_dataset_stats(agency: str, collection: str, run_id: str,
-                        qa_results_dir: Path | str = QA_RESULTS_DIR) -> dict | None:
+                       qa_results_dir=None, conn=None) -> dict | None:
     """The precomputed value-counts/arrival/check-aggregate/manifest-entry
-    data for one run (qa_tools/<bdm|cp>/dataset_stats.py's output),
-    committed under the pseudo-tool name "dataset_stats" - not a real
-    QA tool, just reusing qa_results_writer.write_qa_result()'s same
-    file shape/writer for consistency. Returns None if this run has no
-    committed dataset_stats.json (shouldn't happen for any run written
-    since Phase 3 - see plans/publishing-and-history.md)."""
-    committed = read_raw(agency, collection, run_id, "dataset_stats", qa_results_dir)
-    return committed.get("raw_output") if committed else None
+    data for one run (qa_tools/<bdm|cp>/dataset_stats.py's output).
+
+    Returns None where the run recorded none, which should not happen
+    for any real run - the orchestrator writes it at the one point with
+    a legitimate live connection to supply rows, precisely so nothing
+    downstream ever needs one.
+    """
+    conn, mine = _conn(conn)
+    try:
+        return qa_store.dataset_stats_for(conn, run_id, "")
+    finally:
+        if mine:
+            conn.close()
 
 
 def read_run_provenance(agency: str, collection: str, run_id: str,
-                         qa_results_dir: Path | str = QA_RESULTS_DIR) -> dict | None:
-    """The `run_timestamp`/`run_by` envelope fields for one run - unlike
-    read_dataset_stats() above (which returns only the `raw_output`
-    payload, the shape every existing caller already expects), this
-    reads the two provenance fields write_qa_result() stamps ALONGSIDE
-    raw_output, not inside it. Added for qa_tools/common/changelog.py
-    (plans/publishing-and-history.md Phase 3's changelog feature,
-    2026-09-16) - a separate function rather than reshaping
-    read_dataset_stats() itself, since that would break every existing
-    caller's assumption that its return value IS the raw_output dict.
-    Reads dataset_stats.json specifically since it's the one file
-    guaranteed to exist for every run (orchestrate_bdm.py's/
-    orchestrate_cp.py's own dataset_stats write is where run_by gets
-    stamped - see write_qa_result()'s own docstring). Returns None if
-    this run has no committed dataset_stats.json."""
-    committed = read_raw(agency, collection, run_id, "dataset_stats", qa_results_dir)
-    if committed is None:
-        return None
-    return {"run_timestamp": committed.get("run_timestamp"), "run_by": committed.get("run_by")}
+                        qa_results_dir=None, conn=None) -> dict | None:
+    """The `run_timestamp`/`run_by` pair for one run.
+
+    A separate function from read_dataset_stats() because that one
+    returns the PAYLOAD, which is the shape every existing caller
+    expects. These two are facts about the run rather than about its
+    stats, and are now columns on `qa.run` rather than envelope fields
+    beside a payload - which is the same split, made real.
+    """
+    conn, mine = _conn(conn)
+    try:
+        rows = conn.execute(
+            f'SELECT run_timestamp, run_by FROM "{qa_store.SCHEMA}".run_visible '
+            "WHERE run_key = ?", [run_id]).fetchall()
+        if not rows:
+            return None
+        return {"run_timestamp": _iso(rows[0][0]), "run_by": rows[0][1]}
+    finally:
+        if mine:
+            conn.close()
 
 
 def read_qa_results(agency: str, collection: str,
-                     qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[dict]:
-    """Every committed run's every tool's `verified` records for one
-    `agency`/`dataset` pair, concatenated in run-id then tool order.
-    Only covers the tools that actually write under this exact dataset
-    segment - Child Protection's Evidently check writes under its own
-    table-scoped dataset id instead of the collection id the other 3
-    tools use (see qa_results_writer.py callers' own AGENCY_ID/
-    DATASET_ID/COLLECTION_ID constants), so a caller building CP's full
-    result set calls this once per dataset segment and concatenates -
-    same pattern qa_tools/cp/build_results_from_history.py uses."""
-    all_results: list[dict] = []
-    for run_id in list_run_ids(agency, collection, qa_results_dir):
-        for tool in TOOL_ORDER:
-            all_results.extend(read_one(agency, collection, run_id, tool, qa_results_dir))
-    return all_results
+                    qa_results_dir=None, conn=None) -> list[dict]:
+    """Every complete run's every tool's `verified` records for one
+    agency/collection, in run-id then tool order."""
+    conn, mine = _conn(conn)
+    try:
+        out: list[dict] = []
+        for run_id in list_run_ids(agency, collection, conn=conn):
+            for tool in TOOL_ORDER:
+                out.extend(read_one(agency, collection, run_id, tool, conn=conn))
+        return out
+    finally:
+        if mine:
+            conn.close()
+
+
+def read_cross_table_results(agency: str, collection: str,
+                             qa_results_dir=None, conn=None) -> list[dict]:
+    """Every recorded cross-table check result for one collection
+    (REQ-QAC-037 criterion 1).
+
+    Read from the reserved scope beside the datasets rather than from
+    any one of them, which is the whole point: a referential check
+    between placements and carers is not cp-placements' result because
+    cp-placements is where it happened to be declared.
+    """
+    conn, mine = _conn(conn)
+    try:
+        out: list[dict] = []
+        for run_id in list_run_ids(agency, collection, conn=conn):
+            for tool in TOOL_ORDER:
+                out.extend(_records(conn.execute(
+                    f'SELECT * FROM "{qa_store.SCHEMA}".check_result_visible '
+                    "WHERE run_key = ? AND agency_id = ? AND collection_id = ? "
+                    "AND tool = ? AND scope = ? AND supply_state = ? ORDER BY id",
+                    [run_id, agency, collection, tool, qa_store.CROSS_TABLE_SCOPE,
+                     qa_store.AGREED]), run_id, _run_timestamp(conn, run_id)))
+        return out
+    finally:
+        if mine:
+            conn.close()
+
+
+def _iso(value):
+    """A timestamptz back as the ISO string every caller expects."""
+    return value.isoformat() if hasattr(value, "isoformat") else value
+
+
+def _run_timestamp(conn, run_id: str):
+    """One run's timestamp, which every record it produced carries."""
+    rows = conn.execute(
+        f'SELECT run_timestamp FROM "{qa_store.SCHEMA}".run WHERE run_key = ?',
+        [run_id]).fetchall()
+    return rows[0][0] if rows else None
+
+
+#: THE KEY SET A REAL RECORD HAS, established by counting the committed
+#: corpus rather than by reading the evaluators: every `verified` record
+#: carries exactly these twenty, whatever their values, plus
+#: `tables_read` on the ones that declare it. Reconstructing anything
+#: else is a shape change, and a shape change two transforms upstream of
+#: the dashboard is the failure CLAUDE.md's own standing lesson is about.
+#:
+#: Two traps, both hit on the first attempt. A key whose value is NULL
+#: is PRESENT in a real record - dropping it breaks
+#: `pipeline/build_dashboard_data.py`, which indexes rather than gets.
+#: And `tool` is NOT a record key at all: it is a fact about the
+#: invocation, stored as a column because the write is keyed on it, and
+#: downstream derives it from `check_id`.
+_NOT_IN_A_RECORD = ("id", "run_key", "tool", "scope", "supply_state")
+
+#: Present only where the tool actually set it - Evidently's reference
+#: run, which the other three have no concept of. A column because it is
+#: worth querying; conditional here because adding it as a null to a dbt
+#: record would be inventing a key that record never had.
+_OPTIONAL = ("reference_run_id",)
+
+
+def _records(cursor, run_id: str, run_timestamp=None) -> list[dict]:
+    """Rows as the `verified` records they were written from.
+
+    `extra` is merged back in rather than returned as a nested field:
+    it exists so a fifth tool's own field survives without a migration,
+    and a caller should not have to know which of a record's keys
+    happened to get a column.
+    """
+    columns = [d.name for d in cursor.description]
+    out = []
+    for row in cursor.fetchall():
+        record = dict(zip(columns, row))
+        stamp = record.pop("run_timestamp", None)
+        record.update(record.pop("extra", None) or {})
+        for name in _NOT_IN_A_RECORD:
+            record.pop(name, None)
+        for name in _OPTIONAL:
+            if record.get(name) is None:
+                record.pop(name, None)
+        record["run_id"] = run_id
+        record["run_timestamp"] = _iso(stamp if stamp is not None else run_timestamp)
+        out.append(record)
+    return out
 
 
 def canonical_order(results: list[dict]) -> list[dict]:
@@ -332,36 +497,3 @@ def canonical_order(results: list[dict]) -> list[dict]:
         str(r.get("dataset_id") or ""),
         str(r.get("check_id") or ""),
     ))
-
-
-def read_cross_table_results(agency: str, collection: str,
-                              qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[dict]:
-    """Every committed cross-table check result for one collection
-    (REQ-QAC-037 criterion 1).
-
-    Read from the reserved scope beside the datasets rather than from
-    any one of them, which is the whole point: a referential check
-    between placements and carers is not cp-placements' result because
-    cp-placements is where it happened to be declared.
-
-    Empty where the scope does not exist, which is the ordinary state
-    for a collection with no cross-table checks - and for every
-    collection until the first run after this landed.
-    """
-    from qa_tools.common import tables_read as tables_read_mod
-
-    scope_dir = Path(qa_results_dir) / agency / collection / tables_read_mod.CROSS_TABLE_SCOPE
-    if not scope_dir.is_dir():
-        return []
-    out: list[dict] = []
-    for run_dir in sorted((d for d in scope_dir.iterdir() if d.is_dir()),
-                           key=lambda d: _natural_sort_key(d.name)):
-        for tool in TOOL_ORDER:
-            path = run_dir / f"{tool}.json"
-            if not path.exists():
-                continue
-            try:
-                out.extend(json.loads(path.read_text()).get("verified") or [])
-            except (OSError, json.JSONDecodeError):
-                continue
-    return out

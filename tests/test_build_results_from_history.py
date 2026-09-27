@@ -11,7 +11,7 @@ import qa_tools.bdm.build_results_from_history as bdm_history
 import qa_tools.cp.build_results_from_history as cp_history
 
 
-def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch):
+def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
     results_path = tmp_path / "results_bdm.json"
     monkeypatch.setattr(bdm_history, "RESULTS_PATH", str(results_path))
 
@@ -34,7 +34,7 @@ def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch):
     assert set(output["dataset_stats"]) == {r["run_id"] for r in output["runs"]}
 
 
-def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch):
+def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
     results_path = tmp_path / "results_cp.json"
     monkeypatch.setattr(cp_history, "RESULTS_PATH", str(results_path))
 

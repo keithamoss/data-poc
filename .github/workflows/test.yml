@@ -180,9 +180,22 @@ jobs:
       # the runner's condition locally - move reports/ aside, run those
       # files, watch ten tests skip.
       #
-      # This is the same CI-safe chain deploy-pages.yml runs: both
-      # commands read committed qa_results/ history only and never open
-      # data/ or a warehouse, per CLAUDE.md's standing rule.
+      # THE SUITE NEEDS QA HISTORY, AND SINCE REQ-PIPE-089 THAT MEANS A
+      # BOOTSTRAP. The results used to be a committed tree, so this step
+      # could rebuild the dashboard from whatever the checkout carried.
+      # They are a table now, and a runner's database starts empty - so
+      # something has to generate the synthetic supplies and run the
+      # real checks over them before anything can be built from them.
+      #
+      # THIS IS A TEST STEP, WHICH IS WHY IT MAY TOUCH data/. The rule
+      # it looks like it breaks - a BUILD may read recorded QA results,
+      # never actual data - is about the publisher, and the publisher no
+      # longer runs here at all (REQ-PIPE-092). A test suite has always
+      # been allowed to generate its own synthetic supplies; that is
+      # what the fixtures do.
+      - name: Generate the QA history the suite reads
+        run: uv run mothman pipeline bootstrap
+
       - name: Build the dashboard data the suite reads
         run: |
           uv run mothman dashboard rebuild-results

@@ -908,13 +908,49 @@ Rough layout:
     bootstrap` generates both collections' synthetic data and runs the
     real checks over every supply; **measured 2026-09-27 against an
     empty database, 237 seconds** (~4 minutes, 151 staged tables, 3,204
-    CP check results), so it is worth starting early rather than
-    discovering it is needed. It is a no-op when the database already
+    CP check results), and **re-measured the same evening at 266
+    seconds on 163 staged tables** once QA results had moved into the
+    database - 12% more time for 8% more tables, which is noise at this
+    resolution rather than a cost of the move. Worth starting early
+    rather than discovering it is needed. It is a no-op when the database already
     holds staged tables; `--force` rebuilds anyway, and the pipeline is
     seeded so the content is the same either way. Note it also rewrites
     `qa_results/` with fresh timestamps - ~900 files - so discard that
     churn (`git checkout -- qa_results/`) unless the run was meant to
     add history.
+
+    **SINCE REQ-PIPE-089, A BOOTSTRAP IS NOT OPTIONAL FOR THE TEST
+    SUITE.** This is the part that changed on 2026-09-27 and the part a
+    fresh session will otherwise diagnose as a regression. QA RESULTS
+    used to be a committed tree, so the dashboard build - and the ~167
+    tests that drive the built dashboard - had their source the moment
+    the repository was cloned. The results are a table now, so an empty
+    database means an empty dashboard, and `tests/test_dashboard_e2e.py`
+    fails wholesale with a `CalledProcessError` out of
+    `pipeline.build_dashboard_data` rather than anything that names the
+    real cause.
+
+    So the order is: start PostgreSQL, create the role and database,
+    **bootstrap**, and only then run the suite. The session-start hook
+    reports the staged-table count precisely so "is it populated" is
+    answerable before a red result has to be interpreted.
+
+    **A CAUTION THAT COST A BOOTSTRAP, 2026-09-27**: `data/deliveries/`
+    accumulates, and every delivery in it is staged and QA'd on every
+    run. Nineteen `handfiled-*` directories left behind by smoke-testing
+    REQ-PIPE-103's hand-filing path pushed one bootstrap from 151 staged
+    tables to 275 - about 1.8x the work, which reads as "the database
+    made it slower" and is nothing of the kind. Measured the same day:
+    recording a verdict costs 0.64ms, so a whole run's ~4,000 verdicts
+    are under three seconds of the total. If a bootstrap seems slow,
+    count `ls data/deliveries | wc -l` before blaming the engine.
+
+    **And never benchmark against the real `supply` database.** A quick
+    timing script run that day did `TRUNCATE qa.run CASCADE` to get a
+    clean measurement and destroyed the results a four-minute bootstrap
+    had just written. Regenerable, so the cost was time rather than
+    data - and the same script against `MOTHMAN_TEST_DSN` would have
+    cost nothing.
   - `uv run dbt deps --project-dir dbt_project --profiles-dir
     qa_tools/dbt_profiles` (installs `dbt_utils`, whose macros several
     real dbt checks need - without it 8 real tests fail)

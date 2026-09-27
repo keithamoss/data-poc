@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -153,7 +153,15 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".run (
     run_key        text PRIMARY KEY,
     agency_id      text NOT NULL,
     collection_id  text NOT NULL,
-    run_timestamp  timestamptz NOT NULL,
+    -- BOTH, for the reason `qa.delivery` keeps two: a timestamptz
+    -- stores an INSTANT, not an offset, so reading it back gives the
+    -- same moment on the server's clock rather than the one the run was
+    -- recorded on. That offset is a fact - REQ-PIPE-048 is about which
+    -- clock the asset is on - and it reaches the dashboard's display and
+    -- the changelog. Caught by a test asserting the exact string it
+    -- wrote and getting +00:00 back for +08:00.
+    run_timestamp  text NOT NULL,
+    run_instant    timestamptz NOT NULL,
     -- NULLABLE AT INSERT, REQUIRED AT COMPLETION. A run is registered by
     -- whoever gets there first - the orchestrator, which knows who is
     -- running it, or a bare single-tool invocation, which does not. What
@@ -173,10 +181,14 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".run (
 -- Harmless where it already is; DROP NOT NULL does not error on a
 -- column that has none.
 ALTER TABLE "{SCHEMA}".run ALTER COLUMN run_by DROP NOT NULL;
+ALTER TABLE "{SCHEMA}".run ADD COLUMN IF NOT EXISTS run_instant timestamptz;
 ALTER TABLE "{SCHEMA}".run ALTER COLUMN environment DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS run_completed
     ON "{SCHEMA}".run (completed_at) WHERE completed_at IS NOT NULL;
+
+--   receipt order across runs, on the instant rather than the text
+CREATE INDEX IF NOT EXISTS run_when ON "{SCHEMA}".run (run_instant);
 
 CREATE TABLE IF NOT EXISTS "{SCHEMA}".check_result (
     id                bigserial PRIMARY KEY,
@@ -463,6 +475,65 @@ def _is_current(conn: supply_db.SupplyConnection) -> bool:
     return bool(rows) and rows[0][0] == SCHEMA_VERSION
 
 
+#: Schemas the publisher must never reach. Named rather than derived,
+#: because the point is that a new one has to be added DELIBERATELY - a
+#: derivation would quietly admit whatever came along next, which is
+#: the failure mode a least-privilege grant exists to prevent.
+SUPPLY_SCHEMA_PREFIXES = ("staging", "rejected", "promoted", "period_", "sample",
+                          "qa_run_", "dbt_", "trial_")
+
+
+def ensure_publisher_role(conn: supply_db.SupplyConnection, role: str,
+                          password: str | None = None) -> None:
+    """Create or update the role the dashboard build connects as
+    (criteria 7 and 23).
+
+    READ ON THE METADATA SCHEMA, AND NOTHING ELSE. Not "everything
+    except supply data" - the difference matters, because a grant
+    written as an exclusion has to be revisited every time a schema is
+    added, and the one nobody revisits is the one that leaks. This
+    grants USAGE on `qa` alone; every other schema is unreachable
+    because nothing was ever granted on it.
+
+    DEFAULT PRIVILEGES ARE PART OF THE GRANT, not a refinement. Without
+    them the next table added to this schema arrives unreadable, and
+    the person who hits that at 6pm fixes it with a broader grant than
+    anybody intended.
+
+    WHY A ROLE RATHER THAN A SEPARATE DATABASE (Keith, 2026-09-26): the
+    claim that a second database means the publisher "literally cannot"
+    read supply data was overstated - it is a grant either way. What
+    separation buys is least privilege per component, and a role buys
+    the same; against a second database is REQ-PIPE-075 criterion 9's
+    ordering rule, which collapses into one transaction only while the
+    log and the tables share a database.
+
+    NEEDS A SUPERUSER (or CREATEROLE) connection, and says so rather
+    than half-succeeding: a role created without its grants is worse
+    than no role, because it authenticates and then fails at read time
+    somewhere far away.
+    """
+    quoted = f'"{supply_db._ident(role, "role name")}"'
+    exists = conn.execute(
+        "SELECT 1 FROM pg_roles WHERE rolname = ?", [role]).fetchall()
+    if not exists:
+        conn.execute(f"CREATE ROLE {quoted} LOGIN")
+    if password is not None:
+        conn.execute(f"ALTER ROLE {quoted} WITH PASSWORD '{password}'")
+
+    conn.execute(f'GRANT USAGE ON SCHEMA "{SCHEMA}" TO {quoted}')
+    conn.execute(f'GRANT SELECT ON ALL TABLES IN SCHEMA "{SCHEMA}" TO {quoted}')
+    conn.execute(
+        f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{SCHEMA}" GRANT SELECT ON TABLES TO {quoted}')
+
+    # BELT AND BRACES ON THE PUBLIC SCHEMA, which PostgreSQL grants to
+    # every role by default in versions before 15 and which a supply
+    # table could be created in by accident. Revoking costs nothing and
+    # removes the one schema this role would otherwise hold rights on
+    # without anybody deciding it should.
+    conn.execute(f"REVOKE ALL ON SCHEMA public FROM {quoted}")
+
+
 # ---------------------------------------------------------------------------
 # Writing
 # ---------------------------------------------------------------------------
@@ -490,10 +561,11 @@ def record_run(conn: supply_db.SupplyConnection, *, run_key: str, agency_id: str
     """
     conn.execute(
         f'INSERT INTO "{SCHEMA}".run '
-        "(run_key, agency_id, collection_id, run_timestamp, run_by, environment, tool_versions) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?) "
+        "(run_key, agency_id, collection_id, run_timestamp, run_instant, run_by, "
+        "environment, tool_versions) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT (run_key) DO UPDATE SET "
         "run_timestamp = EXCLUDED.run_timestamp, "
+        "run_instant = EXCLUDED.run_instant, "
         f'run_by = COALESCE(EXCLUDED.run_by, "{SCHEMA}".run.run_by), '
         f'environment = COALESCE(EXCLUDED.environment, "{SCHEMA}".run.environment), '
         # A plain string, not an f-string: the empty-object literal is
@@ -502,8 +574,8 @@ def record_run(conn: supply_db.SupplyConnection, *, run_key: str, agency_id: str
         # object, which is not the same thing and would never match.
         "tool_versions = CASE WHEN EXCLUDED.tool_versions = '{}'::jsonb "
         f'THEN "{SCHEMA}".run.tool_versions ELSE EXCLUDED.tool_versions END',
-        [run_key, agency_id, collection_id, run_timestamp, run_by, environment,
-         json.dumps(dict(tool_versions or {}))])
+        [run_key, agency_id, collection_id, run_timestamp, run_timestamp, run_by,
+         environment, json.dumps(dict(tool_versions or {}))])
 
 
 def complete_run(conn: supply_db.SupplyConnection, run_key: str) -> None:
@@ -663,14 +735,14 @@ def history_for_check(conn: supply_db.SupplyConnection, check_id: str,
     if dataset_id is not None:
         sql += " AND r.dataset_id = ?"
         params.append(dataset_id)
-    return _dicts(conn.execute(sql + " ORDER BY run.run_timestamp, r.id", params))
+    return _dicts(conn.execute(sql + " ORDER BY run.run_instant, r.id", params))
 
 
 def runs_for(conn: supply_db.SupplyConnection, agency_id: str,
              collection_id: str) -> list[dict]:
     return _dicts(conn.execute(
         f'SELECT * FROM "{SCHEMA}".run_visible WHERE agency_id = ? AND collection_id = ? '
-        "ORDER BY run_timestamp", [agency_id, collection_id]))
+        "ORDER BY run_instant, run_key", [agency_id, collection_id]))
 
 
 def incomplete_runs(conn: supply_db.SupplyConnection) -> list[str]:
@@ -697,7 +769,7 @@ def table_history(conn: supply_db.SupplyConnection, logical_table: str) -> list[
     return _dicts(conn.execute(
         f'SELECT t.*, run.run_timestamp FROM "{SCHEMA}".tables_read_visible t '
         f'JOIN "{SCHEMA}".run_visible run USING (run_key) WHERE t.logical_table = ? '
-        "ORDER BY run.run_timestamp", [logical_table]))
+        "ORDER BY run.run_instant", [logical_table]))
 
 
 def tool_output_for(conn: supply_db.SupplyConnection, run_key: str, tool: str,

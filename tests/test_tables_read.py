@@ -211,50 +211,80 @@ class TestAPartialRunIsNotRecordedAsACompleteOne:
     complete because everything it owes is there, not because something
     said so."""
 
-    def _run(self, root, run_id, tools):
-        """A run's RAW scope, which is where REQ-PIPE-038 put the file
-        every invocation writes whatever its records say."""
-        d = root / "a" / "b" / tr.RAW_SCOPE / run_id
-        d.mkdir(parents=True)
-        for tool in tools:
-            (d / f"{tool}.json").write_text("{}")
-        return d
+    def _run(self, conn, run_id, tools, datasets=()):
+        """One run's recorded output, which is what REQ-PIPE-089 made of
+        the `_raw` scope: a `tool_output` row per invocation, and a
+        `dataset_stats`/`tables_read` row for each pseudo-tool.
+        """
+        from qa_tools.common import qa_store
 
-    def test_a_run_missing_a_tool_is_not_complete_and_says_which(self, tmp_path):
-        self._run(tmp_path, "run_1", ["dbt", "soda"])
-        assert not qa_results_reader.run_is_complete("a", "b", "run_1", tmp_path)
-        assert qa_results_reader.missing_tools("a", "b", "run_1", tmp_path) == [
+        qa_store.record_run(conn, run_key=run_id, agency_id="a", collection_id="b",
+                            run_timestamp="2026-01-01T00:00:00+00:00",
+                            run_by="t@e.gov.au", environment="sandbox")
+        for tool in tools:
+            if tool == "dataset_stats":
+                qa_store.record_dataset_stats(conn, run_id, "", {})
+            elif tool == "tables_read":
+                qa_store.record_tables_read(conn, run_id, {"t": "t__1"})
+            else:
+                qa_store.record_tool_output(conn, run_id, tool, {})
+        for dataset in datasets:
+            qa_store.record_results(
+                conn, run_id,
+                [{"dataset_id": dataset, "check_id": "x", "status": "pass"}],
+                tool="soda", agency_id="a", collection_id="b")
+
+    def test_a_run_missing_a_tool_says_which(self, clean_qa_history):
+        """`missing_tools` SURVIVES as the per-tool diagnostic. What it
+        no longer decides is whether the run is complete - see the
+        retirement note below."""
+        self._run(clean_qa_history, "run_1", ["dbt", "soda"])
+        assert qa_results_reader.missing_tools("a", "b", "run_1") == [
             "_raw/datacontract", "_raw/evidently", "_raw/dataset_stats", "_raw/tables_read"]
 
-    def test_a_run_with_every_expected_file_is_complete(self, tmp_path):
-        self._run(tmp_path, "run_1", qa_results_reader.EXPECTED_TOOLS)
-        assert qa_results_reader.run_is_complete("a", "b", "run_1", tmp_path)
+    def test_completeness_is_recorded_rather_than_counted(
+            self, clean_qa_history, finish_runs):
+        """RETIRED AND REPLACED (REQ-PIPE-089 criterion 13).
 
-    def test_incomplete_runs_names_every_partial_run(self, tmp_path):
-        self._run(tmp_path, "run_1", qa_results_reader.EXPECTED_TOOLS)
-        self._run(tmp_path, "run_2", ["dbt"])
-        found = qa_results_reader.incomplete_runs("a", "b", tmp_path)
+        Two tests here asserted that a run with every expected FILE was
+        complete, and that a run missing one was not. That derivation
+        was always a proxy, and its own docstring above says why it was
+        chosen - "there is no third state to get wrong". The trouble is
+        that it gets the SECOND state wrong: a run that died after
+        writing its last file has every file and is not finished, and a
+        run whose last tool legitimately produced nothing is finished
+        and looks broken.
+
+        There is one place that flips now, and this is it.
+        """
+        self._run(clean_qa_history, "run_1", qa_results_reader.EXPECTED_TOOLS)
+        assert not qa_results_reader.run_is_complete("a", "b", "run_1"), \
+            "every expected tool recorded output, and the run never said it finished"
+
+        finish_runs("run_1")
+        assert qa_results_reader.run_is_complete("a", "b", "run_1")
+
+    def test_incomplete_runs_names_every_partial_run(
+            self, clean_qa_history, finish_runs):
+        self._run(clean_qa_history, "run_1", qa_results_reader.EXPECTED_TOOLS)
+        self._run(clean_qa_history, "run_2", ["dbt"])
+        finish_runs("run_1")
+
+        found = qa_results_reader.incomplete_runs("a", "b")
         assert list(found) == ["run_2"]
 
-    def test_a_dataset_owing_a_tool_it_never_wrote_is_named_too(self, tmp_path):
-        """The other half of completeness since REQ-PIPE-038: `_raw`
-        catches a run that died between tools, and the dataset
-        directories catch a tool that ran and wrote nothing."""
-        self._run(tmp_path, "run_1", qa_results_reader.EXPECTED_TOOLS)
-        (tmp_path / "a" / "b" / "cp-carers" / "run_1").mkdir(parents=True)
+    def test_a_dataset_owing_a_tool_it_never_wrote_is_named_too(self, clean_qa_history):
+        """The other half of the diagnostic: `_raw` catches a run that
+        died between tools, and the per-dataset records catch a tool
+        that ran and recorded nothing."""
+        self._run(clean_qa_history, "run_1", qa_results_reader.EXPECTED_TOOLS,
+                  datasets=["cp-carers"])
 
-        missing = qa_results_reader.missing_tools("a", "b", "run_1", tmp_path)
+        missing = qa_results_reader.missing_tools("a", "b", "run_1")
 
         assert "cp-carers/dbt" in missing
         assert "cp-carers/evidently" not in missing, (
             "no Evidently check is defined against cp-carers, so it owes no file")
-
-    def test_every_real_committed_run_is_complete(self, real_committed_history):
-        """The corpus this rule was derived from. A regression here
-        means something stopped writing."""
-        for agency, collection in (("registry-services", "civil-registration"),
-                                    ("child-protection-family-support", "child-protection")):
-            assert qa_results_reader.incomplete_runs(agency, collection) == {}
 
 
 class TestTheFailureNamesTheDatasetAndTheTool:
