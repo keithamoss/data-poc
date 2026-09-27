@@ -19114,6 +19114,9 @@ requirements:
       because that data has supplies and no cadence at all.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     source: >
       Split out of REQ-PIPE-087 on 2026-09-27, Keith's own call, when
       an audit for that requirement's sign-off found its `sample`
@@ -19169,14 +19172,33 @@ requirements:
         development never counts toward a dataset's real quality
         history.
       - >
+        THE SYSTEM SHALL place a dataset without a calendar in the same
+        agency, collection and dataset hierarchy as every other dataset,
+        and SHALL NOT give it a hierarchy, a naming scheme or a location
+        of its own.
+      - >
+        THE SYSTEM SHALL support any number of datasets without a
+        calendar at once, within one collection or across several, and
+        SHALL NOT limit a collection to one of them or require them to
+        share a collection.
+      - >
+        THE SYSTEM SHALL let a cross-table check be authored over two or
+        more datasets without a calendar in the same collection, and
+        SHALL run, record and report it exactly as it does a cross-table
+        check over datasets that have one.
+      - >
         WHEN a dataset gains a calendar, THE SYSTEM SHALL graduate it -
         from that point it owes supplies, is filed to periods, and is
         rolled up like any other - and SHALL record when it graduated.
       - >
-        THE SYSTEM SHALL say what becomes of the data received before
-        graduation - whether it is filed to a period, discarded, or
-        left where it is - and SHALL NOT leave it in a state no rule
-        describes.
+        WHEN a person discards a dataset's pre-graduation data from the
+        terminal, THE SYSTEM SHALL remove it from the sample schema, and
+        SHALL NOT file it to a period.
+      - >
+        THE SYSTEM SHALL NOT discard pre-graduation data automatically -
+        not at graduation, not on a schedule, and not as a side effect of
+        any other operation - and SHALL leave it in the sample schema
+        until a person says so.
       - >
         THE SYSTEM SHALL keep the QA record made before graduation
         readable afterwards, because developing a check is real work
@@ -19205,7 +19227,65 @@ requirements:
         and discovering the permanent one later means rework in the
         rollups, the dashboard and the schedule gate at once.
     dependencies: [REQ-PIPE-087, REQ-PIPE-089]
+    open_questions:
+      - >
+        WHETHER A CROSS-TABLE CHECK MAY SPAN A SAMPLE DATASET AND AN
+        AGREED ONE in the same collection, and if so how its verdict is
+        attributed. Criterion 13 covers checks among samples, which is
+        what Keith named. The mixed case collides with criterion 9's
+        rollup exclusion, and the recommendation in this requirement's
+        decisions is to allow it while recording the result as
+        in-development and excluding it from the agreed dataset's status
+        and every rollup. It affects one criterion rather than the
+        requirement's shape, so the rest is buildable while this is open.
     decisions:
+      - >
+        PRE-GRADUATION DATA IS DISCARDED, BY A PERSON, FROM THE TUI
+        (Keith, 2026-09-27, settling criterion 12's three-way fork and
+        overruling the recommendation made here). The recommendation was
+        to LEAVE IT WHERE IT IS, on the grounds that nothing moved or
+        destroyed can turn out wrong later. His answer is better on the
+        point that actually matters: sample data was received to develop
+        checks against, not as a supply anybody agreed, so keeping it for
+        ever means an agreed dataset carries rows nobody ever owed.
+        REJECTED with it: filing it to the first period, which asserts it
+        met a schedule that did not exist when it arrived. WHAT HIS ANSWER
+        ADDS beyond picking one of three, and it is the half a bare
+        "discard" would have lost: the discard is A DECISION A HUMAN
+        MAKES, so criterion 13 forbids doing it automatically - not at
+        graduation, not on a schedule, not as a side effect of anything
+        else. Graduation and discarding are two acts, and a dataset
+        growing up destroys nothing on its own.
+      - >
+        SAMPLE DATASETS ARE ORDINARY DATASETS IN EVERY STRUCTURAL SENSE
+        (Keith, 2026-09-27): the same agency/collection/dataset
+        hierarchy, any number of them at once, in one collection or
+        across several, and cross-table checks among them authored and
+        run exactly as for calendared datasets - "all of this should work
+        just as if it was a regular dataset with a calendar". Criteria
+        11, 12 and 13 state each part. Worth having as criteria rather
+        than left as an assumption, because each is a thing an
+        implementation could plausibly get wrong in the TIDY direction -
+        a `sample` prefix that flattens the hierarchy, one sample schema
+        per collection, or a cross-table check that refuses to run until
+        every participant has a calendar - and each would then have to be
+        undone rather than extended.
+      - >
+        WHAT HIS ANSWER DOES NOT COVER, recorded rather than guessed: a
+        cross-table check spanning a sample dataset AND an agreed one in
+        the same collection. He named checks among SAMPLES, which
+        criterion 13 states. The mixed case is plausible and arguably the
+        strongest reason to develop checks early - a new dataset joining
+        an existing collection - and it collides with criterion 9, since
+        a mixed check's verdict attributed to the agreed dataset would
+        let an unagreed dataset turn an agreed one's status. It is
+        technically possible: dbt and Soda both read across schemas,
+        established here by real experiment rather than from their docs.
+        RECOMMENDED, not decided: allow the check, record its result as
+        in-development, and exclude it from the agreed dataset's status
+        and every rollup, so the check is exercised and nothing unagreed
+        can move an agreed verdict. Refusing it outright is worse,
+        because it blocks the real case.
       - >
         THE HOLD IS CLEARED (2026-09-27), and by the thing it asked
         for rather than by waiving it. Keith scoped the
