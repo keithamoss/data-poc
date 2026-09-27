@@ -6584,9 +6584,9 @@ requirements:
       by: Keith
       date: "2026-09-22"
     acceptance_criteria:
-      - THE SYSTEM SHALL generate, into the committed synthetic history,
-        a real instance of every scenario the test scenario register
-        marks for injection.
+      - THE SYSTEM SHALL generate, into the generated supply history and
+        its recorded QA results, a real instance of every scenario the
+        test scenario register marks for injection.
       - THE SYSTEM SHALL generate each one under a schedule
         configuration that makes that scenario's stated outcome the
         correct one, and SHALL state that configuration alongside it.
@@ -6608,7 +6608,7 @@ requirements:
         calendar, each in force over the part of the history its
         scenarios occupy.
       - THE SYSTEM SHALL generate at least one schedule version change
-        within the committed history, so that the
+        within the generated history, so that the
         evaluate-each-period-against-the-version-in-force rule is
         exercised against real data.
       - WHEN a schedule version changes, THE SYSTEM SHALL leave every
@@ -6644,42 +6644,61 @@ requirements:
         regeneration that moves a past date should say so in its commit
         message.
     dependencies: [REQ-GEN-040, REQ-GEN-042, REQ-GEN-043, REQ-PIPE-049, REQ-PIPE-051]
-    open_questions:
-      - >
-        NARROWED 2026-09-26, and the first version of this note overstated
-        the problem. It said the register's daily scenarios need three
-        different due times, so hosting them meant splitting Birth
-        Registrations' history into eras. Checked against the real
-        assignment rule rather than reasoned about: TS-1 and TS-2 - the
-        two cascades, and the highest-value scenarios in the register -
-        already produce their stated outcomes under the CURRENT config,
-        due 14:00 with sixty minutes' grace and a four-hour window. TS-1's
-        20:00 arrival files as a resupply of Monday; TS-2's on-time
-        Thursday arrival takes Thursday and leaves Tuesday and Wednesday
-        unfilled. Their stated configs differ from ours, but the outcomes
-        those configs exist to produce do not, and a scenario is placed by
-        choosing its ARRIVAL INSTANT. The same is true of the quarterly
-        family: TS-3a's "one day outside August's window" is a property of
-        the arrival relative to the window, not of the authored dates.
-      - >
-        WHAT REMAINS is smaller and still Keith's: TS-3c, TS-3d and TS-10
-        are EVENING-BEFORE - the supply for day D due 22:00 on D-1 - and
-        that is structurally different from moving an arrival, because the
-        due instant falls on the previous calendar day. It needs a second
-        effective-dated version of the daily calendar covering the stretch
-        of history those three occupy, which criterion 8 asks for anyway.
-        Criterion 11's "no incompatible configurations inside one version's
-        period of effect" then decides where the boundary sits.
-      - >
-        A BLOCKER UNDERNEATH IT WAS FOUND AND FIXED FIRST, 2026-09-26
-        (Keith's call). The daily calendar started 2023-01-01 against a
-        history beginning 2026-08-24, so it owed 1,365 slots against 32
-        real supply days - and because "oldest claimable unfilled slot" is
-        a real branch of the assignment rule, a supply meant for a Monday
-        in August 2026 filed to 2023-01-01. No scenario placement could
-        have worked until that was corrected, whatever the due times.
-
     decisions:
+      - >
+        THE SCENARIOS ARE PLACED BY CHOOSING THEIR ARRIVAL INSTANT, NOT BY
+        RECONFIGURING THE SCHEDULE, and this correction is worth keeping
+        because the first version of it overstated the problem badly. That
+        version said the register's daily scenarios need three different
+        due times, so hosting them meant splitting Birth Registrations'
+        history into eras. Checked against the real assignment rule rather
+        than reasoned about: TS-1 and TS-2 - the two cascades, and the
+        highest-value scenarios in the register - already produce their
+        stated outcomes under the CURRENT config, due 14:00 with sixty
+        minutes' grace and a four-hour window. TS-1's 20:00 arrival files
+        as a resupply of Monday; TS-2's on-time Thursday arrival takes
+        Thursday and leaves Tuesday and Wednesday unfilled. Their stated
+        configs differ from ours and the outcomes those configs exist to
+        produce do not. The same holds for the quarterly family: TS-3a's
+        "one day outside August's window" is a property of the arrival
+        relative to the window, not of the authored dates. So only the
+        evening-before trio needs a schedule version of its own.
+      - >
+        A BLOCKER UNDERNEATH THIS WAS FOUND AND FIXED FIRST, 2026-09-26
+        (Keith's call), and it is recorded because no scenario placement
+        could have worked until it was. The daily calendar started
+        2023-01-01 against a history beginning 2026-08-24, so it owed
+        1,365 slots against 32 real supply days - and because "oldest
+        claimable unfilled slot" is a real branch of the assignment rule,
+        a supply meant for a Monday in August 2026 filed to 2023-01-01.
+      - >
+        THE HOLD IS CLEARED (Keith, 2026-09-27), and what cleared it was
+        restating two criteria rather than waiting for a date. The hold
+        existed because criteria 1 and 9 named "the committed history" -
+        the qa_results/ tree REQ-PIPE-089 retires - so building against
+        them would have populated a store about to stop existing, and the
+        injection IS the work here rather than a migration. Both now name
+        the generated history and its recorded QA results, which is the
+        same claim about the same thing without naming the mechanism.
+        ORDERING THAT SURVIVES THE CLEARANCE: REQ-PIPE-089's last phase
+        deletes the tree, and until it does `write_qa_result` still
+        writes files beside rows, so finishing 089 first keeps an
+        injection from writing into a tree that is about to go. That is
+        sequencing, not a dependency.
+      - >
+        THE EVENING-BEFORE VERSION TAKES THE EARLIEST STRETCH OF THE
+        HISTORY (Keith, 2026-09-27, agreeing with the recommendation).
+        TS-3c, TS-3d and TS-10 need the supply for day D due 22:00 on
+        D-1, which is structurally different from moving an arrival
+        because the due instant falls on the previous calendar day - so
+        they need their own effective-dated version of the daily
+        calendar, which criterion 8 asks for anyway. Putting that version
+        FIRST and letting the current configuration take over from there
+        means the version change lands mid-history, so criterion 9's
+        "at least one schedule version change" is satisfied by the same
+        act rather than needing a second, contrived one. Criterion 11's
+        no-incompatible-configurations-within-one-version rule then
+        places the boundary at the end of that stretch.
       - Decided against a scenario label on the injected runs (Keith,
         2026-09-22 - "this is still just a proof of concept remember").
         A first draft argued for one, to stop the dashboard growing
