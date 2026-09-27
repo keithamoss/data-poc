@@ -59,6 +59,11 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   {
     echo "export MOTHMAN_SUPPLY_DSN=\"postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/supply\""
     echo "export MOTHMAN_TEST_DSN=\"postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/postgres\""
+    # WHICH DEPLOYMENT THIS IS. Declared in contract/environments.yaml;
+    # a session container is 'sandbox'. Set here rather than defaulted
+    # in code, because a build that guesses is a build that can be
+    # labelled as somewhere it is not.
+    echo 'export MOTHMAN_ENVIRONMENT="sandbox"'
   } >> "$CLAUDE_ENV_FILE"
 fi
 

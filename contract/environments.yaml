@@ -1,0 +1,46 @@
+# THE ENVIRONMENTS THIS DATA ASSET IS DEPLOYED INTO.
+#
+# CONFIGURATION, NOT STATE, which is why this file is committed and why
+# it does NOT say which one you are. The list declares how the system
+# behaves and is the same for everybody who checks the repository out;
+# the answer to "which of these am I" is a property of one deployment,
+# so it comes from the MOTHMAN_ENVIRONMENT variable beside the database
+# DSN it belongs with. Putting the answer in a file would mean either
+# committing one deployment's identity for everyone, or gitignoring the
+# list and losing the review that makes it configuration at all.
+#
+# WHY IT EXISTS (Keith, 2026-09-27): the dashboard is built where the
+# data is, once GitHub Actions stops being allowed to reach a database.
+# A dashboard built here and a dashboard built from somebody's
+# development environment are then different artifacts that look
+# identical, so each has to say which environment produced it - "this
+# dashboard here is physically separate to a dashboard from my
+# development or production or another user".
+#
+# An id is a bare identifier because it reaches a schema name, a file
+# name and a URL. `publishes: true` marks the one environment whose
+# build is the published one; the rest build for their own readers.
+environments:
+  - id: local
+    label: Local development
+    description: >
+      A developer's own checkout and their own database. Builds a
+      dashboard to look at, and never publishes.
+    publishes: false
+
+  - id: sandbox
+    label: Claude Code sandbox
+    description: >
+      An agent session's container. Data is synthetic and the database
+      does not survive the container, so a build here describes a
+      moment rather than a system of record.
+    publishes: false
+
+  - id: production
+    label: Production
+    description: >
+      The deployment whose build is the published dashboard. One per
+      data asset - the asset is a deployment's identity rather than a
+      row in the data, so a second asset is a second deployment of this
+      same configuration, not another entry here.
+    publishes: true

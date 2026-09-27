@@ -9,7 +9,7 @@ from __future__ import annotations
 import rich_click as click
 from rich.console import Console
 
-from . import (bdm, check, common, cp, dashboard, debug, github, pipeline, plans,
+from . import (bdm, check, common, cp, dashboard, debug, env, github, pipeline, plans,
                population, scenarios, schedule, supply)
 from .banner import print_banner
 
@@ -110,6 +110,7 @@ def cli(ctx: click.Context) -> None:
 cli.add_command(bdm.bdm_group)
 cli.add_command(cp.cp_group)
 cli.add_command(dashboard.dashboard_group)
+cli.add_command(env.env_group)
 cli.add_command(github.github_group)
 cli.add_command(debug.debug_group)
 cli.add_command(pipeline.pipeline_group)

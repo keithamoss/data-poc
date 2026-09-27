@@ -3700,6 +3700,62 @@ Belongs with batch 5's check work.
     re-indenting four long function bodies under `with`, which is not a
     4am change - it is small, real, and should be its own commit.
 
+49. **[in-progress, 2026-09-27]** **[Pipeline & publishing]** Keith settled how the dashboard reaches Pages - and it moves the build, the issues sync and CI's own database all at once.
+
+    His answer, 2026-09-27, to the one fork left over from the
+    PostgreSQL switch: "a TUI and a CLI command here that rebuilds the
+    dashboard based on what's in the current environment. That would go
+    in, read results from the Postgres database and output the HTML
+    file. That HTML file will know it came from this environment
+    because we will have a list of environments and this will be
+    provided to it... and it would then be pushed up into the GitHub
+    Pages environment from here. And I guess as part of that, we'd also
+    do the writing to GitHub issues as well. So I guess we're dropping
+    that out of GitHub Actions. CI still runs, obviously. It would run
+    on its own database. But it's spun up just for CI purposes,
+    populated just for that CI run."
+
+    **The chain, in dependency order**, because only the first two are
+    safe on their own:
+    1. Environments: a declared list, and each deployment saying which
+       it is. **BUILT** - see below.
+    2. QA results into the database (`REQ-PIPE-089`). Nothing else can
+       start: the build reads committed `qa_results/` files today, so
+       "read results from the Postgres database" has nothing to read.
+    3. The dashboard build reads the database instead of the files.
+    4. `mothman dashboard publish` - build, then push to Pages from
+       here.
+    5. The GitHub issues sync moves out of Actions alongside it.
+    6. `deploy-pages.yml` stops building, and `qa_results/` comes out of
+       the repository.
+
+    **Step 6 removes the only working publish path**, so it goes last
+    and in the same change that proves its replacement, rather than
+    leaving a window where a push updates nothing.
+
+    **Step 1 landed 2026-09-27.** `contract/environments.yaml` declares
+    the list; `MOTHMAN_ENVIRONMENT` says which one this is;
+    `qa_tools/common/environments.py` reads both and `mothman env
+    list`/`current` show them.
+
+    The split is the decision worth recording, and it follows this
+    repo's own configuration-not-state rule rather than being invented:
+    the LIST is configuration (same for everyone, reviewed, committed);
+    WHICH ONE YOU ARE is a property of one deployment, so it sits in an
+    environment variable beside the DSN. Keith offered either "a file or
+    a gitignored config file". Both alternatives lose something -
+    committing the answer commits one deployment's identity for
+    everybody, and gitignoring the list stops the set of valid
+    environments being reviewed, so a typo becomes a new environment
+    rather than an error.
+
+    Refusals rather than defaults, and this is the part that matters
+    once something irreversible hangs off it: unset is an error, not
+    "local" - a production build silently labelled as somebody's laptop
+    is exactly the artifact this exists to prevent. A name not on the
+    list is refused. Two environments claiming `publishes: true` is
+    refused, because they would race to overwrite one dashboard.
+
 48. **[done, 2026-09-27]** **[Testing & dev tooling]** A real command that takes a fresh checkout to a populated, QA'd warehouse - plus the SessionStart hook that was `plans/tooling.md` #11.
 
     Keith: "we have a way to generate the synth data and run a command

@@ -172,6 +172,14 @@ releases:
               knowing: the database needs a password even locally.
       - category: New
         items:
+          - headline: The dashboard will say which environment built it
+            components: ["Pipeline & publishing"]
+            description: >
+              Environments are now declared in one place, and a checkout
+              says which one it is. Groundwork for building the
+              dashboard where the data lives, so a development build can
+              never be mistaken for the published one. `mothman env
+              list` shows them.
           - headline: One command to set up a fresh checkout
             components: ["Testing & dev tooling"]
             description: >
