@@ -370,7 +370,6 @@ def _manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
             "dirty_severity": delivery_obj.severity,  # None | "amber" | "red" - this ARRIVAL's own outcome
             "id_offset": id_offset,
             "seed": seed,
-            "file": f"{run_id}.csv",
         })
     return entries
 
@@ -446,8 +445,15 @@ def main() -> None:
                                               len(manifest), id_offset, seed)
 
         for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
-            out_path = os.path.join(OUT_DIR, entry["file"])
-            delivery_obj.payload.to_csv(out_path, index=False)
+            # ONE WRITE, NOT TWO (REQ-PIPE-102, extended to Birth
+            # Registrations 2026-09-27 at Keith's ask). This used to
+            # write a flat `data/raw/<run_id>.csv` here AND a real
+            # delivery below - the same rows twice, able to disagree.
+            # Only the delivery is an arrival: the whole QA chain
+            # reads deliveries, and the flat copy had no reader left.
+            # data/raw/ ITSELF STAYS - it is where the ad-hoc
+            # `--local-file` path drops a file it was handed, which is
+            # a different job from storing generated supplies.
             # THE RECEIPT INSTANT IS THE DATA'S OWN, not a separately
             # invented one: the earliest extract_timestamp in the file
             # that just landed. That is the same value

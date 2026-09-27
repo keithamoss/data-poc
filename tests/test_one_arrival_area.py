@@ -146,3 +146,58 @@ def test_no_module_still_exports_a_retired_constant(module_name):
     module = importlib.import_module(module_name)
     for attr in ("CP_RAW_DIR", "MANIFEST_PATH"):
         assert not hasattr(module, attr), f"{module_name}.{attr} is retired but still exported"
+
+
+# ---- Birth Registrations has the same double-write (Keith, 2026-09-27) ----
+#
+# BDM's STAGING never kept a second copy - that part was CP-only - but
+# its generator did exactly what CP's did: a flat `data/raw/<run_id>.csv`
+# per run AND a real delivery. The difference that matters is that
+# `data/raw/` keeps a live role CP's tree did not: it is where the
+# ad-hoc `mothman bdm qa --local-file` path drops a file it was handed,
+# and where run_single() normalises an arrived file to. So the flat
+# GENERATED copies go and the directory stays.
+
+
+def test_the_bdm_generator_writes_a_delivery_and_nothing_beside_it():
+    source = (ROOT / "generator" / "generate_runs.py").read_text()
+    tree = ast.parse(source)
+    skip = _docstrings(tree)
+    writes = [n for n in ast.walk(tree)
+               if isinstance(n, ast.Attribute) and n.attr == "to_csv"]
+    # to_csv(index=False) with a PATH argument is a write to disk;
+    # to_csv() with no path returns a string, which is how the delivery
+    # payload is built and is not a second copy.
+    to_disk = []
+    for call in ast.walk(tree):
+        if (isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+                and call.func.attr == "to_csv" and call.args):
+            to_disk.append(call.lineno)
+    assert writes, "no to_csv at all - has this generator been rewritten?"
+    assert not to_disk, (
+        f"generate_runs.py still writes a CSV straight to a path (line(s) {to_disk}) - "
+        f"the delivery is the arrival, and a flat copy beside it is the "
+        f"duplication REQ-PIPE-102 removed for Child Protection")
+    assert "write_delivery" in source, \
+        "the generator must still write a real delivery - that is the arrival"
+    # DELIBERATELY NOT "no .csv literal anywhere". An earlier version
+    # of this asserted that and failed on the `.csv` the DELIVERY's own
+    # filename is built from - a true statement about the source that
+    # said nothing about the duplication. What matters is whether a
+    # frame is written to a path, which the check above measures
+    # directly.
+    del skip
+
+
+def test_the_bdm_raw_directory_is_still_the_ad_hoc_drop():
+    """The half that STAYS, pinned so a later sweep does not take it.
+
+    data/raw/ is not a second copy of generated supplies any more, but
+    it is still where a file handed to `mothman bdm qa --local-file`
+    lands, and where run_single() normalises an arrived file to so the
+    tools can resolve a relative name against it.
+    """
+    from qa_tools.bdm import build_per_run_warehouses
+
+    assert build_per_run_warehouses.RAW_DIR.endswith("raw"), \
+        "the ad-hoc drop directory is gone - --local-file has nowhere to put a file"

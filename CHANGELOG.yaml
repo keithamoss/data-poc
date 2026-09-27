@@ -203,13 +203,14 @@ releases:
               end, all at once, which could pull the floor out from
               under a check you started separately. Each run now
               discards its own the moment it finishes.
-          - headline: One copy of a Child Protection supply, not three
+          - headline: One copy of a supply, not three
             components: ["Pipeline & publishing"]
             description: >
-              A supply was written to disk twice by the generator and a
-              third time by staging, for tools that stopped reading it
-              months ago. It now exists where it arrived and in the
-              database, and nowhere else.
+              A Child Protection supply was written to disk twice by
+              the generator and a third time by staging, for tools
+              that stopped reading it months ago. Birth Registrations
+              was written twice. Each now exists where it arrived and
+              in the database, and nowhere else.
           - headline: Drift will not answer from a stale file
             components: ["QA checks & contract"]
             description: >

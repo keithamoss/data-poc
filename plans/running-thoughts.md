@@ -3801,3 +3801,44 @@ Belongs with batch 5's check work.
     creates - so there may be nothing for bootstrap to do there. Worth
     confirming when the publishing move lands rather than wiring it
     speculatively.
+
+50. **[todo, 2026-09-27]** **[Pipeline & publishing]** Now that an environment decides which database a run writes to, nothing stops locally-messed-with synthetic data reaching a real one.
+
+    Keith's own ask, 2026-09-27, in his words: "I wouldn't want synth
+    data that people were messing around with locally to get to
+    production or, you know, maybe even non-production. So I think
+    there should be some extra gate checks somewhere. I don't know if
+    they're like extra confirmation prompts in the TUI and CLI or if
+    it's a hard gate we can set." Explicitly put on the agenda for
+    after the current loop (REQ-PIPE-089 and the publish chain),
+    rather than started now.
+
+    **Why it is newly real rather than newly noticed.** Until
+    REQ-PIPE-087 the warehouse was a file in the working tree, so
+    "which database am I writing to" had exactly one answer and
+    getting it wrong was not possible. It is now an environment
+    variable, `contract/environments.yaml` names three environments,
+    and `mothman pipeline bootstrap` will happily generate synthetic
+    supplies into whichever one the shell happens to point at. The
+    generator does not know, and nothing downstream asks.
+
+    **The shape of the question, not an answer - this needs scoping
+    with Keith before anything is built.** He named two mechanisms and
+    was open about not knowing which fits:
+    - A CONFIRMATION, which catches the careless case and not the
+      automated one, and which people learn to click through.
+    - A HARD GATE, which is the one that actually holds: an
+      environment declares whether synthetic data may be written to
+      it at all, and the generator refuses rather than asks. That
+      makes it configuration rather than vigilance, which is this
+      project's own stated preference everywhere else.
+
+    Worth carrying into the scoping: `contract/environments.yaml`
+    already has a `publishes` flag, so a `synthetic_data_allowed`
+    sibling is the obvious shape, and `environments.current()`
+    already refuses when unset rather than defaulting - the same
+    stance this would extend. Also worth deciding whether the gate
+    belongs at GENERATION (refuse to generate), at STAGING (refuse to
+    load a supply nothing received), or at both; and whether a run
+    should record which environment produced it, so a wrong one is
+    findable afterwards rather than only preventable beforehand.

@@ -17484,9 +17484,18 @@ requirements:
         arrived, and SHALL NOT write a second copy of it anywhere in
         the working tree.
       - >
-        THE SYSTEM SHALL generate a synthetic Child Protection supply
-        as a delivery only, and SHALL NOT also write the same rows to a
-        separate raw directory.
+        THE SYSTEM SHALL generate a synthetic supply, for EITHER
+        collection, as a delivery only, and SHALL NOT also write the
+        same rows to a separate raw directory. AMENDED 2026-09-27 at
+        Keith's ask ("fix BDM too") from Child-Protection-only: Birth
+        Registrations' staging never kept a second copy, but its
+        generator wrote one exactly as CP's did.
+      - >
+        THE SYSTEM SHALL keep a directory for files a person hands to
+        an ad-hoc check, and SHALL NOT confuse it with a store of
+        generated supplies. `data/raw/` keeps this role for Birth
+        Registrations, which is why that directory stays where
+        `data/cp_raw/` goes.
       - >
         WHERE an ad-hoc check needs the other tables of a past run,
         THE SYSTEM SHALL take them from that run's own arrival, and
@@ -17518,6 +17527,7 @@ requirements:
       - tests/test_run_evidently_cp.py
       - tests/test_cli_cp.py
       - tests/test_generate_cp_runs.py
+      - tests/test_generate_runs.py
     implemented_by:
       - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
       - qa_tools/cp/build_cp_warehouses.py::build_all
@@ -17527,6 +17537,7 @@ requirements:
       - cli/cp.py::arrival_path
       - cli/cp.py::has_arrival
       - generator/generate_cp_runs.py::main
+      - generator/generate_runs.py::main
     evidence:
       - >
         2026-09-27: a full `mothman pipeline run` (both collections)
@@ -17561,11 +17572,23 @@ requirements:
         run's views would be a second way of building a run's views,
         for one ad-hoc path.
       - >
-        THE GENERATOR'S OWN SECOND WRITE GOES TOO. generate_cp_runs.py
-        wrote each run to data/cp_raw/<run_id>/ AND as a real delivery,
-        which is the same duplication one step earlier. Keeping the
-        copy only in the generator would leave the tree looking
-        authoritative while nothing read it.
+        THE GENERATOR'S OWN SECOND WRITE GOES TOO, for both
+        collections - generate_cp_runs.py wrote each run to
+        data/cp_raw/<run_id>/ and generate_runs.py wrote a flat
+        data/raw/<run_id>.csv, each alongside a real delivery. Keeping
+        the copy only in the generator would leave the tree looking
+        authoritative while nothing read it. Established empirically
+        rather than by reading: a full pipeline run for each
+        collection completes with its raw directory deleted and does
+        not miss it.
+      - >
+        data/raw/ STAYS AND data/cp_raw/ GOES, which is not an
+        inconsistency. The BDM directory has a second job CP's never
+        had - it is where `mothman bdm qa --local-file` drops a file
+        it was handed, and where run_single() normalises an arrived
+        file to so a relative name resolves. What is removed from both
+        is the same thing: a copy of a supply that already exists as a
+        delivery.
       - >
         REJECTED, and recorded because it is the smaller change someone
         will propose again: removing the copy and leaving cp_raw in

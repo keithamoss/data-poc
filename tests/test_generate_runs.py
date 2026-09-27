@@ -55,6 +55,13 @@ def raw_dir(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
+def deliveries_dir(raw_dir):
+    """Where the generator's one copy actually goes (REQ-PIPE-102).
+    Depends on raw_dir so the redirection above is already in place."""
+    return Path(generate_runs.DELIVERIES_DIR)
+
+
+@pytest.fixture(scope="module")
 def manifest(raw_dir):
     """This generator's own BOOKKEEPING, which is the only place it is
     written now (REQ-GEN-043) - data/{raw,cp_raw}/manifest.json held a
@@ -71,11 +78,18 @@ def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
     assert len(slot_ids) == len(generate_runs.RUN_PLAN)
 
 
-def test_every_manifest_entry_has_a_real_file_on_disk(manifest, raw_dir):
+def test_every_manifest_entry_has_a_real_file_on_disk(manifest, deliveries_dir):
+    """THE DELIVERY IS THE FILE ON DISK (REQ-PIPE-102, extended to
+    Birth Registrations 2026-09-27). This used to look for a flat
+    `data/raw/<run_id>.csv` written beside the delivery; the generator
+    writes one copy now, and the manifest entry names the delivery it
+    went into rather than a filename of its own."""
     for entry in manifest:
-        path = raw_dir / entry["file"]
-        assert path.exists(), f"{entry['run_id']}: {path} missing"
-        assert path.stat().st_size > 0
+        run_dir = deliveries_dir / entry["delivery"]
+        assert run_dir.is_dir(), f"{entry['run_id']}: {run_dir} missing"
+        csvs = list(run_dir.glob("*.csv"))
+        assert csvs, f"{entry['run_id']}: {run_dir} holds no CSV"
+        assert all(c.stat().st_size > 0 for c in csvs)
 
 
 def test_severity_counts_match_run_plan(manifest):
