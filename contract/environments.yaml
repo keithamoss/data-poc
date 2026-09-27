@@ -20,6 +20,15 @@
 # An id is a bare identifier because it reaches a schema name, a file
 # name and a URL. `publishes: true` marks the one environment whose
 # build is the published one; the rest build for their own readers.
+#
+# `ci` WAS ADDED 2026-09-28, and the alternative is worth recording
+# because it looked cheaper: labelling a GitHub Actions runner `sandbox`.
+# That is a lie of exactly the kind this list exists to prevent - the
+# sandbox entry describes "an agent session's container", which a runner
+# is not, and the error you get for an unset variable says the reason
+# plainly: a build that guesses is a build that can be labelled as
+# somewhere it is not. A runner is a real, distinct place a build can
+# come from, so it gets its own entry.
 environments:
   - id: local
     label: Local development
@@ -34,6 +43,16 @@ environments:
       An agent session's container. Data is synthetic and the database
       does not survive the container, so a build here describes a
       moment rather than a system of record.
+    publishes: false
+
+  - id: ci
+    label: Continuous integration
+    description: >
+      A GitHub Actions runner, with a PostgreSQL service container that
+      exists for the length of one job. It generates its own synthetic
+      supplies so the test suite has something to drive, and publishes
+      nothing - the publisher runs where the data is (REQ-PIPE-092), and a
+      runner has no route to any real database.
     publishes: false
 
   - id: production

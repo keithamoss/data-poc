@@ -915,7 +915,25 @@ Rough layout:
     sudo -u postgres psql -c "CREATE DATABASE supply OWNER \"user\";"
     export MOTHMAN_SUPPLY_DSN="postgresql://user:password@localhost:5432/supply"
     export MOTHMAN_TEST_DSN="postgresql://user:password@localhost:5432/postgres"
+    export MOTHMAN_ENVIRONMENT="sandbox"
     ```
+
+    **THREE VARIABLES, NOT TWO** - `MOTHMAN_ENVIRONMENT` joined the list
+    2026-09-28 (REQ-PIPE-093). It says which place a build came from, it
+    has no default on purpose, and a pipeline run without it stops with
+    "a build that guesses is a build that can be labelled as somewhere it
+    is not". `sandbox` is this container's honest answer; a GitHub Actions
+    runner says `ci`, which was added to `contract/environments.yaml` the
+    same day rather than reusing `sandbox` - that entry describes an agent
+    session's container, which a runner is not.
+
+    **This is the third CI-only gap of the same shape in one night**, and
+    the standing fix is not a longer list here: `tests/test_publish.py`'s
+    `TestTheWorkflowCarriesEveryVariableThePipelineNeeds` now reads the
+    refusals out of the code and asserts `test.yml` names each one, so the
+    next variable somebody adds fails locally rather than on the runner
+    five minutes later. This block is for a human setting up a container;
+    the gate is what keeps CI honest.
     **The cluster does not survive the container, and neither does the
     role.** Hit for real the same night this was written: a resumed
     session found `pg_isready` reporting "no response", started the

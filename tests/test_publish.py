@@ -283,3 +283,77 @@ class TestThePublishedContentCannotMixWithTheSource:
         drops anything beginning with an underscore - a failure that would
         be very hard to diagnose from the outside."""
         assert ".nojekyll" in inspect.getsource(dashboard_cli._publish)
+
+
+class TestTheWorkflowCarriesEveryVariableThePipelineNeeds:
+    """Three CI-only failures in one night, each the same shape.
+
+    `mothman pipeline bootstrap` in test.yml died three times in a row on a
+    variable the runner did not have - MOTHMAN_SUPPLY_DSN, then a git
+    identity, then MOTHMAN_ENVIRONMENT. Every one was green locally,
+    because a developer's shell and this repo's gitignored `.env` have all
+    of them; every one cost a push and a five-minute run to discover.
+
+    SO THIS ASSERTS THE CLASS RATHER THAN THE THREE INSTANCES. What it
+    checks is that every variable the pipeline refuses to run without is
+    named in the workflow that runs it - which is a question answerable
+    locally, and the reason the next one will fail here instead of on the
+    runner.
+
+    IT READS THE REFUSALS FROM THE CODE, not from a list kept beside it: a
+    hand-maintained list is the thing that goes stale, and going stale
+    here means the gate stops covering the variable somebody just added.
+    """
+
+    WORKFLOW = ROOT / ".github" / "workflows" / "test.yml"
+
+    def _required(self) -> set[str]:
+        """Every environment variable something in the pipeline refuses to
+        run without, by the constant each module names it with."""
+        from qa_tools.common import environments, supply_db
+
+        return {supply_db.SUPPLY_DSN_ENV, environments.ENVIRONMENT_ENV}
+
+    def test_the_test_workflow_names_each_one(self):
+        text = self.WORKFLOW.read_text()
+        missing = sorted(name for name in self._required() if name not in text)
+        assert not missing, (
+            f"test.yml runs the real pipeline and does not set {', '.join(missing)}. "
+            f"Every one of these has no default on purpose - the pipeline refuses "
+            f"rather than guessing - so a runner without it fails before any test "
+            f"runs, and passes locally where a shell or .env has it.")
+
+    def test_it_also_names_the_test_dsn_it_creates_databases_with(self):
+        """Separate from the list above because it is required by the SUITE
+        rather than by the pipeline: conftest raises a UsageError without
+        it rather than skipping, on the reasoning that a suite silently
+        skipping its warehouse tests reports green having checked
+        nothing."""
+        from tests.conftest import TEST_DSN_ENV
+
+        assert TEST_DSN_ENV in self.WORKFLOW.read_text()
+
+    def test_the_environment_it_claims_to_be_is_one_the_asset_defines(self):
+        """A value nobody defined would fail at run time with a list of the
+        real ones - which is the right error and a slow way to find it."""
+        import re
+
+        from qa_tools.common import environments
+
+        text = self.WORKFLOW.read_text()
+        found = re.search(r"MOTHMAN_ENVIRONMENT:\s*(\S+)", text)
+        assert found, "test.yml does not set MOTHMAN_ENVIRONMENT"
+        assert found.group(1) in {e.id for e in environments.all_environments()}
+
+    def test_the_environment_it_claims_publishes_nothing(self):
+        """A runner must never be an environment whose build is the
+        published one - it has no route to a real database, and
+        REQ-PIPE-092 moved publishing out of Actions entirely."""
+        import re
+
+        from qa_tools.common import environments
+
+        claimed = re.search(r"MOTHMAN_ENVIRONMENT:\s*(\S+)",
+                             self.WORKFLOW.read_text()).group(1)
+        by_id = {e.id: e for e in environments.all_environments()}
+        assert by_id[claimed].publishes is False

@@ -162,6 +162,13 @@ jobs:
       # rule is about.
       MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
       MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      # WHICH PLACE THIS BUILD CAME FROM (REQ-PIPE-093). There is no
+      # default and deliberately so - a build that guesses is a build that
+      # can be labelled as somewhere it is not. `ci` was added to
+      # contract/environments.yaml on 2026-09-28 rather than reusing
+      # `sandbox`, which describes an agent session's container and is not
+      # what this is. It publishes nothing.
+      MOTHMAN_ENVIRONMENT: ci
     steps:
       - name: Checkout
         uses: actions/checkout@v4
