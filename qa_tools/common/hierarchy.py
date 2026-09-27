@@ -93,8 +93,13 @@ class Dataset:
 
     @property
     def qa_results_scope(self) -> tuple[str, str]:
-        """(agency, collection) - where this dataset's committed QA
-        results live under `qa_results/`.
+        """(agency, collection) - the scope this dataset's recorded QA
+        results are keyed under.
+
+        IT NAMED A DIRECTORY UNTIL REQ-PIPE-089 (`qa_results/<agency>/
+        <collection>/...`) and names a pair of COLUMNS now
+        (`qa.check_result.agency_id`, `.collection_id`). The pair is the
+        same pair; only the store moved.
 
         Deliberately the COLLECTION, not the dataset. Child Protection
         already wrote under its collection while Birth Registrations

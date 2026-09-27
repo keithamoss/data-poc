@@ -129,7 +129,7 @@ for the full, current, authoritative breakdown)
 | `contract/` | The real ODCS contract + SodaCL checks - the actual source of truth for schema/quality rules. |
 | `generator/`, `synthetic_data_generator/` | Synthetic data generation standing in for real production data. |
 | `qa_tools/` | The real dbt-core/Soda Core/datacontract-cli/Evidently runs - the only pipeline path. |
-| `qa_results/` | The permanent, committed history of every real QA run - never regenerated away. |
+| the `qa` schema | The permanent recorded history of every real QA run, in the warehouse database - never regenerated away. It was a committed `qa_results/` tree until REQ-PIPE-089 (2026-09-27); the repository holds configuration, not state. |
 | `dashboard/` | The single-file static reporting dashboard, built from a real hand-authored template plus real embedded data. |
 | `plans/*.md` | This project's own living design memory - real decisions, real open questions, real status per item. |
 | `requirements.yaml` | The live, structured requirements register (MoSCoW, acceptance criteria, real CI-enforced test linkage) - this is what the delivery-scoper/reviewer agents write into. |
@@ -146,9 +146,16 @@ needs this specifically to pick the right code for a new requirement's
 
 - **`mothman` is the only sanctioned way to run anything in this repo** -
   never invoke a script directly.
-- **CI never touches live or synthetic data** - any check that needs a
-  live connection runs once, at real pipeline-run time, never deferred
-  to a later read.
+- **A build may read recorded QA results, never actual data, and never
+  anything else** (Keith's own wording, 2026-09-27) - any computation
+  that needs supply rows runs once, at real pipeline-run time, and its
+  conclusion is recorded, never deferred to a later read. This used to
+  read "CI never touches live or synthetic data", which named the wrong
+  actor and the wrong store: the dashboard is not built in GitHub Actions
+  any more (REQ-PIPE-092) and supply rows are in PostgreSQL rather than
+  under `data/` (REQ-PIPE-087). The rule is unchanged and sharper - the
+  publisher reads the recorded results over a least-privilege grant and
+  cannot reach the extract at all.
 - **A real bug found gets a regression test, confirmed failing before
   the fix** - the same standard a delivery-critic agent should
   hold newly-reviewed work to.

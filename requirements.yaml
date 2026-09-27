@@ -1488,8 +1488,13 @@ requirements:
         one state that is OUR task undone rather than a verdict on
         anybody's data", never distinguished by colour alone.
       - >
-        This is a dashboard-build concern and may never open data/. Every
-        fact it renders is already committed by the producing requirement.
+          This is a dashboard-build concern and may never read supply rows.
+          Every fact it renders is already RECORDED by the producing
+          requirement. AMENDED 2026-09-28 (REQ-DOCS-101 criteria 4 and 5):
+          "open data/" became "read supply rows" and "committed" became
+          "recorded". The queue is built from observations other requirements
+          made; it derives nothing from the extract, and that is what makes it
+          safe for the publisher to render.
       - >
         The dashboard is the ONLY way to see a hold (REQ-PIPE-057's own
         decision), and it is rebuilt by CI on push - so the latency
@@ -4488,19 +4493,69 @@ requirements:
       by: Keith
       date: "2026-09-23"
     acceptance_criteria:
-      - THE SYSTEM SHALL store every committed QA result under the
-        dataset it describes.
-      - THE SYSTEM SHALL store a cross-table result under its own
-        cross-table scope rather than under a dataset.
+      - >
+          THE SYSTEM SHALL store every recorded QA result under the dataset it
+          describes. RESTATED, NOT RETIRED, 2026-09-28 (REQ-DOCS-101 criterion
+          10): "committed" became "recorded".
+
+          THAT QUESTION WAS WORTH ASKING, and the answer is the useful part. This
+          requirement re-keyed the committed tree per dataset on 2026-09-26, and
+          REQ-PIPE-089 retired the tree the next day - so it looks like work
+          thrown away, with its criteria. It is not. The KEY is what this
+          requirement was about, and the key survived the move intact:
+          `qa.check_result` carries `dataset_id` and `scope` as real columns and
+          every read goes through them. What was retired is the DIRECTORY that
+          expressed the key, never the key.
+
+          WHY IT MATTERS BEYOND TIDINESS: the defect it removed was that finding
+          one table's history meant filtering a collection-level file through a
+          hand-maintained map. A collection-level store would bring that straight
+          back, table or tree - so these are live rules about the schema, not
+          history.
+      - >
+          THE SYSTEM SHALL store a cross-table result under its own cross-table
+          scope rather than under a dataset. UNCHANGED, confirmed 2026-09-28
+          (REQ-DOCS-101 criterion 10). The scope is a COLUMN now rather than a
+          directory (`qa.check_result.scope`), which is where it always belonged:
+          a referential check between placements and carers is equally about
+          both, and which one it got recorded against used to be decided by where
+          somebody happened to write the check down.
       - THE SYSTEM SHALL key Child Protection and Birth Registrations by
         the same rule, with no per-dataset special case.
-      - THE SYSTEM SHALL regenerate the committed history from scratch
-        under the new model, and SHALL NOT migrate, reshape or patch the
-        existing files.
-      - WHEN regeneration has completed, THE SYSTEM SHALL leave no
-        committed results in the old shape.
-      - THE SYSTEM SHALL perform regeneration locally, and CI SHALL NOT
-        regenerate, open or query any data.
+      - >
+          THE SYSTEM SHALL regenerate the recorded history from scratch under the
+          keyed model, and SHALL NOT migrate, reshape or patch what is already
+          there. AMENDED 2026-09-28 (REQ-DOCS-101 criterion 10): "committed
+          history" became "recorded history", and "the existing files" became
+          "what is already there".
+
+          DELETE-AND-RE-RUN RATHER THAN MIGRATE is Keith's own call and survives
+          unchanged: the data is synthetic and the pipeline is seeded, so
+          re-running is honest where reshaping recorded results in place would
+          not be. `mothman pipeline regenerate-history` still does exactly this,
+          against rows rather than directories.
+      - >
+          WHEN regeneration has completed, THE SYSTEM SHALL leave no results in
+          the old shape. AMENDED 2026-09-28 (REQ-DOCS-101 criterion 10): "no
+          committed results" became "no results".
+
+          THE FAILURE IT GUARDS IS STILL SILENT, which is why it is restated
+          rather than dropped. A scope that is neither a dataset nor a reserved
+          name reads as a dataset nobody configured, and every reader that walks
+          a collection picks it up as one. It was a stray `run_014` directory at
+          collection level; it is a stray value in the `dataset_id` column now,
+          and `regenerate-history` asserts against exactly that.
+      - >
+          THE SYSTEM SHALL perform regeneration where the data is, and SHALL NOT
+          let the publisher regenerate, open or query supply rows. AMENDED
+          2026-09-28 (REQ-DOCS-101 criterion 10): it said "locally, and CI SHALL
+          NOT", and CI is not the publisher any more (REQ-PIPE-092) - the
+          dashboard is built in the environment that can reach the database.
+
+          THE RULE IS ABOUT WHO MAY TOUCH THE EXTRACT, not whose machine it
+          happens on, and that is untouched. Regeneration re-runs the real tools
+          against supply rows, so it belongs where a connection is legitimately
+          open; the publisher reads recorded results and nothing else.
       - THE SYSTEM SHALL expose regeneration as a mothman subcommand
         rather than a bare script.
     non_functional_requirements:
@@ -4927,9 +4982,18 @@ requirements:
       - WHEN check-lifecycle validation runs, IF a check's identity
         disagrees with the single hierarchy definition, THEN THE SYSTEM
         SHALL exit non-zero and name every offending check.
-      - THE SYSTEM SHALL change every affected check identity exactly
-        once, in the same change as the history rebuild, and SHALL NOT
-        leave two id shapes in committed history.
+      - >
+          THE SYSTEM SHALL change every affected check identity exactly once, in
+          the same change as the history rebuild, and SHALL NOT leave two id
+          shapes in RECORDED history. AMENDED 2026-09-28 (REQ-DOCS-101 criteria
+          4 and 5): "committed history" became "recorded history".
+
+          WHAT IT PROTECTS IS UNTOUCHED: two id shapes for one check mean its
+          history breaks in half, and every reader of that history silently gets
+          the shorter answer. The rebuild is `mothman pipeline
+          regenerate-history`, which deletes and re-runs rather than migrating -
+          so "exactly once, in the same change" is what stops a half-rebuilt
+          corpus existing at all.
       - THE SYSTEM SHALL resolve every reference to a dataset made by
         schedule or asset configuration, including the calendar a
         dataset names, through that same single hierarchy definition, so
@@ -5480,12 +5544,19 @@ requirements:
       - Covered by both toolchains - tests-js for the template's inline
         logic, tests/test_dashboard_e2e.py for the built page.
       - >
-        The dashboard build path must stay a pure function of committed
-        history - the per-dataset QA results AND the delivery log that
-        REQ-PIPE-038 adds beside them - with no live data access. The
-        delivery log matters particularly here, because this
-        requirement is entirely about arrivals and that is where
-        arrivals live.
+          The dashboard build path must stay a pure function of RECORDED
+          history - the per-dataset QA results and the delivery record beside
+          them - and must never read supply rows. AMENDED 2026-09-28
+          (REQ-DOCS-101 criteria 4 and 5): "committed history" became "recorded
+          history", and "may never open data/" became "may never read supply
+          rows".
+
+          WHAT IT PROTECTS IS THE WHOLE VALUE OF THE CLAUSE and is untouched: a
+          build that could re-derive a fact from the extract is a build that can
+          publish a different answer from the one the run produced. Both halves
+          moved store rather than meaning - the results are a table since
+          REQ-PIPE-089 and the extract is PostgreSQL since REQ-PIPE-087 - so
+          naming a directory would forbid nothing.
       - A collection whose tables arrive on six different schedules
         should not look like a bug.
     dependencies: [REQ-PIPE-034, REQ-PIPE-038]
@@ -8881,8 +8952,24 @@ requirements:
       - THE SYSTEM SHALL embed each of the asset's named calendars' period
         sequences into the built dashboard, and SHALL identify which
         calendar each dataset uses.
-      - THE SYSTEM SHALL derive those embedded sequences from
-        configuration only, with no access to anything under data/.
+      - >
+          THE SYSTEM SHALL derive those embedded sequences from configuration
+          only, and SHALL NOT read supply rows. AMENDED 2026-09-28 (REQ-DOCS-101
+          criteria 4 and 5): it read "with no access to anything under data/".
+
+          A SCHEDULE IS CONFIGURATION, which is the point the clause was making
+          and still makes - the sequences come from contract/data-asset.yaml and
+          nothing else, so a new embed into the dashboard build cannot become the
+          route by which the publisher starts reading the extract. The store
+          moved (REQ-PIPE-087), the rule did not.
+
+          NOTE THE NUMBERING MOVED TOO: REQ-DOCS-101 criterion 4 names this as
+          "REQ-DASH-054 criterion 4", and it is criterion 2. The criteria were
+          reordered at sign-off on 2026-09-27, on Keith's own "fix this", because
+          criterion 1 used the pronoun "that embedded sequence" while the
+          criterion introducing the embed sat sixth. Recorded rather than
+          silently followed, since an amendment applied to the wrong criterion is
+          exactly the failure a sweep like this produces.
       - THE SYSTEM SHALL end each embedded sequence at the period the
         present moment falls in on the asset's own clock, and SHALL NOT
         embed a period that has not begun.
@@ -9086,8 +9173,19 @@ requirements:
       - THE SYSTEM SHALL state, for an arrival that is not promoted,
         why it is not - whether it is awaiting a decision, was rejected,
         or cannot be promoted because its schedule has no slot for it.
-      - THE SYSTEM SHALL compute this from committed history alone, with
-        no live data access.
+      - >
+          THE SYSTEM SHALL compute this from recorded history alone, and SHALL
+          NOT read supply rows. AMENDED 2026-09-28 (REQ-DOCS-101 criteria 4 and
+          5): "committed history" became "recorded history" and "no live data
+          access" became the sharper thing it meant.
+
+          WHY THE SHARPER FORM IS NOT A RELAXATION. "No live data access" reads
+          as "open no connection", and the design REQ-PIPE-092 requires has the
+          build open one - to the recorded results, over a least-privilege grant.
+          Stated the old way this criterion would forbid the intended design,
+          which is how a rule ends up deleted instead of kept. What it protects
+          is that arrived and promoted are both facts somebody RECORDED, never
+          recomputed from the extract at render time.
     non_functional_requirements:
       - >
         This is the operational state Keith's team actually manages,
@@ -9205,7 +9303,18 @@ requirements:
       - "WHERE no deliveries are present at all, THE SYSTEM SHALL report no arrivals and SHALL NOT fail."
       - "THE SYSTEM SHALL expose delivery recognition as a subcommand of a mothman command group of its own, named supply, and SHALL NOT place it under a group documented as not human-facing."
       - "THE SYSTEM SHALL keep a run's identity stable against a change in which deliveries are recognised, and SHALL NOT derive a run id from a delivery's position in a list that recognition can reorder or shorten."
-      - "IF a change to recognition would alter the run id of any run already present in committed history, THEN THE SYSTEM SHALL fail, naming the affected runs, and SHALL NOT rewrite or silently re-key that history."
+      - >
+          IF a change to recognition would alter the run id of any run already
+          present in RECORDED history, THEN THE SYSTEM SHALL fail, naming the
+          affected runs, and SHALL NOT rewrite or silently re-key that history.
+          AMENDED 2026-09-28 (REQ-DOCS-101 criteria 4 and 5): "committed
+          history" became "recorded history".
+
+          THE GUARD IS THE SAME GUARD and matters MORE now, not less. While the
+          history was committed, a silent re-key showed up as a large diff
+          somebody might notice. It is rows now, so a re-key leaves no diff at
+          all - nothing to see, and a year of a check's history quietly attached
+          to the wrong run.
     non_functional_requirements:
       - "Recognition runs on every pipeline run and reads every delivery present. At ~30 datasets with years of history this is thousands of deliveries, and today's shape re-reads the whole tree once per collection - it must scale by reading each delivery once per run, not once per collection."
       - "Recognition must work on a freshly-cloned machine where data/ does not exist at all. A test that asserts a gitignored tree is present passes locally and fails in CI - a real red on 2026-09-23 - so absence is a state to handle, not a precondition to assert."
@@ -12121,8 +12230,12 @@ requirements:
         other three the gate reports - done, in-progress, not-started -
         are already in the closed set every plans file uses, and no
         existing value changes meaning.
-      - Runs in the existing `mothman check`, with no network and no access
-        to anything under data/.
+      - >
+          Runs in the existing `mothman check`, with no network and no access to
+          supply rows. AMENDED 2026-09-28 (REQ-DOCS-101 criteria 4 and 5): "no
+          access to anything under data/" became "no access to supply rows". A
+          validator needing either would be a gate nobody could run on a fresh
+          checkout, which is the property being protected.
     dependencies: []
     decisions:
       - >
@@ -12445,8 +12558,17 @@ requirements:
         THE SYSTEM SHALL answer, for any dataset, the identity of its
         most recently promoted supply, from that log alone.
       - >
-        THE SYSTEM SHALL be readable by the dashboard build with no
-        access to anything under data/.
+        THE SYSTEM SHALL be readable by the dashboard build, and SHALL NOT
+        give that build access to any schema holding supply rows. AMENDED
+        2026-09-28 (REQ-DOCS-101 criterion 3). It read "with no access to
+        anything under data/", which was the right rule naming the wrong
+        thing: supply rows are in PostgreSQL since REQ-PIPE-087, so a
+        clause about a directory forbids nothing about them. WHAT IT
+        PROTECTS IS UNCHANGED, which is why it is restated rather than
+        deleted - the build may read recorded QA metadata and must never
+        reach the extract itself, whichever store the extract lives in.
+        Keith's own wording, 2026-09-27: a build may read recorded QA
+        results, never actual data, and never anything else.
       - >
         SUPERSEDED BY REQ-PIPE-091, same amendment as criterion 11 above.
         It read "THE SYSTEM SHALL write each decision as its own file
@@ -12789,9 +12911,19 @@ requirements:
         29, the same rule filing.py already applies to a dataset whose
         schedule cannot be built.
       - >
-        CI must never touch data/, and this one legitimately does - so
-        it belongs in the orchestrator's own run step, beside
-        dataset_stats, never in the dashboard build or any read-committed-history path.
+        A COMPUTATION THAT NEEDS SUPPLY ROWS belongs in the orchestrator's
+        own run step, beside dataset_stats, and never in the dashboard
+        build or any read-recorded-history path. AMENDED 2026-09-28
+        (REQ-DOCS-101 criteria 3 and 5). It read "CI must never touch
+        data/, and this one legitimately does", which is now wrong twice
+        over: CI is not the publisher any more (REQ-PIPE-092) and supply
+        rows are not under data/ (REQ-PIPE-087).
+
+        WHAT IT PROTECTS IS THE WHOLE POINT AND IS UNTOUCHED: this
+        requirement's computation needs the extract, the publisher may
+        never read the extract, so the computation happens once where a
+        connection is legitimately open and its CONCLUSION is recorded.
+        That is the dataset_stats pattern, and the reason it exists.
       - >
         Verify at the layer a reader sees, not just at the data layer.
         CLAUDE.md's shape-change rule was written after a status change
@@ -13172,10 +13304,13 @@ requirements:
         Without the negative case the bug ships, since the positive case
         alone looks like it works.
       - >
-        At 30 datasets a gate that fires on healthy traffic is a gate
-        that gets disabled. This one should fire on genuinely rare
-        shapes only, and the frequency is worth measuring against real
-        committed history once filings exist rather than assumed.
+          At 30 datasets a gate that fires on healthy traffic is a gate that
+          gets disabled. This one should fire on genuinely rare shapes only, and
+          the frequency is worth measuring against real RECORDED history rather
+          than assumed. AMENDED 2026-09-28 (REQ-DOCS-101 criteria 4 and 5):
+          "committed history" became "recorded history". The measurement is the
+          point - a rate nobody checked is a rate nobody knows - and it comes
+          from the same corpus whichever store holds it.
       - >
         Cheap layer, rare shape - so it should cost nothing to evaluate.
         It is a set comparison over a delivery's own filings, needing no
@@ -13258,8 +13393,20 @@ requirements:
         the same terms as one raised at delivery level.
       - >
         THE SYSTEM SHALL let the dashboard build read every outstanding
-        hold from committed history alone, with no access to anything
-        under data/.
+        hold from recorded observations alone, and SHALL NOT give that
+        build access to any schema holding supply rows. AMENDED 2026-09-28
+        (REQ-DOCS-101 criteria 3 and 5). It read "from committed history
+        alone, with no access to anything under data/" - two clauses, both
+        now naming the wrong place: the records are in the metadata schema
+        (REQ-PIPE-089) and the supply rows are in PostgreSQL
+        (REQ-PIPE-087).
+
+        BOTH HALVES SURVIVE, which is why this is restated rather than
+        cut. A hold the build renders is a recorded OBSERVATION somebody
+        made, never something recomputed from the extract at publish time;
+        and the build reaches the recorded observations and nothing else.
+        `qa_tools/common/outstanding.py` already works this way and says
+        so in its own docstring.
       - >
         THE SYSTEM SHALL NOT promote or arrival-classify a held supply.
       - >
@@ -13440,9 +13587,11 @@ requirements:
         real pipeline's output is what those units promised, not new
         machinery.
       - >
-        This legitimately changes committed QA history's shape, so the
+        This legitimately changes the recorded QA history's shape, so the
         seeded regenerate-and-diff correctness check this project relies
-        on will show a real diff. Say so before the run rather than
+        on will show a real diff. (Said "committed" until 2026-09-28; the
+        history is a table since REQ-PIPE-089 and the constraint is
+        unchanged.) Say so before the run rather than
         after, and decide deliberately what the new baseline is.
       - >
         A mixed-period delivery produces several runs from one arrival,
@@ -13734,7 +13883,17 @@ requirements:
       - >
         THE SYSTEM SHALL derive every "as at T" answer from the decision
         log alone, and SHALL NOT derive it from the warehouse's current
-        contents.
+        contents. UNCHANGED IN SUBSTANCE, confirmed 2026-09-28
+        (REQ-DOCS-101 criterion 3), and named here because it LOOKS
+        falsified and is not. The log is a table in the same database as
+        the warehouse now (REQ-PIPE-091), so "the log alone" stops meaning
+        "a different store" - and what this states is which QUESTION is
+        answered, not which store answers it. What a period resolved to as
+        at T is a fact about decisions taken; the warehouse's current
+        contents are the result of the newest one, so reading those would
+        answer "now" whatever T was asked for.
+        `decision_log.promoted_into(..., as_at=...)` is what satisfies
+        this, and it reads nothing but the log.
       - >
         THE SYSTEM SHALL record, on every filing entry, both the instant
         the decision took effect and the instant it was recorded, so
@@ -13765,19 +13924,49 @@ requirements:
         and SHALL NOT claim to answer it for a consumer querying a
         period schema directly in SQL.
       - >
-        WHENEVER the system holds a live warehouse connection, THE
-        SYSTEM SHALL compare the physical tables the decision log names
-        against those the warehouse actually holds, and SHALL commit the
-        DISCREPANCIES - normally none - rather than an inventory of what
-        is present.
+        WHENEVER the system holds a live warehouse connection, THE SYSTEM
+        SHALL compare the physical tables the decision log names against
+        those the warehouse actually holds, and SHALL RECORD the
+        DISCREPANCIES - normally none - rather than an inventory of what is
+        present. AMENDED 2026-09-28 (REQ-DOCS-101 criteria 5 and 9): "SHALL
+        commit" became "SHALL RECORD", because there is nothing committed
+        left to hold the answer.
+
+        WHAT BECOMES OF THE CENSUS, which criterion 9 of REQ-DOCS-101 asks
+        to be settled rather than left implied. The comparison is now one
+        query inside one database, so the tempting conclusion is that it
+        stops being needed. It does not, and the reason is worth stating:
+        the census exists because the log and the warehouse can DISAGREE,
+        and sharing a database does not make them agree - a promotion
+        recorded whose table was later dropped by hand is exactly the
+        disagreement it catches, and REQ-PIPE-091's one-transaction rule
+        stops the log lying about a promotion that failed, not about
+        anything done afterwards.
+
+        SO IT STAYS, AND WHAT MOVES IS WHERE ITS ANSWER LIVES: a recorded
+        result rather than a committed file, on the same terms as every
+        other observation, and still taken where a connection is
+        legitimately open rather than by the publisher. Criteria 15 and 16
+        are unaffected - a reader is told prominently, the build warns and
+        still publishes - because those are about what is DONE with the
+        answer, which does not depend on its store.
       - >
         THE SYSTEM SHALL make that comparison wherever a table is moved
         as well as on a QA run, so that a decision taken between runs is
         checked when it is taken.
       - >
-        THE SYSTEM SHALL report an "as at T" answer against those
-        committed discrepancies, and SHALL NOT read the warehouse to do
-        so.
+        THE SYSTEM SHALL report an "as at T" answer against the recorded
+        census, and SHALL NOT answer it from the warehouse's current
+        contents. AMENDED 2026-09-28 (REQ-DOCS-101 criteria 3 and 9). It
+        read "those committed discrepancies", and there is nothing
+        committed left to hold them - REQ-PIPE-089 retired the committed
+        tree. The rule survives whole: a census answer is a fact about
+        what was found WHEN IT WAS TAKEN, and recomputing it against the
+        warehouse as it stands now answers a different question while
+        looking like the same one.
+
+        WHERE THE CENSUS LIVES IS SETTLED ON CRITERION 12 BELOW, and that
+        is deliberately not restated here - one account, in one place.
       - >
         IF the decision log names a physical table the census does not
         hold, THEN THE SYSTEM SHALL report it prominently to a reader of
@@ -14724,8 +14913,16 @@ requirements:
         THE SYSTEM SHALL raise at most one ticket per slot, however many
         times the overdue condition is observed.
       - >
-        THE SYSTEM SHALL derive overdue-ness from the schedule and
-        filing state alone, with no access to anything under data/.
+          THE SYSTEM SHALL derive overdue-ness from the schedule and filing
+          state alone, and SHALL NOT read supply rows. AMENDED 2026-09-28
+          (REQ-DOCS-101 criteria 4 and 5): it read "with no access to anything
+          under data/".
+
+          THE REASONING IS THE INTERESTING HALF and survives exactly: whether a
+          supply is overdue is a question about a CALENDAR and a FILING, not
+          about anybody's data - so reaching for the extract to answer it would
+          be answering a different question. Which store the extract is in
+          changes nothing about that.
       - >
         THE SYSTEM SHALL detect an overdue slot for a dataset that has
         had no delivery at all.
@@ -15107,8 +15304,12 @@ requirements:
         THE SYSTEM SHALL distinguish the qualifier by label as well as
         by appearance, and SHALL NOT rely on colour alone.
       - >
-        THE SYSTEM SHALL render this from committed history alone, with
-        no access to anything under data/.
+          THE SYSTEM SHALL render this from recorded history alone, and SHALL
+          NOT read supply rows. AMENDED 2026-09-28 (REQ-DOCS-101 criteria 4 and
+          5): both halves named a store rather than a rule. The rule - a reader
+          sees what was recorded, never a fresh derivation from the extract - is
+          unchanged, and is what stops the published page disagreeing with the
+          run it claims to report.
       - >
         THE SYSTEM SHALL render with zero console errors in a real
         browser.
@@ -18539,7 +18740,96 @@ requirements:
       publishes the dashboard, so that nobody is left choosing between
       two signed requirements that contradict each other.
     moscow: must
-    status: not_started
+    status: built
+    implemented_by:
+      - qa_tools/common/validate_premise.py::findings
+      - qa_tools/common/validate_premise.py::main
+      - qa_tools/common/validate_premise.py::RETIRED_PREMISES
+      - qa_tools/common/validate_premise.py::ALLOWED
+      - cli/check.py::check_command
+    linked_tests:
+      - tests/test_validate_premise.py::TestTheRepositoryIsClean
+      - tests/test_validate_premise.py::TestItCatchesAnAssertion
+      - tests/test_validate_premise.py::TestItDoesNotFireOnHistory
+      - tests/test_validate_premise.py::TestEveryAllowanceSaysWhy
+    evidence:
+      - >
+        Built 2026-09-28. The register's own arithmetic: criterion 2's six
+        built requirements were already amended on 2026-09-27; this change
+        amends criterion 3's four (REQ-PIPE-074 c13, REQ-PIPE-081 c3 and
+        c14, REQ-PIPE-078 c4, REQ-PIPE-075 NFR 5 - 074's c11 and c14 went
+        with REQ-PIPE-091), restates criterion 4's ten, settles criterion
+        9's census question on REQ-PIPE-081 c12, and restates five of
+        REQ-PIPE-038's seven criteria for criterion 10. Every amendment
+        carries the date and says what the clause used to read, which is
+        criterion 5 and the traceability NFR in one.
+      - >
+        THE RULE ITSELF GOT SHARPER RATHER THAN JUST BEING RETARGETED, and
+        that is the substantive part. Ten clauses said "no access to
+        anything under data/", which after REQ-PIPE-087 forbids nothing
+        about supply rows - they are in PostgreSQL. Three said "no live
+        data access", which is worse than stale: stated that way the
+        clause forbids the design REQ-PIPE-092 requires, where the build
+        DOES open a connection, to the recorded results, over a
+        least-privilege grant. A rule that forbids the intended design is
+        a rule somebody deletes. They now say "SHALL NOT read supply
+        rows", which is what every one of them meant.
+      - >
+        Criterion 10's answer is that REQ-PIPE-038 is RESTATED, not
+        retired, and the reasoning is worth having: it re-keyed the
+        committed tree per dataset one day before REQ-PIPE-089 retired
+        the tree, so it looks like work thrown away. The KEY is what it
+        was about and the key survived intact - `qa.check_result` carries
+        `dataset_id` and `scope` as real columns. What was retired is the
+        directory that expressed the key.
+      - >
+        CRITERION 7 IS A GATE, `mothman check`'s twelfth:
+        qa_tools/common/validate_premise.py, seven retired premises with
+        an allowlist that carries a reason per entry. It found 13 real
+        assertions on its first honest run, in CLAUDE.md,
+        docs/components.md, cli/plans.py, qa_tools/common/hierarchy.py,
+        qa_tools/common/run_id_guard.py and requirements.yaml itself -
+        all fixed. 16 tests, including four that plant an assertion to
+        prove it catches one.
+      - >
+        THE GATE WAS WRONG TWICE BEFORE IT WAS RIGHT, and both are written
+        into its own docstring because the second kind is dangerous. It
+        first hunted `deploy-pages.yml`, the retired workflow's NAME, and
+        reported 41 lines - almost all of them CLAUDE.md and README
+        narrating real history. A gate that fires on every mention of a
+        retired thing forces its own history to be deleted, which is the
+        opposite of criterion 5. Then it read one LINE at a time, and YAML
+        wraps: a negation landed on a different line from the phrase, so
+        it reported REQ-DOCS-101's own criterion 1 - the requirement that
+        asked for the gate - as an assertion; and a phrase split across
+        two lines was missed entirely, which is the false-clean direction.
+        It scans PARAGRAPHS now.
+      - >
+        Criterion 8 is honoured and then widened: `decisions:` is never
+        read, and `evidence:` is not either. The second is not in the
+        requirement and the gate's first real run is what surfaced it - an
+        evidence entry dated 2026-09-16 records that a rebuild from
+        committed qa_results/ was diffed byte-identical, which is true of
+        that day. Rewording it would claim a measurement nobody took.
+      - >
+        Criterion 6: CLAUDE.md was brought into line through the night as
+        each piece landed; docs/project-context-for-agents.md's `qa_results/`
+        row and its CI-never-touches-data convention are rewritten; and
+        plans/publishing-and-history.md Thread A is marked superseded with
+        a note saying what survives (one publisher, one gate, no ad-hoc
+        path) and what does not (the path filters, committing raw results,
+        deploy-pages.yml itself).
+      - >
+        The third NFR's named exceptions were left alone, deliberately -
+        REQ-DASH-055 NFR 4 and the notes on REQ-GEN-042 and REQ-GEN-043
+        merely mention the words, and amending them for consistency's sake
+        would change what they mean. The gate does not flag them, because
+        it hunts assertions rather than words.
+      - >
+        NO BEHAVIOUR CHANGED, which is the fourth NFR. The only code
+        touched outside the new validator is prose: two docstrings and one
+        f-string message that said "committed QA history" where the
+        history is now recorded. `mothman check`: all twelve gates green.
     signed_off:
       by: Keith
       date: "2026-09-27"

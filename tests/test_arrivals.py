@@ -356,4 +356,4 @@ class TestNoCommittedResultCarriesBookkeeping:
                 if f'"{key}"' in raw:
                     found.append(f"{path.relative_to(self.ROOT)}: {key}")
         assert found == [], (
-            "committed QA history carries the generator's own bookkeeping:\n  " + "\n  ".join(found))
+            "recorded QA history carries the generator's own bookkeeping:\n  " + "\n  ".join(found))

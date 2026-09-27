@@ -1,4 +1,4 @@
-"""A recognition change must never quietly re-key committed QA history
+"""A recognition change must never quietly re-key recorded QA history
 (REQ-PIPE-057 criterion 19).
 
 THE FRAGILITY THIS GUARDS. A run id is assigned from a delivery's
@@ -108,7 +108,7 @@ def check(agency_id: str, collection_id: str, arrivals: list,
     if not moved and not dropped:
         return
 
-    lines = [f"recognition would re-key committed QA history for "
+    lines = [f"recognition would re-key recorded QA history for "
              f"{agency_id}/{collection_id}."]
     for run_id, old, new in moved:
         lines.append(f"  {run_id} was delivery {old!r} and would become {new!r}")

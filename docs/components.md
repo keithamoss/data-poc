@@ -98,8 +98,8 @@ human acts on a bad result - a ticket, an accept/reject decision
 
 ## `PIPE` — Pipeline & publishing
 
-**What it is:** orchestration, the permanent committed QA history, and
-the CI-gated publish path - the plumbing between "a check ran" and "the
+**What it is:** orchestration, the permanent recorded QA history, and
+the gated publish path - the plumbing between "a check ran" and "the
 public dashboard reflects it."
 
 **Owns:** `pipeline/` (`orchestrate.py`'s warehouse build,

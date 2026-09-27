@@ -337,7 +337,37 @@ CHECK_LIFECYCLE = {
 
 ## Thread A - publishing (build after B/D's data format exists)
 
-**Status:** done (2026-09-16) · **Category:** Pipeline & publishing
+**Status:** superseded (2026-09-28) · **Category:** Pipeline & publishing
+
+> **SUPERSEDED BY `REQ-PIPE-092`, AND THE WHOLE MECHANISM BELOW IS
+> HISTORY** (REQ-DOCS-101 criterion 6). Everything in this thread rests
+> on two premises that are no longer true: that a QA run's results are
+> COMMITTED FILES, and that CI is therefore the only thing able to see
+> all of them and so the only thing that may publish. `REQ-PIPE-089`
+> moved the results into the warehouse database on 2026-09-27, and a
+> GitHub Actions runner has no route to that database - so the publisher
+> moved to the environment that does.
+>
+> **WHAT SURVIVES, because it is the part that mattered.** Keith's own
+> call - "gone entirely" - was about there being NO ad-hoc publish path,
+> and that is intact: there is exactly one publisher, `mothman dashboard
+> publish`, it gates before it deploys, and publishing is opt-in on
+> every other command so a debugging run cannot put its reproduction on
+> the public site. The gate itself survives whole: structural checks, a
+> real browser render check, and the check-lifecycle validation, still
+> one gate rather than three. What changed is WHERE it runs, never
+> whether it runs.
+>
+> **WHAT DOES NOT SURVIVE:** the path-filter design in the last two
+> paragraphs, which exists only to decide when CI should rebuild;
+> committing raw per-run files as the way results are shared; and
+> `deploy-pages.yml`, which is deleted - `validate-config.yml` gates the
+> committed CONFIGURATION and deploys nothing.
+>
+> Left in place rather than deleted because CLAUDE.md's rule is that a
+> thread goes whole once its last dependent batch is built, and because
+> the reasoning below is why the design was right for the system it was
+> designed for.
 
 **Decision: no manual "publish from local" path, in any form** - not a
 routine mechanism, and not even as a break-glass fallback for CI being

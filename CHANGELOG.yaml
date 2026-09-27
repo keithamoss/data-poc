@@ -188,6 +188,19 @@ releases:
               That record was going to be written into the repository the day
               this gets switched on. It now goes where everything else does, so
               nothing starts filling the repository with day-to-day state.
+          - headline: The requirements register agrees with itself again
+            components: ["Docs & process", "Pipeline & publishing"]
+            description: >
+              Around twenty requirements still described quality results as
+              files in the repository and the dashboard as something GitHub
+              builds. Each now says what the system actually does, and says
+              what it used to say, so nothing reads as two conflicting rules.
+          - headline: A retired design cannot quietly come back
+            components: ["Testing & dev tooling", "Docs & process"]
+            description: >
+              A new check fails the build if anything starts describing quality
+              results as files again. A tidy-up only stays tidy if something
+              watches it, and this is what watches.
           - headline: The dashboard's read-only account really is read-only now
             components: ["Pipeline & publishing"]
             description: >

@@ -1,5 +1,5 @@
 """qa_tools/common/run_id_guard.py - a recognition change must never
-quietly re-key committed QA history (REQ-PIPE-057 criterion 19).
+quietly re-key recorded QA history (REQ-PIPE-057 criterion 19).
 
 The failure this exists for is invisible from the change that causes
 it: a delivery that starts being skipped shifts every later run down

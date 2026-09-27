@@ -8,8 +8,8 @@ person asks on purpose rather than a gate that runs on their behalf.
 clean.
 
 Everything here reads two committed text files - plans/supply-model.md
-and requirements.yaml. Nothing opens data/, a warehouse or committed
-QA history, so it is safe under CLAUDE.md's CI rule and fast enough to
+and requirements.yaml. It opens no database at all, so it is safe under
+CLAUDE.md's own rule about what may read supply rows and fast enough to
 run while editing either one.
 """
 from __future__ import annotations

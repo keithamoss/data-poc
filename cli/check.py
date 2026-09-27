@@ -98,6 +98,15 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "a sprint's written status matches what its criteria say", True),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
      "CHANGELOG.yaml's schema and component tags", False),
+    # REQ-DOCS-101 criterion 7. A sweep fixed fifteen signed requirements
+    # and three documents that still said the dashboard is built from
+    # committed files; what a sweep cannot do is stay fixed, because the
+    # next requirement drafted from a stale paragraph reintroduces the
+    # contradiction and the register then reads as though it agrees with
+    # itself. That requirement's own first NFR names a half-done sweep as
+    # the real risk rather than the effort.
+    ("premise", ["uv", "run", "python3", "-m", "qa_tools.common.validate_premise"],
+     "nothing still says CI builds the dashboard from committed files", False),
     ("npm test", ["npm", "test", "--silent"],
      "the dashboard template's own inline JS", False),
     ("pytest", ["uv", "run", "pytest"],
