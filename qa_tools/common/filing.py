@@ -26,78 +26,85 @@ Tuesday and every later supply after it.
 So filled_slots() returns nothing today, deliberately, and says why
 rather than being absent - the promotion side arrives with the decision
 log in batch 4.
+
+IT IS A TABLE NOW, NOT A COMMITTED TREE (REQ-PIPE-104). Until 2026-09-28
+this wrote `filings/<dataset>/<supply>.json`, gitignored, with recording
+switched off - so there was nothing to migrate and only a destination to
+build, which is why it is its own requirement rather than part of
+REQ-PIPE-089. Building it now matters because it has to be right on the
+day REQ-PIPE-062 turns recording on: otherwise flipping that switch
+starts committing state to the repository again, which is the thing Keith
+settled against.
+
+WHAT WENT WITH THE FILES: the `filings_dir` parameter every function took
+for test isolation. A test worker has its own DATABASE now, which is
+stronger - a test cannot reach the real filings at all, rather than being
+pointed away from them.
 """
 from __future__ import annotations
 
 import json
-import re
-from pathlib import Path
 
+from qa_tools.common import qa_store, supply_db
 from qa_tools.common.assignment import Assignment
 
-ROOT = Path(__file__).resolve().parent.parent.parent
-
-#: Its own committed tree, beside the delivery and processing logs and
-#: outside qa_results/. A filing is not a QA result - it is decided
-#: BEFORE any check runs, and it survives a supply that never produces
-#: one.
-FILINGS_DIR = ROOT / "filings"
-
-_UNSAFE = re.compile(r"[^0-9A-Za-z._-]+")
+TABLE = f'"{qa_store.SCHEMA}".filing'
 
 
-def path_for(dataset_id: str, supply_id: str, filings_dir: Path | None = None) -> Path:
-    directory = Path(filings_dir or FILINGS_DIR) / _UNSAFE.sub("_", dataset_id)
-    return directory / f"{_UNSAFE.sub('_', supply_id)}.json"
+def _connect(label: str) -> supply_db.SupplyConnection:
+    conn = supply_db.connect(label=label)
+    qa_store.ensure_schema(conn)
+    return conn
 
 
-def record(assignment: Assignment, filings_dir: Path | None = None) -> Path | None:
-    """Commit where one supply was filed, once.
+def record(assignment: Assignment) -> bool:
+    """Record where one supply was filed, once.
 
-    Returns the path written, or None where this supply was already
-    filed - which is the ordinary case on every run after the first,
-    not a guard against a bug.
+    Returns True where a row was written, False where this supply was
+    already filed - which is the ordinary case on every run after the
+    first, not a guard against a bug.
+
+    ON CONFLICT DO NOTHING rather than a read-then-write, and the
+    difference is not tidiness: two arrivals for one dataset can be
+    processed by two workers in the same fan-out, and check-then-insert
+    is a race with a nice-looking shape. It is also criterion 2 in one
+    clause - a supply already filed is left exactly as it was, decided by
+    the database rather than by every caller remembering.
     """
-    path = path_for(assignment.dataset_id, assignment.supply_id, filings_dir)
-    if path.exists():
-        return None
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(assignment.as_record(), indent=2) + "\n")
-    return path
+    with _connect("mothman:filing-record") as conn:
+        rows = conn.execute(
+            f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, record) "
+            "VALUES (?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO NOTHING "
+            "RETURNING dataset_id",
+            [assignment.dataset_id, assignment.supply_id, assignment.slot,
+             assignment.branch, json.dumps(assignment.as_record())]).fetchall()
+    return bool(rows)
 
 
-def filing_for(dataset_id: str, supply_id: str,
-                filings_dir: Path | None = None) -> dict | None:
+def filing_for(dataset_id: str, supply_id: str) -> dict | None:
     """This supply's filing, or None where it has not been filed."""
-    path = path_for(dataset_id, supply_id, filings_dir)
-    if not path.is_file():
-        return None
-    try:
-        return json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return None
+    with _connect("mothman:filing-read") as conn:
+        rows = conn.execute(
+            f"SELECT record FROM {TABLE} WHERE dataset_id = ? AND supply_id = ?",
+            [dataset_id, supply_id]).fetchall()
+    return rows[0][0] if rows else None
 
 
-def filings_of(dataset_id: str, filings_dir: Path | None = None) -> list[dict]:
+def filings_of(dataset_id: str) -> list[dict]:
     """Every filing for one dataset.
 
-    Read from that dataset's OWN directory, so answering it costs
-    nothing in the size of any other dataset's history - the same
-    per-dataset shape REQ-PIPE-034 established for arrivals.
+    Indexed on (dataset_id, recorded_at), so answering it costs nothing
+    in the size of any other dataset's history - the same per-dataset
+    shape REQ-PIPE-034 established for arrivals, and what the retired
+    directory layout gave for free.
     """
-    directory = Path(filings_dir or FILINGS_DIR) / _UNSAFE.sub("_", dataset_id)
-    if not directory.is_dir():
-        return []
-    out = []
-    for path in sorted(directory.glob("*.json")):
-        try:
-            out.append(json.loads(path.read_text()))
-        except (OSError, json.JSONDecodeError):
-            continue
-    return out
+    with _connect("mothman:filing-read") as conn:
+        return [row[0] for row in conn.execute(
+            f"SELECT record FROM {TABLE} WHERE dataset_id = ? "
+            "ORDER BY recorded_at, supply_id", [dataset_id]).fetchall()]
 
 
-def filled_slots(dataset_id: str, filings_dir: Path | None = None) -> frozenset[str]:
+def filled_slots(dataset_id: str) -> frozenset[str]:
     """Slots a supply has been PROMOTED into - so, nothing yet.
 
     NOT the slots supplies have been FILED against, and the difference
@@ -113,7 +120,7 @@ def filled_slots(dataset_id: str, filings_dir: Path | None = None) -> frozenset[
     return frozenset()
 
 
-def file_arrivals(found_arrivals, filings_dir: Path | None = None) -> list[Assignment]:
+def file_arrivals(found_arrivals) -> list[Assignment]:
     """Assign and record every dataset's supply in these arrivals.
 
     BEFORE ANY CHECK RUNS (criterion 1), which is why this is called
@@ -159,13 +166,13 @@ def file_arrivals(found_arrivals, filings_dir: Path | None = None) -> list[Assig
                           f"its supplies are still recorded as arrived.")
                     slots_by_dataset[dataset_id] = []
             supply_id = _supply_id_for(arrival, dataset_id)
-            if filing_for(dataset_id, supply_id, filings_dir) is not None:
+            if filing_for(dataset_id, supply_id) is not None:
                 continue
             decided = assign_mod.assign(
                 dataset_id=dataset_id, supply_id=supply_id,
                 at=arrival.received_at, slots=slots_by_dataset[dataset_id],
-                filled=filled_slots(dataset_id, filings_dir))
-            record(decided, filings_dir)
+                filled=filled_slots(dataset_id))
+            record(decided)
             written.append(decided)
     return written
 
@@ -194,7 +201,7 @@ REFILING_REFERENCE = "refiled_by"
 
 
 def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
-            reason: str = "", filings_dir: Path | None = None) -> dict | None:
+            reason: str = "") -> dict | None:
     """Move one supply to a different slot, and let its verdict follow.
 
     THE VERDICT FOLLOWS THE FILING (REQ-PIPE-067). A supply reported
@@ -222,7 +229,7 @@ def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
     or is already in that slot (criterion 6 - an unchanged filing is
     not recomputed).
     """
-    current = filing_for(dataset_id, supply_id, filings_dir)
+    current = filing_for(dataset_id, supply_id)
     if current is None or current.get("slot") == to_slot:
         return None
 
@@ -236,14 +243,22 @@ def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
     # longer describes where it sits: a person put it here.
     updated["branch"] = "refiled-by-a-person"
 
-    path = path_for(dataset_id, supply_id, filings_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(updated, indent=2) + "\n")
+    # AN UPDATE, AND THE ONLY ONE THIS TABLE TAKES. Write-once
+    # (REQ-PIPE-104 criterion 2) is about the RULE never re-deriving a
+    # filing against a schedule that has moved on; a person moving a
+    # supply is the other thing entirely, and REQ-PIPE-067 requires the
+    # verdict to follow it. That is why `qa.filing` has no append-only
+    # trigger while `qa.decision` does - see the DDL.
+    with _connect("mothman:filing-refile") as conn:
+        conn.execute(
+            f"UPDATE {TABLE} SET slot = ?, branch = ?, record = ? "
+            "WHERE dataset_id = ? AND supply_id = ?",
+            [to_slot, updated["branch"], json.dumps(updated), dataset_id, supply_id])
     return updated
 
 
 def classification_of(dataset_id: str, supply_id: str, arrived_at,
-                       slot_by_name, filings_dir: Path | None = None) -> str:
+                       slot_by_name) -> str:
     """This supply's arrival verdict, for the slot it is filed to NOW.
 
     ALWAYS READ, NEVER CACHED FROM AN EARLIER FILING (criteria 2 and
@@ -258,6 +273,6 @@ def classification_of(dataset_id: str, supply_id: str, arrived_at,
     """
     from qa_tools.common import arrival_classification
 
-    record = filing_for(dataset_id, supply_id, filings_dir)
+    record = filing_for(dataset_id, supply_id)
     slot = slot_by_name(record["slot"]) if record and record.get("slot") else None
     return arrival_classification.classify(arrived_at, slot)

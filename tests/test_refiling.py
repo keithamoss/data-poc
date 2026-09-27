@@ -36,26 +36,37 @@ def _slot_by_name(name):
 
 
 @pytest.fixture
-def filings(tmp_path):
-    directory = tmp_path / "filings"
-    filing.record(assignment.Assignment(
-        dataset_id="d", supply_id="s", slot="2026-Q2",
-        branch=assignment.OLDEST_CLAIMABLE, considered=("2026-Q2",)), directory)
-    return directory
+def filings(supply_dsn):
+    """One misfiled supply, in this worker's own empty filing table.
+
+    A TABLE since REQ-PIPE-104, where this used to be a temporary
+    directory. The assertions below are unchanged; what changed is that
+    isolation comes from the worker's own database, and `supply_id="s"`
+    is exactly the kind of id that would otherwise collide across tests.
+    """
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="test-clean-filings") as conn:
+        qa_store.ensure_schema(conn)
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing')
+        filing.record(assignment.Assignment(
+            dataset_id="d", supply_id="s", slot="2026-Q2",
+            branch=assignment.OLDEST_CLAIMABLE, considered=("2026-Q2",)))
+        yield conn
 
 
 class TestTheVerdictFollowsTheFiling:
     """Criteria 1 and 2."""
 
     def test_a_misfiled_supply_reads_late_before_it_is_moved(self, filings):
-        got = filing.classification_of("d", "s", ARRIVED, _slot_by_name, filings)
+        got = filing.classification_of("d", "s", ARRIVED, _slot_by_name)
         assert got == classify_mod.LATE, (
             "the fixture must start from the wrong answer, or the test below proves "
             "nothing")
 
     def test_and_stops_reading_late_once_it_is_filed_correctly(self, filings):
-        filing.refile("d", "s", "2026-Q3", refiling_id="dec-1", filings_dir=filings)
-        got = filing.classification_of("d", "s", ARRIVED, _slot_by_name, filings)
+        filing.refile("d", "s", "2026-Q3", refiling_id="dec-1")
+        got = filing.classification_of("d", "s", ARRIVED, _slot_by_name)
         assert got == classify_mod.EARLY, (
             "the record must never keep a verdict everybody knows to be untrue")
 
@@ -63,9 +74,7 @@ class TestTheVerdictFollowsTheFiling:
         """Criterion 2, asserted structurally: nothing writes a
         classification into the filing record, so there is nothing that
         could go stale."""
-        import json
-        record = json.loads(
-            filing.path_for("d", "s", filings).read_text())
+        record = filing.filing_for("d", "s")
         assert "classification" not in record and "arrival_status" not in record
 
 
@@ -74,12 +83,12 @@ class TestTheArrivalInstantDoesNotMove:
     it was for is a DECISION, and only the second is being changed."""
 
     def test_refiling_changes_the_slot_and_nothing_about_the_arrival(self, filings):
-        before = filing.filing_for("d", "s", filings)
-        updated = filing.refile("d", "s", "2026-Q3", refiling_id="dec-1", filings_dir=filings)
+        before = filing.filing_for("d", "s")
+        updated = filing.refile("d", "s", "2026-Q3", refiling_id="dec-1")
         assert updated["slot"] == "2026-Q3"
         assert updated["supply_id"] == before["supply_id"]
         # The verdict is recomputed from the SAME instant.
-        assert filing.classification_of("d", "s", ARRIVED, _slot_by_name, filings) \
+        assert filing.classification_of("d", "s", ARRIVED, _slot_by_name) \
             == classify_mod.EARLY
 
 
@@ -90,8 +99,7 @@ class TestItIsTraceableToTheRefiling:
 
     def test_the_recomputation_carries_a_reference_to_what_caused_it(self, filings):
         updated = filing.refile("d", "s", "2026-Q3", refiling_id="dec-42",
-                                 reason="supplier confirmed it was Q3",
-                                 filings_dir=filings)
+                                 reason="supplier confirmed it was Q3",)
         assert updated[filing.REFILING_REFERENCE] == "dec-42"
         assert updated["refiled_from"] == "2026-Q2"
         assert updated["refiling_reason"] == "supplier confirmed it was Q3"
@@ -108,7 +116,7 @@ class TestItIsTraceableToTheRefiling:
         """Under the composed version a re-file appears in the decision
         log as TWO entries, and a reader a year later has to infer they
         were one act."""
-        updated = filing.refile("d", "s", "2026-Q3", refiling_id="dec-1", filings_dir=filings)
+        updated = filing.refile("d", "s", "2026-Q3", refiling_id="dec-1")
         assert updated["refiled_from"] == "2026-Q2" and updated["slot"] == "2026-Q3", (
             "one record carrying both the from-slot and the to-slot - 'why is this "
             "supply in Q3?' must have a single answer")
@@ -118,17 +126,15 @@ class TestAnUnchangedFilingIsNotRecomputed:
     """Criterion 6."""
 
     def test_refiling_to_the_same_slot_does_nothing(self, filings):
-        assert filing.refile("d", "s", "2026-Q2", refiling_id="dec-1",
-                              filings_dir=filings) is None
+        assert filing.refile("d", "s", "2026-Q2", refiling_id="dec-1",) is None
 
     def test_an_unfiled_supply_cannot_be_refiled(self, filings):
-        assert filing.refile("d", "never-filed", "2026-Q3", refiling_id="dec-1",
-                              filings_dir=filings) is None
+        assert filing.refile("d", "never-filed", "2026-Q3", refiling_id="dec-1",) is None
 
     def test_the_record_is_untouched_by_a_no_op_refile(self, filings):
-        before = filing.path_for("d", "s", filings).read_text()
-        filing.refile("d", "s", "2026-Q2", refiling_id="dec-1", filings_dir=filings)
-        assert filing.path_for("d", "s", filings).read_text() == before
+        before = filing.filing_for("d", "s")
+        filing.refile("d", "s", "2026-Q2", refiling_id="dec-1")
+        assert filing.filing_for("d", "s") == before
 
 
 class TestItIsLocalToTheSupplyThatMoved:
@@ -139,9 +145,9 @@ class TestItIsLocalToTheSupplyThatMoved:
     def test_another_supplys_filing_is_untouched(self, filings):
         filing.record(assignment.Assignment(
             dataset_id="d", supply_id="other", slot="2026-Q2",
-            branch=assignment.ON_TIME, considered=("2026-Q2",)), filings)
-        filing.refile("d", "s", "2026-Q3", refiling_id="dec-1", filings_dir=filings)
-        assert filing.filing_for("d", "other", filings)["slot"] == "2026-Q2"
+            branch=assignment.ON_TIME, considered=("2026-Q2",)))
+        filing.refile("d", "s", "2026-Q3", refiling_id="dec-1")
+        assert filing.filing_for("d", "other")["slot"] == "2026-Q2"
 
     def test_it_reads_one_record_rather_than_the_whole_history(self):
         """Checked against the executable BODY, not the whole source -

@@ -265,15 +265,20 @@ def test_the_committed_history_trees_are_never_the_real_ones_in_a_test():
     evidence the tree survived, which is why this asserts the
     redirection itself.
     """
-    from qa_tools.common import delivery_log, filing, in_flight_log
+    from qa_tools.common import delivery_log, in_flight_log
 
     root = delivery_log.ROOT
-    # Neither load_log nor delivery_log is here since REQ-PIPE-089
-    # moved both records into the database. There is no tree of either
-    # left to point anywhere, and a test writing one now writes to its
-    # own worker's database, which cannot be the real one.
-    for module, name in ((in_flight_log, "OBSERVATIONS_DIR"),
-                          (filing, "FILINGS_DIR")):
+    # Neither load_log nor delivery_log nor filing is here any more:
+    # REQ-PIPE-089 moved the first two records into the database and
+    # REQ-PIPE-104 the third. There is no tree of any of them left to
+    # point anywhere, and a test writing one now writes to its own
+    # worker's database, which cannot be the real one.
+    #
+    # ONE ENTRY LEFT, which is worth saying because a single-item loop
+    # invites being flattened: `observations/in_flight/` is the last
+    # committed tree a test can still write into, and the loop is what
+    # this assertion will grow back through when another appears.
+    for module, name in ((in_flight_log, "OBSERVATIONS_DIR"),):
         current = getattr(module, name)
         assert root not in current.parents and current != root, (
             f"{module.__name__}.{name} points into the real repo at {current} - a test "

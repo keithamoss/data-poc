@@ -245,17 +245,17 @@ def _committed_history_is_off_limits(tmp_path_factory):
     that redirects one of these itself still overrides this and still
     restores to a temporary directory rather than to the real tree.
     """
-    from qa_tools.common import filing, in_flight_log
+    from qa_tools.common import in_flight_log
 
     root = tmp_path_factory.mktemp("committed_history")
-    # NEITHER load_log NOR delivery_log is here any more: REQ-PIPE-089
-    # moved both records into the database, so there is no committed
-    # tree of either left to guard. Isolation comes from each worker
-    # having its own database, which is stronger than a redirected
-    # directory - a test cannot reach the real one at all, rather than
-    # being pointed away from it.
-    guarded = [(in_flight_log, "OBSERVATIONS_DIR", "observations"),
-                (filing, "FILINGS_DIR", "filings")]
+    # NEITHER load_log NOR delivery_log NOR filing is here any more:
+    # REQ-PIPE-089 moved the first two into the database and
+    # REQ-PIPE-104 the third, so there is no committed tree of any of
+    # them left to guard. Isolation comes from each worker having its own
+    # database, which is stronger than a redirected directory - a test
+    # cannot reach the real one at all, rather than being pointed away
+    # from it.
+    guarded = [(in_flight_log, "OBSERVATIONS_DIR", "observations")]
     before = [(module, name, getattr(module, name)) for module, name, _ in guarded]
     for module, name, folder in guarded:
         setattr(module, name, root / folder)
@@ -278,13 +278,11 @@ def real_committed_history(_committed_history_is_off_limits):
     the real tree has to say so, which is the difference between an
     exception and a hole.
     """
-    from qa_tools.common import delivery_log, filing, in_flight_log
+    from qa_tools.common import delivery_log, in_flight_log
 
     root = delivery_log.ROOT
-    restore = [(in_flight_log, "OBSERVATIONS_DIR", in_flight_log.OBSERVATIONS_DIR),
-                (filing, "FILINGS_DIR", filing.FILINGS_DIR)]
+    restore = [(in_flight_log, "OBSERVATIONS_DIR", in_flight_log.OBSERVATIONS_DIR)]
     in_flight_log.OBSERVATIONS_DIR = root / "observations" / "in_flight"
-    filing.FILINGS_DIR = root / "filings"
     yield root
     for module, name, value in restore:
         setattr(module, name, value)

@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -373,6 +373,55 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery_file (
 --   being able to ask at thirty datasets over years.
 CREATE INDEX IF NOT EXISTS delivery_file_dataset
     ON "{SCHEMA}".delivery_file (dataset_id);
+
+-- WHERE EACH SUPPLY WAS FILED (REQ-PIPE-104, carrying REQ-PIPE-062's
+-- record across). A row rather than `filings/<dataset>/<supply>.json`,
+-- which is what it was until this requirement - code with recording
+-- switched off, so there was nothing to migrate and only a destination
+-- to build.
+--
+-- WRITE-ONCE, AND THAT IS NOT THE SAME AS IMMUTABLE. The primary key
+-- makes `record()` a no-op for a supply already filed, which is
+-- criterion 2: a filing must never be re-derived against a schedule that
+-- has since moved on, because the slot state it was decided against has
+-- gone. A PERSON re-filing it is a different act and does update the row
+-- - REQ-PIPE-067, and the verdict follows the filing. So no append-only
+-- trigger here, unlike `qa.decision`: the two tables are protecting
+-- different things.
+--
+-- `branch` IS STORED RATHER THAN RECOMPUTED, which looks redundant and
+-- is the point: "why is this supply here" has to be answerable a year
+-- later without re-running anything, and recomputing it then gives a
+-- different answer. It is evidence about a moment, not a derived view.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".filing (
+    dataset_id  text NOT NULL,
+    supply_id   text NOT NULL,
+    -- NULLABLE: a supply the rule could find no slot for is HELD, and
+    -- recording it with no slot is how it reaches the queue a person
+    -- drains. A held supply with no row at all would be a supply nobody
+    -- knows about.
+    slot        text,
+    branch      text NOT NULL,
+    -- THE WHOLE Assignment RECORD, as a document. Normalising it would
+    -- buy a migration for every field REQ-PIPE-064/065 add to an
+    -- explanation and no query anybody runs - the same call
+    -- `dataset_stats` made, and for the same reason. The three columns
+    -- above are lifted out because they ARE queried: which slot, and why.
+    record      jsonb NOT NULL,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (dataset_id, supply_id)
+);
+
+--   one dataset's filings, at a cost that does not grow with any other
+--   dataset's history - the per-dataset shape REQ-PIPE-034 established
+--   for arrivals, which the retired directory layout gave for free.
+CREATE INDEX IF NOT EXISTS filing_dataset
+    ON "{SCHEMA}".filing (dataset_id, recorded_at);
+
+--   "what is filed against this slot", which is what a held or
+--   contested supply is judged against.
+CREATE INDEX IF NOT EXISTS filing_slot
+    ON "{SCHEMA}".filing (dataset_id, slot) WHERE slot IS NOT NULL;
 
 -- WHO DECIDED WHAT (REQ-PIPE-091, carrying REQ-PIPE-074's content
 -- across). THE SINGLE SYSTEM OF RECORD for every filing decision -
@@ -655,11 +704,27 @@ def ensure_publisher_role(conn: supply_db.SupplyConnection, role: str,
         f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{SCHEMA}" '
         f"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLES FROM {quoted}")
 
-    # BELT AND BRACES ON THE PUBLIC SCHEMA, which PostgreSQL grants to
-    # every role by default in versions before 15 and which a supply
-    # table could be created in by accident. Revoking costs nothing and
-    # removes the one schema this role would otherwise hold rights on
-    # without anybody deciding it should.
+    # THE PUBLIC SCHEMA, and this used to be a NO-OP that read like a
+    # safeguard - found 2026-09-28 while asserting criterion 4 of
+    # REQ-PIPE-104. It was `REVOKE ALL ON SCHEMA public FROM <the role>`,
+    # and PostgreSQL grants `public` to the PUBLIC pseudo-role rather than
+    # to each role individually, so revoking from one role removes
+    # nothing: `has_schema_privilege(role, 'public', 'USAGE')` still came
+    # back true. The comment claimed the schema had been removed from this
+    # role's reach and it had not.
+    #
+    # REVOKED FROM PUBLIC, which is the grant that actually exists. It is
+    # database-wide by nature - that is what PUBLIC means - and safe here:
+    # every other connection this project opens is the owning superuser,
+    # and a superuser bypasses grants entirely. On PostgreSQL 15 and later
+    # `public` carries USAGE but no CREATE for PUBLIC, so what this
+    # removes is the ability to LOOK; nothing in this project puts a table
+    # there, and this is what stops one appearing there later and being
+    # readable by a role nobody granted it to.
+    #
+    # The per-role revoke stays beside it: harmless, and it covers a
+    # direct grant somebody might add.
+    conn.execute("REVOKE ALL ON SCHEMA public FROM PUBLIC")
     conn.execute(f"REVOKE ALL ON SCHEMA public FROM {quoted}")
 
 

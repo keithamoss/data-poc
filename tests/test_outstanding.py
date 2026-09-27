@@ -65,9 +65,24 @@ def _empty_database_records(clean_delivery_log, clean_load_log):
 
 
 def _survey(tmp_path, **kwargs):
+    # NO `filings_dir` since REQ-PIPE-104 - filings are a table, and
+    # isolation comes from this worker's own database rather than from a
+    # redirected path. The `_clean_filings` fixture below empties it.
     return outstanding.survey(
-        observations_dir=kwargs.get("observations_dir", tmp_path / "observations"),
-        filings_dir=kwargs.get("filings_dir", tmp_path / "filings"))
+        observations_dir=kwargs.get("observations_dir", tmp_path / "observations"))
+
+
+@pytest.fixture(autouse=True)
+def _clean_filings(supply_dsn):
+    """An empty filing table per test, for the same reason the delivery
+    log gets one: this module surveys EVERYTHING, so a filing left behind
+    by one test shows up in the next one's total."""
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="test-outstanding-filings") as conn:
+        qa_store.ensure_schema(conn)
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing')
+        yield conn
 
 
 class TestOneQueueNotOnePerRule:

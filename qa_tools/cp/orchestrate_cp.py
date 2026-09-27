@@ -272,6 +272,12 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # recording those would bake a known artefact of a missing
     # dependency into permanent history, where it later reads as data.
     # Turn this on in the sprint that lands promotion, not before.
+    #
+    # WHERE IT WILL LAND IS NOW SETTLED (REQ-PIPE-104, 2026-09-28): the
+    # database, in `qa.filing`. That was the reason to build the
+    # destination before flipping this switch rather than with it -
+    # otherwise turning recording on would start committing state to the
+    # repository again, which is the thing Keith settled against.
 
     run_id_guard.check(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, found_arrivals)
     reference_run_id = manifest[0]["run_id"]

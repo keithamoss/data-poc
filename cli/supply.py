@@ -361,7 +361,9 @@ def history_command(dataset_id: str, limit: int) -> None:
     into a delivery of other tables that did not change - and the
     tables that shared that delivery gain nothing from it.
 
-    Reads committed records only. No database is opened.
+    RECORDED IN THE DATABASE since REQ-PIPE-104 - this used to read a
+    gitignored `filings/` tree, which would have started committing state
+    to the repository the day REQ-PIPE-062 turned recording on.
     """
     from qa_tools.common import arrival_history, asset_time, display_time, hierarchy
 

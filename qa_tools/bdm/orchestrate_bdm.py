@@ -403,6 +403,12 @@ def run_pipeline(sequential: bool = False) -> dict:
     # recording those would bake a known artefact of a missing
     # dependency into permanent history, where it later reads as data.
     # Turn this on in the sprint that lands promotion, not before.
+    #
+    # WHERE IT WILL LAND IS NOW SETTLED (REQ-PIPE-104, 2026-09-28): the
+    # database, in `qa.filing`. That was the reason to build the
+    # destination before flipping this switch rather than with it -
+    # otherwise turning recording on would start committing state to the
+    # repository again, which is the thing Keith settled against.
 
     # BEFORE ANY REAL TOOL RUNS (REQ-PIPE-057 criterion 19). Run ids
     # are positional, so a change in what recognition returns renames

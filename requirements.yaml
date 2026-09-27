@@ -19222,7 +19222,74 @@ requirements:
       everything else, so that turning filing recording on does not
       start committing state to the repository again.
     moscow: must
-    status: not_started
+    status: built
+    implemented_by:
+      - qa_tools/common/filing.py::record
+      - qa_tools/common/filing.py::filing_for
+      - qa_tools/common/filing.py::filings_of
+      - qa_tools/common/filing.py::file_arrivals
+      - qa_tools/common/filing.py::refile
+      - qa_tools/common/qa_store.py::ensure_schema
+      - qa_tools/common/qa_store.py::ensure_publisher_role
+      - qa_tools/common/outstanding.py::survey
+      - cli/supply.py::filings_command
+    linked_tests:
+      - tests/test_filing.py::TestAFilingIsRecordedInTheDatabase
+      - tests/test_filing.py::TestWrittenOnceAndNeverReDerived
+      - tests/test_filing.py::TestADatasetsFilingsAreItsOwn
+      - tests/test_filing.py::TestFilingRealArrivals
+      - tests/test_refiling.py
+      - tests/test_outstanding.py
+      - tests/test_cli_supply.py
+    evidence:
+      - >
+        Built 2026-09-28. `qa.filing` in the metadata schema, schema
+        version 5 -> 6, keyed (dataset_id, supply_id) with `slot` and
+        `branch` as real columns and the rest of the explanation as a
+        JSONB document. 19 tests in tests/test_filing.py, 98 across every
+        filing-related module, all passing.
+      - >
+        WRITE-ONCE IS THE PRIMARY KEY, not a convention - `record()` is an
+        INSERT ... ON CONFLICT DO NOTHING. The read-then-write it replaces
+        was a race with a nice-looking shape: two arrivals for one dataset
+        can be processed by two workers in the same fan-out. Asserted by
+        a real UniqueViolation on a direct second insert.
+      - >
+        AND IT IS DELIBERATELY NOT APPEND-ONLY, unlike `qa.decision` in
+        the same schema. Write-once here means the RULE never re-derives a
+        filing against a schedule that has moved on; a person re-filing a
+        supply is REQ-PIPE-067 and the verdict has to follow it, which an
+        append-only trigger would make impossible. Both behaviours have
+        their own test, beside each other, so the contrast is recorded
+        rather than inferred.
+      - >
+        A REAL DEFECT FOUND BY ASSERTING CRITERION 4, and it was a
+        security claim rather than a bug in this requirement's own code:
+        `ensure_publisher_role` ended with `REVOKE ALL ON SCHEMA public
+        FROM <the role>`, commented as removing the one schema the role
+        would otherwise reach. It removed nothing. PostgreSQL grants
+        `public` to the PUBLIC pseudo-role, not to each role, so
+        `has_schema_privilege(role, 'public', 'USAGE')` still came back
+        true - which is how the test failed. Now revoked from PUBLIC,
+        which is the grant that exists, and the publisher reaches `qa` and
+        nothing else. Safe because every other connection this project
+        opens is the owning superuser, and a superuser bypasses grants.
+      - >
+        Criterion 5 asserted on both halves, and the second is the one
+        that matters: `filings/` is out of the repository AND out of
+        .gitignore, because an ignored path is a path somebody's next
+        experiment writes to without anybody noticing.
+      - >
+        Criterion 6 asserted structurally - filing.py contains no
+        FILINGS_DIR, no path_for, no write_text and no mkdir. A path
+        constant is how one would come back, and it would arrive looking
+        like a helpful offline fallback.
+      - >
+        The `filings_dir` parameter went with the files, from five
+        functions and from `outstanding.survey`. Test isolation now comes
+        from each worker having its own DATABASE, which is stronger than a
+        redirected path: a test cannot reach the real filings at all
+        rather than being pointed away from them.
     signed_off:
       by: Keith
       date: "2026-09-27"
@@ -19279,11 +19346,22 @@ requirements:
     dependencies: [REQ-PIPE-089]
     open_questions:
       - >
-        Whether REQ-PIPE-062's "turn filing recording on" is done by
-        this requirement or remains its own step. The two are
-        adjacent - this builds the destination, that decides when real
-        filings start being written - and doing both here would change
-        behaviour REQ-PIPE-062 owns.
+        ANSWERED AT BUILD TIME, 2026-09-28: it REMAINS REQ-PIPE-062's own
+        step, and the reasoning is the one the question itself points at -
+        turning recording on is a behaviour change 062 owns, and the
+        reason it is off has nothing to do with where the record lands.
+        It is off because only a PROMOTION fills a slot and promotion does
+        not exist yet, so today every supply not on time for its own
+        current slot files against the oldest slot in the calendar - 102
+        of 108 on a real run landed on 2023-Q1. A filing is write-once, so
+        recording those would bake a known artefact of a missing
+        dependency into permanent history where it later reads as data.
+        Both orchestrators carry that reasoning at the call site that
+        would turn it on, and now also say where it will land.
+
+        Which is the whole point of building the destination first: on the
+        day 062 flips the switch, nothing starts committing state to the
+        repository.
     decisions:
       - >
         A FOLLOW-UP RATHER THAN PART OF REQ-PIPE-089 (Keith,

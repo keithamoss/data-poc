@@ -48,14 +48,6 @@ node_modules/
 # and console logs into the workspace root (see .mcp.json)
 .playwright-mcp/
 
-# REQ-PIPE-062's filings are NOT recorded yet (Keith, 2026-09-25). The
-# assignment rule is built and tested; recording is off until promotion
-# exists to fill a slot, because a filing is write-once and today every
-# late supply files against the oldest slot in the calendar - 102 of 108
-# on a real run. Ignored so a local experiment cannot stage that state
-# into permanent history. Remove this when the promotion sprint turns
-# recording on: filings/ is committed history from that point.
-filings/
 
 # The built Pages site (REQ-PIPE-092). `mothman dashboard publish` builds
 # it here, pushes its CONTENT to the gh-pages branch, and leaves the

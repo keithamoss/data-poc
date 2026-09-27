@@ -158,6 +158,20 @@ releases:
               replacing one already in use all need a reason. A routine
               promotion does not - reasons you are made to give for everything
               stop meaning anything.
+      - category: Fixed
+        items:
+          - headline: Which period each supply counts for is recorded in the warehouse
+            components: ["Pipeline & publishing"]
+            description: >
+              That record was going to be written into the repository the day
+              this gets switched on. It now goes where everything else does, so
+              nothing starts filling the repository with day-to-day state.
+          - headline: The dashboard's read-only account really is read-only now
+            components: ["Pipeline & publishing"]
+            description: >
+              It could still reach one part of the warehouse it was never meant
+              to, because of how database-wide permissions work. It is now
+              limited to the quality records and nothing else.
   - date: "2026-09-27"
     summary: >
       The warehouse is now PostgreSQL, and every QA tool checks what was

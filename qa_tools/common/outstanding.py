@@ -356,7 +356,7 @@ def _from_in_flight(observations_dir: Path | None = None) -> list[Item]:
     return items
 
 
-def _from_filings(filings_dir: Path | None = None) -> list[Item]:
+def _from_filings() -> list[Item]:
     """REQ-PIPE-065's uncertain assignment - NON-BLOCKING, and the one
     item here that is not a failure of anything.
 
@@ -368,7 +368,7 @@ def _from_filings(filings_dir: Path | None = None) -> list[Item]:
     """
     items = []
     for entry in hierarchy.all_datasets():
-        for record in filing.filings_of(entry.dataset_id, filings_dir):
+        for record in filing.filings_of(entry.dataset_id):
             if not record.get("ambiguous"):
                 continue
             items.append(Item(
@@ -386,7 +386,7 @@ def _from_filings(filings_dir: Path | None = None) -> list[Item]:
     return items
 
 
-def _from_closed_slots(filings_dir: Path | None = None) -> list[Item]:
+def _from_closed_slots() -> list[Item]:
     """REQ-PIPE-063's slot closed by monotonic filling and left unfilled
     (criterion 7).
 
@@ -408,7 +408,7 @@ def _from_closed_slots(filings_dir: Path | None = None) -> list[Item]:
 
     items = []
     for entry in hierarchy.all_datasets():
-        filled = filing.filled_slots(entry.dataset_id, filings_dir)
+        filled = filing.filled_slots(entry.dataset_id)
         if not filled:
             continue
         dataset_slots = slots_mod.slots_for_dataset(entry.dataset_id)
@@ -433,9 +433,7 @@ def _sort_key(item: Item) -> tuple:
             item.kind, item.dataset_id or "", item.headline)
 
 
-def survey(conn=None,
-            observations_dir: Path | None = None,
-            filings_dir: Path | None = None) -> Outstanding:
+def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
     """Everything currently waiting for a person, from committed history.
 
     BLOCKING FIRST, then by severity, then stably by kind and dataset.
@@ -444,7 +442,7 @@ def survey(conn=None,
     """
     items = (_from_deliveries(conn)
               + _from_loads()
-              + _from_filings(filings_dir)
-              + _from_closed_slots(filings_dir)
+              + _from_filings()
+              + _from_closed_slots()
               + _from_in_flight(observations_dir))
     return Outstanding(items=tuple(sorted(items, key=_sort_key)))
