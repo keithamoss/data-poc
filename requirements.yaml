@@ -8995,6 +8995,9 @@ requirements:
       downstream is using is bad" - which today look identical.
     moscow: should
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     source: >
       Keith, 2026-09-23, during REQ-DASH-041's sign-off. Settling that
       the as-of view shows the most recent ARRIVAL rather than the most
@@ -9050,15 +9053,20 @@ requirements:
         vocabulary is shared with the Python side through
         status-cases.json, and a fourth quiet state was explicitly
         forbidden on REQ-DASH-041 the same day.
-    open_questions:
-      - >
-        Where it appears - the dataset tile, the detail panel, or both.
-        A tile is where a viewer forms their first impression, which
-        argues for it being there; but the Tier-2 row is already carrying
-        an exhausted-schedule marker, and two annotations competing for
-        one row is how a row stops being readable. Needs the dashboard
-        UX pass rather than a decision here.
 
+      - >
+        IT APPEARS IN THE DETAIL PANEL, NOT ON THE TILE (Keith,
+        2026-09-27: "let's make that a panel"). The question was tile,
+        panel, or both. What decided it is the argument the question
+        already carried against itself: the Tier-2 row is already
+        carrying an exhausted-schedule marker, and two annotations
+        competing for one row is how a row stops being readable. REJECTED
+        with it: putting it on the tile as well, on the reasoning that a
+        tile is where a viewer forms their first impression - true, and
+        the value of that first impression comes from the tile saying ONE
+        thing clearly. A viewer who needs to know whether the latest
+        arrival is the promoted supply is already looking at that
+        dataset, which is the panel.
   - id: REQ-PIPE-057
     title: A delivery is recognised from the transport, and what it cannot place it reports
     date_written: "2026-09-23"
@@ -18078,6 +18086,9 @@ requirements:
       two signed requirements that contradict each other.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     source: >
       Keith, 2026-09-26, choosing "one REQ-DOCS owns the sweep" over
       amending each contradiction inside the batch that causes it. The
@@ -18176,25 +18187,33 @@ requirements:
         amendment has gone beyond restating and should be a criterion
         on the requirement that owns the behaviour instead.
     dependencies: [REQ-PIPE-089, REQ-PIPE-092, REQ-PIPE-074, REQ-PIPE-081]
-    open_questions:
-      - >
-        ITS SCOPE IS NOT FINAL until question sets B and C are
-        answered. Set B2 decides whether the delivery log, load
-        records, outstanding holds, the processing marker and the
-        scenario map follow qa_results/ into the database - which
-        determines whether REQ-PIPE-069 criterion 4, REQ-PIPE-060
-        criterion 20 and REQ-GEN-045 criterion 4 are falsified at all,
-        or merely lose their stated rationale. Set C decides how the
-        built artifact reaches Pages, which determines what
-        REQ-PIPE-005 criterion 1 is amended TO rather than merely away
-        from.
-      - >
-        Whether criterion 7's gate is a pytest test over the register
-        and the docs, or a tenth mothman check validator. A validator
-        is more visible and runs in the same place as the other nine;
-        a test is cheaper and can assert over prose files without a
-        new command. Either satisfies the criterion.
     decisions:
+      - >
+        CRITERION 7'S GATE IS A TENTH `mothman check` VALIDATOR, not a
+        pytest test (Keith, 2026-09-27: "happy to make Criterion 7 a
+        validator"). Either satisfied the criterion, and what decided it
+        is visibility: the other nine gates are in that table, a
+        contributor already reads it, and this project's standing
+        convention is that everything runs through `mothman`. The
+        rejected option was cheaper - a test can assert over prose files
+        with no new command - and cheapness is the wrong axis for a gate
+        whose whole job is to be noticed.
+      - >
+        ITS SCOPE IS NOW FINAL, and it was settled by what got BUILT
+        rather than by an answer (2026-09-27). The open question said the
+        scope could not be fixed until question set B2 decided whether
+        the delivery log, load records, outstanding holds, the processing
+        marker and the scenario map follow qa_results/ into the database.
+        They did, all of them, in REQ-PIPE-089's own build - and the
+        processing marker was DROPPED outright rather than moved, which
+        is why REQ-PIPE-061's criteria 6 and 7 needed amending in that
+        same change. So REQ-PIPE-069 criterion 4, REQ-PIPE-060 criterion
+        20 and REQ-GEN-045 criterion 4 are falsified rather than merely
+        losing their rationale, which is the stricter of the two readings
+        the question left open. Set C is likewise answered: REQ-PIPE-092
+        is signed and owns how the built artifact reaches Pages, so
+        REQ-PIPE-005 criterion 1 is amended TO that rather than only away
+        from Actions.
       - >
         ONE REQUIREMENT OWNS THE WHOLE SWEEP, rather than each
         contradiction being amended inside the batch that causes it
