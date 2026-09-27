@@ -9,6 +9,15 @@ from __future__ import annotations
 import rich_click as click
 from rich.console import Console
 
+# A DEVELOPER'S OWN .env, BEFORE ANYTHING READS THE ENVIRONMENT.
+# First thing, and above the command imports on purpose: several of
+# them read a DSN at import time, and a loader that ran after them
+# would be a loader that works only sometimes. Never overrides
+# something already set - see qa_tools/common/local_env.py.
+from qa_tools.common.local_env import load_local_env
+
+load_local_env()
+
 from . import (bdm, check, common, cp, dashboard, debug, env, github, pipeline, plans,
                population, scenarios, schedule, supply)
 from .banner import print_banner

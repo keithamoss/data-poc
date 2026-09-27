@@ -24,6 +24,18 @@ from datetime import date
 
 import pytest
 
+# A DEVELOPER'S OWN .env, so `uv run pytest` needs no exports.
+# At import time rather than in a fixture: the supply_dsn fixture
+# below is autouse and reads the environment, and several test
+# modules read it at import. Never overrides something already
+# set, which is what keeps CI's own MOTHMAN_TEST_DSN authoritative
+# - a .env that clobbered it would point the run at a database
+# that does not exist there, and the failure would read as a code
+# fault.
+from qa_tools.common.local_env import load_local_env  # noqa: E402
+
+load_local_env()
+
 import fixture_ids
 from generator.daily_batch import generate_daily_batch
 from qa_tools.common import asset_time, delivery

@@ -147,6 +147,20 @@ releases:
               both be right. They now look at the same thing.
       - category: Fixed
         items:
+          - headline: A failed check no longer leaves a connection behind either
+            components: ["QA checks & contract"]
+            description: >
+              Four places closed their database connection only when
+              everything went right, so a check that errored leaked one
+              and could block the next run's tidy-up. They now close
+              whatever happens.
+          - headline: Nothing to export before you run anything
+            components: ["Testing & dev tooling"]
+            description: >
+              Put your database details in a `.env` file once and every
+              command and the tests pick them up. Anything already set
+              in your shell still wins. `.env.example` lists what goes
+              in it.
           - headline: Soda no longer leaves a connection behind after every scan
             components: ["QA checks & contract"]
             description: >

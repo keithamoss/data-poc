@@ -2704,6 +2704,61 @@ testing before anyone treats it as the easy option.
     `CLAUDE.md`'s own standing lesson describes; the text above was
     read with `curl`.
 
+26. **[investigate, 2026-09-27]** **[Testing & dev tooling]** The suite is FLAKY under the parallel default - different tests fail on each full run, and a green result is therefore weaker than it looks.
+
+    Found while profiling for item 24, and it matters more than the
+    thing I was looking for: **two consecutive full runs of the same
+    tree failed DIFFERENT tests.**
+
+    - Run A: 8 failed / 2037 passed - `test_tables_read`,
+      `test_cross_table_scope`, `test_cli_cp`, `test_cli_bdm`,
+      `test_run_dbt_bdm`, `test_orchestrate_single_run`,
+      `test_run_soda_cp`, `test_build_warehouses_rebuild`.
+    - Run B: 4 failed / 2041 passed - a DIFFERENT set, overlapping only
+      partly.
+
+    Run serially (`-n0`) the same modules pass. So this is contention,
+    not an ordering dependency and not a code fault in the modules
+    that fail.
+
+    **The symptom is `relation "stg_birth_registrations" does not
+    exist`** and its CP equivalents - a staged table or a dbt model
+    that was there a moment earlier. Two candidate causes, and they are
+    not exclusive:
+
+    1. **The shared filesystem.** `data/raw/`, the delivery tree and
+       `reports/` are real paths shared by every worker, and several
+       modules regenerate or restage from them. This is the same class
+       `plans/tooling.md` #10 already fixed twice (the embed tests
+       reading `reports/` mid-rewrite, the e2e build fixture running
+       per worker) - so the pattern has form here.
+    2. **dbt's one shared schema.** `dbt_common.run_dbt()` sets
+       `DBT_PG_SCHEMA = supply_db.DBT_SCHEMA` - a single `dbt` schema
+       per database. Under the retired engine each run got its own
+       scratch FILE, so models were per-run by construction;
+       `REQ-PIPE-087`'s note that the schema "is what the ATTACH
+       arrangement was imitating" is not quite true, because the ATTACH
+       gave each run its own. Any two dbt invocations against one
+       database now drop and recreate the same models. Per-worker
+       databases mean this cannot bite ACROSS workers, but it can
+       within one whenever anything fans out.
+
+    **Which one it is has not been established**, and guessing would be
+    the same mistake the lock hunt made before the server was asked
+    directly. The cheap decisive test: run the suite with the dbt
+    schema made per-run and see whether the failures stop; separately,
+    run it with `data/` made per-worker.
+
+    **Why this outranks item 24's remaining fix.** Making the e2e module
+    parallel is worth ~100s. A suite that fails a different four tests
+    every run costs more than that in re-runs and in trust - and it
+    quietly weakens every "gates green" claim in this project's commit
+    messages, including the ones from today. Fix the flakiness first.
+
+    Not caused by the 2026-09-27 work, but made visible by it: those
+    changes added four modules and shifted the timing. The runtime log
+    in CLAUDE.md should carry this caveat until it is resolved.
+
 25. **[todo, 2026-09-26]** **[Testing & dev tooling]** `mothman` never deletes its own temp directories - 4,218 of them, 1.3GB, found while tidying `/tmp`.
 
 **Status:** todo · **Category:** Testing & dev tooling

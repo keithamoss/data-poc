@@ -4,6 +4,11 @@ version = "0.1.0"
 description = "QA/data-pipeline PoC for a multi-agency government data asset (BDM Birth Registrations + Child Protection), backed by real dbt-core/Soda Core/datacontract-cli/Evidently runs against synthetic data."
 requires-python = ">=3.11"
 dependencies = [
+    # Reads a developer's own .env - see qa_tools/common/local_env.py.
+    # Declared explicitly rather than leaned on transitively (soda and
+    # datacontract-cli both pull it in): a dependency this project calls
+    # directly is one this project should name.
+    "python-dotenv>=1.0",
     "dbt-core>=1.12",
     "dbt-postgres>=1.9", # the warehouse engine (REQ-PIPE-087). dbt-duckdb is gone:
     # every tool now checks what is in PostgreSQL, not a file

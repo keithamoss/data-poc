@@ -252,126 +252,131 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
 
     # Unqualified names resolve to dbt's own schema - see connect_dbt().
     conn = supply_db.connect_dbt()
-    # AN ABSENT STAGING MODEL IS A LEGITIMATE STATE, not a reason to
-    # abandon the run. A logical name has no view where two staged
-    # tables claim it (REQ-PIPE-059's held supply) or where nothing
-    # arrived, so dbt cannot build that table's staging model - and the
-    # OTHER five tables' results are still real and still wanted. The
-    # unguarded version raised UndefinedTable and took the whole run
-    # down, turning one ambiguous table into no results at all, which is
-    # the opposite of what a QA pipeline is for.
-    #
-    # Asked of the catalogue in one query rather than by try/except per
-    # table, because a failed statement inside a transaction would have
-    # to be recovered from as well as caught.
-    built = {row[0] for row in conn.execute(
-        "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
-        [supply_db.DBT_SCHEMA]).fetchall()}
-    n_total_by_table = {
-        t: (conn.execute(f"SELECT COUNT(*) FROM stg_{t}").fetchone()[0]
-            if f"stg_{t}" in built else None)
-        for t in cp_common.TABLES}
+    # CLOSED IN A `finally` (2026-09-27). It used to close on the
+    # last line of the happy path, which leaks the connection on
+    # every exception - and an audit-table query raising is exactly the case nobody is watching.
+    try:
+        # AN ABSENT STAGING MODEL IS A LEGITIMATE STATE, not a reason to
+        # abandon the run. A logical name has no view where two staged
+        # tables claim it (REQ-PIPE-059's held supply) or where nothing
+        # arrived, so dbt cannot build that table's staging model - and the
+        # OTHER five tables' results are still real and still wanted. The
+        # unguarded version raised UndefinedTable and took the whole run
+        # down, turning one ambiguous table into no results at all, which is
+        # the opposite of what a QA pipeline is for.
+        #
+        # Asked of the catalogue in one query rather than by try/except per
+        # table, because a failed statement inside a transaction would have
+        # to be recovered from as well as caught.
+        built = {row[0] for row in conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
+            [supply_db.DBT_SCHEMA]).fetchall()}
+        n_total_by_table = {
+            t: (conn.execute(f"SELECT COUNT(*) FROM stg_{t}").fetchone()[0]
+                if f"stg_{t}" in built else None)
+            for t in cp_common.TABLES}
 
-    results = []
-    for r in run_results["results"]:
-        node = nodes.get(r["unique_id"])
-        if node is None:
-            continue
-        table = _table_for_test(node)
-        if table is None:
-            continue  # a birth-registrations test, out of scope here
+        results = []
+        for r in run_results["results"]:
+            node = nodes.get(r["unique_id"])
+            if node is None:
+                continue
+            table = _table_for_test(node)
+            if table is None:
+                continue  # a birth-registrations test, out of scope here
 
-        meta = node.get("test_metadata")
-        test_name = meta["name"] if meta else node["name"]
-        column = node["column_name"] if meta else _SINGULAR_TEST_COLUMN.get(node["name"], "(table)")
-        config = node.get("config", {})
-        status = r["status"]
-        failures = r.get("failures") or 0
-        warn_t = parse_threshold(config.get("warn_if"))
-        fail_t = parse_threshold(config.get("error_if"))
+            meta = node.get("test_metadata")
+            test_name = meta["name"] if meta else node["name"]
+            column = node["column_name"] if meta else _SINGULAR_TEST_COLUMN.get(node["name"], "(table)")
+            config = node.get("config", {})
+            status = r["status"]
+            failures = r.get("failures") or 0
+            warn_t = parse_threshold(config.get("warn_if"))
+            fail_t = parse_threshold(config.get("error_if"))
 
-        relation_name = node.get("relation_name")
-        # A SKIPPED TEST HAS NO AUDIT TABLE, and `status != "error"` does
-        # not cover it. Where a table has no staging model - two staged
-        # tables claiming one logical name, or nothing arrived - dbt
-        # SKIPS its tests, so --store-failures never creates their audit
-        # tables. Their names are still in the manifest, which is why
-        # reading relation_name and querying it looked safe: the manifest
-        # describes what WOULD run, not what did. Querying one abandoned
-        # the whole run over a table that was legitimately absent.
-        model_built = table is None or f"stg_{table}" in built
-        if (test_name in _AUDIT_AGGREGATE_SQL and relation_name
-                and status not in ("error", "skipped") and model_built):
-            sql = _AUDIT_AGGREGATE_SQL[test_name].format(relation=relation_name)
-            # int(), and this is load-bearing rather than defensive.
-            # PostgreSQL's SUM() over a bigint returns NUMERIC, which
-            # psycopg faithfully gives back as a decimal.Decimal - where
-            # the retired engine returned a plain integer. A Decimal
-            # reaching metric_value is not a cosmetic difference: it is
-            # what qa_results/ serialises, and json.dumps REFUSES a
-            # Decimal outright, so every run writing an accepted_values
-            # or unique result would have failed at the write. COUNT()
-            # is unaffected; SUM() is the one that changes shape
-            # (REQ-PIPE-087).
-            verified_count = int(conn.execute(sql).fetchone()[0] or 0)
-            failures = verified_count
-            if warn_t is not None or fail_t is not None:
-                status = _status_for(verified_count, warn_t, fail_t)
-            else:
-                # the 3 business-rule singular tests have no warn_if/
-                # error_if config, so no threshold to compare against -
-                # _status_for would silently read as "always pass" with
-                # both thresholds None; any nonzero verified count means
-                # the test genuinely failed instead (same fix
-                # run_dbt_bdm.py's own mechanism already needed).
-                status = "fail" if verified_count > 0 else "pass"
+            relation_name = node.get("relation_name")
+            # A SKIPPED TEST HAS NO AUDIT TABLE, and `status != "error"` does
+            # not cover it. Where a table has no staging model - two staged
+            # tables claiming one logical name, or nothing arrived - dbt
+            # SKIPS its tests, so --store-failures never creates their audit
+            # tables. Their names are still in the manifest, which is why
+            # reading relation_name and querying it looked safe: the manifest
+            # describes what WOULD run, not what did. Querying one abandoned
+            # the whole run over a table that was legitimately absent.
+            model_built = table is None or f"stg_{table}" in built
+            if (test_name in _AUDIT_AGGREGATE_SQL and relation_name
+                    and status not in ("error", "skipped") and model_built):
+                sql = _AUDIT_AGGREGATE_SQL[test_name].format(relation=relation_name)
+                # int(), and this is load-bearing rather than defensive.
+                # PostgreSQL's SUM() over a bigint returns NUMERIC, which
+                # psycopg faithfully gives back as a decimal.Decimal - where
+                # the retired engine returned a plain integer. A Decimal
+                # reaching metric_value is not a cosmetic difference: it is
+                # what qa_results/ serialises, and json.dumps REFUSES a
+                # Decimal outright, so every run writing an accepted_values
+                # or unique result would have failed at the write. COUNT()
+                # is unaffected; SUM() is the one that changes shape
+                # (REQ-PIPE-087).
+                verified_count = int(conn.execute(sql).fetchone()[0] or 0)
+                failures = verified_count
+                if warn_t is not None or fail_t is not None:
+                    status = _status_for(verified_count, warn_t, fail_t)
+                else:
+                    # the 3 business-rule singular tests have no warn_if/
+                    # error_if config, so no threshold to compare against -
+                    # _status_for would silently read as "always pass" with
+                    # both thresholds None; any nonzero verified count means
+                    # the test genuinely failed instead (same fix
+                    # run_dbt_bdm.py's own mechanism already needed).
+                    status = "fail" if verified_count > 0 else "pass"
 
-        failing_sample_keys = _failing_sample_keys(
-            conn, test_name, column, table, node, status, built=frozenset(built))
+            failing_sample_keys = _failing_sample_keys(
+                conn, test_name, column, table, node, status, built=frozenset(built))
 
-        # Model+column are None for a singular test (no test_metadata,
-        # and schema.yml's own tests: block has no model association -
-        # fine, singular test names are globally unique - see
-        # dbt_check_id_lookup()'s own docstring) even though `column`
-        # above may hold a display-only fallback. `table` (already
-        # resolved above via _table_for_test()) gives the real model
-        # name for a generic test - CP's schema.yml holds 6 models
-        # together, so this must match dbt_check_id_lookup()'s own
-        # per-model keying or a same-named column+test-type collision
-        # across tables (or against BDM's own models, same file) would
-        # silently tag a result with the wrong check_id.
-        check_id_model = f"stg_{table}" if meta else None
-        check_id_column = node["column_name"] if meta else None
-        check_id = _CHECK_ID_LOOKUP.get((check_id_model, check_id_column, test_name))
-        if check_id is None:
-            raise ValueError(f"no check_id found for dbt test {test_name!r} "
-                              f"(model={check_id_model!r}, column={check_id_column!r}) - schema.yml "
-                              f"is missing meta.check_id or this test isn't declared there")
+            # Model+column are None for a singular test (no test_metadata,
+            # and schema.yml's own tests: block has no model association -
+            # fine, singular test names are globally unique - see
+            # dbt_check_id_lookup()'s own docstring) even though `column`
+            # above may hold a display-only fallback. `table` (already
+            # resolved above via _table_for_test()) gives the real model
+            # name for a generic test - CP's schema.yml holds 6 models
+            # together, so this must match dbt_check_id_lookup()'s own
+            # per-model keying or a same-named column+test-type collision
+            # across tables (or against BDM's own models, same file) would
+            # silently tag a result with the wrong check_id.
+            check_id_model = f"stg_{table}" if meta else None
+            check_id_column = node["column_name"] if meta else None
+            check_id = _CHECK_ID_LOOKUP.get((check_id_model, check_id_column, test_name))
+            if check_id is None:
+                raise ValueError(f"no check_id found for dbt test {test_name!r} "
+                                  f"(model={check_id_model!r}, column={check_id_column!r}) - schema.yml "
+                                  f"is missing meta.check_id or this test isn't declared there")
 
-        results.append({
-            "agency_id": cp_common.AGENCY_ID,
-            "collection_id": cp_common.COLLECTION_ID,
-            "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
-            "check_id": check_id,
-            "column_name": column,
-            "check_name": f"dbt:{test_name}",
-            "dimension": _DIMENSION_BY_TEST.get(test_name, ""),
-            "label": _LABEL_BY_TEST.get(test_name),
-            "run_id": run_id,
-            "run_timestamp": run_timestamp,
-            "metric_value": failures,
-            "unit": "count",
-            "warn_threshold": warn_t,
-            "fail_threshold": fail_t,
-            "status": status,
-            "on_fail_action": "flag",
-            "row_count_total": n_total_by_table[table],
-            "row_count_invalid": failures,
-            "failing_sample_keys": failing_sample_keys,
-            "engine": ENGINE_TAG,
-        })
+            results.append({
+                "agency_id": cp_common.AGENCY_ID,
+                "collection_id": cp_common.COLLECTION_ID,
+                "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
+                "check_id": check_id,
+                "column_name": column,
+                "check_name": f"dbt:{test_name}",
+                "dimension": _DIMENSION_BY_TEST.get(test_name, ""),
+                "label": _LABEL_BY_TEST.get(test_name),
+                "run_id": run_id,
+                "run_timestamp": run_timestamp,
+                "metric_value": failures,
+                "unit": "count",
+                "warn_threshold": warn_t,
+                "fail_threshold": fail_t,
+                "status": status,
+                "on_fail_action": "flag",
+                "row_count_total": n_total_by_table[table],
+                "row_count_invalid": failures,
+                "failing_sample_keys": failing_sample_keys,
+                "engine": ENGINE_TAG,
+            })
 
-    conn.close()
+    finally:
+        conn.close()
     # Committed only now, after the audit-table correction above - see
     # run_dbt_bdm.py's own identical comment / qa_results_writer.py's
     # docstring for why.

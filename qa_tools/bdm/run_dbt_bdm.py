@@ -284,100 +284,105 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     nodes = test_nodes(manifest)
     # Unqualified names resolve to dbt's own schema - see connect_dbt().
     conn = supply_db.connect_dbt()
-    n_total = conn.execute("SELECT COUNT(*) FROM stg_birth_registrations").fetchone()[0]
+    # CLOSED IN A `finally` (2026-09-27). It used to close on the
+    # last line of the happy path, which leaks the connection on
+    # every exception - and an audit-table query raising is exactly the case nobody is watching.
+    try:
+        n_total = conn.execute("SELECT COUNT(*) FROM stg_birth_registrations").fetchone()[0]
 
-    results = []
-    for r in run_results["results"]:
-        node = nodes.get(r["unique_id"])
-        if node is None:
-            continue
-        meta = node.get("test_metadata")
-        test_name = meta["name"] if meta else node["name"]
-        # Three cases: a real column-level generic test (column_name set);
-        # a model-level generic test (test_metadata present, but
-        # column_name is None - dbt_utils.expression_is_true, declared
-        # under the model itself in schema.yml, not a column); a
-        # singular test (no test_metadata at all - multiple_birth_
-        # sibling, recency).
-        if meta and node["column_name"]:
-            column = node["column_name"]
-        elif meta:
-            column = _MODEL_LEVEL_TEST_COLUMN.get(test_name, "(table)")
-        else:
-            column = _SINGULAR_TEST_COLUMN.get(node["name"], "(table)")
-        config = node.get("config", {})
-        status = r["status"]
-        failures = r.get("failures") or 0
-        warn_t = parse_threshold(config.get("warn_if"))
-        fail_t = parse_threshold(config.get("error_if"))
-
-        relation_name = node.get("relation_name")
-        if test_name in _AUDIT_AGGREGATE_SQL and relation_name and status != "error":
-            sql = _AUDIT_AGGREGATE_SQL[test_name].format(relation=relation_name)
-            # int(), and this is load-bearing rather than defensive.
-            # PostgreSQL's SUM() over a bigint returns NUMERIC, which
-            # psycopg faithfully gives back as a decimal.Decimal - where
-            # the retired engine returned a plain integer. A Decimal
-            # reaching metric_value is not a cosmetic difference: it is
-            # what qa_results/ serialises, and json.dumps REFUSES a
-            # Decimal outright, so every run writing an accepted_values
-            # or unique result would have failed at the write. COUNT()
-            # is unaffected; SUM() is the one that changes shape
-            # (REQ-PIPE-087).
-            verified_count = int(conn.execute(sql).fetchone()[0] or 0)
-            failures = verified_count
-            if warn_t is not None or fail_t is not None:
-                status = _status_for(verified_count, warn_t, fail_t)
+        results = []
+        for r in run_results["results"]:
+            node = nodes.get(r["unique_id"])
+            if node is None:
+                continue
+            meta = node.get("test_metadata")
+            test_name = meta["name"] if meta else node["name"]
+            # Three cases: a real column-level generic test (column_name set);
+            # a model-level generic test (test_metadata present, but
+            # column_name is None - dbt_utils.expression_is_true, declared
+            # under the model itself in schema.yml, not a column); a
+            # singular test (no test_metadata at all - multiple_birth_
+            # sibling, recency).
+            if meta and node["column_name"]:
+                column = node["column_name"]
+            elif meta:
+                column = _MODEL_LEVEL_TEST_COLUMN.get(test_name, "(table)")
             else:
-                # a hard pass/fail test (no warn_if/error_if config, so no
-                # threshold to compare against) - _status_for would
-                # silently read as "always pass" with both thresholds
-                # None; any nonzero verified count means the test
-                # genuinely failed instead.
-                status = "fail" if verified_count > 0 else "pass"
+                column = _SINGULAR_TEST_COLUMN.get(node["name"], "(table)")
+            config = node.get("config", {})
+            status = r["status"]
+            failures = r.get("failures") or 0
+            warn_t = parse_threshold(config.get("warn_if"))
+            fail_t = parse_threshold(config.get("error_if"))
 
-        failing_sample_keys = _failing_sample_keys(conn, test_name, column, node, status)
+            relation_name = node.get("relation_name")
+            if test_name in _AUDIT_AGGREGATE_SQL and relation_name and status != "error":
+                sql = _AUDIT_AGGREGATE_SQL[test_name].format(relation=relation_name)
+                # int(), and this is load-bearing rather than defensive.
+                # PostgreSQL's SUM() over a bigint returns NUMERIC, which
+                # psycopg faithfully gives back as a decimal.Decimal - where
+                # the retired engine returned a plain integer. A Decimal
+                # reaching metric_value is not a cosmetic difference: it is
+                # what qa_results/ serialises, and json.dumps REFUSES a
+                # Decimal outright, so every run writing an accepted_values
+                # or unique result would have failed at the write. COUNT()
+                # is unaffected; SUM() is the one that changes shape
+                # (REQ-PIPE-087).
+                verified_count = int(conn.execute(sql).fetchone()[0] or 0)
+                failures = verified_count
+                if warn_t is not None or fail_t is not None:
+                    status = _status_for(verified_count, warn_t, fail_t)
+                else:
+                    # a hard pass/fail test (no warn_if/error_if config, so no
+                    # threshold to compare against) - _status_for would
+                    # silently read as "always pass" with both thresholds
+                    # None; any nonzero verified count means the test
+                    # genuinely failed instead.
+                    status = "fail" if verified_count > 0 else "pass"
 
-        # The lookup key's column segment is None for a model-level or
-        # singular test even though `column` above may hold a display-
-        # only column (_MODEL_LEVEL_TEST_COLUMN/_SINGULAR_TEST_COLUMN) -
-        # matches dbt_check_id_lookup()'s own keying exactly. Model is
-        # None for a singular test (schema.yml's own tests: block has no
-        # model association - see that function's own docstring on why
-        # that's fine); every generic test here is on this dataset's one
-        # model.
-        check_id_model = "stg_birth_registrations" if meta else None
-        check_id_column = node["column_name"] if (meta and node["column_name"]) else None
-        check_id = _CHECK_ID_LOOKUP.get((check_id_model, check_id_column, test_name))
-        if check_id is None:
-            raise ValueError(f"no check_id found for dbt test {test_name!r} "
-                              f"(model={check_id_model!r}, column={check_id_column!r}) - schema.yml "
-                              f"is missing meta.check_id or this test isn't declared there")
+            failing_sample_keys = _failing_sample_keys(conn, test_name, column, node, status)
 
-        results.append({
-            "agency_id": AGENCY_ID,
-            "collection_id": COLLECTION_ID,
-            "dataset_id": DATASET_ID,
-            "check_id": check_id,
-            "column_name": column,
-            "check_name": f"dbt:{test_name}",
-            "dimension": _DIMENSION_BY_TEST.get(test_name, ""),
-            "label": _LABEL_BY_TEST.get(test_name),
-            "run_id": run_id,
-            "run_timestamp": run_timestamp,
-            "metric_value": failures,
-            "unit": "count",
-            "warn_threshold": warn_t,
-            "fail_threshold": fail_t,
-            "status": status,
-            "on_fail_action": "flag",
-            "row_count_total": n_total,
-            "row_count_invalid": failures,
-            "failing_sample_keys": failing_sample_keys,
-            "engine": ENGINE_TAG,
-        })
+            # The lookup key's column segment is None for a model-level or
+            # singular test even though `column` above may hold a display-
+            # only column (_MODEL_LEVEL_TEST_COLUMN/_SINGULAR_TEST_COLUMN) -
+            # matches dbt_check_id_lookup()'s own keying exactly. Model is
+            # None for a singular test (schema.yml's own tests: block has no
+            # model association - see that function's own docstring on why
+            # that's fine); every generic test here is on this dataset's one
+            # model.
+            check_id_model = "stg_birth_registrations" if meta else None
+            check_id_column = node["column_name"] if (meta and node["column_name"]) else None
+            check_id = _CHECK_ID_LOOKUP.get((check_id_model, check_id_column, test_name))
+            if check_id is None:
+                raise ValueError(f"no check_id found for dbt test {test_name!r} "
+                                  f"(model={check_id_model!r}, column={check_id_column!r}) - schema.yml "
+                                  f"is missing meta.check_id or this test isn't declared there")
 
-    conn.close()
+            results.append({
+                "agency_id": AGENCY_ID,
+                "collection_id": COLLECTION_ID,
+                "dataset_id": DATASET_ID,
+                "check_id": check_id,
+                "column_name": column,
+                "check_name": f"dbt:{test_name}",
+                "dimension": _DIMENSION_BY_TEST.get(test_name, ""),
+                "label": _LABEL_BY_TEST.get(test_name),
+                "run_id": run_id,
+                "run_timestamp": run_timestamp,
+                "metric_value": failures,
+                "unit": "count",
+                "warn_threshold": warn_t,
+                "fail_threshold": fail_t,
+                "status": status,
+                "on_fail_action": "flag",
+                "row_count_total": n_total,
+                "row_count_invalid": failures,
+                "failing_sample_keys": failing_sample_keys,
+                "engine": ENGINE_TAG,
+            })
+
+    finally:
+        conn.close()
     # Committed only now, after the audit-table correction above (not
     # right after run_results.json is read) - raw_output stays dbt's own
     # unmodified output (bug included), but `verified` (=`results`, the

@@ -60,108 +60,113 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # Read-only, and the run's own view schema on the search path - see
     # the BDM counterpart for what each now means (REQ-PIPE-087).
     conn = supply_db.connect(read_only=True)
-    conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
-    n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in cp_common.TABLES}
-
-    scan = Scan()
-    scan.set_data_source_name("cp_collection")
-    # CONFIGURED RATHER THAN HANDED A CONNECTION (REQ-PIPE-087).
-    # soda-core-duckdb took the live connection object this code already
-    # had open; soda-core-postgres has no equivalent, so the run's view
-    # schema reaches Soda as its data source's own `schema` - which is
-    # what the SET search_path above was doing for the shared connection.
-    scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
-        "cp_collection", supply_db.run_schema(run_id)))
-    scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
-    sampler = CaptureSampler()
-    scan.sampler = sampler
-    scan.disable_telemetry()
-    # See the BDM counterpart: Soda's own teardown closes an empty dict,
-    # so without this each scan leaves a backend idle in transaction
-    # holding ACCESS SHARE on every table it read.
+    # CLOSED IN A `finally` (2026-09-27). It used to close on the
+    # last line of the happy path, which leaks the connection on
+    # every exception - and a Soda scan raising is exactly the case nobody is watching.
     try:
-        scan.execute()
-        scan_results = scan.get_scan_results()
+        conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
+        n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in cp_common.TABLES}
+
+        scan = Scan()
+        scan.set_data_source_name("cp_collection")
+        # CONFIGURED RATHER THAN HANDED A CONNECTION (REQ-PIPE-087).
+        # soda-core-duckdb took the live connection object this code already
+        # had open; soda-core-postgres has no equivalent, so the run's view
+        # schema reaches Soda as its data source's own `schema` - which is
+        # what the SET search_path above was doing for the shared connection.
+        scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
+            "cp_collection", supply_db.run_schema(run_id)))
+        scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
+        sampler = CaptureSampler()
+        scan.sampler = sampler
+        scan.disable_telemetry()
+        # See the BDM counterpart: Soda's own teardown closes an empty dict,
+        # so without this each scan leaves a backend idle in transaction
+        # holding ACCESS SHARE on every table it read.
+        try:
+            scan.execute()
+            scan_results = scan.get_scan_results()
+        finally:
+            close_scan_connections(scan)
+        metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
+
+        results = []
+        for c in scan_results["checks"]:
+            table = c["table"]
+            if table not in cp_common.TABLES:
+                continue  # not a CP table (shouldn't happen - guard anyway)
+
+            column = c["column"] or _CUSTOM_CHECK_COLUMN.get(c["name"]) or "(table)"
+
+            check_id = check_id_from_resource_attributes(c)
+            if check_id is None:
+                raise ValueError(f"no check_id found in resourceAttributes for soda check {c['name']!r} - "
+                                  f"the checks YAML is missing attributes.check_id for this check")
+
+            diagnostics = c["diagnostics"]
+            value = diagnostics.get("value")
+            outcome = c["outcome"]
+
+            base_check = metric_name_by_id.get(c["metrics"][0], c["name"]) if c["metrics"] else c["name"]
+            is_custom_name = "when" not in c["name"]
+            check_name = c["name"] if is_custom_name else base_check
+            is_pct = base_check.endswith("percent")
+
+            row_count_invalid = None
+            if diagnostics.get("blocks"):
+                row_count_invalid = diagnostics["blocks"][0].get("totalFailingRows")
+            elif base_check == "row_count":
+                row_count_invalid = 0
+            elif base_check == "reference":
+                row_count_invalid = int(value) if value is not None else None
+
+            if is_custom_name:
+                dimension = _BUSINESS_RULE_DIMENSION.get(check_name, "")
+            elif base_check == "reference":
+                dimension = "consistency"
+            elif base_check == "row_count":
+                dimension = "completeness"
+            else:
+                dimension = ""
+
+            # A short, human-readable phrase for what this check actually
+            # measures - written here, where the check result is constructed,
+            # not guessed later from check_name by the dashboard-building
+            # code. None for the 3 named business-rule checks: their own
+            # names are already plain (and match dbt's and datacontract-cli's
+            # own names for the same rule closely enough that a reader sees
+            # the overlap without a further prefix).
+            label = None if is_custom_name else {
+                "row_count": "Row count", "reference": "Referential integrity",
+                "missing_count": "Null rate", "missing_percent": "Null rate",
+                "invalid_percent": "Invalid values", "duplicate_count": "Duplicate rate",
+            }.get(base_check)
+
+            results.append({
+                "agency_id": cp_common.AGENCY_ID,
+                "collection_id": cp_common.COLLECTION_ID,
+                "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
+                "check_id": check_id,
+                "column_name": column,
+                "check_name": check_name,
+                "dimension": dimension,
+                "label": label,
+                "run_id": run_id,
+                "run_timestamp": run_timestamp,
+                "metric_value": value,
+                "unit": "%" if is_pct else "count",
+                "warn_threshold": threshold(diagnostics.get("warn")),
+                "fail_threshold": threshold(diagnostics.get("fail")),
+                "status": outcome,
+                "on_fail_action": "flag",
+                "row_count_total": n_total_by_table[table],
+                "row_count_invalid": row_count_invalid,
+                "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], cp_common.TABLE_PK[table]),
+                "engine": ENGINE_TAG,
+            })
+
     finally:
-        close_scan_connections(scan)
-    metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
-
-    results = []
-    for c in scan_results["checks"]:
-        table = c["table"]
-        if table not in cp_common.TABLES:
-            continue  # not a CP table (shouldn't happen - guard anyway)
-
-        column = c["column"] or _CUSTOM_CHECK_COLUMN.get(c["name"]) or "(table)"
-
-        check_id = check_id_from_resource_attributes(c)
-        if check_id is None:
-            raise ValueError(f"no check_id found in resourceAttributes for soda check {c['name']!r} - "
-                              f"the checks YAML is missing attributes.check_id for this check")
-
-        diagnostics = c["diagnostics"]
-        value = diagnostics.get("value")
-        outcome = c["outcome"]
-
-        base_check = metric_name_by_id.get(c["metrics"][0], c["name"]) if c["metrics"] else c["name"]
-        is_custom_name = "when" not in c["name"]
-        check_name = c["name"] if is_custom_name else base_check
-        is_pct = base_check.endswith("percent")
-
-        row_count_invalid = None
-        if diagnostics.get("blocks"):
-            row_count_invalid = diagnostics["blocks"][0].get("totalFailingRows")
-        elif base_check == "row_count":
-            row_count_invalid = 0
-        elif base_check == "reference":
-            row_count_invalid = int(value) if value is not None else None
-
-        if is_custom_name:
-            dimension = _BUSINESS_RULE_DIMENSION.get(check_name, "")
-        elif base_check == "reference":
-            dimension = "consistency"
-        elif base_check == "row_count":
-            dimension = "completeness"
-        else:
-            dimension = ""
-
-        # A short, human-readable phrase for what this check actually
-        # measures - written here, where the check result is constructed,
-        # not guessed later from check_name by the dashboard-building
-        # code. None for the 3 named business-rule checks: their own
-        # names are already plain (and match dbt's and datacontract-cli's
-        # own names for the same rule closely enough that a reader sees
-        # the overlap without a further prefix).
-        label = None if is_custom_name else {
-            "row_count": "Row count", "reference": "Referential integrity",
-            "missing_count": "Null rate", "missing_percent": "Null rate",
-            "invalid_percent": "Invalid values", "duplicate_count": "Duplicate rate",
-        }.get(base_check)
-
-        results.append({
-            "agency_id": cp_common.AGENCY_ID,
-            "collection_id": cp_common.COLLECTION_ID,
-            "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
-            "check_id": check_id,
-            "column_name": column,
-            "check_name": check_name,
-            "dimension": dimension,
-            "label": label,
-            "run_id": run_id,
-            "run_timestamp": run_timestamp,
-            "metric_value": value,
-            "unit": "%" if is_pct else "count",
-            "warn_threshold": threshold(diagnostics.get("warn")),
-            "fail_threshold": threshold(diagnostics.get("fail")),
-            "status": outcome,
-            "on_fail_action": "flag",
-            "row_count_total": n_total_by_table[table],
-            "row_count_invalid": row_count_invalid,
-            "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], cp_common.TABLE_PK[table]),
-            "engine": ENGINE_TAG,
-        })
-
-    conn.close()
+        conn.close()
     # Committed only now, after row_count_total's own live per-table
     # query above - see run_soda_bdm.py's own identical comment /
     # qa_results_writer.py's docstring for why.

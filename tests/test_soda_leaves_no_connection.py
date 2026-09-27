@@ -42,31 +42,58 @@ def _unlabelled_backends(dsn: str) -> int:
             "AND coalesce(application_name, '') = ''").fetchone()[0]
 
 
+#: A table the probe scan can really read. Soda only opens a connection
+#: when it gets far enough to run a query, so a scan against a table
+#: that does not exist may never connect at all - which made an earlier
+#: version of these tests pass or fail depending on what the database
+#: happened to hold. The scan needs a real target for the leak it is
+#: measuring to be deterministic.
+PROBE_TABLE = "soda_leak_probe"
+
+
+def _ensure_probe_table() -> None:
+    with supply_db.connect(label="test-setup") as conn:
+        supply_db.ensure_schemas(conn)
+        conn.execute(
+            f'CREATE TABLE IF NOT EXISTS "{supply_db.STAGING_SCHEMA}".{PROBE_TABLE} '
+            "(id integer)")
+
+
 def _scan(schema: str) -> Scan:
     scan = Scan()
     scan.set_data_source_name("probe")
     scan.add_configuration_yaml_str(supply_db.soda_config_yaml("probe", schema))
     scan.disable_telemetry()
-    # A check that runs and resolves against any schema, since what is
-    # under test is the CONNECTION rather than the check's own verdict.
-    scan.add_sodacl_yaml_str("checks for not_a_real_table:\n  - row_count > -1\n")
+    scan.add_sodacl_yaml_str(f"checks for {PROBE_TABLE}:\n  - row_count >= 0\n")
     return scan
 
 
 @pytest.fixture
 def dsn(supply_dsn):
+    _ensure_probe_table()
     return supply_dsn
 
 
-def test_a_scan_on_its_own_leaks_exactly_one_backend(dsn):
+def test_a_scan_on_its_own_leaks_its_connection(dsn):
     """The bug itself, pinned. If a future Soda release fixes this, this
     test fails and close_scan_connections() can be deleted - which is a
-    better outcome than carrying a workaround nobody re-examines."""
-    before = _unlabelled_backends(dsn)
+    better outcome than carrying a workaround nobody re-examines.
+
+    ASKS THE SCAN, NOT pg_stat_activity, and the difference is not
+    stylistic. An earlier version counted unlabelled backends and was
+    flaky: the count depends on what else is connected at that instant
+    and on the scan having got far enough to connect at all, so it
+    reported "no leak" in a suite run and "leaks one" in isolation.
+    Looking at the connection object Soda is holding is the same claim
+    with none of the timing.
+    """
     scan = _scan(supply_db.STAGING_SCHEMA)
     scan.execute()
-    assert _unlabelled_backends(dsn) == before + 1, (
-        "Soda no longer leaks its connection - close_scan_connections() "
+    held = [ds.connection for ds in scan._data_source_manager.data_sources.values()
+            if getattr(ds, "connection", None) is not None]
+    assert held, "the scan never opened a connection - it cannot leak or not leak one"
+    assert any(not c.closed for c in held), (
+        "Soda no longer leaves its connection open - close_scan_connections() "
         "may now be unnecessary; check before deleting it")
     close_scan_connections(scan)
 
