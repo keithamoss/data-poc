@@ -253,6 +253,92 @@ class TestAsOfDatePicking:
         assert "No data" in clean_page.locator(".view-head").first.inner_text()
 
 
+class TestTheAsOfPanelSaysWhichPeriod:
+    """REQ-DASH-054 criteria 6, 8, 9 and 10, at the layer a reader sees.
+
+    THE DATA LAYER IS NOT ENOUGH HERE, and this project has the scar:
+    item 74 shipped a correct `reports/*.json` and a template whose own
+    transform silently dropped the new field, rendering a check with 14
+    real violations green. The lookups have their own unit tests in
+    tests-js/; what this holds is that the built page actually renders
+    what they answer.
+    """
+
+    def _open_panel(self, page):
+        page.click("#asof-btn")
+        page.wait_for_selector("#asof-panel.open")
+
+    def test_the_panel_names_the_period_per_calendar(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        self._open_panel(clean_page)
+        text = clean_page.locator("#asof-periods").inner_text()
+        # This asset has two named calendars, and the same chosen date is a
+        # different period on each - which is the whole reason a reader
+        # needs telling rather than inferring it from the date.
+        assert "quarterly calendar" in text
+        assert "daily calendar" in text
+
+    def test_the_named_period_follows_the_date_the_reader_picks(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        self._open_panel(clean_page)
+        before = clean_page.locator("#asof-periods").inner_text()
+        # A date inside the covered range but well away from the default,
+        # taken from the page's own embedded range rather than from a
+        # literal - a hard-coded date here would go stale the moment the
+        # calendars were re-authored.
+        first = clean_page.evaluate("() => coveredDateRange().first")
+        clean_page.evaluate("(d) => renderAsOfPeriods(d)", first)
+        after = clean_page.locator("#asof-periods").inner_text()
+        assert after != before, "the period statement did not follow the date"
+
+    def test_the_input_is_bounded_to_what_the_page_has_periods_for(self, clean_page, built_dashboard_html):
+        """Criterion 8. A native date input greys out anything outside
+        min/max, which puts the limit where the reader is choosing rather
+        than in a correction afterwards."""
+        _goto(clean_page, built_dashboard_html)
+        self._open_panel(clean_page)
+        bounds = clean_page.evaluate(
+            "() => ({min: document.getElementById('asof-input').min,"
+            "        max: document.getElementById('asof-input').max,"
+            "        range: coveredDateRange()})")
+        assert bounds["min"] == bounds["range"]["first"]
+        assert bounds["max"] == bounds["range"]["last"]
+        # And the maximum is NOT the future: criterion 3 embeds no period
+        # that has not begun, so there is nothing beyond it to offer.
+        assert bounds["max"] >= bounds["min"]
+
+    def test_an_out_of_range_date_by_url_says_so_and_offers_a_way_back(
+            self, clean_page, built_dashboard_html):
+        """Criteria 9 and 10. A URL is the way in - an old bookmark, a
+        hand-edited query string - and the input's own bounds cannot stop
+        any of those."""
+        _goto(clean_page, built_dashboard_html, as_of="1990-01-01")
+        notice = clean_page.locator("#asof-range-notice")
+        assert notice.is_visible()
+        text = notice.inner_text()
+        assert "outside the dates" in text
+        # It states the covered range, so the reader knows what to ask for.
+        first = clean_page.evaluate("() => coveredDateRange().first")
+        assert first[:4] in text, "the notice does not state the covered range"
+
+        # The page itself is still there - every dataset resolved to a real
+        # state at that date, and hiding correct answers to make a point
+        # about the date is the empty view criterion 10 forbids.
+        assert clean_page.locator("#view").inner_html().strip()
+
+        clean_page.click("#asof-range-reset")
+        # wait_for_function rather than wait_for_selector: the default
+        # selector state is "visible", and what is being waited for here is
+        # the element going hidden - which that condition can never see.
+        clean_page.wait_for_function(
+            "() => document.getElementById('asof-range-notice').hidden")
+        assert "asof=" not in clean_page.url
+
+    def test_a_date_inside_the_range_draws_no_notice_at_all(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        assert clean_page.locator("#asof-range-notice").is_hidden()
+
+
 class TestSupplyHistoryDrillDown:
     def test_clicking_a_supply_history_entry_sets_the_as_of_date_to_that_run(self, clean_page, built_dashboard_html):
         _goto(

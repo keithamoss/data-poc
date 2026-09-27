@@ -402,6 +402,61 @@ def embed() -> None:
     html = _replace_const(html, "SCHEDULE_RUNWAY",
                            json.dumps(schedule_runway, separators=(",", ":")))
 
+    # PERIOD_SEQUENCES - REQ-DASH-054. Every named calendar's period
+    # sequence, and which calendar each dataset follows.
+    #
+    # WHY THE BROWSER NEEDS THIS AT ALL. The as-of picker lets a viewer
+    # choose ANY date, and a static site has no backend to ask - so the
+    # page had its own JS port of cycle_start(), which was genuinely
+    # unavoidable while a schedule was a RULE. It stops being unavoidable
+    # once a schedule is a LIST, because a list can be shipped. And it was
+    # never sufficient: a port can compute a cadence rule and cannot
+    # compute an AUTHORED date list, which is what the quarterly calendar
+    # is - Feb/May/Aug/Nov, deliberately not calendar quarters. Asking the
+    # browser "which quarter is 2025-06-14 in" for Child Protection could
+    # not be answered at all.
+    #
+    # IT ENDS AT THE PRESENT AND EMBEDS NO PERIOD THAT HAS NOT BEGUN
+    # (criterion 3, Keith's own question: "why would we be able to choose
+    # a date in the future? nothing has happened yet, so why project
+    # forward?"). The as-of picker asks about the PAST, so a date with
+    # nothing behind it has no answer to give. That removes the horizon
+    # question rather than answering it - there is no number to choose,
+    # because the sequence simply stops at the period today falls in.
+    #
+    # THE CURRENT PERIOD IS INCLUDED: it has begun. Its start is behind us
+    # and its end ahead, which is exactly the period a viewer asking about
+    # today is in.
+    #
+    # A CONSEQUENCE TO KNOW: a sequence that ends "now" ends at BUILD
+    # time, so on a daily calendar the newest pickable date is the date of
+    # the last build. That is tolerable only because REQ-PIPE-092 rebuilds
+    # on every publish - a deployment that stopped rebuilding would
+    # quietly lose its most recent days from the picker, which is what the
+    # page's own out-of-range message makes visible rather than silent.
+    today = asset_time.now().date()
+    sequences = {"calendars": {}, "datasetCalendar": {}}
+    for cal in schedule.calendars():
+        sequences["calendars"][cal.name] = [
+            {"period": period.name, "date": period.date.isoformat()}
+            for period in schedule.periods_for_calendar(cal.name, until=today)
+        ]
+    for entry in hierarchy.all_datasets():
+        try:
+            sequences["datasetCalendar"][entry.dataset_id] = \
+                schedule.calendar_for_dataset(entry.dataset_id).name
+        except Exception:
+            # A dataset with no calendar is REQ-PIPE-106's subject rather
+            # than an error here - the picker simply has no period
+            # arithmetic to do for it.
+            sequences["datasetCalendar"][entry.dataset_id] = None
+    html = _replace_const(html, "PERIOD_SEQUENCES",
+                           json.dumps(sequences, separators=(",", ":")))
+    print("Re-embedded PERIOD_SEQUENCES = "
+          + ", ".join(f"{name} {len(periods)} period(s)"
+                       for name, periods in sequences["calendars"].items())
+          + f", ending at {today.isoformat()}")
+
     # OUTSTANDING - REQ-DASH-070. Everything that needs a person, from
     # committed history alone, as ONE thing carrying ONE total.
     #

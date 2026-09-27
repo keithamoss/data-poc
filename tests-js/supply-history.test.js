@@ -36,6 +36,12 @@ function datasetWithStatuses(entries, cadence = { type: "daily", expected_time: 
     run_id, run_date, value: VALUE_FOR_STATUS[status],
   }));
   return {
+    // AN ID, because period arithmetic is a lookup keyed by dataset since
+    // REQ-DASH-054 - the page asks which calendar THIS dataset follows
+    // before it can say which period a date falls in. It used to compute
+    // from `sla.cadence` alone, which is why these fixtures never needed
+    // one. `cadence` stays: it is still what the cadence LABEL renders.
+    id: "birth-registrations",
     sla: { cadence },
     runs: entries.map(([run_id, run_date]) => ({ run_id, run_date })),
     arrivalByRun,
@@ -247,6 +253,59 @@ describe("buildSupplyHistory", () => {
   it("returns [] for a dataset with no real runs", () => {
     const w = load();
     expect(w.buildSupplyHistory(datasetWithStatuses([]))).toEqual([]);
+  });
+});
+
+describe("a dataset with no agreed supply calendar", () => {
+  // REQ-PIPE-106's subject, reaching the supply history. It arrived as a
+  // REAL DEFECT rather than as a design question: REQ-DASH-054 made the
+  // period a lookup, a lookup answers null for a dataset it has no
+  // calendar for, and the chain sort went straight into
+  // `null.localeCompare` and took the whole panel out with a TypeError.
+  //
+  // The old code could not fail this way and was not better for it -
+  // cycleStartDate() computed a cycle from a cadence rule for any input,
+  // so a dataset with no agreed schedule got a confidently invented
+  // period instead of an error.
+  function unscheduled(dates) {
+    const d = datasetWithStatuses(dates.map((day, i) => [`r${i + 1}`, day, "green"]));
+    return { ...d, id: "a-sample-nobody-has-agreed-a-calendar-for" };
+  }
+
+  it("still builds its real arrival history", () => {
+    const w = load();
+    const chains = w.buildSupplyHistory(unscheduled(["2026-02-01", "2026-05-01"]));
+    expect(chains.flatMap((c) => c.entries)).toHaveLength(2);
+  });
+
+  it("says it has no period rather than inventing one", () => {
+    const w = load();
+    const [chain] = w.buildSupplyHistory(unscheduled(["2026-02-01"]));
+    expect(chain.cycleStart).toBeNull();
+    expect(w.cycleLabel({ type: "daily" }, chain.cycleStart)).toBe("No agreed supply period");
+  });
+
+  it("orders its chains newest-first on their own arrivals", () => {
+    const w = load();
+    // Three chains, because each green arrival closes the one before it.
+    const chains = w.buildSupplyHistory(unscheduled(["2026-02-01", "2026-05-01", "2026-08-01"]));
+    expect(chains).toHaveLength(3);
+    expect(chains.map((c) => c.entries[0].run_date))
+      .toEqual(["2026-08-01", "2026-05-01", "2026-02-01"]);
+  });
+
+  it("badges none of its chains the current one", () => {
+    const w = load();
+    // Both sides of the comparison are null for a dataset with no
+    // calendar, so `null===null` would badge every chain in its whole
+    // history "Current cycle" - a confident wrong answer, and the one
+    // this requirement exists to stop.
+    const ds = { ...unscheduled(["2026-02-01", "2026-05-01"]),
+      name: "A sample", sla: { cadence: { type: "daily", expected_time: "14:00" } } };
+    const cycles = w.buildSupplyHistory(ds);
+    const html = w.renderSupplyHistorySection(ds, cycles, w.periodStartDate(ds.id, "2026-09-01"));
+    expect(html).toContain("No agreed supply period");
+    expect(html).not.toContain("Current cycle");
   });
 });
 

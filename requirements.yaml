@@ -8794,7 +8794,76 @@ requirements:
       a real answer whatever delivery schedule the dataset follows,
       instead of a blank page that looks like there was never any data.
     moscow: must
-    status: not_started
+    status: built
+    implemented_by:
+      - dashboard/embed_dashboard_data.py::embed
+      - dashboard/qa-reporting-dashboard.template.html::periodsFor
+      - dashboard/qa-reporting-dashboard.template.html::periodStartDate
+      - dashboard/qa-reporting-dashboard.template.html::periodNameFor
+      - dashboard/qa-reporting-dashboard.template.html::periodForCalendar
+      - dashboard/qa-reporting-dashboard.template.html::coveredDateRange
+      - dashboard/qa-reporting-dashboard.template.html::renderAsOfPeriods
+      - dashboard/qa-reporting-dashboard.template.html::boundAsOfInput
+      - dashboard/qa-reporting-dashboard.template.html::renderAsOfRangeNotice
+      - dashboard/qa-reporting-dashboard.template.html::buildSupplyHistory
+      - dashboard/qa-reporting-dashboard.template.html::cycleLabel
+    linked_tests:
+      - tests/test_embed_dashboard_data.py::test_the_embed_carries_every_named_calendar_and_which_one_each_dataset_follows
+      - tests/test_embed_dashboard_data.py::test_a_dataset_with_no_calendar_is_recorded_as_having_none
+      - tests/test_embed_dashboard_data.py::test_the_embedded_dates_come_from_the_authored_calendar_rather_than_a_rule
+      - tests/test_embed_dashboard_data.py::test_nothing_that_has_not_begun_is_embedded
+      - tests/test_embed_dashboard_data.py::test_the_current_period_IS_embedded_because_it_has_begun
+      - tests/test_embed_dashboard_data.py::test_deriving_the_sequences_opens_nothing_under_data
+      - tests/test_dashboard_e2e.py::TestTheAsOfPanelSaysWhichPeriod
+      - tests-js/cadence.test.js
+      - tests-js/asof-range.test.js
+      - tests-js/supply-history.test.js
+    evidence:
+      - >
+        Built 2026-09-27. Measured against the real configuration the
+        same day: the quarterly calendar embeds 15 periods ending
+        2026-08-01 (2026-Q3, the open one), and the daily calendar 36
+        ending 2026-09-28 - which is the asset's own date at the time,
+        while this environment's UTC clock still read the 27th. Both stop
+        at the period the present moment falls in, and the embed prints
+        those counts on every run.
+
+        The daily count is small because the daily calendar's authored
+        window starts recently, not because the sequence is truncated -
+        it will lengthen by one entry a day, which is the growth this
+        requirement's own NFR asks to be re-measured rather than
+        assumed.
+      - >
+        The browser-side port is GONE rather than narrowed:
+        cycleStartDate(cadence, dateStr) is deleted and its four call
+        sites take a dataset id now. tests-js/cadence.test.js asserts
+        window.cycleStartDate is undefined, and that an unbuilt template
+        answers null from every lookup rather than falling back to
+        arithmetic - which is criterion 5 stated as behaviour rather than
+        as an absence.
+      - >
+        A REAL DEFECT THE CHANGE SURFACED, fixed with a failing test
+        first: buildSupplyHistory() sorted its chains with
+        `b.cycleStart.localeCompare(...)`, and a period lookup can answer
+        null where a cadence rule always answered something - so a
+        dataset with no agreed calendar took the whole supply-history
+        panel out with a TypeError. Four tests in
+        tests-js/supply-history.test.js confirmed failing against the
+        pre-fix template (16 of 20 passing), passing after. The same
+        change stops `null===null` badging every chain in such a
+        dataset's history "Current cycle".
+      - >
+        Verified at the render layer in a real Chromium, per this
+        requirement's own NFR: tests/test_dashboard_e2e.py's
+        TestTheAsOfPanelSaysWhichPeriod drives the built page - the panel
+        naming a period per calendar, the date input's min/max matching
+        coveredDateRange(), an `?asof=1990-01-01` arrival showing the
+        plain out-of-range message and its one-click reset, and the page
+        itself still rendered underneath it. 5 passed.
+      - >
+        tests-js: 25 files, 375 tests passing, including the new
+        tests-js/asof-range.test.js (16). tests/test_embed_dashboard_data.py
+        18 passed.
     signed_off:
       by: Keith
       date: "2026-09-27"
@@ -9067,6 +9136,45 @@ requirements:
         thing clearly. A viewer who needs to know whether the latest
         arrival is the promoted supply is already looking at that
         dataset, which is the panel.
+    open_questions:
+      - >
+        FOUND WHILE BUILDING, 2026-09-27, and it is why this is still
+        not_started while everything either side of it in the build order
+        shipped: NOTHING RECORDS PROMOTION STATE YET, so criterion 1 has
+        no second supply to show and criterion 4 has no reason to give.
+        All three declared dependencies are built - the blocker is
+        somewhere else, which is why the sign-off check did not catch it.
+
+        Precisely what is missing. Only a promotion puts a table in a
+        period schema, and promotion belongs to the promotion sprint;
+        qa_tools/common/period_schema.py says so in as many words, and
+        its create_overlay_views() - the one function that would record
+        which tables a run read FROM the period rather than from staging,
+        and so the only recorded source of "what is currently promoted" -
+        is called by nothing. The recorded shape confirms it rather than
+        just the prose: qa.tables_read carries logical_table and
+        physical_table and no period or source at all.
+
+        So every arrival is unpromoted today, which makes criterion 3's
+        quiet case unreachable and would put the distinction on all 30
+        datasets at once - the exact noise this requirement's own third
+        NFR forbids. A panel section in one permanent state is not a
+        build of this requirement, it is a placeholder that reads like
+        one.
+
+        THE RECOMMENDATION, and it needs no decision to proceed with:
+        build it AFTER REQ-PIPE-091, which makes a filing decision a
+        recorded row and so supplies criterion 4's "awaiting a decision"
+        and "rejected" directly. That is a reordering of two adjacent
+        items in the agreed overnight order rather than a change of
+        scope. What 091 does NOT supply is criterion 1's promoted
+        supply itself, so if that still has no recorded source after
+        091, this needs Keith: either it waits for the promotion sprint,
+        or the mechanism gets built against the real rule with today's
+        honest answer being "nothing is promoted in this deployment
+        yet", which is the pattern REQ-PIPE-065 already used and which
+        the noise NFR would then have to be read against.
+
   - id: REQ-PIPE-057
     title: A delivery is recognised from the transport, and what it cannot place it reports
     date_written: "2026-09-23"

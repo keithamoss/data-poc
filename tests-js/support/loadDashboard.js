@@ -73,7 +73,49 @@ function stubMatchMedia(window) {
  * Caller must call `close()` when done (afterEach) - jsdom windows aren't
  * garbage-collected on their own the way a real browser tab is.
  */
-export function loadDashboard({ html, hierarchy, assetTimezone } = {}) {
+// A DAILY calendar and an AUTHORED quarterly one, which is the pair the
+// real asset has and the pair that matters: a daily sequence is what a
+// rule would have produced anyway, and the quarterly one is the case a
+// rule could never produce - Feb/May/Aug/Nov, deliberately not calendar
+// quarters. Both stop in 2026, since nothing that has not begun is
+// embedded (REQ-DASH-054 criterion 3).
+export const PERIOD_SEQUENCES_DEFAULT = {
+  calendars: {
+    // WIDE ON PURPOSE. A daily calendar's period IS its date, so a lookup
+    // only answers for a date the sequence actually holds - a narrow
+    // fixture would make tests fail for using a date outside it rather
+    // than for anything about the page.
+    daily: Array.from({ length: 800 }, (_, i) => {
+      const day = new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10);
+      return { period: day, date: day };
+    }),
+    quarterly: [
+      { period: "2025-Q3", date: "2025-08-01" },
+      { period: "2025-Q4", date: "2025-11-01" },
+      { period: "2026-Q1", date: "2026-02-01" },
+      { period: "2026-Q2", date: "2026-05-01" },
+      { period: "2026-Q3", date: "2026-08-01" },
+    ],
+  },
+  // THE SIX CP DATASET IDS ARE HERE ON PURPOSE. The embed maps a
+  // DATASET to its calendar, and several test fixtures build synthetic
+  // cp-* datasets - left unmapped they would have no calendar at all,
+  // which is a real state (REQ-PIPE-106) but not the one those tests are
+  // about: their whole subject is period grouping, which needs a period.
+  datasetCalendar: {
+    "birth-registrations": "daily",
+    bdm: "daily",
+    "child-protection": "quarterly",
+    "cp-clients": "quarterly",
+    "cp-carers": "quarterly",
+    "cp-case-workers": "quarterly",
+    "cp-notifications": "quarterly",
+    "cp-investigations": "quarterly",
+    "cp-placements": "quarterly",
+  },
+};
+
+export function loadDashboard({ html, hierarchy, assetTimezone, periodSequences, url } = {}) {
   let source = html ?? readFileSync(TEMPLATE_PATH, "utf-8");
   if (hierarchy !== undefined) {
     const line = `const HIERARCHY = ${JSON.stringify(hierarchy)};`;
@@ -106,9 +148,35 @@ export function loadDashboard({ html, hierarchy, assetTimezone } = {}) {
     source = source.replace(pattern, `const ASSET_TIMEZONE = ${JSON.stringify(tz)};\n`);
   }
 
+  // Same mechanism again, for the embedded period sequences
+  // (REQ-DASH-054). The page's period arithmetic is a LOOKUP against
+  // these now rather than a computation, so a test about which period a
+  // date falls in has to embed them the way a real build does. It
+  // replaced a JS port of Python's cycle_start(), which needed no
+  // embedding and could not answer the question for an authored calendar
+  // at all.
+  //
+  // DEFAULTS TO A SMALL REAL-SHAPED PAIR rather than to the template's
+  // null, because a built dashboard always has them and a test against
+  // null would be exercising a page that cannot exist - the same
+  // reasoning the asset clock above already uses. Pass `null` explicitly
+  // for the unbuilt case.
+  {
+    const value = periodSequences === undefined ? PERIOD_SEQUENCES_DEFAULT : periodSequences;
+    const pattern = /const PERIOD_SEQUENCES = .*?;\n/;
+    if (!pattern.test(source)) {
+      throw new Error("could not find `const PERIOD_SEQUENCES = ...;` to replace - has the template changed?");
+    }
+    source = source.replace(pattern, `const PERIOD_SEQUENCES = ${JSON.stringify(value)};\n`);
+  }
+
   const errors = [];
   const dom = new JSDOM(source, {
-    url: "http://localhost/",
+    // A REAL URL, because the page reads one. `?asof=` is where an
+    // out-of-range as-of date comes from (REQ-DASH-054 criterion 9) and a
+    // hash is where drill-down state lives, so a test about either has to
+    // set the address rather than poke at the page afterwards.
+    url: url ?? "http://localhost/",
     runScripts: "dangerously",
     pretendToBeVisual: true,
     beforeParse: stubMatchMedia,

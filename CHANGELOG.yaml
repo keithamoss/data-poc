@@ -109,6 +109,33 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-09-28"
+    summary: >
+      Looking at the dashboard as of an earlier date now follows the
+      delivery dates you actually agreed, and tells you which one you are
+      looking at.
+    changes:
+      - category: Improved
+        items:
+          - headline: As-of viewing now follows your real delivery dates
+            components: ["Dashboard UI"]
+            description: >
+              Pick a past date and the dashboard works out which delivery
+              period it falls in from the calendar you agreed, not from a
+              guess about how quarters usually run. It gets the February,
+              May, August and November cycle right.
+          - headline: The as-of panel tells you which period you are looking at
+            components: ["Dashboard UI"]
+            description: >
+              Choose a date and the panel names the period it lands in on
+              each of your calendars. The same day is its own day on a daily
+              feed and the middle of a quarter on a quarterly one.
+          - headline: You can no longer pick a date the dashboard cannot answer for
+            components: ["Dashboard UI"]
+            description: >
+              The date box now stops at the earliest and latest periods it
+              has. If an old link carries a date outside them, the page says
+              so, names the range it covers and offers one click back.
   - date: "2026-09-27"
     summary: >
       The warehouse is now PostgreSQL, and every QA tool checks what was

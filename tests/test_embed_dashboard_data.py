@@ -305,3 +305,149 @@ def test_embed_reads_the_real_committed_cast_file_when_present(monkeypatch, tmp_
     )
     embedded = _run_embed_and_extract_demo_cast(monkeypatch, tmp_path, cast_text)
     assert embedded == cast_text
+
+
+# ---------------------------------------------------------------------------
+# PERIOD_SEQUENCES - REQ-DASH-054 criteria 1, 2 and 3.
+#
+# The page's period arithmetic is a LOOKUP against these now, replacing a
+# JS port of pipeline/cadence.py's cycle_start(). What the port could never
+# do is the reason the embed exists: a cadence RULE cannot produce an
+# AUTHORED date list, and the quarterly calendar is one (Feb/May/Aug/Nov,
+# deliberately not calendar quarters), so "which quarter is this date in"
+# had no answer at all for Child Protection.
+# ---------------------------------------------------------------------------
+def _run_embed_and_extract_period_sequences(monkeypatch, tmp_path):
+    out_html = tmp_path / "out.html"
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    edd.embed()
+    match = re.search(r"const PERIOD_SEQUENCES = (.*?);\n", out_html.read_text())
+    assert match, "PERIOD_SEQUENCES const not found in built output"
+    return json.loads(match.group(1))
+
+
+def test_the_embed_carries_every_named_calendar_and_which_one_each_dataset_follows(
+        monkeypatch, tmp_path):
+    """Criterion 1, both halves. The sequences alone are unusable: the page
+    is asked about a DATASET's period, and without the mapping it would
+    have to guess which calendar to look in - or merge them, which is
+    silently wrong for whichever calendar lost."""
+    from qa_tools.common import hierarchy, schedule
+
+    sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
+
+    assert set(sequences["calendars"]) == {c.name for c in schedule.calendars()}
+    assert set(sequences["datasetCalendar"]) == {
+        d.dataset_id for d in hierarchy.all_datasets()}
+    for name, periods in sequences["calendars"].items():
+        assert periods, f"{name} embedded no periods at all"
+        assert all({"period", "date"} == set(p) for p in periods)
+
+
+def test_a_dataset_with_no_calendar_is_recorded_as_having_none(monkeypatch, tmp_path):
+    """REQ-PIPE-106's subject reaching the embed. It is a real state - a
+    dataset can exist before any supply is agreed - so the mapping says
+    null rather than the build failing or the dataset being left out.
+    Omitting it would be worse than either: a missing key and a null key
+    read identically in JavaScript, so the page could not tell "no
+    calendar" from "not a dataset"."""
+    sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
+    # Every value is either a real calendar name or an explicit null.
+    known = set(sequences["calendars"])
+    for dataset_id, calendar in sequences["datasetCalendar"].items():
+        assert calendar is None or calendar in known, \
+            f"{dataset_id} points at a calendar that was not embedded: {calendar!r}"
+
+
+def test_the_embedded_dates_come_from_the_authored_calendar_rather_than_a_rule(
+        monkeypatch, tmp_path):
+    """Criterion 2, positively. The quarterly calendar's own anchor is
+    February, so its periods must be Feb/May/Aug/Nov - a rule producing
+    calendar quarters would give Jan/Apr/Jul/Oct, which is the exact
+    mistake this replaces."""
+    sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
+    months = {int(p["date"][5:7]) for p in sequences["calendars"]["quarterly"]}
+    assert months <= {2, 5, 8, 11}, f"quarterly periods fell outside the authored months: {months}"
+
+
+def test_nothing_that_has_not_begun_is_embedded(monkeypatch, tmp_path):
+    """Criterion 3, and Keith's own question behind it: "why would we be
+    able to choose a date in the future? nothing has happened yet, so why
+    project forward?" The as-of picker asks about the past, so a date with
+    nothing behind it has no answer to give - which removes the horizon
+    question rather than answering it.
+
+    ON THE ASSET'S CLOCK, not this machine's. Perth is eight hours ahead of
+    UTC, so for a third of every day the two are on different calendar
+    dates - and a test that took `today` from date.today() would go red in
+    that window for no reason about the code."""
+    from qa_tools.common import asset_time
+
+    today = asset_time.now().date().isoformat()
+    sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
+    for name, periods in sequences["calendars"].items():
+        future = [p["date"] for p in periods if p["date"] > today]
+        assert not future, f"{name} embedded {len(future)} period(s) that have not begun: {future[:3]}"
+
+
+def test_the_current_period_IS_embedded_because_it_has_begun(monkeypatch, tmp_path):
+    """The other side of criterion 3, and the one a naive "drop anything
+    not in the past" filter gets wrong. A quarterly period that began six
+    weeks ago is the period a viewer asking about today is in; dropping it
+    would make today unpickable on that calendar."""
+    from qa_tools.common import asset_time, schedule
+
+    today = asset_time.now().date()
+    sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
+    for name in sequences["calendars"]:
+        expected = [p.date.isoformat()
+                     for p in schedule.periods_for_calendar(name, until=today)]
+        assert [p["date"] for p in sequences["calendars"][name]] == expected
+
+
+def test_deriving_the_sequences_opens_nothing_under_data(monkeypatch, tmp_path):
+    """Criterion 2's real constraint, asserted rather than reasoned about.
+
+    A schedule is CONFIGURATION, so this derivation is entitled to read
+    contract/ and nothing else - and a new embed into the dashboard build
+    is exactly the shape CLAUDE.md's never-read-data rule exists to catch.
+    Asserted by watching the real `open` for a path under data/, which is
+    the mechanism rather than a promise about it.
+
+    SCOPED TO THE DERIVATION, not to embed() as a whole, and the narrower
+    claim is the honest one: embed() reads a dozen other things whose own
+    entitlements are their own requirements' business, and a test that
+    swept them all up here would go red for a reason that had nothing to do
+    with period sequences. What this holds is that the two calls the embed
+    makes for THIS const - periods_for_calendar() and
+    calendar_for_dataset() - touch configuration only."""
+    import builtins
+    from pathlib import Path
+
+    from qa_tools.common import hierarchy, schedule
+
+    root = Path(edd.__file__).resolve().parent.parent
+    data_dir = root / "data"
+    opened: list[str] = []
+    real_open = builtins.open
+
+    def watched(file, *args, **kwargs):
+        try:
+            resolved = Path(file).resolve()
+        except TypeError:                     # a file descriptor, not a path
+            resolved = None
+        if resolved is not None and data_dir in resolved.parents:
+            opened.append(str(resolved))
+        return real_open(file, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", watched)
+    today = __import__("datetime").date(2026, 9, 27)
+    for cal in schedule.calendars():
+        schedule.periods_for_calendar(cal.name, until=today)
+    for entry in hierarchy.all_datasets():
+        try:
+            schedule.calendar_for_dataset(entry.dataset_id)
+        except Exception:
+            pass
+
+    assert opened == [], f"the schedule read {len(opened)} file(s) under data/: {opened[:3]}"

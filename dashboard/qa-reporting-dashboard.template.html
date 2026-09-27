@@ -285,7 +285,7 @@ button{font:inherit; color:inherit;}
    own IBM Plex Mono with tabular numerals, which every other code-ish
    string on the page uses. */
 .notice-exhausted code, .notice-runway code, .notice-queue code,
-.stale-link-notice code, .view-sub code{
+.stale-link-notice code, .asof-range-notice code, .view-sub code{
   background:var(--surface); padding:1px 5px; border-radius:4px;
   /* Without this a wrapped chip renders as TWO rounded boxes, so
      `mothman schedule candidate-dates` reads as two commands at 390px
@@ -303,10 +303,17 @@ button{font:inherit; color:inherit;}
    (post-build-review #11). Deliberately a notice above the page rather
    than a replacement of it: unlike a missing dataset, everything the
    reader asked for except the column is right there. */
-.stale-link-notice{border:1px solid var(--warn-border, var(--ink-faint)); border-radius:8px;
+/* TWO CLASSES, ONE APPEARANCE, and they are deliberately not one class
+   (REQ-DASH-054). Both are a notice above the page rather than instead of
+   it, so they should look identical - but .stale-link-notice is COUNTED by
+   tests/test_dashboard_e2e.py to assert that exactly one stale-link
+   notice appeared, so a second thing wearing that class breaks an
+   assertion about the first. Sharing the rule shares the look without
+   making the class an identifier. */
+.stale-link-notice, .asof-range-notice{border:1px solid var(--warn-border, var(--ink-faint)); border-radius:8px;
   padding:10px 12px; margin-bottom:14px; font-size:13.5px; color:var(--ink);
   background:var(--warn-bg, transparent); max-width:72ch;}
-.stale-link-notice code{font-size:12.5px;}
+.stale-link-notice code, .asof-range-notice code{font-size:12.5px;}
 /* Visually hidden, still announced. The route announcer (#10) has to
    reach a screen reader without appearing on the page; display:none
    and visibility:hidden would remove it from the accessibility tree
@@ -768,6 +775,13 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   <nav class="rail" id="rail" aria-label="Drill-down breadcrumb"></nav>
 
   <div id="route-announcer" class="sr-only" aria-live="polite" role="status"></div>
+  <!-- An as-of date the embedded period sequences do not cover
+       (REQ-DASH-054 criteria 9 and 10). Above the page rather than
+       instead of it, same treatment as .stale-link-notice: everything
+       on screen is still a real answer, it is just not the answer the
+       link asked for. Empty and hidden unless there is something to
+       say. -->
+  <div id="asof-range-notice" class="asof-range-notice" role="status" hidden></div>
   <main id="view"></main>
 
   <footer>
@@ -846,6 +860,13 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     </div>
     <label for="asof-input" style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">As of date</label>
     <input type="date" id="asof-input" style="font:600 14px 'IBM Plex Mono',monospace; padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); width:100%; max-width:220px;">
+    <!-- WHICH PERIOD, PER CALENDAR (criterion 6). A date on its own does
+         not tell a reader what they are about to see: on a quarterly
+         calendar the 20th of a month is deep inside a period that began
+         seven weeks earlier, and two datasets on two calendars are
+         showing two different periods of the same chosen date. Naming
+         both is what makes the chosen date mean something. -->
+    <div id="asof-periods" style="margin-top:14px; font-size:12.5px; color:var(--ink-muted);"></div>
     <div style="margin-top:14px;">
       <button class="link-btn" id="asof-reset-btn" type="button">Reset to default (<span id="asof-default-label"></span>)</button>
     </div>
@@ -1489,8 +1510,10 @@ function groupChecksByCategory(checks){
    living in each dataset's own ODCS contract (`slaProperties:`), parsed
    by pipeline/cadence.py and already folded into REAL_BIRTH_REG_DATA/
    REAL_CP_DATA's own `sla.cadence` field by the two build_*_dashboard_
-   data.py scripts - see cycleStartDate() below, this page's own JS port
-   of pipeline/cadence.py's cycle_start().
+   data.py scripts. The page used to carry its own JS port of
+   pipeline/cadence.py's cycle_start() to turn that cadence into a period
+   start; REQ-DASH-054 replaced the port with the embedded period
+   sequences themselves - see PERIOD_SEQUENCES below.
 
    CHANGELOG_FEED — Phase 5a's "📋 Recent activity" panel (Thread A,
    plans/publishing-and-history.md): "who published what, when" -
@@ -1645,6 +1668,27 @@ const SNAPSHOT_MANIFEST = [];
 // periods for ever and cannot run out, so warning about one would be
 // warning about something that cannot happen.
 const SCHEDULE_RUNWAY = null;
+// PERIOD_SEQUENCES - REQ-DASH-054. Every named calendar's period sequence
+// and which calendar each dataset follows, embedded from configuration at
+// build time.
+//
+// WHY THIS EXISTS. The as-of picker lets a viewer choose any date, and a
+// static site has no backend to ask - so this page carried its own JS
+// port of Python's cycle_start(). That was unavoidable while a schedule
+// was a RULE, and never sufficient: a port can compute a rule and cannot
+// compute an AUTHORED date list, which is what the quarterly calendar is
+// (Feb/May/Aug/Nov, deliberately not calendar quarters). "Which quarter
+// is 2025-06-14 in" for Child Protection had no answer here at all.
+//
+// A list can be shipped, so it is, and the port is deleted rather than
+// kept for the cases it could handle - one path, not one path with a
+// fallback that only the rule-shaped calendars ever take.
+//
+// IT STOPS AT THE PERIOD TODAY FALLS IN and holds no period that has not
+// begun (Keith: "why would we be able to choose a date in the future?
+// nothing has happened yet, so why project forward?"). So the picker's
+// covered range has an end without anybody choosing a horizon.
+const PERIOD_SEQUENCES = null;
 // OUTSTANDING — REQ-DASH-070: everything that needs a person, in one
 // place with one count. Built by qa_tools/common/outstanding.py from
 // committed history alone (delivery_log/, processing_log/,
@@ -1859,35 +1903,87 @@ function buildRealDataset(d){
 // page - no timezone/latency involved (that's classify_arrival()'s job,
 // already computed server-side per real run - see pipeline/cadence.py's
 // own docstring for why that half never needs a JS port).
-function cycleStartDate(cadence, dateStr){
-  if(cadence.type==="daily") return dateStr;
-  if(cadence.type==="weekly"){
-    const d = new Date(dateStr+"T00:00:00Z");
-    const pyWeekday = (d.getUTCDay()+6)%7; // JS Sun=0..Sat=6 -> Mon=0..Sun=6, matching Python's date.weekday()
-    const delta = ((pyWeekday - cadence.weekday) % 7 + 7) % 7;
-    return addDaysToDateStr(dateStr, -delta);
-  }
-  if(cadence.type==="quarterly"){
-    // For each anchor month, consider both this year's and last year's
-    // occurrence, keep only those at or before dateStr, return the
-    // latest - generalizes generator/generate_cp_runs.py's own
-    // _quarter_start() the same way pipeline/cadence.py's cycle_start()
-    // does. ISO "YYYY-MM-DD" strings sort and compare lexicographically,
-    // same as their underlying dates, so plain string comparison/sort is
-    // exact here - no Date object needed.
-    const year = Number(dateStr.slice(0,4));
-    const pad2 = n => String(n).padStart(2,"0");
-    const candidates = [];
-    for(const month of cadence.anchor_months){
-      for(const y of [year, year-1]){
-        const candidate = `${y}-${pad2(month)}-${pad2(cadence.day_of_month)}`;
-        if(candidate <= dateStr) candidates.push(candidate);
-      }
-    }
-    return candidates.sort().pop();
-  }
-  throw new Error(`unknown cadence type ${cadence.type}`);
+function periodsFor(datasetId){
+  // One dataset's own calendar sequence, or null where it has none.
+  // REQ-DASH-054 criterion 1: the embed says which calendar each dataset
+  // follows, because the picker cannot do any period arithmetic for a
+  // dataset without knowing that first - an embed of one merged sequence
+  // would be unusable and silently wrong for whichever calendar lost.
+  if(!PERIOD_SEQUENCES) return null;
+  const name = PERIOD_SEQUENCES.datasetCalendar?.[datasetId];
+  if(!name) return null;
+  return PERIOD_SEQUENCES.calendars?.[name] || null;
 }
+
+function periodStartDate(datasetId, dateStr){
+  // The start date of the period `dateStr` falls in, from the EMBEDDED
+  // sequence (REQ-DASH-054 criteria 4 and 5).
+  //
+  // THIS REPLACED cycleStartDate(cadence, dateStr), a JS port of Python's
+  // cycle_start() that lived here for months. The port was unavoidable
+  // while a schedule was a rule and insufficient the whole time: it could
+  // compute a cadence rule and could not compute an AUTHORED date list,
+  // so "which quarter is 2025-06-14 in" for a Feb/May/Aug/Nov calendar
+  // had no answer. Deleted rather than kept for the cases it handled,
+  // because one path with a fallback only some calendars take is two
+  // implementations wearing one name.
+  //
+  // ISO "YYYY-MM-DD" strings compare lexicographically exactly as their
+  // dates do, so plain string comparison is exact here - no Date object.
+  const periods = periodsFor(datasetId);
+  if(!periods || !periods.length) return null;
+  let found = null;
+  for(const entry of periods){
+    if(entry.date <= dateStr) found = entry;
+    else break;                       // the sequence is in date order
+  }
+  return found ? found.date : null;
+}
+
+function periodNameFor(datasetId, dateStr){
+  const periods = periodsFor(datasetId);
+  if(!periods) return null;
+  let found = null;
+  for(const entry of periods){
+    if(entry.date <= dateStr) found = entry;
+    else break;
+  }
+  return found ? found.period : null;
+}
+
+function periodForCalendar(calendarName, dateStr){
+  // The period a date falls in on ONE NAMED CALENDAR, rather than for one
+  // dataset (criterion 6). The panel is asset-wide - it is not looking at
+  // a dataset when it is open - so it asks per calendar, which is also
+  // the shorter answer: two lines for two calendars instead of one per
+  // dataset saying the same two things thirty times over.
+  if(!PERIOD_SEQUENCES) return null;
+  const periods = PERIOD_SEQUENCES.calendars?.[calendarName];
+  if(!periods || !periods.length) return null;
+  let found = null;
+  for(const entry of periods){
+    if(entry.date <= dateStr) found = entry;
+    else break;
+  }
+  return found;
+}
+
+function calendarNames(){
+  return PERIOD_SEQUENCES ? Object.keys(PERIOD_SEQUENCES.calendars || {}).sort() : [];
+}
+
+function coveredDateRange(){
+  // The range every embedded sequence covers, which is what the as-of
+  // input is bounded to (criterion 8). Earliest period start across all
+  // calendars, to the latest - and the latest is the period today falls
+  // in, because nothing that has not begun is embedded.
+  if(!PERIOD_SEQUENCES) return null;
+  const all = Object.values(PERIOD_SEQUENCES.calendars || {}).flat();
+  if(!all.length) return null;
+  const dates = all.map(e=> e.date).sort();
+  return {first: dates[0], last: dates[dates.length-1]};
+}
+
 // stats.byRun's own "total" is already the dataset-wide row count at
 // that run (qa_tools' dataset_stats.py/pipeline's build_*_dashboard_
 // data.py - every column shares the same value) - reused here rather
@@ -1948,7 +2044,7 @@ function datasetStatusByRun(d){
 // required no change here
 // (real for the SYNTHETIC DATA's own generation, but nothing a real
 // production dashboard would ever have). Chain membership is now derived
-// purely from two real, cadence-agnostic facts: cycleStartDate() (only
+// purely from two real, cadence-agnostic facts: periodStartDate() (only
 // used to anchor where a NEW chain starts) and each arrival's own real
 // aggregate status (datasetStatusByRun() above). Walking a dataset's
 // real arrivals in chronological (run_date) order: a RED arrival starts
@@ -1983,7 +2079,7 @@ function buildSupplyHistory(d){
       // anchored at ITS OWN cadence cycle (never the previous chain's -
       // a resolved chain is done, whatever cycle the next arrival lands
       // in is a new story).
-      current = {cycleStart: cycleStartDate(cadence, run.run_date), entries: [], open: false};
+      current = {cycleStart: periodStartDate(d.id, run.run_date), entries: [], open: false};
       chains.push(current);
     }
     const idx = current.entries.length;
@@ -2013,14 +2109,32 @@ function buildSupplyHistory(d){
     current.open = status==="red";
   }
 
+  // cycleStart IS NULLABLE, and that is not a defect to guard against -
+  // it is REQ-PIPE-106's subject arriving here. A dataset can have no
+  // agreed calendar yet and still have real arrivals, so a chain can be
+  // real while the period it belongs to does not exist. It used to be
+  // unconditionally a date because cycleStartDate() computed one from a
+  // cadence rule for any input at all, including a dataset that had no
+  // schedule - which is the false answer this nullability replaces.
+  //
+  // So the SORT falls back to the chain's own newest arrival. With no
+  // calendar that date is genuinely the only thing that orders one chain
+  // against another, and a null in a localeCompare() is a TypeError that
+  // takes the whole panel out.
+  const sortKey = chain => chain.cycleStart
+    || chain.entries.reduce((newest, e) => e.run_date > newest ? e.run_date : newest, "");
   return chains
     .map(chain => ({
       cycleStart: chain.cycleStart,
       entries: chain.entries.sort((a,b)=> b.run_date.localeCompare(a.run_date) || b.run_id.localeCompare(a.run_id)),
     }))
-    .sort((a,b)=> b.cycleStart.localeCompare(a.cycleStart));
+    .sort((a,b)=> sortKey(b).localeCompare(sortKey(a)));
 }
 function cycleLabel(cadence, cycleStartStr){
+  // No period rather than an invented one (REQ-PIPE-106). The heading
+  // has to say something, and what it must not say is a date computed
+  // from a schedule nobody has agreed.
+  if(cycleStartStr==null) return "No agreed supply period";
   const label = fmtDay(cycleStartStr);
   if(cadence.type==="daily") return label;
   if(cadence.type==="weekly") return `Week of ${label}`;
@@ -2072,7 +2186,7 @@ function clipDatasetToAsOf(d, asOfDateStr){
   // the checks' own real current/previous values or their historical
   // trend charts. Only a genuinely EMPTY eligibleRuns (checked above,
   // still returns null) has nothing at all worth passing through.
-  const staleAsOf = effectiveRun.run_date < cycleStartDate(d.sla.cadence, asOfDateStr);
+  const staleAsOf = effectiveRun.run_date < periodStartDate(d.id, asOfDateStr);
   const effectiveRunId = effectiveRun.run_id;
   const prevRunId = eligibleRuns.length>1 ? eligibleRuns[eligibleRuns.length-2].run_id : null;
   const eligibleRunIds = new Set(eligibleRuns.map(r=>r.run_id));
@@ -3830,13 +3944,19 @@ function renderSupplyCycleRows(entries, datasetId){
 }
 function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   if(!cycles.length) return "";
-  const current = cycles.find(c=>c.cycleStart===currentCycleStart);
-  const older = cycles.filter(c=>c.cycleStart!==currentCycleStart);
+  // A NULL as-of period MATCHES NOTHING, rather than matching every
+  // chain that also has none. Both sides are null for a dataset with no
+  // calendar, and `null===null` would then badge every chain in its
+  // history "Current cycle" - which is exactly the confident wrong
+  // answer REQ-PIPE-106 exists to stop.
+  const isCurrent = c => currentCycleStart!=null && c.cycleStart===currentCycleStart;
+  const current = cycles.find(isCurrent);
+  const older = cycles.filter(c=>!isCurrent(c));
   const cycleBlock = c => `
     <div class="supply-cycle">
       <div class="supply-cycle-label">
         <b>${cycleLabel(ds.sla.cadence, c.cycleStart)}</b>
-        ${c.cycleStart===currentCycleStart ? '<span class="pill tag sm"><span class="ico"></span>Current cycle</span>' : ""}
+        ${isCurrent(c) ? '<span class="pill tag sm"><span class="ico"></span>Current cycle</span>' : ""}
         <span style="color:var(--ink-faint);">${c.entries.length} ${pluralize(c.entries.length,"delivery","deliveries")}</span>
       </div>
       <div class="overflow-x">
@@ -3980,7 +4100,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     ${ds.noDataAsOf ? `
     <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">
       As of <b>${fmtDay(CURRENT_AS_OF)}</b>, nothing has landed yet in this dataset's
-      current expected cycle (started <b>${fmtDay(cycleStartDate(ds.sla.cadence, CURRENT_AS_OF))}</b>) -
+      current expected cycle (started <b>${fmtDay(periodStartDate(ds.id, CURRENT_AS_OF))}</b>) -
       so the figures below show its full real history, but no column reads red/amber/green as CURRENT status.
     </div>` : ""}
     ${outstandingQueue("dataset", ds.id)}
@@ -4096,7 +4216,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   const historyWrap = document.getElementById("supply-history-wrap");
   if(rawDs){
     const cycles = buildSupplyHistory(rawDs);
-    const currentCycleStart = cycleStartDate(ds.sla.cadence, CURRENT_AS_OF);
+    const currentCycleStart = periodStartDate(ds.id, CURRENT_AS_OF);
     historyWrap.innerHTML = renderSupplyHistorySection(ds, cycles, currentCycleStart);
     wireSupplyHistorySection(historyWrap);
   }
@@ -5716,16 +5836,81 @@ function updateAsOfButtonLabel(){
   const label = document.getElementById("asof-btn-label");
   if(label) label.textContent = fmtDay(CURRENT_AS_OF);
 }
+// WHICH PERIOD THE CHOSEN DATE FALLS IN, one line per named calendar
+// (criterion 6). A calendar the date is BEFORE gets a line too, saying
+// so - leaving it out would read as "this calendar has no opinion", and
+// "the asset's records do not go back that far" is the actual answer.
+function renderAsOfPeriods(dateStr){
+  const wrap = document.getElementById("asof-periods");
+  if(!wrap) return;
+  const names = calendarNames();
+  if(!names.length || !dateStr){ wrap.innerHTML = ""; return; }
+  wrap.innerHTML = names.map(name=>{
+    const entry = periodForCalendar(name, dateStr);
+    const said = entry
+      ? `<b>${escHtml(entry.period)}</b>, which began ${fmtDay(entry.date)}`
+      : "<b>no period</b> — this calendar does not go back that far";
+    return `<div style="margin-bottom:2px;">On the ${escHtml(name)} calendar: ${said}</div>`;
+  }).join("");
+}
+
+// BOUND THE INPUT ITSELF (criterion 8), so the picker cannot offer a date
+// the page has no period for. The native date input greys out anything
+// outside min/max, which makes the limit visible where a validation
+// message after the fact would make it a correction.
+//
+// THE MAXIMUM IS NOT "TODAY". It is the last date the embedded sequences
+// cover, which on a daily calendar is the date of the last build - the
+// honest bound, and the one a reader can act on.
+function boundAsOfInput(){
+  const input = document.getElementById("asof-input");
+  const range = coveredDateRange();
+  if(!input) return;
+  if(!range){ input.removeAttribute("min"); input.removeAttribute("max"); return; }
+  input.min = range.first;
+  input.max = range.last;
+}
+
+// AND SAY SO when a date outside that range arrives anyway (criteria 9
+// and 10). A URL is the way in - a bookmark from before a calendar was
+// re-authored, a hand-edited `?asof=`, a link from someone else's
+// deployment - and the input's own min/max cannot stop any of those.
+//
+// Above the page rather than instead of it: every dataset still resolves
+// to a real state at an uncovered date (each one rolls back to its own
+// newest run at or before it, or says No data), so replacing the page
+// would hide correct answers to make a point about the date.
+function renderAsOfRangeNotice(){
+  const notice = document.getElementById("asof-range-notice");
+  if(!notice) return;
+  const range = coveredDateRange();
+  const outside = range && CURRENT_AS_OF
+    && (CURRENT_AS_OF < range.first || CURRENT_AS_OF > range.last);
+  if(!outside){ notice.hidden = true; notice.innerHTML = ""; return; }
+  notice.hidden = false;
+  notice.innerHTML = `You are viewing this asset as of
+    <b>${fmtDay(CURRENT_AS_OF)}</b>, which is outside the dates this
+    dashboard has delivery periods for — it covers
+    <b>${fmtDay(range.first)}</b> to <b>${fmtDay(range.last)}</b>.
+    <button class="link-btn" id="asof-range-reset" type="button">View as of
+    ${fmtDay(DEFAULT_AS_OF)} instead</button>`;
+  const reset = document.getElementById("asof-range-reset");
+  if(reset) reset.addEventListener("click", ()=> applyAsOf(DEFAULT_AS_OF));
+}
 function applyAsOf(dateStr){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
   CURRENT_AS_OF = dateStr;
   DATA = buildData(CURRENT_AS_OF);
   setAsOfInUrl(CURRENT_AS_OF, DEFAULT_AS_OF);
   updateAsOfButtonLabel();
+  renderAsOfPeriods(dateStr);
+  renderAsOfRangeNotice();
   renderFromState();
 }
 function openAsOfPanel(){
   document.getElementById("asof-input").value = CURRENT_AS_OF;
+  boundAsOfInput();
+  renderAsOfPeriods(CURRENT_AS_OF);
   document.getElementById("asof-default-label").textContent = fmtDay(DEFAULT_AS_OF);
   document.getElementById("asof-backdrop").classList.add("open");
   document.getElementById("asof-panel").classList.add("open");
@@ -5740,11 +5925,19 @@ document.getElementById("asof-btn").addEventListener("click", openAsOfPanel);
 document.getElementById("asof-backdrop").addEventListener("click", closeAsOfPanel);
 document.getElementById("asof-panel-close").addEventListener("click", closeAsOfPanel);
 document.getElementById("asof-input").addEventListener("change", (e)=> applyAsOf(e.target.value));
+// The period statement follows the INPUT, not the applied date - a reader
+// scrubbing through dates wants to see which period each one is before
+// deciding, and `change` on a date input does apply immediately anyway.
+document.getElementById("asof-input").addEventListener("input", (e)=> renderAsOfPeriods(e.target.value));
 document.getElementById("asof-reset-btn").addEventListener("click", ()=>{
   document.getElementById("asof-input").value = DEFAULT_AS_OF;
   applyAsOf(DEFAULT_AS_OF);
 });
 updateAsOfButtonLabel();
+// AT BOOT, because the URL is where an out-of-range date comes from, and
+// the notice has to be there on the first paint rather than after the
+// reader's first interaction.
+renderAsOfRangeNotice();
 
 document.getElementById("backdrop").addEventListener("click", closeDrawer);
 document.getElementById("drawer-close").addEventListener("click", closeDrawer);
