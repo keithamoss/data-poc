@@ -237,11 +237,14 @@ def _committed_history_is_off_limits(tmp_path_factory):
     that redirects one of these itself still overrides this and still
     restores to a temporary directory rather than to the real tree.
     """
-    from qa_tools.common import delivery_log, filing, in_flight_log, load_log
+    from qa_tools.common import delivery_log, filing, in_flight_log
 
     root = tmp_path_factory.mktemp("committed_history")
-    guarded = [(load_log, "PROCESSING_LOG_DIR", "processing_log"),
-                (delivery_log, "DELIVERY_LOG_DIR", "delivery_log"),
+    # load_log is NOT here any more: REQ-PIPE-089 moved the load record
+    # into the database, so there is no committed tree of it left to
+    # guard. Isolation for it comes from each worker having its own
+    # database, which is stronger than a redirected directory.
+    guarded = [(delivery_log, "DELIVERY_LOG_DIR", "delivery_log"),
                 (in_flight_log, "OBSERVATIONS_DIR", "observations"),
                 (filing, "FILINGS_DIR", "filings")]
     before = [(module, name, getattr(module, name)) for module, name, _ in guarded]
@@ -266,20 +269,45 @@ def real_committed_history(_committed_history_is_off_limits):
     the real tree has to say so, which is the difference between an
     exception and a hole.
     """
-    from qa_tools.common import delivery_log, filing, in_flight_log, load_log
+    from qa_tools.common import delivery_log, filing, in_flight_log
 
     root = delivery_log.ROOT
-    restore = [(load_log, "PROCESSING_LOG_DIR", load_log.PROCESSING_LOG_DIR),
-                (delivery_log, "DELIVERY_LOG_DIR", delivery_log.DELIVERY_LOG_DIR),
+    restore = [(delivery_log, "DELIVERY_LOG_DIR", delivery_log.DELIVERY_LOG_DIR),
                 (in_flight_log, "OBSERVATIONS_DIR", in_flight_log.OBSERVATIONS_DIR),
                 (filing, "FILINGS_DIR", filing.FILINGS_DIR)]
-    load_log.PROCESSING_LOG_DIR = root / "processing_log"
     delivery_log.DELIVERY_LOG_DIR = root / "delivery_log"
     in_flight_log.OBSERVATIONS_DIR = root / "observations" / "in_flight"
     filing.FILINGS_DIR = root / "filings"
     yield root
     for module, name, value in restore:
         setattr(module, name, value)
+
+
+@pytest.fixture
+def clean_load_log(supply_dsn):
+    """An empty load log for one test (REQ-PIPE-089).
+
+    Until the load record moved into the database each test got this
+    free, from its own temporary directory. A worker's database is
+    shared across the tests that run on it, so a test asserting on the
+    WHOLE log - "these are the only records" - has to empty it first or
+    it is asserting about whatever ran before it. Exactly the leakage
+    that made three assertions in tests/test_qa_store.py fail on rows
+    an earlier test left behind.
+
+    DELIBERATELY NOT AUTOUSE, for a reason rather than restraint: the
+    module-scoped staging fixtures below write load records, and those
+    records are the gate that makes their staged tables readable. A
+    blanket truncate between tests would leave the tables staged and
+    invisible, which is a far more confusing failure than the one it
+    would prevent.
+    """
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="test-clean-load-log") as conn:
+        qa_store.ensure_schema(conn)
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".load_outcome')
+        yield conn
 
 
 @pytest.fixture(scope="module")

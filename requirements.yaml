@@ -18082,6 +18082,27 @@ requirements:
     open_questions: []
     decisions:
       - >
+        THE TRIAL'S LOAD RECORDS MOVED FROM A DIRECTORY TO A COLUMN
+        (2026-09-27, while building REQ-PIPE-089), and criterion 2 is
+        met more strongly than when this was signed. `trial.log_dir()`
+        put a trial's load records in a disposable directory outside
+        the committed tree, and `discard()` removed them with an
+        `rmtree` AFTER the transaction that dropped the schemas. Two
+        acts: a crash between them left a trial half-discarded, with
+        its schemas gone and its records still claiming tables that no
+        longer existed.
+
+        It is now `trial.scope_for()` and a `trial_run_id` column on
+        `qa.load_outcome`, so the DELETE runs inside the same
+        transaction as the DROPs. "A trial writes nothing that outlives
+        the command" stops being two things that both have to succeed.
+
+        What did NOT change is the part worth keeping: a trial still
+        WRITES its load records rather than skipping them, because the
+        record is the gate deciding which staged tables a run's views
+        may resolve, and a trial running under a weaker rule than the
+        real thing is not worth having.
+      - >
         FILE FIRST, THEN CHECK - Keith's own ordering, and it is
         what makes the rest fall out. A supply filed before the check
         runs is recognised like any other, so it takes its run id
@@ -18255,7 +18276,7 @@ requirements:
       - qa_tools/common/trial.py::discard
       - qa_tools/common/trial.py::schemas_of
       - qa_tools/common/trial.py::orphan_schemas
-      - qa_tools/common/trial.py::log_dir
+      - qa_tools/common/trial.py::scope_for
       - qa_tools/common/hand_filing.py::file_supply
       - qa_tools/common/hand_filing.py::check
       - qa_tools/common/supply_db.py::staging_schema_for

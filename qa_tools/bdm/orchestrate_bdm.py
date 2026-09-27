@@ -44,7 +44,8 @@ from qa_tools.common import trial
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_reader import canonical_order
-from qa_tools.common.qa_results_writer import write_qa_result
+from qa_tools.common.qa_results_writer import (
+    finish_run, open_run, write_qa_result)
 from . import build_per_run_warehouses
 from . import dataset_stats
 from . import run_dbt_bdm
@@ -132,6 +133,13 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
 def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: str,
                     run_by: str, reference_run_id: str,
                     on_step: Callable[[str], None] | None) -> list[dict]:
+    # BEFORE ANY TOOL WRITES, so the run exists with the identity only
+    # this layer knows (REQ-PIPE-089 criterion 6). Each tool's own write
+    # registers the run again, defensively, knowing nothing about who is
+    # running it - which is why record_run coalesces rather than letting
+    # the last writer win.
+    open_run(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, run_by)
+
     results: list[dict] = []
     _announce(on_step, RUN_STEPS[0])
     results.extend(_run_step(COLLECTION_ID, "dbt-core", run_id,
@@ -178,6 +186,13 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     # staging schema that has since moved on.
     write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp,
                      "tables_read", tables_read)
+
+    # EVERYTHING THIS RUN PRODUCES IS NOW WRITTEN, so the run says so -
+    # and only here (REQ-PIPE-089 criterion 13). A run that raised on
+    # any step above never reaches this line, which is what keeps a
+    # partial run invisible rather than indistinguishable from a
+    # finished one.
+    finish_run(run_id)
     return results
 
 

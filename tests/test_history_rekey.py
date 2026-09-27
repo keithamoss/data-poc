@@ -22,6 +22,11 @@ from qa_tools.common import qa_results_reader as reader
 from qa_tools.common import tables_read as tr
 from qa_tools.common.qa_results_writer import write_qa_result
 
+#: A real instant rather than the bare "t" these fixtures used to pass.
+#: It was only ever a JSON string before REQ-PIPE-089; a run's timestamp
+#: is now a timestamptz, and "t" is not one.
+_WHEN = "2026-09-26T10:00:00+08:00"
+
 AGENCY = "child-protection-family-support"
 COLLECTION = "child-protection"
 
@@ -99,7 +104,7 @@ class TestRawOutputIsRecordedOnce:
     def test_the_write_returns_the_raw_path(self, tmp_path):
         """It used to return the dataset-scoped path, which no longer
         exists for a tool that produced no record for any dataset."""
-        path = write_qa_result(AGENCY, COLLECTION, "r1", "t", "evidently", {"x": 1}, [],
+        path = write_qa_result(AGENCY, COLLECTION, "r1", _WHEN, "evidently", {"x": 1}, [],
                                 results_dir=tmp_path)
         assert path == tmp_path / AGENCY / COLLECTION / "_raw" / "r1" / "evidently.json"
         assert path.is_file()
@@ -107,7 +112,7 @@ class TestRawOutputIsRecordedOnce:
 
 class TestThePseudoToolsDescribeARun:
     def test_dataset_stats_writes_no_dataset_file(self, tmp_path):
-        write_qa_result(AGENCY, COLLECTION, "r1", "t", "dataset_stats",
+        write_qa_result(AGENCY, COLLECTION, "r1", _WHEN, "dataset_stats",
                          {"row_counts": {"cp_clients": 5}}, run_by="a@b.c",
                          results_dir=tmp_path)
         written = [str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*.json")]

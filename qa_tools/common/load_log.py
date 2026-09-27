@@ -1,5 +1,16 @@
-"""One committed record per staged table, written only after that
-table's load is durable (REQ-PIPE-060, criteria 13-20).
+"""One record per staged table, written only after that table's load
+is durable (REQ-PIPE-060 criteria 13-20, moved into the database by
+REQ-PIPE-089 criteria 14 and 22).
+
+IT USED TO BE A COMMITTED FILE TREE, `processing_log/`, and everything
+below about ORDERING, PHYSICAL PRESENCE and APPEND-ONLY is unchanged by
+the move - those are properties of the record, not of where it lives.
+What changed is that the repository stops holding it, and that "latest"
+is now the highest id on an append-only table rather than the largest
+`recorded_at` string. The second is a real improvement rather than a
+consequence: string ordering is only correct while every writer uses
+one UTC offset, and a second deployment in another one would have
+silently reordered history.
 
 THE ORDERING IS THE LOAD-BEARING PART, and it deserves saying twice
 because the two orders look identical in review and fail in opposite
@@ -47,39 +58,28 @@ match are all red findings on that table.
 """
 from __future__ import annotations
 
-import json
-import os
-import re
+from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent.parent
-
-#: Beside the delivery log and outside the per-dataset QA results
-#: (criterion 20). A load outcome is not a QA result and a delivery
-#: spans datasets, so qa_results/ - keyed by agency and collection - is
-#: the wrong tree for both.
-PROCESSING_LOG_DIR = ROOT / "processing_log"
-
-#: Redirects the whole log, the same way MOTHMAN_SUPPLY_DB redirects
-#: the database - for a real run against a checkout that is not this
-#: one. Most callers several frames down pass no `log_dir`, so without
-#: something like this the only way to move the log is to edit code.
-PROCESSING_LOG_ENV = "MOTHMAN_PROCESSING_LOG"
-
-
-def log_directory(log_dir: Path | None = None) -> Path:
-    """Where records are read and written: the explicit argument, then
-    the environment, then the committed tree."""
-    if log_dir is not None:
-        return Path(log_dir)
-    configured = os.environ.get(PROCESSING_LOG_ENV)
-    return Path(configured) if configured else PROCESSING_LOG_DIR
+from qa_tools.common import qa_store, supply_db
 
 LOADED = "loaded"
 FAILED = "failed"
 
-_UNSAFE = re.compile(r"[^0-9A-Za-z._-]+")
+_TABLE = f'"{qa_store.SCHEMA}".load_outcome'
+_FIELDS = ("delivery", "dataset_id", "physical", "outcome", "recorded_at",
+           "reason", "row_count")
+
+#: A run that is not a trial sees only real records; a trial sees those
+#: PLUS its own. Both halves matter: a trial borrowing an earlier run's
+#: tables needs their real records to resolve them, and a trial's own
+#: staged tables need records nobody else can see.
+_VISIBLE = "(trial_run_id IS NULL OR trial_run_id = ?)"
+_REAL_ONLY = "trial_run_id IS NULL"
+
+
+def _scope(trial: str | None) -> tuple[str, list]:
+    return (_VISIBLE, [trial]) if trial else (_REAL_ONLY, [])
 
 
 @dataclass(frozen=True)
@@ -97,53 +97,67 @@ class LoadRecord:
         return self.outcome == LOADED
 
 
-def _path(physical: str, recorded_at: str, log_dir: Path | None = None) -> Path:
-    directory = log_directory(log_dir)
-    stamp = _UNSAFE.sub("", recorded_at)
-    return directory / f"{_UNSAFE.sub('_', physical)}--{stamp}.json"
+@contextmanager
+def _db(conn: supply_db.SupplyConnection | None):
+    """Reuse the caller's connection, or open one for the call.
+
+    Every read here sits on a hot path - resolving a run's views asks
+    `loaded_tables()` - so a caller already holding a connection passes
+    it rather than paying for another. Callers that do not are the CLI
+    and one-off tooling, where one connection per call is nothing.
+    """
+    if conn is not None:
+        yield conn
+        return
+    with supply_db.connect(label="mothman:load-log") as opened:
+        qa_store.ensure_schema(opened)
+        yield opened
+
+
+def _rows(cursor) -> list[LoadRecord]:
+    return [LoadRecord(**dict(zip(_FIELDS, row))) for row in cursor.fetchall()]
 
 
 def record(delivery: str, dataset_id: str, physical: str, outcome: str,
-            recorded_at: str, reason: str | None = None,
-            row_count: int | None = None,
-            log_dir: Path | None = None) -> Path:
+           recorded_at: str, reason: str | None = None,
+           row_count: int | None = None, trial: str | None = None,
+           conn: supply_db.SupplyConnection | None = None) -> LoadRecord:
     """Write one load outcome.
 
     CALL THIS ONLY ONCE THE LOAD IS DURABLE. Nothing here can check
     that for you - the ordering is the caller's to get right, which is
     why it has a criterion of its own rather than being left as an
     implementation note.
+
+    Returns the record written. It used to return the path of the file
+    it wrote, and no caller used that for anything but a truth test.
     """
     if outcome not in (LOADED, FAILED):
         raise ValueError(f"a load outcome is {LOADED!r} or {FAILED!r}, not {outcome!r}")
-    path = _path(physical, recorded_at, log_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({
-        "delivery": delivery,
-        "dataset_id": dataset_id,
-        "physical": physical,
-        "outcome": outcome,
-        "recorded_at": recorded_at,
-        "reason": reason,
-        "row_count": row_count,
-    }, indent=2) + "\n")
-    return path
+    entry = LoadRecord(delivery, dataset_id, physical, outcome, recorded_at,
+                       reason, row_count)
+    with _db(conn) as db:
+        db.execute(
+            f"INSERT INTO {_TABLE} ({', '.join(_FIELDS)}, trial_run_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [delivery, dataset_id, physical, outcome, recorded_at, reason,
+             row_count, trial])
+    return entry
 
 
 def record_load(delivery: str, dataset_id: str, physical: str, outcome: str,
-                 recorded_at: str, reason: str | None = None,
-                 row_count: int | None = None,
-                 log_dir: Path | None = None) -> Path | None:
+                recorded_at: str, reason: str | None = None,
+                row_count: int | None = None, trial: str | None = None,
+                conn: supply_db.SupplyConnection | None = None) -> LoadRecord | None:
     """`record()`, but silent where the latest record already says
     exactly this.
 
     WHY THIS EXISTS, found by running it rather than by reading it: a
     re-run stages every delivery again, and without this each one wrote
-    a fresh record for an unchanged table - 42 new committed files for
-    a run in which nothing whatsoever changed. Over a PoC that is
-    clutter; over the years of history this tree is FOR, at ~30
-    datasets, it is a committed directory growing without bound and
-    carrying no signal at all.
+    a fresh record for an unchanged table - 42 new records for a run in
+    which nothing whatsoever changed. Over a PoC that is clutter; over
+    the years of history this is FOR, at ~30 datasets, it is a table
+    growing without bound and carrying no signal at all.
 
     IT DOES NOT WEAKEN CRITERION 19, which is the thing to check before
     reaching for a deduplicate anywhere near an append-only log. That
@@ -153,63 +167,75 @@ def record_load(delivery: str, dataset_id: str, physical: str, outcome: str,
     to preserve is preserved by being the latest one until something
     different happens to that table.
 
-    Returns the path written, or None where nothing needed writing.
+    Returns the record written, or None where nothing needed writing.
     """
-    latest = latest_by_table(log_dir).get(physical)
-    if (latest is not None and latest.outcome == outcome
-            and latest.reason == reason and latest.row_count == row_count
-            and latest.delivery == delivery and latest.dataset_id == dataset_id):
-        return None
-    return record(delivery, dataset_id, physical, outcome, recorded_at,
-                   reason=reason, row_count=row_count, log_dir=log_dir)
+    with _db(conn) as db:
+        latest = latest_for(physical, trial=trial, conn=db)
+        if (latest is not None and latest.outcome == outcome
+                and latest.reason == reason and latest.row_count == row_count
+                and latest.delivery == delivery and latest.dataset_id == dataset_id):
+            return None
+        return record(delivery, dataset_id, physical, outcome, recorded_at,
+                      reason=reason, row_count=row_count, trial=trial, conn=db)
 
 
-def records(log_dir: Path | None = None) -> list[LoadRecord]:
+def records(trial: str | None = None,
+            conn: supply_db.SupplyConnection | None = None) -> list[LoadRecord]:
     """Every load record ever written, oldest first."""
-    directory = log_directory(log_dir)
-    if not directory.is_dir():
-        return []
-    out = []
-    for path in sorted(directory.glob("*.json")):
-        try:
-            raw = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            # Unreadable means UNTRUSTED, which is the safe reading
-            # everywhere here: a table whose record cannot be read is a
-            # table with no record, so it is not visible to a check.
-            continue
-        out.append(LoadRecord(
-            delivery=raw.get("delivery", ""), dataset_id=raw.get("dataset_id", ""),
-            physical=raw.get("physical", ""), outcome=raw.get("outcome", ""),
-            recorded_at=raw.get("recorded_at", ""), reason=raw.get("reason"),
-            row_count=raw.get("row_count")))
-    return sorted(out, key=lambda r: r.recorded_at)
+    where, params = _scope(trial)
+    with _db(conn) as db:
+        return _rows(db.execute(
+            f"SELECT {', '.join(_FIELDS)} FROM {_TABLE} WHERE {where} ORDER BY id",
+            params))
 
 
-def latest_by_table(log_dir: Path | None = None) -> dict[str, LoadRecord]:
+def latest_for(physical: str, trial: str | None = None,
+               conn: supply_db.SupplyConnection | None = None) -> LoadRecord | None:
+    """The current outcome for ONE staged table.
+
+    Its own query rather than a lookup in `latest_by_table()`, because
+    `record_load` asks about a single table on every staged table of
+    every delivery - which over a re-run of the whole history is the
+    difference between one indexed row and the entire log each time.
+    """
+    with _db(conn) as db:
+        where, params = _scope(trial)
+        found = _rows(db.execute(
+            f"SELECT {', '.join(_FIELDS)} FROM {_TABLE} "
+            f"WHERE physical = ? AND {where} ORDER BY id DESC LIMIT 1",
+            [physical, *params]))
+    return found[0] if found else None
+
+
+def latest_by_table(trial: str | None = None,
+                    conn: supply_db.SupplyConnection | None = None) -> dict[str, LoadRecord]:
     """The current outcome for each staged table.
 
     LATEST WINS, which is what makes a reprocess work without editing
     history: the failed record stays, and the record written after it
     is the one that counts.
     """
-    current: dict[str, LoadRecord] = {}
-    for entry in records(log_dir):
-        current[entry.physical] = entry
-    return current
+    with _db(conn) as db:
+        where, params = _scope(trial)
+        found = _rows(db.execute(
+            f"SELECT DISTINCT ON (physical) {', '.join(_FIELDS)} FROM {_TABLE} "
+            f"WHERE {where} ORDER BY physical, id DESC", params))
+    return {entry.physical: entry for entry in found}
 
 
-def loaded_tables(log_dir: Path | None = None) -> frozenset[str]:
+def loaded_tables(trial: str | None = None,
+                  conn: supply_db.SupplyConnection | None = None) -> frozenset[str]:
     """Physical tables a check may read.
 
     A table absent from this set is UNLOADED as far as anything
     downstream is concerned, whether it is physically there or not.
     """
-    return frozenset(name for name, entry in latest_by_table(log_dir).items()
-                      if entry.loaded)
+    return frozenset(name for name, entry in latest_by_table(trial, conn).items()
+                     if entry.loaded)
 
 
-def failures(log_dir: Path | None = None) -> list[LoadRecord]:
+def failures(trial: str | None = None,
+             conn: supply_db.SupplyConnection | None = None) -> list[LoadRecord]:
     """Loads currently recorded as failed - the queue a person drains.
 
     Never retried automatically (Keith, 2026-09-24): the call is theirs,
@@ -219,12 +245,12 @@ def failures(log_dir: Path | None = None) -> list[LoadRecord]:
     to read it changed, and deliveries are immutable on disk, so a
     reprocess re-reads the same bytes.
     """
-    return sorted((e for e in latest_by_table(log_dir).values() if not e.loaded),
-                   key=lambda e: (e.delivery, e.dataset_id))
+    return sorted((e for e in latest_by_table(trial, conn).values() if not e.loaded),
+                  key=lambda e: (e.delivery, e.dataset_id))
 
 
 def delivery_is_processed(delivery: str, expected: set[str] | frozenset[str],
-                           log_dir: Path | None = None) -> bool:
+                          conn: supply_db.SupplyConnection | None = None) -> bool:
     """Criterion 16: processed only where EVERY file attributed to a
     dataset has a load record.
 
@@ -232,7 +258,15 @@ def delivery_is_processed(delivery: str, expected: set[str] | frozenset[str],
     produced. A delivery missing one is partial, however many it has -
     which is the case deriving completeness from the catalogue gets
     wrong.
+
+    BOUNDED BY THIS DELIVERY rather than by the whole log, which the
+    file-tree version could not be: it read every record to find the
+    few belonging here. That is REQ-PIPE-089 criterion 19's cost bound
+    falling out of the move rather than needing its own mechanism.
     """
-    have = {name for name, entry in latest_by_table(log_dir).items()
-            if entry.delivery == delivery}
+    with _db(conn) as db:
+        have = {row[0] for row in db.execute(
+            f"SELECT DISTINCT ON (physical) physical FROM {_TABLE} "
+            f"WHERE delivery = ? AND {_REAL_ONLY} ORDER BY physical, id DESC",
+            [delivery]).fetchall()}
     return bool(expected) and set(expected) <= have

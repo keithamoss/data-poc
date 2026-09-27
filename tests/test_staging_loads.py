@@ -15,7 +15,7 @@ import pytest
 import dbsupport
 
 from qa_tools.bdm import build_per_run_warehouses as bdm
-from qa_tools.common import load_log, supply_db
+from qa_tools.common import load_log, qa_store, supply_db
 
 _RECEIPT = "2026-09-25T09:00:00+08:00"
 _LATER = "2026-11-01T09:00:00+08:00"
@@ -55,11 +55,10 @@ class TestTheNameCarriesTheArrival:
     """Criterion 4."""
 
     def test_a_resupply_does_not_overwrite_the_earlier_arrival(self, staging):
-        log_dir = staging / "processing_log"
         first = bdm.build_one("run_001", _csv(staging / "a.csv", 2), "2026-09-25",
-                               received_at=_RECEIPT, log_dir=log_dir)
+                               received_at=_RECEIPT)
         second = bdm.build_one("run_002", _csv(staging / "b.csv", 5), "2026-11-01",
-                                received_at=_LATER, log_dir=log_dir)
+                                received_at=_LATER)
         assert first != second
         assert _tables() == sorted([first, second]), (
             "a resupply must be a NEW table - the cheapest implementation, CREATE OR "
@@ -77,18 +76,16 @@ class TestTheNameCarriesTheArrival:
         cannot move a supply in time by touching a file or writing a
         column."""
         physical = bdm.build_one("run_001", _csv(staging / "a.csv"), "2026-09-25",
-                                  received_at=_RECEIPT,
-                                  log_dir=staging / "processing_log")
+                                  received_at=_RECEIPT)
         assert physical.endswith("__" + supply_db.arrival_key(_RECEIPT))
 
     def test_restaging_the_same_arrival_replaces_it_rather_than_adding(self, staging):
         """Criterion 15, and it is what makes an interrupted run
         resumable: what is already there is not trusted."""
-        log_dir = staging / "processing_log"
         first = bdm.build_one("run_001", _csv(staging / "a.csv", 2), "2026-09-25",
-                               received_at=_RECEIPT, log_dir=log_dir)
+                               received_at=_RECEIPT)
         again = bdm.build_one("run_001", _csv(staging / "a.csv", 7), "2026-09-25",
-                               received_at=_RECEIPT, log_dir=log_dir)
+                               received_at=_RECEIPT)
         assert first == again and _tables() == [first]
         conn = supply_db.connect(read_only=True)
         try:
@@ -102,40 +99,35 @@ class TestAFileThatCannotBeLoaded:
     """Criteria 5 and 6."""
 
     def test_it_leaves_no_table_and_records_why(self, staging):
-        log_dir = staging / "processing_log"
         physical = bdm.build_one("run_001", str(staging / "not-here.csv"), "2026-09-25",
-                                  received_at=_RECEIPT, delivery_name="drop-1",
-                                  log_dir=log_dir)
+                                  received_at=_RECEIPT, delivery_name="drop-1")
         assert physical is None
         assert _tables() == [], "a file that could not be loaded must leave NO table"
-        failed = load_log.failures(log_dir)
+        failed = load_log.failures()
         assert [(r.delivery, r.dataset_id) for r in failed] == [("drop-1", "birth-registrations")]
         assert failed[0].reason, "the reason a load failed is the whole value of the record"
-        assert load_log.loaded_tables(log_dir) == frozenset()
+        assert load_log.loaded_tables() == frozenset()
 
     def test_the_rest_of_the_delivery_still_stages(self, staging):
-        log_dir = staging / "processing_log"
         bdm.build_one("run_001", str(staging / "not-here.csv"), "2026-09-25",
-                       received_at=_RECEIPT, delivery_name="drop-1", log_dir=log_dir)
+                       received_at=_RECEIPT, delivery_name="drop-1")
         good = bdm.build_one("run_002", _csv(staging / "b.csv"), "2026-11-01",
-                              received_at=_LATER, delivery_name="drop-1", log_dir=log_dir)
+                              received_at=_LATER, delivery_name="drop-1")
         assert good is not None and _tables() == [good]
-        assert load_log.loaded_tables(log_dir) == frozenset({good})
+        assert load_log.loaded_tables() == frozenset({good})
 
     def test_a_failed_load_writes_no_loaded_record(self, staging):
         """Criterion 14 from the other side: nothing may claim a load
         that did not happen, which is the half that fails silently."""
-        log_dir = staging / "processing_log"
         bdm.build_one("run_001", str(staging / "not-here.csv"), "2026-09-25",
-                       received_at=_RECEIPT, log_dir=log_dir)
-        assert all(not r.loaded for r in load_log.records(log_dir))
+                       received_at=_RECEIPT)
+        assert all(not r.loaded for r in load_log.records())
 
     def test_a_truncated_table_from_an_earlier_attempt_is_not_left_readable(self, staging):
         """The failure this whole mechanism exists for. A previous run
         left a table behind with no record; the load then fails. What
         must not happen is the stale table being readable as this
         arrival's supply."""
-        log_dir = staging / "processing_log"
         physical = supply_db.staged_table(bdm.TABLE, _RECEIPT)
         conn = supply_db.connect()
         try:
@@ -146,7 +138,7 @@ class TestAFileThatCannotBeLoaded:
             conn.close()
 
         assert bdm.build_one("run_001", str(staging / "not-here.csv"), "2026-09-25",
-                              received_at=_RECEIPT, log_dir=log_dir) is None
+                              received_at=_RECEIPT) is None
         assert _tables() == [], "the stale table must go, not be left for a check to read"
 
 
@@ -154,9 +146,8 @@ class TestOnlyLoadedTablesAreReadable:
     """Criterion 7, at the layer a check actually reads."""
 
     def test_a_check_reads_the_run_view_only_where_a_record_exists(self, staging):
-        log_dir = staging / "processing_log"
         physical = bdm.build_one("run_001", _csv(staging / "a.csv", 3), "2026-09-25",
-                                  received_at=_RECEIPT, log_dir=log_dir)
+                                  received_at=_RECEIPT)
         schema = supply_db.run_schema("run_001")
         conn = supply_db.connect(read_only=True)
         try:
@@ -166,14 +157,17 @@ class TestOnlyLoadedTablesAreReadable:
             conn.close()
 
         # Lose the record, keep the table - an interrupted load, exactly.
-        for path in log_dir.glob("*.json"):
-            path.unlink()
+        # A DELETE rather than unlinking files since REQ-PIPE-089; the
+        # state being simulated is the same one, a staged table nothing
+        # vouches for.
+        with supply_db.connect(label="test-lose-the-record") as scratch:
+            scratch.execute(f'TRUNCATE "{qa_store.SCHEMA}".load_outcome')
         conn = supply_db.connect()
         try:
             res = supply_db.create_run_views(conn, "run_001", supply_db.candidates_in(
                 conn, supply_db.STAGING_SCHEMA, [bdm.TABLE],
                 arrival=supply_db.arrival_key(_RECEIPT),
-                loaded=load_log.loaded_tables(log_dir)))
+                loaded=load_log.loaded_tables()))
             assert res.resolved == {} and res.absent == [bdm.TABLE]
             with pytest.raises(psycopg.errors.UndefinedTable):
                 conn.execute(f'SELECT * FROM "{res.schema}"."{bdm.TABLE}"')
@@ -256,8 +250,7 @@ class TestNothingIsWrittenIntoTheDelivery:
         before = sorted(p.name for p in drop.iterdir())
 
         physical = bdm.build_one("run_001", source, "2026-09-25",
-                                  received_at=_RECEIPT,
-                                  log_dir=staging / "processing_log")
+                                  received_at=_RECEIPT)
         assert physical is not None
         after = sorted(p.name for p in drop.iterdir())
         assert after == before, (
@@ -270,6 +263,5 @@ class TestNothingIsWrittenIntoTheDelivery:
         drop.mkdir(parents=True, exist_ok=True)
         before = sorted(p.name for p in drop.iterdir())
         assert bdm.build_one("run_001", str(drop / "missing.csv"), "2026-09-25",
-                              received_at=_RECEIPT,
-                              log_dir=staging / "processing_log") is None
+                              received_at=_RECEIPT) is None
         assert sorted(p.name for p in drop.iterdir()) == before

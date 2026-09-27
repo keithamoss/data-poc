@@ -43,7 +43,17 @@ class _FakeConn:
 
     `execute` earns its place: since REQ-PIPE-068 the orchestrators set
     the run's view schema on the connection before handing it over, so a
-    fake with only close() stopped being a connection."""
+    fake with only close() stopped being a connection. The context
+    manager earns its place the same way: REQ-PIPE-089 opens connections
+    with `with`, so a fake without one stopped being a connection
+    again."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
 
     def execute(self, *args, **kwargs):
         return self
@@ -68,6 +78,11 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     monkeypatch.setattr(orchestrate_bdm.run_evidently_bdm, "evaluate_evidently_bdm", fake_evaluate_evidently_bdm)
     monkeypatch.setattr(orchestrate_bdm.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
     monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
+    # REQ-PIPE-089 brackets a run with these two. Stubbed on the same
+    # terms as write_qa_result above: this test is about which reference
+    # run gets forwarded, and a real run row would need a real database.
+    monkeypatch.setattr(orchestrate_bdm, "open_run", lambda *a, **k: None)
+    monkeypatch.setattr(orchestrate_bdm, "finish_run", lambda *a, **k: None)
     # The orchestrators no longer import duckdb directly - they open
     # the supply database through supply_db.connect() and set the
     # run's view schema on it (REQ-PIPE-068).
@@ -109,6 +124,11 @@ def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatc
     monkeypatch.setattr(orchestrate_cp.run_evidently_cp, "evaluate_evidently_cp", fake_evaluate_evidently_cp)
     monkeypatch.setattr(orchestrate_cp.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
     monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
+    # REQ-PIPE-089 brackets a run with these two. Stubbed on the same
+    # terms as write_qa_result above: this test is about which reference
+    # run gets forwarded, and a real run row would need a real database.
+    monkeypatch.setattr(orchestrate_cp, "open_run", lambda *a, **k: None)
+    monkeypatch.setattr(orchestrate_cp, "finish_run", lambda *a, **k: None)
     # The orchestrators no longer import duckdb directly - they open
     # the supply database through supply_db.connect() and set the
     # run's view schema on it (REQ-PIPE-068).

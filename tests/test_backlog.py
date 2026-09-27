@@ -179,18 +179,21 @@ class TestDrainingTheBacklog:
             "re-processing something already done is idempotent; skipping something never done "
             "is a lost supply")
 
-    def test_the_marker_is_not_read_as_a_load_record(self, tmp_path):
-        """It lives inside the processing log's tree, and load_log's
-        own glob must not pick it up."""
+    def test_the_marker_is_not_read_as_a_load_record(self, tmp_path, clean_load_log):
+        """It used to live inside the processing log's TREE, where
+        load_log's own glob could pick it up. The load log is a table
+        since REQ-PIPE-089, so the collision is gone by construction -
+        this stays until criterion 18 removes the marker itself, at
+        which point it goes with it."""
         from qa_tools.common import load_log
 
         log_dir = tmp_path / "processing_log"
         log_dir.mkdir()
         load_log.record("d1", "cp-clients", "cp_clients__2026", load_log.LOADED,
-                         "2026-09-25T09:00:00+08:00", log_dir=log_dir)
+                         "2026-09-25T09:00:00+08:00")
         backlog.advance(backlog.Position("2026-09-25T09:00:00+08:00", 1),
                          log_dir / "marker" / "position.json")
-        assert [r.physical for r in load_log.records(log_dir)] == ["cp_clients__2026"]
+        assert [r.physical for r in load_log.records()] == ["cp_clients__2026"]
 
 
 class TestAnExhaustedScheduleStillAcceptsSupplies:

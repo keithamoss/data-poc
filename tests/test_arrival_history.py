@@ -107,7 +107,7 @@ class TestTheMostRecentArrival:
             == "2026-03-01T09:00:00+08:00"
 
     def test_a_supply_that_could_not_be_loaded_is_still_the_latest_arrival(
-            self, tmp_path, logs):
+            self, tmp_path, logs, clean_load_log):
         """Criterion 2, and the reason this is not derived from the
         warehouse: a supplier sending garbage on Tuesday has NO table
         anywhere, so a catalogue-derived timeline would show Monday and
@@ -115,15 +115,14 @@ class TestTheMostRecentArrival:
         _drop(tmp_path, logs, "monday", ["cp_clients.csv"], "2026-01-01T09:00:00+08:00", 1)
         _drop(tmp_path, logs, "tuesday", ["cp_clients.csv"], "2026-01-02T09:00:00+08:00", 2)
 
-        processing = tmp_path / "processing_log"
         load_log.record("tuesday", "cp-clients", "cp_clients__20260102", load_log.FAILED,
-                         "2026-01-02T09:05:00+08:00", reason="not a CSV", log_dir=processing)
+                         "2026-01-02T09:05:00+08:00", reason="not a CSV")
 
         latest = arrival_history.last_arrived("cp-clients", logs)
         assert latest.delivery == "tuesday"
         assert arrival_history.load_outcome(
-            latest.supply_id, "cp-clients", "tuesday", processing) == load_log.FAILED
-        assert load_log.loaded_tables(processing) == frozenset(), "no table exists for it"
+            latest.supply_id, "cp-clients", "tuesday") == load_log.FAILED
+        assert load_log.loaded_tables() == frozenset(), "no table exists for it"
 
     def test_nothing_recorded_means_none_rather_than_an_error(self, logs):
         assert arrival_history.last_arrived("cp-clients", logs) is None

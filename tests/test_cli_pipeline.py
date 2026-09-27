@@ -245,11 +245,14 @@ def test_the_committed_history_trees_are_never_the_real_ones_in_a_test():
     evidence the tree survived, which is why this asserts the
     redirection itself.
     """
-    from qa_tools.common import delivery_log, filing, in_flight_log, load_log
+    from qa_tools.common import delivery_log, filing, in_flight_log
 
     root = delivery_log.ROOT
-    for module, name in ((load_log, "PROCESSING_LOG_DIR"),
-                          (delivery_log, "DELIVERY_LOG_DIR"),
+    # load_log is absent since REQ-PIPE-089 moved the load record into
+    # the database. There is no tree of it left to point anywhere, and
+    # a test writing load records now writes them to its own worker's
+    # database, which cannot be the real one.
+    for module, name in ((delivery_log, "DELIVERY_LOG_DIR"),
                           (in_flight_log, "OBSERVATIONS_DIR"),
                           (filing, "FILINGS_DIR")):
         current = getattr(module, name)

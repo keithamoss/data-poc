@@ -206,7 +206,7 @@ class TestARealTrialStagesAndVanishes:
             before_staged, before_schemas = _database_state(conn)
 
         physical = build_per_run_warehouses.build_one(
-            run_id, self._csv(bdm_delivery_dirs), "2026-01-01", log_dir=tmp_path)
+            run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
         assert physical, "the real loader staged nothing"
 
         with supply_db.connect(label="test-trial") as conn:
@@ -239,33 +239,46 @@ class TestARealTrialStagesAndVanishes:
             assert not trial.schemas_of(conn, run_id)
             assert not trial.orphan_schemas(conn)
 
-    def test_a_real_trials_load_records_go_with_it(self, supply_dsn, bdm_delivery_dirs):
-        """Criterion 6 names the load record explicitly. It is still a
-        file today (processing_log/), so a trial's must not land in the
-        committed tree - and must not simply be skipped either, because
-        the record is the gate that decides which staged tables a run's
-        views may resolve."""
+    def test_a_real_trials_load_records_go_with_it(
+            self, supply_dsn, bdm_delivery_dirs, clean_load_log):
+        """Criterion 6 names the load record explicitly. A trial's must
+        not join the real ones - and must not simply be skipped either,
+        because the record is the gate that decides which staged tables
+        a run's views may resolve.
+
+        THE MECHANISM CHANGED WITH REQ-PIPE-089 AND THE GUARANTEE GOT
+        STRONGER. It used to be a scratch DIRECTORY outside the
+        committed tree, removed by an rmtree after the schemas were
+        dropped - two acts, and a crash between them left a
+        half-discarded trial. It is now a column, and the delete runs
+        inside the same transaction as the DROPs.
+        """
         from qa_tools.bdm import build_per_run_warehouses
         from qa_tools.common import load_log
 
         run_id = trial.trial_run_id()
-        committed = load_log.log_directory()
-        before = set(committed.glob("*.json")) if committed.exists() else set()
+        before = len(load_log.records())
 
-        build_per_run_warehouses.build_one(run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
+        physical = build_per_run_warehouses.build_one(
+            run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
 
-        scratch = trial.log_dir(run_id)
-        assert list(scratch.glob("*.json")), \
+        assert len(load_log.records()) == before, \
+            "a trial's load record turned up among the real ones"
+        mine = load_log.records(trial=run_id)
+        assert any(r.physical == physical for r in mine), \
             "a trial wrote no load record, so its views resolved on a weaker rule"
-        after = set(committed.glob("*.json")) if committed.exists() else set()
-        assert after == before, "a trial wrote a load record into the committed tree"
+        assert physical in load_log.loaded_tables(trial=run_id)
+        assert physical not in load_log.loaded_tables(), \
+            "a trial's staged table was readable outside the trial"
 
         with supply_db.connect(label="test-trial") as conn:
             trial.discard(conn, run_id)
-        assert not scratch.exists(), "a discarded trial left its load records behind"
+        assert not load_log.records(trial=run_id), \
+            "a discarded trial left its load records behind"
+        assert len(load_log.records()) == before
 
     def test_a_kept_run_still_stages_into_shared_staging(
-            self, supply_dsn, bdm_delivery_dirs, tmp_path):
+            self, supply_dsn, bdm_delivery_dirs):
         """The other half, and the one a mistake here would break
         silently: a real arrival must still land in the history staging
         exists to keep."""
@@ -273,7 +286,7 @@ class TestARealTrialStagesAndVanishes:
 
         physical = build_per_run_warehouses.build_one(
             "run_999", self._csv(bdm_delivery_dirs), "2099-03-03",
-            received_at="2099-03-03T01:02:03+00:00", log_dir=tmp_path)
+            received_at="2099-03-03T01:02:03+00:00")
         with supply_db.connect(label="test-trial") as conn:
             staged, _ = _database_state(conn)
             assert physical in staged

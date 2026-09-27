@@ -110,40 +110,70 @@ CROSS_TABLE_SCOPE = "_cross-table"
 AGREED = "agreed"
 IN_DEVELOPMENT = "in-development"
 
+
+class UnattributedRun(Exception):
+    """A run tried to finish without saying who ran it (criterion 6)."""
+
 #: Every column of `qa.check_result` that comes straight from a verified
 #: record, in order. Anything a record carries that is NOT here lands in
 #: `extra` - which is the behaviour that makes a new tool's own field
 #: survive without a migration, and the reason this is an explicit list
 #: rather than a set difference computed at the call site.
 _RESULT_COLUMNS = (
-    "agency_id", "collection_id", "dataset_id", "tool",
+    "dataset_id",
     "check_id", "check_name", "column_name", "dimension", "label",
     "status", "metric_value", "unit", "warn_threshold", "fail_threshold",
     "row_count_total", "row_count_invalid", "on_fail_action", "engine",
     "reference_run_id",
 )
 
-#: Carried on the row rather than left to the record, because they key
-#: the write. A record that names its own `tool` is trusted for the
-#: column; the delete uses the argument either way, so a record whose
-#: `tool` disagrees with the invocation cannot orphan itself.
-_KEY_COLUMNS = ("scope", "supply_state")
+#: Taken from the INVOCATION rather than from the record, because that
+#: is where they are actually known. The retired tree encoded agency,
+#: collection and tool in the PATH and only `dataset_id` in the record,
+#: which is the same split - a record carrying its own agency was never
+#: how this worked, and trusting one would let a record file itself
+#: under an agency the caller was not writing for. `scope` and
+#: `supply_state` are here too because they key the write.
+_KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
+
+#: Bumped whenever the DDL below changes shape. `ensure_schema` reads
+#: it and does nothing when it already matches, which is what keeps
+#: migration DDL off the hot write path - see that function.
+SCHEMA_VERSION = 2
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
+
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".schema_version (
+    only_row boolean PRIMARY KEY DEFAULT true CHECK (only_row),
+    version  integer NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS "{SCHEMA}".run (
     run_key        text PRIMARY KEY,
     agency_id      text NOT NULL,
     collection_id  text NOT NULL,
     run_timestamp  timestamptz NOT NULL,
-    run_by         text NOT NULL,
-    environment    text NOT NULL,
+    -- NULLABLE AT INSERT, REQUIRED AT COMPLETION. A run is registered by
+    -- whoever gets there first - the orchestrator, which knows who is
+    -- running it, or a bare single-tool invocation, which does not. What
+    -- criterion 6 actually requires is that a FINISHED run says who ran
+    -- it, so `complete_run` is where that is enforced. The alternative
+    -- was a placeholder identity at insert, which CLAUDE.md's own rule
+    -- on get_run_by() rules out: never fall back to one.
+    run_by         text,
+    environment    text,
     tool_versions  jsonb NOT NULL DEFAULT '{{}}',
     created_at     timestamptz NOT NULL DEFAULT now(),
     -- NULL while the run is in flight. Criterion 13 lives here.
     completed_at   timestamptz
 );
+
+-- Self-healing for a database created before run_by became nullable.
+-- Harmless where it already is; DROP NOT NULL does not error on a
+-- column that has none.
+ALTER TABLE "{SCHEMA}".run ALTER COLUMN run_by DROP NOT NULL;
+ALTER TABLE "{SCHEMA}".run ALTER COLUMN environment DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS run_completed
     ON "{SCHEMA}".run (completed_at) WHERE completed_at IS NOT NULL;
@@ -157,8 +187,13 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".check_result (
     scope             text NOT NULL DEFAULT '{DATASET_SCOPE}',
     supply_state      text NOT NULL DEFAULT '{AGREED}',
     tool              text NOT NULL,
+    -- The IDENTITY is required; the label is not. REQ-QAC-039 made
+    -- check_id the spine every history question keys on, so a verdict
+    -- with no check_id is a verdict about nothing - refusing it is the
+    -- loud failure criterion 12 asks for. `check_name` is a display
+    -- string and a tool is entitled not to supply one.
     check_id          text NOT NULL,
-    check_name        text NOT NULL,
+    check_name        text,
     column_name       text,
     dimension         text,
     label             text,
@@ -174,6 +209,11 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".check_result (
     reference_run_id  text,
     extra             jsonb NOT NULL DEFAULT '{{}}'
 );
+
+-- Self-healing, same as the run columns above: a database created
+-- before check_name became a display string keeps its NOT NULL
+-- otherwise.
+ALTER TABLE "{SCHEMA}".check_result ALTER COLUMN check_name DROP NOT NULL;
 
 -- Each index earns its place from a query that exists rather than from a
 -- guess about one that might.
@@ -210,6 +250,50 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".tables_read (
 --   "which runs read this table, in order" - the audit question
 CREATE INDEX IF NOT EXISTS tables_read_logical
     ON "{SCHEMA}".tables_read (logical_table);
+
+-- ONE RECORD PER LOAD ATTEMPT, append-only (REQ-PIPE-089 criterion 14,
+-- carrying REQ-PIPE-060's criteria 13-20 across unchanged). It is not a
+-- QA verdict and sits in its own table for that reason: a verdict says
+-- what a check found, this says whether the data is readable at all.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".load_outcome (
+    -- LATEST WINS BY id, NOT BY TIMESTAMP. The file tree it replaces
+    -- sorted on the recorded_at string, which works only while every
+    -- writer uses one UTC offset - a second deployment in a different
+    -- one would silently reorder history. A serial on an append-only
+    -- table is insertion order, which is what "latest" actually means.
+    id          bigserial PRIMARY KEY,
+    delivery    text NOT NULL,
+    dataset_id  text NOT NULL,
+    physical    text NOT NULL,
+    outcome     text NOT NULL,
+    -- Kept as the exact text the writer recorded rather than parsed to
+    -- timestamptz: it is read back and compared, and reformatting it
+    -- through the server's session timezone would change the value
+    -- without changing the instant. Ordering does not depend on it.
+    recorded_at text NOT NULL,
+    reason      text,
+    row_count   bigint,
+    -- NULL for a real load; the trial's own run id for a trial's
+    -- (REQ-PIPE-103 criterion 2). A trial has to WRITE load records -
+    -- they are the gate deciding which staged tables its views may
+    -- resolve, so skipping them would have a trial run under a weaker
+    -- rule than the real thing - and it has to leave none behind. A
+    -- column does both, and does the second inside the same
+    -- transaction that drops the trial's schemas, which the temporary
+    -- directory it replaces could not.
+    trial_run_id text
+);
+
+--   a trial's own rows, for the delete that ends it
+CREATE INDEX IF NOT EXISTS load_outcome_trial
+    ON "{SCHEMA}".load_outcome (trial_run_id) WHERE trial_run_id IS NOT NULL;
+
+--   the question every view resolution asks: is this table readable
+CREATE INDEX IF NOT EXISTS load_outcome_latest
+    ON "{SCHEMA}".load_outcome (physical, id DESC);
+--   "has this delivery been processed", bounded by one delivery
+CREATE INDEX IF NOT EXISTS load_outcome_delivery
+    ON "{SCHEMA}".load_outcome (delivery);
 
 CREATE TABLE IF NOT EXISTS "{SCHEMA}".dataset_stats (
     run_key    text NOT NULL REFERENCES "{SCHEMA}".run ON DELETE CASCADE,
@@ -249,15 +333,74 @@ CREATE OR REPLACE VIEW "{SCHEMA}".dataset_stats_visible AS
 """
 
 
+#: An arbitrary but FIXED key for the advisory lock below. Any two
+#: sessions agreeing on the same number serialise against each other;
+#: the value itself means nothing beyond "this project's QA schema".
+_DDL_LOCK = 8_9_0_0_8_9
+
 def ensure_schema(conn: supply_db.SupplyConnection) -> None:
     """Create the metadata schema if it is not there.
 
-    Idempotent, and safe to call from every writer rather than from one
-    privileged setup step - which is deliberate: a pipeline that only
-    works after somebody remembered to run a migration is a pipeline that
-    fails on a new environment.
+    Safe to call from every writer rather than from one privileged setup
+    step - which is deliberate: a pipeline that only works after
+    somebody remembered to run a migration is a pipeline that fails on a
+    new environment.
+
+    THE ADVISORY LOCK IS NOT BELT AND BRACES. `CREATE SCHEMA IF NOT
+    EXISTS` is not atomic against a concurrent `CREATE SCHEMA` -
+    PostgreSQL checks, then creates, and two sessions can both pass the
+    check. The first real `mothman pipeline bootstrap` against this
+    schema died on exactly that: its two collections run in parallel,
+    both reached here, and one lost with `duplicate key value violates
+    unique constraint "pg_namespace_nspname_index"`. Child Protection
+    recorded nothing that run.
+
+    `IF NOT EXISTS` reads as the careful option, which is what makes it
+    worth naming: every CREATE in the DDL above carries the same hazard,
+    so the lock covers the whole script rather than that one statement.
+    A session-level lock with an explicit release, because these
+    connections are autocommit and so have no transaction for
+    `pg_advisory_xact_lock` to hang off.
+
+    THE VERSION CHECK IS WHAT KEEPS THE DDL OFF THE HOT PATH, and it is
+    there because the lock alone was not enough. Running the whole
+    script on every write meant `ALTER TABLE ... DROP NOT NULL` and
+    `CREATE OR REPLACE VIEW` - both AccessExclusiveLock - contending
+    with parallel workers holding RowShareLock on `qa.run` for their
+    foreign-key checks. The second real bootstrap deadlocked and
+    PostgreSQL killed a dbt run. Migration DDL belongs where the shape
+    changes, not where a result is written.
     """
-    conn.raw.execute(DDL)
+    if _is_current(conn):
+        return
+    conn.execute("SELECT pg_advisory_lock(?)", [_DDL_LOCK])
+    try:
+        # Re-checked INSIDE the lock. Whoever was ahead in the queue has
+        # finished by now, so without this every waiting session runs
+        # the whole DDL again in turn - which is the thing being avoided.
+        if _is_current(conn):
+            return
+        conn.raw.execute(DDL)
+        conn.execute(
+            f'INSERT INTO "{SCHEMA}".schema_version (version) VALUES (?) '
+            "ON CONFLICT (only_row) DO UPDATE SET version = EXCLUDED.version",
+            [SCHEMA_VERSION])
+    finally:
+        conn.execute("SELECT pg_advisory_unlock(?)", [_DDL_LOCK])
+
+
+def _is_current(conn: supply_db.SupplyConnection) -> bool:
+    """Whether the schema is already at SCHEMA_VERSION.
+
+    One cheap SELECT against a one-row table, and deliberately not a
+    per-process cache: the test suite drops and rebuilds this schema,
+    and a cache would happily report a schema that is no longer there.
+    """
+    if not conn.execute(
+            f"SELECT to_regclass('{SCHEMA}.schema_version')").fetchall()[0][0]:
+        return False
+    rows = conn.execute(f'SELECT version FROM "{SCHEMA}".schema_version').fetchall()
+    return bool(rows) and rows[0][0] == SCHEMA_VERSION
 
 
 # ---------------------------------------------------------------------------
@@ -265,8 +408,9 @@ def ensure_schema(conn: supply_db.SupplyConnection) -> None:
 # ---------------------------------------------------------------------------
 
 def record_run(conn: supply_db.SupplyConnection, *, run_key: str, agency_id: str,
-               collection_id: str, run_timestamp: str, run_by: str,
-               environment: str, tool_versions: Mapping[str, str] | None = None) -> None:
+               collection_id: str, run_timestamp: str, run_by: str | None = None,
+               environment: str | None = None,
+               tool_versions: Mapping[str, str] | None = None) -> None:
     """Register a run, or update it where it is re-run.
 
     ON CONFLICT rather than a prior existence check, because two workers
@@ -276,14 +420,28 @@ def record_run(conn: supply_db.SupplyConnection, *, run_key: str, agency_id: str
     IT DOES NOT TOUCH `completed_at`, so registering a run that already
     finished does not quietly un-finish it; `reopen_run` is the explicit
     way to do that and says so at the call site.
+
+    IT ALSO DOES NOT REPLACE A KNOWN IDENTITY WITH AN UNKNOWN ONE. A
+    tool's own write registers the run defensively and has no `run_by`;
+    the orchestrator's does and is the one that knows. Plain EXCLUDED
+    would make the last writer win, which here means the one with less
+    information - so each field keeps what it had unless the caller
+    actually supplies something.
     """
     conn.execute(
         f'INSERT INTO "{SCHEMA}".run '
         "(run_key, agency_id, collection_id, run_timestamp, run_by, environment, tool_versions) "
         "VALUES (?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT (run_key) DO UPDATE SET "
-        "run_timestamp = EXCLUDED.run_timestamp, run_by = EXCLUDED.run_by, "
-        "environment = EXCLUDED.environment, tool_versions = EXCLUDED.tool_versions",
+        "run_timestamp = EXCLUDED.run_timestamp, "
+        f'run_by = COALESCE(EXCLUDED.run_by, "{SCHEMA}".run.run_by), '
+        f'environment = COALESCE(EXCLUDED.environment, "{SCHEMA}".run.environment), '
+        # A plain string, not an f-string: the empty-object literal is
+        # two real braces in the SQL, and doubling them here would send
+        # PostgreSQL '{{}}' - a one-element array containing an empty
+        # object, which is not the same thing and would never match.
+        "tool_versions = CASE WHEN EXCLUDED.tool_versions = '{}'::jsonb "
+        f'THEN "{SCHEMA}".run.tool_versions ELSE EXCLUDED.tool_versions END',
         [run_key, agency_id, collection_id, run_timestamp, run_by, environment,
          json.dumps(dict(tool_versions or {}))])
 
@@ -295,9 +453,21 @@ def complete_run(conn: supply_db.SupplyConnection, run_key: str) -> None:
     all (decision 2). Without it, completeness has to be inferred by
     counting results against an expectation - and an expectation that
     can be wrong is how a partial run reads as a finished one.
+
+    THIS IS WHERE CRITERION 6 IS ENFORCED - a finished run says who ran
+    it and when, or it does not finish. Refusing here rather than at
+    registration is what lets a bare single-tool invocation open a run
+    without inventing an identity for it.
     """
-    conn.execute(f'UPDATE "{SCHEMA}".run SET completed_at = now() WHERE run_key = ?',
-                 [run_key])
+    rows = conn.execute(
+        f'UPDATE "{SCHEMA}".run SET completed_at = now() '
+        "WHERE run_key = ? AND run_by IS NOT NULL AND environment IS NOT NULL "
+        "RETURNING run_key", [run_key]).fetchall()
+    if not rows:
+        raise UnattributedRun(
+            f"run {run_key!r} cannot be completed: it is not registered, or it has "
+            "no run_by/environment recorded. A finished run has to say who ran it "
+            "and where (REQ-PIPE-089 criterion 6).")
 
 
 def reopen_run(conn: supply_db.SupplyConnection, run_key: str) -> None:
@@ -313,6 +483,7 @@ def reopen_run(conn: supply_db.SupplyConnection, run_key: str) -> None:
 
 def record_results(conn: supply_db.SupplyConnection, run_key: str,
                    results: Sequence[Mapping[str, Any]], *, tool: str,
+                   agency_id: str, collection_id: str,
                    scope: str = DATASET_SCOPE,
                    supply_state: str = AGREED) -> int:
     """Write one tool's resolved check results. Returns how many landed.
@@ -328,19 +499,20 @@ def record_results(conn: supply_db.SupplyConnection, run_key: str,
         [run_key, tool, scope, supply_state])
     columns = ("run_key", *_RESULT_COLUMNS, *_KEY_COLUMNS, "extra")
     placeholders = ", ".join(["?"] * len(columns))
+    keys = (agency_id, collection_id, tool, scope, supply_state)
+    # A record that names its own agency, collection or tool has those
+    # DROPPED rather than carried into `extra`: they are the same fact
+    # the invocation already stated, and keeping a second copy is how
+    # the two come to disagree.
+    ignored = set(_RESULT_COLUMNS) | set(_KEY_COLUMNS) | {"run_id", "run_timestamp"}
     rows = 0
     for record in results:
         values = [record.get(name) for name in _RESULT_COLUMNS]
-        # The invocation's tool wins over the record's, so a record that
-        # names a different one cannot land outside the tuple the delete
-        # above would clear - which is how a row orphans itself.
-        values[_RESULT_COLUMNS.index("tool")] = tool
-        extra = {k: v for k, v in record.items()
-                 if k not in _RESULT_COLUMNS and k not in ("run_id", "run_timestamp")}
+        extra = {k: v for k, v in record.items() if k not in ignored}
         conn.execute(
             f'INSERT INTO "{SCHEMA}".check_result ({", ".join(columns)}) '
             f"VALUES ({placeholders})",
-            [run_key, *values, scope, supply_state, json.dumps(extra, default=str)])
+            [run_key, *values, *keys, json.dumps(extra, default=str)])
         rows += 1
     return rows
 

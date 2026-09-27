@@ -149,11 +149,14 @@ class TestWhatWasActuallyLoaded:
     reaches them through."""
 
     @pytest.fixture(autouse=True)
-    def _log(self, tmp_path, monkeypatch):
-        from qa_tools.common import load_log
-        directory = tmp_path / "processing_log"
-        monkeypatch.setattr(load_log, "PROCESSING_LOG_DIR", directory)
-        return directory
+    def _log(self, supply_dsn):
+        """An empty load log, which since REQ-PIPE-089 means emptying a
+        table rather than pointing at a temporary directory."""
+        from qa_tools.common import qa_store, supply_db
+        with supply_db.connect(label="test-cli-supply") as conn:
+            qa_store.ensure_schema(conn)
+            conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".load_outcome')
+        return None
 
     def test_load_is_a_subcommand_of_the_supply_group(self):
         """Criterion 12. A test of build_all() would pass with this
@@ -175,7 +178,7 @@ class TestWhatWasActuallyLoaded:
         found = arrivals.recognise(delivery.survey().received[0])
         for physical in supply_db.expected_tables(found, WHEN).values():
             load_log.record("monday", "cp-clients", physical, load_log.LOADED,
-                             WHEN.isoformat(), log_dir=_log)
+                             WHEN.isoformat())
         result = _run(["deliveries"])
         assert result.exit_code == 0, result.output
         assert "1/1" in result.output
@@ -187,8 +190,7 @@ class TestWhatWasActuallyLoaded:
         assert empty.exit_code == 0 and "No load is currently recorded as failed" in empty.output
 
         load_log.record("monday", "cp-clients", "cp_clients__2026", load_log.FAILED,
-                         WHEN.isoformat(), reason="UnicodeDecodeError: byte 0x9c",
-                         log_dir=_log)
+                         WHEN.isoformat(), reason="UnicodeDecodeError: byte 0x9c")
         result = _run(["failures"])
         assert result.exit_code == 0, result.output
         assert "monday" in result.output
@@ -202,7 +204,7 @@ class TestWhatWasActuallyLoaded:
         draws."""
         from qa_tools.common import load_log
         load_log.record("monday", "cp-clients", "cp_clients__2026", load_log.FAILED,
-                         WHEN.isoformat(), reason="bad csv", log_dir=_log)
+                         WHEN.isoformat(), reason="bad csv")
         assert _run(["failures"]).exit_code == 0
 
 

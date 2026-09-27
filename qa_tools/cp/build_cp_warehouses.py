@@ -37,7 +37,7 @@ TABLES = [d.table for d in hierarchy.datasets_in_collection("child-protection")]
 def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = None,
                       contract_path: str = CONTRACT_PATH,
                       ordinal: int = 0, received_at=None, dataset_id: str = "",
-                      delivery_name: str = "", log_dir=None) -> str | None:
+                      delivery_name: str = "") -> str | None:
     """Stage exactly one CP table's CSV for that run, and rebuild the
     run's views. Returns the physical staged table, or None where the
     file could not be loaded at all.
@@ -98,7 +98,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
         # even in principle (REQ-PIPE-103 criterion 6). Read from the
         # run id rather than passed in - see supply_db.is_trial_run().
         staging = supply_db.ensure_staging(conn, run_id)
-        log_dir = trial.log_dir(run_id, log_dir)
+        trial_scope = trial.scope_for(run_id)
         rows = None
         try:
             df = read_csv_explicit_nulls(csv_path,
@@ -131,16 +131,16 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
             conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
             load_log.record_load(delivery_name, dataset_id, physical, load_log.FAILED,
                              asset_time.now().isoformat(),
-                             reason=f"{type(exc).__name__}: {exc}", log_dir=log_dir)
+                             reason=f"{type(exc).__name__}: {exc}", trial=trial_scope)
             print(f"{run_id}: {table} FAILED to load ({type(exc).__name__}: {exc}) "
                   f"- no table staged, recorded for human action")
             return None
         # AFTER THE LOAD, NEVER BEFORE (criterion 14).
         load_log.record_load(delivery_name, dataset_id, physical, load_log.LOADED,
-                         asset_time.now().isoformat(), row_count=rows, log_dir=log_dir)
+                         asset_time.now().isoformat(), row_count=rows, trial=trial_scope)
         res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
             conn, staging, TABLES, arrival=key,
-            loaded=load_log.loaded_tables(log_dir)), source_schema=staging)
+            loaded=load_log.loaded_tables(trial_scope)), source_schema=staging)
         # Recorded at staging time, which is the only moment this is an
         # observed fact rather than a re-derivation.
         supply_db.record_resolution(conn, res)

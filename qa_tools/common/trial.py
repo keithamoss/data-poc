@@ -38,11 +38,9 @@ out which tables belonged to what.
 """
 from __future__ import annotations
 
-import shutil
 from datetime import datetime, timezone
-from pathlib import Path
 
-from qa_tools.common import supply_db
+from qa_tools.common import qa_store, supply_db
 
 #: Prefix for a run nobody kept. supply_db owns the constant because
 #: staging_schema_for() has to recognise one without importing this
@@ -83,13 +81,13 @@ def is_trial(run_id: str) -> bool:
     return supply_db.is_trial_run(run_id)
 
 
-def log_dir(run_id: str, given=None):
-    """Where a run's load records go.
+def scope_for(run_id: str) -> str | None:
+    """The scope a run's load records are written under.
 
-    A REAL ARRIVAL'S GO WHERE THEY ALWAYS DID - `given`, or load_log's
-    own committed tree. A TRIAL'S GO SOMEWHERE DISPOSABLE, because
-    criterion 2 says a trial writes nothing that outlives the command
-    and a load record is a record.
+    A REAL ARRIVAL'S ARE WRITTEN PLAINLY - `None`, meaning everybody
+    sees them. A TRIAL'S CARRY ITS OWN RUN ID, because criterion 2 says
+    a trial writes nothing that outlives the command and a load record
+    is a record.
 
     THEY ARE WRITTEN RATHER THAN SKIPPED, which is the part worth
     explaining. The load record is not bookkeeping a trial could do
@@ -103,17 +101,15 @@ def log_dir(run_id: str, given=None):
     DERIVED FROM THE RUN ID rather than passed in, for the reason
     supply_db.is_trial_run() gives: a flag travelling beside the id
     through a dozen call sites is a flag one of them forgets.
+
+    IT USED TO BE A DIRECTORY (`log_dir`), disposable because it sat
+    outside the committed tree. A column is better for one specific
+    reason rather than tidiness: `discard()` now removes the records in
+    the same transaction that drops the schemas, so "a trial leaves
+    nothing" is one atomic act instead of a DROP plus an rmtree that
+    could half-happen.
     """
-    if not is_trial(run_id):
-        return given
-    directory = _trial_dir(run_id)
-    directory.mkdir(parents=True, exist_ok=True)
-    return directory
-
-
-def _trial_dir(run_id: str) -> Path:
-    return supply_db.scratch_dir() / "trials" / supply_db.normalise_ident_part(run_id)
-
+    return run_id if is_trial(run_id) else None
 
 def schemas_of(conn, run_id: str) -> list[str]:
     """Every schema this trial actually has in the database right now.
@@ -184,13 +180,19 @@ def discard(conn, run_id: str) -> list[str]:
         raise supply_db.SupplyDbError(
             f"{run_id!r} is not a trial - refusing to discard a run that "
             "was kept")
+    # Cheap once the schema exists - see qa_store.ensure_schema's own
+    # version check - and needed because a trial can be discarded by a
+    # `mothman supply tidy` in a process that has written nothing.
+    qa_store.ensure_schema(conn)
     mine = schemas_of(conn, run_id)
-    if mine:
-        with conn.raw.transaction():
-            for schema in mine:
-                conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
-    # And the file-shaped half - this trial's own load records, which
-    # log_dir() above kept out of the committed tree precisely so that
-    # removing them is one directory rather than a search.
-    shutil.rmtree(_trial_dir(run_id), ignore_errors=True)
+    # THE LOAD RECORDS GO WITH THE SCHEMAS, inside the one transaction -
+    # which is the whole reason they became a column rather than staying
+    # a directory. A DROP that committed followed by an rmtree that did
+    # not is a half-discarded trial; this cannot be one.
+    with conn.raw.transaction():
+        for schema in mine:
+            conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+        conn.execute(
+            f'DELETE FROM "{qa_store.SCHEMA}".load_outcome WHERE trial_run_id = ?',
+            [run_id])
     return mine

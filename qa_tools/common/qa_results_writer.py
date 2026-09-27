@@ -261,9 +261,121 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
         # same reason every dataset file now does.
         _write(tables_read_mod.CROSS_TABLE_SCOPE, spanning, None)
 
+    # THE SAME FAN-OUT, INTO THE DATABASE (REQ-PIPE-089). Deliberately
+    # here rather than in a parallel writer of its own: the rules above
+    # - a spanning record belongs to no dataset, raw output describes
+    # the invocation and is recorded once, the two pseudo-tools describe
+    # a run - are the fan-out, and two implementations of them is two
+    # things to keep in step. When the file half goes, this stays and
+    # everything above it is deleted.
+    _record_in_database(agency, collection, run_id, run_timestamp, tool,
+                        raw_output, own, spanning, run_by)
+
     # The RAW path, which is the one file every invocation writes
     # whatever its records turn out to say. It used to be the
     # dataset-scoped one, and could not stay so: a tool that produced
     # no record for any dataset now writes no dataset file, and a
     # caller wants a path back rather than None.
     return raw_path
+
+
+#: The two pseudo-tools. Neither is a QA tool - they describe a RUN -
+#: and each lands in a table of its own rather than in `tool_output`.
+DATASET_STATS_TOOL = "dataset_stats"
+TABLES_READ_TOOL = "tables_read"
+
+#: `qa.dataset_stats` is keyed (run, dataset) because decision 2 said so,
+#: and what is actually written today is ONE COLLECTION-LEVEL document
+#: per run - Child Protection's holds `row_counts` for six tables inside
+#: it. The empty string is that document, the same convention
+#: `qa.tool_output` already uses for output that belongs to no one
+#: dataset. Keeping the key rather than collapsing it means splitting the
+#: payload per dataset later needs no migration.
+RUN_LEVEL = ""
+
+
+def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp: str,
+                         tool: str, raw_output: Any, own: list[dict],
+                         spanning: list[dict], run_by: str | None) -> None:
+    """Record one tool's output for one run in the metadata schema.
+
+    THE RUN KEY IS THE RUN ID, which is safe because this project
+    already requires run ids to be globally unique: `supply_db
+    .run_schema(run_id)` puts every run's views in one schema namespace
+    regardless of collection, so a collision would already be a
+    collision there. Inheriting that constraint beats inventing a
+    compound key that reads worse everywhere.
+
+    REGISTERING THE RUN IS DEFENSIVE HERE. The orchestrator registers it
+    properly, knowing who is running it; this call knows only what its
+    arguments say, which for eight of the ten writers is no identity at
+    all. `record_run` coalesces rather than overwriting for exactly that
+    reason, and `complete_run` is where a missing identity is refused.
+    """
+    from qa_tools.common import environments, qa_store, supply_db
+
+    environment = environments.current_or_none()
+    with supply_db.connect(label="mothman:qa-results") as conn:
+        qa_store.ensure_schema(conn)
+        qa_store.record_run(conn, run_key=run_id, agency_id=agency,
+                            collection_id=collection, run_timestamp=run_timestamp,
+                            run_by=run_by,
+                            environment=environment.id if environment else None)
+
+        if tool == DATASET_STATS_TOOL:
+            qa_store.record_dataset_stats(conn, run_id, RUN_LEVEL, raw_output)
+        elif tool == TABLES_READ_TOOL:
+            qa_store.record_tables_read(conn, run_id, (raw_output or {}).get("resolved", {}))
+        else:
+            qa_store.record_tool_output(conn, run_id, tool, raw_output)
+
+        # BOTH SCOPES ARE WRITTEN EVEN WHEN EMPTY, because each call
+        # REPLACES that (run, tool, scope) - so "this tool found nothing
+        # this time" has to clear what it found last time. Skipping the
+        # empty case would leave a stale verdict standing, which is the
+        # file-based equivalent of not rewriting a file.
+        keys = {"tool": tool, "agency_id": agency, "collection_id": collection}
+        qa_store.record_results(conn, run_id, own, **keys)
+        qa_store.record_results(conn, run_id, spanning, **keys,
+                                scope=qa_store.CROSS_TABLE_SCOPE)
+
+
+def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
+             run_by: str) -> None:
+    """Register a run before any of its tools write, with the identity
+    only the orchestrator knows (REQ-PIPE-089 criteria 6 and 13).
+
+    A tool's own write registers the run too, defensively, because
+    `mothman debug run-dbt` invokes one tool with no orchestrator around
+    it. The difference is that this call knows WHO is running it, and
+    `record_run` coalesces so the defensive registrations cannot undo
+    that.
+    """
+    from qa_tools.common import environments, qa_store, supply_db
+
+    with supply_db.connect(label="mothman:qa-run-open") as conn:
+        qa_store.ensure_schema(conn)
+        qa_store.record_run(conn, run_key=run_id, agency_id=agency,
+                            collection_id=collection, run_timestamp=run_timestamp,
+                            run_by=run_by, environment=environments.current().id)
+        # A RE-RUN STARTS INCOMPLETE AGAIN. Without this, re-running a
+        # run that finished once would leave its results observable
+        # while the new ones were still being written - a reader would
+        # see the old run's verdicts mixed with however much of the new
+        # one had landed, which is the partial-run problem wearing the
+        # one disguise the completeness marker does not catch.
+        qa_store.reopen_run(conn, run_id)
+
+
+def finish_run(run_id: str) -> None:
+    """Mark a run complete, which is what makes its results observable.
+
+    Called only where every tool has written. A run that raised never
+    reaches this, so its partial results stay invisible and an operator
+    finds it through `qa_store.incomplete_runs()` - which is criteria 13
+    and 20 being the same mechanism rather than two.
+    """
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="mothman:qa-run-finish") as conn:
+        qa_store.complete_run(conn, run_id)

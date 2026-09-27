@@ -16,7 +16,7 @@ import json
 
 import pytest
 
-from qa_tools.common import outstanding
+from qa_tools.common import load_log, outstanding
 
 
 def _delivery(tmp_path, name="monday", **overrides):
@@ -30,10 +30,20 @@ def _delivery(tmp_path, name="monday", **overrides):
     return directory
 
 
+@pytest.fixture(autouse=True)
+def _no_stray_load_failures(clean_load_log):
+    """Every test here surveys the whole outstanding queue, and a failed
+    LOAD is one of its four producers. Since REQ-PIPE-089 those live in
+    the worker's database rather than in each test's own directory, so
+    without this a failure written by one test shows up in the next
+    one's total. Autouse in this file specifically, because surveying
+    everything is what this file does."""
+    return clean_load_log
+
+
 def _survey(tmp_path, **kwargs):
     return outstanding.survey(
         delivery_log_dir=kwargs.get("delivery_log_dir", tmp_path / "delivery_log"),
-        processing_log_dir=kwargs.get("processing_log_dir", tmp_path / "processing_log"),
         observations_dir=kwargs.get("observations_dir", tmp_path / "observations"),
         filings_dir=kwargs.get("filings_dir", tmp_path / "filings"))
 
@@ -48,12 +58,11 @@ class TestOneQueueNotOnePerRule:
                    files=[{"filename": "note.pdf", "dataset_id": None, "contested_by": None},
                           {"filename": "both.csv", "dataset_id": None,
                            "contested_by": ["cp-carers", "cp-clients"]}])
-        log = tmp_path / "processing_log"
-        log.mkdir()
-        (log / "one.json").write_text(json.dumps({
-            "delivery": "monday", "dataset_id": "cp-carers", "physical": "cp_carers",
-            "outcome": "failed", "recorded_at": "2026-09-01T09:05:00+08:00",
-            "reason": "not valid CSV", "row_count": None}))
+        # A failed load, which since REQ-PIPE-089 is a row rather than a
+        # file. `clean_load_log` is what makes "this is the only failure"
+        # true on a worker database shared with other tests.
+        load_log.record("monday", "cp-carers", "cp_carers", load_log.FAILED,
+                        "2026-09-01T09:05:00+08:00", reason="not valid CSV")
 
         found = _survey(tmp_path)
 

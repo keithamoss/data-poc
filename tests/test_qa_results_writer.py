@@ -57,7 +57,12 @@ def test_write_qa_result_writes_verified_beside_raw_output(tmp_path):
     WHERE they land, not whether the pair is recorded."""
     raw = {"results": [{"status": "fail", "failures": 0}]}  # e.g. dbt's own (buggy) count
     # the corrected record, naming the dataset it describes
+    # `check_id` is not decoration here: REQ-QAC-039 made it the spine
+    # every history question keys on, and REQ-PIPE-089 records verdicts
+    # in a table that refuses one without it. This fixture predates both
+    # and was the only one in the file missing it.
     verified = [{"status": "fail", "metric_value": 7, "column_name": "sex",
+                 "check_id": "bdm.birth_registrations.sex.accepted_values",
                  "dataset_id": "birth-registrations"}]
 
     out_path = write_qa_result("registry-services", "civil-registration", "run_01",

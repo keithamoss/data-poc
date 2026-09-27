@@ -305,7 +305,7 @@ def _from_deliveries(log_dir: Path | None = None) -> list[Item]:
     return items
 
 
-def _from_loads(log_dir: Path | None = None) -> list[Item]:
+def _from_loads() -> list[Item]:
     """REQ-PIPE-060's failed loads - the queue a person drains.
 
     Never retried automatically: the call is theirs, and it is one of
@@ -313,7 +313,7 @@ def _from_loads(log_dir: Path | None = None) -> list[Item]:
     reprocess.
     """
     items = []
-    for record in load_log.failures(log_dir):
+    for record in load_log.failures():
         agency, collection = _scope_of(record.dataset_id)
         items.append(Item(
             kind=FAILED_LOAD, severity=NEEDS_ACTION, blocking=True,
@@ -433,7 +433,6 @@ def _sort_key(item: Item) -> tuple:
 
 
 def survey(delivery_log_dir: Path | None = None,
-            processing_log_dir: Path | None = None,
             observations_dir: Path | None = None,
             filings_dir: Path | None = None) -> Outstanding:
     """Everything currently waiting for a person, from committed history.
@@ -443,7 +442,7 @@ def survey(delivery_log_dir: Path | None = None,
     to do today below six things they have already seen.
     """
     items = (_from_deliveries(delivery_log_dir)
-              + _from_loads(processing_log_dir)
+              + _from_loads()
               + _from_filings(filings_dir)
               + _from_closed_slots(filings_dir)
               + _from_in_flight(observations_dir))

@@ -189,14 +189,13 @@ def last_promoted(dataset_id: str, log_dir: Path | None = None) -> None:
     return None
 
 
-def load_outcome(supply_id: str, dataset_id: str, delivery: str,
-                  processing_dir: Path | None = None) -> str | None:
+def load_outcome(supply_id: str, dataset_id: str, delivery: str) -> str | None:
     """Whether this dataset's supply from this delivery loaded.
 
     None where nothing was recorded - which is what an interrupted load
     leaves, and is not the same as a failure.
     """
-    for record in load_log.records(processing_dir):
+    for record in load_log.records():
         if record.delivery == delivery and record.dataset_id == dataset_id:
             return record.outcome
     return None
