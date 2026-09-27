@@ -15040,7 +15040,10 @@ requirements:
       design leans on is exercised rather than read from
       documentation, and a supply's whole life happens in one place.
     moscow: must
-    status: not_started
+    status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26), given to
       delivery-scoper as the first of three items in the batch-5
@@ -15050,15 +15053,9 @@ requirements:
         THE SYSTEM SHALL hold all supply data in one PostgreSQL
         database, and SHALL NOT hold any of it in a DuckDB file.
       - >
-        THE SYSTEM SHALL provide four kinds of schema in that database
-        - one staging schema, one rejected schema, one schema per
-        period, and one `sample` schema for data received before any
-        supply is agreed.
-      - >
-        THE SYSTEM SHALL exclude the `sample` schema from every
-        period, slot, lateness, promotion, rollup and status
-        computation by construction, and SHALL NOT rely on a flag, a
-        filter or a convention to exclude it.
+        THE SYSTEM SHALL provide three kinds of schema in that database
+        - one staging schema, one rejected schema, and one schema per
+        period.
       - >
         THE SYSTEM SHALL load an arriving file into the staging schema
         before any QA tool runs against that supply.
@@ -15203,36 +15200,78 @@ requirements:
         so that reasoning expires and something has to own how they
         reach dbt, Soda and datacontract-cli in each environment.
     dependencies: [REQ-PIPE-068]
-    open_questions:
+    open_questions: []
+    linked_tests:
+      - tests/test_supply_db.py
+      - tests/test_declared_capabilities.py
+      - tests/test_period_schema.py
+      - tests/test_run_schema_lifecycle.py
+      - tests/test_soda_leaves_the_environment_alone.py
+    implemented_by:
+      - qa_tools/common/supply_db.py::connect
+      - qa_tools/common/supply_db.py::supply_db_dsn
+      - qa_tools/common/supply_db.py::load_csv_into
+      - qa_tools/common/supply_db.py::ensure_schemas
+      - qa_tools/common/supply_db.py::dbt_schema
+      - qa_tools/common/supply_db.py::dbt_target_path
+      - qa_tools/common/supply_db.py::move_table
+      - qa_tools/common/period_schema.py::ensure_period_schema
+      - qa_tools/common/soda_common.py::execute_scan
+    evidence:
       - >
-        THE PRE-AGREEMENT DATASET LIFECYCLE the `sample` schema exists
-        FOR is deliberately not scoped here. What it needs at minimum,
-        from #45: a dataset may exist without a calendar; its supplies
-        may be QA'd without being filed to a period; the dashboard
-        says plainly that it is in development rather than
-        green-and-good or red; and there is a GRADUATION, the moment
-        it gains a calendar and starts owing supplies. Whether it
-        joins this batch or goes with the project-extraction asset
-        shape is Keith's call. This requirement provides only the
-        schema and the by-construction exclusion.
+        2026-09-27: 109 tests pass across tests/test_supply_db.py,
+        test_declared_capabilities.py, test_period_schema.py,
+        test_run_schema_lifecycle.py, test_soda_leaves_the_environment_alone.py,
+        test_soda_leaves_no_connection.py and test_devcontainer.py -
+        run against a real PostgreSQL 16, which every run of this suite
+        now requires.
       - >
-        THE COMMITTED SAMPLE-QA TREE NEEDS RE-TESTING against
-        REQ-PIPE-089. Keith settled on 2026-09-26 that sample QA is
-        committed to the repository in its own top-level tree, never
-        in qa_results/, because check development is real work whose
-        record should survive graduation - and that was decided hours
-        BEFORE qa_results/ itself stopped being committed. The
-        argument for it (a separate tree makes pollution structurally
-        impossible) maps cleanly onto a separate schema or a scope
-        column, so the conclusion may survive with a different
-        mechanism. Its NAME was never fixed either - `qa_sample/` was
-        a suggestion only.
+        2026-09-27: criteria 7 and 8 are SATISFIED VACUOUSLY and that
+        is worth stating rather than claiming a build. Criterion 7 is
+        conditional - "WHERE a DuckDB extension is needed" - and only
+        CSV is read today, which needs none; it becomes real work the
+        day Parquet arrives. Criterion 8 asks that every operation go
+        to the writer endpoint, and with one server every connection
+        IS the writer endpoint; it becomes real on Aurora.
       - >
-        STILL GENUINELY UNREAD, and both bear on the version anchor
-        REQ-PIPE-093 asserts: Aurora 16.8's own extension allowlist,
-        and Aurora's major-version support timeline (how long 16
-        remains available), which is the counter-argument for 17.7.
+        2026-09-27: criterion 1 verified by deletion as well as by
+        code - `data/supply.duckdb` (52MB) and `data/warehouse.duckdb`
+        (3.8MB) were removed, nothing reads them, and a full test run
+        passes without them. `data/` went from 2.0GB to 17MB, the bulk
+        of which was a real leak found in this audit and fixed (see
+        the decisions).
     decisions:
+      - >
+        A RUN NOW GIVES BACK ITS DISK SPACE AS WELL AS ITS SCHEMAS -
+        a real leak found while auditing this requirement for sign-off
+        (2026-09-27), and fixed rather than noted. `data/` was 2.0GB,
+        of which 1.9GB was `data/dbt_scratch/`: 80 directories, one
+        per DSN digest, one of them holding 101 per-run dbt target
+        directories that nothing ever removed.
+
+        THE REASONING HAD BEEN APPLIED TO HALF THE PROBLEM.
+        REQ-PIPE-068 made a run's schemas self-discarding, and
+        supply_db.drop_orphan_run_schemas' own docstring gives the
+        reason - "a per-run thing that nothing deletes is just a leak
+        with a tidier name". dbt's on-disk target/ is per-run by
+        exactly the same mechanism, dbt_target_path(run_id), so that
+        two parallel workers cannot clobber each other's
+        manifest.json. Nobody carried the conclusion across.
+
+        Both orchestrators' _discard_this_runs_schemas() now remove it
+        alongside the schemas, and only there: dbt's artefacts are
+        PARSED during evaluation, so the one safe moment is after the
+        results are recorded, which is where that function already
+        runs.
+
+        REJECTED, AND WORTH RECORDING BECAUSE IT WAS NEARLY ACCEPTED:
+        leaving it on the grounds that it goes away with the move to
+        PostgreSQL. It does not. manifest.json and run_results.json
+        are dbt's own artefacts about a run, written to disk because
+        that is the only thing dbt does with them, and
+        evaluate_dbt_*() parses them to build the verified records.
+        REQ-PIPE-089 retires qa_results/, not dbt's working
+        directory, which exists for as long as dbt runs.
       - >
         ONE ENGINE, AND IT IS POSTGRESQL (Keith, 2026-09-26). Staging,
         rejected and the period schemas all live there. Rejected
@@ -15383,7 +15422,10 @@ requirements:
       never quietly disagree about their subject and nothing a load
       did to the data goes unexamined.
     moscow: must
-    status: not_started
+    status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26) - his own
       model, that the pipeline loads what arrived into PostgreSQL
@@ -15446,6 +15488,45 @@ requirements:
         collections, now need a real PostgreSQL - which is what
         REQ-TEST-095 supplies.
     dependencies: [REQ-PIPE-087, REQ-PIPE-068]
+    linked_tests:
+      - tests/test_run_dbt_bdm.py
+      - tests/test_run_dbt_cp.py
+      - tests/test_run_soda_bdm.py
+      - tests/test_run_soda_cp.py
+      - tests/test_run_datacontract_bdm.py
+      - tests/test_run_datacontract_cp.py
+      - tests/test_run_evidently_bdm.py
+      - tests/test_run_evidently_cp.py
+    implemented_by:
+      - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
+      - qa_tools/bdm/run_soda_bdm.py::evaluate_soda_bdm
+      - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
+      - qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm
+      - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
+      - qa_tools/cp/run_soda_cp.py::evaluate_soda_cp
+      - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
+      - qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp
+    evidence:
+      - >
+        2026-09-27: 28 tests pass across all eight real-tool modules -
+        dbt-core, Soda Core, datacontract-cli and Evidently, for both
+        collections - each running the real tool against the warehouse
+        through the run's own view schema.
+      - >
+        2026-09-27: criterion 2 verified structurally as well as
+        behaviourally - no module under qa_tools/bdm/ or qa_tools/cp/
+        reads supply data from a file any more. The CSV fallbacks the
+        drift and contract checks carried were removed, and their
+        removal is what surfaced two real bugs behind them (see
+        REQ-PIPE-102).
+      - >
+        Criterion 7 is MET AND HAD NOTHING TO REPORT: 6,563 check
+        verdicts were proved unchanged across three separate refactors
+        in one day by regenerate-and-diff, so repointing every tool at
+        the warehouse altered no verdict and there was no change to
+        account for. That technique is itself recorded in
+        plans/supply-model.md as something REQ-PIPE-089's move would
+        cost.
     decisions:
       - >
         LOAD FIRST, ALL FOUR TOOLS CHECK THE WAREHOUSE (Keith,
@@ -15599,6 +15680,11 @@ requirements:
         recorded QA results, load outcomes and delivery records, and
         to nothing else - never to any schema holding supply rows.
       - >
+        THE SYSTEM SHALL record, with every result, whether it belongs
+        to an agreed supply or to a dataset still in development, and
+        SHALL exclude the second from every quality history, rollup
+        and status a viewer reads as real.
+      - >
         THE SYSTEM SHALL populate the database by regenerating this
         PoC's synthetic history and re-running the real checks over
         it, rather than by migrating the committed trees, and SHALL
@@ -15660,6 +15746,20 @@ requirements:
     dependencies: [REQ-PIPE-087]
     open_questions: []
     decisions:
+      - >
+        SAMPLE QA IS DISTINGUISHED BY A SCOPE ON THE RESULT, decided
+        here at Keith's own call (2026-09-27) rather than deferred to
+        REQ-PIPE-106, because a column is nearly free while this
+        schema is being designed and expensive to add afterwards.
+
+        WHAT IT REPLACES: he settled on 2026-09-26 that sample QA went
+        into its own committed top-level tree, never qa_results/ -
+        hours before qa_results/ stopped being committed at all, so
+        the mechanism was obsolete almost immediately. The reasoning
+        survives and is what the criterion protects: check development
+        must be structurally incapable of counting toward a dataset's
+        real quality history. REQ-PIPE-106 owns the lifecycle; this
+        owns the column.
       - >
         THE SCHEMA, SETTLED 2026-09-27 (Keith, agreeing to three
         recommendations after the options were put to him).
@@ -16465,6 +16565,15 @@ requirements:
     dependencies: [REQ-PIPE-087]
     open_questions:
       - >
+        STILL GENUINELY UNREAD, and both bear on the version this
+        requirement anchors - moved here from REQ-PIPE-087 on
+        2026-09-27, since that one provides the engine and this one
+        declares its version: Aurora 16.8's own extension allowlist,
+        and Aurora's major-version support timeline (how long 16
+        remains available), which is the counter-argument for 17.7.
+        docs.aws.amazon.com is reachable, so this is unread rather
+        than unreachable.
+      - >
         HOW THE ENVIRONMENT IS STATED, and what production's extra
         friction actually is - relayed as question set D. A mandatory
         flag on every command, a mandatory environment variable, or
@@ -16589,7 +16698,10 @@ requirements:
       laptop, in a dev container, on a GitHub runner and in a cloud
       session that has no Docker at all.
     moscow: must
-    status: not_started
+    status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26) - the
       test-strategy half of the PostgreSQL switch, including his own
@@ -16697,20 +16809,79 @@ requirements:
         thing of that shape, and the cheapest check is the same one -
         reproduce the CI condition locally before pushing.
     dependencies: [REQ-PIPE-087]
-    open_questions:
+    open_questions: []
+    linked_tests:
+      - tests/test_devcontainer.py
+      - tests/test_soda_leaves_the_environment_alone.py
+      - tests/test_one_arrival_area.py
+    implemented_by:
+      - tests/conftest.py::supply_dsn
+      - qa_tools/common/soda_common.py::execute_scan
+      - .devcontainer/devcontainer.json
+      - .devcontainer/docker-compose.yml
+      - .devcontainer/post-create.sh
+      - .github/workflows/test.yml
+    evidence:
       - >
-        Whether a test worker gets its own DATABASE or its own set of
-        SCHEMAS in a shared one. One database per worker is today's
-        shape, inherited from DuckDB's single-writer lock; on
-        PostgreSQL both work, and concurrent writers are no longer a
-        constraint. Worth deciding deliberately rather than
-        inheriting, since it is the difference between N
-        create-database calls and one.
+        2026-09-27: tests/test_devcontainer.py (5 tests) passes -
+        checking that the dev container exists, supplies a database the
+        suite is handed a DSN for, waits for it to be healthy before
+        the app starts, pins the SAME PostgreSQL major CI does, and
+        that conftest.py starts nothing itself.
       - >
-        Whether the whole suite runs against PostgreSQL or only the
-        warehouse-touching part - the runtime question #45 names and
-        does not answer.
+        2026-09-27: criterion 4's dev container is WRITTEN BUT NEVER
+        LAUNCHED. No Docker daemon is reachable in this project's cloud
+        sessions - the CLI is present and `docker info` fails - so the
+        files are validated by parsing rather than by running. Stated
+        rather than implied: this is as unverified as the AWS ingest
+        path, and for the same reason.
+      - >
+        2026-09-27: criteria 2, 9, 10 and 11 were each proved by a real
+        failure they now prevent. Criterion 10 came from the Soda
+        `.env` reload that silently moved a worker onto the developer's
+        own database mid-suite, which is what had made three
+        consecutive full runs fail eight, then four, then one
+        different tests. Criterion 9 came from two tests asserting a
+        gitignored tree existed, green locally and red on a fresh
+        runner. Criterion 11 came from a dead `raw_dir` parameter that
+        made two tests stage the whole real 42-arrival delivery tree
+        on every run, eighty seconds of it.
     decisions:
+      - >
+        A TEST WORKER GETS ITS OWN DATABASE, chosen rather than
+        inherited (Keith, 2026-09-27). One database per worker came
+        from DuckDB's single-writer file lock, which PostgreSQL does
+        not have, so it was worth deciding deliberately.
+
+        THE REASON IT STILL WINS: the code under test creates and drops
+        SCHEMAS as its ordinary business - staging, rejected, one per
+        period, one per run, and since REQ-PIPE-103 one per trial. A
+        worker confined to a schema would need every one of those names
+        rewritten to be worker-aware, and the thing being tested would
+        stop being the thing that runs. A database is the boundary that
+        needs no cooperation from the code.
+
+        Rejected: schemas per worker, which is lighter and would mean
+        changing production code purely to serve the tests. Also
+        rejected: measuring first, on something that is not a problem.
+      - >
+        THE WHOLE SUITE RUNS AGAINST PostgreSQL, not only the
+        warehouse-touching part (Keith, 2026-09-27). This was already
+        true BY CONSTRUCTION - conftest's `supply_dsn` is
+        session-scoped and autouse, so every test gets a database
+        whether it touches one or not - and it had never been decided,
+        which is why it was worth asking rather than leaving.
+
+        One rule, no judgement call about which tests count as
+        warehouse-touching, and nothing can silently skip. A test that
+        later grows a warehouse dependency simply works instead of
+        failing oddly. The cost accepted: running one pure-logic test
+        still needs a database up.
+
+        Rejected: narrowing it, because the mechanism for opting in is
+        the mechanism for accidentally opting out - which is how a
+        suite goes green having checked nothing, the failure this
+        requirement's own criterion 2 exists to prevent.
       - >
         THE FLAKINESS WAS A LIBRARY REWRITING THE ENVIRONMENT, not a
         shared resource, and two plausible wrong answers were fixed
@@ -18477,3 +18648,108 @@ requirements:
         verified from this sandbox, so building would be replacing
         untested code with untested code. What this does buy now is
         that nobody builds on a premise already rejected.
+
+  - id: REQ-PIPE-106
+    title: "A dataset can exist before any supply is agreed, and graduates when it gains a calendar"
+    date_written: "2026-09-27"
+    story: >
+      As the person standing up a new dataset, I want to receive sample
+      data and develop checks against it before any delivery schedule
+      is agreed, so that the first real supply meets checks somebody
+      has already exercised - and so that a dataset still in
+      development never reads as a healthy one or as a failing one.
+    moscow: should
+    status: not_started
+    source: >
+      Split out of REQ-PIPE-087 on 2026-09-27, Keith's own call, when
+      an audit for that requirement's sign-off found its `sample`
+      schema criteria unbuilt. His words on why splitting beats
+      building the schema alone: the schema is nearly useless without
+      the lifecycle around it. The lifecycle itself is from
+      plans/running-thoughts.md #45 (2026-09-26), where it was
+      deliberately left unscoped while 087 provided only the schema.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL let a dataset exist with no delivery calendar,
+        and SHALL NOT report it as owing a supply.
+      - >
+        THE SYSTEM SHALL hold data received before any supply is agreed
+        in a schema of its own, separate from staging, from rejected,
+        and from every period.
+      - >
+        THE SYSTEM SHALL exclude that data from every period, slot,
+        lateness, promotion, rollup and status computation BY
+        CONSTRUCTION, and SHALL NOT rely on a flag, a filter or a
+        convention to exclude it.
+      - >
+        THE SYSTEM SHALL run QA over such data without filing it to a
+        period, so that a check can be developed and exercised before
+        a schedule exists.
+      - >
+        THE SYSTEM SHALL keep the record of that QA distinguishable
+        from the QA history of agreed supplies, so that check
+        development never counts toward a dataset's real quality
+        history.
+      - >
+        THE SYSTEM SHALL say plainly on the dashboard that such a
+        dataset is IN DEVELOPMENT, and SHALL NOT render it as
+        green-and-good or as red.
+      - >
+        WHEN a dataset gains a calendar, THE SYSTEM SHALL graduate it -
+        from that point it owes supplies, is filed to periods, and is
+        rolled up like any other - and SHALL record when it graduated.
+      - >
+        THE SYSTEM SHALL keep the QA record made before graduation
+        readable afterwards, because developing a check is real work
+        whose record should survive the dataset growing up.
+    non_functional_requirements:
+      - >
+        BY CONSTRUCTION IS THE WHOLE POINT of criterion 3, and it is
+        why this is a separate schema rather than a column. A flag can
+        be forgotten in one WHERE clause out of thirty, and the
+        failure is silent and in the dangerous direction: sample data
+        counting toward a real dataset's quality history, or a
+        development dataset appearing green on a dashboard somebody
+        makes a decision from. A schema nothing joins to cannot be
+        forgotten.
+      - >
+        THE THIRD AND FOURTH ASSET SHAPES ARE COMING, and this is the
+        first requirement that touches what they need. QA of one-off
+        data extractions for individual projects has supplies and no
+        cadence at all - which is exactly "a dataset with no
+        calendar", arrived at from a different direction. Whether this
+        generalises to that shape or stays a pre-agreement state is
+        worth deciding before building, not after.
+    dependencies: [REQ-PIPE-087, REQ-PIPE-089]
+    open_questions:
+      - >
+        Whether this is a pre-agreement STATE that a dataset leaves,
+        or the same mechanism the project-extraction asset shape needs
+        permanently - a dataset that never gains a calendar because it
+        never will. Keith's own framing in #45 was the first; the
+        third asset shape suggests the second. It changes whether
+        graduation is the only exit.
+    decisions:
+      - >
+        SPLIT FROM REQ-PIPE-087 RATHER THAN BUILT INSIDE IT (Keith,
+        2026-09-27). 087's criteria 2 and 3 asked for a `sample`
+        schema and its by-construction exclusion, and the audit for
+        087's sign-off found neither built. Building just the schema
+        was rejected: a schema nothing writes to and nothing reads is
+        the kind of thing a later sweep deletes as dead, and the
+        lifecycle is what makes it mean anything. Dropping it
+        entirely was also rejected - it would lose the record that
+        this was wanted.
+      - >
+        THE QA RECORD IS DISTINGUISHED BY SCOPE INSIDE THE DATABASE,
+        not by a committed tree of its own. Keith settled on
+        2026-09-26 that sample QA went in its own top-level tree,
+        never in qa_results/ - decided HOURS before qa_results/ itself
+        stopped being committed, so the mechanism was obsolete almost
+        immediately. The reasoning survives intact: a separate scope
+        makes pollution of real quality history structurally
+        impossible. He chose on 2026-09-27 to settle the mechanism as
+        part of REQ-PIPE-089, while that schema is being designed, so
+        criterion 5 here states the property and 089 carries the
+        column. The name `qa_sample/` was only ever a suggestion and
+        goes with the tree.

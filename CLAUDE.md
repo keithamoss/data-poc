@@ -446,11 +446,48 @@ Rough layout:
   is `qa_tools/common/supply_db.py`'s own `dbt_target_path(run_id)`,
   hanging off the supply database's own directory, so a test worker
   with its own database gets its own dbt scratch for free - the
-  per-worker uniqueness inherited rather than re-invented. Note the
-  retired layout leaves real litter behind: a checkout that ran the
-  pipeline before 068 still has `data/duckdb_runs/` and
-  `data/cp_duckdb_runs/` on disk (407MB in this sandbox), read by
-  nothing and safe to delete. The other 3 tools' own fixtures were
+  per-worker uniqueness inherited rather than re-invented.
+
+  **`data/` ACCUMULATES, AND ONE PART OF IT WAS LEAKING - cleaned out
+  2026-09-27 (Keith: "nuke the on-disk dbt stuff"), and the fix matters
+  more than the cleanup.** Found while auditing REQ-PIPE-087 for
+  sign-off: `data/` was **2.0GB**, of which **1.9GB was
+  `data/dbt_scratch/`** - 80 directories, one per DSN digest, one of
+  them holding **101 per-run dbt target directories**. Nothing ever
+  removed them. REQ-PIPE-068 made a run's SCHEMAS self-discarding and
+  `drop_orphan_run_schemas`' own docstring gives the reason - "a
+  per-run thing that nothing deletes is just a leak with a tidier
+  name" - and the identical reasoning was never applied to the on-disk
+  half, which is per-run by the same mechanism
+  (`supply_db.dbt_target_path(run_id)`, so two parallel workers cannot
+  clobber each other's `manifest.json`).
+
+  Fixed at the source: both orchestrators' `_discard_this_runs_schemas()`
+  now removes the run's dbt target directory alongside its schemas,
+  covered by `tests/test_run_schema_lifecycle.py`'s own
+  `TestARunGivesBackItsDiskSpaceToo` (confirmed failing against the
+  pre-fix code first). Safe at that point and only there: dbt's
+  artefacts are PARSED during evaluation, and the tidy-up runs once
+  the results are recorded.
+
+  **A NOTE ON "it goes away with PostgreSQL anyway", because it does
+  not.** `manifest.json`/`run_results.json` are dbt's own artefacts
+  about a run, written to disk because that is the only thing dbt does
+  with them, and `evaluate_dbt_*()` parses them to build the verified
+  records. REQ-PIPE-089 retires `qa_results/` - the recorded results -
+  not dbt's working directory, which exists for as long as dbt runs.
+
+  Deleted the same day, all gitignored and read by nothing:
+  `data/dbt_scratch/` (1.9GB of accumulation), `data/supply.duckdb`
+  (52MB) and `data/warehouse.duckdb` (3.8MB) - both retired by
+  REQ-PIPE-087 - and `data/duckdb_runs/`/`data/cp_duckdb_runs/`, which
+  REQ-PIPE-068 retired and an older checkout may still carry (407MB in
+  an earlier sandbox). `data/` went 2.0GB -> 17MB, leaving only
+  `data/deliveries/` and `data/receipts/`, which are the supplier's
+  files and our own receipts. Everything here is regenerated on
+  demand, so deleting it costs a `mothman pipeline bootstrap`.
+
+  The other 3 tools' own fixtures were
   confirmed already safe (their scratch dirs were already monkeypatched to per-worker
   `tmp_path_factory` dirs). **Parallel is now the DEFAULT** (2026-09-19,
   Keith's own call, reversing the earlier serial-by-default preference):

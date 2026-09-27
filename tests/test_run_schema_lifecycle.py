@@ -257,3 +257,55 @@ def test_an_arrival_segment_never_contains_the_separator(db):
         assert parsed[1] == segment, \
             f"{physical} parsed its arrival as {parsed[1]!r}, not {segment!r}"
         assert parsed[2] == "", f"{physical} parsed a spurious ordinal {parsed[2]!r}"
+
+
+class TestARunGivesBackItsDiskSpaceToo:
+    """A real leak, found 2026-09-27 while auditing REQ-PIPE-087 for
+    sign-off: 1.9 GB in `data/dbt_scratch/` across 80 DSN digests, one
+    of them holding 101 per-run directories.
+
+    THE REASONING WAS APPLIED TO HALF THE PROBLEM. REQ-PIPE-068 made a
+    run's schemas self-discarding, and supply_db.drop_orphan_run_schemas'
+    own docstring gives the reason in as many words - "a per-run thing
+    that nothing deletes is just a leak with a tidier name". dbt's
+    on-disk target/ is per-run by exactly the same mechanism
+    (dbt_target_path(run_id), so two parallel workers cannot clobber
+    each other's manifest.json), and nothing ever removed it.
+
+    SAFE TO REMOVE AT THIS POINT because dbt's artefacts are read
+    DURING evaluation - run_results.json and manifest.json are parsed
+    by evaluate_dbt_*() - and this tidy-up runs in _run_one's finally,
+    after the results are already recorded.
+    """
+
+    def _target(self, run_id):
+        from qa_tools.common import supply_db as db_mod
+        return db_mod.dbt_target_path(run_id)
+
+    @pytest.mark.parametrize("module_name", ["bdm", "cp"])
+    def test_a_finished_run_removes_its_own_dbt_target_directory(self, db, module_name):
+        import importlib
+
+        orchestrate = importlib.import_module(
+            f"qa_tools.{module_name}.orchestrate_{module_name}")
+        run_id = f"leak_probe_{module_name}"
+        target = self._target(run_id)
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "run_results.json").write_text("{}")
+        assert target.is_dir(), "test precondition - the directory must exist to be removed"
+
+        orchestrate._discard_this_runs_schemas(run_id)
+
+        assert not target.exists(), (
+            f"{target} survived the run's own tidy-up - a per-run directory "
+            f"nothing deletes is a leak with a tidier name")
+
+    def test_removing_it_never_fails_a_finished_run(self, db):
+        """The results are already recorded by the time this happens, so
+        a tidy-up that cannot complete is a thing to report and move
+        past - the same rule the schema half already follows."""
+        from qa_tools.bdm import orchestrate_bdm
+
+        # A run that never created one: the ordinary case for a run that
+        # failed before dbt, and it must not turn one failure into two.
+        orchestrate_bdm._discard_this_runs_schemas("leak_probe_never_existed")

@@ -90,17 +90,41 @@ def test_staging_writes_no_second_copy_of_the_file_it_was_given(tmp_path, supply
     csv.write_text("worker_id,full_name,office,_extract_timestamp\n"
                     "W1,A Worker,Perth,2026-01-01T00:00:00+00:00\n")
 
+    # A SUPPLY-SHAPED FILE, not every path under data/, and the
+    # narrowing is a real fix rather than a loosening (2026-09-27).
+    #
+    # This used to snapshot all of data/ and assert nothing new
+    # appeared. It passed for a reason that had nothing to do with the
+    # loader: data/dbt_scratch/ was already full of every run ever
+    # made, so a CONCURRENT worker writing its own dbt target rarely
+    # created a path this one had not already seen. Emptying that
+    # directory (1.9 GB of it) made the flaw visible immediately - the
+    # test failed on another worker's compiled .sql files, mid-run.
+    #
+    # What the criterion actually says is that staging writes no second
+    # copy of the FILE IT WAS GIVEN, so that is what is asserted: no
+    # new delivered-data file anywhere under data/. dbt's compiled SQL
+    # is not a copy of a supply, and another worker's scratch is not
+    # this loader's doing.
+    supply_suffixes = {".csv", ".parquet", ".json"}
+
+    def supply_files() -> set:
+        if not data_dir.exists():
+            return set()
+        return {p for p in data_dir.rglob("*")
+                if p.is_file() and p.suffix.lower() in supply_suffixes
+                and "dbt_scratch" not in p.parts}
+
     data_dir = ROOT / "data"
-    before = {p for p in data_dir.rglob("*")} if data_dir.exists() else set()
+    before = supply_files()
 
     build_cp_warehouses.add_table_to_run(
         "one_area_run", "cp_case_workers", str(csv), dataset_id="cp-case-workers")
 
-    after = {p for p in data_dir.rglob("*")} if data_dir.exists() else set()
-    new = {p for p in after - before if p.is_file()}
     # The loader's own scratch CSV is written and removed inside the
     # call, so anything left is a copy that outlived it.
-    assert not new, f"staging left files behind under data/: {sorted(str(p) for p in new)}"
+    new = supply_files() - before
+    assert not new, f"staging left a copy of the supply under data/: {sorted(str(p) for p in new)}"
 
 
 def test_the_drift_check_does_not_fall_back_to_a_file():

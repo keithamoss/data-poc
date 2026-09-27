@@ -26,6 +26,7 @@ Phase 4's completeness bar: mothman is the only programmatic access
 point to this repo).
 """
 from __future__ import annotations
+import shutil
 
 from collections.abc import Callable
 import json
@@ -203,6 +204,14 @@ def _discard_this_runs_schemas(run_id: str) -> None:
     reason supply_db.is_trial_run() exists.
     """
     try:
+        # AND THE ON-DISK HALF, which was leaking. dbt's target/ is
+        # per-run by the same mechanism the schemas are - so that two
+        # parallel workers cannot clobber each other's manifest.json -
+        # and nothing removed it: 1.9 GB across 80 scratch directories
+        # by the time it was found, one of them holding 101 runs. Safe
+        # here and only here: dbt's artefacts are parsed DURING
+        # evaluation, and this runs once the results are recorded.
+        shutil.rmtree(supply_db.dbt_target_path(run_id), ignore_errors=True)
         conn = supply_db.connect(label="mothman:discard-run-schemas")
         try:
             if trial.is_trial(run_id):

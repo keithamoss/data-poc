@@ -132,6 +132,20 @@ releases:
               Pass --commit or --trial to answer without being asked.
       - category: Improved
         items:
+          - headline: A run now cleans up after itself on disk
+            components: ["Pipeline & publishing"]
+            description: >
+              Each run already gave back the database schemas it borrowed;
+              it now gives back dbt's working directory too. That had been
+              quietly accumulating - nearly two gigabytes of it in this
+              checkout - because nothing ever removed it.
+          - headline: Open the project in a container and it just works
+            components: ["Testing & dev tooling"]
+            description: >
+              A development container now brings up a PostgreSQL on the
+              same version the build server uses, waits for it, and
+              installs everything the tests need. Evaluating the project
+              no longer starts with a list of commands to run by hand.
           - headline: Run names you can actually read
             components: ["Pipeline & publishing"]
             description: >

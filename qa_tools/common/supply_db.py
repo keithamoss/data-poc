@@ -130,6 +130,42 @@ STAGING_SCHEMA = "staging"
 #: Where a supply goes when it was recognised and could not be loaded.
 REJECTED_SCHEMA = "rejected"
 
+#: WHAT THIS ENGINE CAN DO, DECLARED RATHER THAN DISCOVERED
+#: (REQ-PIPE-087 criterion 9). PostgreSQL moves a table between
+#: schemas with `ALTER TABLE ... SET SCHEMA`, which rewrites the
+#: catalogue entry and does not copy a single row - so promotion
+#: (REQ-PIPE-081) is a rename rather than an INSERT ... SELECT of a
+#: whole supply.
+#:
+#: DECLARED, because the alternative is a caller wrapping the move in
+#: try/except and inferring the engine's capabilities from which
+#: exception came back. That reads as defensive and is worse than
+#: asking: a failure then means either "this engine cannot do it" or
+#: "it can and something else went wrong", and the caller has to guess
+#: which. A capability somebody states is one somebody can also
+#: correct.
+CAN_MOVE_TABLE_BETWEEN_SCHEMAS = True
+
+
+def move_table(conn, table: str, from_schema: str, to_schema: str) -> None:
+    """Move one table to another schema, as a catalogue operation.
+
+    REFUSES RATHER THAN FALLS BACK where the capability is not
+    declared. There is no copy-and-drop path here on purpose: a
+    fallback that quietly rewrites a whole supply would turn a
+    promotion from an instant rename into an operation whose cost
+    scales with the data, and nobody would see it happen.
+    """
+    if not CAN_MOVE_TABLE_BETWEEN_SCHEMAS:
+        raise SupplyDbError(
+            f"this engine does not declare that a table can be moved between "
+            f"schemas, so {from_schema}.{table} cannot be promoted by rename")
+    conn.execute(
+        f'ALTER TABLE "{_ident(from_schema, "schema name")}".'
+        f'"{_ident(table, "table name")}" '
+        f'SET SCHEMA "{_ident(to_schema, "schema name")}"')
+
+
 #: A per-run view schema carries this prefix so one left behind by an
 #: interrupted run is identifiable on its own terms (criterion 6) -
 #:
