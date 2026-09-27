@@ -16138,6 +16138,9 @@ requirements:
       happened to the data.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26), settling
       REQ-PIPE-074's own open question earlier than planned - and
@@ -16561,9 +16564,19 @@ requirements:
 
         HIS ANSWER: "both of those things feel like decisions to me -
         they just happen in different places, but should be show in the
-        one log." Which makes the dependency real, because the
-        dashboard renders accept/reject badges and their source becomes
-        that log.
+        one log."
+
+        THAT ANSWER WAS THEN WITHDRAWN, AND THE DEPENDENCY SURVIVED IT
+        ON BETTER GROUND (Keith, 2026-09-27, hours later, once told that
+        REQ-PIPE-075 criterion 1 already auto-promotes a green OR AMBER
+        supply). So it is NOT true that the accept/reject badges' source
+        becomes the filing log - an amber accept is not a decision and
+        is not logged at all. The dependency holds regardless, because
+        REQ-PIPE-075 criterion 6 derives the set of filled slots FROM
+        THE DECISION LOG: anything that shows what a period resolved to
+        reads that log, and this requirement's dashboard is exactly
+        that. An amber `/reject` is in the log too, as a rejection under
+        REQ-PIPE-076 criterion 1.
 
         WHY THE CHECK COULD NOT HAVE CAUGHT IT, which is the part worth
         keeping: the premise being tested was not "does the dashboard
