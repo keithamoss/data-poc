@@ -16476,36 +16476,54 @@ requirements:
     dependencies: [REQ-PIPE-089, REQ-PIPE-091]
     open_questions:
       - >
-        IS AN AMBER ACCEPT/REJECT THE SAME ACT AS A PROMOTION, or a
-        different act about the same supply? This replaces a question
-        that asked whether REQ-PIPE-091 is really a dependency, and the
-        replacement is the honest version of it.
+        DOES ACCEPTING AN AMBER SUPPLY ALSO BAR IT FROM AUTOMATIC
+        PROMOTION FOR EVER? It follows from what is already signed
+        rather than from anything anybody decided about accept, which
+        is why it is worth asking before it is built.
 
-        Keith settled the dependency on 2026-09-27: "both of those
-        things feel like decisions to me - they just happen in
-        different places, but should be show in the one log." That is a
-        product statement, and it makes REQ-PIPE-091 a real dependency
-        of this requirement - the dashboard renders accept/reject
-        badges today, and their source becomes that log.
+        Keith settled the larger question on 2026-09-27: "'accept this
+        amber supply' is a decision worth logging too", so it is an
+        entry in the one log. REQ-PIPE-076 criterion 7 then says
+        "WHERE any decision has been recorded against a supply by a
+        person, THE SYSTEM SHALL NOT promote that supply automatically
+        thereafter", and criterion 12 keeps that bar for the life of
+        the supply.
 
-        WHAT IS STILL OPEN is narrower and belongs with him rather than
-        with analysis. REQ-PIPE-075 criterion 1 already promotes a green
-        OR AMBER supply into an empty slot, so amber is a promotion
-        case; and a person accepting an amber supply is, in plain
-        terms, deciding it may stand as the period's answer. Against
-        that, REQ-QAC-017 keeps an accepted run's pill amber and a
-        rejected run's pill amber too - his own call, 2026-09-19, "the
-        smaller, safer option" - which reads as acknowledging a verdict
-        rather than filing a supply.
+        So an accept bars automatic promotion. For a supply already
+        promoted - which it always is, because REQ-PIPE-075 criterion
+        1 promotes amber the moment QA completes - that only bites on a
+        re-run or a resupply. It may be exactly right: a person has
+        spoken about this supply and automation should defer. It is
+        just not a thing anybody chose.
 
-        It decides whether the log carries one entry type or two, which
-        is cheap either way: REQ-PIPE-074 criterion 2 already records
-        the actor, the instant and the subject, and REQ-GHUB-082
-        criterion 31 already distinguishes an automated actor from a
-        human one. See plans/running-thoughts.md #54 for the full
-        account, including a separate unconditional finding about
-        REQ-PIPE-074 criterion 11.
+        See plans/running-thoughts.md #54 for the full mapping,
+        including why an accept is a new entry type and a reject is not.
     decisions:
+      - >
+        AN AMBER ACCEPT IS A NEW ENTRY TYPE; AN AMBER REJECT IS NOT
+        (following from Keith's 2026-09-27 call that "'accept this
+        amber supply' is a decision worth logging too").
+
+        The asymmetry is the useful part, and it falls out of
+        REQ-PIPE-075 criterion 1: a green OR AMBER supply promotes
+        itself into an unfilled slot when QA completes, before anybody
+        looks. So a person's `/accept` or `/reject` always arrives
+        AFTER promotion.
+
+        `/reject` is then an existing filing decision - REQ-PIPE-076
+        criteria 1 and 4, move to the rejected schema and leave the
+        slot unfilled. `/accept` moves nothing, because the supply is
+        already the period's answer; what it records is that a person
+        read an amber verdict and is content for it to stand. That is
+        an acknowledgement, and it needs an entry type of its own.
+
+        IT ALSO EXPLAINS SOMETHING THAT READS LIKE AN INCONSISTENCY,
+        recorded so nobody "fixes" it: REQ-QAC-017 keeps the pill amber
+        after an accept AND after a reject, while REQ-PIPE-076
+        criterion 4 empties the slot on a reject. Both are right. The
+        pill is the QUALITY VERDICT, and a person rejecting a supply
+        does not make its data better or worse; the filing state is a
+        separate fact. Two questions, two answers, one supply.
       - >
         REQ-PIPE-091 IS A REAL DEPENDENCY, and the reasoning here got
         there the wrong way round twice before Keith corrected it

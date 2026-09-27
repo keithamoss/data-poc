@@ -897,13 +897,50 @@ to the exact right file/line/folder with zero console errors.
     rather than a filing action - "somebody has looked at this" - which
     is a different fact from "this is what Q3 resolves to".
 
-    **Not resolved here, and it needs Keith rather than analysis,**
-    because it decides whether the answer is one entry type or two in
-    one log. Worth noting the log can carry both honestly: REQ-PIPE-074
-    C2 already records the actor, the instant, and the subject, and
-    REQ-GHUB-082 C31 already distinguishes an automated actor from a
-    human one. Widening the entry types is cheap; deciding they are the
-    same act is not.
+    **RESOLVED, 2026-09-27, Keith: "'accept this amber supply' is a
+    decision worth logging too."** It goes in the one log. And once it
+    does, the two operations map onto the supply model already
+    specified rather than needing a new one - which is worth writing
+    out, because the mapping is not symmetric and that is the
+    interesting part.
+
+    **A HUMAN'S ACCEPT OR REJECT ALWAYS COMES AFTER AUTOMATIC
+    PROMOTION.** REQ-PIPE-075 C1 promotes a green OR AMBER supply into
+    an unfilled slot when QA completes, before anybody has looked. So
+    by the time a person comments `/accept` or `/reject`, the supply is
+    already the period's answer.
+
+    Which makes them different acts:
+
+    - **`/reject` IS an existing filing decision.** REQ-PIPE-076 C1 and
+      C4: move the supply to the rejected schema, leave its slot
+      unfilled, record the decision. No new entry type needed.
+    - **`/accept` IS NOT.** Nothing needs to move - the supply is
+      already promoted. What the entry records is that a person looked
+      at an amber verdict and is content for it to stand. That is an
+      ACKNOWLEDGEMENT, and it is a new entry type.
+
+    **AND IT EXPLAINS THE PILL BEHAVIOUR that looked like an
+    inconsistency.** REQ-QAC-017 keeps the pill amber after an accept
+    AND after a reject, while REQ-PIPE-076 C4 says a reject empties the
+    slot. Those do not conflict, and the reason is worth stating so
+    nobody "fixes" it: the pill is the QUALITY VERDICT, and a person
+    rejecting a supply does not make its data better or worse. The
+    filing state is a separate fact with a separate display. Two
+    different questions, two different answers, one supply.
+
+    **ONE CONSEQUENCE HE MAY NOT HAVE INTENDED, worth putting to him
+    before it is built.** REQ-PIPE-076 C7: "WHERE any decision has been
+    recorded against a supply by a person, THE SYSTEM SHALL NOT promote
+    that supply automatically thereafter", and C12 keeps that bar for
+    the life of the supply. If an accept is a recorded person-decision
+    - and it is - then accepting an amber supply permanently bars it
+    from automatic promotion. For a supply already promoted that only
+    bites on a re-run or a resupply, so it may be exactly right: a
+    human has spoken about this supply and automation should defer. But
+    it follows from C7 rather than from anything anybody decided about
+    accept, which is the kind of thing worth noticing before rather
+    than after.
 
     **WHAT IT CHANGES IMMEDIATELY, whichever way it goes.** If an
     accept/reject becomes an entry in the one log, then REQ-PIPE-091 IS
