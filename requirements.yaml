@@ -16401,6 +16401,30 @@ requirements:
       - >
         THE SYSTEM SHALL invoke the build and the publish through
         mothman.
+      - >
+        THE SYSTEM SHALL deliver the built artifact by pushing it to a
+        branch GitHub Pages serves directly, and SHALL NOT ask any
+        GitHub Actions job to build it, deploy it, or hold a database
+        credential.
+      - >
+        THE SYSTEM SHALL keep that branch's content separate from the
+        source branch, so that a build output can never be staged or
+        committed alongside the code that produced it.
+      - >
+        THE SYSTEM SHALL offer to publish after a person has run QA
+        interactively, and SHALL make that a prompt they answer rather
+        than something that happens on its own.
+      - >
+        THE SYSTEM SHALL reach the published site from that prompt by
+        the same path the command uses, and by no other.
+      - >
+        THE SYSTEM SHALL NOT publish as part of a non-interactive run,
+        so that a debugging run, a batch and a scheduled run cannot
+        publish a dashboard nobody asked for.
+      - >
+        THE SYSTEM SHALL name, in the published artifact, the commit
+        the code was built from as well as the environment, so that a
+        published dashboard can be traced to both.
     non_functional_requirements:
       - >
         SECURITY: this REMOVES a credential from CI rather than adding
@@ -16451,26 +16475,115 @@ requirements:
     dependencies: [REQ-PIPE-089, REQ-PIPE-091]
     open_questions:
       - >
-        HOW THE BUILT ARTIFACT REACHES ITS HOST IN THE PoC, given
-        public Pages stays. Three real routes, relayed as question set
-        C: the environment pushes the artifact and a workflow deploys
-        what it did not build; the environment uploads to an S3 static
-        site now rather than later; or the built HTML is committed,
-        which re-creates the exact thing the 2026-09-16
-        template/output split made structurally impossible.
-      - >
-        REQ-PIPE-005 CRITERION 1 - "There is no local publish command
-        - only CI can deploy" - is BUILT and SIGNED, and this
-        requirement contradicts it outright. Thread A's prose was the
-        part the brief flagged; the signed requirement is the part
-        that actually has to be amended or retired, and that is
-        Keith's call, not a rewording.
-      - >
-        Whether publishing is a step of `mothman pipeline run` or its
-        own command, and what triggers it inside an environment with
-        no scheduler - the same no-cron problem REQ-PIPE-083 is
-        already stuck on.
+        IS REQ-PIPE-091 REALLY A DEPENDENCY? It is listed as one, and
+        the reason given on 2026-09-27 was that the dashboard renders
+        decisions. CHECKED, AND THE PREMISE DOES NOT HOLD TODAY: the
+        only decision rendering in the template is `AMBER_DECISIONS`,
+        which is accept/reject decisions synced from GitHub tickets by
+        `acceptance_sync.py`. That is a different record from
+        REQ-PIPE-074's FILING decision log, which is what REQ-PIPE-091
+        turns into a table. REQ-PIPE-074 is `not_started`, its display
+        is delivery sprint 21 (`todo`), and nothing in the template
+        reads it.
+
+        WHY IT MATTERS RATHER THAN BEING A TIDY-UP: keeping it pulls
+        eleven more unsigned criteria into this piece of work, for
+        something the dashboard cannot show until that display work is
+        scoped and built. Dropping it abandons nothing - REQ-PIPE-091
+        keeps its own requirement, and the decision log still lands in
+        the schema REQ-PIPE-089 establishes, which is REQ-PIPE-091
+        criterion 1's own wording.
+
+        Keith's call. Raised again rather than acted on, because he
+        chose to keep it after being asked once and a premise that
+        turns out to be wrong is worth putting back to him rather than
+        being decided by default.
     decisions:
+      - >
+        TRANSPORT IS A BRANCH GITHUB PAGES SERVES, NOT A WORKFLOW
+        (Keith, 2026-09-27). The environment builds, gates and pushes
+        the artifact to an orphan branch; Pages serves it with no
+        Actions involvement at all. This is REQ-PIPE-005 criterion 1's
+        own amended wording made concrete - "GitHub is transport rather
+        than the thing that builds".
+
+        Rejected: pushing the artifact and having a workflow deploy it
+        through the Pages API - one more moving part, and a workflow
+        deploying something it did not build and cannot verify.
+        Rejected: an S3 static site now. That is probably where
+        production goes, and it needs credentials and a bucket, and it
+        drops the public Pages URL this PoC has today. Rejected
+        outright: committing the built HTML to the source branch, which
+        would re-create the exact thing the 2026-09-16 template/output
+        split made structurally impossible.
+
+        The separate-branch criterion is not decoration - it is what
+        keeps that split intact. A build output on the source branch is
+        one git can see a diff on, and the point of that day's work was
+        that it cannot.
+      - >
+        PUBLISHING IS ITS OWN COMMAND, PLUS A PROMPT AFTER A HUMAN'S QA
+        RUN (Keith, 2026-09-27, in his own words: "its own command, but
+        also a prompt after a human initiated QA run (and other
+        relevant commands)").
+
+        Both halves matter, and they close opposite failures. A command
+        alone means the published site silently lags the results,
+        because publishing becomes a separate thing somebody has to
+        remember. A step of `mothman pipeline run` alone means every
+        debugging run attempts a publish - and putting that behind a
+        flag would be the second, ad hoc publish path criterion 10
+        forbids. A prompt is neither: the person who just ran QA is
+        asked, once, and answers.
+
+        THE PROMPT USES THE SAME PATH, which is why criterion 15 exists
+        separately. A prompt that published by some shortcut would be
+        exactly the ad hoc route criterion 10 rules out, wearing a
+        friendlier face.
+
+        IT DOES NOT SOLVE THE NO-SCHEDULER PROBLEM and is not meant to.
+        Nothing inside the environment triggers work on a clock - the
+        same gap REQ-PIPE-083 is stuck on - so a human starts this, as
+        a human starts everything else in this PoC today.
+      - >
+        REQ-PIPE-005 CRITERION 1 WAS ALREADY AMENDED, so the open
+        question naming it as a blocker was stale by the time it was
+        read (noticed 2026-09-27). It now says "there is no ad-hoc
+        publish path - the one publisher is the dashboard build that
+        runs where the data is, and GitHub is transport rather than the
+        thing that builds." What the original wording protected - no
+        manual local publish, nothing published that did not pass the
+        gate - is kept by criteria 5, 10 and 11 here.
+
+        Recorded because that question named a BUILT AND SIGNED
+        requirement as a blocker and it had already been unblocked. A
+        stale open question is not harmless: it is a thing somebody
+        schedules work against.
+      - >
+        THE COMMIT SHA JOINS THE ENVIRONMENT IN THE ARTIFACT
+        (criterion 17), which extends criterion 7 rather than
+        introducing a new idea. That one already requires the artifact
+        to name the environment it was built from, for the reason
+        `contract/environments.yaml` gives: a dashboard built here and
+        one built from somebody's development environment are different
+        artifacts that look identical.
+
+        The commit is the other half of the same question, and it
+        CHANGED MEANING with REQ-PIPE-089. While results travelled
+        through git the SHA said which RESULTS were published; now it
+        says which CODE rendered them. Both are worth knowing when a
+        panel looks wrong, and `github_links.current_commit_sha()`
+        already resolves it.
+      - >
+        THE PATTERNS GATE ALREADY DEGRADES FOR CRITERION 9, built ahead
+        of this requirement while REQ-PIPE-089 moved the delivery log
+        (2026-09-27). That criterion requires every gate needing no
+        database to stay runnable without one, and the
+        duplicate-attribution half of `validate_arrival_patterns` reads
+        a corpus that is now a table. It returns `None` rather than an
+        empty list and SAYS the check was skipped - an empty list would
+        read as "checked, found nothing", which is the one answer that
+        would be a lie.
       - >
         A THIRD OPTION NEITHER PARTY HAD ON THE TABLE (2026-09-26):
         the rule Keith actually wrote is not "committed files are
