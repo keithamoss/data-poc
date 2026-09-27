@@ -144,7 +144,24 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
+      # TWO DSNs, AND THEY POINT AT DIFFERENT DATABASES ON PURPOSE - the
+      # same shape CLAUDE.md documents for a dev container.
+      #
+      # MOTHMAN_TEST_DSN is the ADMIN connection the suite uses to create
+      # and drop a database per xdist worker, so it has to name a database
+      # that is never one of those - `postgres`.
+      #
+      # MOTHMAN_SUPPLY_DSN is the warehouse anything outside the suite
+      # uses, which here is the bootstrap and dashboard-build steps below.
+      # Added 2026-09-28 after those steps had been failing on every push
+      # since REQ-PIPE-089 phase 6 introduced them: only the test DSN was
+      # set, so `mothman pipeline bootstrap` died on "MOTHMAN_SUPPLY_DSN is
+      # not set" before a single test ran. Green locally the whole time,
+      # because a developer's shell has both - which is the exact shape
+      # CLAUDE.md's own "local passing is necessary, never sufficient"
+      # rule is about.
       MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
+      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -154,6 +171,14 @@ jobs:
 
       - name: Sync dependencies
         run: uv sync --dev
+
+      # The service container creates `postgres` and nothing else, so the
+      # warehouse the DSN above names has to be made. A step rather than a
+      # second POSTGRES_DB, because the image takes only one.
+      - name: Create the warehouse database
+        run: |
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c 'CREATE DATABASE supply'
 
       - name: Install dbt_utils
         run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
