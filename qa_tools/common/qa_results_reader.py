@@ -229,7 +229,8 @@ def incomplete_runs(agency: str, collection: str,
 
 
 def read_one(agency: str, collection: str, run_id: str, tool: str,
-             dataset: str | None = None, conn=None) -> list[dict]:
+             dataset: str | None = None, conn=None, *,
+             supply_state: str | None = qa_store.AGREED) -> list[dict]:
     """One tool's `verified` records for one run.
 
     With `dataset`, that one dataset's. Without it, every dataset under
@@ -240,14 +241,22 @@ def read_one(agency: str, collection: str, run_id: str, tool: str,
     `[]` where nothing was recorded, which is ordinary rather than an
     error: a tool with no check defined against a dataset records
     nothing for it.
+
+    `supply_state` DEFAULTS TO AGREED, and `None` means every state
+    (REQ-PIPE-106 criterion 10). The default is the safe direction: a
+    caller has to ASK to see verdicts from a dataset nobody has agreed a
+    schedule for, so a reader that has never heard of this requirement
+    cannot accidentally count check development as quality history.
     """
     conn, mine = _conn(conn)
     try:
         sql = (f'SELECT * FROM "{qa_store.SCHEMA}".check_result_visible '
                "WHERE run_key = ? AND agency_id = ? AND collection_id = ? "
-               "AND tool = ? AND scope = ? AND supply_state = ?")
-        params = [run_id, agency, collection, tool,
-                  qa_store.DATASET_SCOPE, qa_store.AGREED]
+               "AND tool = ? AND scope = ?")
+        params = [run_id, agency, collection, tool, qa_store.DATASET_SCOPE]
+        if supply_state is not None:
+            sql += " AND supply_state = ?"
+            params.append(supply_state)
         if dataset is not None:
             sql += " AND dataset_id = ?"
             params.append(dataset)
@@ -352,15 +361,19 @@ def read_run_provenance(agency: str, collection: str, run_id: str,
 
 
 def read_qa_results(agency: str, collection: str,
-                    conn=None) -> list[dict]:
+                    conn=None, *,
+                    supply_state: str | None = qa_store.AGREED) -> list[dict]:
     """Every complete run's every tool's `verified` records for one
-    agency/collection, in run-id then tool order."""
+    agency/collection, in run-id then tool order.
+
+    `supply_state=None` includes the in-development ones - see read_one()."""
     conn, mine = _conn(conn)
     try:
         out: list[dict] = []
         for run_id in list_run_ids(agency, collection, conn=conn):
             for tool in TOOL_ORDER:
-                out.extend(read_one(agency, collection, run_id, tool, conn=conn))
+                out.extend(read_one(agency, collection, run_id, tool, conn=conn,
+                                    supply_state=supply_state))
         return out
     finally:
         if mine:
@@ -368,7 +381,8 @@ def read_qa_results(agency: str, collection: str,
 
 
 def read_cross_table_results(agency: str, collection: str,
-                             conn=None) -> list[dict]:
+                             conn=None, *,
+                             supply_state: str | None = qa_store.AGREED) -> list[dict]:
     """Every recorded cross-table check result for one collection
     (REQ-QAC-037 criterion 1).
 
@@ -382,12 +396,15 @@ def read_cross_table_results(agency: str, collection: str,
         out: list[dict] = []
         for run_id in list_run_ids(agency, collection, conn=conn):
             for tool in TOOL_ORDER:
-                out.extend(_records(conn.execute(
-                    f'SELECT * FROM "{qa_store.SCHEMA}".check_result_visible '
-                    "WHERE run_key = ? AND agency_id = ? AND collection_id = ? "
-                    "AND tool = ? AND scope = ? AND supply_state = ? ORDER BY id",
-                    [run_id, agency, collection, tool, qa_store.CROSS_TABLE_SCOPE,
-                     qa_store.AGREED]), run_id, _run_timestamp(conn, run_id)))
+                sql = (f'SELECT * FROM "{qa_store.SCHEMA}".check_result_visible '
+                       "WHERE run_key = ? AND agency_id = ? AND collection_id = ? "
+                       "AND tool = ? AND scope = ?")
+                params = [run_id, agency, collection, tool, qa_store.CROSS_TABLE_SCOPE]
+                if supply_state is not None:
+                    sql += " AND supply_state = ?"
+                    params.append(supply_state)
+                out.extend(_records(conn.execute(sql + " ORDER BY id", params),
+                                    run_id, _run_timestamp(conn, run_id)))
         return out
     finally:
         if mine:
@@ -420,7 +437,16 @@ def _run_timestamp(conn, run_id: str):
 #: And `tool` is NOT a record key at all: it is a fact about the
 #: invocation, stored as a column because the write is keyed on it, and
 #: downstream derives it from `check_id`.
-_NOT_IN_A_RECORD = ("id", "run_key", "tool", "scope", "supply_state")
+#:
+#: `supply_state` IS DROPPED FOR AN AGREED RECORD AND KEPT FOR AN
+#: IN-DEVELOPMENT ONE (REQ-PIPE-106 criteria 7 and 15). Dropping it
+#: outright would leave the dashboard build unable to tell a verdict about
+#: a dataset nobody has agreed from a real one, and adding it to all of
+#: them is a shape change to a corpus of millions of records for the sake
+#: of a value that is `agreed` in every one. So it follows
+#: `reference_run_id`'s precedent below: present only where it says
+#: something.
+_NOT_IN_A_RECORD = ("id", "run_key", "tool", "scope")
 
 #: Present only where the tool actually set it - Evidently's reference
 #: run, which the other three have no concept of. A column because it is
@@ -448,6 +474,8 @@ def _records(cursor, run_id: str, run_timestamp=None) -> list[dict]:
         for name in _OPTIONAL:
             if record.get(name) is None:
                 record.pop(name, None)
+        if record.get("supply_state") == qa_store.AGREED:
+            record.pop("supply_state", None)
         record["run_id"] = run_id
         record["run_timestamp"] = _iso(stamp if stamp is not None else run_timestamp)
         out.append(record)

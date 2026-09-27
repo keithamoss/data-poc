@@ -29,7 +29,7 @@ import json
 import os
 from datetime import date, datetime
 
-from qa_tools.common import hierarchy
+from qa_tools.common import hierarchy, qa_store
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
@@ -528,19 +528,13 @@ def _schedule_not_agreed(dataset_id: str) -> str | None:
     return schedule.no_calendar(dataset_id)
 
 
-def build() -> dict:
-    with open(RESULTS_PATH) as f:
-        payload = json.load(f)
-    manifest = sorted(payload["runs"], key=_run_date)
-    results = payload["results"]
-    dataset_stats = payload["dataset_stats"]
+def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict]]) -> None:
+    """Give each cross-table result to every table it reads.
 
-    # Same retirement lookup as build_dashboard_data.py's identical block -
-    # computed once here, not once per table.
-    lifecycle_by_id = {c.check_id: c for c in collect_checks(None)}
-
-    by_table = {t: [r for r in results if r["dataset_id"] == hierarchy.dataset_for_table(t).dataset_id]
-                for t in cp_common.TABLES}
+    PULLED OUT OF build() so the exclusion below is testable without a
+    whole reports/results_cp.json - the rule it carries is one a test
+    should be able to state in four records.
+    """
     # REQ-QAC-037 criteria 6 and 7: a cross-table result belongs to
     # EVERY table it reads, not only to the one it happened to be
     # declared on. Which table that was is an artefact of where
@@ -558,8 +552,44 @@ def build() -> dict:
     reads = tables_read.declared_by_check_id(collect_checks(None))
     for r in results:
         for other in reads.get(r.get("check_id")) or ():
-            if other in by_table and r not in by_table[other]:
-                by_table[other].append(r)
+            if other not in by_table or r in by_table[other]:
+                continue
+            # BUT AN IN-DEVELOPMENT RESULT IS NOT SHARED WITH AN AGREED
+            # PARTICIPANT (REQ-PIPE-106 criterion 15). A cross-table check
+            # spanning a dataset nobody has agreed a schedule for and one
+            # that has a calendar is ALLOWED - Keith, 2026-09-27: "allow it,
+            # but don't let it affect the agreed data set" - and it is
+            # recorded as in-development by whoever wrote it, because ANY
+            # unagreed participant makes the whole verdict one. Sharing it
+            # here would put that verdict into the agreed table's own
+            # status, which is the one thing criterion 15 forbids and the
+            # exact way an unagreed dataset could turn an agreed one red.
+            #
+            # THE CHECK IS STILL RUN, RECORDED AND REPORTED - on the
+            # calendar-less participant's page, which is where somebody
+            # developing the check is looking. Refusing the check outright
+            # would block the strongest case for developing one early: a new
+            # dataset joining an existing collection.
+            if r.get("supply_state") == qa_store.IN_DEVELOPMENT and \
+                    not _schedule_not_agreed(hierarchy.dataset_for_table(other).dataset_id):
+                continue
+            by_table[other].append(r)
+
+
+def build() -> dict:
+    with open(RESULTS_PATH) as f:
+        payload = json.load(f)
+    manifest = sorted(payload["runs"], key=_run_date)
+    results = payload["results"]
+    dataset_stats = payload["dataset_stats"]
+
+    # Same retirement lookup as build_dashboard_data.py's identical block -
+    # computed once here, not once per table.
+    lifecycle_by_id = {c.check_id: c for c in collect_checks(None)}
+
+    by_table = {t: [r for r in results if r["dataset_id"] == hierarchy.dataset_for_table(t).dataset_id]
+                for t in cp_common.TABLES}
+    share_cross_table_results(results, by_table)
     datasets = [build_one_table(t, by_table[t], manifest, dataset_stats, lifecycle_by_id) for t in cp_common.TABLES]
     return {"datasets": datasets}
 

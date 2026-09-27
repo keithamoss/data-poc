@@ -214,6 +214,82 @@ def supply_dsn(worker_id):
 
 
 @pytest.fixture(scope="session", autouse=True)
+def _no_test_files_a_real_delivery():
+    """No test writes a delivery into this repo's own delivery tree.
+
+    NOT PRECAUTIONARY - it is a cleanup. `mothman bdm qa`/`mothman cp qa`
+    with `--commit` FILE the supply (REQ-PIPE-103), by design, into
+    data/deliveries/ with a receipt beside it. One CLI test invoked that
+    without redirecting the directories, so every run of the suite filed a
+    real `handfiled-*` delivery. Twenty-three had accumulated when CI found
+    it, on 2026-09-28.
+
+    THE DAMAGE WAS NOT THE CLUTTER, and this is why a guard rather than a
+    one-line fix in that test. Those directories are read by everything that
+    recognises arrivals from disk, so they became two extra Child Protection
+    runs: they pushed a bootstrap from 151 staged tables to 275, and they got
+    themselves PINNED into tests/fixtures/arrival_semantics_golden.json as
+    cp_run_019 and cp_run_020 - a characterization pin that then disagreed
+    with every clean checkout, which is exactly what CI reported. A test
+    artefact had become part of the corpus this project measures itself
+    against.
+
+    REFUSES RATHER THAN REDIRECTS, which is the opposite of
+    _committed_history_is_off_limits below, and deliberately so. That one
+    guards trees written several frames below whatever a test called, where
+    a test cannot reliably opt in. This is the other shape: every write here
+    comes from a test that asked for `--commit`, so it KNOWS it is filing
+    something and can say where. Silently redirecting would leave the test
+    passing while asserting about a directory it never named.
+    """
+    import functools
+    import inspect
+    from pathlib import Path
+
+    from qa_tools.common import delivery
+
+    real = delivery.write_delivery
+    # THE REAL PATH IS CAPTURED HERE, once, BEFORE any test has run - and
+    # that is the whole correctness of this guard rather than a detail.
+    # The first version compared the target against the LIVE
+    # `delivery.DELIVERIES_DIR`, which several tests legitimately
+    # monkeypatch to a tmp_path: those two are then equal and the guard
+    # fired on thirteen tests that were already doing the right thing.
+    # Caught by the gate, which is where a guard this broad should be
+    # caught.
+    real_tree = Path(delivery.DELIVERIES_DIR).resolve()
+
+    # BOUND THROUGH THE REAL SIGNATURE rather than picking `deliveries_dir`
+    # out of **kwargs, which is the second thing this guard got wrong:
+    # several tests pass the directories POSITIONALLY, so a keyword-only
+    # read saw None and the guard fired on a call that had named a
+    # tmp_path perfectly well. `bind` gets the same answer whichever way
+    # the caller wrote it, and keeps getting it if the signature changes.
+    signature = inspect.signature(real)
+
+    @functools.wraps(real)
+    def guarded(*args, **kwargs):
+        bound = signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+        named = bound.arguments.get("deliveries_dir")
+        target = Path(named or delivery.DELIVERIES_DIR).resolve()
+        if target == real_tree:
+            raise AssertionError(
+                f"a test tried to file delivery "
+                f"{bound.arguments.get('name')!r} into this repo's real "
+                f"{real_tree} - point deliveries_dir and receipts_dir "
+                f"at tmp_path, or monkeypatch delivery.DELIVERIES_DIR "
+                f"(see tests/conftest.py's _no_test_files_a_real_delivery)")
+        return real(*args, **kwargs)
+
+    delivery.write_delivery = guarded
+    try:
+        yield
+    finally:
+        delivery.write_delivery = real
+
+
+@pytest.fixture(scope="session", autouse=True)
 def _committed_history_is_off_limits(tmp_path_factory):
     """No test writes into this repo's committed history trees.
 

@@ -52,10 +52,20 @@ def build_results_from_history() -> dict:
     manifest.sort(key=lambda m: m["run_index"])
 
     all_results: list[dict] = []
+    # AND THE IN-DEVELOPMENT ONES (REQ-PIPE-106 criterion 7). `None` means
+    # every supply_state, and asking for it explicitly is the point: the
+    # reader defaults to AGREED so nothing counts check development as
+    # quality history by accident, and the dashboard is the one reader that
+    # has to show a calendar-less dataset's REAL verdicts - red, amber or
+    # green as the checks actually found - because developing a check means
+    # seeing whether it passes. What keeps them apart from here on is the
+    # `supply_state` each such record carries, and the rollup exclusion
+    # criterion 9 already built on both sides.
     for entry in manifest:
         run_id = entry["run_id"]
         for tool in TOOL_ORDER:
-            all_results.extend(read_one(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, tool))
+            all_results.extend(read_one(cp_common.AGENCY_ID, cp_common.COLLECTION_ID,
+                                        run_id, tool, supply_state=None))
     # THE CROSS-TABLE SCOPE IS A SIBLING OF THE RUN DIRECTORIES, so a
     # walk of the run ids does not reach it (REQ-QAC-037 criterion 1).
     # Missing this is not a visible failure: the live run assembles its
@@ -65,7 +75,7 @@ def build_results_from_history() -> dict:
     # live against 2,772 rebuilt, with all 126 relationships_soda and
     # 126 relationships_dbt gone and nothing anywhere saying so.
     all_results.extend(read_cross_table_results(
-        cp_common.AGENCY_ID, cp_common.COLLECTION_ID))
+        cp_common.AGENCY_ID, cp_common.COLLECTION_ID, supply_state=None))
 
     # ONE AGREED ORDERING down both paths (REQ-PIPE-038). A live run
     # emits a collection's tables interleaved; a rebuild reads them as

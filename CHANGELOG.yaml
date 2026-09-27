@@ -158,8 +158,47 @@ releases:
               replacing one already in use all need a reason. A routine
               promotion does not - reasons you are made to give for everything
               stop meaning anything.
+      - category: New
+        items:
+          - headline: You can now run checks before a schedule is agreed
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Sample data for a dataset nobody has agreed a schedule for is held
+              apart from your real supplies, and the checks run over it normally.
+              You see whether each one passes, which is the whole point of
+              developing it.
+          - headline: Check development stays out of your quality history
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              Results from a dataset with no agreed schedule are recorded as
+              in-development. They show on that dataset's own page with their real
+              verdicts, and count towards nothing above it.
+          - headline: A new dataset can be checked against an established one
+            components: ["QA checks & contract"]
+            description: >
+              A check that compares two tables works even when only one of them has
+              an agreed schedule. Its verdict belongs to the new dataset, so a
+              dataset still in development can never turn a live one red.
+          - headline: Sample data goes when you say it goes
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              Run mothman supply discard-sample to remove the data you were
+              developing checks against. Nothing removes it for you - not agreeing a
+              schedule, not any later run - and the record of that work stays.
       - category: Improved
         items:
+          - headline: A dataset with no schedule cannot colour the others
+            components: ["Dashboard UI"]
+            description: >
+              A dataset you have not agreed a schedule for keeps its own real red,
+              amber or green, and every summary above it leaves it out. One
+              collection's unfinished work no longer changes the asset's headline.
+          - headline: The tile says which kind of no-schedule it is
+            components: ["Dashboard UI"]
+            description: >
+              "No delivery schedule agreed yet" is somebody's outstanding job. A
+              one-off extraction says so instead, because presenting a finished
+              decision as an open one puts a permanent item on your list.
           - headline: A supply no longer waits for the rest of its delivery
             components: ["Pipeline & publishing"]
             description: >
@@ -215,6 +254,12 @@ releases:
               A new check fails the build if anything starts describing quality
               results as files again. A tidy-up only stays tidy if something
               watches it, and this is what watches.
+          - headline: The test suite stopped leaving deliveries behind
+            components: ["Testing & dev tooling"]
+            description: >
+              One test was filing a real delivery every time it ran, and twenty-six
+              had built up. They were being counted as arrivals, which made one
+              measurement of what actually arrived wrong. Nothing can do it again.
           - headline: The dashboard's read-only account really is read-only now
             components: ["Pipeline & publishing"]
             description: >

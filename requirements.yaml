@@ -20001,7 +20001,7 @@ requirements:
       extraction for a project, I want the same thing permanently,
       because that data has supplies and no cadence at all.
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: "2026-09-27"
@@ -20124,67 +20124,130 @@ requirements:
         and discovering the permanent one later means rework in the
         rollups, the dashboard and the schedule gate at once.
     dependencies: [REQ-PIPE-087, REQ-PIPE-089]
+    implemented_by:
+      - qa_tools/common/sample_data.py::is_sample
+      - qa_tools/common/sample_data.py::supply_state
+      - qa_tools/common/sample_data.py::state_for_participants
+      - qa_tools/common/sample_data.py::ensure_schema_for_table
+      - qa_tools/common/sample_data.py::discard
+      - qa_tools/common/schedule.py::no_calendar
+      - qa_tools/common/schedule.py::will_graduate
+      - qa_tools/common/schedule.py::owes_from
+      - qa_tools/common/schedule.py::calendar_for_dataset
+      - qa_tools/common/supply_db.py::add_run_views
+      - qa_tools/common/qa_results_writer.py::write_qa_result
+      - qa_tools/common/qa_results_reader.py::read_one
+      - qa_tools/common/dataset_status.py::in_no_rollup
+      - qa_tools/cp/build_cp_warehouses.py::_build_run_views
+      - qa_tools/bdm/build_per_run_warehouses.py::build_one
+      - pipeline/build_cp_dashboard_data.py::share_cross_table_results
+      - dashboard/qa-reporting-dashboard.template.html
+      - cli/supply.py::discard_sample_command
+    linked_tests:
+      - tests/test_no_calendar.py
+      - tests/test_sample_data.py
+      - tests/test_git_identity.py
+      - tests-js/status-rollups.test.js
+    evidence:
+      - >
+        2026-09-28: 32 tests in tests/test_sample_data.py cover the running
+        half and 33 in tests/test_no_calendar.py the configuration half, plus
+        9 in tests-js/status-rollups.test.js for the rollup exclusion on the
+        page's own side. The two implementations of that exclusion are
+        compared against each other on the same inputs rather than each
+        suite checking its own.
+      - >
+        2026-09-28: the exclusion in pipeline/build_cp_dashboard_data.py was
+        confirmed FAILING against the pre-fix code before being fixed - the
+        mixed cross-table result reached the agreed table until the guard
+        was added.
+      - >
+        2026-09-28: no calendar-less dataset exists in
+        contract/data-asset.yaml, so every test drives a fixture hierarchy
+        built from the REAL asset with its datasets replaced. Seven datasets,
+        all agreed, so nothing in the shipped configuration changes
+        behaviour - verified by sample_dataset_ids() returning an empty set
+        against the real asset.
     decisions:
       - >
-        BUILT IN STAGES, and this records where it got to on 2026-09-28 so
-        nobody infers it from the code. `in_progress` rather than `built`
-        because the register's gate forbids evidence on anything not built,
-        and a status that overclaims is worse than one that cannot carry
-        the detail.
+        BUILT IN TWO HALVES ON 2026-09-28, and this records which half is
+        which because the code alone does not say. The CONFIGURATION AND
+        EXCLUSION half came first - a dataset declaring it has no calendar,
+        the gate that still fails a bare omission, the sample schema, the
+        rollup exclusion and the label. The RUNNING half followed: QA over
+        that data recorded as in-development, cross-table checks over it,
+        and a person discarding it from the terminal.
 
-        DONE - the CONFIGURATION AND EXCLUSION layer plus the rollup and
-        the label: criteria 1, 2, 3, 4, 5, 8, 9, 11, 12 and 16. A dataset declares `no_calendar: not-yet-agreed`
-        or `no_calendar: never`; `schedule.calendar_for_dataset()` raises a
-        DISTINCT `NoCalendarAgreed` rather than a config error, which is
-        what lets the filing rule, the runway warning and the dashboard
-        embed carry on rather than stop; the schedule gate accepts the
-        declaration and still fails a bare omission, a typo'd calendar
-        name, both at once, an unrecognised value, and a declaration that
-        also subsets a calendar it does not have; `supply_db.SAMPLE_SCHEMA`
-        exists beside staging and rejected and is already in the
-        publisher's forbidden prefixes; `schedule.owes_from()` is
-        criterion 16's record.
+        WHAT MAKES THE SECOND HALF ONE MECHANISM RATHER THAN A FLAG.
+        `supply_state` is DERIVED in qa_results_writer.write_qa_result(),
+        the one place every result already fans out to its dataset and
+        scope, from the `no_calendar:` declaration in configuration. Ten
+        run_*.py callers pass `verified` and any one of them could forget a
+        `sample=True`; none of them can forget to be that line. Rejected
+        explicitly: a `sample boolean` on the staged table, and a naming
+        convention - both fail in the quiet direction, where one WHERE
+        clause out of thirty forgets and check development starts counting
+        as quality history.
 
-        THE ROLLUP EXCLUSION IS BUILT ON BOTH SIDES (criteria 8 and 9),
-        which this project has a scar for: item 74 shipped a correct data
-        layer and a dashboard whose own transform disagreed, rendering a
-        check with 14 real violations green. So `inNoRollup()`/`rollup()`
-        in the template and `in_no_rollup()`/`rollup_datasets()` in
-        dataset_status.py, with a test that runs the SAME inputs through
-        both and compares. The dataset keeps its own real verdict
-        (criterion 7's half of this), and a `.pill.unagreed` says in words
-        which of the two kinds it is - "No delivery schedule agreed yet"
-        against "One-off extraction", because presenting a finished
-        decision as an outstanding job would put a permanent item on
-        somebody's list. Both builders emit `scheduleNotAgreed` from
-        configuration, so the field has a real source. 33 Python tests
-        plus 9 JS.
+        A MIXED CROSS-TABLE CHECK IS IN-DEVELOPMENT IF ANY PARTICIPANT IS,
+        which is criterion 15 by construction rather than by a downstream
+        filter: the agreed dataset's page reads AGREED results, so a mixed
+        verdict simply is not among them. The dashboard build carries the
+        same rule at the transform, because this project has the scar -
+        item 74 shipped a correct data layer and a page whose own transform
+        disagreed, rendering a check with 14 real violations green.
 
-        NOT DONE - everything that RUNS. Criteria 6, 7's data half and 10
-        (QA over sample data, recorded as in-development), 13 and 14
-        (cross-table checks over calendar-less datasets), 15's recording
-        half, and 17, 18 and 19 (discarding pre-graduation data from the
-        terminal, never automatically).
+        `add_run_views()` IS A SECOND FUNCTION RATHER THAN A FLAG ON
+        `create_run_views()`. That one OWNS the run's view schema - it drops
+        and recreates it, which is what makes a re-run idempotent and stops
+        a stale view being read as this run's - so calling it twice for two
+        source schemas would throw the first away. dbt and Soda read across
+        schemas but only within one search path, so a cross-table check
+        spanning an agreed and a calendar-less dataset needs both sets of
+        views side by side.
 
-        ONE HONEST GAP IN WHAT IS CLAIMED: criterion 8 is asserted on
-        `unagreedMarker()`'s own output rather than on a rendered page,
-        because no calendar-less dataset exists in the real build yet - so
-        there is nothing for a real browser to render. The function is what
-        the page calls, so the logic is covered; the pixel is not.
+        SAMPLE TABLES ARE NOT SCOPED TO AN ARRIVAL and agreed ones are.
+        The asymmetry is deliberate: an agreed supply belongs to an arrival
+        and the read-the-newest rule for the rest is the period's job, while
+        sample data sits in its own schema until a person discards it - so
+        the newest version of it is simply what a check developed against it
+        should read, whichever run staged it.
 
-        GROUNDWORK THAT ALREADY EXISTS for those, so the next session does
-        not rebuild it: `qa_store.IN_DEVELOPMENT` and the `supply_state`
-        column are there and every read already defaults to AGREED, so a
-        caller has to ASK for in-development verdicts to see them - which
-        is criterion 10 already enforced structurally, with nothing writing
-        them yet.
+        WHERE EACH CRITERION LANDED, so nobody has to infer it from the
+        code. The configuration half: 1, 2, 3, 4, 5, 11, 12 and 16 - a
+        dataset declares `no_calendar: not-yet-agreed` or `no_calendar:
+        never`, `schedule.calendar_for_dataset()` raises a DISTINCT
+        `NoCalendarAgreed` rather than a config error (which is what lets
+        the filing rule, the runway warning and the dashboard embed carry
+        on rather than stop), the gate still fails a bare omission, a
+        typo'd calendar name, both at once, an unrecognised value and a
+        declaration that also subsets a calendar it does not have, and
+        `schedule.owes_from()` is criterion 16's record. The display half:
+        7, 8 and 9 - `inNoRollup()`/`rollup()` in the template against
+        `in_no_rollup()`/`rollup_datasets()` in dataset_status.py, one test
+        driving the SAME inputs through both, and a `.pill.unagreed` saying
+        in words which of the two kinds it is. The running half: 6, 10, 13,
+        14, 15, 17, 18 and 19 - `sample_data.py`, the derived
+        `supply_state`, `add_run_views()`, and `mothman supply
+        discard-sample`.
+
+        ONE HONEST GAP, recorded rather than glossed: criterion 8 is
+        asserted on `unagreedMarker()`'s own output rather than on a
+        rendered page, because no calendar-less dataset exists in the real
+        build yet - there is nothing for a browser to render. The function
+        is what the page calls, so the logic is covered; the pixel is not.
+        The same limit applies to criteria 13 and 14 end to end: the two
+        source schemas and the mixed check are exercised against real
+        PostgreSQL and a fixture hierarchy, never against a shipped sample
+        dataset.
+
       - >
-        TESTED AGAINST A FIXTURE HIERARCHY RATHER THAN BY SHIPPING A
-        SAMPLE DATASET, and that is a deliberate call worth your reaction.
-        Criterion 12 asks the system to SUPPORT any number of
-        calendar-less datasets, not to ship one - and shipping one would
-        drag a contract, its checks and generated data behind it, for no
-        additional coverage of this requirement. The tests build the REAL
+        TESTED AGAINST A FIXTURE HIERARCHY RATHER THAN BY SHIPPING A SAMPLE
+        DATASET, and that is a deliberate call worth your reaction.
+        Criterion 12 asks the system to SUPPORT any number of calendar-less
+        datasets, not to ship one - and shipping one would drag a contract,
+        its checks and generated data behind it, for no additional coverage
+        of this requirement. The tests build the REAL
         contract/data-asset.yaml with its datasets replaced, so the
         calendars, claim windows and hierarchy shape are the real ones.
 

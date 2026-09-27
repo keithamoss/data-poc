@@ -218,8 +218,51 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
     # not copied; a record kept in two places is two records to keep in
     # step.
     declared = _declared_reads_tables()
-    spanning = [r for r in records if r.get("check_id") in declared]
-    own = [r for r in records if r.get("check_id") not in declared]
+
+    # WHETHER EACH RECORD IS REAL QUALITY HISTORY, DECIDED HERE ALONGSIDE
+    # WHOSE IT IS (REQ-PIPE-106 criteria 10 and 15). A result about a
+    # dataset that has declared it has no calendar is recorded as
+    # IN-DEVELOPMENT, and a cross-table check is in-development where ANY
+    # participant is - so a mixed check cannot move an agreed dataset's
+    # verdict, because the agreed dataset's own page reads AGREED results
+    # and this is not one.
+    #
+    # DERIVED, NEVER PASSED IN, which is the whole reason it is here rather
+    # than an argument on this function. Ten callers pass `verified` and any
+    # one of them could forget a `sample=True`; none of them can forget to
+    # be this line.
+    from qa_tools.common import qa_store as _qa_store
+    from qa_tools.common import sample_data
+
+    own_by_state: dict[str, list[dict]] = _empty_states()
+    spanning_by_state: dict[str, list[dict]] = _empty_states()
+    sample_ids = sample_data.sample_dataset_ids()
+    for index, record in enumerate(records):
+        if record.get("check_id") in declared:
+            state = sample_data.state_for_participants(
+                _participants(record.get("check_id"), declared), sample_ids=sample_ids)
+            spanning_by_state[state].append(record)
+        else:
+            state = sample_data.supply_state(record.get("dataset_id"),
+                                             sample_ids=sample_ids)
+            own_by_state[state].append(record)
+        # AND SAID ON THE RECORD ITSELF, for the in-development ones only.
+        # The reader drops it again for an agreed record
+        # (qa_results_reader's `_NOT_IN_A_RECORD`), and the reason both ends
+        # agree is that a LIVE run writes reports/results_*.json from the
+        # list it holds in memory while a rebuild reads it out of the
+        # database - so a field on one and not the other would make the two
+        # paths produce different dashboards from the same run. That has
+        # happened here before, measured at 432 results carrying tables_read
+        # from committed history and none from the live run.
+        #
+        # ONLY THE IN-DEVELOPMENT ONES, so an agreed record keeps the exact
+        # twenty keys it has always had. `supply_state` is a key column, so
+        # record_results drops it rather than duplicating it into `extra`.
+        if state == _qa_store.IN_DEVELOPMENT:
+            record["supply_state"] = _qa_store.IN_DEVELOPMENT
+            if verified and index < len(verified):
+                verified[index]["supply_state"] = _qa_store.IN_DEVELOPMENT
 
     # THE FAN-OUT, INTO THE DATABASE (REQ-PIPE-089). It writes a
     # committed tree of JSON files as well until this line's own history
@@ -239,7 +282,45 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
     # one-dataset collection is precisely where a special case would look
     # harmless.
     _record_in_database(agency, collection, run_id, run_timestamp, tool,
-                        raw_output, own, spanning, run_by)
+                        raw_output, own_by_state, spanning_by_state, run_by)
+
+
+def _participants(check_id: str | None, declared: dict[str, list[str]]) -> list[str]:
+    """The dataset ids a cross-table check reads, from its declaration.
+
+    A table the hierarchy does not map is SKIPPED rather than raised on:
+    the declaration is authored prose and the hierarchy gate is what
+    reports a name that resolves to nothing. Skipping is safe here for one
+    specific reason - a table nobody can resolve is not a configured
+    calendar-less dataset, so it cannot be the participant that makes this
+    check in-development.
+    """
+    from qa_tools.common import hierarchy
+
+    out = []
+    for table in declared.get(check_id) or ():
+        try:
+            out.append(hierarchy.dataset_for_table(table).dataset_id)
+        except Exception:  # noqa: BLE001 - see the docstring
+            continue
+    return out
+
+
+def _empty_states() -> dict[str, list[dict]]:
+    """One bucket per `supply_state`, both present even when empty.
+
+    THE EMPTY ONE IS LOAD-BEARING, and it is the same reasoning the write
+    below already has for writing an empty scope: each `record_results`
+    call REPLACES that (run, tool, scope, supply_state), so "this tool
+    found nothing in-development this time" has to clear what it found last
+    time. A dataset that GRADUATES between two runs is exactly that case -
+    its next run records nothing in-development, and the stale
+    in-development verdicts have to go rather than stand beside the real
+    ones for ever.
+    """
+    from qa_tools.common import qa_store
+
+    return {qa_store.AGREED: [], qa_store.IN_DEVELOPMENT: []}
 
 
 #: The two pseudo-tools. Neither is a QA tool - they describe a RUN -
@@ -258,8 +339,9 @@ RUN_LEVEL = ""
 
 
 def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp: str,
-                         tool: str, raw_output: Any, own: list[dict],
-                         spanning: list[dict], run_by: str | None) -> None:
+                         tool: str, raw_output: Any, own_by_state: dict[str, list[dict]],
+                         spanning_by_state: dict[str, list[dict]],
+                         run_by: str | None) -> None:
     """Record one tool's output for one run in the metadata schema.
 
     THE RUN KEY IS THE RUN ID, which is safe because this project
@@ -297,10 +379,18 @@ def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp
         # this time" has to clear what it found last time. Skipping the
         # empty case would leave a stale verdict standing, which is the
         # file-based equivalent of not rewriting a file.
+        #
+        # AND EVERY STATE, for the same reason (REQ-PIPE-106). A dataset
+        # that graduates between two runs records nothing in-development on
+        # the second, and the first run's in-development verdicts have to be
+        # cleared rather than left standing beside the real ones.
         keys = {"tool": tool, "agency_id": agency, "collection_id": collection}
-        qa_store.record_results(conn, run_id, own, **keys)
-        qa_store.record_results(conn, run_id, spanning, **keys,
-                                scope=qa_store.CROSS_TABLE_SCOPE)
+        for state, group in own_by_state.items():
+            qa_store.record_results(conn, run_id, group, **keys, supply_state=state)
+        for state, group in spanning_by_state.items():
+            qa_store.record_results(conn, run_id, group, **keys,
+                                    scope=qa_store.CROSS_TABLE_SCOPE,
+                                    supply_state=state)
 
 
 def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,

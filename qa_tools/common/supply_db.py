@@ -994,6 +994,52 @@ def create_run_views(conn, run_id: str, candidates: Mapping[str, Sequence[str]],
     return res
 
 
+def add_run_views(conn, run_id: str, candidates: Mapping[str, Sequence[str]],
+                  source_schema: str, base: Resolution) -> Resolution:
+    """Add views from a SECOND source schema to a run's existing schema.
+
+    WHY THIS IS NOT create_run_views WITH A FLAG. That function OWNS the
+    run's schema - it drops and recreates it, which is what makes a re-run
+    idempotent and what stops a stale view from an earlier attempt being
+    read as this run's. Calling it twice would throw the first source's
+    views away, and giving it a "don't drop" flag would make the same
+    function mean two different things depending on an argument.
+
+    THE CASE IT EXISTS FOR is a run whose collection holds both agreed
+    datasets and datasets with no calendar (REQ-PIPE-106 criteria 13 and
+    14): the first stage into shared `staging`, the second into `sample`,
+    and a cross-table check spanning them has to be able to read both. dbt
+    and Soda both read across schemas, established here by real experiment
+    - but only within one search path, so the views have to be together.
+
+    The resolution is MERGED into `base` - the one create_run_views just
+    returned - and PASSED IN rather than re-read from what the run recorded,
+    which borrow_views does because it runs much later. Re-reading here
+    would mean recording the first source's resolution, reading it back and
+    recording it again, so the intermediate state would briefly be the
+    published answer. A run whose schema holds views its record does not
+    name is under-reporting a fact nobody can reconstruct once the schema is
+    dropped, so the two have to land together.
+    """
+    schema = run_schema(run_id)
+    res = base
+    for logical in sorted(candidates):
+        physical = sorted(candidates[logical])
+        if len(physical) == 1:
+            conn.execute(
+                f'CREATE OR REPLACE VIEW "{schema}"."{_ident(logical, "table name")}" AS '
+                f'SELECT * FROM "{_ident(source_schema, "schema name")}"."{physical[0]}"')
+            res.resolved[logical] = physical[0]
+            res.ambiguous.pop(logical, None)
+            if logical in res.absent:
+                res.absent.remove(logical)
+        elif physical:
+            res.ambiguous[logical] = physical
+        elif logical not in res.resolved and logical not in res.absent:
+            res.absent.append(logical)
+    return res
+
+
 def borrow_views(conn, run_id: str, from_run_id: str, tables) -> list[str]:
     """Let one run read another run's supplies for the tables it was
     not sent.

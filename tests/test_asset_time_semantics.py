@@ -14,10 +14,12 @@ early/onTime/late verdict. Regenerate it ONLY when the committed
 history is legitimately rebuilt, never to make a failing test pass - a
 diff here after a timezone change is the finding, not the noise.
 
-REGENERATED TWICE, both times on 2026-09-23, both times checked rather
-than assumed - and `mothman debug capture-arrival-golden` is how, so
-the one operation that can silently destroy this pin has a recorded
-procedure instead of an ad-hoc script.
+REGENERATED THREE TIMES - twice on 2026-09-23, both checked rather than
+assumed, and once on 2026-09-28 to UNDO an extension that should never
+have happened (see TestEveryCommittedArrivalKeepsItsVerdict's own
+docstring). `mothman debug capture-arrival-golden` is how, so the one
+operation that can silently destroy this pin has a recorded procedure
+instead of an ad-hoc script.
 
   1. For REQ-GEN-042's rebuild, which renamed every run_id. The verdict
      distribution came back IDENTICAL - 131 onTime, 16 early, 3 late
@@ -106,22 +108,36 @@ def _built_datasets():
 
 
 class TestEveryCommittedArrivalKeepsItsVerdict:
-    """The pin proper. 162 real arrivals across 7 datasets.
+    """The pin proper. 150 real arrivals across 7 datasets.
 
-    IT WAS SILENTLY COVERING 150 OF THEM, found 2026-09-27 while
-    REQ-PIPE-089 moved QA history into the database - and the way it was
-    found is the point. The pin covered 18 Child Protection runs per
-    dataset while the corpus held 20, and it went on passing because
-    `_built_datasets()` reads `reports/*.json`, which is gitignored
-    build output: the reports in the working tree were stale in exactly
-    the same way as the pin. Rebuilding them from a real corpus made the
-    two disagree at once.
+    IT WAS EXTENDED TO 162 ON 2026-09-27 AND THAT WAS WRONG, corrected
+    2026-09-28 - and the correction is worth more than the pin, because
+    the mistake was invisible from here and obvious from CI.
 
-    This class's own docstring already said it: "a pin that silently
-    stops covering things is worse than none - it goes green by
-    measuring less." It did, for both reasons at the same time. The
-    twelve missing arrivals are pinned now, with their instants, and
-    none of the 150 that were already covered moved.
+    What happened: `_built_datasets()` reads `reports/*.json`, gitignored
+    build output, and rebuilding those from the working tree's own
+    `data/deliveries/` showed 20 Child Protection runs per dataset where
+    the pin held 18. That read as the pin having silently stopped covering
+    things, so twelve arrivals were added to the golden - cp_run_019 and
+    cp_run_020 across six datasets.
+
+    They were not arrivals. They were `handfiled-*` deliveries that one
+    CLI test had been filing into the real delivery tree on every run of
+    the suite (see tests/conftest.py's `_no_test_files_a_real_delivery`,
+    which now refuses that). A clean checkout has 18, so CI failed three
+    ways on a corpus that had never existed anywhere but this container.
+
+    THE LESSON IS ABOUT WHAT A GOLDEN MAY BE CAPTURED FROM. This one is
+    captured from `reports/*.json`, which is built from `data/`, which is
+    gitignored and accumulates - so the pin is only ever as trustworthy as
+    that directory was on the day. A disagreement between the pin and the
+    corpus is therefore TWO hypotheses, not one: the pin went stale, or the
+    corpus did. It was the corpus, and the reflex was to believe the
+    corpus.
+
+    So: before extending this golden, count the deliveries. `mothman
+    debug capture-arrival-golden` is still the recorded procedure, and
+    `ls data/deliveries | wc -l` is the question to ask first.
     """
 
     def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):
@@ -179,18 +195,28 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
 
     def test_the_distribution_is_the_one_that_was_measured(self):
         """A blunt backstop for the two tests above, readable without a
-        diff: 131 on time, 28 early, 3 late, measured 2026-09-27.
+        diff: 131 on time, 16 early, 3 late over 150 arrivals.
 
-        It read "131 / 16 / 3, measured 2026-09-23" until the twelve
-        uncovered Child Protection arrivals were added - all twelve are
-        early, which is why only that figure moved.
+        THIS NUMBER WENT TO 28 EARLY AND BACK, and the round trip is the
+        useful part. It moved to 28 on 2026-09-27 when twelve arrivals were
+        added to the golden - all twelve early, which is the only reason a
+        single figure moved and looked plausible. Those twelve were the
+        `handfiled-*` deliveries one CLI test had been leaving in the real
+        delivery tree, not arrivals at all, so the recapture on 2026-09-28
+        restored exactly 131 / 16 / 3 - the figure measured on 2026-09-23,
+        twice, against a corpus nothing had polluted.
+
+        A distribution coming back identical is therefore evidence the
+        corpus is the same corpus, which is precisely what was wanted and
+        precisely what 28 could not tell anybody.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"onTime": 131, "early": 28, "late": 3}
+        assert counts == {"onTime": 131, "early": 16, "late": 3}
+        assert sum(counts.values()) == 150
 
 
 class TestTheClassificationBoundaries:

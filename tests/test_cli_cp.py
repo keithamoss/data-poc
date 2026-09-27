@@ -261,7 +261,17 @@ def test_qa_command_local_folder_commit_records_the_run(
         monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir, clean_qa_history):
     from qa_tools.common import qa_results_reader as reader
 
-    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir)
+    # THE DELIVERY DIRECTORIES ARE REDIRECTED, and this test is why the
+    # guard in conftest exists: `--commit` FILES a real delivery, and
+    # without these two lines it filed one into this repo's own
+    # data/deliveries/ on every single run. Twenty-three of them had
+    # accumulated by the time CI found it - by which route is the part
+    # worth knowing, because nothing looked wrong locally: they pushed a
+    # bootstrap from 151 staged tables to 275, and they got themselves
+    # PINNED into tests/fixtures/arrival_semantics_golden.json as two extra
+    # Child Protection runs that no clean checkout has.
+    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir,
+                    (tmp_path / "deliveries", tmp_path / "receipts"))
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(cp.qa_command, [

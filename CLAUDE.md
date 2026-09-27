@@ -989,6 +989,54 @@ Rough layout:
     are under three seconds of the total. If a bootstrap seems slow,
     count `ls data/deliveries | wc -l` before blaming the engine.
 
+    **AND IT WAS NOT SMOKE-TESTING - THE TEST SUITE WAS DOING IT, found
+    2026-09-28.** The entry above blamed a person running the hand-filing
+    path by hand, which was wrong and comfortable: `mothman cp qa
+    --commit` FILES the supply, by design, and one CLI test invoked that
+    without redirecting the delivery directories. So every single run of
+    the suite filed one more real `handfiled-*` delivery into this repo's
+    own tree. Twenty-six of them by the time it was found.
+
+    **THE CLUTTER WAS THE SMALLEST PART OF THE DAMAGE, and this is the
+    bit worth carrying forward.** Everything that recognises arrivals
+    reads that tree, so those directories BECAME RUNS - 44 Child
+    Protection arrivals where a clean checkout has 18. Two of them got
+    themselves captured into
+    `tests/fixtures/arrival_semantics_golden.json` as `cp_run_019` and
+    `cp_run_020`, and that file is a CHARACTERIZATION PIN this project
+    measures timezone and arrival-semantics changes against. A test
+    artefact had become part of the corpus of record, and the pin then
+    disagreed with every clean checkout - which is exactly what CI
+    reported, three failures deep in a module about asset time that has
+    nothing to do with hand filing.
+
+    Fixed in four places rather than one: the test now redirects,
+    `tests/conftest.py`'s `_no_test_files_a_real_delivery` REFUSES any
+    test write into the real tree (rather than silently redirecting -
+    see its own docstring for why that distinction matters here), two
+    ORPHANED RUNS were deleted from the database, and the golden was
+    re-captured from a clean 18-run corpus.
+
+    **THE ORPHANED RUNS ARE THE PART TO REMEMBER, because deleting the
+    directories did not remove them and `--force` did not either.** A
+    bootstrap re-runs the arrivals it FINDS; nothing deletes a recorded
+    run whose delivery has since gone. So `qa.run` still held
+    `cp_run_019` and `cp_run_020` with 178 results each, the dashboard
+    build read all of them, and the golden went on failing after the
+    tree was clean - which reads as "the fix did not work" and is a
+    second copy of the same pollution one layer down. The check is one
+    query: compare `SELECT run_key FROM qa.run` against what
+    `arrivals.arrivals_for()` recognises, and anything only in the first
+    is an orphan. **There is no command for this yet** - `mothman supply
+    tidy` clears orphaned SCHEMAS, not orphaned runs.
+
+    **The standing lesson is the diagnosis, not the fix**: a wrong
+    number in a gitignored tree does not stay in the gitignored tree,
+    because committed fixtures get captured FROM it and recorded results
+    outlive it. Anything captured from `data/` is only as trustworthy as
+    `data/` was that day, and the database remembers a day the tree has
+    forgotten.
+
     **And never benchmark against the real `supply` database.** A quick
     timing script run that day did `TRUNCATE qa.run CASCADE` to get a
     clean measurement and destroyed the results a four-minute bootstrap
@@ -1562,6 +1610,26 @@ Rough layout:
     docs for anything installed here. The docs would still have been
     worth reading for what Evidently intends rather than what it
     happens to do.
+  - **`productionresultssa5.blob.core.windows.net`** - where GitHub
+    Actions actually stores a job's own log file. Hit 2026-09-28 reading
+    the first CI run that got as far as the test suite: a real `curl:
+    (56) CONNECT tunnel failed, response 403`, and `docs.github.com`
+    being allow-listed does not help, because this is the storage host
+    the log download redirects to rather than the API.
+
+    NOT FATAL, and worth saying how it was worked around so nobody
+    re-hits the dead end: the GitHub MCP server's own
+    `get_job_logs` returns the log CONTENT (`return_content: true`), and
+    a large one is written to a local file that can then be grepped. The
+    trap is that the tool returns a TAIL, and a job with a PostgreSQL
+    service container ends with ~1,100 lines of "there is no transaction
+    in progress" from the container's own log - so a 150-line tail shows
+    none of pytest's output and reads as though the log is empty. Ask for
+    ~4,000 lines and grep for `short test summary`.
+
+    Worth allow-listing anyway: this project's own standing rule is that
+    a real CI result has to be checked after every push, and a plain
+    `curl` of the log is the cheapest way to do it.
   - **`skills.lc`** - a design-review skill writeup, wanted for the
     UX-reviewer-agent precedent research.
   - **`patch-diff.githubusercontent.com`** - `cfisch3r/estimate` PR

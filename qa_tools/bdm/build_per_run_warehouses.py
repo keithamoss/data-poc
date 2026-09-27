@@ -28,7 +28,7 @@ from __future__ import annotations
 import os
 
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
-from qa_tools.common import arrivals, asset_time, load_log, supply_db, trial
+from qa_tools.common import arrivals, asset_time, load_log, sample_data, supply_db, trial
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
@@ -95,7 +95,11 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
         # declining to keep a check leaves nothing among real supplies
         # even in principle (REQ-PIPE-103 criterion 6). Read from the
         # run id rather than passed in - see supply_db.is_trial_run().
-        staging = supply_db.ensure_staging(conn, run_id)
+        #
+        # AND `sample` FOR A DATASET WITH NO AGREED CALENDAR
+        # (REQ-PIPE-106 criterion 4), which is the same decision asked of
+        # the dataset rather than of the run - see sample_data.schema_for().
+        staging = sample_data.ensure_schema_for_table(conn, run_id, TABLE)
         trial_scope = trial.scope_for(run_id)
         rows = None
         try:

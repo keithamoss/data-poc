@@ -13,6 +13,23 @@ from qa_tools.common import git_identity
 from qa_tools.common.git_identity import MissingGitIdentityError, get_run_by
 
 
+#: THE SERVICE VARIABLES ARE CLEARED FOR EVERY TEST IN THIS MODULE, and it
+#: is not tidiness - it is a real CI-only failure, 2026-09-28. `get_run_by()`
+#: checks for a Lambda and then for a GitHub Actions runner BEFORE it shells
+#: out to git, deliberately, so the three tests that assert the LOCAL git
+#: path passed on a laptop and failed on the runner, where GITHUB_ACTIONS is
+#: set by the runner itself. The tests were asserting about an environment
+#: they did not control.
+#:
+#: Cleared here rather than in each of them, because the next test written
+#: about the local path would be written on a laptop too - and would go red
+#: only in CI, which is the slowest place to find anything.
+@pytest.fixture(autouse=True)
+def _no_service_runtime(monkeypatch):
+    monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+
+
 def _git(repo, *args):
     subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
 

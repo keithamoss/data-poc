@@ -589,6 +589,76 @@ def tidy_command(yes: bool) -> None:
         conn.close()
 
 
+@supply_group.command("discard-sample")
+@click.option("--dataset", "dataset_id", required=True,
+              help="The dataset whose pre-graduation data to discard.")
+@click.option("--yes", is_flag=True, help="Skip the confirmation.")
+def discard_sample_command(dataset_id: str, yes: bool) -> None:
+    """Discard a dataset's pre-graduation data (REQ-PIPE-106 criteria 17, 18).
+
+    A PERSON DOES THIS, AND ONLY A PERSON. Nothing in the pipeline
+    discards sample data: not graduation, not a schedule, not as a side
+    effect of anything else. That is Keith's own condition from the day he
+    settled the fork (2026-09-27) and it is the half a bare "discard"
+    would have lost - graduation and discarding are two acts, and a
+    dataset growing up destroys nothing on its own.
+
+    WHY IT IS DISCARDED AT ALL, since the recommendation at the time was
+    to leave it where it is: sample data was received to develop checks
+    against, not as a supply anybody agreed, so keeping it for ever means
+    an agreed dataset carries rows nobody ever owed. Filing it to the
+    first period was rejected outright - that asserts it met a schedule
+    which did not exist when it arrived.
+
+    THE QA RECORD IS NOT TOUCHED (criterion 19). Developing a check is
+    real work and its record survives; this removes the DATA the checks
+    ran against, which is a different thing in a different place.
+    """
+    from qa_tools.common import hierarchy, sample_data, schedule, supply_db
+
+    try:
+        hierarchy.dataset(dataset_id)
+    except Exception as exc:  # noqa: BLE001 - the hierarchy's own message names the ids
+        raise click.ClickException(str(exc)) from exc
+    kind = schedule.no_calendar(dataset_id)
+    if kind is None:
+        # A GRADUATED DATASET'S DATA IS NOT THIS COMMAND'S TO TOUCH.
+        # Refusing is not pedantry: once a calendar is agreed the supplies
+        # are filed to periods and promoted, and "discard the sample data"
+        # has no meaning for them. Whatever is still in the sample schema
+        # from before graduation is reached by re-declaring nothing - it is
+        # keyed by dataset, and the dataset is the same one - so the honest
+        # answer is to say which state it is in rather than guess.
+        raise click.ClickException(
+            f"{dataset_id} has an agreed delivery calendar, so it has no "
+            f"pre-graduation data to discard. If it graduated and left sample "
+            f"data behind, discard it before the calendar is agreed.")
+
+    conn = supply_db.connect(label="mothman:discard-sample")
+    try:
+        found = sample_data.staged_tables(conn, dataset_id)
+        if not found:
+            console.print(f"[green]Nothing to discard[/green] - {dataset_id} has no "
+                           f"data in the {sample_data.SCHEMA} schema.")
+            return
+        waiting = ("no schedule agreed yet" if kind == schedule.NOT_YET_AGREED
+                   else "one-off extraction, no schedule ever")
+        console.print(f"[yellow]{len(found)} table(s)[/yellow] in "
+                       f"{sample_data.SCHEMA} for [bold]{dataset_id}[/bold] ({waiting}):")
+        for physical in found:
+            console.print(f"  {physical}")
+        if not yes and not click.confirm(
+                "Discard these? The data goes, the QA record made against it stays",
+                default=False):
+            console.print("[dim]Left alone.[/dim]")
+            return
+        dropped = sample_data.discard(conn, dataset_id)
+        console.print(f"[green]Discarded {len(dropped)} table(s).[/green] "
+                       f"The QA record is untouched.")
+    finally:
+        conn.close()
+
+
 @supply_group.command("grant-publisher")
 @click.option("--role", default="mothman_publisher", show_default=True,
               help="The role the dashboard build connects as.")

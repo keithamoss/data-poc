@@ -23,7 +23,7 @@ from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
 from qa_tools.common import load_log
 from qa_tools.common import supply_db
-from qa_tools.common import trial
+from qa_tools.common import period_schema, sample_data, trial
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -32,6 +32,56 @@ CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
 # The six CP tables, in the order contract/data-asset.yaml declares
 # them - resolved, not restated (REQ-QAC-039).
 TABLES = [d.table for d in hierarchy.datasets_in_collection("child-protection")]
+
+
+def _sample_and_agreed_tables() -> tuple[list[str], list[str]]:
+    """This collection's tables, split by whether a schedule is agreed.
+
+    Read from configuration on every call rather than computed once at
+    import, because a dataset GRADUATES (criterion 16) by its
+    configuration changing - and a module-level constant would hold the
+    answer from whenever this process started.
+    """
+    sample, agreed = [], []
+    for table in TABLES:
+        dataset_id = hierarchy.dataset_for_table(table).dataset_id
+        (sample if sample_data.is_sample(dataset_id) else agreed).append(table)
+    return sample, agreed
+
+
+def _build_run_views(conn, run_id: str, key: str, trial_scope) -> supply_db.Resolution:
+    """The run's view schema, over one source schema or two.
+
+    AGREED TABLES ARE SCOPED TO THIS ARRIVAL and sample tables are not,
+    and the asymmetry is the point rather than an oversight. An agreed
+    supply belongs to an arrival: this run is checking what arrived, and
+    the read-the-newest rule for the tables it did NOT carry is the
+    period's job, not this function's. Sample data has no arrival that
+    matters - it sits in its own schema until a person discards it
+    (criterion 18) - so the newest version of it is simply what a check
+    developed against it should read, whichever run staged it.
+
+    `period_schema.newest()` decides between versions rather than a
+    `max()` here, for the reason its own docstring gives: a physical name
+    orders by its arrival key and ordinal, never lexically.
+    """
+    sample_tables, agreed_tables = _sample_and_agreed_tables()
+    staging = supply_db.staging_schema_for(run_id)
+    res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
+        conn, staging, agreed_tables, arrival=key,
+        loaded=load_log.loaded_tables(trial_scope)), source_schema=staging)
+    if not sample_tables:
+        return res
+    # THE LOAD-RECORD GATE STILL APPLIES (REQ-PIPE-060 criterion 7).
+    # Physical presence is not readability wherever the table sits, and a
+    # truncated sample table is exactly as indistinguishable from a short
+    # one as a truncated staged table is.
+    found = supply_db.candidates_in(conn, sample_data.SCHEMA, sample_tables,
+                                    loaded=load_log.loaded_tables(trial_scope))
+    newest = {logical: [period_schema.newest(versions)]
+              for logical, versions in found.items()
+              if period_schema.newest(versions) is not None}
+    return supply_db.add_run_views(conn, run_id, newest, sample_data.SCHEMA, res)
 
 
 def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = None,
@@ -99,7 +149,14 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
         # declining to keep a check leaves nothing among real supplies
         # even in principle (REQ-PIPE-103 criterion 6). Read from the
         # run id rather than passed in - see supply_db.is_trial_run().
-        staging = supply_db.ensure_staging(conn, run_id)
+        #
+        # AND `sample` FOR A DATASET WITH NO AGREED CALENDAR
+        # (REQ-PIPE-106 criterion 4). PER DATASET rather than per run,
+        # which is the whole reason this collection needs the two-source
+        # view build below: six datasets in one collection can legitimately
+        # be a mix of agreed and still-being-developed-against, and a
+        # cross-table check across them has to read both (criterion 14).
+        staging = sample_data.ensure_schema_for_table(conn, run_id, table)
         trial_scope = trial.scope_for(run_id)
         rows = None
         try:
@@ -140,9 +197,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
         # AFTER THE LOAD, NEVER BEFORE (criterion 14).
         load_log.record_load(delivery_name, dataset_id, physical, load_log.LOADED,
                          asset_time.now().isoformat(), row_count=rows, trial=trial_scope)
-        res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
-            conn, staging, TABLES, arrival=key,
-            loaded=load_log.loaded_tables(trial_scope)), source_schema=staging)
+        res = _build_run_views(conn, run_id, key, trial_scope)
         # Recorded at staging time, which is the only moment this is an
         # observed fact rather than a re-derivation.
         supply_db.record_resolution(conn, res)

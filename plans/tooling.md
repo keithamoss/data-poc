@@ -2454,6 +2454,68 @@ somewhere shared. Option 3 would need it moved to a temporary output
 or given the opt-in, and that choice is the interesting part of the
 work rather than an implementation detail.
 
+**AND THE AUDIT WENT STALE IN TWO DAYS - option 1 failing exactly as
+it said it would, 2026-09-28.** The measurement above reported
+`CREATED: 0` and was true when taken. `REQ-PIPE-103` then landed hand
+filing on 2026-09-27, `mothman cp qa --commit` gained the ability to
+FILE a supply by design, and one CLI test invoked it without
+redirecting the delivery directories. From that day every single run
+of the suite wrote a real `handfiled-*` delivery into
+`data/deliveries/`. Twenty-six had accumulated when CI found it.
+
+This is worth reading against option 1's own sentence - "it stays true
+only as long as nobody adds a test that takes one of the reachable
+paths, which is precisely what nothing would flag". Nobody added such
+a test; a COMMAND an existing test already called grew the ability.
+The gap was not in the list of protected trees, it was that a
+measurement is a snapshot and the code kept moving.
+
+**What the damage actually was, because the clutter was the least of
+it.** Everything that recognises arrivals reads that tree, so those
+directories became RUNS - 44 Child Protection arrivals against a clean
+checkout's 18. They pushed a bootstrap from 151 staged tables to 275.
+And two of them were captured into
+`tests/fixtures/arrival_semantics_golden.json` as `cp_run_019` and
+`cp_run_020`: a characterization pin, committed, that then disagreed
+with every clean checkout and failed CI three ways inside a module
+about asset time. A test artefact had become part of the corpus this
+project measures itself against.
+
+**Option 3, applied narrowly rather than wholesale.**
+`tests/conftest.py`'s `_no_test_files_a_real_delivery` wraps
+`delivery.write_delivery` and RAISES when the target resolves to the
+real tree. It is the deny-by-default shape, scoped to one function
+rather than to `open`/`mkdir`/`unlink` - which is a smaller claim than
+option 3 makes and covers the one hole that actually opened. Note it
+REFUSES rather than redirecting, unlike the fixture beside it: every
+write here comes from a test that asked for `--commit`, so it knows it
+is filing something and can say where, and a silent redirect would
+leave it passing while asserting about a directory it never named.
+
+**AND THE DATABASE KEEPS A RUN AFTER ITS DELIVERY IS GONE - a second
+copy of the same pollution, one layer down.** Deleting the twenty-six
+directories did not remove the two runs they had produced, and
+`mothman pipeline bootstrap --force` did not either: a bootstrap
+re-runs the arrivals it FINDS, and nothing deletes a recorded run whose
+delivery has since disappeared. `qa.run` still held `cp_run_019` and
+`cp_run_020` with 178 results each, the dashboard build read them, and
+the golden went on failing after the tree was clean - which reads as
+"the fix did not work" rather than as a second instance.
+
+Removed by hand this time. The check is one query - compare `SELECT
+run_key FROM qa.run` against what `arrivals.arrivals_for()` recognises
+- and there is no command for it: `mothman supply tidy` clears orphaned
+SCHEMAS, not orphaned runs. Worth one, and worth thinking about first,
+because "the delivery is gone" and "this run should be forgotten" are
+not obviously the same statement: a real deployment may well delete an
+old delivery directory while wanting to keep years of QA history about
+it. That is the design question, and it is why this is a note rather
+than a fix.
+
+**The remaining options are unchanged and still worth doing.** This
+covers deliveries and nothing else, and the next capability to grow
+this way will not be a delivery.
+
 **THE INVERSE QUESTION, audited 2026-09-26 and CLEAN.** Everything
 above measures what the suite WRITES to real trees. The other half is
 what it ASSUMES ALREADY EXISTS, which is a different failure mode

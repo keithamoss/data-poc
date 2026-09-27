@@ -57,12 +57,21 @@ def build_results_from_history() -> dict:
     # sorts it away from its parent delivery; run_index doesn't.
     manifest.sort(key=lambda m: m["run_index"])
 
-    all_results = read_qa_results(AGENCY_ID, COLLECTION_ID)
+    # AND THE IN-DEVELOPMENT ONES (REQ-PIPE-106 criterion 7). `None` means
+    # every supply_state, and asking for it explicitly is the point: the
+    # reader defaults to AGREED so nothing counts check development as
+    # quality history by accident, and the dashboard is the one reader that
+    # has to show a calendar-less dataset's REAL verdicts - red, amber or
+    # green as the checks actually found - because developing a check means
+    # seeing whether it passes. What keeps them apart from here on is the
+    # `supply_state` each such record carries, and the rollup exclusion
+    # criterion 9 already built on both sides.
+    all_results = read_qa_results(AGENCY_ID, COLLECTION_ID, supply_state=None)
     # Symmetric with the Child Protection rebuild - see its own comment.
     # Birth Registrations declares no cross-table check today, so this
     # reads nothing; written anyway, because the collection that gets
     # one later must not be the thing that discovers the omission.
-    all_results += read_cross_table_results(AGENCY_ID, COLLECTION_ID)
+    all_results += read_cross_table_results(AGENCY_ID, COLLECTION_ID, supply_state=None)
 
     # ONE AGREED ORDERING down both paths (REQ-PIPE-038). A live run
     # emits a collection's tables interleaved; a rebuild reads them as
