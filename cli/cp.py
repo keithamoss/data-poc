@@ -214,17 +214,24 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
             f"Reference run {reference_run_id!r}'s delivery isn't on disk - "
             f"run generate-synthetic-data first?")
 
-    _load_delivery(reference_run_id)
-    _load_delivery(run_id)
-
-    # KEEP OR TRIAL IS DECIDED BEFORE THE CHAIN RUNS - see cli/bdm.py's
+    # KEEP OR TRIAL IS DECIDED BEFORE ANYTHING IS STAGED - see cli/bdm.py's
     # run_check() for the whole reasoning (REQ-PIPE-089 criterion 8).
-    if not keep:
-        entry = {**entry, "run_id": trial_mod.trial_run_id()}
+    #
+    # AND BEFORE, NOT AFTER, THE LOAD - which is a real bug this had for
+    # one commit. A run's staged tables are named for its run id
+    # (`staging.cp_clients__<run_id>`), so taking the trial identity after
+    # _load_delivery() had already staged under the manifest's own id left
+    # dbt looking for six tables that did not exist under that name. The
+    # identity has to be settled before the first thing that uses it.
+    recorded_run_id = run_id if keep else trial_mod.trial_run_id()
+    entry = {**entry, "run_id": recorded_run_id}
+
+    _load_delivery(reference_run_id)
+    _load_delivery_from_folder(arrival_path(run_id), recorded_run_id)
 
     results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by,
                                         on_step=on_step)
-    return results, entry["run_id"]
+    return results, recorded_run_id
 
 
 def run_check_local_folder(folder: str, reference_folder: str, run_by: str,

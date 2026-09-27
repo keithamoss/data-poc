@@ -9,7 +9,6 @@ missing.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -139,12 +138,13 @@ class TestTheDeclarationsInThisRepo:
         assert cl._table_list({}, "reads_tables") == []
 
 
-class TestItReachesTheCommittedFile:
-    """The end-to-end path, because everything above tests a function
-    and the requirement is about what is COMMITTED."""
+class TestItReachesTheRecordedResult:
+    """The end-to-end path, because everything above tests a function and
+    the requirement is about what is RECORDED. It asserted on a committed
+    JSON file until REQ-PIPE-089 made the results rows."""
 
-    def test_a_cross_table_checks_committed_result_carries_what_it_read(
-            self, tmp_path, monkeypatch):
+    def test_a_cross_table_checks_recorded_result_carries_what_it_read(
+            self, monkeypatch, finish_runs):
         # EMPTY FIRST, then record - the order matters and getting it
         # wrong is invisible: resetting after the resolution was written
         # simply deleted it, and the test then failed reporting a missing
@@ -172,26 +172,28 @@ class TestItReachesTheCommittedFile:
         qa_results_writer.write_qa_result(
             "child-protection-family-support", "child-protection", "cp_run_001",
             "2026-09-25T22:00:00+08:00", "dbt", {"raw": True},
-            verified=[_result(check_id)], results_dir=tmp_path / "qa_results")
+            verified=[_result(check_id)])
+        finish_runs("cp_run_001", agency="child-protection-family-support",
+                    collection="child-protection", when="2026-09-25T22:00:00+08:00")
 
         # THE RECORD FOLLOWED THE CHECK. REQ-QAC-037 moved cross-table
-        # results out of the dataset file and into the reserved scope
-        # beside it, so this asserts where the check actually is rather
-        # than where it used to be - and asserts it LEFT, which is that
+        # results out of the dataset's own results and into the reserved
+        # scope, so this asserts where the check actually is rather than
+        # where it used to be - and asserts it LEFT, which is that
         # requirement's criterion 2.
-        collection_dir = tmp_path / "qa_results" / "child-protection-family-support" / "child-protection"
-        assert not (collection_dir / "cp-placements").exists(), "the record did not leave"
-        cross = collection_dir / tr.CROSS_TABLE_SCOPE / "cp_run_001" / "dbt.json"
-        written = json.loads(cross.read_text())
-        assert written["verified"][0][tr.RESULT_FIELD] == {
-            "cp_carers": "cp_carers__20260801010000"}
+        assert qa_results_reader.read_one("child-protection-family-support", "child-protection",
+                                "cp_run_001", "dbt", dataset="cp-placements") == [], \
+            "the record did not leave"
+        cross = qa_results_reader.read_cross_table_results("child-protection-family-support",
+                                                 "child-protection")
+        assert len(cross) == 1
+        assert cross[0][tr.RESULT_FIELD] == {"cp_carers": "cp_carers__20260801010000"}
 
-    def test_a_run_with_no_recorded_resolution_writes_no_tables_read(
-            self, tmp_path, monkeypatch):
-        """Quiet on purpose, and safe to be: the run-level
-        tables_read.json records the same resolution for the whole run,
-        so an absence here is visible against a file that is always
-        written."""
+    def test_a_run_with_no_recorded_resolution_records_no_tables_read(
+            self, monkeypatch, finish_runs):
+        """Quiet on purpose, and safe to be: the run-level tables_read
+        record carries the same resolution for the whole run, so an
+        absence here is visible against something always recorded."""
         # An EMPTY database on this worker's PostgreSQL, which is what a
         # fresh file used to give (REQ-TEST-095).
         dbsupport.use_empty_supply_db(monkeypatch)
@@ -199,10 +201,13 @@ class TestItReachesTheCommittedFile:
 
         qa_results_writer.write_qa_result(
             "a", "b", "run_1", "2026-09-25T22:00:00+08:00", "dbt", {},
-            verified=[_result("anything")], results_dir=tmp_path / "qa_results")
+            verified=[_result("anything")])
+        finish_runs("run_1", agency="a", collection="b",
+                    when="2026-09-25T22:00:00+08:00")
 
-        written = tmp_path / "qa_results" / "a" / "b" / "cp-placements" / "run_1" / "dbt.json"
-        assert tr.RESULT_FIELD not in json.loads(written.read_text())["verified"][0]
+        recorded = qa_results_reader.read_one("a", "b", "run_1", "dbt", dataset="cp-placements")
+        assert recorded, "nothing was recorded at all"
+        assert not recorded[0].get(tr.RESULT_FIELD)
 
 
 class TestAPartialRunIsNotRecordedAsACompleteOne:

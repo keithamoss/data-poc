@@ -5,9 +5,7 @@ already built (real generator output, not hand-crafted rows), and drives
 the Click commands through click.testing.CliRunner, same pattern as
 tests/test_cli_bdm.py."""
 from __future__ import annotations
-import json
 
-from qa_tools.common import tables_read
 from qa_tools.common import hand_filing
 import os
 import re
@@ -112,42 +110,44 @@ def test_has_failures_true_on_fail_or_error_false_otherwise():
     assert cp.has_failures([{"status": "error"}]) is True
 
 
-def test_qa_command_flag_mode_reports_real_results_and_never_touches_real_qa_results(
+def test_qa_command_flag_mode_without_commit_is_a_trial(
         monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs):
+    """See cli/bdm.py's counterpart: "local-only check" described the
+    absence of a later promote step, and REQ-PIPE-089 made that absence
+    impossible - results are recorded as a run completes. Not keeping one
+    is a real thing now, a TRIAL identity that records nothing."""
     _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
 
     result = _runner.invoke(cp.qa_command, ["--run-id", _REF_RUN_ID, "--reference-run-id", _REF_RUN_ID])
 
     assert result.exit_code == 0, result.output
-    assert "local-only check" in result.output
-    assert not fake_qa_results.exists()
+    assert "TRIAL" in result.output
+    assert "nothing was recorded" in result.output
 
 
-def test_qa_command_flag_mode_commit_promotes_into_the_patched_qa_results_dir(
+def test_qa_command_flag_mode_commit_records_the_run_under_its_own_id(
         monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs):
+    """The kept case: the run keeps the manifest's own identity and its
+    results are readable afterwards, attributed to whoever ran it."""
+    from qa_tools.common import qa_results_reader as reader
+
     _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(cp.qa_command,
                              ["--run-id", _REF_RUN_ID, "--reference-run-id", _REF_RUN_ID, "--commit"])
 
     assert result.exit_code == 0, result.output
-    assert "Promoted" in result.output
-    dataset_stats_path = (fake_qa_results / cp.AGENCY_ID / cp.COLLECTION_ID
-                           / tables_read.RAW_SCOPE / _REF_RUN_ID / "dataset_stats.json")
-    assert dataset_stats_path.exists()
-    with open(dataset_stats_path) as f:
-        assert json.load(f)["run_by"] == "test@example.com"
+    assert "Recorded" in result.output
+    assert "TRIAL" not in result.output
+    provenance = reader.read_run_provenance(cp.AGENCY_ID, cp.COLLECTION_ID, _REF_RUN_ID)
+    assert provenance is not None, "the kept run recorded nothing"
+    assert provenance["run_by"] == "test@example.com"
 
 
 def test_qa_command_reports_real_failures_and_exits_nonzero(
         monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs):
     _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs)
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", tmp_path / "unused")
 
     result = _runner.invoke(cp.qa_command, ["--run-id", _DIRTY_RUN_ID, "--reference-run-id", _REF_RUN_ID])
 
@@ -223,8 +223,6 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
     """
     _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir,
                     (tmp_path / "deliveries", tmp_path / "receipts"))
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(cp.qa_command, [
@@ -244,8 +242,6 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
 
 def test_qa_command_local_folder_reports_real_cp_failures(monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
     _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
 
     result = _runner.invoke(cp.qa_command, [
         "--folder", os.path.join(cp_raw_dir, _DIRTY_RUN_ID),
@@ -259,14 +255,13 @@ def test_qa_command_local_folder_reports_real_cp_failures(monkeypatch, tmp_path,
     # "local-only check", which described the RESULTS and said nothing
     # about whether the supply had been filed.
     assert "nothing was filed and nothing was recorded" in _flat(result.output)
-    assert not fake_qa_results.exists()
 
 
-def test_qa_command_local_folder_commit_promotes_into_the_patched_qa_results_dir(
-        monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
+def test_qa_command_local_folder_commit_records_the_run(
+        monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir, clean_qa_history):
+    from qa_tools.common import qa_results_reader as reader
+
     _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(cp.qa_command, [
@@ -276,12 +271,10 @@ def test_qa_command_local_folder_commit_promotes_into_the_patched_qa_results_dir
     ])
 
     assert result.exit_code == 0, result.output
-    assert "Promoted" in result.output
-    matches = list(fake_qa_results.glob(
-        f"{cp.AGENCY_ID}/{cp.COLLECTION_ID}/{tables_read.RAW_SCOPE}/*/dataset_stats.json"))
-    assert len(matches) == 1
-    with open(matches[0]) as f:
-        assert json.load(f)["run_by"] == "test@example.com"
+    recorded = reader.list_run_ids(cp.AGENCY_ID, cp.COLLECTION_ID)
+    assert len(recorded) == 1, recorded
+    assert reader.read_run_provenance(cp.AGENCY_ID, cp.COLLECTION_ID,
+                                       recorded[0])["run_by"] == "test@example.com"
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -367,13 +360,13 @@ def test_run_check_s3_delivery_downloads_both_prefixes_then_delegates_to_local_f
         captured["reference_folder"] = reference_folder
         captured["run_by"] = run_by
         captured["keep"] = keep
-        return ([{"status": "pass"}], "/tmp/fake-results",
+        return ([{"status": "pass"}],
                 hand_filing.Filed("", "trial_x", (folder,), None))
 
     monkeypatch.setattr(cp, "run_check_local_folder", _fake_run_check_local_folder)
 
     _fake_client = MagicMock()
-    results, tmp_dir, _filed = cp.run_check_s3_delivery(
+    results, _filed = cp.run_check_s3_delivery(
         "my-bucket", "cp/delivery_002/", "cp/delivery_001/", "test@example.com",
         s3_client=_fake_client, keep=False)
 
@@ -386,7 +379,6 @@ def test_run_check_s3_delivery_downloads_both_prefixes_then_delegates_to_local_f
     # it must forward unchanged is the operator's decision.
     assert captured["keep"] is False
     assert results == [{"status": "pass"}]
-    assert tmp_dir == "/tmp/fake-results"
 
 
 def test_qa_command_s3_delivery_and_run_id_together_is_a_real_clean_error(monkeypatch):
@@ -432,7 +424,7 @@ def test_qa_command_s3_delivery_flag_mode_downloads_and_runs_real_checks(monkeyp
         captured.update(bucket=bucket, delivery_prefix=delivery_prefix,
                          reference_delivery_prefix=reference_delivery_prefix, run_by=run_by,
                          run_id=run_id, keep=keep)
-        return ([{"status": "pass"}], "/tmp/fake-results",
+        return ([{"status": "pass"}],
                 hand_filing.Filed("", "trial_x", (delivery_prefix,), None))
 
     monkeypatch.setattr(cp, "run_check_s3_delivery", _fake_run_check_s3_delivery)
@@ -536,7 +528,7 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
 
     monkeypatch.setattr(orchestrate_cp, "run_single", _fake_run_single)
 
-    results, tmp_dir, filed = cp.run_check_single_table(
+    results, filed = cp.run_check_single_table(
         "cp_clients", "/tmp/fresh_cp_clients.csv", "test@example.com",
         run_id="table_cp_clients_001", keep=False)
 
@@ -555,7 +547,6 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
     assert captured["reference_run_id"] == "cp_run_promoted"
     assert captured["run_by"] == "test@example.com"
     assert results == [{"status": "pass"}]
-    assert tmp_dir
     assert filed.delivery_name == "", "a trial filed a delivery"
 
 
@@ -578,12 +569,12 @@ def test_run_check_s3_single_table_downloads_then_delegates_to_single_table_mode
                                       keep=None, **kwargs):
         captured.update(table=table, file_path=file_path, run_by=run_by,
                         run_id=run_id, keep=keep)
-        return ([{"status": "pass"}], "/tmp/fake-results",
+        return ([{"status": "pass"}],
                 hand_filing.Filed("", "trial_x", (file_path,), None))
 
     monkeypatch.setattr(cp, "run_check_single_table", _fake_run_check_single_table)
 
-    results, tmp_dir, _filed = cp.run_check_s3_single_table(
+    results, _filed = cp.run_check_s3_single_table(
         "my-bucket", "cp_clients", "cp/delivery_005/cp_clients.csv", "test@example.com",
         keep=False)
 
@@ -593,7 +584,6 @@ def test_run_check_s3_single_table_downloads_then_delegates_to_single_table_mode
     assert captured["run_by"] == "test@example.com"
     assert captured["keep"] is False
     assert results == [{"status": "pass"}]
-    assert tmp_dir == "/tmp/fake-results"
 
 
 def test_qa_command_table_and_run_id_together_is_a_real_clean_error(tmp_path):
@@ -638,7 +628,7 @@ def test_qa_command_table_file_flag_mode_calls_run_check_single_table(monkeypatc
                                       keep=None, **kwargs):
         captured.update(table=table, file_path=file_path, run_by=run_by,
                         run_id=run_id, keep=keep)
-        return ([{"status": "pass"}], "/tmp/fake-results",
+        return ([{"status": "pass"}],
                 hand_filing.Filed("", "trial_x", (file_path,), None))
 
     monkeypatch.setattr(cp, "run_check_single_table", _fake_run_check_single_table)
@@ -662,7 +652,7 @@ def test_qa_command_table_s3_key_flag_mode_calls_run_check_s3_single_table(monke
                                          s3_client=None, keep=None, **kwargs):
         captured.update(bucket=bucket, table=table, key=key, run_by=run_by,
                         run_id=run_id, keep=keep)
-        return ([{"status": "pass"}], "/tmp/fake-results",
+        return ([{"status": "pass"}],
                 hand_filing.Filed("", "trial_x", (key,), None))
 
     monkeypatch.setattr(cp, "run_check_s3_single_table", _fake_run_check_s3_single_table)
