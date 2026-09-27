@@ -15571,24 +15571,36 @@ requirements:
         those records, without reading anything under data/ and
         without a second copy of them anywhere.
       - >
-        THE SYSTEM SHALL record how far processing has reached in that
-        same database, so that resuming after an interruption reads
-        the same position it would have read from the committed
-        marker.
+        THE SYSTEM SHALL determine how far processing has reached by
+        querying the recorded load outcomes, and SHALL NOT keep a
+        stored marker of its own.
+      - >
+        THE SYSTEM SHALL process, on each run, every arrival not yet
+        processed, at a cost bounded by the number of arrivals not yet
+        processed rather than by the total history received.
+      - >
+        THE SYSTEM SHALL NOT treat an arrival that was reached but not
+        fully processed as processed, so that an interrupted run costs
+        a re-process rather than skipping a supply.
+      - >
+        THE SYSTEM SHALL amend REQ-PIPE-061 criteria 6 and 7 and its
+        replay-cost constraint in the same change, so that no
+        requirement still describes a stored marker, and SHALL carry
+        forward what those clauses were protecting.
       - >
         THE SYSTEM SHALL stop committing processing_log/ and
         delivery_log/ to the repository, and SHALL remove both rather
         than leaving them in place to go stale.
       - >
         THE SYSTEM SHALL give the dashboard build read access to the
-        recorded QA results, load outcomes, delivery records and
-        processing marker, and to nothing else - never to any schema
-        holding supply rows.
+        recorded QA results, load outcomes and delivery records, and
+        to nothing else - never to any schema holding supply rows.
       - >
-        THE SYSTEM SHALL migrate the existing committed delivery and
-        load records into that database rather than discarding them,
-        and SHALL NOT leave the committed copies as a parallel source
-        of the same facts.
+        THE SYSTEM SHALL populate the database by regenerating this
+        PoC's synthetic history and re-running the real checks over
+        it, rather than by migrating the committed trees, and SHALL
+        delete both the trees and the migration code rather than
+        leaving either as a parallel source of the same facts.
     non_functional_requirements:
       - >
         SCALE is the reason `verified` wants real columns. Today's 60
@@ -15643,28 +15655,95 @@ requirements:
         degrade into reading all of history per dataset to render the
         current view.
     dependencies: [REQ-PIPE-087]
-    open_questions:
-      - >
-        THE SCHEMA'S SHAPE IS STILL UNSETTLED, and deliberately so -
-        Keith's explicit call was to have the options put to him
-        rather than decided cold. Two of the original four forks are
-        now answered and recorded in `decisions` (where `raw_output`
-        lives; what retention policy to take). THREE REMAIN: how
-        `verified` is shaped - a row per result with real columns, a
-        document per run, or columns plus a JSONB side-car for
-        tool-specific extras; whether a RUN is a first-class table
-        everything else keys to; and whether the `dataset_stats` and
-        `tables_read` pseudo-tools become real tables or stay
-        documents. None of them changes WHAT this requirement
-        promises - criteria 2, 3, 4 and 5 hold whichever way each
-        goes - but all three change what gets built, so they are put
-        to him before building rather than after.
+    open_questions: []
     decisions:
       - >
-        SCOPE, SETTLED 2026-09-27: four records move - the QA results,
-        the load outcomes, the delivery record, and the processing
-        marker. Keith's own answer, given after two corrections to
-        the question he was first asked.
+        THE SCHEMA, SETTLED 2026-09-27 (Keith, agreeing to three
+        recommendations after the options were put to him).
+
+        `verified` IS COLUMNS PLUS A JSONB SIDE-CAR. A real record has
+        22 fields, 20 of them scalar; `failing_sample_keys` is a list
+        and `tables_read` is a dict. So "a row per result with real
+        columns" collapses into this anyway the moment it meets those
+        two. Rejected: a DOCUMENT PER RUN, which is closest to today's
+        files and cheapest to build, and defeats the story - "every
+        failure of this check since we started" would mean unpacking
+        every document.
+
+        A RUN IS A FIRST-CLASS TABLE everything else keys to, rather
+        than repeating run_timestamp and run_by on every result row as
+        the files do today. Criterion 13 all but forces it: results
+        observable only once the run is complete needs ONE place to
+        flip, and without a run row completeness has to be inferred
+        from counting results - which is the false-green shape that
+        criterion exists to prevent.
+
+        `dataset_stats` STAYS A DOCUMENT per (run, dataset) and
+        `tables_read` BECOMES A REAL TABLE. They are not alike:
+        dataset_stats is heterogeneous presentation data read whole by
+        the dashboard with nothing querying inside it, so normalising
+        it buys nothing and costs a lot of schema; tables_read is
+        already a uniform (run, logical, physical) triple and answers
+        "which version of this table did that run read", which is
+        exactly the audit question worth being queryable across years.
+
+        MEASURED, so the trade is not guessed: 924 files, 6,563
+        verified records, 26 MB, of which raw_output is 15.7 MB - some
+        60% of the bytes are the payload nothing queries inside.
+      - >
+        THE PROCESSING MARKER IS DROPPED RATHER THAN MOVED (Keith,
+        2026-09-27: "let's ditch it and just derive from load records
+        - that's much easier now it's all going to be in a database").
+        His call, and the reason is sharper than convenience.
+
+        The marker existed to AVOID A SCAN. REQ-PIPE-061's constraint
+        is that replay cost be bounded by the arrivals not yet
+        processed rather than by total history, and over a file tree
+        the only way to hold that was to store the position. In a
+        database the same bound comes from an indexed aggregate over
+        the load outcomes, so the marker buys nothing it did not
+        already buy by being a file.
+
+        AND DERIVING IS STRICTLY SAFER. A stored marker can disagree
+        with the load records, and the way it fails is the dangerous
+        one: advanced optimistically past an arrival that was reached
+        but not finished, it turns a crash into a silently skipped
+        supply. Derived, there is nothing to advance and nothing to
+        disagree - the same reasoning that made "record the load AFTER
+        it is durable" the right order one layer down.
+
+        WHAT THIS COSTS: REQ-PIPE-061 is BUILT AND SIGNED, and its
+        criteria 6 and 7 name the marker explicitly. Criterion 21 here
+        amends them in the same change, restating the property -
+        bounded replay, never skip a reached-but-unfinished arrival -
+        while removing the mechanism. Same pattern REQ-DOCS-101 uses
+        for the clauses this switch falsifies.
+      - >
+        THE DATABASE IS POPULATED BY REBUILDING, NOT MIGRATING (Keith,
+        2026-09-27: "happy to nuke and rebuild - probably cleaner and
+        safer"). It also deletes qa_tools/common/qa_results_migrate.py,
+        which exists and is wired to nothing.
+
+        WHAT IS LOST, stated so it is a choice rather than a surprise:
+        every run_timestamp becomes the day of the rebuild rather than
+        the real day a session ran the pipeline, so the dashboard's
+        "who QA'd what, when" feed collapses into one burst; and every
+        run_by becomes whoever ran it.
+
+        WHAT IS NOT LOST, which is why this is safe: the generator is
+        seeded, so arrivals, receipts, delivery names and the data
+        itself regenerate identically, and the arrival history and
+        as-of views are unaffected. The only casualty is a timeline
+        recording when a session happened to run a command, which is
+        an artefact of how this PoC was built rather than a fact about
+        the data.
+      - >
+        SCOPE, SETTLED 2026-09-27: three records move - the QA
+        results, the load outcomes and the delivery record. The
+        processing marker was a fourth until the decision above
+        dropped it entirely rather than moving it. Keith's own answer,
+        given after two corrections to the question he was first
+        asked.
 
         THE FIRST CORRECTION: he answered "qa_results plus load
         records, holds and the marker", and HOLDS ARE NOT A SEPARATE
@@ -15682,22 +15761,23 @@ requirements:
         criterion 20 likewise went from "in committed history" to
         "durably". Both amendments were already pointing here.
       - >
-        FILINGS AND IN-FLIGHT OBSERVATIONS GO TO A FOLLOW-UP
-        (REQ-PIPE-104), not into this requirement - Keith's own call,
-        2026-09-27, having first asked what they were. They are the
-        same kind of thing and belong in the database for the same
-        reason; what separates them is that NEITHER HAS DATA TODAY.
-        `filings/` exists as code with recording switched off (his
-        call, 2026-09-25) and is gitignored; `observations/in_flight/`
-        is live code called on every run that writes nothing, because
-        a synthetic delivery is never mid-upload. So this requirement
-        keeps the records that have real history to migrate, and the
-        sibling takes the two that only have a destination.
+        FILINGS GO TO A FOLLOW-UP (REQ-PIPE-104), not into this
+        requirement - Keith's own call, 2026-09-27, having first
+        asked what a filing was. It belongs in the database for the
+        same reason as everything here; what separates it is that it
+        HAS NO DATA TODAY, existing as code with recording switched
+        off (his call, 2026-09-25) and gitignored. So this
+        requirement takes the records with real history and the
+        sibling builds a destination.
 
-        Rejected: leaving both on disk. The no-state rule would then
-        ship with two exceptions already scheduled to break it -
+        Rejected: leaving it on disk. The no-state rule would then
+        ship with an exception already scheduled to break it, since
         REQ-PIPE-062 turning filing recording on would immediately
         start writing committed state again.
+
+        IN-FLIGHT OBSERVATIONS WERE IN THAT SIBLING AND ARE NOW
+        DROPPED ALTOGETHER - see REQ-PIPE-104's own decisions, and
+        the receipt-writing question they turned out to depend on.
       - >
         `raw_output` STAYS IN THE DATABASE, ALL OF IT (Keith,
         2026-09-27, choosing "keep everything, prune raw_output
@@ -18034,116 +18114,350 @@ requirements:
         criterion 4 enforced by absence rather than by a rule.
 
   - id: REQ-PIPE-104
-    title: "Filings and in-flight observations are recorded in the database, never as committed files"
+    title: "A filing is recorded in the database, never as a committed file"
     date_written: "2026-09-27"
     story: >
-      As the person running this pipeline, I want the two remaining
-      records the system writes about its own work - where each supply
-      was filed, and what each run saw still arriving - to land in the
-      database like everything else, so that turning either of them on
-      does not start committing state to the repository again.
+      As the person running this pipeline, I want the record of which
+      slot each supply was filed against to land in the database like
+      everything else, so that turning filing recording on does not
+      start committing state to the repository again.
     moscow: must
     status: not_started
     source: >
-      Keith, 2026-09-27, splitting these out of REQ-PIPE-089's scope
-      after asking what they were: "option 1 but also filings/ and
+      Keith, 2026-09-27, splitting this out of REQ-PIPE-089's scope
+      after asking what a filing was and how it differs from the
+      delivery log: "option 1 but also filings/ and
       observations/in_flight/ - but explain what those are first",
       then choosing to take them as a follow-up rather than widening
-      089. What separates them from 089's four records is that
-      NEITHER HAS ANY DATA TODAY, so there is nothing to migrate and
-      nothing waiting on them.
+      089. In-flight observations were in this requirement for one
+      round and he then dropped them entirely - see the decisions
+      below. What separates a filing from 089's three records is that
+      IT HAS NO DATA TODAY, so there is nothing to rebuild and
+      nothing waiting on it.
     acceptance_criteria:
       - >
         THE SYSTEM SHALL record where each supply was filed - the
-        dataset, the supply, the slot, and which branch of the filing
-        rule put it there - in the warehouse database rather than as
-        a committed file.
+        dataset, the supply, the slot it was filed against, and which
+        branch of the filing rule put it there - in the warehouse
+        database rather than as a committed file.
       - >
         THE SYSTEM SHALL keep that record WRITE-ONCE, so that a supply
         already filed is left exactly as it was and is never
-        re-derived against a schedule that has moved on.
+        re-derived against a schedule that has since moved on.
       - >
-        THE SYSTEM SHALL record what each run observed still arriving
-        - the collection, when the run looked, and the filenames it
-        saw - in that same database, as an observation about the RUN
-        rather than a claim about the delivery.
+        THE SYSTEM SHALL keep a filing distinguishable from a delivery
+        record and from a QA verdict, since one delivery can carry
+        several datasets and each is filed separately against its own
+        dataset's schedule.
       - >
-        THE SYSTEM SHALL keep recording filenames rather than a count,
-        so that a list growing across runs reads as an upload in
-        progress and one that does not move reads as a delivery that
-        died.
+        THE SYSTEM SHALL let the dashboard build read the filings, and
+        SHALL NOT give it access to any schema holding supply rows.
       - >
-        THE SYSTEM SHALL write nothing where nothing was in flight,
-        so that the ordinary run leaves no observation at all.
+        THE SYSTEM SHALL remove filings/ from the repository and from
+        .gitignore, so that the path cannot quietly come back into
+        use.
       - >
-        THE SYSTEM SHALL let the dashboard build read both records,
-        and SHALL NOT give it access to any schema holding supply
-        rows.
-      - >
-        THE SYSTEM SHALL remove filings/ and observations/ from the
-        repository and from .gitignore, so that neither path can
-        quietly come back into use.
-      - >
-        THE SYSTEM SHALL leave no code path that writes either record
-        to disk.
+        THE SYSTEM SHALL leave no code path that writes a filing to
+        disk.
     non_functional_requirements:
       - >
-        NEITHER RECORD HAS DATA TO MIGRATE, and that is the whole
-        reason this is a separate requirement rather than part of
-        REQ-PIPE-089. `filings/` is code with recording switched off
-        (Keith, 2026-09-25) and is gitignored; `observations/in_flight/`
-        is live code called by both orchestrators on every run that
-        has never written a file, because a synthetic delivery is
-        never mid-upload. So this requirement builds a destination,
-        not a migration - and it must stay correct for the day a real
-        feed makes both of them start producing.
+        THERE IS NO DATA TO MIGRATE, and that is the whole reason this
+        is a separate requirement rather than part of REQ-PIPE-089.
+        `filings/` is code with recording switched off (Keith,
+        2026-09-25) and is gitignored, so this requirement builds a
+        destination rather than moving anything - and it has to stay
+        correct for the day REQ-PIPE-062 turns recording on.
       - >
-        IN-FLIGHT OBSERVATIONS CHURN, which no other record here
-        does. An in-flight delivery's file list legitimately differs
-        run to run and that difference IS the signal. As committed
-        files that was awkward - the one write-many record among
-        write-once ones; as rows it is ordinary, and the awkwardness
-        should not be carried across in the table's shape.
-      - >
-        A FILENAME IS POTENTIALLY IDENTIFYING in a Birth Registrations
-        or Child Protection context, which is why in_flight_log
-        records names and never contents. That line does not move
-        because the storage does, and it becomes easier to hold: a
-        database can grant per-agency access where a public
-        repository gave everyone everything.
+        A FILING IS EVIDENCE ABOUT A MOMENT, not a derived view, so
+        whatever shape it takes must not be recomputable-on-read. The
+        whole reason it is stored is that recomputing it later gives a
+        different answer, because the slot state it was decided
+        against has moved on.
     dependencies: [REQ-PIPE-089]
     open_questions:
       - >
         Whether REQ-PIPE-062's "turn filing recording on" is done by
         this requirement or remains its own step. The two are
-        adjacent - this builds the destination, that decides when
-        real filings start being written - and doing both here would
-        change behaviour REQ-PIPE-062 owns.
+        adjacent - this builds the destination, that decides when real
+        filings start being written - and doing both here would change
+        behaviour REQ-PIPE-062 owns.
     decisions:
       - >
         A FOLLOW-UP RATHER THAN PART OF REQ-PIPE-089 (Keith,
-        2026-09-27). He asked for all six records to move and then
-        chose to split them this way once it was clear the two here
-        have no data: 089 keeps the records with real history to
-        migrate, and this one takes the two that only need a
-        destination. Rejected: leaving both on disk, which would ship
-        the no-state-in-the-repository rule with two exceptions
-        already scheduled to break it, since REQ-PIPE-062 turning
-        filing recording on would immediately start writing committed
-        state again.
+        2026-09-27). He asked for every remaining record to move and
+        then chose to split on whether there was data to move: 089
+        takes the records with real history, this one takes the record
+        that only needs a destination. Rejected: leaving it on disk,
+        which would ship the no-state-in-the-repository rule with an
+        exception already scheduled to break it.
       - >
-        A FILING IS NOT A QA RESULT and the separation survives the
-        move. It is decided BEFORE any check runs, by a rule with no
-        human in it, and it outlives a supply that never produces a
-        verdict at all. The reason it is stored rather than
-        recomputed is that "why is this supply here" must be
-        answerable a year later, and recomputing it then gives a
-        different answer because the slot state it was decided
-        against has moved on.
+        A FILING IS NOT A DELIVERY RECORD, and the distinction is the
+        schedule. The delivery record says WHAT ARRIVED - the files,
+        our receipt instant, which dataset each file was attributed
+        to, what was contested or held. A filing says WHICH OBLIGATION
+        IT SATISFIES - this supply is Monday's delivery, or Q3's, or a
+        resupply of the slot last filled - and records which branch of
+        the rule decided.
+
+        They cannot be one record for three reasons: one delivery can
+        carry several datasets, each filed separately against its own
+        dataset's schedule; the filing depends on the schedule's state
+        at that moment, which the delivery record knows nothing about;
+        and recomputing a filing later gives a different answer,
+        because the slot state has moved on. That last one is why it
+        is stored rather than derived - "why is this supply here" has
+        to be answerable a year later.
       - >
-        AN IN-FLIGHT OBSERVATION IS ABOUT THE RUN, not the delivery,
-        and that framing is what made it recordable at all. A record
-        saying "delivery X is in flight" is a permanent claim about
-        something never accepted; "the run at 14:32 saw these" is a
-        fact about something that genuinely happened. Moving it into
-        the database must not quietly re-subject it to the delivery.
+        A FILING IS NOT A QA RESULT either. It is decided BEFORE any
+        check runs, by a rule with no human in it, and it outlives a
+        supply that never produces a verdict at all.
+      - >
+        IN-FLIGHT OBSERVATIONS ARE DROPPED ENTIRELY (Keith,
+        2026-09-27), having been in this requirement for one round.
+        REQ-PIPE-105 then settled the receipt question they depended
+        on, and its answer removes the gap rather than leaving it:
+        with every file its own arrival, a file that lands is
+        immediately an arrival with a receipt, so there is no
+        in-flight state left to observe.
+        They recorded, per run, the filenames a run saw still arriving
+        - deliveries with files on disk and no receipt yet, which are
+        otherwise invisible because a delivery is only "received" once
+        our receipt exists.
+
+        WHAT KILLED IT was his own question: what writes the receipt,
+        and is the in-flight window not tiny? Checked rather than
+        assumed - NOTHING IN A REAL DEPLOYMENT WRITES A RECEIPT. The
+        only writer in the repository is delivery.write_delivery(),
+        called by the generator and by the hand-filing path; nothing
+        in aws/lambda_handlers/ writes or reads one. So the window is
+        zero here only because the generator writes files and receipt
+        in one operation, and in a real deployment its size is
+        entirely determined by a design nobody has done.
+
+        The record was also the wrong SHAPE for what it was for. An
+        in-flight delivery is either gone in seconds or stuck for
+        ever, so the interesting state is "stuck since when", which is
+        one mutable row rather than an observation per run to be
+        diffed. Both the shape and the value depend on the receipt
+        design, so building either now would be guessing.
+
+        WHAT IS GIVEN UP, stated plainly: an upload that dies halfway
+        stays invisible until its slot goes overdue. One day for a
+        daily feed; up to three months on the quarterly asset. That
+        gap is open today and has been all along - this decision
+        declines to close it yet rather than closing it badly.
+
+  - id: REQ-PIPE-105
+    title: "Every arriving file is its own arrival, and its receipt is when our storage received it"
+    date_written: "2026-09-27"
+    story: >
+      As the person running this pipeline, I want every file that
+      arrives to be its own arrival, with a receipt stamped from the
+      moment our own storage took it, so that nothing has to work out
+      when a multi-file delivery is finished and no supply waits on a
+      signal a supplier will never send.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-27, scoping who writes a receipt - a question
+      that arose from REQ-PIPE-104's in-flight observations and turned
+      out to be bigger than them. Two findings drove it. First,
+      NOTHING IN A REAL DEPLOYMENT WRITES A RECEIPT: the only writer
+      in the repository is delivery.write_delivery(), called by the
+      generator and by REQ-PIPE-103's hand-filing path, and nothing in
+      aws/lambda_handlers/ writes or reads one - the receipt concept
+      and the ingest path were designed separately and never joined
+      up. Second, his own verdict on how Child Protection decides a
+      delivery is complete: "suppliers won't send manifest markers -
+      so the CP design is fundamentally WRONG."
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL treat every arriving file as its own arrival,
+        and SHALL process it without waiting for any other file.
+      - >
+        THE SYSTEM SHALL NOT require, detect or infer that a
+        multi-file delivery is complete, and SHALL NOT hold a supply
+        pending the arrival of another.
+      - >
+        THE SYSTEM SHALL write a receipt for every arrival, taken from
+        the instant our own storage recorded the object, and SHALL NOT
+        take it from the supplier's file, its contents, or a
+        timestamp the supplier controls.
+      - >
+        WHERE our storage records no such instant, THE SYSTEM SHALL
+        use our own clock at the moment of receipt, and SHALL record
+        which of the two it used.
+      - >
+        THE SYSTEM SHALL evaluate each arrival against, for every
+        table the arrival did not itself carry, the NEWEST SUPPLY
+        STAGED FOR THAT PERIOD, falling back to the period's promoted
+        state where none is staged - and SHALL NOT restrict a run to
+        the tables of the single arrival that triggered it.
+      - >
+        THE SYSTEM SHALL resolve several staged versions of one
+        logical table within a period by taking the newest, on the
+        same rule the promoted side already uses, rather than
+        reporting the table ambiguous.
+      - >
+        THE SYSTEM SHALL amend REQ-PIPE-035 criterion 3 in the same
+        change, since "the staged delivery's own tables" names a unit
+        that no longer exists once every file is its own arrival.
+      - >
+        THE SYSTEM SHALL amend REQ-PIPE-036 criteria 1, 2 and 7 in the
+        same change, so that no requirement still describes one QA run
+        per delivery or forbids one per table, and SHALL carry forward
+        what those clauses were protecting.
+      - >
+        THE SYSTEM SHALL retire qa_tools/cp/completion_tracker.py and
+        every document recommending a supplier-written completion
+        marker, and SHALL leave no code or prose presenting either
+        completion strategy as the intended design.
+      - >
+        WHERE a cross-table check cannot read a table because no
+        supply has been promoted into that period, THE SYSTEM SHALL
+        make plain that the check is red for want of a promoted
+        table rather than because of anything in the data.
+    non_functional_requirements:
+      - >
+        CROSS-TABLE CHECKS GO RED WHILE A DELIVERY IS STILL
+        ARRIVING, and then resolve. This was presented to Keith as
+        "every CP cross-table check red until promotion exists", and
+        that was WRONG - it assumed a run reads only its own
+        arrival's table plus promoted state. Reading the newest
+        supply staged for the period instead (criterion 5) means the
+        run triggered by the last file of a six-file delivery sees
+        all six, so the final evaluation resolves normally even with
+        nothing promoted at all. REQ-QAC-037 criterion 4 already
+        re-evaluates a cross-table check whenever a dataset it reads
+        receives an arrival, so the intermediate states are transient
+        by construction.
+
+        What remains is real but much smaller: during the minutes a
+        delivery is landing, a viewer can see a cross-table check red
+        for a table that has not arrived yet. Criterion 8 is what
+        keeps that legible rather than merely loud - a dashboard red
+        for reasons about our own timing rather than about the data
+        is how people learn to ignore red.
+      - >
+        SIX RUNS WHERE THERE WAS ONE, for a six-table Child
+        Protection delivery. At two datasets that is a rounding
+        error; the target is ~30 datasets on the quarterly asset, and
+        the real tool chain is the expensive part of a run. Whether
+        that matters is a question for the scale this is a PoC for
+        rather than for today's timings.
+      - >
+        A REFERENTIAL CHECK STILL ASKS WHETHER THE SUPPLY IS
+        COHERENT, which is worth stating because an earlier draft of
+        this requirement said it did not. Reading the newest staged
+        supply for the period keeps new-against-new where both have
+        arrived; it becomes new-against-promoted only for a table
+        genuinely not resupplied this period, which is the correct
+        comparison in that case.
+    dependencies: [REQ-PIPE-035, REQ-PIPE-036]
+    open_questions:
+      - >
+        Whether the local path should start writing receipts the same
+        way. Keith's call, 2026-09-27, was to leave the generator
+        writing files and receipt in one operation, because its job
+        is to produce a delivery that HAS arrived rather than to
+        simulate arrival mechanics. The cost is that the
+        receipt-writing path stays unexercised locally and therefore
+        as unverified as the rest of the AWS code.
+    decisions:
+      - >
+        DELIVERY-LEVEL COMPLETENESS IS DROPPED, NOT REPLACED (Keith,
+        2026-09-27). The question was how a multi-file delivery is
+        judged complete once a supplier-written marker is off the
+        table, and his answer was to stop asking: every file is its
+        own arrival.
+
+        REJECTED: THE DYNAMODB ARRIVAL COUNTER, which is already
+        built and tested against a mock and was written for exactly
+        this contingency - the design doc names it as the alternative
+        "if Keith's actual source systems can't guarantee 'marker
+        file lands last'". It counts to the expected set, so a
+        genuine five-of-six partial resupply never completes, never
+        gets a receipt, never gets QA'd and nothing reports it. That
+        is the same unbounded wait the marker had, one door along.
+
+        REJECTED: A QUIET PERIOD. It is the timeout rejected when
+        this was first scoped, the window is a guess, and a slow
+        supplier trickling files looks identical to a finished one.
+
+        REJECTED: A DEADLINE BACKSTOP - all expected tables or the
+        slot's due instant plus grace, whichever comes first, with a
+        partial delivery reported rather than hung. It works today
+        with no dependency on promotion and it keeps delivery-level
+        completeness, which is the thing being got rid of.
+      - >
+        THE MODEL ALREADY WORKED THIS WAY FOR THE PARTIAL CASE, which
+        is what makes this an extension rather than an inversion.
+        REQ-PIPE-036 criterion 7 already treats a table missing from
+        an earlier delivery and arriving later as its own delivery,
+        and REQ-QAC-037 criterion 4 already re-evaluates a
+        cross-table check whenever a dataset it depends on receives
+        an arrival. What changes is that the exception becomes the
+        rule, and criterion 2's "SHALL NOT trigger a separate QA run
+        per table within a delivery" goes with it.
+      - >
+        THE RECEIPT IS THE OBJECT'S LastModified IN OUR OWN BUCKET
+        (Keith, 2026-09-27), not the handler's now(). It is closer to
+        when we actually took custody and it survives a Lambda retry,
+        a queue delay, or a handler that runs minutes later.
+
+        IT IS OURS, which the existing rule reads as forbidding.
+        REQ-PIPE-060 criterion 11 says the receipt is our own instant
+        and "never the file's mtime" - written against a supplier's
+        file timestamp, which is a fact they control. An object's
+        LastModified in our bucket is written by our storage when it
+        finished accepting the bytes, and is a fact we control. The
+        rule needs restating to draw the line where it was actually
+        meant rather than where its wording happens to fall.
+
+        REJECTED: the handler's own now(), which records when we got
+        round to processing rather than when we received - the same
+        conflation REQ-PIPE-103 hit from the other direction and
+        plans/running-thoughts.md #52 is parked on.
+      - >
+        AN ARRIVAL'S RUN READS THE NEWEST SUPPLY STAGED FOR THE
+        PERIOD, NOT ONLY ITS OWN TABLE - Keith's own challenge,
+        2026-09-27, to a claim made here that was an overstatement
+        and wrong in two ways.
+
+        THE CLAIM: that with every file its own arrival, each run
+        checks one new table against five promoted ones, so a
+        delivery's internal consistency is never checked.
+
+        THE FIRST ERROR was assuming a run must scope to a single
+        arrival. It does today - candidates_in(arrival=key) - and for
+        a real reason: a run once built views from every version ever
+        staged, so on the forty-second run one logical name had
+        forty-two candidates and the ambiguity rule correctly refused
+        to choose. But "the newest staged version in this period" is
+        a different resolution and an unambiguous one, and it is
+        ALREADY the rule on the promoted side, where
+        newest(promoted.get(logical)) picks among a supply and its
+        resupplies. Applying it to staged tables is consistency
+        rather than invention.
+
+        THE SECOND ERROR was getting the failure direction backwards.
+        Even granting the first assumption, the claim that mutually
+        inconsistent files "all go green" is wrong: new notifications
+        referencing clients added this period, read against last
+        period's PROMOTED clients, resolve nothing and go RED. The
+        risk of arrival-scoping is spurious reds on good data, not
+        silent greens on bad.
+
+        WHY IT MATTERS RATHER THAN BEING A CORRECTION FOR ITS OWN
+        SAKE: the main argument against switching before promotion
+        exists was that every cross-table check would be red. Under
+        this rule the run triggered by a delivery's last file reads
+        all of it, so the final evaluation resolves with nothing
+        promoted at all, and the reds are transient.
+      - >
+        NOTHING IS BUILT BY THIS REQUIREMENT YET (Keith, 2026-09-27:
+        "write the requirement, build nothing yet"). The whole AWS
+        ingest path has never run against real AWS and cannot be
+        verified from this sandbox, so building would be replacing
+        untested code with untested code. What this does buy now is
+        that nobody builds on a premise already rejected.
