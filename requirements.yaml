@@ -16418,9 +16418,10 @@ requirements:
         THE SYSTEM SHALL reach the published site from that prompt by
         the same path the command uses, and by no other.
       - >
-        THE SYSTEM SHALL NOT publish as part of a non-interactive run,
-        so that a debugging run, a batch and a scheduled run cannot
-        publish a dashboard nobody asked for.
+        THE SYSTEM SHALL NOT publish from a pipeline run unless the
+        run was explicitly asked to, so that a debugging run, a batch
+        and a scheduled run cannot publish a dashboard nobody asked
+        for.
       - >
         THE SYSTEM SHALL name, in the published artifact, the commit
         the code was built from as well as the environment, so that a
@@ -16500,6 +16501,27 @@ requirements:
         being decided by default.
     decisions:
       - >
+        A PIPELINE RUN PUBLISHES ONLY WHEN ASKED - `--publish`, opt-in
+        (Keith, 2026-09-27, settling it after trying opt-out first).
+
+        AN OBJECTION MADE HERE EARLIER WAS WRONG, and correcting it
+        matters more than the outcome, because it was used to argue
+        against this exact flag. The claim was that `--publish` would
+        be "the second, ad hoc publish path criterion 10 forbids". It
+        is not. What criterion 10 forbids is a second WAY TO GET
+        CONTENT PUBLISHED - a hand-copied file, a workflow that
+        deploys something it did not gate. A flag invoking the same
+        gated path is another ENTRY POINT to the one path, which is
+        exactly what `mothman dashboard publish` and the post-QA
+        prompt already are.
+
+        WHICH LEAVES THE REAL QUESTION: which way a mistake falls.
+        Opt-in, forgetting the flag leaves the site lagging. Opt-out,
+        forgetting it publishes a dashboard nobody asked for. Both are
+        recoverable by publishing again, and only one is outward-facing
+        while it lasts - so opt-in is the safer default as well as the
+        one chosen.
+      - >
         TRANSPORT IS A BRANCH GITHUB PAGES SERVES, NOT A WORKFLOW
         (Keith, 2026-09-27). The environment builds, gates and pushes
         the artifact to an orphan branch; Pages serves it with no
@@ -16530,11 +16552,13 @@ requirements:
         Both halves matter, and they close opposite failures. A command
         alone means the published site silently lags the results,
         because publishing becomes a separate thing somebody has to
-        remember. A step of `mothman pipeline run` alone means every
-        debugging run attempts a publish - and putting that behind a
-        flag would be the second, ad hoc publish path criterion 10
-        forbids. A prompt is neither: the person who just ran QA is
-        asked, once, and answers.
+        remember. A step of `mothman pipeline run` that always ran would
+        mean every debugging run attempts a publish. A prompt is
+        neither: the person who just ran QA is asked, once, and
+        answers - and a pipeline run publishes only when `--publish`
+        says so. (An earlier version of this decision called that flag
+        "the second, ad hoc publish path criterion 10 forbids". It is
+        not, and the decision below corrects it.)
 
         THE PROMPT USES THE SAME PATH, which is why criterion 15 exists
         separately. A prompt that published by some shortcut would be
