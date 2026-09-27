@@ -16426,6 +16426,9 @@ requirements:
         THE SYSTEM SHALL name, in the published artifact, the commit
         the code was built from as well as the environment, so that a
         published dashboard can be traced to both.
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     non_functional_requirements:
       - >
         SECURITY: this REMOVES a credential from CI rather than adding
@@ -16474,31 +16477,24 @@ requirements:
         editing job with a real risk of leaving contradictory copies
         behind.
     dependencies: [REQ-PIPE-089, REQ-PIPE-091]
-    open_questions:
-      - >
-        DOES ACCEPTING AN AMBER SUPPLY ALSO BAR IT FROM AUTOMATIC
-        PROMOTION FOR EVER? It follows from what is already signed
-        rather than from anything anybody decided about accept, which
-        is why it is worth asking before it is built.
-
-        Keith settled the larger question on 2026-09-27: "'accept this
-        amber supply' is a decision worth logging too", so it is an
-        entry in the one log. REQ-PIPE-076 criterion 7 then says
-        "WHERE any decision has been recorded against a supply by a
-        person, THE SYSTEM SHALL NOT promote that supply automatically
-        thereafter", and criterion 12 keeps that bar for the life of
-        the supply.
-
-        So an accept bars automatic promotion. For a supply already
-        promoted - which it always is, because REQ-PIPE-075 criterion
-        1 promotes amber the moment QA completes - that only bites on a
-        re-run or a resupply. It may be exactly right: a person has
-        spoken about this supply and automation should defer. It is
-        just not a thing anybody chose.
-
-        See plans/running-thoughts.md #54 for the full mapping,
-        including why an accept is a new entry type and a reject is not.
     decisions:
+      - >
+        ACCEPTING AN AMBER SUPPLY DOES BAR IT FROM AUTOMATIC PROMOTION,
+        and that is accepted rather than merely noticed (Keith,
+        2026-09-27: "happy with that, signed off").
+
+        It follows from REQ-PIPE-076 criterion 7 - any decision
+        recorded against a supply by a person stops it being promoted
+        automatically thereafter - and criterion 12, which keeps that
+        bar for the life of the supply. An accept is such a decision.
+        Because REQ-PIPE-075 criterion 1 has already promoted the
+        supply by the time anybody looks, the bar only bites on a
+        re-run or a resupply.
+
+        Recorded as a decision rather than left implicit because it was
+        never chosen ABOUT accept - it was inherited from a clause
+        about decisions in general, and the person building this should
+        know it is deliberate.
       - >
         AN AMBER ACCEPT IS A NEW ENTRY TYPE; AN AMBER REJECT IS NOT
         (following from Keith's 2026-09-27 call that "'accept this
