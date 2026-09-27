@@ -9,6 +9,7 @@ import subprocess
 
 import pytest
 
+from qa_tools.common import git_identity
 from qa_tools.common.git_identity import MissingGitIdentityError, get_run_by
 
 
@@ -66,3 +67,72 @@ def test_lambda_identity_is_checked_before_ever_shelling_out_to_git(monkeypatch)
 
     monkeypatch.setattr("subprocess.run", _fail_if_called)
     assert get_run_by() == "aws-lambda:cp-ingest-handler"
+
+
+class TestAGitHubActionsRunnerAttributesToTheWorkflow:
+    """REQ-PIPE-105's own CI fallout, and the same reasoning the Lambda
+    branch already carries.
+
+    An Actions runner has a real `.git` checkout and no `git config
+    user.email`, so the local path failed there - for a reason that has
+    nothing to do with a person forgetting to configure git, because there
+    is no person. Found by the runner going red, not by reading.
+    """
+
+    def test_it_names_the_repository_and_the_workflow(self, monkeypatch):
+        monkeypatch.setenv("GITHUB_ACTIONS", "true")
+        monkeypatch.setenv("GITHUB_REPOSITORY", "keithamoss/data-poc")
+        monkeypatch.setenv("GITHUB_WORKFLOW", "Run test suite")
+        monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+        assert git_identity.get_run_by() == \
+            "github-actions:keithamoss/data-poc@Run test suite"
+
+    def test_it_never_shells_out_to_git_there(self, monkeypatch):
+        """The order is load-bearing rather than tidy: a runner DOES have a
+        checkout, so a developer's global config leaking into the image
+        would otherwise attribute a CI run to whoever was configured."""
+        monkeypatch.setenv("GITHUB_ACTIONS", "true")
+        monkeypatch.setenv("GITHUB_REPOSITORY", "o/r")
+        monkeypatch.setenv("GITHUB_WORKFLOW", "w")
+        monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+
+        def _never(*a, **k):
+            raise AssertionError("shelled out to git on an Actions runner")
+
+        monkeypatch.setattr(git_identity.subprocess, "run", _never)
+        assert git_identity.get_run_by().startswith("github-actions:")
+
+    def test_a_lambda_still_wins_over_an_actions_variable(self, monkeypatch):
+        """Both can be set at once in a test environment, and only one of
+        them can be true of a real runtime. Lambda first, because that is
+        the narrower claim."""
+        monkeypatch.setenv("GITHUB_ACTIONS", "true")
+        monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "cp-ingest-handler")
+        assert git_identity.get_run_by() == "aws-lambda:cp-ingest-handler"
+
+    def test_a_partial_actions_environment_still_attributes(self, monkeypatch):
+        """It does not raise. A real CI run taken down over a missing label
+        is worse than an attribution that says "github-actions" and names
+        what it could - and there is still no human being invented."""
+        monkeypatch.setenv("GITHUB_ACTIONS", "true")
+        monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+        monkeypatch.delenv("GITHUB_WORKFLOW", raising=False)
+        monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+        got = git_identity.get_run_by()
+        assert got.startswith("github-actions:")
+        assert "unknown-repository" in got
+
+    def test_a_developers_machine_is_unaffected(self, monkeypatch):
+        """GITHUB_ACTIONS is set by the runner and by nothing else, so a
+        local run still goes to the git identity - and still raises where
+        that is missing, which is the rule this must not weaken."""
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+        monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+        monkeypatch.setattr(git_identity.subprocess, "run",
+                             lambda *a, **k: _Result(0, "keith@example.gov.au\n"))
+        assert git_identity.get_run_by() == "keith@example.gov.au"
+
+
+class _Result:
+    def __init__(self, returncode, stdout):
+        self.returncode, self.stdout = returncode, stdout

@@ -101,11 +101,16 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
 
 def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_present(
         monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
-    """CP's own single-delivery entry point - assumes (as documented in
-    orchestrate_cp.run_single()'s own docstring) that all 6 tables have
-    already landed via 6 real add_table_to_run() calls before this is
-    ever invoked, exactly what a CP ingest Lambda would have done by the
-    time its own completion_tracker says the delivery is complete."""
+    """CP's own single-arrival entry point, with all six tables staged.
+
+    IT NO LONGER ASSUMES THAT, which is REQ-PIPE-105 criterion 1 - a run
+    is triggered by any one arriving file and reads the newest supply
+    staged for its period for every table that file did not carry. This
+    test stages all six because that is the case where the cross-table
+    checks have something to find, which is what it is asserting on; the
+    handler test in tests/test_lambda_handlers.py covers the one-file
+    case. Nothing waits for a completion signal any more, and there is no
+    completion tracker left to consult."""
     import qa_tools.cp.run_datacontract_cp as run_datacontract_cp
     import qa_tools.cp.run_dbt_cp as run_dbt_cp
     import qa_tools.cp.run_evidently_cp as run_evidently_cp

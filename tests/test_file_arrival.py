@@ -26,11 +26,16 @@ _CP_TABLE_PATTERN = {
     "dataset_id": "cp-clients",
     "extractTo": "cp_clients",
 }
-_CP_MARKER_PATTERN = {
+# A SECOND nested_folder PATTERN, and it is deliberately not a completion
+# marker any more (REQ-PIPE-105 retired those). What the test below is
+# actually about is pattern DISCRIMINATION - that two patterns matching
+# under one prefix resolve to different tables - and a second real table
+# exercises that without reintroducing a shape the design has dropped.
+_CP_SECOND_TABLE_PATTERN = {
     "type": "nested_folder",
-    "keyPattern": "raw/cp/{run_id}/_MANIFEST_COMPLETE.json",
-    "dataset_id": "cp-collection",
-    "extractTo": "_manifest",
+    "keyPattern": "raw/cp/{run_id}/cp_carers.csv",
+    "dataset_id": "cp-carers",
+    "extractTo": "cp_carers",
 }
 _ZIP_PATTERN = {
     "type": "zip_archive",
@@ -56,10 +61,14 @@ def test_nested_folder_pattern_resolves_table_via_extract_to():
     assert match.groups == {"run_id": "cp_run_09"}
 
 
-def test_marker_file_pattern_is_distinguishable_from_a_table_pattern():
-    match = match_arrival("raw/cp/cp_run_09/_MANIFEST_COMPLETE.json", [_CP_TABLE_PATTERN, _CP_MARKER_PATTERN])
+def test_two_patterns_under_one_prefix_resolve_to_different_tables():
+    match = match_arrival("raw/cp/cp_run_09/cp_carers.csv",
+                           [_CP_TABLE_PATTERN, _CP_SECOND_TABLE_PATTERN])
     assert match is not None
-    assert match.table == "_manifest"
+    assert match.table == "cp_carers", (
+        "a key matching the second pattern must not be attributed to the first - "
+        "under per-file arrivals this is how six tables in one folder stay six "
+        "distinct supplies")
 
 
 def test_unmatched_key_returns_none_not_an_error():

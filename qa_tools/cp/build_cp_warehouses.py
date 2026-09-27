@@ -46,9 +46,11 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
     body, called once per arriving CP table file so a delivery fills in
     incrementally as each of the 6 real tables lands, in whatever order
     they actually arrive (see plans/running-thoughts.md #5 Thread B /
-    docs/aws-event-driven-mvp-design.md - CP's own completion-tracking
-    design lives in qa_tools/cp/completion_tracker.py, not here; this
-    function only ever loads one table, it never decides completeness).
+    docs/aws-event-driven-mvp-design.md). It only ever loads ONE table,
+    and since REQ-PIPE-105 nothing anywhere decides completeness - there
+    is no completion tracker to point at, because every arriving file is
+    its own arrival and is checked against the newest supply staged for
+    its period.
 
     Safe to call for the same (run_id, table) more than once. The
     physical name carries the arrival instant (criterion 4), so

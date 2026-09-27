@@ -588,7 +588,10 @@ def main() -> None:
             delivery.write_delivery(
                 dname, csvs,
                 received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]),
-                deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR)
+                deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR,
+                # STORAGE - see generate_runs.py's identical note. The
+                # generator plays the object store here.
+                received_from=delivery.RECEIVED_FROM_STORAGE)
 
             tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
             resupply_tag = (f"  [resupply {n - 1}, received "

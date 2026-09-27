@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from qa_tools.common import delivery
+from qa_tools.common import asset_time, delivery
 
 PERTH = timezone(timedelta(hours=8))
 WHEN = datetime(2026, 8, 24, 14, 36, 3, tzinfo=PERTH)
@@ -263,3 +263,98 @@ class TestTwoArrivalsCanNeverShareADirectory:
         _write(dirs, "one")
         _write(dirs, "two", {"cp_clients.csv": "a\n"})
         assert delivery.existing_delivery_names(d) == {"one", "two"}
+
+
+class TestWhichClockStampedTheReceipt:
+    """REQ-PIPE-105 criteria 3 and 4.
+
+    A RECEIPT'S INSTANT IS THE ONE THING A LATENESS VERDICT IS COMPUTED
+    FROM, so where it came from is not metadata - it is how sure anybody
+    can be of the verdict. Two sources, and the receipt says which.
+    """
+
+    def test_a_supplied_instant_is_recorded_as_storages_own(self, tmp_path):
+        """What our object store said when it took the object - S3's
+        `LastModified`, set by S3 rather than by whoever uploaded."""
+        d, r = tmp_path / "deliveries", tmp_path / "receipts"
+        delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
+                                 WHEN, deliveries_dir=d, receipts_dir=r)
+        record = json.loads((r / "monday.json").read_text())
+        assert record["received_from"] == delivery.RECEIVED_FROM_STORAGE
+        assert record["received_at"].startswith(WHEN.date().isoformat())
+
+    def test_no_instant_means_our_own_clock_and_says_so(self, tmp_path):
+        """Criterion 4. The fallback is not silent: a receipt stamped by us
+        is a weaker claim than one storage made, and a reader judging
+        lateness has to be able to tell."""
+        d, r = tmp_path / "deliveries", tmp_path / "receipts"
+        before = asset_time.now()
+        delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
+                                 deliveries_dir=d, receipts_dir=r)
+        record = json.loads((r / "monday.json").read_text())
+        assert record["received_from"] == delivery.RECEIVED_FROM_OUR_CLOCK
+        stamped = asset_time.parse_instant(record["received_at"], "test")
+        assert stamped >= before, "our clock means now, not some other moment"
+
+    def test_a_caller_may_state_the_source_itself(self, tmp_path):
+        """hand_filing does exactly this: it supplies an instant AND says
+        that instant is ours, because an operator handing over a folder is
+        not our storage taking an object."""
+        d, r = tmp_path / "deliveries", tmp_path / "receipts"
+        delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
+                                 WHEN, deliveries_dir=d, receipts_dir=r,
+                                 received_from=delivery.RECEIVED_FROM_OUR_CLOCK)
+        assert json.loads((r / "monday.json").read_text())["received_from"] \
+            == delivery.RECEIVED_FROM_OUR_CLOCK
+
+    def test_a_third_source_is_refused(self, tmp_path):
+        """There is no 'unknown' and no 'supplier'. The second of those is
+        what criterion 3 forbids outright, and a vocabulary that admits it
+        is how it arrives."""
+        d, r = tmp_path / "deliveries", tmp_path / "receipts"
+        with pytest.raises(delivery.DeliveryFormatError, match="not a receipt source"):
+            delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
+                                     WHEN, deliveries_dir=d, receipts_dir=r,
+                                     received_from="the-filename")
+
+    def test_the_source_comes_back_on_the_delivery(self, tmp_path):
+        d, r = tmp_path / "deliveries", tmp_path / "receipts"
+        delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
+                                 WHEN, deliveries_dir=d, receipts_dir=r)
+        read = delivery.read_delivery("monday", deliveries_dir=d, receipts_dir=r)
+        assert read.received_from == delivery.RECEIVED_FROM_STORAGE
+
+    def test_a_receipt_written_before_this_field_reads_as_our_clock(self, tmp_path):
+        """The weaker of the two claims, deliberately. The alternative - a
+        hard error, the way a missing `sequence` is treated - would be
+        wrong here: a missing sequence breaks ORDERING, which has no safe
+        default, while a missing source only makes provenance less
+        certain. Asserting storage said something the record does not
+        mention would be the unsafe direction."""
+        d, r = tmp_path / "deliveries", tmp_path / "receipts"
+        delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
+                                 WHEN, deliveries_dir=d, receipts_dir=r)
+        record = json.loads((r / "monday.json").read_text())
+        del record["received_from"]
+        (r / "monday.json").write_text(json.dumps(record))
+        read = delivery.read_delivery("monday", deliveries_dir=d, receipts_dir=r)
+        assert read.received_from == delivery.RECEIVED_FROM_OUR_CLOCK
+
+    def test_it_is_never_taken_from_the_files_own_modification_time(self, tmp_path):
+        """Criterion 3's own words - not from the supplier's file, its
+        contents, or a timestamp the supplier controls. An mtime survives
+        a copy, so it is exactly the third of those, which is why this is
+        asserted rather than assumed."""
+        import os
+
+        d, r = tmp_path / "deliveries", tmp_path / "receipts"
+        delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
+                                 deliveries_dir=d, receipts_dir=r)
+        # Backdate the file by a decade. The receipt must not move.
+        target = d / "monday" / "birth_registrations.csv"
+        ancient = 946_684_800          # 2000-01-01
+        os.utime(target, (ancient, ancient))
+        read = delivery.read_delivery("monday", deliveries_dir=d, receipts_dir=r)
+        assert read.received_at.year > 2020, (
+            "the receipt followed the file's mtime - a supplier who preserves "
+            "timestamps on upload would be setting our own arrival record")

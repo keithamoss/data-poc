@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from qa_tools.common import delivery as delivery_module
 from qa_tools.common import delivery_log, supply_db, validate_arrival_patterns
 
 PERTH = timezone.utc
@@ -45,6 +46,11 @@ class _Delivery:
     #: record's own FILENAME, which is what the write-once defect
     #: below was about; nothing reads it now.
     sequence: int = 1
+    #: WHICH CLOCK STAMPED `received_at` (REQ-PIPE-105 criterion 4).
+    #: Defaulted to our clock here, which is the weaker claim, so a test
+    #: that does not care says the honest thing rather than asserting
+    #: storage reported an instant.
+    received_from: str = delivery_module.RECEIVED_FROM_OUR_CLOCK
 
 
 @dataclass

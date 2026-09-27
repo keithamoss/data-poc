@@ -198,16 +198,22 @@ def run_single(entry: dict, reference_run_id: str, run_by: str | None = None,
     batch loop - built for the AWS event-driven MVP (plans/running-
     thoughts.md #5 Thread B / docs/aws-event-driven-mvp-design.md).
 
-    Unlike orchestrate_bdm.run_single() (one call per arriving file), this
-    is called only ONCE per delivery, after a CP ingest Lambda has already
-    called build_cp_warehouses.add_table_to_run() for all 6 real tables
-    (each one landing its own CSV under data/cp_raw/<run_id>/ and its own
-    table in data/cp_duckdb_runs/<run_id>.duckdb) and confirmed completion
-    via qa_tools/cp/completion_tracker.py - this function has no way to
-    check that itself, since it has no manifest to cross-reference against;
-    calling it before all 6 tables have actually landed produces exactly
-    the kind of incomplete/wrong cross-table-check result the explicit-
-    completion-signal design exists to prevent.
+    ONE CALL PER ARRIVING FILE, exactly like orchestrate_bdm.run_single()
+    (REQ-PIPE-105 criterion 1). That is a reversal: this used to be called
+    once per DELIVERY, after a CP ingest Lambda had staged all six tables
+    and a completion tracker had confirmed they were all there, and this
+    docstring used to warn that calling it sooner produced an incomplete
+    cross-table result.
+
+    WHAT MAKES THAT WARNING OBSOLETE rather than merely relaxed: a run
+    reads the newest supply STAGED for its period for every table this
+    arrival did not itself carry, falling back to the period's promoted
+    state. So a call after the sixth file sees all six, and a call after
+    the first sees the first plus whatever the period already holds -
+    which is a true statement about the data as it stands, not a wrong
+    one. The completion signal existed to make waiting safe; not waiting
+    is safe, and it also removes the failure the signal could not avoid,
+    where a supply waits silently on a marker nobody sends.
 
     `entry` is a manifest-entry-shaped dict for this one delivery
     (run_id/received_at/dirty_severity at minimum - see data/cp_raw/

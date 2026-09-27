@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -338,6 +338,16 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery (
     -- one offset.
     received_at      text NOT NULL,
     received_instant timestamptz NOT NULL,
+    -- WHICH CLOCK STAMPED IT (REQ-PIPE-105 criterion 4): our own storage's
+    -- record of taking the object, or ours at the moment of receipt.
+    -- Recorded rather than inferred, because anything judging whether a
+    -- supply was late is judging that instant, and the two are different
+    -- claims about how sure we are of it.
+    --
+    -- DEFAULTS TO 'our-clock', which is the weaker of the two, so a record
+    -- written before this column existed does not come to assert that
+    -- storage said something it never did.
+    received_from    text NOT NULL DEFAULT 'our-clock',
     collections jsonb NOT NULL DEFAULT '[]',
     -- Derivable from the files below - two carrying one dataset_id -
     -- and stated anyway, for the reason REQ-PIPE-059 criterion 4 gave:
@@ -351,6 +361,10 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery (
     anomalies   jsonb NOT NULL DEFAULT '[]',
     recorded_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Self-healing for a database created before the column existed.
+ALTER TABLE "{SCHEMA}".delivery
+    ADD COLUMN IF NOT EXISTS received_from text NOT NULL DEFAULT 'our-clock';
 
 CREATE INDEX IF NOT EXISTS delivery_receipt_order
     ON "{SCHEMA}".delivery (received_instant);

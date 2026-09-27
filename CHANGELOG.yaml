@@ -158,6 +158,28 @@ releases:
               replacing one already in use all need a reason. A routine
               promotion does not - reasons you are made to give for everything
               stop meaning anything.
+      - category: Improved
+        items:
+          - headline: A supply no longer waits for the rest of its delivery
+            components: ["Pipeline & publishing"]
+            description: >
+              Every file that arrives is checked on its own, against the newest
+              version of the other tables it needs. Nothing has to work out when
+              a multi-file delivery has finished, so nothing can sit waiting for
+              a file that never comes.
+          - headline: Every arrival now records which clock timed it
+            components: ["Pipeline & publishing"]
+            description: >
+              An arrival is timed by when our own storage took the file, or by
+              our clock where storage does not say - and the record tells you
+              which. It is never taken from the file itself, which a supplier
+              controls.
+          - headline: A check run by automation now says which automation
+            components: ["Pipeline & publishing"]
+            description: >
+              A run from a scheduled workflow is credited to that workflow by
+              name rather than needing a person's details, so the activity feed
+              stops implying somebody was at a keyboard.
       - category: Fixed
         items:
           - headline: Which period each supply counts for is recorded in the warehouse

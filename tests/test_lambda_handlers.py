@@ -10,6 +10,7 @@ own event-parsing/routing/S3-upload logic, not the real 4-tool chain
 from __future__ import annotations
 import json
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock
 
 sys.path.insert(0, "aws/lambda_handlers")
@@ -107,7 +108,17 @@ def test_neither_handler_can_reach_a_results_bucket_at_all(monkeypatch):
         assert not hasattr(handler, "patch_write_qa_result_for_lambda")
 
 
-def test_cp_handler_loads_a_table_arrival_without_running_the_full_pipeline(monkeypatch, tmp_path):
+def test_cp_handler_checks_every_table_arrival_on_its_own(monkeypatch, tmp_path):
+    """REQ-PIPE-105 criterion 1, and the assertion is INVERTED from what it
+    was. It used to read "a single table arrival must never trigger the full
+    pipeline on its own", which was the completion signal's whole premise:
+    the cross-table checks needed all six tables, so five of six arrivals
+    staged and stopped.
+
+    Nothing waits now. A run reads the newest supply staged for that period
+    for every table this arrival did not carry, so one file is enough to
+    check - and a supply never waits on a signal a supplier may never send.
+    """
     fake_client = MagicMock()
     fake_client.download_file.side_effect = lambda bucket, key, local_path: open(local_path, "w").close()
     fake_boto3 = MagicMock()
@@ -117,84 +128,35 @@ def test_cp_handler_loads_a_table_arrival_without_running_the_full_pipeline(monk
     captured = {}
     monkeypatch.setattr(cp_ingest_handler.build_cp_warehouses, "add_table_to_run",
                          lambda run_id, table, csv_path: captured.setdefault("calls", []).append((run_id, table)))
-    run_single_called = []
-    monkeypatch.setattr(cp_ingest_handler.orchestrate_cp, "run_single", lambda *a, **k: run_single_called.append(1))
+    monkeypatch.setattr(cp_ingest_handler.orchestrate_cp, "run_single",
+                         lambda entry, reference_run_id: [{"status": "pass"}])
 
     result = cp_ingest_handler.handler(_s3_created_event("raw-bucket", "cp/cp_run_09/cp_clients.csv"))
 
     assert captured["calls"] == [("cp_run_09", "cp_clients")]
-    assert not run_single_called, "a single table arrival must never trigger the full pipeline on its own"
     body = json.loads(result["body"])
     assert body["tables_loaded"] == 1
-    assert body["deliveries_completed"] == 0
-
-
-def test_cp_handler_runs_the_full_pipeline_only_once_the_marker_confirms_all_keys_exist(monkeypatch, tmp_path):
-    manifest_keys = {"cp_clients": "cp/cp_run_09/cp_clients.csv", "cp_carers": "cp/cp_run_09/cp_carers.csv"}
-    manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest_keys))
-
-    fake_client = MagicMock()
-
-    def fake_download_file(bucket, key, local_path):
-        if key.endswith("_MANIFEST_COMPLETE.json"):
-            with open(manifest_path) as src, open(local_path, "w") as dst:
-                dst.write(src.read())
-        else:
-            open(local_path, "w").close()
-
-    fake_client.download_file.side_effect = fake_download_file
-    fake_client.head_object.return_value = {}  # exists - no exception raised
-    fake_boto3 = MagicMock()
-    fake_boto3.client.return_value = fake_client
-    monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
-
-    captured = {}
-
-    def fake_run_single(entry, reference_run_id):
-        captured["entry"] = entry
-        captured["reference_run_id"] = reference_run_id
-        return [{"status": "pass"}]
-
-    monkeypatch.setattr(cp_ingest_handler.orchestrate_cp, "run_single", fake_run_single)
-
-    result = cp_ingest_handler.handler(_s3_created_event("raw-bucket", "cp/cp_run_09/_MANIFEST_COMPLETE.json"))
-
-    assert captured["entry"]["run_id"] == "cp_run_09"
-    assert captured["reference_run_id"] == cp_ingest_handler.REFERENCE_RUN_ID
-    body = json.loads(result["body"])
-    assert body["deliveries_completed"] == 1
+    assert body["arrivals_checked"] == 1, "one file is one arrival, and an arrival is checked"
     assert body["pass"] == 1
 
 
-def test_cp_handler_skips_the_full_pipeline_when_the_marker_lists_a_key_that_does_not_exist_yet(monkeypatch, tmp_path):
-    manifest_keys = {"cp_clients": "cp/cp_run_09/cp_clients.csv", "cp_carers": "cp/cp_run_09/cp_carers.csv"}
-    manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest_keys))
+def test_the_cp_handler_has_no_completion_tracking_left(monkeypatch):
+    """Criterion 9, asserted on the module for the same reason the results
+    bucket is above: a handler reintroducing a completion signal has to
+    notice this test rather than a reviewer having to.
 
-    fake_client = MagicMock()
+    The failure it guards is specific. Six independent upstream systems
+    each landing their own table with no orchestration to coordinate a
+    marker was in the retired design's own recommendation as the case that
+    breaks it - and what breaks is a supply waiting silently forever.
+    """
+    import qa_tools.cp as cp_package
 
-    def fake_download_file(bucket, key, local_path):
-        with open(manifest_path) as src, open(local_path, "w") as dst:
-            dst.write(src.read())
-
-    fake_client.download_file.side_effect = fake_download_file
-
-    def fake_head_object(Bucket, Key):
-        if Key == "cp/cp_run_09/cp_carers.csv":
-            raise Exception("404 Not Found")
-        return {}
-
-    fake_client.head_object.side_effect = fake_head_object
-    fake_boto3 = MagicMock()
-    fake_boto3.client.return_value = fake_client
-    monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
-    run_single_called = []
-    monkeypatch.setattr(cp_ingest_handler.orchestrate_cp, "run_single", lambda *a, **k: run_single_called.append(1))
-
-    result = cp_ingest_handler.handler(_s3_created_event("raw-bucket", "cp/cp_run_09/_MANIFEST_COMPLETE.json"))
-
-    assert not run_single_called, "the marker's own listed keys weren't all real yet - must not trust it"
-    body = json.loads(result["body"])
-    assert body["skipped"] == 1
-    assert body["deliveries_completed"] == 0
+    assert not hasattr(cp_ingest_handler, "ManifestMarkerCompletionTracker")
+    assert not hasattr(cp_ingest_handler, "_head_object_exists")
+    # No seventh pattern: the marker file is not a supply.
+    assert len(cp_ingest_handler.CP_ARRIVAL_PATTERNS) == len(cp_ingest_handler.CP_TABLE_NAMES)
+    assert not any("MANIFEST" in p["keyPattern"]
+                    for p in cp_ingest_handler.CP_ARRIVAL_PATTERNS)
+    # And the module itself is gone rather than merely unused.
+    assert not (Path(cp_package.__file__).parent / "completion_tracker.py").exists()

@@ -145,9 +145,15 @@ def file_supply(paths, collection_id: str, run_id_prefix: str,
         # decoding-then-re-encoding would quietly normalise a BOM, a
         # line ending or an encoding we were meant to notice.
         files[p.name] = p.read_bytes()
+    # OUR CLOCK, SAID OUT LOUD (REQ-PIPE-105 criterion 4). An operator
+    # hands us a folder; nothing recorded when storage took it, because
+    # storage did not take it - we did. The alternative available here is
+    # the files' own mtimes, which is exactly what criterion 3 rules out:
+    # an mtime survives a copy, so it can be a timestamp the SUPPLIER set.
     directory = delivery.write_delivery(
         name, files, received_at=received_at,
-        deliveries_dir=deliveries_dir, receipts_dir=receipts_dir)
+        deliveries_dir=deliveries_dir, receipts_dir=receipts_dir,
+        received_from=delivery.RECEIVED_FROM_OUR_CLOCK)
 
     # THE RUN ID COMES BACK FROM RECOGNITION, never from the caller
     # (criterion 1). Asking for it rather than computing it is what

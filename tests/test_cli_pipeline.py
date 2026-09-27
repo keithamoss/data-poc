@@ -164,12 +164,17 @@ def _log_one(conn, name):
     """
     from types import SimpleNamespace
 
-    from qa_tools.common import asset_time, delivery_log
+    from qa_tools.common import asset_time, delivery, delivery_log
 
     return delivery_log.record(
         SimpleNamespace(name=name, files=[], anomalies=[],
                         received_at=asset_time.parse_instant(
-                            "2026-01-01T09:00:00+08:00", name)),
+                            "2026-01-01T09:00:00+08:00", name),
+                        # Which clock stamped it (REQ-PIPE-105 criterion 4).
+                        # OUR_CLOCK because this fixture is the one taking
+                        # the instant, which is the weaker claim and the
+                        # honest one.
+                        received_from=delivery.RECEIVED_FROM_OUR_CLOCK),
         SimpleNamespace(by_dataset={}, contested={}, collections=[]),
         conn=conn)
 

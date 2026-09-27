@@ -19438,7 +19438,7 @@ requirements:
       when a multi-file delivery is finished and no supply waits on a
       signal a supplier will never send.
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-27"
@@ -19540,6 +19540,53 @@ requirements:
     dependencies: [REQ-PIPE-035, REQ-PIPE-036]
     open_questions: []
     decisions:
+      - >
+        BUILT IN STAGES, and this records where it got to on 2026-09-28 so
+        nobody has to infer it from the code. `in_progress` rather than
+        `built` because the register's gate forbids evidence on anything
+        not built, and a status that overclaims is worse than one that
+        cannot carry the detail.
+
+        DONE: criterion 9 - `qa_tools/cp/completion_tracker.py` and its
+        tests are deleted, the CP ingest handler checks every table
+        arrival instead of waiting for a marker, the DynamoDB table and
+        its IAM grant are out of the CDK stack, and
+        `docs/aws-event-driven-mvp-design.md`'s recommendation is replaced
+        by an account of why the marker was the wrong shape rather than
+        merely unnecessary. Criteria 3 and 4 - a receipt records WHICH
+        CLOCK stamped it, storage's own or ours, carried through
+        `delivery.Delivery` and into `qa.delivery.received_from`, with a
+        third value refused outright and a test proving the instant never
+        follows a file's mtime.
+
+        NOT DONE: criteria 1, 2, 5 and 6 - the arrival UNIT itself, which
+        is still the delivery folder rather than the file, and the overlay
+        reading the newest supply staged for the period. Criteria 7 and 8,
+        the amendments to REQ-PIPE-035 and REQ-PIPE-036, go with that
+        change rather than ahead of it. Criterion 10's legible red for a
+        table nothing has promoted is unbuilt.
+      - >
+        A TENSION WITH REQ-PIPE-059 THAT THIS REQUIREMENT DOES NOT
+        ADDRESS, found while building and worth your eyes rather than my
+        guess. Criterion 6 says several staged versions of one logical
+        table within a period resolve to the NEWEST rather than being
+        reported ambiguous. REQ-PIPE-059 holds a supply when two files in
+        one arrival both claim one dataset, and refuses to choose between
+        them - deliberately, because nothing distinguishes them.
+
+        Once an arrival is one FILE, those two files are two arrivals, and
+        if they share a receipt instant "newest" is decided by an ordinal
+        that means nothing. Newest-wins would then silently pick one of
+        two contested files, which is the choice 059 exists not to make.
+
+        THE READING I INTEND, unless you say otherwise: "newest" is by
+        RECEIPT INSTANT, and where two share an instant the hold still
+        applies. That resolves versions that arrived at different times -
+        the common case once every file is its own arrival - and still
+        refuses where it genuinely cannot tell. It preserves both
+        requirements and is the conservative direction. Recorded here
+        rather than built on quietly, because it is the sort of thing that
+        reads as settled once the code exists.
       - >
         DELIVERY-LEVEL COMPLETENESS IS DROPPED, NOT REPLACED (Keith,
         2026-09-27). The question was how a multi-file delivery is

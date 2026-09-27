@@ -473,7 +473,14 @@ def main() -> None:
                 {f"birth_registrations_{delivery_obj.received_date.isoformat()}.csv":
                     delivery_obj.payload.to_csv(index=False)},
                 received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]),
-                deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR)
+                deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR,
+                # STORAGE, because in this PoC the generator IS storage
+                # (REQ-PIPE-105 criterion 4). It is standing in for the
+                # moment our own object store took a supplier's file, the
+                # same way its CSVs stand in for the supplier's extract -
+                # so the receipt says what it is simulating rather than
+                # claiming our clock stamped a 2023 instant this morning.
+                received_from=delivery.RECEIVED_FROM_STORAGE)
 
             tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
             resupply_tag = (f"  [resupply {n - 1}, received "

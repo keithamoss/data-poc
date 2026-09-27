@@ -42,6 +42,32 @@ from qa_tools.common import arrival_patterns, asset_time, delivery_boundary
 ROOT = Path(__file__).resolve().parent.parent.parent
 DELIVERIES_DIR = ROOT / "data" / "deliveries"
 RECEIPTS_DIR = ROOT / "data" / "receipts"
+
+#: WHERE A RECEIPT'S INSTANT CAME FROM (REQ-PIPE-105 criteria 3 and 4).
+#:
+#: `STORAGE` means our own storage recorded when it took the object, and
+#: that instant is what the receipt carries - S3's `LastModified`, set by
+#: S3 when the object is stored rather than by whoever uploaded it. This is
+#: the one to prefer, because it is the moment the thing actually became
+#: ours.
+#:
+#: `OUR_CLOCK` means storage reported no such instant and we stamped it
+#: ourselves at the moment of receipt. A local folder drop is the ordinary
+#: case: a filesystem mtime survives a copy, so it can be a timestamp the
+#: SUPPLIER set, which criterion 3 rules out explicitly.
+#:
+#: NEITHER IS EVER THE FILE'S CONTENTS. A date inside an extract is the
+#: supplier's claim about their own data and has nothing to do with when we
+#: received it - and a resupply exists precisely because the first attempt
+#: was wrong, possibly wrong in its dates.
+#:
+#: RECORDED RATHER THAN INFERRED, which is criterion 4's own requirement
+#: and the part that is easy to leave out: the two instants mean different
+#: things to anyone judging whether a supply was late, and a receipt that
+#: does not say which it holds cannot be judged at all.
+RECEIVED_FROM_STORAGE = "storage"
+RECEIVED_FROM_OUR_CLOCK = "our-clock"
+RECEIPT_SOURCES = (RECEIVED_FROM_STORAGE, RECEIVED_FROM_OUR_CLOCK)
 BOOKKEEPING_PATH = ROOT / "data" / "generator_bookkeeping.json"
 
 # Names that would be a receipt record if we trusted one from inside a
@@ -102,6 +128,17 @@ class Delivery:
     #: tiebreak for two arrivals sharing a receipt instant
     #: (REQ-PIPE-061 criterion 3). Never a supplier's fact.
     sequence: int = 0
+    #: WHICH CLOCK STAMPED `received_at` (REQ-PIPE-105 criterion 4) -
+    #: storage's own record of taking the object, or ours at the moment of
+    #: receipt. Carried rather than left in the receipt file, because
+    #: anything judging whether a supply was late is judging this instant
+    #: and has to know which it is.
+    #:
+    #: DEFAULTS TO OUR_CLOCK for a receipt written before this field
+    #: existed, which is the conservative direction: it claims the weaker
+    #: provenance rather than asserting storage said something it never
+    #: did.
+    received_from: str = RECEIVED_FROM_OUR_CLOCK
 
     @property
     def file_paths(self) -> tuple[Path, ...]:
@@ -178,11 +215,25 @@ def validate_delivery_name(name: str) -> str:
     return name
 
 
-def write_delivery(name: str, files: dict[str, str | bytes], received_at: datetime,
+def write_delivery(name: str, files: dict[str, str | bytes],
+                    received_at: datetime | None = None,
                     deliveries_dir: Path | None = None,
-                    receipts_dir: Path | None = None) -> Path:
+                    receipts_dir: Path | None = None,
+                    received_from: str | None = None) -> Path:
     """Writes one delivery and its receipt record, and returns the
     delivery's own directory.
+
+    `received_at` IS WHEN OUR STORAGE TOOK THE OBJECT where storage
+    reports that (REQ-PIPE-105 criterion 3) - S3's own `LastModified`,
+    say. Omit it and this stamps our own clock instead, which is
+    criterion 4's fallback, and the receipt says which of the two it
+    holds. See RECEIVED_FROM_STORAGE above for why the distinction is
+    recorded rather than assumed.
+
+    `received_from` is stated by the caller where it knows, and defaults
+    to STORAGE when an instant is supplied and OUR_CLOCK when one is
+    not - which is the honest reading of each: an instant handed in came
+    from somewhere outside this process, and one we take is ours.
 
     `files` maps a file name to its content. Content is written
     verbatim - a caller wanting a file that cannot be parsed as the
@@ -196,6 +247,17 @@ def write_delivery(name: str, files: dict[str, str | bytes], received_at: dateti
     """
     deliveries_dir = deliveries_dir or DELIVERIES_DIR
     receipts_dir = receipts_dir or RECEIPTS_DIR
+    if received_from is None:
+        received_from = (RECEIVED_FROM_STORAGE if received_at is not None
+                          else RECEIVED_FROM_OUR_CLOCK)
+    if received_from not in RECEIPT_SOURCES:
+        raise DeliveryFormatError(
+            f"{received_from!r} is not a receipt source - one of "
+            f"{', '.join(RECEIPT_SOURCES)}. There is no third answer and no "
+            f"'unknown': a receipt that cannot say which clock stamped it cannot "
+            f"be judged for lateness.")
+    if received_at is None:
+        received_at = asset_time.now()
     validate_delivery_name(name)
     if not files:
         raise DeliveryFormatError(f"delivery {name!r} has no files - a delivery is an ARRIVAL, "
@@ -229,6 +291,8 @@ def write_delivery(name: str, files: dict[str, str | bytes], received_at: dateti
         json.dump({"delivery": name,
                    "received_at": asset_time.isoformat(
                        asset_time.parse_instant(received_at, f"received_at for delivery {name!r}")),
+                   # WHICH CLOCK STAMPED IT (REQ-PIPE-105 criterion 4).
+                   "received_from": received_from,
                    # THE ORDER THIS RECORD WAS WRITTEN (REQ-PIPE-061
                    # criterion 3), and the only fact available for
                    # breaking a tie between two arrivals sharing a
@@ -285,9 +349,10 @@ def read_receipt(name: str, receipts_dir: Path | None = None) -> datetime:
     return read_receipt_record(name, receipts_dir)[0]
 
 
-def read_receipt_record(name: str, receipts_dir: Path | None = None) -> tuple[datetime, int]:
-    """Our receipt for one delivery: when it arrived, and where it fell
-    in the order receipts were written.
+def read_receipt_record(name: str,
+                         receipts_dir: Path | None = None) -> tuple[datetime, int, str]:
+    """Our receipt for one delivery: when it arrived, where it fell in the
+    order receipts were written, and which clock stamped the instant.
 
     A MISSING SEQUENCE IS A HARD ERROR, not a default of zero
     (REQ-PIPE-061). Defaulting would put every pre-sequence receipt at
@@ -321,7 +386,17 @@ def read_receipt_record(name: str, receipts_dir: Path | None = None) -> tuple[da
             f"place, so a tie between two of them would fall to a directory listing - the "
             f"non-determinism this sequence exists to remove, reintroduced by the fallback "
             f"written to tolerate it.")
-    return received_at, sequence
+    # A MISSING SOURCE READS AS OUR_CLOCK rather than raising, and the
+    # asymmetry with `sequence` above is deliberate. A missing sequence
+    # breaks ORDERING, which is a correctness property with no safe
+    # default. A missing source only makes a receipt's provenance less
+    # certain, and the honest default is the weaker of the two claims: we
+    # do not get to say storage reported an instant when the record does
+    # not say so.
+    received_from = record.get("received_from")
+    if received_from not in RECEIPT_SOURCES:
+        received_from = RECEIVED_FROM_OUR_CLOCK
+    return received_at, sequence, received_from
 
 
 def read_delivery(name: str, deliveries_dir: Path | None = None,
@@ -358,8 +433,9 @@ def read_delivery(name: str, deliveries_dir: Path | None = None,
             continue
         files.append(entry.name)
 
-    received_at, sequence = read_receipt_record(name, receipts_dir)
+    received_at, sequence, received_from = read_receipt_record(name, receipts_dir)
     return Delivery(name=name, path=path, received_at=received_at, sequence=sequence,
+                     received_from=received_from,
                      files=tuple(files), anomalies=tuple(anomalies))
 
 

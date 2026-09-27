@@ -2,7 +2,8 @@
 CDK (Python) infra for the event-driven MVP - plans/running-thoughts.md #5
 Thread B, full design at docs/aws-event-driven-mvp-design.md (read that
 first; this module doesn't repeat the architecture, trust-boundary
-decision, or completion-tracker discussion, only encodes the "Infra (AWS
+decision, or (since REQ-PIPE-105, retired) completion-tracker
+discussion, only encodes the "Infra (AWS
 CDK, Python)" section of it).
 
 **Never `cdk synth`'d or deployed.** This sandbox has no AWS CLI, no CDK
@@ -21,7 +22,6 @@ from aws_cdk import (
     Duration,
     Stack,
 )
-from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_notifications as s3n
@@ -41,8 +41,15 @@ LAMBDA_HANDLERS_DIR = "aws/lambda_handlers"
 
 
 class DataPipelineStack(Stack):
-    """Two S3 buckets, two Lambdas, one DynamoDB table, and the IAM/event
-    wiring between them - the whole of docs/aws-event-driven-mvp-design.md's
+    """Two S3 buckets, two Lambdas, and the IAM/event wiring between them.
+
+    THE DYNAMODB TABLE IS GONE (REQ-PIPE-105, 2026-09-28). It existed to
+    count which of Child Protection's six tables had landed, so the
+    cross-table checks could wait for all of them. Nothing waits now -
+    every arriving file is checked against the newest supply staged for
+    its period - so there is no completion state to keep, and a table
+    provisioned "so switching strategies later is a config change" is
+    infrastructure for a strategy that no longer exists - the whole of docs/aws-event-driven-mvp-design.md's
     "Infra (AWS CDK, Python)" section, nothing else. No git/GitHub
     credentials anywhere in this stack, by design (the "Getting results
     back into git" trust-boundary decision in the design doc - Lambda only
@@ -63,20 +70,6 @@ class DataPipelineStack(Stack):
             "RawDataBucket",
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
-        )
-
-        # Provisioned per the design doc even though ManifestMarkerCompletion
-        # Tracker (a marker file + a live S3 HeadObject check, no state store
-        # at all) is the recommended MVP default, not this table - so that
-        # switching to DynamoDBCompletionTracker later (if Keith's real CP
-        # source systems can't guarantee a marker lands last) is a config
-        # change, not an infra change.
-        completion_table = dynamodb.Table(
-            self,
-            "CpDeliveryCompletionTable",
-            table_name="cp-delivery-completion",
-            partition_key=dynamodb.Attribute(name="delivery_id", type=dynamodb.AttributeType.STRING),
-            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
         )
 
         # Real dependency bundling (this repo's own qa_tools/generator/
@@ -114,9 +107,8 @@ class DataPipelineStack(Stack):
             code=lambda_.Code.from_asset(LAMBDA_HANDLERS_DIR),
             timeout=Duration.minutes(15),
             memory_size=1024,
-            environment={
-                "COMPLETION_TABLE_NAME": completion_table.table_name,
-            },
+            # NO ENVIRONMENT AT ALL: the completion table it used to name
+            # is gone with the completion tracking (REQ-PIPE-105).
         )
 
         # S3 ObjectCreated -> Lambda wiring, filtered by prefix so each
@@ -158,10 +150,9 @@ class DataPipelineStack(Stack):
         # all gone - a write permission nothing needs is worth removing on
         # its own terms, not only for tidiness.
 
-        # Completion-tracking table: CP only. record_arrival()/is_complete()
-        # (qa_tools/cp/completion_tracker.py's DynamoDBCompletionTracker)
-        # both read and write, so this needs full read/write, not read-only.
-        completion_table.grant_read_write_data(cp_lambda)
+        # No DynamoDB grant either. The CP Lambda used to need read/write on
+        # a completion table; it has nothing to count (REQ-PIPE-105), and a
+        # permission nothing needs is worth removing on its own terms.
 
         CfnOutput(self, "RawBucketName", value=raw_bucket.bucket_name)
         CfnOutput(self, "BdmIngestHandlerFunctionName", value=bdm_lambda.function_name)

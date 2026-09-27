@@ -146,17 +146,52 @@ class TestGitHubHoldsNoCredentialAndRunsNoBuild:
     def _workflows(self):
         return sorted((ROOT / ".github" / "workflows").glob("*.yml"))
 
-    def test_no_workflow_names_a_database_dsn(self):
+    def test_no_workflow_can_reach_a_database_off_the_runner(self):
+        """The rule is REACHABILITY, not a variable name - and it was a
+        variable name until 2026-09-28, which is how it broke CI.
+
+        WHAT HAPPENED, because it is the more useful half. This test used
+        to assert that no workflow anywhere named MOTHMAN_SUPPLY_DSN, on
+        the reasoning that test.yml needs only MOTHMAN_TEST_DSN. That was
+        simply untrue: `mothman pipeline bootstrap` connects to the
+        WAREHOUSE, so the step test.yml runs to give ~167 tests something
+        to drive cannot work without one. The workflow was written to obey
+        this test, so every run died on "MOTHMAN_SUPPLY_DSN is not set"
+        before a single test ran - red for three pushes while every local
+        gate was green.
+
+        So the rule now says what it always meant, and what the sibling
+        test below already spelled out: a workflow may stand up its own
+        throwaway PostgreSQL and talk to it, and may never reach a
+        database that outlives the job. A host is what decides that, so a
+        host is what this checks - and it catches a real deployment DSN
+        pasted in, which the name check never would have.
+        """
+        import re
+
+        allowed_hosts = {"localhost", "127.0.0.1"}
         for path in self._workflows():
             text = path.read_text()
-            for name in ("MOTHMAN_SUPPLY_DSN", "postgresql://"):
-                if name in text and path.name == "test.yml":
-                    # test.yml runs against its own throwaway service
-                    # container, which is not this deployment's database -
-                    # MOTHMAN_TEST_DSN, never MOTHMAN_SUPPLY_DSN.
-                    assert "MOTHMAN_SUPPLY_DSN" not in text, path.name
+            for dsn in re.findall(r"postgresql://[^\s'\"]+", text):
+                host = dsn.split("@")[-1].split(":")[0].split("/")[0]
+                assert host in allowed_hosts, (
+                    f"{path.name} names a database at {host!r}. A workflow may only "
+                    f"reach a service container inside its own job - anything else "
+                    f"outlives the run and is this deployment's data.")
+
+    def test_no_workflow_reads_a_database_credential_from_a_secret(self):
+        """The other half of the same rule, and the one a name check could
+        never see. A throwaway container's password is written inline
+        BECAUSE it guards nothing; a secrets reference means somebody
+        stored a credential to something real."""
+        for path in self._workflows():
+            text = path.read_text().lower()
+            for line in text.splitlines():
+                if "secrets." not in line:
                     continue
-                assert name not in text, f"{path.name} names {name}"
+                assert not any(word in line for word in ("dsn", "postgres", "database")), (
+                    f"{path.name} reads a database credential from a secret: "
+                    f"{line.strip()}")
 
     def test_no_workflow_publishes_the_dashboard(self):
         """The line is PUBLISHING, not building, and the distinction is

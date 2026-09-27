@@ -41,12 +41,13 @@ gathered here so it's not missed:
    See "Getting results back into git" below. This is the single
    biggest architectural fork in this whole design — confirm or
    redirect it before any of the rest gets built for real.
-2. **CP's completion signal is a marker file, not a DynamoDB
-   arrival-counter** — recommended for MVP simplicity (no state store,
-   no race window), with the counter-based `DynamoDBCompletionTracker`
-   built too as a real, tested alternative if Keith's actual source
-   systems can't guarantee "marker file lands last." See "Child
-   Protection: waiting for all 6 tables" below.
+2. ~~**CP's completion signal is a marker file, not a DynamoDB
+   arrival-counter.**~~ **RETIRED 2026-09-28 (REQ-PIPE-105).** There is
+   no completion signal, of either kind. Every arriving file is its own
+   arrival and is checked against the newest supply staged for its
+   period, so nothing has to know when a delivery is finished. See
+   "Child Protection: nothing waits for all 6 tables" below for why the
+   marker was the wrong shape rather than merely unnecessary.
 3. **File-arrival contract matching (`arrivalPattern`) is a
    design-doc-only proposal, not applied to the real production
    contract YAML files.** Kept out of `contract/bdm-birth-registrations-
@@ -70,11 +71,11 @@ S3 (raw-data bucket)
   ▼
 ┌─────────────────────────┐     ┌─────────────────────────┐
 │  bdm-ingest Lambda       │     │  cp-ingest Lambda        │
-│  (single BDM file)       │     │  (single CP table file,  │
-│                          │     │   or the completion       │
-│                          │     │   marker file)            │
+│  (single BDM file)       │     │  (single CP table file)  │
+│                          │     │                          │
+│                          │     │                          │
 └──────────┬───────────────┘     └──────────┬────────────────┘
-           │                                 │ (only once complete)
+           │                                 │ (every file, at once)
            ▼                                 ▼
    qa_tools.bdm.orchestrate_bdm      qa_tools.cp.orchestrate_cp
      .run_single()                     .run_single()
@@ -149,12 +150,15 @@ CP table file, so a delivery's warehouse fills in incrementally as each
 of the 6 tables lands, in whatever order they actually arrive.
 
 `qa_tools/cp/orchestrate_cp.py` gained `run_single(run_id,
-reference_run_id, run_by=None)` — same shape as BDM's, called only once
-`completion_tracker`/the manifest-marker logic below says all 6 tables
-are actually present in that run's warehouse; runs the full 4-tool
-evaluation (including the cross-table referential-integrity checks,
-which need every table loaded — this is exactly why CP can't run
-per-table the way BDM runs per-file).
+reference_run_id, run_by=None)` — same shape as BDM's, and since
+REQ-PIPE-105 called for EVERY arriving file rather than once a delivery
+is complete. It runs the full 4-tool evaluation including the cross-table
+referential-integrity checks, which read the newest supply staged for
+that period for every table this arrival did not itself carry - so they
+have every table to read without anything having detected that every
+table arrived. The sentence this replaces said CP "can't run per-table
+the way BDM runs per-file", and that was the assumption the completion
+signal was built on.
 
 ## File-arrival contract matching
 
@@ -213,67 +217,52 @@ Moving that list into the real contract files (as genuine
 `customProperties`) is a good, small follow-up once someone can verify
 it against real Soda/dbt/datacontract-cli parsing — flagged, not done.
 
-## Child Protection: waiting for all 6 tables
+## Child Protection: nothing waits for all 6 tables
 
-Keith's own answer when this was scoped: **explicit completion
-signal**, not a timeout or a "6 files landed" heuristic inferred purely
-from S3 listing. Two real implementations exist, behind one shared
-`qa_tools/cp/completion_tracker.py` interface —
-`CompletionTracker.record_arrival(delivery_id, table)` / `.is_complete
-(delivery_id, expected_tables)` / `.arrived_tables(delivery_id)` — so
-the Lambda handler's own logic doesn't need to know which strategy is
-in use:
+**RETIRED 2026-09-28 (REQ-PIPE-105 criterion 9).** This section used to
+recommend an **explicit completion signal** - a marker file the source
+system writes once all six CP tables for a delivery have landed - with a
+DynamoDB counter as the built alternative, behind one
+`qa_tools/cp/completion_tracker.py` interface. Both trackers, their tests,
+and the handler logic that waited on them are deleted. What follows is why,
+because the reasoning is the part worth keeping.
 
-1. **`ManifestMarkerCompletionTracker` (recommended default for this
-   MVP).** The source system itself writes one extra file once all 6
-   real CP tables for a delivery have landed — e.g.
-   `cp/<run_id>/_MANIFEST_COMPLETE.json`, listing the 6 real table keys
-   it just finished writing. The CP Lambda's S3 event filter includes
-   this marker key pattern; every *other* CP file arrival is recorded
-   via `record_arrival()` for bookkeeping/observability but never
-   itself triggers a pipeline run. Only the marker's own arrival calls
-   `is_complete()` (which, with this tracker, also double-checks via a
-   real `HeadObject` that all 6 listed keys genuinely exist in S3
-   before trusting the marker — protects against a source-system bug
-   writing the marker before finishing a slow upload). **No state
-   store needed at all** — the marker file itself, plus a live S3
-   check, is the complete signal; nothing has to persist across Lambda
-   invocations. Simplest to reason about, and matches Keith's own
-   framing of "explicit completion signal" most literally (a real
-   signal file, not a count).
-2. **`DynamoDBCompletionTracker` (built as a real alternative, not the
-   default).** Every one of the 6 table files increments a DynamoDB
-   item keyed by `delivery_id` (a table-name string set, using DynamoDB
-   `ADD`/`String Set` semantics — idempotent against S3's own at-
-   least-once delivery, a real risk this design has to account for,
-   not a hypothetical one), and `is_complete()` compares the recorded
-   set against the 6 expected table names, true the moment the 6th
-   distinct table has ever landed. Doesn't require the source system to
-   write anything extra, and copes with any arrival order — the real
-   tradeoff against option 1 is it needs a real DynamoDB table
-   (infra + IAM to provision and pay for) and has a genuine, if narrow,
-   race condition if two of the 6 files' S3 events get processed by
-   concurrent Lambda invocations at the exact same moment (mitigated by
-   DynamoDB's own atomic `ADD`, but the *read-after-write* completion
-   check right after is not itself atomic with the write — two
-   invocations landing on the true 6th and final file at once could
-   both see "complete" and both trigger `run_single()`; harmless
-   (idempotent — same `run_id`, same results, `write_qa_result()`
-   would just overwrite with the same content) but wasteful, a real,
-   accepted cost documented here rather than solved with a distributed
-   lock this MVP doesn't need yet).
+**Every arriving file is its own arrival, and nothing has to know when a
+delivery is finished.** A completion signal only works if something
+upstream can be relied on to send it, and the case that breaks it was
+already written into the old recommendation: six independent upstream
+systems each landing their own table with no shared orchestration to
+coordinate a marker. In that case a supply waits on a signal nobody will
+ever send - and it waits silently, which is the worst available failure.
+The DynamoDB alternative removes the dependency on the supplier and keeps
+the shape of the problem: it still has to know what "all six" means, so a
+dataset added to the collection makes every in-flight delivery
+permanently incomplete.
 
-**Recommendation: ship with `ManifestMarkerCompletionTracker` as the
-real default**, since it needs zero new AWS infrastructure and matches
-"explicit completion signal" most directly — but this assumes Keith's
-real source systems for CP's 6 tables can reliably write a marker file
-last. If that's not true of the real delivery mechanism (e.g. 6
-independent upstream systems each land their own table with no
-shared orchestration to coordinate a marker), `DynamoDBCompletionTracker`
-is the real fallback, already built and tested
-(`tests/test_completion_tracker.py`, with `boto3`'s DynamoDB calls
-mocked via `unittest.mock` rather than a new test dependency like
-`moto`).
+**What replaces it costs nothing to be sure of.** Each file is checked
+when it arrives, against the newest supply staged for that period for
+every table it did not itself carry, falling back to the period's
+promoted state. So the run triggered by the sixth file of a six-file
+delivery sees all six, and the cross-table checks resolve normally - not
+because anything detected completeness, but because the other five are
+already staged. No marker, no counter, no expected-table list, and no
+supply held pending a file that may never come.
+
+**The cost, stated rather than discovered.** During the minutes a
+delivery is landing, a cross-table check can be red for a table that has
+not arrived yet, and it resolves on the next arrival - REQ-QAC-037
+criterion 4 already re-evaluates a cross-table check whenever a dataset
+it reads receives one. Those intermediate states are transient by
+construction, and REQ-PIPE-105 criterion 10 is what keeps them legible:
+a check red for want of a table says so, rather than reading as a finding
+about the data. A dashboard red for reasons about our own timing is how
+people learn to ignore red.
+
+It also means six QA runs where there was one for a six-table delivery.
+At two datasets that is a rounding error; at the ~30 this is a PoC for it
+is a real cost, and the real tool chain is the expensive part of a run.
+Accepted deliberately, and noted here so nobody re-derives it as a
+surprise.
 
 ## Lambda-context `run_by` attribution
 
@@ -385,11 +374,12 @@ file(s) to the results bucket via `results_s3_sink.py`. Returns a small
 JSON summary (counts by status) as the Lambda's own return value, useful
 for CloudWatch Logs / a Lambda destination on failure.
 
-`aws/lambda_handlers/cp_ingest_handler.py` — same shape, but: matches
-against CP's own arrival patterns (6 table patterns + the marker
-pattern), calls `add_table_to_run()` for a table file, or — only for a
-marker-file match — checks `ManifestMarkerCompletionTracker.is_complete()`
-and calls `orchestrate_cp.run_single()` only then.
+`aws/lambda_handlers/cp_ingest_handler.py` — the same shape, and since
+REQ-PIPE-105 literally the same behaviour: it matches against CP's own six
+arrival patterns, stages the file, and runs
+`orchestrate_cp.run_single()` for it. There is no seventh marker pattern
+and nothing to check before running. `results_s3_sink.py` is gone too
+(REQ-PIPE-089) - a run records its results in the database.
 
 Both are real, importable Python (verified this sandbox can `import
 boto3` — v1.43.93, already a transitive dependency, no new install
@@ -415,15 +405,13 @@ synthesized, let alone deployed.
     Python 3.11 runtime (matching this repo's own pinned
     `.python-version`), `boto3` layer/bundled dependency.
   - S3 event notifications wiring each bucket prefix to its Lambda.
-  - One DynamoDB table (`cp-delivery-completion`), on-demand billing,
-    used only if `DynamoDBCompletionTracker` is the chosen strategy —
-    provisioned either way in this MVP so switching strategies later
-    doesn't need an infra change, just a config flag.
+  - ~~One DynamoDB table (`cp-delivery-completion`).~~ **Not needed
+    since REQ-PIPE-105** - there is no completion tracking, so there is
+    nothing to keep state for.
   - IAM roles scoped narrowly per the trust-boundary decision: each
-    Lambda's role gets S3 read on the raw bucket's own prefix, S3 write
-    on the results bucket's own prefix, and (CP only) DynamoDB
-    read/write on the completion table — no git/GitHub credentials
-    anywhere in this stack, by design.
+    Lambda's role gets S3 read on the raw bucket's own prefix and S3
+    write on the results bucket's own prefix — no DynamoDB (see above),
+    and no git/GitHub credentials anywhere in this stack, by design.
 
 Real dependencies added under a new optional group (not the core
 install — this PoC's core dependency set stays exactly as narrow as it
@@ -443,9 +431,8 @@ source.
 - `file_arrival.match_arrival()` against all three pattern types,
   including a real fixture zip for the archive case (`tests/
   test_file_arrival.py`).
-- Both `CompletionTracker` implementations, including the DynamoDB
-  one's idempotent-`ADD` and race-condition behavior, against a mocked
-  boto3 DynamoDB client (`tests/test_completion_tracker.py`).
+- ~~Both `CompletionTracker` implementations.~~ Deleted with the
+  completion signal itself (REQ-PIPE-105).
 - `build_one()`/`add_table_to_run()`/`run_single()` (both datasets)
   produce real, non-empty check results — including real failures on
   the same red-severity dirty fixture data the batch-path tests already
