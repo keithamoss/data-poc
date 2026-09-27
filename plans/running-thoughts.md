@@ -981,6 +981,77 @@ to the exact right file/line/folder with zero console errors.
     the mechanism. True whether or not the two decision kinds converge.
 
 
+56. **[done, 2026-09-28]** **[Pipeline & publishing]** **[Docs & process]** How much state is left on disk - measured, because Keith asked.
+
+    His own question, 2026-09-27: "get back to me on how much state is
+    actually left on disk now, or whether we've actually cleared out all
+    the state and put it in the database." Measured in this container on
+    2026-09-28, after REQ-PIPE-089 (QA results), REQ-PIPE-104 (filings)
+    and REQ-PIPE-091 (the decision log) had all landed.
+
+    **THE SHORT ANSWER: the repository holds no state at all any more,
+    and `data/` holds 44MB that is not state either.** Nothing that
+    accumulates is committed, with one deliberate exception.
+
+    **WHAT THE REPOSITORY TRACKS** - 442 files, and every one of them is
+    configuration, code, tests or prose:
+
+    | path | files | what |
+    |---|---|---|
+    | `tests/` + `tests-js/` | 166 | tests |
+    | `qa_tools/` `cli/` `pipeline/` `generator/` `dashboard/` etc | ~170 | code |
+    | `contract/` | 11 | the contracts, calendars, hierarchy, environments |
+    | `plans/` `docs/` | 27 | prose |
+    | `dashboard/snapshots/*.html.gz` | 7 (16MB) | **the deliberate exception** |
+
+    The snapshots stay, and the reason is unchanged: a snapshot's whole
+    purpose is to be openable years later with nothing but a browser,
+    which a row in a database it cannot reach is not.
+
+    **WHAT IS ON DISK AND GITIGNORED** - 44MB under `data/`, none of it
+    state in the sense Keith's rule is about:
+
+    - **`data/deliveries/` (19MB)** - the supplier's own files. This is
+      not our state, it is the INPUT. In production it is an object
+      store; here it stands in for one.
+    - **`data/receipts/` (332KB)** - our record of when each delivery
+      arrived, written outside the delivery so a supplier has no path to
+      our clock. **This one is arguably state and is staying on disk on
+      purpose**: it is written by the receiving side at the moment of
+      receipt, before anything has a database connection or knows which
+      collection the delivery is for. It is also now duplicated INTO
+      `qa.delivery` by `delivery_log.record()`, so the durable copy is
+      already in the database and the file is the receiving side's own
+      note. Worth a decision at some point rather than left implicit.
+    - **`data/dbt_scratch/` (25MB)** - dbt's own working directory,
+      per run. Not ours and not durable; `_discard_this_runs_schemas()`
+      removes each run's after its results are recorded (2026-09-27).
+    - **`data/generator_bookkeeping.json` (24KB)** - which scenario each
+      generated delivery came from. The generator's own note to itself,
+      and nothing in the pipeline may read it (REQ-GEN-043 criterion 7).
+
+    Plus the ordinary build outputs, all gitignored and all regenerated:
+    `reports/` 9.2MB, `_site/` 20MB, the built dashboard 4.8MB, and
+    `.venv`/`node_modules` at 1.4GB and 94MB.
+
+    **WHAT THE DATABASE HOLDS** - 49MB: `staging` 163 tables / 20MB, and
+    the `qa` metadata schema 11 tables / 9.9MB (results, tool output,
+    runs, tables_read, dataset_stats, deliveries, delivery files,
+    filings, decisions, and the visible views).
+
+    **ONE REAL FINDING, and it is small**: two orphaned per-run schemas,
+    `qa_ref_birth_registrat_20260927t045754z` and
+    `qa_ref_birth_registrations_2026_09_01_20260927t041512z`. Both are
+    EMPTY - zero tables - so they cost nothing today, and both are
+    exactly what `drop_orphan_run_schemas()`'s own docstring warns about:
+    "a per-run thing that nothing deletes is just a leak with a tidier
+    name - at ~30 datasets on a quarterly cadence that would be thousands
+    of abandoned schemas in a year." They are reference-run schemas, and
+    something on that path is not calling the tidy-up. Not chased
+    tonight; logged rather than fixed in passing, because the fix is a
+    question about which path owns the cleanup rather than a one-liner.
+
+
 55. **[investigate, 2026-09-27]** **[Pipeline & publishing]** **[Docs & process]** How is CONFIGURATION organised once there are two data assets, sample datasets, project extractions and ad hoc QA?
 
     Keith raised this himself at the end of 2026-09-27, in his own
