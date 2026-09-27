@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**0 of 15 scenarios marked for injection have data behind them today.** 51 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**3 of 15 scenarios marked for injection have data behind them today.** 51 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -42,7 +42,12 @@ for injection and has not been placed yet.
 
 *Config: daily, due 12:00.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `run_026`, `run_027`, `run_028` |
+| Period | 2026-09-15 |
+| Set the as-of date to | 2026-09-15 |
 
 ### TS-2 - Backward cascade
 
@@ -52,7 +57,12 @@ for injection and has not been placed yet.
 
 *Config: daily, due ~22:00.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `run_022` |
+| Period | 2026-09-11 |
+| Set the as-of date to | 2026-09-11 |
 
 ### TS-3 - Arrival just OUTSIDE the claim window - four sub-tests
 
@@ -92,7 +102,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it demonstrates.** Never auto-promotes whatever its status; warns; the message names the context ("a supply arrived for Monday, which was already accepted at 16:00", plus the boundary detail where relevant); and the three genuinely different actions are reachable - **accept** as a correction, **re-file** to another slot, **reject** as a duplicate.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `run_026`, `run_027`, `run_028` |
+| Period | 2026-09-15 |
+| Set the as-of date to | 2026-09-15 |
 
 ### TS-5 - Monotonic filling - a missed slot must not absorb a later resupply
 
@@ -394,7 +409,16 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "demonstrates": "The 20:00 arrival files as a **resupply of Monday**, because Tuesday's claim window has not opened and no claimable unfilled slot exists. Being a filled slot, it does NOT auto-promote - it holds and warns (TS-4).",
    "breaksAs": "Files as Tuesday's supply; the next file takes Wednesday; every later supply is permanently off by one, each day looking locally plausible.",
    "config": "Config: daily, due 12:00.",
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "run_026",
+     "run_027",
+     "run_028"
+    ],
+    "period": "2026-09-15",
+    "asOf": "2026-09-15"
+   }
   },
   {
    "id": "TS-2",
@@ -404,7 +428,14 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "demonstrates": "Files as **Thursday** (on-time-wins-for-the-current-slot). Tuesday and Wednesday stay unfilled, go overdue, and a human marks them missed with a reason.",
    "breaksAs": "Files as Tuesday, two days late; the next as Wednesday; the feed sits permanently two days behind for ever.",
    "config": "Config: daily, due ~22:00.",
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "run_022"
+    ],
+    "period": "2026-09-11",
+    "asOf": "2026-09-11"
+   }
   },
   {
    "id": "TS-3",
@@ -464,7 +495,16 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "demonstrates": "Never auto-promotes whatever its status; warns; the message names the context (\"a supply arrived for Monday, which was already accepted at 16:00\", plus the boundary detail where relevant); and the three genuinely different actions are reachable - **accept** as a correction, **re-file** to another slot, **reject** as a duplicate.",
    "breaksAs": null,
    "config": null,
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "run_026",
+     "run_027",
+     "run_028"
+    ],
+    "period": "2026-09-15",
+    "asOf": "2026-09-15"
+   }
   },
   {
    "id": "TS-5",

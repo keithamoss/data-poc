@@ -6643,7 +6643,7 @@ requirements:
       can see the model working on the real dashboard rather than take a
       green test run's word for it.
     moscow: must
-    status: not_started
+    status: in_progress
     source: >
       Keith's second standing obligation on the test scenario register,
       2026-09-22 - "the scenarios KEITH PROPOSED get INJECTED into
@@ -6716,6 +6716,104 @@ requirements:
         message.
     dependencies: [REQ-GEN-040, REQ-GEN-042, REQ-GEN-043, REQ-PIPE-049, REQ-PIPE-051]
     decisions:
+      - >
+        BUILT IN PART ON 2026-09-28, and this records exactly which part so
+        nobody infers it from the code. `in_progress` rather than `built`,
+        because the register's gate forbids evidence on anything not built
+        and a status that overclaims is worse than one that cannot carry
+        the detail.
+
+        THE FIELDS THAT WOULD NAME THE CODE ARE ABSENT ON PURPOSE: the
+        gate refuses `implemented_by` and `linked_tests` on anything not
+        `built`, so they land with the rest of the work rather than
+        half-filled now. What exists today is
+        `generator/scenario_injection.py`, its wiring in
+        `generator/generate_runs.py` (`_plan_injections`,
+        `_injected_chain`, `_away_from_suppressed`) and
+        `tests/test_scenario_injection.py`.
+
+        DONE - the PLACEMENT ENGINE and the two Birth Registrations
+        cascades. `generator/scenario_injection.py` resolves each
+        injection to a real period, refuses a history that cannot host
+        one, records where everything landed, and
+        `generator/generate_runs.py` writes the arrivals. TS-1 lands as
+        three files on one day at 14:00, 16:00 and 20:00; TS-2 as two
+        consecutive days carrying nothing at all followed by an on-time
+        arrival; TS-4 shares TS-1's third file, which IS an arrival into
+        an already-filled slot. Criteria 1 (for those three), 2, 3, 4, 5,
+        6 and 7.
+
+        NOT DONE - the Child Protection scenarios (TS-12, TS-13, TS-14,
+        TS-34, TS-38, and the quarterly TS-3a, TS-3b, TS-9), and criteria
+        8 to 11 with the three scenarios that depend on them.
+
+        TWO DEFECTS OF MY OWN, both found by running the real generator
+        rather than by reading, and both worth keeping because each is a
+        shape that will recur. The placement first recorded the
+        GENERATOR'S OWN run id, and run identity comes from RECEIPT ORDER
+        over recognised deliveries - so suppressing two periods shifted
+        every later id and the placement claimed run_036 for a supply
+        that was run_034, a coordinate pointing at somebody else's data.
+        It records the delivery NAME now and reads the run id back from
+        recognition. And suppressing a period stopped that period's own
+        chain while leaving a RESUPPLY of an earlier one to land the same
+        day, which made TS-2 demonstrate something else; the supplier is
+        DOWN in that scenario, so nothing of theirs arrives at all and a
+        resupply that would have is shifted forward.
+
+      - >
+        THE FIRST INJECTION ALREADY EARNED ITS KEEP, which is the
+        argument for this requirement stated as a fact rather than as a
+        hope. TS-1 is three files landing at 14:00, 16:00 and 20:00 on
+        one day, and the dashboard shows none of those times: both
+        builders set `arrivedAt` from `earliest_extract`, the earliest
+        row in the staged file, rather than from the receipt instant
+        REQ-PIPE-105 made authoritative. Nobody had noticed because the
+        two agreed BY CONSTRUCTION for every supply ever generated -
+        `generate_runs.py` derives the receipt instant from the payload's
+        own earliest extract so the manifest and the warehouse cannot
+        disagree. An injected arrival sets its own instant, and they came
+        apart on the first run. Logged as plans/road-testing.md #14 and
+        not fixed here: `arrivedAt` is pinned by the arrival golden and
+        read by the classification display, so changing what it means is
+        a shape change with several consumers.
+
+      - >
+        THE REGISTER'S OWN CONFIG LINE FOR TS-1 SAYS "daily, due 12:00" AND
+        THE INJECTION USES 14:00, which is this requirement's own earlier
+        correction landing in the data and is flagged rather than quietly
+        reconciled. That correction established that TS-1 and TS-2 already
+        produce their stated outcomes under the configuration in force -
+        checked against the real assignment rule rather than reasoned
+        about - so the 12:00 line predates it. The placement records the
+        configuration actually used, which is what criterion 2 asks for,
+        so SCENARIOS.md now carries both statements for TS-1.
+        NOT EDITED HERE, because the register is prose Keith reviewed as
+        prose and that review is what makes it authoritative; a session
+        rewriting a config line to match its own build is how a reviewed
+        document stops meaning anything. It is his line to change or to
+        leave.
+
+      - >
+        CRITERIA 8 TO 11 NEED A DECISION FROM KEITH BEFORE THEY CAN BE
+        BUILT, and it is a real fork rather than an implementation
+        detail. Criterion 8 asks for the differing schedule
+        configurations to be expressed as effective-dated versions of the
+        same calendar. TS-3c, TS-3d and TS-10 need the supply for day D
+        due 22:00 on D-1. A calendar version today carries the claim
+        window, the dates or the cadence rule - and NOT the due time,
+        which lives unversioned in each ODCS contract's `slaProperties`
+        (`expectedTime: 14:00`, `latency: 60`), read by
+        pipeline/cadence.py.
+        So there is nowhere to put an effective-dated due time, and the
+        choice is what becomes authoritative: move the due time onto the
+        calendar version, duplicate it there, or express the
+        evening-before shape some third way. Moving it changes what the
+        ODCS contract means, which is a decision about the contract
+        rather than about the generator - and this project's own standing
+        rule on shape changes says enumerate every consumer first.
+        Recorded rather than guessed, so nothing gets built against the
+        wrong answer.
       - >
         THE SCENARIOS ARE PLACED BY CHOOSING THEIR ARRIVAL INSTANT, NOT BY
         RECONFIGURING THE SCHEDULE, and this correction is worth keeping

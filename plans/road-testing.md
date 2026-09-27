@@ -719,3 +719,43 @@ anything here that turns into real build work becomes a requirement in
     A row probably needs to name its participants and its tool, but
     that is a guess and this entry is a sighting rather than a
     diagnosis.
+
+14. **[investigate, 2026-09-28]** **[Dashboard UI]** **"Arrived at" on
+    the dashboard is the earliest row in the file, not when the supply
+    arrived - and the two only agreed by coincidence.**
+
+    **Status:** investigate · **Category:** Dashboard UI
+
+    Found while injecting REQ-GEN-044's first scenarios, which is the
+    kind of thing that requirement exists to surface: the whole of TS-1
+    is three files landing at 14:00, 16:00 and 20:00 on one day, and
+    the dashboard shows none of those times.
+
+    **What is actually happening.** `pipeline/build_dashboard_data.py`
+    and its Child Protection counterpart both set `arrivedAt` from
+    `earliest_extract` - the earliest `extract_timestamp` in the staged
+    rows. The RECEIPT instant, which REQ-PIPE-105 established as the
+    authoritative answer to when a supply arrived and which records
+    which clock timed it, is not what the page renders.
+
+    **Why nobody noticed.** For generated Birth Registrations data the
+    two were the same value by construction: `generate_runs.py`'s own
+    `_received_at()` takes the receipt instant FROM the payload's
+    earliest extract, deliberately, so that "the manifest and the
+    warehouse cannot disagree". So the label was true of every supply
+    this project had ever generated. An injected scenario sets its own
+    arrival instant - that is the point of it - and the two came apart
+    immediately.
+
+    **Why it matters beyond the scenarios.** A real supplier's extract
+    timestamp is a fact about their system, not about when we received
+    anything, and the gap between the two is exactly what a lateness
+    verdict is measured on. A dashboard that labels one as the other is
+    fine until the day they differ, which is the day somebody is trying
+    to work out why a supply was late.
+
+    **Not fixed here**, deliberately. `arrivedAt` is pinned by
+    `tests/fixtures/arrival_semantics_golden.json` and read by the
+    arrival-classification display, so changing what it means is a
+    shape change with several consumers - this project's own standing
+    rule says enumerate them first. Written down as a sighting.

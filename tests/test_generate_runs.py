@@ -73,9 +73,49 @@ def manifest(raw_dir):
         return json.load(f)[generate_runs.DATASET_ID]
 
 
+
+def _injected_periods() -> tuple[set[str], set[str]]:
+    """Which periods an injected scenario owns, and which it empties.
+
+    RESOLVED THE SAME WAY THE GENERATOR RESOLVES THEM rather than
+    hardcoded here, so moving an anchor moves both at once. Three of the
+    invariants below are properties of the ORDINARY chain - one supply
+    per slot, the planned severity, a resupply only after a red - and an
+    injected scenario breaks each one ON PURPOSE. Excluding them by name
+    would quietly stop covering a slot the day somebody renamed one.
+    """
+    from generator import scenario_injection as si
+    from generator.anchor_date import get_anchor_date
+    from qa_tools.common import schedule
+
+    periods = schedule.periods_for_dataset(
+        "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
+    placed = [si.resolve(i, periods) for i in si.for_dataset("birth-registrations")]
+    return ({p.period for p in placed},
+            {name for p in placed for name in p.suppressed})
+
+
+def _ordinary_slots(manifest) -> dict[str, list[dict]]:
+    """Every slot the ordinary chain produced, injected ones removed."""
+    injected, _ = _injected_periods()
+    by_slot: dict[str, list[dict]] = {}
+    for entry in sorted(manifest, key=lambda e: e["run_index"]):
+        if entry["period"] in injected:
+            continue
+        by_slot.setdefault(entry["slot_id"], []).append(entry)
+    return by_slot
+
+
 def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
+    """Every scheduled slot gets a supply, EXCEPT the ones an injected
+    scenario deliberately leaves empty (REQ-GEN-044). TS-2 is a supplier
+    outage, and the only way to express two days with no supply at all
+    is not to write one."""
+    _, suppressed = _injected_periods()
     slot_ids = {e["slot_id"] for e in manifest}
-    assert len(slot_ids) == len(generate_runs.RUN_PLAN)
+    assert len(slot_ids) == len(generate_runs.RUN_PLAN) - len(suppressed)
+    assert not ({e["period"] for e in manifest} & suppressed), (
+        "a period an injected scenario needs empty carries a supply")
 
 
 def test_every_manifest_entry_has_a_real_file_on_disk(manifest, deliveries_dir):
@@ -99,28 +139,26 @@ def test_severity_counts_match_run_plan(manifest):
     retired it), so "first" is read from position - the lowest run_index
     within each slot - which is how the rest of the system now decides
     it too."""
-    first_by_slot = {}
-    for e in sorted(manifest, key=lambda e: e["run_index"]):
-        first_by_slot.setdefault(e["slot_id"], e)
-    assert len(first_by_slot) == len(generate_runs.RUN_PLAN)
+    first_by_slot = {slot: entries[0] for slot, entries in _ordinary_slots(manifest).items()}
 
-    expected = [severity for (_, severity) in generate_runs.RUN_PLAN]
-    # Sort by run_index (a real int, matching RUN_PLAN's own generation
-    # order), not slot_id (a zero-padded string) - a plain string sort
-    # broke for real once the count crossed a fixed padding width
-    # ("slot_100" < "slot_11"), which this test itself caught
-    # (2026-09-17).
-    actual = [e["dirty_severity"]
-              for e in sorted(first_by_slot.values(), key=lambda e: e["run_index"])]
-    assert actual == expected
+    # AGAINST THE PLAN ENTRY FOR THAT SLOT'S OWN POSITION, rather than
+    # against the whole plan in order: an injected scenario chooses its
+    # own severities and a suppressed period has no entry at all, so the
+    # two lists stopped being the same length (REQ-GEN-044). `slot_NNN`
+    # is 1-indexed over the generated periods, which is the same order
+    # RUN_PLAN is in.
+    for slot_id, entry in first_by_slot.items():
+        planned = generate_runs.RUN_PLAN[int(slot_id.split("_")[1]) - 1][1]
+        assert entry["dirty_severity"] == planned, (
+            f"{slot_id}: planned {planned!r}, generated {entry['dirty_severity']!r}")
+    assert first_by_slot, "every slot was excluded - the exclusion is too wide"
 
 
 def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
-    by_slot: dict[str, list[dict]] = {}
-    for e in manifest:
-        by_slot.setdefault(e["slot_id"], []).append(e)
-
-    for slot_id, deliveries in by_slot.items():
+    """Of the ORDINARY chain. TS-1's whole point is a third file landing
+    after a resupply has already passed, so the injected slots are
+    excluded here and asserted on their own terms below."""
+    for slot_id, deliveries in _ordinary_slots(manifest).items():
         deliveries = sorted(deliveries, key=lambda e: e["run_index"])
         if len(deliveries) > 1:
             assert deliveries[0]["dirty_severity"] == "red", \
@@ -245,3 +283,51 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
     assert (delivery.BOOKKEEPING_PATH.read_bytes()
             if delivery.BOOKKEEPING_PATH.exists() else None) == book_before
+
+
+class TestTheInjectedScenariosAreReallyThere:
+    """REQ-GEN-044 criterion 1, against the REAL generated history.
+
+    The three tests above exclude the injected slots so the ordinary
+    chain's invariants still mean something. That exclusion is only
+    honest if something else asserts the injected slots have the shape
+    they were excluded FOR - otherwise a scenario could silently stop
+    being generated and every remaining test would go green.
+    """
+
+    def test_the_forward_cascade_landed_as_three_files_on_one_day(self, manifest):
+        """TS-1: 14:00 red, 16:00 clean, 20:00 into the now-filled slot."""
+        from generator import scenario_injection as si
+
+        ts1 = next(i for i in si.INJECTIONS if i.scenario_id == "TS-1")
+        entries = sorted((e for e in manifest if e["period"] == _period_of(si, ts1)),
+                         key=lambda e: e["run_index"])
+        assert len(entries) == 3, [e["run_id"] for e in entries]
+        assert [e["dirty_severity"] for e in entries] == ["red", None, None]
+        times = [e["received_at"][11:16] for e in entries]
+        assert times == ["14:00", "16:00", "20:00"], times
+
+    def test_the_outage_left_two_days_with_nothing_at_all(self, manifest):
+        """TS-2, and the half that is an ABSENCE - the easiest thing in
+        this requirement to stop generating without anyone noticing."""
+        _, suppressed = _injected_periods()
+        assert len(suppressed) == 2, sorted(suppressed)
+        present = {e["period"] for e in manifest}
+        assert not (present & suppressed), sorted(present & suppressed)
+
+    def test_nothing_arrives_on_a_suppressed_day_either(self, manifest):
+        """Not just "that period has no supply of its own" - NOTHING
+        arrives, resupplies of earlier periods included. The supplier is
+        down. This is the half that was wrong on the first real run."""
+        _, suppressed = _injected_periods()
+        landed = {e["received_at"][:10] for e in manifest}
+        assert not (landed & suppressed), sorted(landed & suppressed)
+
+
+def _period_of(si, injection) -> str:
+    from generator.anchor_date import get_anchor_date
+    from qa_tools.common import schedule
+
+    periods = schedule.periods_for_dataset(
+        "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
+    return si.resolve(injection, periods).period

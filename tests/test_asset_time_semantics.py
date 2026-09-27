@@ -209,13 +209,30 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         A distribution coming back identical is therefore evidence the
         corpus is the same corpus, which is precisely what was wanted and
         precisely what 28 could not tell anybody.
+
+        AND THEN IT MOVED AGAIN, TO 129 / 18 / 3, LEGITIMATELY - the same
+        day, once REQ-GEN-044 injected its first two scenarios into Birth
+        Registrations. That one IS a corpus change: three slots on one
+        day instead of a random chain, and two days carrying no supply at
+        all. Checked the way this file's own header says to check rather
+        than accepted because a number moved - SIX golden entries differ,
+        all Birth Registrations, all inside the 2026-09-09 to 2026-09-15
+        window the two scenarios occupy; the other 36 Birth
+        Registrations arrivals and all 108 Child Protection ones are
+        byte-identical.
+
+        Most of that six is the LABEL shift REQ-GEN-043's own recapture
+        documented rather than a verdict moving: run ids are positional
+        over receipt order, so two suppressed days renumber the tail and
+        run_022 through run_027 each carry the instant that used to
+        belong to a neighbour.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"onTime": 131, "early": 16, "late": 3}
+        assert counts == {"onTime": 129, "early": 18, "late": 3}
         assert sum(counts.values()) == 150
 
 

@@ -66,9 +66,9 @@ import pandas as pd
 from generator.anchor_date import get_anchor_date
 from generator.daily_batch import generate_daily_batch
 from generator.dirty import apply_birth_registrations_presets, inject_stale_delivery
-from generator import delivery_names
-from generator.resupply import MAX_ATTEMPTS, DatasetProvider, run_slot_chain
-from qa_tools.common import asset_time, delivery, schedule
+from generator import delivery_names, scenario_injection
+from generator.resupply import MAX_ATTEMPTS, Delivery, DatasetProvider, run_slot_chain
+from qa_tools.common import arrivals, asset_time, delivery, hierarchy, schedule
 
 # Which dataset this generator produces - the one literal it needs, so
 # it can look its own calendar up rather than carrying a private copy of
@@ -409,6 +409,132 @@ def _previous_delivery_names() -> list[str]:
         book = json.load(f)
     return [e["delivery"] for e in book.get(DATASET_ID, []) if e.get("delivery")]
 
+def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
+                    id_offset: int, n_rows: int, previous_row_count):
+    """The arrivals ONE injected scenario needs, in place of the ordinary
+    chain (REQ-GEN-044 criteria 1 and 6).
+
+    THE SCENARIO SAYS HOW MANY ARRIVALS AND WHAT EACH ONE IS, where
+    `run_slot_chain()` decides both from a random draw. That is the whole
+    difference: an injected scenario is a shape somebody specified, and a
+    chain that sometimes produced it would demonstrate nothing on the run
+    where it did not.
+
+    SHAPES, NOT VERDICTS (criterion 6). `severity` here is what the
+    GENERATOR injects into the rows - the same lever the ordinary chain
+    pulls - so the QA tools still decide whether a supply is red. It is
+    not a recorded verdict and nothing downstream reads it as one.
+
+    Each arrival after the first is CHURNED from the one before, exactly
+    as a real resupply is: the source system was not frozen between
+    them, and a fresh random draw would make the third file unrelated to
+    the first two, which is not what a resupply is.
+    """
+    deliveries = []
+    payload = provider.generate(period.date, seed=seed, n_rows=n_rows, id_offset=id_offset)
+    for n, extra in enumerate(injection.arrivals):
+        if n:
+            payload = provider.churn(payload, seed=seed + 900 + n, run_date=period.date,
+                                      id_offset=id_offset + (n + 1) * (ID_BLOCK // 10))
+        this = payload
+        if extra.severity:
+            this = provider.dirty(payload, severity=extra.severity, seed=seed + 800 + n,
+                                   previous_row_count=previous_row_count)
+        deliveries.append(Delivery(
+            received_date=period.date + timedelta(days=extra.day_offset),
+            severity=extra.severity, payload=this))
+    return deliveries
+
+
+def _away_from_suppressed(deliveries, suppressed: set[str], taken_days: set[str]):
+    """Move any arrival that would land on a day the supplier is down.
+
+    THE SCENARIO SAYS THE SUPPLIER IS DOWN, not that one particular
+    period went unfilled - so nothing from them arrives those days,
+    including a RESUPPLY of some earlier period whose delay happened to
+    land there. Suppressing the period's own chain and leaving the
+    resupply is the half-measure that made TS-2 demonstrate something
+    else on the first real run: two days meant to be empty, one of them
+    carrying run_032.
+
+    Shifted forward rather than dropped, because a resupply that never
+    arrives at all is a different scenario again - the supplier came
+    back and sent it late, which is what an outage actually produces.
+
+    AND ON A WEEKDAY, which `run_slot_chain()` already guarantees for
+    every resupply it schedules and this was quietly undoing - it pushed
+    one off a Thursday/Friday outage straight onto the Saturday.
+    `tests/test_generate_runs.py`'s own weekday invariant caught it.
+
+    THE BACKLOG ARRIVES IN SEQUENCE, ONE DAY EACH, and that is not
+    flavour - it is a correctness fix found by the pipeline refusing to
+    run. Two resupplies shifted off a two-day outage both landed on the
+    first day back, and a receipt instant is the payload's own earliest
+    extract, which churn leaves unchanged - so both got the SAME instant,
+    both got the same physical staged table name, and loading the second
+    dropped the first. The run then failed with
+    `relation "qa_run_032.birth_registrations" does not exist`, which
+    names nothing about the real cause. `taken_days` is shared across
+    slots because the collision is between them.
+    """
+    if not suppressed:
+        return deliveries
+    out = []
+    for item in deliveries:
+        when = item.received_date
+        moved = False
+        while (when.isoformat() in suppressed
+               or (moved and (when.isoformat() in taken_days or when.weekday() >= 5))):
+            when += timedelta(days=1)
+            moved = True
+        if moved:
+            taken_days.add(when.isoformat())
+        out.append(item if when == item.received_date
+                   else Delivery(received_date=when, severity=item.severity,
+                                  payload=item.payload))
+    return out
+
+
+def _no_two_arrivals_share_an_instant(manifest: list[dict]) -> None:
+    """Refuse a history where two supplies claim one receipt instant.
+
+    A STAGED TABLE IS NAMED FOR ITS ARRIVAL, so two supplies at the same
+    instant claim one physical table and loading the second DROPs the
+    first - the failure this guard exists for was real, and what it
+    reported was a missing relation several steps downstream rather than
+    anything about a duplicate instant. Loud here, where the cause is
+    still visible.
+    """
+    seen: dict[str, str] = {}
+    for entry in manifest:
+        instant = entry.get("received_at")
+        if instant in seen:
+            raise ValueError(
+                f"{entry['run_id']} and {seen[instant]} both claim receipt instant "
+                f"{instant}. A staged table is named for its arrival, so these two "
+                f"would claim one table and the second would drop the first.")
+        seen[instant] = entry["run_id"]
+
+
+def _plan_injections(periods):
+    """Where every Birth Registrations scenario lands, resolved BEFORE
+    anything is written (REQ-GEN-044 criterion 4).
+
+    All of it up front, deliberately: a scenario that cannot be placed
+    must stop the generator rather than be discovered halfway through,
+    because a half-written history is one somebody has to notice is
+    half-written.
+    """
+    mine = scenario_injection.for_dataset(DATASET_ID)
+    scenario_injection.no_two_scenarios_share_a_period(mine, {DATASET_ID: periods})
+    resolved = [(injection, scenario_injection.resolve(injection, periods))
+                for injection in mine]
+    by_period = {placement.period: (injection, placement)
+                 for injection, placement in resolved}
+    suppressed = {name for _, placement in resolved for name in placement.suppressed}
+    return resolved, by_period, suppressed
+
+
 def main() -> None:
     provider: DatasetProvider = BirthRegistrationsProvider()
     manifest = []
@@ -431,14 +557,38 @@ def main() -> None:
 
     periods = schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())[-N_DELIVERIES:]
 
+    # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4) - see
+    # _plan_injections()'s own docstring.
+    resolved_injections, injected_by_period, suppressed_periods = _plan_injections(periods)
+    #: Days a shifted arrival has already claimed - see
+    #: _away_from_suppressed(). Shared across slots, because the
+    #: collision it prevents is between them.
+    shifted_onto: set[str] = set()
+
     for i, ((n_rows, severity), period) in enumerate(zip(RUN_PLAN, periods), start=1):
         slot_id = f"slot_{i:03d}"
         slot_date = period.date
         seed = 1000 + i
         id_offset = i * ID_BLOCK
 
-        deliveries = list(run_slot_chain(provider, slot_date, seed, id_offset,
-                                          n_rows, severity, previous_row_count))
+        # A SCENARIO MAY NEED A DAY TO CARRY NO SUPPLY AT ALL, which is
+        # an arrival shape like any other - TS-2's supplier outage is
+        # two of them - and the only way to express it is not to write
+        # one. The slot is still owed; nothing fills it.
+        if period.name in suppressed_periods:
+            print(f"{period.name}: no supply at all (an injected scenario needs this "
+                  f"day empty)")
+            continue
+
+        injected = injected_by_period.get(period.name)
+        if injected is not None:
+            deliveries = _injected_chain(provider, injected[0], period, seed,
+                                          id_offset, n_rows, previous_row_count)
+        else:
+            deliveries = _away_from_suppressed(
+                list(run_slot_chain(provider, slot_date, seed, id_offset,
+                                     n_rows, severity, previous_row_count)),
+                suppressed_periods, shifted_onto)
         entries = _manifest_entries_for_slot(deliveries, slot_id, period.name,
                                               len(manifest), id_offset, seed)
 
@@ -458,8 +608,21 @@ def main() -> None:
             # qa_tools/bdm/dataset_stats.py computes downstream as
             # earliest_extract, so the manifest and the warehouse cannot
             # disagree about when a supply turned up.
-            entry["received_at"] = _received_at(
-                delivery_obj.payload, delivery_obj.received_date, f"received_at for {entry['run_id']}")
+            if injected is not None:
+                # THE SCENARIO'S OWN INSTANT, not the payload's earliest
+                # extract. The whole of TS-1 is that the third file lands
+                # at 20:00 rather than whenever the rows happen to say -
+                # an arrival time derived from the data would put it
+                # wherever the generator's row timestamps fell, which is
+                # the one thing this scenario is not free to vary.
+                extra = injected[0].arrivals[n - 1]
+                entry["received_at"] = asset_time.isoformat(
+                    asset_time.wall_clock(delivery_obj.received_date, extra.at))
+                injected[1].arrivals[n - 1]["delivery"] = None  # set below, with the name
+            else:
+                entry["received_at"] = _received_at(
+                    delivery_obj.payload, delivery_obj.received_date,
+                    f"received_at for {entry['run_id']}")
 
             # AND AS A REAL DELIVERY (REQ-GEN-043): one directory, an
             # arbitrary supplier-shaped name, a filename matching this
@@ -468,6 +631,19 @@ def main() -> None:
             name = delivery_names.delivery_name(slot_date, seed, attempt=n, taken=taken_names)
             taken_names.add(name)
             entry["delivery"] = name
+            if injected is not None:
+                # THE DELIVERY NAME, NOT THE GENERATOR'S OWN RUN ID, and
+                # this is a correction worth keeping. The first version
+                # recorded `entry["run_id"]` and was wrong on the first
+                # real run: run identity comes from RECEIPT ORDER over
+                # recognised deliveries (REQ-GEN-043), not from this
+                # manifest's numbering, and suppressing two days made the
+                # two disagree by exactly the two slots removed. The
+                # placement said run_036 and the real supply was run_034.
+                # A name is stable under both, and the run ids are
+                # resolved from recognition below - observed rather than
+                # predicted.
+                injected[1].arrivals[n - 1]["delivery"] = name
             delivery.write_delivery(
                 name,
                 {f"birth_registrations_{delivery_obj.received_date.isoformat()}.csv":
@@ -500,7 +676,23 @@ def main() -> None:
     # the pipeline had read it since arrivals became recognised rather
     # than declared, so the only thing it could still do was tempt
     # somebody to wire it back up.
+    _no_two_arrivals_share_an_instant(manifest)
     _write_bookkeeping(manifest)
+    # WHERE EVERY SCENARIO LANDED (criterion 7), written once the run
+    # ids exist - qa_tools/common/scenario_map.py reads exactly this.
+    if resolved_injections:
+        placed = [placement for _, placement in resolved_injections]
+        recognised = arrivals.arrivals_for(
+            hierarchy.dataset(DATASET_ID).collection_id, "run_",
+            DELIVERIES_DIR, RECEIPTS_DIR)
+        # AGAINST WHAT RECOGNITION FOUND, not against what was meant to
+        # be written - see each function's own docstring.
+        scenario_injection.check_suppressed_days_are_empty(placed, recognised)
+        scenario_injection.resolve_run_ids(placed, recognised)
+        written = scenario_injection.write_placements(
+            [placement for _, placement in resolved_injections])
+        print(f"Recorded {len(resolved_injections)} injected scenario placement(s) "
+              f"-> {written}")
     n_red_chains = sum(1 for _, sev in RUN_PLAN if sev == "red")
     print(f"\nWrote {len(manifest)} deliveries across {len(RUN_PLAN)} scheduled slots "
           f"({n_red_chains} of which went red and triggered a resupply chain) "

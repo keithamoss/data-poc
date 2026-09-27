@@ -2883,18 +2883,33 @@ class TestScenariosPanel:
 
     def test_an_entry_with_no_coordinates_is_plain_text_not_a_link(
             self, clean_page, built_dashboard_html):
-        """Criterion 4, and today that is EVERY entry - nothing is
-        injected yet, so a panel full of dead links is exactly the
-        failure this rules out."""
+        """Criterion 4.
+
+        IT USED TO BE EVERY ENTRY, because nothing was injected and a
+        panel full of dead links was the whole failure this ruled out.
+        REQ-GEN-044 changed that: three scenarios have real coordinates
+        now, so the assertion is no longer "no links anywhere" but the
+        thing it always meant - an entry with nothing behind it does not
+        pretend to lead somewhere. Counting controls against the number
+        of PLACED scenarios keeps it honest as more are injected, where
+        a fixed count would have to be edited every time and would
+        eventually be edited to whatever the page happened to render.
+        """
+        from qa_tools.common import scenario_map
+
+        placed = {sid for sid, p in scenario_map.read_placements().items()
+                  if p.is_complete}
         _goto(clean_page, built_dashboard_html)
         clean_page.locator("#scenarios-btn").click()
         clean_page.wait_for_timeout(400)
 
         panel = clean_page.locator("#scenarios-panel")
-        assert panel.locator("a").count() == 0, "the panel rendered a link"
-        assert panel.locator("button[data-scenario]").count() == 0, (
-            "an entry with no coordinates rendered as an activatable control")
-        assert "no data behind it" in panel.inner_text()
+        controls = panel.locator("a").count() + panel.locator("button[data-scenario]").count()
+        assert controls <= len(placed), (
+            f"the panel offers {controls} control(s) for {len(placed)} placed "
+            f"scenario(s) - one of them leads nowhere")
+        assert "no data behind it" in panel.inner_text(), (
+            "no entry says it has nothing behind it, and most still have nothing")
 
     def test_the_committed_map_carries_no_url_for_the_page_to_follow(
             self, clean_page, built_dashboard_html):
