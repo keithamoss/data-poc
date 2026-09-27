@@ -204,6 +204,52 @@ def rollup_statuses(statuses) -> str:
     return "green"
 
 
+def in_no_rollup(dataset: dict) -> bool:
+    """Whether this dataset is excluded from every rollup above it
+    (REQ-PIPE-106 criterion 9).
+
+    EXCLUDED ENTIRELY, with no fallback, and that is the difference from
+    every other exclusion here. `nodata` and `exhausted` both come BACK
+    if they are all there is, because "every dataset in this collection
+    has ended" is a real answer about the collection. This one has none,
+    because a collection whose only member is a dataset somebody is still
+    developing checks against has nothing to say about the asset's quality
+    - and what it prevents is a dataset nobody agreed turning an agreed
+    one's status.
+
+    SEPARATE FROM THE DATASET'S OWN STATUS, which criterion 7 requires to
+    be the REAL verdict its checks found: developing a check means seeing
+    whether it passes. The tile stays red or amber or green; only the
+    rollup skips it.
+
+    The Python mirror of the dashboard's own `inNoRollup()` - held to the
+    same committed table as everything else here, for the reason this
+    module exists at all.
+    """
+    return bool(dataset.get("scheduleNotAgreed"))
+
+
+def rollup_datasets(datasets) -> str:
+    """Roll a collection or an agency up from its datasets, leaving out the
+    ones no rollup counts.
+
+    THE FILTER IS FIRST, deliberately. Rolling up and then trying to
+    subtract an unagreed dataset's contribution is not possible - worst-of
+    loses which input won - so anything excluded has to be excluded before
+    the reduce, which is also what makes "by construction" true of the
+    ordering rather than only of the storage.
+    """
+    counted = [d for d in datasets if not in_no_rollup(d)]
+    live = [d for d in counted
+            if not d.get("noDataAsOf") and not d.get("scheduleExhausted")]
+    if not live:
+        if any(d.get("scheduleExhausted") for d in counted):
+            return "exhausted"
+        return "nodata" if counted else "green"
+    return rollup_statuses([rollup_statuses(
+        [c.get("status") for c in (d.get("columns") or [])]) for d in live])
+
+
 def dashboard_status(tool_status: str | None) -> str | None:
     """Maps a real tool verdict onto the dashboard's own green/amber/red
     vocabulary. None for anything unrecognised (or absent), so callers

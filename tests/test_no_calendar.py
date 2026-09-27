@@ -331,3 +331,97 @@ class TestSampleDataLivesInItsOwnSchema:
 
         assert any(supply_db.SAMPLE_SCHEMA.startswith(p)
                     for p in qa_store.SUPPLY_SCHEMA_PREFIXES)
+
+
+class TestItIsInNoRollup:
+    """Criteria 8 and 9, at the shared rule both implementations use.
+
+    THE PYTHON SIDE IS NOT OPTIONAL, which this project has a scar for:
+    plans/qa-pipeline.md item 74 shipped a correct data layer and a
+    dashboard whose own transform disagreed with it, rendering a check with
+    14 real violations green. There are two implementations of dataset
+    status on purpose - the dashboard's in a browser, and this one in a
+    GitHub Action with no JS runtime - so anything one knows, the other has
+    to.
+    """
+
+    @staticmethod
+    def _ds(dataset_id, status, **extra):
+        return {"id": dataset_id, "name": dataset_id,
+                "columns": [{"name": "a", "status": status}], **extra}
+
+    def test_a_red_unagreed_dataset_does_not_turn_its_collection(self):
+        from qa_tools.common import dataset_status as ds
+
+        assert ds.rollup_datasets([
+            self._ds("agreed", "green"),
+            self._ds("sample", "red", scheduleNotAgreed="not-yet-agreed"),
+        ]) == "green", "a dataset nobody agreed turned an agreed one's status"
+
+    def test_it_keeps_its_own_real_verdict(self):
+        """Criterion 7. Developing a check means seeing whether it passes,
+        so its own tile is never softened to a quiet state."""
+        from qa_tools.common import dataset_status as ds
+
+        sample = self._ds("sample", "red", scheduleNotAgreed="not-yet-agreed")
+        assert ds.in_no_rollup(sample) is True
+        assert ds.rollup_statuses([c["status"] for c in sample["columns"]]) == "red"
+
+    def test_a_collection_of_only_unagreed_datasets_says_nothing(self):
+        """NO FALLBACK, unlike nodata and exhausted - those come back if
+        they are all there is, because "every dataset here has ended" is a
+        real answer about the group. This is not."""
+        from qa_tools.common import dataset_status as ds
+
+        assert ds.rollup_datasets([
+            self._ds("a", "red", scheduleNotAgreed="not-yet-agreed"),
+            self._ds("b", "amber", scheduleNotAgreed="never"),
+        ]) == "green"
+
+    def test_an_exhausted_schedule_still_comes_back(self):
+        """The contrast, asserted so the new exclusion cannot be mistaken
+        for the old one."""
+        from qa_tools.common import dataset_status as ds
+
+        assert ds.rollup_datasets(
+            [{"id": "x", "columns": [], "scheduleExhausted": "quarterly"}]) == "exhausted"
+
+    def test_an_ordinary_dataset_is_unaffected(self):
+        from qa_tools.common import dataset_status as ds
+
+        assert ds.in_no_rollup(self._ds("agreed", "red")) is False
+        assert ds.rollup_datasets(
+            [self._ds("agreed", "red"), self._ds("other", "green")]) == "red"
+
+    def test_the_two_implementations_agree(self):
+        """The one assertion that would have caught item 74. Same inputs,
+        both sides, compared - rather than each suite checking its own.
+        """
+        import json
+        import subprocess
+        from pathlib import Path
+
+        from qa_tools.common import dataset_status as ds
+
+        cases = [
+            [self._ds("a", "green"), self._ds("b", "red", scheduleNotAgreed="not-yet-agreed")],
+            [self._ds("a", "red"), self._ds("b", "green", scheduleNotAgreed="never")],
+            [self._ds("a", "amber", scheduleNotAgreed="not-yet-agreed")],
+            [self._ds("a", "green"), self._ds("b", "amber")],
+        ]
+        mine = [ds.rollup_datasets(c) for c in cases]
+
+        root = Path(__file__).resolve().parent.parent
+        script = (
+            "import {loadDashboard} from './tests-js/support/loadDashboard.js';"
+            f"const cases = {json.dumps(cases)};"
+            "const d = loadDashboard(); const w = d.window;"
+            "console.log(JSON.stringify(cases.map(c => w.rollup(c)))); d.close();"
+        )
+        (root / "node_modules").exists() or __import__("pytest").skip("npm not installed")
+        out = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=root, capture_output=True, text=True)
+        assert out.returncode == 0, out.stderr[-2000:]
+        theirs = json.loads(out.stdout.strip().splitlines()[-1])
+        assert mine == theirs, f"python {mine} != dashboard {theirs}"

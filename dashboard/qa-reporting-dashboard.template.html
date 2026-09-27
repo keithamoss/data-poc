@@ -212,6 +212,18 @@ button{font:inherit; color:inherit;}
 .pill.inactive .ico::after{content:""; position:absolute; left:-1px; right:-1px; top:50%;
   height:1.5px; background:var(--ink-muted); transform:rotate(-45deg);}
 
+/* A dataset nobody has agreed a delivery schedule for (REQ-PIPE-106
+   criterion 8). NOT A STATUS - it sits BESIDE the real red/amber/green
+   verdict its checks found, because developing a check means seeing
+   whether it passes and criterion 7 requires that verdict to show.
+   Distinguished in WORDS, following the pattern .pill.inactive set: an
+   outline rather than a fill, since nothing here is a verdict and a
+   filled pill reads as one. */
+.pill.unagreed{background:transparent; color:var(--ink-muted);
+  border:1px dashed var(--ink-faint);}
+.pill.unagreed .ico{background:transparent; border:1.5px dashed var(--ink-muted);
+  border-radius:50%;}
+
 /* ============ Event severity (REQ-DASH-070) =============================
    A SEPARATE VOCABULARY FROM STATUS, which is criterion 5 rather than
    a style choice. The five pills above are verdicts on somebody's
@@ -2314,6 +2326,24 @@ function rawRealDatasetById(datasetId){
 // If literally every dataset in the group has no data, the group's own
 // status becomes "nodata" too, rather than falling back to a
 // meaningless "green" over an empty list.
+// A DATASET NOBODY HAS AGREED A SCHEDULE FOR IS NOT IN ANY ROLLUP
+// (REQ-PIPE-106 criterion 9), and it is excluded ENTIRELY rather than
+// treated as a quiet state. That is the difference from every other
+// exclusion on this page: nodata and exhausted both come BACK if they are
+// all there is, because "every dataset here has ended" is a real answer
+// about the group. This one has no such fallback, because a collection
+// whose only member is a dataset somebody is still developing checks
+// against has nothing to say about the asset's quality at all - and the
+// failure it prevents is a dataset nobody agreed turning an agreed one's
+// status, which is the whole of criterion 9.
+//
+// SEPARATE FROM ITS OWN STATUS, which criterion 7 requires to be the REAL
+// verdict its checks found: developing a check means seeing whether it
+// passes. So the tile stays red or amber or green and says in words that
+// no schedule is agreed (criterion 8); only the rollup above it skips it.
+function inNoRollup(d){
+  return Boolean(d && d.scheduleNotAgreed);
+}
 function rollup(datasets){
   // An exhausted schedule is excluded from the worst-of for the same
   // reason nodata is - it is a different KIND of signal - but UNLIKE
@@ -2321,10 +2351,11 @@ function rollup(datasets){
   // exhausted, the group says so rather than reporting the "no data"
   // that would be indistinguishable from a quiet healthy feed
   // (REQ-PIPE-053).
-  const live = datasets.filter(d=>!d.noDataAsOf && !d.scheduleExhausted);
+  const counted = datasets.filter(d=>!inNoRollup(d));
+  const live = counted.filter(d=>!d.noDataAsOf && !d.scheduleExhausted);
   if(!live.length){
-    if(datasets.some(d=>d.scheduleExhausted)) return "exhausted";
-    return datasets.length ? "nodata" : "green";
+    if(counted.some(d=>d.scheduleExhausted)) return "exhausted";
+    return counted.length ? "nodata" : "green";
   }
   // Both levels roll rather than order, for the same reason: a column
   // whose only check has no rule is `inactive`, and a collection of
@@ -2564,6 +2595,9 @@ function buildData(asOfDateStr){
           ds.status = "exhausted";
           col.exhaustedCount++; ag.exhaustedCount++;
         } else if(!ds.noDataAsOf){
+          // ITS OWN STATUS IS ITS REAL VERDICT even where no schedule is
+          // agreed (REQ-PIPE-106 criterion 7) - what changes is that
+          // `rollup()` above leaves it out of the collection.
           ds.status = rollupStatuses(ds.columns.map(c=>c.status));
         }
       });
@@ -2997,6 +3031,26 @@ function exhaustedMarker(count, status){
 }
 
 function pill(status, size){ return `<span class="pill ${status} ${size||""}"><span class="ico"></span>${STATUS_LABEL[status]}</span>`; }
+// SAID IN WORDS, AND SAID DIFFERENTLY FOR THE TWO KINDS (REQ-PIPE-106
+// criteria 3 and 8). "No schedule agreed yet" is somebody's outstanding
+// job; "one-off extraction" is a finished decision about data that has
+// supplies and no cadence at all - and presenting the second as the first
+// would put a permanent item on somebody's list.
+//
+// BESIDE the status pill rather than instead of it, which is criterion 7:
+// the dataset's own verdict is whatever its checks actually found, because
+// developing a check means seeing whether it passes.
+//
+// Never distinguished by colour alone - the label carries the whole
+// meaning, the same rule `nodata` and `inactive` already follow.
+function unagreedMarker(d){
+  if(!d || !d.scheduleNotAgreed) return "";
+  const words = d.scheduleNotAgreed === "never"
+    ? "One-off extraction — no delivery schedule"
+    : "No delivery schedule agreed yet";
+  return `<span class="pill unagreed sm" title="This dataset is not counted in any \
+collection or asset rollup."><span class="ico"></span>${words}</span>`;
+}
 // Item 76's UI-integration follow-up (plans/qa-pipeline.md, 2026-09-18) -
 // a small badge next to a dataset's own status pill linking straight to
 // its real, currently-open GitHub Issue (TICKET_STATUS, embedded by
@@ -4094,7 +4148,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${unagreedMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
     ${exhaustedBanner}
     ${ds.noDataAsOf ? `

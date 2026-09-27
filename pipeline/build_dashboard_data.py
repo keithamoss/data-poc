@@ -144,6 +144,23 @@ def _pseudo_column_for(check_name: str) -> str:
 ALL_COLUMNS = list(COLUMN_META.keys())
 
 
+def _schedule_not_agreed(dataset_id: str) -> str | None:
+    """Whether this dataset has declared it has no delivery calendar, and
+    which kind (REQ-PIPE-106 criteria 3, 8 and 9).
+
+    Carried onto the dataset so the page can say so IN WORDS beside the
+    dataset's own real verdict, and so every rollup above it can leave it
+    out. Read from CONFIGURATION, which is what makes it safe here: this
+    build may read recorded QA results and never supply rows, and a
+    declaration in contract/data-asset.yaml is neither.
+
+    None for every dataset that has a calendar, which today is all seven.
+    """
+    from qa_tools.common import schedule
+
+    return schedule.no_calendar(dataset_id)
+
+
 def build() -> dict:
     with open(REAL_RESULTS_PATH) as f:
         payload = json.load(f)
@@ -442,6 +459,12 @@ def build() -> dict:
         "provider": "Registry of Births, Deaths & Marriages (BDM)",
         "deliveryFormat": "CSV (S3 drop) — Parquet planned",
         "sla": {"cadence": cadence},
+        # WHETHER ANYBODY HAS AGREED A SCHEDULE FOR THIS DATASET
+        # (REQ-PIPE-106). None for every dataset that has a calendar, so
+        # the page renders nothing extra in the ordinary case - which is
+        # the point at 30 datasets: a marker on every tile is noise that
+        # trains people to stop reading markers.
+        "scheduleNotAgreed": _schedule_not_agreed("birth-registrations"),
         "lastArrival": {
             "run_date": _run_date(latest_entry),
             "arrivedAt": earliest_extract,

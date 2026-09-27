@@ -108,3 +108,92 @@ describe("rollup (dataset-list -> worst-of-columns rollup)", () => {
     expect(w.rollup([])).toBe("green");
   });
 });
+
+// ---------------------------------------------------------------------------
+// A dataset nobody has agreed a delivery schedule for (REQ-PIPE-106).
+// ---------------------------------------------------------------------------
+describe("a dataset with no agreed schedule is in no rollup", () => {
+  function ds(id, status, extra = {}) {
+    return { id, name: id, columns: [{ name: "a", status }], ...extra };
+  }
+
+  it("is left out of its collection's rollup entirely", () => {
+    const w = load();
+    // A red dataset nobody agreed must not make the collection red -
+    // criterion 9's whole point: a dataset nobody agreed cannot turn an
+    // agreed one's status.
+    const green = ds("agreed", "green");
+    const redUnagreed = ds("sample", "red", { scheduleNotAgreed: "not-yet-agreed" });
+    expect(w.rollup([green, redUnagreed])).toBe("green");
+  });
+
+  it("keeps its OWN status, which is the real verdict its checks found", () => {
+    const w = load();
+    // Criterion 7. Developing a check means seeing whether it passes, so
+    // its own tile must not be softened to a quiet state.
+    const redUnagreed = ds("sample", "red", { scheduleNotAgreed: "not-yet-agreed" });
+    expect(w.rollupStatuses(redUnagreed.columns.map((c) => c.status))).toBe("red");
+    expect(w.inNoRollup(redUnagreed)).toBe(true);
+  });
+
+  it("a collection of only unagreed datasets reports green, not their verdicts", () => {
+    const w = load();
+    // NO FALLBACK, unlike nodata and exhausted - those come back if they
+    // are all there is, because "every dataset here has ended" is a real
+    // answer about the group. A collection whose only member is one
+    // somebody is still developing checks against has nothing to say
+    // about the asset's quality.
+    expect(w.rollup([ds("a", "red", { scheduleNotAgreed: "not-yet-agreed" }),
+                      ds("b", "amber", { scheduleNotAgreed: "never" })])).toBe("green");
+  });
+
+  it("an ordinary dataset is unaffected", () => {
+    const w = load();
+    expect(w.inNoRollup(ds("agreed", "red"))).toBe(false);
+    expect(w.rollup([ds("agreed", "red"), ds("other", "green")])).toBe("red");
+  });
+
+  it("an exhausted schedule still comes back when it is all there is", () => {
+    const w = load();
+    // The contrast, asserted so the new exclusion cannot be mistaken for
+    // the old one: exhausted is a real answer about the group.
+    expect(w.rollup([{ id: "x", columns: [], scheduleExhausted: "quarterly" }]))
+      .toBe("exhausted");
+  });
+});
+
+describe("it says so in words rather than by colour", () => {
+  function ds(kind) {
+    return { id: "sample", name: "Sample", scheduleNotAgreed: kind, status: "red" };
+  }
+
+  it("names the outstanding job for a dataset that will graduate", () => {
+    const w = load();
+    const markup = w.unagreedMarker(ds("not-yet-agreed"));
+    expect(markup).toContain("No delivery schedule agreed yet");
+  });
+
+  it("says something DIFFERENT for a one-off extraction", () => {
+    const w = load();
+    // Criterion 3: presenting a finished decision as an outstanding job
+    // would put a permanent item on somebody's list.
+    const markup = w.unagreedMarker(ds("never"));
+    expect(markup).toContain("One-off extraction");
+    expect(markup).not.toContain("agreed yet");
+  });
+
+  it("says nothing at all for an ordinary dataset", () => {
+    const w = load();
+    expect(w.unagreedMarker({ id: "agreed", status: "green" })).toBe("");
+  });
+
+  it("carries the whole meaning in the label, never in the colour", () => {
+    const w = load();
+    // The rule nodata and inactive already follow. Asserted because a
+    // marker distinguished only by a dashed border is one a colour-blind
+    // reader, or a printed page, cannot read at all.
+    const markup = w.unagreedMarker(ds("not-yet-agreed"));
+    const withoutMarkup = markup.replace(/<[^>]*>/g, "").trim();
+    expect(withoutMarkup.length).toBeGreaterThan(10);
+  });
+});

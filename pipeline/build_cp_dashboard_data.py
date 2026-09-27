@@ -474,6 +474,12 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         "provider": "Department for Child Protection and Family Support — Casework Management System",
         "deliveryFormat": "CSV (S3 drop)",
         "sla": {"cadence": cadence},
+        # WHETHER ANYBODY HAS AGREED A SCHEDULE FOR THIS DATASET
+        # (REQ-PIPE-106). None for every dataset that has a calendar, so
+        # the page renders nothing extra in the ordinary case - which is
+        # the point at 30 datasets: a marker on every tile is noise that
+        # trains people to stop reading markers.
+        "scheduleNotAgreed": _schedule_not_agreed(dataset_id),
         "lastArrival": {
             "run_date": _run_date(latest_entry),
             "arrivedAt": str(earliest_extract),
@@ -503,6 +509,23 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                         f"dbt schema.yml, and real Evidently AI drift on concern_type — see README.md. "
                         f"({TABLE_META[table]})",
     }
+
+
+def _schedule_not_agreed(dataset_id: str) -> str | None:
+    """Whether this dataset has declared it has no delivery calendar, and
+    which kind (REQ-PIPE-106 criteria 3, 8 and 9).
+
+    Carried onto the dataset so the page can say so IN WORDS beside the
+    dataset's own real verdict, and so every rollup above it can leave it
+    out. Read from CONFIGURATION, which is what makes it safe here: this
+    build may read recorded QA results and never supply rows, and a
+    declaration in contract/data-asset.yaml is neither.
+
+    None for every dataset that has a calendar, which today is all seven.
+    """
+    from qa_tools.common import schedule
+
+    return schedule.no_calendar(dataset_id)
 
 
 def build() -> dict:

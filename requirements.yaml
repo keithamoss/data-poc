@@ -20132,8 +20132,8 @@ requirements:
         and a status that overclaims is worse than one that cannot carry
         the detail.
 
-        DONE - the CONFIGURATION AND EXCLUSION layer, criteria 1, 2, 3, 4,
-        5, 11, 12 and 16. A dataset declares `no_calendar: not-yet-agreed`
+        DONE - the CONFIGURATION AND EXCLUSION layer plus the rollup and
+        the label: criteria 1, 2, 3, 4, 5, 8, 9, 11, 12 and 16. A dataset declares `no_calendar: not-yet-agreed`
         or `no_calendar: never`; `schedule.calendar_for_dataset()` raises a
         DISTINCT `NoCalendarAgreed` rather than a config error, which is
         what lets the filing rule, the runway warning and the dashboard
@@ -20143,14 +20143,34 @@ requirements:
         also subsets a calendar it does not have; `supply_db.SAMPLE_SCHEMA`
         exists beside staging and rejected and is already in the
         publisher's forbidden prefixes; `schedule.owes_from()` is
-        criterion 16's record. 27 tests.
+        criterion 16's record.
 
-        NOT DONE - everything that runs or renders. Criteria 6, 7 and 10
-        (QA over sample data, recorded as in-development), 8, 9 and 15 (the
-        in-words label and the rollup exclusion, both sides), 13 and 14
-        (cross-table checks over calendar-less datasets), and 17, 18 and 19
-        (discarding pre-graduation data from the terminal, never
-        automatically).
+        THE ROLLUP EXCLUSION IS BUILT ON BOTH SIDES (criteria 8 and 9),
+        which this project has a scar for: item 74 shipped a correct data
+        layer and a dashboard whose own transform disagreed, rendering a
+        check with 14 real violations green. So `inNoRollup()`/`rollup()`
+        in the template and `in_no_rollup()`/`rollup_datasets()` in
+        dataset_status.py, with a test that runs the SAME inputs through
+        both and compares. The dataset keeps its own real verdict
+        (criterion 7's half of this), and a `.pill.unagreed` says in words
+        which of the two kinds it is - "No delivery schedule agreed yet"
+        against "One-off extraction", because presenting a finished
+        decision as an outstanding job would put a permanent item on
+        somebody's list. Both builders emit `scheduleNotAgreed` from
+        configuration, so the field has a real source. 33 Python tests
+        plus 9 JS.
+
+        NOT DONE - everything that RUNS. Criteria 6, 7's data half and 10
+        (QA over sample data, recorded as in-development), 13 and 14
+        (cross-table checks over calendar-less datasets), 15's recording
+        half, and 17, 18 and 19 (discarding pre-graduation data from the
+        terminal, never automatically).
+
+        ONE HONEST GAP IN WHAT IS CLAIMED: criterion 8 is asserted on
+        `unagreedMarker()`'s own output rather than on a rendered page,
+        because no calendar-less dataset exists in the real build yet - so
+        there is nothing for a real browser to render. The function is what
+        the page calls, so the logic is covered; the pixel is not.
 
         GROUNDWORK THAT ALREADY EXISTS for those, so the next session does
         not rebuild it: `qa_store.IN_DEVELOPMENT` and the `supply_state`
