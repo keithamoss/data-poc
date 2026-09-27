@@ -1123,7 +1123,11 @@ requirements:
       - qa_tools/common/supply_db.py::create_run_views
       - qa_tools/common/supply_db.py::candidates_in
       - qa_tools/common/supply_db.py::record_resolution
+      - qa_tools/common/supply_db.py::drop_run_schemas
       - qa_tools/common/supply_db.py::drop_orphan_run_schemas
+      - qa_tools/bdm/orchestrate_bdm.py::_discard_this_runs_schemas
+      - qa_tools/cp/orchestrate_cp.py::_discard_this_runs_schemas
+      - cli/supply.py::tidy_command
       - qa_tools/common/supply_db.py::connect_dbt
       - qa_tools/bdm/build_per_run_warehouses.py::build_one
       - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
@@ -17454,6 +17458,9 @@ requirements:
   - id: REQ-PIPE-102
     title: "One arrival area, not two - data/cp_raw/ is retired"
     date_written: "2026-09-27"
+    signed_off:
+      by: Keith
+      date: "2026-09-27"
     story: >
       As the person running this pipeline, I want a Child Protection
       supply to exist in exactly two places - the delivery it arrived
@@ -17461,12 +17468,12 @@ requirements:
       keep a third copy in step, and so the repository stops
       accumulating rows it never reviews.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-27, choosing "retire cp_raw entirely" from three
       scoped options after asking why tools still restage from data/.
       Found while chasing the suite flakiness that the Soda dotenv
-      fault (plans/tooling.md #26) was masking: the staging step copies
+      fault (plans/tooling.md #26) was masking: the staging step copied
       every delivered CP CSV into data/cp_raw/<run_id>/, and the reason
       it did - run_datacontract_cp.py and run_evidently_cp.py reading
       those CSVs directly - stopped being true when REQ-QAC-088 pointed
@@ -17505,6 +17512,32 @@ requirements:
         the database is a copy OF rather than the other way round.
     dependencies: [REQ-QAC-088, REQ-GEN-043]
     open_questions: []
+    linked_tests:
+      - tests/test_one_arrival_area.py
+      - tests/test_run_schema_lifecycle.py::test_two_runs_over_the_same_files_do_not_share_a_staged_table
+      - tests/test_run_evidently_cp.py
+      - tests/test_cli_cp.py
+      - tests/test_generate_cp_runs.py
+    implemented_by:
+      - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+      - qa_tools/cp/build_cp_warehouses.py::build_all
+      - qa_tools/cp/run_evidently_cp.py::_current_frame
+      - qa_tools/cp/run_evidently_cp.py::_reference_frame
+      - qa_tools/common/supply_db.py::arrival_segment
+      - cli/cp.py::arrival_path
+      - cli/cp.py::has_arrival
+      - generator/generate_cp_runs.py::main
+    evidence:
+      - >
+        2026-09-27: a full `mothman pipeline run` (both collections)
+        completes with data/cp_raw/ deleted from disk, never recreates
+        it, and leaves no per-run schema behind.
+      - >
+        2026-09-27: tests/test_one_arrival_area.py checks each
+        criterion directly - including a structural check by AST, so
+        docstrings recording the history are exempt while evaluated
+        strings are not, and a check that no exception handler in
+        run_evidently_cp reads a CSV.
     decisions:
       - >
         THE FALLBACK GOES RATHER THAN BEING KEPT AND NARROWED.

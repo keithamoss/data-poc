@@ -1,7 +1,8 @@
 """
-Generates periodic Child Protection collection snapshots into
-data/cp_raw/ - the "whole collection" counterpart to generate_runs.py's
-daily birth-registrations feed.
+Generates periodic Child Protection collection snapshots as real
+deliveries - the "whole collection" counterpart to generate_runs.py's
+daily birth-registrations feed. Each snapshot is ONE delivery holding
+all six tables, because they arrive together as one extract.
 
 Deliberately a different generation model from generate_runs.py, by design
 (see plans/dashboard.md #1 and the AskUserQuestion decisions that shaped
@@ -105,13 +106,12 @@ from synthetic_data_generator.child_protection import generate_child_protection_
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 
-OUT_DIR = os.path.join(ROOT, "data", "cp_raw")
 
-# WHERE THIS GENERATOR WRITES, all of it, redirectable the same way
-# OUT_DIR is (read at call time, never captured into a default arg).
+# WHERE THIS GENERATOR WRITES, all of it, read at call time and never
+# captured into a default arg, so a test can redirect every one.
 #
-# Redirecting OUT_DIR alone used to isolate a test run. REQ-GEN-043
-# gave the generator two more outputs - the delivery tree and the
+# Redirecting a single output directory used to isolate a test run.
+# REQ-GEN-043 gave the generator two more - the delivery tree and the
 # receipts beside it - plus a shared bookkeeping file, and all three
 # defaulted to the real ones under data/. So the module's own
 # isolation, which exists because "tests and production share an
@@ -523,8 +523,6 @@ def _previous_delivery_names() -> list[str]:
     return [e["delivery"] for e in book.get(DATASET_ID, []) if e.get("delivery")]
 
 def main() -> None:
-    os.makedirs(OUT_DIR, exist_ok=True)
-
     print(f"Generating base Child Protection collection (population={POPULATION_N:,}, seed={BASE_SEED})...")
     pop = generate_population(POPULATION_N, seed=BASE_SEED)
     base_tables = generate_child_protection_collection(pop, seed=BASE_SEED + 1000, n_case_workers=N_CASE_WORKERS)
@@ -563,13 +561,17 @@ def main() -> None:
         entries = _cp_manifest_entries_for_slot(deliveries, slot_id, period.name, len(manifest), seed)
 
         for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
-            run_dir = os.path.join(OUT_DIR, entry["run_id"])
-            os.makedirs(run_dir, exist_ok=True)
+            # ONE WRITE, NOT TWO (REQ-PIPE-102, 2026-09-27). This used
+            # to write each run's six tables to a run directory of its
+            # own AND as a real delivery below - the same rows twice,
+            # in two trees, able to disagree. Only the delivery is an
+            # arrival; the other copy was there because the CP tools
+            # once read CSVs off disk, which they stopped doing in
+            # REQ-QAC-088.
             csvs = {}
             for name in TABLES:
                 df = delivery_obj.payload[name]
                 cols = [c for c in df.columns if not c.startswith("_")]
-                df[cols].to_csv(os.path.join(run_dir, f"{name}.csv"), index=False)
                 csvs[f"{name}.csv"] = df[cols].to_csv(index=False)
             entry["received_at"] = _cp_received_at(
                 delivery_obj.payload, delivery_obj.received_date, f"received_at for {entry['run_id']}")
@@ -609,7 +611,7 @@ def main() -> None:
     n_red_slots = sum(1 for _, sev in RUN_PLAN if sev == "red")
     print(f"\nWrote {len(manifest)} deliveries across {len(RUN_PLAN)} scheduled slots "
           f"({n_red_slots} of which went red and triggered a resupply chain) "
-          f"to {os.path.abspath(OUT_DIR)}")
+          f"to {os.path.abspath(DELIVERIES_DIR)}")
 
 
 if __name__ == "__main__":

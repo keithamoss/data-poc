@@ -624,6 +624,34 @@ def run_id_of(schema: str) -> str | None:
     return schema[len(RUN_SCHEMA_PREFIX):]
 
 
+def arrival_segment(received_at) -> str:
+    """The `__<arrival>` part of a staged table's name.
+
+    A REAL RECEIPT GOES THROUGH arrival_key() UNCHANGED, which is the
+    half that must not move: committed history records these names, so
+    `2026-08-01T01:00:00+00:00` has to keep producing
+    `202608010100000000` exactly as it always has.
+
+    A RUN ID DOES NOT (2026-09-27). Callers with no receipt - the
+    ad-hoc `--folder` and `--local-file` paths - fall back to passing
+    the run id, and arrival_key() keeps only the digits, which is
+    right for an instant and lossy for a name. It made
+    `adhoc_cp_run_001_20260927t030150` and
+    `ref_cp_run_001_20260927t030150` the same arrival, so the two runs
+    claimed one physical table - and because re-loading one does
+    `DROP TABLE ... CASCADE`, staging the second silently destroyed
+    the first run's views. Hidden for as long as the drift check read
+    a CSV instead of the warehouse.
+    """
+    text = received_at if isinstance(received_at, str) else received_at.isoformat()
+    # An instant always carries a `:` or a `-`; a run id never does,
+    # because run ids are already constrained to [a-z0-9_]. That is
+    # what tells the two apart without the caller having to say.
+    if any(c in text for c in ":-"):
+        return arrival_key(received_at)
+    return normalise_ident_part(text)
+
+
 def staged_table(table: str, received_at, ordinal: int = 0) -> str:
     """The physical name a staged table takes.
 
@@ -635,7 +663,7 @@ def staged_table(table: str, received_at, ordinal: int = 0) -> str:
     per-run builders did, keeps exactly one version and so destroys the
     history the read-the-newest rule exists for.
     """
-    name = f"{_ident(table, 'table name')}__{arrival_key(received_at)}"
+    name = f"{_ident(table, 'table name')}__{arrival_segment(received_at)}"
     if not ordinal:
         return name
     # A HELD SUPPLY STAGES EVERY FILE THAT MATCHED (REQ-PIPE-059), so
@@ -828,6 +856,50 @@ def run_schemas(conn) -> list[str]:
         "WHERE schema_name LIKE ? ESCAPE '!'",
         [RUN_SCHEMA_PREFIX.replace("_", "!_") + "%"]).fetchall()
     return sorted(r[0] for r in rows)
+
+
+def drop_run_schemas(conn, run_id: str) -> list[str]:
+    """Discard ONE run's own schemas - its views, and dbt's.
+
+    CALLED WHEN THAT RUN FINISHES, which is a change from how this
+    worked until 2026-09-27 (Keith's question: "shouldn't they be
+    automatically discarded when the run is done, not separately later
+    on?"). They used to be swept after the whole fan-out, and the
+    reason was real at the time and is not any more: under DuckDB a
+    drop took an exclusive lock over the WHOLE database, so a worker
+    tidying up after itself would have locked out every other worker
+    still reading. PostgreSQL locks the objects being dropped, so a run
+    dropping its own schemas does not touch a sibling's.
+
+    IT ALSO REMOVES A HAZARD the sweep could not avoid. A blanket sweep
+    cannot tell a schema left behind by an interrupted run from one
+    belonging to a run happening right now in another process, so it
+    was liable to pull the floor out from under a concurrent ad-hoc
+    check. Dropping only what this run created cannot.
+
+    Returns what it dropped, and dropping a run that staged nothing is
+    an ordinary no-op: a run that failed before staging still reaches
+    its own tidy-up, and must not turn one failure into two.
+    """
+    present = set(run_schemas(conn)) | set(dbt_schemas(conn))
+    # DBT MAKES TWO SCHEMAS PER RUN, not one - `--store-failures` puts
+    # each failing test's offending rows in `<target_schema>_dbt_test__
+    # audit`. Found by running the real pipeline, not by reading dbt's
+    # configuration: the first version of this dropped only the target
+    # schema and left eighteen audit schemas behind.
+    #
+    # EXACT, OR FOLLOWED BY AN UNDERSCORE. A bare prefix test would let
+    # `run_001` take `run_0011` with it, which is the kind of quiet
+    # collateral nobody would look for.
+    base = dbt_schema(run_id)
+    mine = {run_schema(run_id), base}
+    mine |= {s for s in present if s.startswith(base + "_")}
+    dropped = []
+    for schema in sorted(mine):
+        conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+        if schema in present:
+            dropped.append(schema)
+    return dropped
 
 
 def drop_orphan_run_schemas(conn, keep: Sequence[str] = ()) -> list[str]:

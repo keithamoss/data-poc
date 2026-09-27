@@ -47,6 +47,12 @@ def s3_config() -> dict:
     return s3_source.dataset_s3_config(CONTRACT_PATH)
 
 
+def generated_output_dir() -> str:
+    """Where `generate-synthetic-data` leaves its output - see the CP
+    counterpart for why this is a per-dataset accessor."""
+    return raw_dir()
+
+
 def raw_dir() -> str:
     """Read dynamically, at call time, off build_per_run_warehouses'
     own module attribute - never bound to a module-level constant here.

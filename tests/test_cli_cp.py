@@ -18,8 +18,6 @@ import cli.common as common
 import cli.cp as cp
 import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
-import qa_tools.cp.run_datacontract_cp as run_datacontract_cp
-import qa_tools.cp.run_evidently_cp as run_evidently_cp
 
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
@@ -42,44 +40,54 @@ def _patch_cp_dirs(monkeypatch, raw_dir, duckdb_dir, delivery_dirs=None):
     # tests reading the real data/deliveries/ tree.
     if delivery_dirs is not None:
         _patch_delivery_dirs(monkeypatch, delivery_dirs)
-    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_datacontract_cp, "CP_RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_evidently_cp, "CP_RAW_DIR", raw_dir)
+    # NOTHING LEFT TO POINT AT A RAW DIRECTORY (REQ-PIPE-102). CP
+    # staging kept a second copy of every delivered file under
+    # data/cp_raw/ and two of the tools read it back; all three are
+    # gone, so the delivery tree above is the only thing to redirect.
+    del raw_dir
     # One database, named by the environment - see the BDM
     # counterpart's own comment (REQ-PIPE-068).
     # The environment already points at this worker's database
     # (conftest's supply_dsn); duckdb_dir is what staged the data into it.
 
 
-def test_raw_dir_reads_build_cp_warehouses_live_not_a_frozen_import_time_copy(monkeypatch):
-    """Same regression coverage as cli/bdm.py's own raw_dir() test, for
-    the CP counterpart - must re-read build_cp_warehouses.CP_RAW_DIR
-    fresh on every call, not cache it at import time."""
-    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", "/some/other/path")
-    assert cp.raw_dir() == "/some/other/path"
+def test_arrival_path_is_resolved_live_not_frozen_at_import(monkeypatch, tmp_path):
+    """The successor to the raw_dir() test this replaced (REQ-PIPE-102).
+
+    Same property, different source: where a run's files are used to
+    be a module constant, and is now whichever delivery recognition
+    matches - so it has to be read at call time, not bound once.
+    """
+    from qa_tools.common import arrivals
+
+    class _Arrival:
+        run_id = "cp_run_001"
+        path = tmp_path / "SOME_DELIVERY"
+
+    monkeypatch.setattr(arrivals, "arrivals_for", lambda *a, **k: [_Arrival()])
+    assert cp.arrival_path("cp_run_001") == str(tmp_path / "SOME_DELIVERY")
+    assert cp.has_arrival("cp_run_001") is True
+    assert cp.has_arrival("cp_run_999") is False
 
 
-def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promoted(monkeypatch, tmp_path):
-    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
-    (tmp_path / "cp_run_01").mkdir()
+def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promoted(monkeypatch):
+    monkeypatch.setattr(cp, "has_arrival", lambda run_id: run_id == "cp_run_01")
     manifest = [{"run_id": "cp_run_01"}, {"run_id": "cp_run_02"}]
 
     monkeypatch.setattr(cp, "list_run_ids", lambda agency, dataset: [])
     assert cp.default_reference(manifest) == "cp_run_01"
 
 
-def test_default_reference_uses_last_promoted_run_when_its_data_still_exists(monkeypatch, tmp_path):
-    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
-    (tmp_path / "cp_run_05").mkdir()
+def test_default_reference_uses_last_promoted_run_when_its_data_still_exists(monkeypatch):
+    monkeypatch.setattr(cp, "has_arrival", lambda run_id: run_id == "cp_run_05")
     manifest = [{"run_id": "cp_run_01"}]
 
     monkeypatch.setattr(cp, "list_run_ids", lambda agency, dataset: ["cp_run_02", "cp_run_05"])
     assert cp.default_reference(manifest) == "cp_run_05"
 
 
-def test_default_reference_falls_back_when_last_promoted_runs_data_no_longer_exists(monkeypatch, tmp_path):
-    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
-    (tmp_path / "cp_run_01").mkdir()
+def test_default_reference_falls_back_when_last_promoted_runs_data_no_longer_exists(monkeypatch):
+    monkeypatch.setattr(cp, "has_arrival", lambda run_id: run_id == "cp_run_01")
     manifest = [{"run_id": "cp_run_01"}]
 
     monkeypatch.setattr(cp, "list_run_ids", lambda agency, dataset: ["cp_run_99_no_longer_generated"])
@@ -153,8 +161,7 @@ def test_qa_command_unknown_run_id_is_a_real_clean_error(monkeypatch, cp_raw_dir
     assert "no manifest entry" in result.output.lower()
 
 
-def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_path, cp_delivery_dirs):
-    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
+def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, cp_delivery_dirs):
     # Real deliveries already on disk - so there IS something to
     # overwrite, and the command must ask before it does.
     _patch_delivery_dirs(monkeypatch, cp_delivery_dirs)
@@ -169,8 +176,7 @@ def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_pa
     assert "not regenerated" in result.output.lower()
 
 
-def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch, tmp_path, cp_delivery_dirs):
-    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
+def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch, cp_delivery_dirs):
     _patch_delivery_dirs(monkeypatch, cp_delivery_dirs)
     called = []
     monkeypatch.setattr(cp, "generate_synthetic_data", lambda: called.append(True))
@@ -184,7 +190,6 @@ def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch
 def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypatch, tmp_path):
     """No deliveries on disk yet - nothing to overwrite, so this
     shouldn't even ask."""
-    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
     _patch_delivery_dirs(monkeypatch, (tmp_path / "deliveries", tmp_path / "receipts"))
     called = []
     monkeypatch.setattr(cp, "generate_synthetic_data", lambda: called.append(True))
@@ -405,8 +410,8 @@ def test_qa_command_s3_delivery_flag_mode_downloads_and_runs_real_checks(monkeyp
 # ---- Single-table Child Protection QA (plans/tooling.md #1 Phase 3.5) --
 
 
-def test_run_check_single_table_errors_when_the_other_tables_run_has_no_local_data(monkeypatch, tmp_path):
-    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
+def test_run_check_single_table_errors_when_the_other_tables_run_has_no_arrival(monkeypatch):
+    monkeypatch.setattr(cp, "has_arrival", lambda run_id: False)
     monkeypatch.setattr(cp, "load_manifest", lambda: [{"run_id": "cp_run_01"}])
     monkeypatch.setattr(cp, "default_reference", lambda manifest: "cp_run_missing")
 
@@ -418,7 +423,7 @@ def test_run_check_single_table_errors_when_the_other_tables_run_has_no_local_da
 
     import rich_click as click
     assert isinstance(result_exc, click.ClickException)
-    assert "no local data" in str(result_exc).lower()
+    assert "no delivery on disk" in str(result_exc).lower()
 
 
 def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(monkeypatch, tmp_path):
@@ -429,8 +434,14 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
     integration tests; this test is about proving the RIGHT 6 tables
     from the RIGHT 2 sources (5 from the last Promoted run, 1 fresh)
     actually get loaded."""
-    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
-    (tmp_path / "cp_run_promoted").mkdir()
+    # THE REFERENCE RUN'S OWN DELIVERY is where the other five come
+    # from now (REQ-PIPE-102) - it holds all six tables exactly as the
+    # supplier sent them, so the second copy under data/cp_raw/ this
+    # used to read had nothing the delivery did not.
+    promoted_delivery = tmp_path / "CP_PROMOTED_DELIVERY"
+    promoted_delivery.mkdir()
+    monkeypatch.setattr(cp, "has_arrival", lambda run_id: run_id == "cp_run_promoted")
+    monkeypatch.setattr(cp, "arrival_path", lambda run_id: str(promoted_delivery))
     monkeypatch.setattr(cp, "load_manifest", lambda: [{"run_id": "cp_run_01"}])
     monkeypatch.setattr(cp, "default_reference", lambda manifest: "cp_run_promoted")
 
@@ -439,7 +450,7 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
 
     add_table_calls = []
 
-    def _fake_add_table_to_run(run_id, table, csv_path, db_path=None, raw_dir=None):
+    def _fake_add_table_to_run(run_id, table, csv_path, **kwargs):
         add_table_calls.append((run_id, table, csv_path))
 
     monkeypatch.setattr(build_cp_warehouses, "add_table_to_run", _fake_add_table_to_run)
@@ -469,7 +480,7 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
     other_calls = {c[1]: c[2] for c in add_table_calls if c[0] == "table_cp_clients_001" and c[1] != "cp_clients"}
     assert set(other_calls) == {t for t in cp.TABLES if t != "cp_clients"}
     for table, csv_path in other_calls.items():
-        assert csv_path == os.path.join(str(tmp_path), "cp_run_promoted", f"{table}.csv")
+        assert csv_path == os.path.join(str(promoted_delivery), f"{table}.csv")
 
     assert captured["reference_run_id"] == "cp_run_promoted"
     assert captured["run_by"] == "test@example.com"

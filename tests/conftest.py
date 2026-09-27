@@ -282,11 +282,22 @@ def real_committed_history(_committed_history_is_off_limits):
         setattr(module, name, value)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def bdm_duckdb_dir(supply_dsn, bdm_raw_dir):
     """bdm_raw_dir's same two runs, staged into this worker's supply
     database via the real build_all() - the exact loading code path the
     real pipeline uses, not a hand-rolled copy of it.
+
+    PER MODULE, NOT PER SESSION, since 2026-09-27. What this fixture
+    guarantees is not just "the rows are staged" but "this run has a
+    view schema to read them through", and a QA run now DISCARDS its
+    own view schema when it finishes (REQ-PIPE-068 criterion 1, which
+    always said "once the run completes" - the sweep-at-the-end it
+    replaced never actually met it). So one module calling run_single()
+    used to leave the next module on the same xdist worker with staged
+    tables and no views. Re-staging is cheap here - two arrivals, 620
+    rows - and buys back an invariant every reader of this fixture
+    assumes.
 
     Named for the directory it used to return, and returning the
     database path instead. The name is left alone on purpose: every
@@ -385,13 +396,18 @@ def cp_delivery_dirs(cp_raw_dir):
     return Path(cp_raw_dir) / "deliveries", Path(cp_raw_dir) / "receipts"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def cp_duckdb_dir(supply_dsn, cp_raw_dir):
     """cp_raw_dir's same two runs, staged into this worker's supply
     database via the real build_all(). Shares one database with the BDM
     fixture above, which is the point rather than a compromise - the
     whole asset has one, and the two collections' tables have always
     been distinct.
+
+    PER MODULE for the same reason as the BDM fixture - see its own
+    note on run_single() discarding the view schema it read through.
+    The expensive half (generating a 45,000-person population) stays
+    session-scoped in cp_raw_dir; only the staging repeats.
 
     See the BDM fixture for why the name still says `dir`.
     """
@@ -404,7 +420,7 @@ def cp_duckdb_dir(supply_dsn, cp_raw_dir):
     # tree (REQ-GEN-043) - a real leak this fixture hit for exactly one
     # run, building 18 real CP warehouses into a pytest tmp dir while
     # the fixture's own two sat unread.
-    build_all(raw_dir=cp_raw_dir,
+    build_all(
                deliveries_dir=Path(cp_raw_dir) / "deliveries",
                receipts_dir=Path(cp_raw_dir) / "receipts")
     return supply_dsn

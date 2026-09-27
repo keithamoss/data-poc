@@ -85,7 +85,10 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
     """
     arrival = received_at if received_at is not None else run_id
     physical = supply_db.staged_table(TABLE, arrival, ordinal)
-    key = supply_db.arrival_key(arrival)
+    # THE SAME SEGMENT staged_table() names the physical table with -
+    # not arrival_key() directly. They disagreed for one commit and
+    # the run built views over candidates that could never match.
+    key = supply_db.arrival_segment(arrival)
     delivery_name = delivery_name or run_id
 
     conn = supply_db.connect(dsn=dsn)

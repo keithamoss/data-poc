@@ -46,11 +46,18 @@ from qa_tools.common import asset_time
 
 @pytest.fixture(scope="module")
 def raw_dir(tmp_path_factory):
-    """Every one of generate_cp_runs' outputs, not just OUT_DIR - see
-    tests/generator_isolation.py and BDM's own counterpart."""
+    """Every one of generate_cp_runs' outputs - see
+    tests/generator_isolation.py and BDM's own counterpart.
+
+    YIELDS THE DELIVERY TREE since REQ-PIPE-102: Child Protection no
+    longer writes a flat per-run CSV directory, so the deliveries ARE
+    the generator's output. The fixture keeps its name because every
+    test that depends on it depends on "where the generator wrote",
+    not on the shape of what it wrote.
+    """
     root = tmp_path_factory.mktemp("cp_gen")
     restore = generator_isolation.redirect(generate_cp_runs, root)
-    yield Path(generate_cp_runs.OUT_DIR)
+    yield Path(generate_cp_runs.DELIVERIES_DIR)
     restore()
 
 
@@ -77,9 +84,21 @@ def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
     assert len(delivery_ids) == len(generate_cp_runs.RUN_PLAN)
 
 
+def _delivery_dir(raw_dir, entry):
+    """Where this run's six CSVs are, now that the delivery is the only
+    copy (REQ-PIPE-102).
+
+    KEYED BY DELIVERY NAME, not run id. The generator used to write
+    `<run_id>/<table>.csv` alongside the delivery; the delivery it
+    already wrote is named by the supplier-shaped name the manifest
+    entry carries, which is the thing recognition reads.
+    """
+    return raw_dir / entry["delivery"]
+
+
 def test_every_manifest_entry_has_real_files_on_disk(manifest, raw_dir):
     for entry in manifest:
-        run_dir = raw_dir / entry["run_id"]
+        run_dir = _delivery_dir(raw_dir, entry)
         for table in generate_cp_runs.TABLES:
             path = run_dir / f"{table}.csv"
             assert path.exists(), f"{entry['run_id']}: {path} missing"
@@ -189,7 +208,7 @@ def test_clean_runs_never_have_bad_cp_clients_values(manifest, raw_dir):
     for entry in manifest:
         if entry["dirty_severity"] is not None:
             continue
-        run_dir = raw_dir / entry["run_id"]
+        run_dir = _delivery_dir(raw_dir, entry)
         with open(run_dir / "cp_clients.csv") as f:
             lines = f.read().splitlines()
         header = lines[0].split(",")
@@ -203,7 +222,7 @@ def test_some_dirty_runs_inject_bad_cp_clients_values(manifest, raw_dir):
     for entry in manifest:
         if entry["dirty_severity"] is None:
             continue
-        run_dir = raw_dir / entry["run_id"]
+        run_dir = _delivery_dir(raw_dir, entry)
         with open(run_dir / "cp_clients.csv") as f:
             lines = f.read().splitlines()
         header = lines[0].split(",")
@@ -261,7 +280,6 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     # would bring it into existence, which the comparison below catches
     # either way.
 
-    monkeypatch.setattr(generate_cp_runs, "OUT_DIR", str(tmp_path / "cp_raw"))
     monkeypatch.setattr(generate_cp_runs, "DELIVERIES_DIR", tmp_path / "deliveries")
     monkeypatch.setattr(generate_cp_runs, "RECEIPTS_DIR", tmp_path / "receipts")
     monkeypatch.setattr(generate_cp_runs, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")

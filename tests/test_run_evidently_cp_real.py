@@ -13,14 +13,15 @@ import qa_tools.cp.run_evidently_cp as run_evidently_cp
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
 
-def _run(monkeypatch, cp_raw_dir, run_id, run_timestamp, reference_run_id=_REF_RUN_ID):
-    monkeypatch.setattr(run_evidently_cp, "CP_RAW_DIR", cp_raw_dir)
+def _run(monkeypatch, cp_duckdb_dir, run_id, run_timestamp, reference_run_id=_REF_RUN_ID):
+    # THE WAREHOUSE, not a directory of CSVs (REQ-PIPE-102) -
+    # cp_duckdb_dir is what staged the fixture's two arrivals into it.
     monkeypatch.setattr(run_evidently_cp, "write_qa_result", lambda *a, **k: None)
     return run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id)
 
 
-def test_reference_run_against_itself_has_no_psi_drift(monkeypatch, cp_raw_dir):
-    results = _run(monkeypatch, cp_raw_dir, _REF_RUN_ID, "2026-01-01T09:00:00Z")
+def test_reference_run_against_itself_has_no_psi_drift(monkeypatch, cp_duckdb_dir):
+    results = _run(monkeypatch, cp_duckdb_dir, _REF_RUN_ID, "2026-01-01T09:00:00Z")
 
     assert len(results) == 1
     psi = results[0]
@@ -30,12 +31,12 @@ def test_reference_run_against_itself_has_no_psi_drift(monkeypatch, cp_raw_dir):
     assert psi["reference_run_id"] == _REF_RUN_ID
 
 
-def test_dirty_run_has_a_real_check_id_and_reference(monkeypatch, cp_raw_dir):
+def test_dirty_run_has_a_real_check_id_and_reference(monkeypatch, cp_duckdb_dir):
     """generator.dirty.apply_cp_notifications_presets(severity="red")
     perturbs concern_type's own value distribution (the same column
     this check watches) - real evidence this is a genuine, non-trivial
     PSI computation against real data, not just a shape check."""
-    results = _run(monkeypatch, cp_raw_dir, _DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
+    results = _run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
 
     assert len(results) == 1
     psi = results[0]

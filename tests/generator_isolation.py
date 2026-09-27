@@ -1,12 +1,19 @@
 """Redirecting a generator's output, all of it (REQ-GEN-043).
 
-A generator writes FOUR things now, not one: its extracted CSVs, the
-delivery tree, the receipts beside it, and the shared bookkeeping file.
-Three of those defaulted to the real ones under data/, so redirecting
-OUT_DIR alone - which is what both generator test modules did - left a
-test run deleting and rewriting the real delivery tree as a side
-effect. Deterministic, so the bytes came back identical and nothing
-noticed; a run interrupted mid-write would have left it half-deleted.
+A generator writes several things, not one: the delivery tree, the
+receipts beside it, the shared bookkeeping file, and - for Birth
+Registrations only - a flat extracted CSV per run. Most of those
+defaulted to the real ones under data/, so redirecting the CSV output
+alone - which is what both generator test modules did - left a test
+run deleting and rewriting the real delivery tree as a side effect.
+Deterministic, so the bytes came back identical and nothing noticed; a
+run interrupted mid-write would have left it half-deleted.
+
+NOT EVERY GENERATOR HAS EVERY OUTPUT. Child Protection stopped writing
+a flat copy in REQ-PIPE-102 - its delivery is the only thing it
+produces - so `OUT_DIR` is redirected where it exists and skipped
+where it does not, rather than this helper insisting on a name one
+module legitimately lacks.
 
 Kept in one place so the next output added has one obvious place to be
 added to, and so the two generator modules cannot drift apart on it.
@@ -29,6 +36,8 @@ def redirect(module, root: Path):
              "BOOKKEEPING_PATH": root / "generator_bookkeeping.json"}
     original = {}
     for name, value in names.items():
+        if not hasattr(module, name):
+            continue
         original[name] = getattr(module, name)
         setattr(module, name, value)
 

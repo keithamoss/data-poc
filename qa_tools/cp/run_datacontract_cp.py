@@ -43,7 +43,6 @@ from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
-CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
 
 _QUALITY_CHECK_TYPES = {
     "field_null_values", "field_invalid_values", "field_duplicate_values",

@@ -143,7 +143,7 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
                           "AS SELECT 1 AS id")
         res = supply_db.create_run_views(conn, "run_001", supply_db.candidates_in(
             conn, supply_db.STAGING_SCHEMA, ["birth_registrations"],
-            arrival=supply_db.arrival_key("run_001")))
+            arrival=supply_db.arrival_segment("run_001")))
         assert res.resolved == {}
         assert len(res.ambiguous["birth_registrations"]) == 2
         with pytest.raises(psycopg.errors.UndefinedTable):
@@ -164,7 +164,7 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
             conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" '
                           f"AS SELECT * FROM generate_series(1, {rows})")
         found = supply_db.candidates_in(conn, supply_db.STAGING_SCHEMA, ["t"],
-                                         arrival=supply_db.arrival_key("run_001"))
+                                         arrival=supply_db.arrival_segment("run_001"))
         assert len(found["t"]) == 2
         conn.close()
 

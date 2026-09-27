@@ -46,7 +46,6 @@ from . import run_evidently_cp
 from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-MANIFEST_PATH = os.path.join(ROOT, "data", "cp_raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
 
 
@@ -105,7 +104,32 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
              on_step: Callable[[str], None] | None = None) -> list[dict]:
     run_id = entry["run_id"]
     print(f"--- {run_id} ---")
+    try:
+        return _run_one_inner(entry, run_id, run_timestamp, run_by, reference_run_id, on_step)
+    finally:
+        # Per run, in a finally - see orchestrate_bdm.py's identical
+        # block and supply_db.drop_run_schemas() for why this stopped
+        # being a sweep at the end of the fan-out.
+        _discard_this_runs_schemas(run_id)
 
+
+def _discard_this_runs_schemas(run_id: str) -> None:
+    """Give back what this run borrowed. Never fails the run - see the
+    BDM counterpart's own docstring."""
+    try:
+        conn = supply_db.connect(label="mothman:discard-run-schemas")
+        try:
+            supply_db.drop_run_schemas(conn, run_id)
+        finally:
+            conn.close()
+    except Exception as exc:  # noqa: BLE001 - housekeeping never fails a finished run
+        print(f"{run_id}: could not discard this run's schemas ({type(exc).__name__}: {exc}) "
+              f"- results are recorded; `mothman supply tidy` clears leftovers")
+
+
+def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
+                    reference_run_id: str,
+                    on_step: Callable[[str], None] | None) -> list[dict]:
     results: list[dict] = []
     _announce(on_step, RUN_STEPS[0])
     results.extend(_run_step(cp_common.COLLECTION_ID, "dbt-core", run_id,
@@ -234,21 +258,14 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, run_by, reference_run_id, sequential=sequential)
 
-    # DISCARD THE RUN SCHEMAS (REQ-PIPE-068 criteria 1 and 6). Here, after
-    # the fan-out, rather than at the end of each run: dropping a schema
-    # is a WRITE, DuckDB gives a writer an exclusive lock over the whole
-    # database, and a worker that tidied up after itself would lock out
-    # every other worker still reading. Sweeping everything is also what
-    # clears a schema left behind by an interrupted run - it is
-    # identifiable on its own terms, from its name alone, which is the
-    # whole reason the name carries the run id.
-    conn = supply_db.connect()
-    try:
-        dropped = supply_db.drop_orphan_run_schemas(conn)
-    finally:
-        conn.close()
-    if dropped:
-        print(f"discarded {len(dropped)} per-run view schema(s)")
+    # NOTHING TO SWEEP HERE ANY MORE (Keith, 2026-09-27). Each run
+    # discards its own view and dbt schemas as it finishes - see
+    # _discard_this_runs_schemas() above and
+    # supply_db.drop_run_schemas(). The blanket sweep that used to sit
+    # here could not tell a schema left by an interrupted run from one
+    # belonging to a run happening right now in another process, so it
+    # is now an explicit `mothman supply tidy`, run by someone who
+    # knows nothing else is going.
 
     # HOW FAR PROCESSING GOT (REQ-PIPE-061 criteria 6-8). The same
     # global marker orchestrate_bdm.py advances, for the same reason:

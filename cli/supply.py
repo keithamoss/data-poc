@@ -465,3 +465,41 @@ def holds_command() -> None:
         console.print(f"\n[yellow]{entry.dataset_id}[/yellow] - {entry.supply_id}")
         for name, why in entry.unavailable:
             console.print(f"  {name}: [dim]{why}[/dim]")
+
+
+@supply_group.command("tidy")
+@click.option("--yes", is_flag=True, help="Skip the confirmation.")
+def tidy_command(yes: bool) -> None:
+    """Drop per-run schemas nothing is using any more.
+
+    WHY THIS IS A COMMAND RATHER THAN AN AUTOMATIC STEP (Keith,
+    2026-09-27). A run now discards its own view and dbt schemas as it
+    finishes, so in the ordinary case there is nothing here to do -
+    what is left belongs to a run that was interrupted. Sweeping that
+    automatically is what this replaced, and the reason it had to stop
+    is that a sweep cannot tell an interrupted run's leftovers from a
+    run happening RIGHT NOW in another process. A person can.
+
+    So this asks first, and names what it is about to drop.
+    """
+    from qa_tools.common import supply_db
+
+    conn = supply_db.connect(label="mothman:supply-tidy")
+    try:
+        leftovers = supply_db.run_schemas(conn) + supply_db.dbt_schemas(conn)
+        if not leftovers:
+            console.print("[green]Nothing to tidy[/green] - no per-run schemas are left over.")
+            return
+        console.print(f"[yellow]{len(leftovers)} per-run schema(s) left over:[/yellow]")
+        for schema in leftovers:
+            console.print(f"  {schema}")
+        if not yes and not click.confirm(
+                "Drop these? Anything still running will lose the schema it is reading through",
+                default=False):
+            console.print("[dim]Left alone.[/dim]")
+            return
+        for schema in leftovers:
+            conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+        console.print(f"[green]Dropped {len(leftovers)} schema(s).[/green]")
+    finally:
+        conn.close()

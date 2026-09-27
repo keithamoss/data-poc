@@ -50,11 +50,47 @@ def s3_config() -> dict:
     return s3_source.dataset_s3_config(CONTRACT_PATH)
 
 
-def raw_dir() -> str:
-    """Read dynamically off build_cp_warehouses' own module attribute -
-    same rationale as cli/bdm.py's raw_dir(), never a module-level
-    constant bound once at import time."""
-    return build_cp_warehouses.CP_RAW_DIR
+def arrival_path(run_id: str) -> str:
+    """Where this run's six CSVs actually arrived.
+
+    REPLACED raw_dir()/<run_id>/ (REQ-PIPE-102, 2026-09-27). CP staging
+    used to keep a second copy of every delivered file under
+    data/cp_raw/<run_id>/, and these paths read it back. The delivery
+    is the arrival and always held the same six files; the copy existed
+    only because the CP tools once read CSVs off disk.
+
+    Raises rather than returning a path that is not there, because
+    every caller is about to open six files in it.
+    """
+    from qa_tools.common import arrivals
+
+    for arrival in arrivals.arrivals_for(COLLECTION_ID, "cp_run_"):
+        if arrival.run_id == run_id:
+            return str(arrival.path)
+    raise click.ClickException(
+        f"No arrival on disk for run_id={run_id!r} - run generate-synthetic-data first?")
+
+
+def generated_output_dir() -> str:
+    """Where `generate-synthetic-data` leaves its output, for the one
+    line that reports it. CP writes deliveries and nothing else
+    (REQ-PIPE-102); BDM's counterpart still has a raw drop alongside
+    them, which is why this is a per-dataset accessor rather than one
+    shared constant."""
+    from generator import generate_cp_runs
+
+    return str(generate_cp_runs.DELIVERIES_DIR)
+
+
+def has_arrival(run_id: str) -> bool:
+    """Is that run's delivery still on disk? Asked before offering a
+    run as a reference, where the answer decides a fallback rather than
+    an error."""
+    try:
+        arrival_path(run_id)
+        return True
+    except click.ClickException:
+        return False
 
 
 
@@ -103,14 +139,14 @@ def default_reference(manifest: list[dict]) -> str:
     """The last Promoted run for this collection, falling back to the
     manifest's own first (always-clean-by-construction) entry - same
     reasoning as cli/bdm.py's default_reference(), except CP has no
-    per-reference CSV filename to check for (a reference run's own 6
-    table CSVs live under raw_dir()/<run_id>/, checked directly rather
-    than inferred from a manifest `file` field CP's manifest doesn't
+    per-reference CSV filename to check for (a reference run's six
+    tables are its delivery's own files, checked directly rather than
+    inferred from a manifest `file` field CP's manifest doesn't
     have)."""
     promoted = list_run_ids(AGENCY_ID, COLLECTION_ID)
     if promoted:
         candidate = promoted[-1]
-        if os.path.isdir(os.path.join(raw_dir(), candidate)):
+        if has_arrival(candidate):
             return candidate
     return manifest[0]["run_id"]
 
@@ -119,8 +155,8 @@ def _load_delivery_from_folder(folder: str, run_id: str) -> None:
     """Loads all 6 real tables for one run_id from an arbitrary folder
     into that run's warehouse - the retired qa_tools/cp/check_delivery.py
     CLI's own _load_delivery() logic, folded in here verbatim (Phase 2).
-    Used by both Synthetic mode (_load_delivery(), pointed at this run's
-    own data/cp_raw/<run_id>/ directory) and Local files mode
+    Used by both Synthetic mode (_load_delivery(), pointed at the
+    delivery this run arrived in) and Local files mode
     (run_check_local_folder(), pointed at whatever folder the operator
     browsed to)."""
     missing = [t for t in TABLES if not os.path.isfile(os.path.join(folder, f"{t}.csv"))]
@@ -129,20 +165,15 @@ def _load_delivery_from_folder(folder: str, run_id: str) -> None:
             f"{folder} is missing: {', '.join(f'{t}.csv' for t in missing)} - "
             f"a CP delivery needs all 6 real tables, the cross-table checks can't run on a partial set")
     for table in TABLES:
-        build_cp_warehouses.add_table_to_run(run_id, table, os.path.join(folder, f"{table}.csv"),
-                                              raw_dir=build_cp_warehouses.CP_RAW_DIR)
+        build_cp_warehouses.add_table_to_run(run_id, table, os.path.join(folder, f"{table}.csv"))
 
 
 def _load_delivery(run_id: str) -> None:
     """Synthetic mode's own delivery loader - a thin wrapper around
-    _load_delivery_from_folder() pointed at this run's own
-    data/cp_raw/<run_id>/ directory, with a clearer error message for
-    that specific (missing-synthetic-data) case."""
-    run_dir = os.path.join(raw_dir(), run_id)
-    if not os.path.isdir(run_dir):
-        raise click.ClickException(
-            f"No manifest entry for run_id={run_id!r} - run generate-synthetic-data first?")
-    _load_delivery_from_folder(run_dir, run_id)
+    _load_delivery_from_folder() pointed at the delivery this run
+    actually arrived in (REQ-PIPE-102; it used to be pointed at a
+    second copy under data/cp_raw/<run_id>/)."""
+    _load_delivery_from_folder(arrival_path(run_id), run_id)
 
 
 def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
@@ -167,9 +198,9 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
 
     if reference_run_id is None:
         reference_run_id = default_reference(manifest)
-    if not os.path.isdir(os.path.join(raw_dir(), reference_run_id)):
+    if not has_arrival(reference_run_id):
         raise click.ClickException(
-            f"Reference run {reference_run_id!r}'s data isn't in {raw_dir()} - "
+            f"Reference run {reference_run_id!r}'s delivery isn't on disk - "
             f"run generate-synthetic-data first?")
 
     tmp_dir = common.new_tmp_results_dir()
@@ -246,9 +277,8 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
     CP's real dbt models need all 6 real tables present (ref()/
     source()), so a check against just one freshly-arrived table can't
     run a reduced set - it auto-pulls the OTHER 5 tables from the most
-    recent Promoted run's own local data (data/cp_raw/<run_id>/
-    <table>.csv - the only place this PoC durably keeps CP table data
-    once a check has finished running), via the exact same
+    recent Promoted run's own delivery, which holds all six of its
+    tables exactly as the supplier sent them, via the exact same
     default_reference() the Synthetic flow already uses to pick its own
     reference run. That same run doubles as the Evidently drift baseline
     too - a real, known-good, already-Promoted 6-table delivery is
@@ -263,9 +293,9 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
     wrong answer."""
     manifest = load_manifest()
     other_tables_run_id = default_reference(manifest)
-    if not os.path.isdir(os.path.join(raw_dir(), other_tables_run_id)):
+    if not has_arrival(other_tables_run_id):
         raise click.ClickException(
-            f"No local data for run {other_tables_run_id!r} (the last Promoted/fallback run) - "
+            f"No delivery on disk for run {other_tables_run_id!r} (the last Promoted/fallback run) - "
             f"run generate-synthetic-data first? Single-table mode needs a known-good delivery "
             f"already on disk to source the other 5 tables from.")
 
@@ -277,12 +307,11 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
 
     _load_delivery(other_tables_run_id)  # full 6-table warehouse, doubles as the Evidently reference
 
+    other_tables_dir = arrival_path(other_tables_run_id)
     for other_table in (t for t in TABLES if t != table):
         build_cp_warehouses.add_table_to_run(
-            run_id, other_table, os.path.join(raw_dir(), other_tables_run_id, f"{other_table}.csv"),
-            raw_dir=build_cp_warehouses.CP_RAW_DIR)
-    build_cp_warehouses.add_table_to_run(
-        run_id, table, file_path, raw_dir=build_cp_warehouses.CP_RAW_DIR)
+            run_id, other_table, os.path.join(other_tables_dir, f"{other_table}.csv"))
+    build_cp_warehouses.add_table_to_run(run_id, table, file_path)
 
     entry = {"run_id": run_id, "dirty_severity": None,
              "received_at": asset_time.isoformat(asset_time.start_of_day(date.fromisoformat(run_date)))}
@@ -531,12 +560,15 @@ def cp_group() -> None:
 def generate_synthetic_data_command(yes: bool) -> None:
     """Generate (or deterministically regenerate) the full synthetic Child Protection collection."""
     if manifest_exists() and not common.confirm(
-            "This will regenerate data/cp_raw/ (deterministic - same content either way). Continue?",
+            "This will regenerate the Child Protection deliveries "
+            "(deterministic - same content either way). Continue?",
             yes=yes, default=True):
         console.print("Not regenerated.", style="yellow")
         return
     generate_synthetic_data()
-    console.print(f"Generated -> {raw_dir()}", style="green")
+    from generator import generate_cp_runs
+
+    console.print(f"Generated -> {generate_cp_runs.DELIVERIES_DIR}", style="green")
 
 
 def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bool) -> None:

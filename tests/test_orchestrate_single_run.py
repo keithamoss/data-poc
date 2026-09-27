@@ -114,8 +114,9 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     # per-run DuckDB files (REQ-PIPE-068).
     # The environment already points at this worker's database
     # (conftest's supply_dsn); cp_duckdb_dir is what staged the data into it.
-    monkeypatch.setattr(run_datacontract_cp, "CP_RAW_DIR", cp_raw_dir)
-    monkeypatch.setattr(run_evidently_cp, "CP_RAW_DIR", cp_raw_dir)
+    # NOTHING LEFT TO REDIRECT ON DISK (REQ-PIPE-102) - both of these
+    # modules read the warehouse now, so the CP_RAW_DIR they used to
+    # carry is gone rather than pointed somewhere else.
     for mod in (run_dbt_cp, run_soda_cp, run_datacontract_cp, run_evidently_cp):
         monkeypatch.setattr(mod, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: None)

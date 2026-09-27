@@ -75,15 +75,16 @@ def _generate_menu() -> None:
                              flag_hint="mothman bdm generate-synthetic-data / mothman cp generate-synthetic-data")
     if dataset is None:
         return
-    mod, raw_dir_label = (bdm, "data/raw/") if dataset == _DATASET_BDM else (cp, "data/cp_raw/")
+    mod = bdm if dataset == _DATASET_BDM else cp
     if mod.manifest_exists() and not common.confirm(
-            f"This will regenerate {raw_dir_label} (deterministic - same content either way). Continue?",
+            f"This will regenerate {mod.generated_output_dir()} "
+            f"(deterministic - same content either way). Continue?",
             yes=False, default=True):
         console.print("Not regenerated.", style="yellow")
         return
     console.print("Generating synthetic data...", style="dim")
     mod.generate_synthetic_data()
-    console.print(f"Generated -> {mod.raw_dir()}", style="green")
+    console.print(f"Generated -> {mod.generated_output_dir()}", style="green")
 
 
 def _bootstrap_menu() -> None:

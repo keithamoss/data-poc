@@ -26,7 +26,6 @@ from qa_tools.common import supply_db
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
 
 # The six CP tables, in the order contract/data-asset.yaml declares
@@ -35,7 +34,7 @@ TABLES = [d.table for d in hierarchy.datasets_in_collection("child-protection")]
 
 
 def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = None,
-                      raw_dir: str = CP_RAW_DIR, contract_path: str = CONTRACT_PATH,
+                      contract_path: str = CONTRACT_PATH,
                       ordinal: int = 0, received_at=None, dataset_id: str = "",
                       delivery_name: str = "", log_dir=None) -> str | None:
     """Stage exactly one CP table's CSV for that run, and rebuild the
@@ -72,19 +71,20 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
     not raise, so the delivery's other five tables still stage
     (criterion 6).
 
-    Also copies csv_path into raw_dir/<run_id>/<table>.csv if it isn't
-    already there - a real constraint discovered while building this:
-    run_datacontract_cp.py/run_evidently_cp.py both read CP's raw CSVs
-    directly off disk under CP_RAW_DIR/<run_id>/, not just the staged
-    tables this function also builds (unlike BDM, where the warehouse
-    is enough) - so a Lambda-arrived file needs to land in both places
-    for orchestrate_cp.run_single()'s later 4-tool run to find it, the
-    same normalization orchestrate_bdm.run_single() does for its own
-    RAW_DIR dependency.
+    NO SECOND COPY ANY MORE (REQ-PIPE-102, 2026-09-27). This used to
+    copy csv_path into data/cp_raw/<run_id>/<table>.csv as well,
+    because run_datacontract_cp.py and run_evidently_cp.py read CP's
+    CSVs off disk rather than from the warehouse. REQ-QAC-088 pointed
+    both at the warehouse and the reason went with it, leaving a third
+    copy of every supply that nothing read and everything had to keep
+    in step. Birth Registrations never had one.
     """
     arrival = received_at if received_at is not None else run_id
     physical = supply_db.staged_table(table, arrival, ordinal)
-    key = supply_db.arrival_key(arrival)
+    # THE SAME SEGMENT staged_table() names the physical table with -
+    # not arrival_key() directly. They disagreed for one commit and
+    # the run built views over candidates that could never match.
+    key = supply_db.arrival_segment(arrival)
     delivery_name = delivery_name or run_id
     dataset_id = dataset_id or table
 
@@ -93,15 +93,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
         supply_db.ensure_schemas(conn)
         rows = None
         try:
-            run_raw_dir = os.path.join(raw_dir, run_id)
-            os.makedirs(run_raw_dir, exist_ok=True)
-            dest_csv = os.path.join(run_raw_dir, os.path.basename(csv_path) if ordinal
-                                     else f"{table}.csv")
-            if os.path.abspath(csv_path) != os.path.abspath(dest_csv):
-                with open(csv_path, "rb") as src, open(dest_csv, "wb") as dst:
-                    dst.write(src.read())
-
-            df = read_csv_explicit_nulls(dest_csv,
+            df = read_csv_explicit_nulls(csv_path,
                                           load_null_values_by_column(contract_path).get(table, {}))
             # Our own scratch, for the reason supply_db.staging_csv()
             # gives: a temp file in a tree anything else reads back is
@@ -150,10 +142,9 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
     return physical
 
 
-def build_all(raw_dir: str = CP_RAW_DIR, dsn: str | None = None,
+def build_all(dsn: str | None = None,
                deliveries_dir=None, receipts_dir=None) -> list[str]:
-    """Stage every recognised arrival - see the BDM counterpart for why
-    `raw_dir` is kept but no longer read."""
+    """Stage every recognised arrival, from where it arrived."""
     run_ids = []
     # One directory per arrival, recognised from disk (REQ-GEN-043) -
     # the six CP tables land together as ONE delivery, which is why the
@@ -186,7 +177,7 @@ def build_all(raw_dir: str = CP_RAW_DIR, dsn: str | None = None,
                 # ours.
                 if add_table_to_run(
                         run_id, table, os.path.join(str(arrival.path), filename),
-                        dsn=dsn, raw_dir=raw_dir,
+                        dsn=dsn,
                         ordinal=ordinal if len(filenames) > 1 else 0,
                         received_at=arrival.received_at, dataset_id=dataset_id,
                         delivery_name=arrival.delivery_name) is not None:

@@ -57,7 +57,7 @@ class TestOneNameResolvesToOneTable:
         res = supply_db.create_run_views(
             db, "run_001", supply_db.candidates_in(
                 db, supply_db.STAGING_SCHEMA, ["birth_registrations"]))
-        assert res.resolved == {"birth_registrations": "birth_registrations__001"}
+        assert res.resolved == {"birth_registrations": "birth_registrations__run_001"}
         got = db.execute(
             f'SELECT count(*) FROM "{res.schema}"."birth_registrations"').fetchone()[0]
         assert got == 3
@@ -84,14 +84,14 @@ class TestAmbiguityIsAbsenceRatherThanAChoice:
         # is what two files delivered for one dataset looks like once
         # both are staged.
         db.execute(
-            f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."cp_clients__007b" AS '
+            f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."cp_clients__run_007b" AS '
             "SELECT * FROM generate_series(0, 8) AS t(id)")
         res = supply_db.create_run_views(
             db, "run_007", supply_db.candidates_in(
                 db, supply_db.STAGING_SCHEMA, ["cp_clients"]))
         assert res.resolved == {}
         assert res.ambiguous == {
-            "cp_clients": ["cp_clients__007", "cp_clients__007b"]}
+            "cp_clients": ["cp_clients__run_007", "cp_clients__run_007b"]}
         with pytest.raises(psycopg.errors.UndefinedTable):
             db.execute(f'SELECT * FROM "{res.schema}"."cp_clients"')
 
@@ -139,8 +139,8 @@ class TestCandidatesAreScopedToTheRun:
         for run_id in ("run_001", "run_002", "run_042"):
             _stage(db, "birth_registrations", run_id)
         res = supply_db.create_run_views(db, "run_042", supply_db.candidates_in(
-            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_key("run_042")))
-        assert res.resolved == {"birth_registrations": "birth_registrations__042"}
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_segment("run_042")))
+        assert res.resolved == {"birth_registrations": "birth_registrations__run_042"}
         assert res.ambiguous == {}
 
     def test_unscoped_is_what_went_wrong(self, db):
@@ -160,8 +160,8 @@ class TestCandidatesAreScopedToTheRun:
         _stage(db, "birth_registrations", "run_001")
         _stage(db, "birth_registrations", "run_0011")
         found = supply_db.candidates_in(
-            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_key("run_001"))
-        assert found["birth_registrations"] == ["birth_registrations__001"]
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_segment("run_001"))
+        assert found["birth_registrations"] == ["birth_registrations__run_001"]
 
     def test_two_files_for_one_dataset_in_one_run_are_still_ambiguous(self, db):
         """The ambiguity this is actually for (REQ-PIPE-059) survives
@@ -173,7 +173,7 @@ class TestCandidatesAreScopedToTheRun:
             f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"'
             f'."{supply_db.staged_table("cp_clients", "run_007", 2)}" AS SELECT 1 AS id')
         found = supply_db.candidates_in(
-            db, supply_db.STAGING_SCHEMA, ["cp_clients"], arrival=supply_db.arrival_key("run_007"))
+            db, supply_db.STAGING_SCHEMA, ["cp_clients"], arrival=supply_db.arrival_segment("run_007"))
         assert len(found["cp_clients"]) == 2
         res = supply_db.create_run_views(db, "run_007", found)
         assert res.resolved == {} and list(res.ambiguous) == ["cp_clients"]
@@ -187,11 +187,11 @@ class TestACandidateMustActuallyClaimTheName:
         found = supply_db.candidates_in(
             db, supply_db.STAGING_SCHEMA, ["cp_case", "cp_case_workers"])
         assert found["cp_case"] == []
-        assert found["cp_case_workers"] == ["cp_case_workers__001"]
+        assert found["cp_case_workers"] == ["cp_case_workers__run_001"]
 
     def test_a_table_in_another_schema_is_not_a_candidate(self, db):
         db.execute('CREATE SCHEMA IF NOT EXISTS "somewhere_else"')
-        db.execute('CREATE TABLE "somewhere_else"."cp_clients__001" AS SELECT 1 AS id')
+        db.execute('CREATE TABLE "somewhere_else"."cp_clients__run_001" AS SELECT 1 AS id')
         found = supply_db.candidates_in(
             db, supply_db.STAGING_SCHEMA, ["cp_clients"])
         assert found["cp_clients"] == []
@@ -220,7 +220,7 @@ class TestTheRunSchemaIsDisposable:
         supply_db.drop_run_schema(db, "run_001")
         still = db.execute(
             f'SELECT count(*) FROM "{supply_db.STAGING_SCHEMA}".'
-            f'"birth_registrations__001"').fetchone()[0]
+            f'"birth_registrations__run_001"').fetchone()[0]
         assert still == 5, "a view schema is a lens, and dropping it must not drop the supply"
 
     def test_an_orphan_is_identifiable_without_any_other_record(self, db):
@@ -260,9 +260,9 @@ class TestOneDatabase:
         _stage(db, "birth_registrations", "run_001", rows=1)
         _stage(db, "birth_registrations", "run_002", rows=2)
         a = supply_db.create_run_views(db, "run_001", {
-            "birth_registrations": ["birth_registrations__001"]})
+            "birth_registrations": ["birth_registrations__run_001"]})
         b = supply_db.create_run_views(db, "run_002", {
-            "birth_registrations": ["birth_registrations__002"]})
+            "birth_registrations": ["birth_registrations__run_002"]})
         assert a.schema != b.schema
         assert db.execute(f'SELECT count(*) FROM "{a.schema}"."birth_registrations"').fetchone()[0] == 1
         assert db.execute(f'SELECT count(*) FROM "{b.schema}"."birth_registrations"').fetchone()[0] == 2
@@ -410,12 +410,12 @@ class TestWhatARunReadIsRecorded:
     def test_a_resolution_survives_the_schema_it_describes(self, db):
         _stage(db, "birth_registrations", "run_001")
         res = supply_db.create_run_views(db, "run_001", supply_db.candidates_in(
-            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_key("run_001")))
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_segment("run_001")))
         supply_db.record_resolution(db, res)
         supply_db.drop_run_schema(db, "run_001")
 
         back = supply_db.resolution_for(db, "run_001")
-        assert back.resolved == {"birth_registrations": "birth_registrations__001"}
+        assert back.resolved == {"birth_registrations": "birth_registrations__run_001"}
 
     def test_it_records_why_a_name_was_not_readable(self, db):
         """Ambiguous and absent are different answers to "why is this
@@ -425,22 +425,22 @@ class TestWhatARunReadIsRecorded:
                 f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"'
                 f'."{supply_db.staged_table("cp_carers", "r", ordinal)}" AS SELECT 1 AS id')
         res = supply_db.create_run_views(db, "r", supply_db.candidates_in(
-            db, supply_db.STAGING_SCHEMA, ["cp_carers", "cp_placements"], arrival=supply_db.arrival_key("r")))
+            db, supply_db.STAGING_SCHEMA, ["cp_carers", "cp_placements"], arrival=supply_db.arrival_segment("r")))
         supply_db.record_resolution(db, res)
 
         back = supply_db.resolution_for(db, "r")
-        assert back.ambiguous == {"cp_carers": ["cp_carers__0__1", "cp_carers__0__2"]}
+        assert back.ambiguous == {"cp_carers": ["cp_carers__r__1", "cp_carers__r__2"]}
         assert back.absent == ["cp_placements"]
 
     def test_restaging_replaces_the_record_rather_than_adding_to_it(self, db):
         _stage(db, "birth_registrations", "run_001")
         args = (db, "run_001", supply_db.candidates_in(
-            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_key("run_001")))
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_segment("run_001")))
         supply_db.record_resolution(db, supply_db.create_run_views(*args))
         supply_db.record_resolution(db, supply_db.create_run_views(*args))
 
         back = supply_db.resolution_for(db, "run_001")
-        assert back.resolved == {"birth_registrations": "birth_registrations__001"}
+        assert back.resolved == {"birth_registrations": "birth_registrations__run_001"}
         assert back.ambiguous == {} and back.absent == []
 
     def test_a_run_nobody_recorded_reads_as_empty_rather_than_raising(self, db):
@@ -451,8 +451,8 @@ class TestWhatARunReadIsRecorded:
     def test_the_record_names_the_run_and_the_schema_it_describes(self, db):
         _stage(db, "birth_registrations", "run_009")
         res = supply_db.create_run_views(db, "run_009", supply_db.candidates_in(
-            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_key("run_009")))
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_segment("run_009")))
         record = res.as_record()
         assert record["run_id"] == "run_009"
         assert record["schema"] == supply_db.run_schema("run_009")
-        assert record["resolved"] == {"birth_registrations": "birth_registrations__009"}
+        assert record["resolved"] == {"birth_registrations": "birth_registrations__run_009"}

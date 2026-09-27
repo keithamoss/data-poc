@@ -14,15 +14,16 @@ plans/qa-pipeline.md #84.
 from __future__ import annotations
 import os
 
+import psycopg
+
 from qa_tools.common import hierarchy
 from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
-from qa_tools.common.csv_io import load_null_values_by_column, read_csv_explicit_nulls
+from qa_tools.common.csv_io import load_null_values_by_column
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
 from .evidently_check_lifecycle import PSI_CHECK_ID
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
 _NULL_VALUES = load_null_values_by_column(CONTRACT_PATH).get("cp_notifications", {})
 
@@ -42,31 +43,50 @@ REFERENCE_RUN_ID = "cp_run_01_2026-07-06"
 _COLUMN = "concern_type"
 
 
-def _csv_frame(run_id: str):
-    return read_csv_explicit_nulls(
-        os.path.join(CP_RAW_DIR, run_id, "cp_notifications.csv"), _NULL_VALUES)[[_COLUMN]]
-
-
 def _current_frame(run_id: str):
     """This run's column, from the warehouse - see the BDM counterpart.
-    Falls back to the CSV only where the run has no view schema."""
+
+    NO CSV FALLBACK ANY MORE (REQ-PIPE-102, 2026-09-27). This used to
+    catch a bare `Exception` and read `data/cp_raw/<run_id>/
+    cp_notifications.csv` instead, which meant a lock, a missing view
+    or a wrong schema produced a drift number computed from a file
+    rather than an error - a plausible-looking answer to a question
+    that had actually failed. Every path that reaches here stages into
+    the warehouse first, ad-hoc checks included, so there is no case
+    left where the rows are absent and a file would still be right.
+    """
     import pandas as pd
 
     from qa_tools.common import supply_db
 
-    try:
-        with supply_db.connect(read_only=True, label="mothman:evidently-cp") as conn:
-            conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
+    schema = supply_db.run_schema(run_id)
+    with supply_db.connect(read_only=True, label="mothman:evidently-cp") as conn:
+        conn.execute(f'SET search_path TO "{schema}"')
+        try:
             rows = conn.execute(f"SELECT {_COLUMN} FROM cp_notifications").fetchall()
-        return pd.DataFrame({_COLUMN: [r[0] for r in rows]})
-    except Exception:
-        return _csv_frame(run_id)
+        except psycopg.errors.UndefinedTable as exc:
+            # NAME THE SCHEMA. PostgreSQL ignores a missing schema in
+            # search_path rather than complaining, so the bare error
+            # says only "cp_notifications does not exist" and sends the
+            # reader looking for a table when the problem is a whole
+            # run's views being absent.
+            existing = supply_db.run_schemas(conn)
+            raise ValueError(
+                f"run {run_id!r} has no readable cp_notifications: schema {schema!r} "
+                f"{'exists but has no such view' if schema in existing else 'does not exist'}. "
+                f"Stage that supply before checking it.") from exc
+    return pd.DataFrame({_COLUMN: [r[0] for r in rows]})
 
 
 def _reference_frame(reference_run_id: str):
     """Rebuilt from what that run RECORDED, so its rows need not be
     found - see qa_tools/common/evidently_common.py for why that is
-    exact for a categorical column."""
+    exact for a categorical column.
+
+    A reference with no recorded distribution is an error rather than a
+    cue to go looking on disk: drift measured against a baseline nobody
+    can name is not a measurement.
+    """
     from qa_tools.common.evidently_common import (
         frame_from_value_counts, reference_value_counts,
     )
@@ -75,7 +95,17 @@ def _reference_frame(reference_run_id: str):
         cp_common.AGENCY_ID, cp_common.COLLECTION_ID, reference_run_id, _COLUMN)
     if counts:
         return frame_from_value_counts(counts, _COLUMN)
-    return _csv_frame(reference_run_id)
+    # NO RECORDING YET, SO READ THE WAREHOUSE - never a CSV
+    # (REQ-PIPE-102 criterion 4). A recorded distribution is the
+    # preferred source because it keeps working after the reference
+    # supply's own rows have aged out of staging; but an ad-hoc check
+    # against a folder of files creates a brand-new reference run that
+    # has never been QA'd, so there is nothing recorded for it yet and
+    # its rows are right there, freshly staged. Reading them is not the
+    # permissive fallback this requirement removed - that one answered
+    # a failed database read from a file on disk. This reads the same
+    # database, and still fails if the rows are not there either.
+    return _current_frame(reference_run_id)
 
 
 def evaluate_evidently_cp(run_id: str, run_timestamp: str,

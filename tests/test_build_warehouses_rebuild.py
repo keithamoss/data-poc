@@ -57,13 +57,11 @@ def test_bdm_build_all_restages_an_arrival_it_has_already_seen(
 def test_cp_build_all_restages_an_arrival_it_has_already_seen(
         cp_duckdb_dir, cp_raw_dir, cp_delivery_dirs):
     deliveries, receipts = cp_delivery_dirs
-    first = build_all_cp(raw_dir=cp_raw_dir,
-                          deliveries_dir=deliveries, receipts_dir=receipts)
+    first = build_all_cp(deliveries_dir=deliveries, receipts_dir=receipts)
     before = _staged(cp_duckdb_dir, "cp_clients")
     assert before, "the fixture staged nothing at all"
 
-    second = build_all_cp(raw_dir=cp_raw_dir,
-                           deliveries_dir=deliveries, receipts_dir=receipts)
+    second = build_all_cp(deliveries_dir=deliveries, receipts_dir=receipts)
 
     assert second == first
     assert _staged(cp_duckdb_dir, "cp_clients") == before
