@@ -26,8 +26,6 @@ import tempfile
 import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
 from qa_tools.common.file_arrival import match_arrival
-from qa_tools.common.lambda_results_dir import CP_MODULES, patch_write_qa_result_for_lambda
-from qa_tools.common.results_s3_sink import upload_qa_result
 from qa_tools.cp.completion_tracker import ManifestMarkerCompletionTracker
 from qa_tools.common import asset_time
 
@@ -49,7 +47,6 @@ CP_ARRIVAL_PATTERNS = [
 # identical comment and the design doc's own open question.
 REFERENCE_RUN_ID = "cp_run_01"
 
-RESULTS_BUCKET_NAME = os.environ.get("RESULTS_BUCKET_NAME")
 
 
 def _head_object_exists(s3_client, bucket: str, key: str) -> bool:
@@ -67,9 +64,8 @@ def handler(event: dict, context=None) -> dict:
     summary = {"tables_loaded": 0, "deliveries_completed": 0, "skipped": 0, "pass": 0, "warn": 0, "fail": 0,
                "error": 0}
 
-    qa_results_root = os.path.join(tempfile.gettempdir(), "qa_results")
-    patch_write_qa_result_for_lambda(CP_MODULES, qa_results_root)
-
+    # NOTHING TO REDIRECT ANY MORE - see the Birth Registrations handler's
+    # own note for the whole account (REQ-PIPE-089).
     for record in event.get("Records", []):
         bucket = record["s3"]["bucket"]["name"]
         key = record["s3"]["object"]["key"]
@@ -115,13 +111,6 @@ def handler(event: dict, context=None) -> dict:
         run_date = asset_time.now().date().isoformat()
         entry = {"run_id": run_id, "run_date": run_date, "dirty_severity": None}
         results = orchestrate_cp.run_single(entry, reference_run_id=REFERENCE_RUN_ID)
-
-        run_dirs_root = os.path.join(qa_results_root, orchestrate_cp.cp_common.AGENCY_ID,
-                                      orchestrate_cp.cp_common.COLLECTION_ID, run_id)
-        if RESULTS_BUCKET_NAME and os.path.isdir(run_dirs_root):
-            for filename in os.listdir(run_dirs_root):
-                upload_qa_result(os.path.join(run_dirs_root, filename), qa_results_root, RESULTS_BUCKET_NAME,
-                                  s3_client=s3_client)
 
         summary["deliveries_completed"] += 1
         for status in ("pass", "warn", "fail", "error"):

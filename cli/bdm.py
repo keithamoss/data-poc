@@ -26,7 +26,7 @@ from rich.table import Table
 from qa_tools.bdm import build_per_run_warehouses, orchestrate_bdm
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
-from qa_tools.common.lambda_results_dir import BDM_MODULES, patch_write_qa_result_for_lambda
+from qa_tools.common import trial as trial_mod
 from qa_tools.common import hand_filing
 from qa_tools.common.qa_results_reader import list_run_ids
 
@@ -118,8 +118,8 @@ def manifest_exists() -> bool:
 
 def default_reference(manifest: list[dict]) -> tuple[str, str]:
     """The last Promoted run for this dataset (plans/tooling.md #1's own
-    design: Evidently's reference/baseline defaults to the last run
-    that's actually in the real, permanent qa_results/ history), falling
+    design: Evidently's reference/baseline defaults to the last run whose
+    results were actually recorded), falling
     back to the manifest's own first (always-clean-by-construction) entry
     - the same reference run_pipeline() itself already uses - if nothing
     has been Promoted yet, or if a previously-Promoted run is no longer
@@ -142,13 +142,18 @@ def default_reference(manifest: list[dict]) -> tuple[str, str]:
 
 
 def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
-              on_step=None) -> tuple[list[dict], str]:
-    """Runs the real check chain for one existing Synthetic manifest entry
-    into a fresh throwaway location - never the real, permanent
-    qa_results/ history directly. Returns (results, tmp_results_dir); the
-    caller decides whether to common.promote() it, matching the same
-    tmp-dir-first pattern qa_tools/bdm/check_file.py's own --commit
-    handling already uses (qa_tools.common.lambda_results_dir).
+              on_step=None, *, keep: bool = True) -> tuple[list[dict], str]:
+    """Runs the real check chain for one existing Synthetic manifest entry.
+    Returns (results, recorded_run_id) - the second is `run_id` itself for
+    a kept run, and a throwaway trial identity when `keep` is False.
+
+    IT USED TO WRITE INTO A THROWAWAY DIRECTORY and hand the caller a
+    path to promote into the committed qa_results/ tree. REQ-PIPE-089
+    removed the tree, and with it the idea that a run can be held
+    somewhere provisional until somebody accepts it: results are recorded
+    as the run completes, so the keep-or-not decision moved to before the
+    chain rather than after the report. See the body for the whole
+    reasoning.
 
     This used to do two extra things, both of which REQ-GEN-043 removed
     the NEED for rather than the code for, which is worth saying so the
@@ -179,15 +184,24 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
             f"run generate-synthetic-data first?")
 
     csv_path = entry["csv_path"]
-    tmp_dir = common.new_tmp_results_dir()
-    patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
+
+    # KEEP OR TRIAL IS DECIDED BEFORE THE CHAIN RUNS, and it used to be
+    # decided afterwards (REQ-PIPE-089 criterion 8). The old shape wrote
+    # every run's results to a throwaway directory and then asked
+    # "promote?" - so declining meant deleting files nobody had read. A
+    # recorded result is visible the moment its run completes, so there
+    # is no afterwards to ask in: a run the operator does not want kept
+    # runs under a TRIAL identity instead, which records nothing that
+    # survives it (REQ-PIPE-103). Same choice, moved to the only place it
+    # can still be made.
+    recorded_run_id = run_id if keep else trial_mod.trial_run_id()
 
     results = _run_single_preserving_manifest(
-        run_id, csv_path, asset_time.local_date(entry["received_at"]).isoformat(),
+        recorded_run_id, csv_path, asset_time.local_date(entry["received_at"]).isoformat(),
         reference_run_id, run_by=run_by,
         on_step=on_step,
     )
-    return results, tmp_dir
+    return results, recorded_run_id
 
 
 def _run_single_preserving_manifest(*args, **kwargs) -> list[dict]:
@@ -240,9 +254,6 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     csv_path = filed.paths[0]
     reference_run_id = common.reference_run_id()
 
-    tmp_dir = common.new_tmp_results_dir()
-    patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
-
     # THE REFERENCE IS STAGED TOO (REQ-PIPE-102, 2026-09-27), which is
     # what lets data/raw/ go. It used to be copied into that directory
     # so Evidently could find it by name, leaving it the one supply in
@@ -259,7 +270,7 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
         )
     finally:
         common.discard_reference(reference_run_id)
-    return results, tmp_dir, filed
+    return results, filed
 
 
 def run_check_s3(bucket: str, key: str, reference_key: str, run_by: str,
@@ -322,30 +333,52 @@ _SOURCE_LOCAL_FILE = "Local files - a CSV you've already downloaded"
 _SOURCE_S3 = "S3 - browse the real raw-data bucket"
 
 
-def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_default: bool) -> None:
-    console.print(report_table(results, run_id))
-    if common.confirm("Promote this run into the real, permanent qa_results/ history?",
-                       yes=False, default=commit_default):
-        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, run_id)
-        common.report_promoted(dst)
+def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
+                       *, interactive: bool) -> None:
+    """Report a Synthetic-mode check, and say what became of it.
+
+    IT USED TO ASK "Promote this run into the real, permanent qa_results/
+    history?" here, with the report already on screen. That question is
+    gone rather than reworded (REQ-PIPE-089 criterion 8): the results were
+    recorded as the run completed, so by the time anything could be asked
+    the answer is already true. The same decision is now taken before the
+    chain runs, which is the only place it can still change anything.
+
+    NOTHING SAYS "commit and push to publish" ANY MORE either, and that
+    absence is the point rather than an omission - publishing was a git
+    push, and it is now REQ-PIPE-092's own step.
+    """
+    console.print(report_table(results, recorded_run_id))
+    if not keep:
+        console.print(f"TRIAL {recorded_run_id} - the real tools ran against the same rows and "
+                       "nothing was recorded.", style="dim")
+    elif interactive:
+        common.report_recorded(recorded_run_id, len(results))
     else:
-        console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
+        # The scriptable form keeps its one line, for the same reason the
+        # panel it replaces kept its own: a panel is noise in a pipeline
+        # and a blocking keypress would be a hang.
+        console.print(f"Recorded {len(results)} results for {recorded_run_id}", style="green")
 
 
-def _finish_supply(results: list[dict], filed, tmp_dir: str) -> None:
-    """Report a hand-supplied check, and do what the operator already
-    said (REQ-PIPE-103 criterion 8).
+def _finish_supply(results: list[dict], filed) -> None:
+    """Report a hand-supplied check, and say what the operator already
+    decided (REQ-PIPE-103 criterion 8).
 
     NO SECOND QUESTION. The decision was taken before anything ran,
     because a supply has to be filed BEFORE it can take its identity
     from recognition - so asking "promote?" afterwards would be
     offering a choice that was already made, with only half of it
     still available.
+
+    THAT REASONING NOW GOVERNS EVERY MODE, which is what REQ-PIPE-089
+    criterion 8 changed. This path already asked before the run; the
+    Synthetic path asked after, and could only do so because results
+    were parked in a temp directory until somebody accepted them. With
+    the results recorded as the run completes, this is the only shape
+    left - so the copy-then-commit step this used to end with is gone.
     """
     console.print(report_table(results, filed.run_id))
-    if filed.delivery_name:
-        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, filed.run_id)
-        common.report_promoted(dst)
     common.say_what_it_did(filed.run_id, filed.delivery_name)
 
 
@@ -390,13 +423,18 @@ def run_qa_interactive(commit_default: bool = False) -> None:
         return
     run_id = run_id_from_choice(choice)
 
+    # ASKED BEFORE THE CHAIN, not after the report (REQ-PIPE-089
+    # criterion 8) - and before the "Running..." line too, so the
+    # question never appears to interrupt a run already under way.
+    keep = common.decide_record(run_id, keep=True if commit_default else None)
+
     # plans/tooling.md #13 - this used to print the line below and then
     # go completely silent for ~13.5s while the real chain ran.
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {run_id}...",
                   style="dim")
     with common.chain_progress(run_id) as on_step:
-        results, tmp_dir = run_check(run_id, run_by, on_step=on_step)
-    _offer_promote(results, run_id, tmp_dir, commit_default)
+        results, recorded_run_id = run_check(run_id, run_by, on_step=on_step, keep=keep)
+    _report_synthetic(results, recorded_run_id, keep, interactive=True)
 
 
 def _run_qa_interactive_local_file(run_by: str, commit_default: bool) -> None:
@@ -423,9 +461,9 @@ def _run_qa_interactive_local_file(run_by: str, commit_default: bool) -> None:
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {csv_path}...",
                   style="dim")
     with common.chain_progress(os.path.basename(csv_path)) as on_step:
-        results, tmp_dir, filed = run_check_local_file(csv_path, reference_csv, run_by,
+        results, filed = run_check_local_file(csv_path, reference_csv, run_by,
                                                         on_step=on_step, keep=keep)
-    _finish_supply(results, filed, tmp_dir)
+    _finish_supply(results, filed)
 
 
 def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
@@ -455,9 +493,9 @@ def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
     console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                   f"for s3://{bucket}/{key}...", style="dim")
     with common.chain_progress(os.path.basename(key)) as on_step:
-        results, tmp_dir, filed = run_check_s3(bucket, key, reference_key, run_by,
+        results, filed = run_check_s3(bucket, key, reference_key, run_by,
                                                 on_step=on_step, keep=keep)
-    _finish_supply(results, filed, tmp_dir)
+    _finish_supply(results, filed)
 
 
 @click.group("bdm")
@@ -478,17 +516,6 @@ def generate_synthetic_data_command(yes: bool) -> None:
     console.print(f"Generated -> {generated_output_dir()}", style="green")
 
 
-def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bool) -> None:
-    console.print(report_table(results, run_id))
-    if commit:
-        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, run_id)
-        console.print(f"Promoted -> {dst}", style="green")
-    else:
-        console.print("(local-only check - not written to qa_results/ history; re-run with --commit to keep it)",
-                       style="dim")
-    sys.exit(1 if has_failures(results) else 0)
-
-
 @bdm_group.command("qa")
 @click.option("--run-id", default=None, help="Synthetic mode: an existing manifest run_id "
                                               "(e.g. run_005_2026-...). Omit to pick interactively.")
@@ -506,8 +533,8 @@ def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bo
               help="S3 mode: a known-good reference object key to compare distribution drift against. "
                    "Required together with --s3-key.")
 @click.option("--commit", is_flag=True,
-              help="Keep it: file the supply as a real delivery received now, and write "
-                   "this run into the real, permanent qa_results/ history.")
+              help="Keep it: file the supply as a real delivery received now, and record "
+                   "this run in the dataset's QA history.")
 @click.option("--trial", is_flag=True,
               help="Run it as a TRIAL: the same four tools against the same rows, filed "
                    "nowhere and recorded nowhere. The opposite of --commit, stated so a "
@@ -528,10 +555,10 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
         bucket = common.raw_bucket_name()
         run_by = get_run_by() if commit else "trial:not-recorded"
         with common.chain_progress(os.path.basename(s3_key)) as on_step:
-            results, tmp_dir, filed = run_check_s3(bucket, s3_key, s3_reference_key, run_by,
+            results, filed = run_check_s3(bucket, s3_key, s3_reference_key, run_by,
                                                     on_step=on_step,
                                                     keep=common.keep_from_flags(commit, trial))
-        _finish_supply(results, filed, tmp_dir)
+        _finish_supply(results, filed)
         sys.exit(1 if has_failures(results) else 0)
 
     if file_path is not None:
@@ -541,10 +568,10 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
             raise click.ClickException("--file requires --reference-file (a known-good CSV to compare against).")
         run_by = get_run_by() if commit else "trial:not-recorded"
         with common.chain_progress(os.path.basename(file_path)) as on_step:
-            results, tmp_dir, filed = run_check_local_file(file_path, reference_file, run_by,
+            results, filed = run_check_local_file(file_path, reference_file, run_by,
                                                             on_step=on_step,
                                                             keep=common.keep_from_flags(commit, trial))
-        _finish_supply(results, filed, tmp_dir)
+        _finish_supply(results, filed)
         sys.exit(1 if has_failures(results) else 0)
 
     if run_id is None:
@@ -553,7 +580,10 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
         run_qa_interactive(commit_default=commit)
         return
 
-    run_by = get_run_by() if commit else "local-check:not-persisted"
+    keep = common.keep_from_flags(commit, trial)
+    run_by = get_run_by() if keep else "trial:not-recorded"
     with common.chain_progress(run_id) as on_step:
-        results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id, on_step=on_step)
-    _finish_flag_mode(results, run_id, tmp_dir, commit)
+        results, recorded_run_id = run_check(run_id, run_by, reference_run_id=reference_run_id,
+                                              on_step=on_step, keep=keep)
+    _report_synthetic(results, recorded_run_id, keep, interactive=False)
+    sys.exit(1 if has_failures(results) else 0)

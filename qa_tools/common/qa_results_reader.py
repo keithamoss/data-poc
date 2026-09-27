@@ -20,10 +20,10 @@ WHAT GOT BETTER RATHER THAN MERELY MOVED:
   survives as `missing_tools`, because "which tool did not write" is
   still the useful diagnostic once a run IS known incomplete.
 
-  `qa_results_dir` IS ACCEPTED AND IGNORED. Every signature kept it
-  rather than dropping it, so that ten call sites did not all have to
-  change in the same commit as the storage. It is documented as dead
-  at each one; a later sweep can remove it.
+  `qa_results_dir` IS GONE FROM EVERY SIGNATURE. It was accepted and
+  ignored for one commit, so that ten call sites did not all have to
+  change alongside the storage; REQ-PIPE-089's last phase removed both
+  the parameter and the tree it named.
 
 WHAT IT MAY READ, and the line is Keith's own (2026-09-27): a build
 may read recorded QA results, never actual data, and never anything
@@ -34,15 +34,8 @@ is reachable from this module at all.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from qa_tools.common import qa_store, supply_db
-
-ROOT = Path(__file__).resolve().parent.parent.parent
-
-#: Retained so the handful of callers that still pass it keep working.
-#: Nothing reads it - the history is in the database.
-QA_RESULTS_DIR = ROOT / "qa_results"
 
 _DIGIT_RUN = re.compile(r"(\d+)")
 
@@ -153,7 +146,7 @@ def _datasets_in(conn, agency: str, collection: str) -> list[str]:
 
 
 def missing_tools(agency: str, collection: str, run_id: str,
-                  qa_results_dir=None, conn=None) -> list[str]:
+                  conn=None) -> list[str]:
     """What this run still owes, or [] where it owes nothing.
 
     STILL THE PER-TOOL DIAGNOSTIC it always was, and no longer the
@@ -199,7 +192,7 @@ def missing_tools(agency: str, collection: str, run_id: str,
 
 
 def run_is_complete(agency: str, collection: str, run_id: str,
-                    qa_results_dir=None, conn=None) -> bool:
+                    conn=None) -> bool:
     """Whether the run SAID it finished (REQ-PIPE-089 criterion 13).
 
     It used to mean "all six expected files are present", which is a
@@ -219,7 +212,7 @@ def run_is_complete(agency: str, collection: str, run_id: str,
 
 
 def incomplete_runs(agency: str, collection: str,
-                    qa_results_dir=None, conn=None) -> dict[str, list[str]]:
+                    conn=None) -> dict[str, list[str]]:
     """Every run under this collection that failed partway, and what
     each is missing."""
     conn, mine = _conn(conn)
@@ -236,7 +229,7 @@ def incomplete_runs(agency: str, collection: str,
 
 
 def read_one(agency: str, collection: str, run_id: str, tool: str,
-             qa_results_dir=None, dataset: str | None = None, conn=None) -> list[dict]:
+             dataset: str | None = None, conn=None) -> list[dict]:
     """One tool's `verified` records for one run.
 
     With `dataset`, that one dataset's. Without it, every dataset under
@@ -266,7 +259,7 @@ def read_one(agency: str, collection: str, run_id: str, tool: str,
 
 
 def read_raw(agency: str, collection: str, run_id: str, tool: str,
-             qa_results_dir=None, conn=None) -> dict | None:
+             conn=None) -> dict | None:
     """The whole envelope one invocation recorded - `raw_output` plus
     its provenance fields - or None where that invocation recorded
     nothing.
@@ -300,7 +293,7 @@ def read_raw(agency: str, collection: str, run_id: str, tool: str,
 
 
 def list_run_ids(agency: str, collection: str,
-                 qa_results_dir=None, conn=None) -> list[str]:
+                 conn=None) -> list[str]:
     """Every COMPLETE run recorded under this agency/collection, sorted.
 
     Only complete ones, which is criterion 13 and is a change: the file
@@ -318,7 +311,7 @@ def list_run_ids(agency: str, collection: str,
 
 
 def read_dataset_stats(agency: str, collection: str, run_id: str,
-                       qa_results_dir=None, conn=None) -> dict | None:
+                       conn=None) -> dict | None:
     """The precomputed value-counts/arrival/check-aggregate/manifest-entry
     data for one run (qa_tools/<bdm|cp>/dataset_stats.py's output).
 
@@ -336,7 +329,7 @@ def read_dataset_stats(agency: str, collection: str, run_id: str,
 
 
 def read_run_provenance(agency: str, collection: str, run_id: str,
-                        qa_results_dir=None, conn=None) -> dict | None:
+                        conn=None) -> dict | None:
     """The `run_timestamp`/`run_by` pair for one run.
 
     A separate function from read_dataset_stats() because that one
@@ -359,7 +352,7 @@ def read_run_provenance(agency: str, collection: str, run_id: str,
 
 
 def read_qa_results(agency: str, collection: str,
-                    qa_results_dir=None, conn=None) -> list[dict]:
+                    conn=None) -> list[dict]:
     """Every complete run's every tool's `verified` records for one
     agency/collection, in run-id then tool order."""
     conn, mine = _conn(conn)
@@ -375,7 +368,7 @@ def read_qa_results(agency: str, collection: str,
 
 
 def read_cross_table_results(agency: str, collection: str,
-                             qa_results_dir=None, conn=None) -> list[dict]:
+                             conn=None) -> list[dict]:
     """Every recorded cross-table check result for one collection
     (REQ-QAC-037 criterion 1).
 

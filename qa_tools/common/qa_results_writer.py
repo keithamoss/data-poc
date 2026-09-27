@@ -1,12 +1,23 @@
 """
-Writes each real QA tool's NATIVE raw output (dbt's run_results.json, a
+Records each real QA tool's NATIVE raw output (dbt's run_results.json, a
 Soda scan_results dict, a datacontract-cli Run, an Evidently Report
-snapshot) under `qa_results/<agency>/<collection>/` - committed to
-git, not gitignored. This is Phase 1 of plans/publishing-
-and-history.md's Thread B: the real source of truth for QA history,
+snapshot) in the `qa` metadata schema, alongside the resolved records
+the dashboard renders. This is the real source of truth for QA history,
 independent of whatever the dashboard currently renders from
 `reports/*.json` (which stays exactly as it is today - gitignored,
-regenerated, a reshaped VIEW of this raw data, not the source of it).
+regenerated, a reshaped VIEW of this data, not the source of it).
+
+IT USED TO WRITE A COMMITTED TREE, under
+`qa_results/<agency>/<collection>/<dataset>/<run_id>/<tool>.json`, and
+REQ-PIPE-089 replaced that with rows. The reason is Keith's own standing
+rule: the repository holds CONFIGURATION, not STATE. QA results are
+state - they accumulate, nobody reviews them, and a second person
+running the pipeline legitimately produces different bytes.
+
+WHAT THE MOVE COST, recorded so it is a known trade rather than a
+discovery: a reader with no database access can no longer read the
+history, and the dashboard build had to move out of GitHub Actions,
+which cannot reach the database. Both were accepted deliberately.
 
 Deliberately native format, not reshaped into a common schema -
 `raw_output` is each tool's own real output, genuinely unmodified, so a
@@ -67,40 +78,34 @@ never needed correcting - uniform shape, so the reader
 (`qa_results_reader.py`) never has to special-case which tools happen
 to need it.
 
-Path layout, REQ-PIPE-038 - three scopes under a collection, one
-directory per run inside each, one file per tool:
+THE THREE SCOPES SURVIVED THE MOVE (REQ-PIPE-038, REQ-QAC-037) as a
+column rather than as a directory, because they are about what a record
+DESCRIBES rather than about where it is kept:
 
-    <agency>/<collection>/<dataset>/<run_id>/<tool>.json
-        that dataset's own `verified` records, and nothing else.
-    <agency>/<collection>/_cross-table/<run_id>/<tool>.json
+    a dataset's own id
+        that dataset's own resolved records, and nothing else.
+    `_cross-table`
         the records that span datasets (REQ-QAC-037).
-    <agency>/<collection>/_raw/<run_id>/<tool>.json
+    `_raw`
         the one genuinely-unmodified `raw_output` per invocation, plus
         the `dataset_stats` and `tables_read` pseudo-tools, which
         describe a RUN rather than a dataset.
 
-`run_id` (not `run_timestamp`) is the directory name since it's
-already this project's own stable, human-readable identifier for a
-specific run (e.g. `run_07`, `cp_run_03`) - `run_timestamp` is captured
-inside each written file instead, for the actual wall-clock provenance.
+A leading underscore stays a RESERVED name the hierarchy gate refuses
+for any agency, collection or dataset id, which is what keeps every
+scope unambiguously distinct from a dataset.
 
-Before this, both collections wrote one file per tool per run at
-collection level, so neither was keyed per dataset and Child
-Protection's six tables shared a single `soda.json`. Finding one
-table's history meant filtering a collection-level file through a map
-somebody maintained by hand, which is the thing REQ-PIPE-038's story
-is about.
+ONE CALL STILL RECORDS SEVERAL THINGS. A Child Protection Soda scan is
+one `Scan()` over six tables, and its 50 results fan out to six
+datasets while its scan document is recorded once. Before REQ-PIPE-038
+both collections recorded one document per tool per run at collection
+level, so finding one table's history meant filtering that through a map
+somebody maintained by hand.
 """
 from __future__ import annotations
 
-import json
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
-
-ROOT = Path(__file__).resolve().parent.parent.parent
-QA_RESULTS_DIR = ROOT / "qa_results"
-
 
 def _with_tables_read(verified: list[dict], run_id: str) -> list[dict]:
     """Record, on each cross-table check's own result, the physical
@@ -159,15 +164,13 @@ def _declared_reads_tables() -> dict[str, list[str]]:
 
 def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: str,
                      tool: str, raw_output: Any, verified: list[dict] | None = None,
-                     run_by: str | None = None,
-                     results_dir: Path = QA_RESULTS_DIR) -> Path:
-    """Writes one tool's native raw output for one run to a committed
-    JSON file. `raw_output` must already be JSON-serializable (a plain
-    dict/list) - each run_*.py caller is responsible for converting its
-    own tool's native result object first (e.g. a Pydantic model's
-    `.model_dump()`, an Evidently snapshot's `.dict()`) since that
-    conversion is tool-specific, not something this generic writer
-    should need to know about.
+                     run_by: str | None = None) -> None:
+    """Records one tool's native raw output for one run. `raw_output` must
+    already be JSON-serializable (a plain dict/list) - each run_*.py
+    caller is responsible for converting its own tool's native result
+    object first (e.g. a Pydantic model's `.model_dump()`, an Evidently
+    snapshot's `.dict()`) since that conversion is tool-specific, not
+    something this generic writer should need to know about.
 
     `verified` is the caller's already-built list of fully-resolved
     check-result dicts for this tool+run (see this module's own
@@ -184,21 +187,17 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
     run_*.py callers leave it None, same "always present as a key,
     defaulted" shape `verified` already uses.
 
-    Wraps the raw output with `run_timestamp` (and `run_by`) alongside
-    it (not inside it - never mutates what the tool actually produced)
-    so the file carries real provenance without touching the tool's own
-    payload.
+    Records `run_timestamp` (and `run_by`) alongside the raw output
+    rather than inside it - this never mutates what the tool actually
+    produced, so provenance is carried without touching the payload.
 
-    ONE CALL WRITES SEVERAL FILES (REQ-PIPE-038). The second argument
+    ONE CALL RECORDS SEVERAL THINGS (REQ-PIPE-038). The second argument
     is the COLLECTION - it was named `dataset` when Child Protection's
-    four tools all wrote one collection-level file, and the rename is
-    the point of the change rather than tidying: each `verified` record
-    now goes to the dataset it names, the raw output goes to `_raw`
-    once, and a spanning record goes to `_cross-table` (REQ-QAC-037).
-    Returns the `_raw` path, which is the one file every invocation
-    writes whatever its records say."""
-    from qa_tools.common import tables_read as tables_read_mod
-
+    four tools all recorded one collection-level document, and the
+    rename is the point of the change rather than tidying: each
+    `verified` record goes to the dataset it names, the raw output is
+    recorded once against `_raw`, and a spanning record goes to
+    `_cross-table` (REQ-QAC-037)."""
     records = _with_tables_read(verified or [], run_id)
     # THE CALLER'S OWN RECORDS ARE BROUGHT UP TO DATE, and that is not
     # tidiness. The orchestrator keeps the list it passed here and
@@ -222,61 +221,25 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
     spanning = [r for r in records if r.get("check_id") in declared]
     own = [r for r in records if r.get("check_id") not in declared]
 
-    def _write(scope: str, verified_records: list[dict] | None, raw: Any) -> Path:
-        scope_dir = results_dir / agency / collection / scope / run_id
-        scope_dir.mkdir(parents=True, exist_ok=True)
-        path = scope_dir / f"{tool}.json"
-        with open(path, "w") as f:
-            json.dump({"run_timestamp": run_timestamp, "run_by": run_by,
-                        "raw_output": raw, "verified": verified_records},
-                       f, indent=2, default=str)
-        return path
-
-    # REQ-PIPE-038 CRITERION 1: every result under the dataset it
-    # DESCRIBES, which is the dataset its own record names - not the
-    # one the tool happened to be invoked against. A Child Protection
-    # scan is one invocation over six tables, so this is a fan-out
-    # rather than a rename: 50 Soda results become six files.
+    # THE FAN-OUT, INTO THE DATABASE (REQ-PIPE-089). It writes a
+    # committed tree of JSON files as well until this line's own history
+    # caught up with it: the rules just above - a spanning record belongs
+    # to no dataset, raw output describes the invocation and is recorded
+    # once, the two pseudo-tools describe a run - ARE the fan-out, and
+    # two implementations of them were two things to keep in step. So
+    # the file half was deleted from underneath this call rather than
+    # beside it, leaving the rules in one place.
     #
-    # CRITERION 3: Birth Registrations goes through the identical code
-    # path and lands one level deeper than before, even though its
-    # collection holds exactly one dataset and the move buys that
-    # collection nothing. A one-dataset collection is precisely where a
-    # special case would look harmless.
-    by_dataset: dict[str, list[dict]] = {}
-    for record in own:
-        by_dataset.setdefault(record.get("dataset_id") or collection, []).append(record)
-    for dataset_id, dataset_records in sorted(by_dataset.items()):
-        _write(dataset_id, dataset_records, None)
-
-    # RAW OUTPUT IS RECORDED ONCE, in a scope of its own, because it
-    # describes the INVOCATION. See tables_read.RAW_SCOPE's own comment
-    # for why neither copying nor filtering it was acceptable. The two
-    # pseudo-tools land here too and write no dataset file at all -
-    # `dataset_stats` and `tables_read` are facts about a run.
-    raw_path = _write(tables_read_mod.RAW_SCOPE, None, raw_output)
-
-    if spanning:
-        # REQ-QAC-037. Carries `verified` and no raw output, for the
-        # same reason every dataset file now does.
-        _write(tables_read_mod.CROSS_TABLE_SCOPE, spanning, None)
-
-    # THE SAME FAN-OUT, INTO THE DATABASE (REQ-PIPE-089). Deliberately
-    # here rather than in a parallel writer of its own: the rules above
-    # - a spanning record belongs to no dataset, raw output describes
-    # the invocation and is recorded once, the two pseudo-tools describe
-    # a run - are the fan-out, and two implementations of them is two
-    # things to keep in step. When the file half goes, this stays and
-    # everything above it is deleted.
+    # REQ-PIPE-038 CRITERION 1 still holds here, and is what `own`
+    # carries: every result against the dataset it DESCRIBES, which is
+    # the dataset its own record names - not the one the tool happened to
+    # be invoked against. CRITERION 3: Birth Registrations goes through
+    # the identical code path even though its collection holds exactly
+    # one dataset and the keying buys that collection nothing. A
+    # one-dataset collection is precisely where a special case would look
+    # harmless.
     _record_in_database(agency, collection, run_id, run_timestamp, tool,
                         raw_output, own, spanning, run_by)
-
-    # The RAW path, which is the one file every invocation writes
-    # whatever its records turn out to say. It used to be the
-    # dataset-scoped one, and could not stay so: a tool that produced
-    # no record for any dataset now writes no dataset file, and a
-    # caller wants a path back rather than None.
-    return raw_path
 
 
 #: The two pseudo-tools. Neither is a QA tool - they describe a RUN -

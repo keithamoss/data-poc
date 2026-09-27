@@ -7,10 +7,7 @@ second, wasteful re-run of the real tool chain just to change where the
 result lands)."""
 from __future__ import annotations
 import os
-import shutil
 import sys
-import tempfile
-from pathlib import Path
 
 import click
 import questionary
@@ -23,7 +20,6 @@ from rich.text import Text
 from questionary import Style
 
 from qa_tools.common import hand_filing, supply_db, trial
-from qa_tools.common.qa_results_writer import QA_RESULTS_DIR
 # Both orchestrators define an identical RUN_STEPS; importing one keeps
 # this helper honest about the real step count rather than hardcoding 5.
 from qa_tools.bdm.orchestrate_bdm import RUN_STEPS
@@ -123,76 +119,37 @@ def confirm(message: str, *, yes: bool, default: bool = False) -> bool:
     return bool(answer)
 
 
-def promote(tmp_root: str, agency: str, collection: str, run_id: str) -> Path:
-    """Copies one run's real tool output from the throwaway tmp_root a QA
-    flow already wrote into (via qa_tools.common.lambda_results_dir's
-    patch_write_qa_result_for_lambda) into the real, permanent, committed
-    qa_results/ tree - the actual meaning of "Promote". Never re-runs the
-    real tool chain a second time just to change where its output lands;
-    the tools already ran once, for real, into tmp_root.
+def report_recorded(run_id: str, count: int) -> None:
+    """The real success affordance after an interactive check that was
+    kept (Keith's own ask, 2026-09-19, about the step this replaces:
+    "after the user confirms promotion of results, they should get a
+    success message rather than being bumped straight back to the
+    menu").
 
-    ONE RUN IS SEVERAL DIRECTORIES since REQ-PIPE-038 - one per dataset
-    it wrote a result for, plus `_raw` and possibly `_cross-table` - so
-    this walks the collection's scopes rather than copying a single
-    run directory. Copying only one of them would promote a run that
-    looks complete and is missing most of itself.
+    WHAT IT REPLACED, and why the panel survived the change rather than
+    going with it. `promote()` copied one run's JSON files out of a
+    throwaway directory into the committed qa_results/ tree, and
+    `report_promoted()` said how many files had landed and where. There
+    is no tree and there are no files (REQ-PIPE-089), so the count is of
+    recorded results rather than of files - but the reason the panel
+    exists is untouched: this is still the most consequential action in
+    the whole tool, and it still must not look like the end of a no-op.
 
-    Returns the `_raw` path, which is the one scope every run writes.
+    IT NO LONGER SAYS "commit and push qa_results/ yourself to publish".
+    That sentence was true and is now false twice over: there is nothing
+    to commit, and a git push is not what publishes (REQ-PIPE-092).
     """
-    src_collection = Path(tmp_root) / agency / collection
-    dst_collection = QA_RESULTS_DIR / agency / collection
-    for scope_dir in sorted(p for p in src_collection.iterdir() if p.is_dir()):
-        src = scope_dir / run_id
-        if not src.is_dir():
-            continue
-        dst = dst_collection / scope_dir.name / run_id
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(src, dst, dirs_exist_ok=True)
-    from qa_tools.common import tables_read as tables_read_mod
-
-    return dst_collection / tables_read_mod.RAW_SCOPE / run_id
-
-
-def report_promoted(dst: Path) -> None:
-    """The real success affordance after an interactive Promote (Keith's
-    own ask, 2026-09-19: "after the user confirms promotion of results,
-    they should get a success message rather than being bumped straight
-    back to the menu").
-
-    Two separate things were wrong. The message itself already existed -
-    a green `Promoted -> <path>` plus a dim follow-up line - but it was
-    a pair of ordinary printed lines immediately followed by the main
-    menu redrawing, so the end of the single most consequential action
-    in the whole tool looked exactly like the end of a no-op. It now
-    lands as a bordered panel, states the real, checkable outcome (how
-    many files, where), and, in a real terminal, waits for an explicit
-    keypress before the menu comes back - a completion the user
-    acknowledges rather than one that scrolls past.
-
-    The flag-based `--commit` paths deliberately keep their existing
-    one-line `Promoted -> <path>`: those are the scriptable form, where
-    a panel is noise and a blocking keypress would be a hang.
-    """
-    files = sorted(p.name for p in dst.glob("*.json"))
-    try:
-        shown = dst.relative_to(Path.cwd())
-    except ValueError:
-        shown = dst
     body = Text()
-    body.append(f"{len(files)} result file{'' if len(files) == 1 else 's'} written to the real, permanent "
-                 "qa_results/ history:\n", style="bold green")
-    body.append(f"{shown}\n\n", style="green")
-    body.append("Nothing has left this machine yet - commit and push qa_results/ yourself\n"
-                 "to publish. That push is what triggers the real CI rebuild.", style="dim")
-    console.print(Panel(body, title="Promoted", border_style="green", expand=False))
+    body.append(f"{count} check result{'' if count == 1 else 's'} recorded for {run_id}\n",
+                 style="bold green")
+    body.append("in this environment's QA history.\n\n", style="green")
+    body.append("Nothing has been published yet - publishing is a separate step\n"
+                 "(mothman pipeline run --publish).", style="dim")
+    console.print(Panel(body, title="Recorded", border_style="green", expand=False))
 
     if sys.stdin.isatty() and sys.stdout.isatty():
         questionary.press_any_key_to_continue(
             "Press any key to return to the menu...", style=_QMARK_STYLE).ask()
-
-
-def new_tmp_results_dir() -> str:
-    return tempfile.mkdtemp(prefix="mothman-qa-")
 
 
 def raw_bucket_name() -> str:
@@ -335,6 +292,39 @@ def decide_keep(paths, *, keep: bool | None) -> bool:
         return False
     console.print(describe_keep_choice(paths))
     return confirm("Keep this check?", yes=False, default=False)
+
+
+def decide_record(run_id: str, *, keep: bool | None) -> bool:
+    """Record this Synthetic-mode check, or run it as a trial?
+
+    A DIFFERENT QUESTION FROM decide_keep(), which is why it is its own
+    function rather than a reworded call. decide_keep() asks whether to
+    FILE a supply the operator is handing over - an arrival nothing has
+    recorded yet. Here the arrival is already recognised on disk and
+    already filed; the only thing still open is whether this run's
+    VERDICTS join the dataset's quality history.
+
+    ASKED BEFORE THE CHAIN RUNS (REQ-PIPE-089 criterion 8). It used to be
+    asked afterwards, as "promote this run?", which worked only because
+    the results sat in a throwaway directory until somebody accepted
+    them. Recorded results are visible as the run completes, so asking
+    after would be offering a choice already made.
+
+    A TRIAL IS THE NON-INTERACTIVE DEFAULT, for the same asymmetry
+    decide_keep() records: a trial that should have been recorded costs a
+    re-run, and a recorded run that should not have been is a verdict in
+    a dataset's permanent quality history that nobody chose.
+    """
+    if keep is not None:
+        return keep
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        console.print(
+            "Not a real terminal and no --commit/--trial given - running as a TRIAL, "
+            "which records nothing. Pass --commit to record this check.",
+            style="yellow")
+        return False
+    return confirm(f"Record this check of {run_id} in the dataset's QA history?",
+                    yes=False, default=False)
 
 
 def file_or_trial(paths, collection_id: str, run_id_prefix: str,

@@ -18,8 +18,6 @@ import tempfile
 
 import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 from qa_tools.common.file_arrival import match_arrival
-from qa_tools.common.lambda_results_dir import BDM_MODULES, patch_write_qa_result_for_lambda
-from qa_tools.common.results_s3_sink import upload_qa_result
 from qa_tools.common import asset_time
 
 # The proposed arrivalPattern contract extension (docs/aws-event-driven-
@@ -41,7 +39,6 @@ BDM_ARRIVAL_PATTERNS = [
 REFERENCE_RUN_ID = "run_001"
 REFERENCE_CSV = "run_001.csv"
 
-RESULTS_BUCKET_NAME = os.environ.get("RESULTS_BUCKET_NAME")
 AGENCY_ID = orchestrate_bdm.AGENCY_ID
 COLLECTION_ID = orchestrate_bdm.COLLECTION_ID
 
@@ -52,15 +49,15 @@ def handler(event: dict, context=None) -> dict:
     s3_client = boto3.client("s3")
     summary = {"processed": 0, "skipped": 0, "pass": 0, "warn": 0, "fail": 0, "error": 0}
 
-    # A real, necessary fix (qa_tools/common/lambda_results_dir.py's own
-    # docstring has the full account): every write_qa_result() call in
-    # this call chain defaults to this repo's own committed qa_results/
-    # path, which doesn't exist (and isn't writable) inside a real
-    # Lambda's deployment package - redirected to /tmp instead, then
-    # uploaded to S3 below.
-    qa_results_root = os.path.join(tempfile.gettempdir(), "qa_results")
-    patch_write_qa_result_for_lambda(BDM_MODULES, qa_results_root)
-
+    # THERE IS NOTHING TO REDIRECT ANY MORE, and the absence is worth a
+    # note because it used to be the fiddliest thing in this handler.
+    # write_qa_result() wrote JSON files under this repo's own committed
+    # qa_results/ path, which is neither present nor writable inside a
+    # Lambda, so every call had to be rebound to /tmp and the files
+    # uploaded to a results bucket for a sync workflow to lay back into
+    # git. REQ-PIPE-089 records results in the database instead, so the
+    # redirection, the upload and the sync all went with it - a Lambda
+    # inside the VPC reaches the database directly.
     for record in event.get("Records", []):
         bucket = record["s3"]["bucket"]["name"]
         key = record["s3"]["object"]["key"]
@@ -96,12 +93,6 @@ def handler(event: dict, context=None) -> dict:
             results = orchestrate_bdm.run_single(
                 run_id, local_csv, run_date,
                 reference_run_id=REFERENCE_RUN_ID, reference_csv=REFERENCE_CSV)
-
-        run_dir = os.path.join(qa_results_root, AGENCY_ID, COLLECTION_ID, run_id)
-        if RESULTS_BUCKET_NAME and os.path.isdir(run_dir):
-            for filename in os.listdir(run_dir):
-                upload_qa_result(os.path.join(run_dir, filename), qa_results_root, RESULTS_BUCKET_NAME,
-                                  s3_client=s3_client)
 
         summary["processed"] += 1
         for status in ("pass", "warn", "fail", "error"):

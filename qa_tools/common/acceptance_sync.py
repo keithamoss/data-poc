@@ -46,10 +46,9 @@ import os
 import re
 import subprocess
 from datetime import date, datetime
-from pathlib import Path
 
 from qa_tools.common import hierarchy
-from qa_tools.common.qa_results_reader import QA_RESULTS_DIR, list_run_ids, read_dataset_stats
+from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats
 from qa_tools.common.ticket_sync import TICKET_LABEL
 from qa_tools.common import asset_time
 
@@ -66,7 +65,7 @@ REJECT_RE = re.compile(r"^/reject\b", re.IGNORECASE)
 QA_RESULTS_SCOPE_FOR_DATASET = {d.dataset_id: d.qa_results_scope for d in hierarchy.all_datasets()}
 
 
-def _run_windows_for_dataset(dataset_id: str, qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[tuple[str, date, date | None]]:
+def _run_windows_for_dataset(dataset_id: str) -> list[tuple[str, date, date | None]]:
     """[(run_id, window_start, window_end_or_None), ...], oldest first,
     built purely from committed qa_results/ history - the same real
     receipt instant the dashboard's own supply-history table already
@@ -95,8 +94,8 @@ def _run_windows_for_dataset(dataset_id: str, qa_results_dir: Path | str = QA_RE
         return []
     agency, dataset = scope
     entries: list[tuple[str, date]] = []
-    for run_id in list_run_ids(agency, dataset, qa_results_dir):
-        stats = read_dataset_stats(agency, dataset, run_id, qa_results_dir)
+    for run_id in list_run_ids(agency, dataset):
+        stats = read_dataset_stats(agency, dataset, run_id)
         if stats is None:
             continue
         entries.append((run_id, asset_time.local_date(stats["arrival_record"]["received_at"])))
@@ -155,7 +154,7 @@ def match_decisions(comments: list[dict], windows: list[tuple[str, date, date | 
     return result
 
 
-def build_decisions(raw_tickets: list[dict], qa_results_dir: Path | str = QA_RESULTS_DIR) -> dict[str, dict]:
+def build_decisions(raw_tickets: list[dict]) -> dict[str, dict]:
     """{dataset_id: {run_id: {...}}} - `raw_tickets` is the real,
     already-fetched `gh issue view --json number,labels,comments` output
     for every real qa-ticket issue (fetch_all_ticket_comments()'s own
@@ -174,7 +173,7 @@ def build_decisions(raw_tickets: list[dict], qa_results_dir: Path | str = QA_RES
 
     result: dict[str, dict] = {}
     for dataset_id, comments in comments_by_dataset.items():
-        windows = _run_windows_for_dataset(dataset_id, qa_results_dir)
+        windows = _run_windows_for_dataset(dataset_id)
         matched = match_decisions(comments, windows)
         if matched:
             result[dataset_id] = matched

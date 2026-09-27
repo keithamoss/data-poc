@@ -76,11 +76,13 @@ repos:
         pass_filenames: false
   # The hierarchy gate, at commit time for one specific reason beyond
   # the general one (Keith's own ask, 2026-09-26: "a guard against it
-  # ever being used"). A cross-table check's result is recorded at
-  # qa_results/<agency>/<collection>/_cross-table/<run_id>/, beside the
-  # datasets - and that name is only unambiguous while no dataset,
+  # ever being used"). A cross-table check's result is recorded against
+  # the scope `_cross-table` rather than against any of the datasets it
+  # spans - and that name is only unambiguous while no dataset,
   # collection or agency can be called it. The gate refuses any id
-  # beginning with an underscore.
+  # beginning with an underscore. It was a DIRECTORY beside the datasets
+  # when this was written (REQ-PIPE-089 made it a column), which changes
+  # nothing about why the name has to stay reserved.
   #
   # Worth having locally rather than only in CI because the failure it
   # prevents is not a red build, it is a directory tree where nobody

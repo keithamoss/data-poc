@@ -65,13 +65,6 @@ class DataPipelineStack(Stack):
             enforce_ssl=True,
         )
 
-        results_bucket = s3.Bucket(
-            self,
-            "ResultsBucket",
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            enforce_ssl=True,
-        )
-
         # Provisioned per the design doc even though ManifestMarkerCompletion
         # Tracker (a marker file + a live S3 HeadObject check, no state store
         # at all) is the recommended MVP default, not this table - so that
@@ -109,7 +102,6 @@ class DataPipelineStack(Stack):
             # invocation.
             memory_size=1024,
             environment={
-                "RESULTS_BUCKET_NAME": results_bucket.bucket_name,
             },
         )
 
@@ -123,7 +115,6 @@ class DataPipelineStack(Stack):
             timeout=Duration.minutes(15),
             memory_size=1024,
             environment={
-                "RESULTS_BUCKET_NAME": results_bucket.bucket_name,
                 "COMPLETION_TABLE_NAME": completion_table.table_name,
             },
         )
@@ -158,13 +149,14 @@ class DataPipelineStack(Stack):
         raw_bucket.grant_read(bdm_lambda, "bdm/*")
         raw_bucket.grant_read(cp_lambda, "cp/*")
 
-        # Both Lambdas write results bucket-wide, not prefix-scoped - the
-        # design doc's trust-boundary section only requires "S3 write on the
-        # results bucket," and each Lambda's own qa_results/<agency>/... key
-        # layout already keeps their outputs from colliding without needing
-        # IAM to enforce it too.
-        results_bucket.grant_write(bdm_lambda)
-        results_bucket.grant_write(cp_lambda)
+        # THERE IS NO RESULTS BUCKET (REQ-PIPE-089), and the grant that went
+        # with it is the part worth noting rather than the bucket. Both
+        # Lambdas used to hold bucket-wide S3 write so they could upload
+        # qa_results/ JSON files for a sync workflow to lay back into git.
+        # Results are recorded in the database now, so the bucket, the two
+        # write grants and the RESULTS_BUCKET_NAME environment variable are
+        # all gone - a write permission nothing needs is worth removing on
+        # its own terms, not only for tidiness.
 
         # Completion-tracking table: CP only. record_arrival()/is_complete()
         # (qa_tools/cp/completion_tracker.py's DynamoDBCompletionTracker)
@@ -172,6 +164,5 @@ class DataPipelineStack(Stack):
         completion_table.grant_read_write_data(cp_lambda)
 
         CfnOutput(self, "RawBucketName", value=raw_bucket.bucket_name)
-        CfnOutput(self, "ResultsBucketName", value=results_bucket.bucket_name)
         CfnOutput(self, "BdmIngestHandlerFunctionName", value=bdm_lambda.function_name)
         CfnOutput(self, "CpIngestHandlerFunctionName", value=cp_lambda.function_name)

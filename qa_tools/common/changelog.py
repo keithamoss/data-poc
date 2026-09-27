@@ -43,15 +43,12 @@ count and diff size. Two fixes got it to 0.7s; a column needs none.
 """
 from __future__ import annotations
 
-from pathlib import Path
 
 from qa_tools.common import qa_store, supply_db
 
-ROOT = Path(__file__).resolve().parent.parent.parent
 
 
-def build_changelog(agency: str, dataset: str, qa_results_dir=None,
-                    repo_root: Path = ROOT, conn=None) -> list[dict]:
+def build_changelog(agency: str, dataset: str, conn=None) -> list[dict]:
     """One entry per real QA event for this (agency, dataset):
     `{agency, dataset, run_timestamp, run_by, committed_at}`.
 
@@ -63,9 +60,9 @@ def build_changelog(agency: str, dataset: str, qa_results_dir=None,
     Sorted by run_timestamp, oldest first - the feed's own UI can
     re-sort as it likes.
 
-    `qa_results_dir` and `repo_root` are accepted and ignored, so the
-    handful of callers still passing them keep working; a later sweep
-    can remove them.
+    `qa_results_dir` and `repo_root` used to be accepted and ignored here,
+    so callers did not all have to change alongside the storage.
+    REQ-PIPE-089's last phase removed them.
     """
     close = conn is None
     if conn is None:

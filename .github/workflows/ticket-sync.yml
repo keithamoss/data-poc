@@ -63,13 +63,32 @@ on:
     # 7 before plans/qa-pipeline.md item 74's fix, so the first run opens
     # 3 tickets rather than the noise-storm that item's own write-up had
     # been holding this back to avoid.
-    branches: ["claude/**"]
+    #
+    # THE PUSH TRIGGER IS DISABLED, AND THIS WORKFLOW CANNOT CURRENTLY RUN
+    # (REQ-PIPE-089). It opens a ticket per failing check by rebuilding
+    # the check results first - which it did from the committed
+    # `qa_results/` tree, and that tree is gone: the results are rows in a
+    # PostgreSQL database, and a GitHub runner has no route to it.
+    #
+    # DISABLED RATHER THAN DELETED, deliberately. The ticketing logic is
+    # real, tested and wanted; what it needs is to run somewhere that can
+    # read the results, which inverts the direction of the whole
+    # integration - something inside the secure environment posting OUT to
+    # GitHub, rather than a workflow reaching in. That inversion is
+    # plans/running-thoughts.md #53, and it is not scoped yet, so leaving
+    # this file in place with its trigger removed records the gap instead
+    # of hiding it. `workflow_dispatch` stays so the failure is
+    # reproducible on demand rather than only in theory.
+    #
+    # The trigger it used to carry, kept so restoring it needs no
+    # archaeology:
+    #   branches: ["claude/**"]
+    #   paths: qa_results/**, contract/**,
+    #          dbt_project/models/staging/schema.yml,
+    #          qa_tools/**, pipeline/**
+    branches: ["disabled-see-the-note-above"]
     paths:
-      - "qa_results/**"
-      - "contract/**"
-      - "dbt_project/models/staging/schema.yml"
-      - "qa_tools/**"
-      - "pipeline/**"
+      - ".github/workflows/ticket-sync.yml"
       - ".github/workflows/ticket-sync.yml"
   workflow_dispatch:
 

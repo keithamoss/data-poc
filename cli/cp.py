@@ -28,9 +28,9 @@ from rich.table import Table
 from qa_tools.cp import build_cp_warehouses, cp_common, orchestrate_cp
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
-from qa_tools.common.lambda_results_dir import CP_MODULES, patch_write_qa_result_for_lambda
 from qa_tools.common import hand_filing
 from qa_tools.common import supply_db
+from qa_tools.common import trial as trial_mod
 from qa_tools.common.qa_results_reader import list_run_ids
 
 from . import common
@@ -189,12 +189,11 @@ def _load_delivery(run_id: str) -> None:
 
 
 def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
-              on_step=None) -> tuple[list[dict], str]:
+              on_step=None, *, keep: bool = True) -> tuple[list[dict], str]:
     """Runs the real check chain for one existing Synthetic manifest
-    entry into a fresh throwaway location - never the real, permanent
-    qa_results/ history directly. Returns (results, tmp_results_dir); the
-    caller decides whether to common.promote() it, same tmp-dir-first
-    pattern as cli/bdm.py's own run_check().
+    entry. Returns (results, recorded_run_id) - `run_id` itself when kept,
+    a throwaway trial identity otherwise. See cli/bdm.py's run_check() for
+    why it no longer writes into a throwaway directory first.
 
     Unlike BDM, orchestrate_cp.run_single() has no manifest-clobbering
     side effect to guard against (CP's manifest isn't touched by the
@@ -215,15 +214,17 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
             f"Reference run {reference_run_id!r}'s delivery isn't on disk - "
             f"run generate-synthetic-data first?")
 
-    tmp_dir = common.new_tmp_results_dir()
-    patch_write_qa_result_for_lambda(CP_MODULES, tmp_dir)
-
     _load_delivery(reference_run_id)
     _load_delivery(run_id)
 
+    # KEEP OR TRIAL IS DECIDED BEFORE THE CHAIN RUNS - see cli/bdm.py's
+    # run_check() for the whole reasoning (REQ-PIPE-089 criterion 8).
+    if not keep:
+        entry = {**entry, "run_id": trial_mod.trial_run_id()}
+
     results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by,
                                         on_step=on_step)
-    return results, tmp_dir
+    return results, entry["run_id"]
 
 
 def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
@@ -252,9 +253,6 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
     folder = os.path.dirname(filed.paths[0])
     reference_run_id = common.reference_run_id()
 
-    tmp_dir = common.new_tmp_results_dir()
-    patch_write_qa_result_for_lambda(CP_MODULES, tmp_dir)
-
     _load_delivery_from_folder(reference_folder, reference_run_id)
     _load_delivery_from_folder(folder, run_id, received_at=filed.received_at)
 
@@ -267,7 +265,7 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
                                             run_by=run_by, on_step=on_step)
     finally:
         common.discard_reference(reference_run_id)
-    return results, tmp_dir, filed
+    return results, filed
 
 
 def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_prefix: str, run_by: str,
@@ -339,9 +337,6 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
     run_id = filed.run_id
     file_path = filed.paths[0]
 
-    tmp_dir = common.new_tmp_results_dir()
-    patch_write_qa_result_for_lambda(CP_MODULES, tmp_dir)
-
     _load_delivery(other_tables_run_id)  # full 6-table warehouse, doubles as the Evidently reference
 
     build_cp_warehouses.add_table_to_run(run_id, table, file_path,
@@ -369,7 +364,7 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
                  or asset_time.start_of_day(date.fromisoformat(run_date)))}
     results = orchestrate_cp.run_single(entry, reference_run_id=other_tables_run_id, run_by=run_by,
                                         on_step=on_step)
-    return results, tmp_dir, filed
+    return results, filed
 
 
 def run_check_s3_single_table(bucket: str, table: str, key: str, run_by: str,
@@ -432,24 +427,27 @@ _DELIVERY_FULL = "Full delivery - all 6 real tables"
 _DELIVERY_SINGLE_TABLE = "Single table - a partial resupply (one table only)"
 
 
-def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_default: bool) -> None:
-    console.print(report_table(results, run_id))
-    if common.confirm("Promote this run into the real, permanent qa_results/ history?",
-                       yes=False, default=commit_default):
-        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, run_id)
-        common.report_promoted(dst)
+def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
+                       *, interactive: bool) -> None:
+    """Report a Synthetic-mode check and say what became of it - see
+    cli/bdm.py's counterpart for why the "Promote this run?" question
+    this replaces could not survive REQ-PIPE-089 criterion 8."""
+    console.print(report_table(results, recorded_run_id))
+    if not keep:
+        console.print(f"TRIAL {recorded_run_id} - the real tools ran against the same rows and "
+                       "nothing was recorded.", style="dim")
+    elif interactive:
+        common.report_recorded(recorded_run_id, len(results))
     else:
-        console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
+        console.print(f"Recorded {len(results)} results for {recorded_run_id}", style="green")
 
 
-def _finish_supply(results: list[dict], filed, tmp_dir: str) -> None:
-    """Report a hand-supplied check, and do what the operator already
-    said (REQ-PIPE-103 criterion 8) - see cli/bdm.py's counterpart for
-    why there is no second question."""
+def _finish_supply(results: list[dict], filed) -> None:
+    """Report a hand-supplied check, and say what the operator already
+    decided (REQ-PIPE-103 criterion 8) - see cli/bdm.py's counterpart for
+    why there is no second question, and why the copy-into-the-tree step
+    this used to end with is gone."""
     console.print(report_table(results, filed.run_id))
-    if filed.delivery_name:
-        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, filed.run_id)
-        common.report_promoted(dst)
     common.say_what_it_did(filed.run_id, filed.delivery_name)
 
 
@@ -501,11 +499,15 @@ def run_qa_interactive(commit_default: bool = False) -> None:
         return
     run_id = run_id_from_choice(choice)
 
+    # ASKED BEFORE THE CHAIN, and before the "Running..." line - see
+    # cli/bdm.py's counterpart (REQ-PIPE-089 criterion 8).
+    keep = common.decide_record(run_id, keep=True if commit_default else None)
+
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {run_id}...",
                   style="dim")
     with common.chain_progress(run_id) as on_step:
-        results, tmp_dir = run_check(run_id, run_by, on_step=on_step)
-    _offer_promote(results, run_id, tmp_dir, commit_default)
+        results, recorded_run_id = run_check(run_id, run_by, on_step=on_step, keep=keep)
+    _report_synthetic(results, recorded_run_id, keep, interactive=True)
 
 
 def _run_qa_interactive_local_folder(run_by: str, commit_default: bool) -> None:
@@ -528,10 +530,10 @@ def _run_qa_interactive_local_folder(run_by: str, commit_default: bool) -> None:
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {folder}...",
                   style="dim")
     with common.chain_progress(os.path.basename(folder.rstrip("/"))) as on_step:
-        results, tmp_dir, filed = run_check_local_folder(
+        results, filed = run_check_local_folder(
             folder, reference_folder, run_by, on_step=on_step,
             keep=True if commit_default else None)
-    _finish_supply(results, filed, tmp_dir)
+    _finish_supply(results, filed)
 
 
 def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
@@ -561,10 +563,10 @@ def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
     console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                   f"for s3://{bucket}/{delivery}...", style="dim")
     with common.chain_progress(delivery.rstrip("/").rsplit("/", 1)[-1]) as on_step:
-        results, tmp_dir, filed = run_check_s3_delivery(
+        results, filed = run_check_s3_delivery(
             bucket, delivery, reference_delivery, run_by, on_step=on_step,
             keep=True if commit_default else None)
-    _finish_supply(results, filed, tmp_dir)
+    _finish_supply(results, filed)
 
 
 def _run_qa_interactive_single_table(run_by: str, commit_default: bool) -> None:
@@ -597,7 +599,7 @@ def _run_qa_interactive_single_table(run_by: str, commit_default: bool) -> None:
         console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                       f"for s3://{bucket}/{key} (table: {table})...", style="dim")
         with common.chain_progress(key.rsplit("/", 1)[-1]) as on_step:
-            results, tmp_dir, filed = run_check_s3_single_table(
+            results, filed = run_check_s3_single_table(
                 bucket, table, key, run_by, on_step=on_step,
                 keep=True if commit_default else None)
     else:
@@ -607,11 +609,11 @@ def _run_qa_interactive_single_table(run_by: str, commit_default: bool) -> None:
         console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {file_path} "
                       f"(table: {table})...", style="dim")
         with common.chain_progress(os.path.basename(file_path)) as on_step:
-            results, tmp_dir, filed = run_check_single_table(
+            results, filed = run_check_single_table(
                 table, file_path, run_by, on_step=on_step,
                 keep=True if commit_default else None)
 
-    _finish_supply(results, filed, tmp_dir)
+    _finish_supply(results, filed)
 
 
 @click.group("cp")
@@ -633,17 +635,6 @@ def generate_synthetic_data_command(yes: bool) -> None:
     from generator import generate_cp_runs
 
     console.print(f"Generated -> {generate_cp_runs.DELIVERIES_DIR}", style="green")
-
-
-def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bool) -> None:
-    console.print(report_table(results, run_id))
-    if commit:
-        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, run_id)
-        console.print(f"Promoted -> {dst}", style="green")
-    else:
-        console.print("(local-only check - not written to qa_results/ history; re-run with --commit to keep it)",
-                       style="dim")
-    sys.exit(1 if has_failures(results) else 0)
 
 
 @cp_group.command("qa")
@@ -673,8 +664,8 @@ def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bo
               help="Single-table mode: an object key under the dataset's s3Source prefix for --table "
                    "(instead of --s3-delivery).")
 @click.option("--commit", is_flag=True,
-              help="Keep it: file the supply as a real delivery received now, and write "
-                   "this run into the real, permanent qa_results/ history.")
+              help="Keep it: file the supply as a real delivery received now, and record "
+                   "this run in the dataset's QA history.")
 @click.option("--trial", is_flag=True,
               help="Run it as a TRIAL: the same four tools against the same rows, filed "
                    "nowhere and recorded nowhere. The opposite of --commit, stated so a "
@@ -701,14 +692,14 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         keep = common.keep_from_flags(commit, trial)
         if table_file is not None:
             with common.chain_progress(os.path.basename(table_file)) as on_step:
-                results, tmp_dir, filed = run_check_single_table(
+                results, filed = run_check_single_table(
                     table, table_file, run_by, on_step=on_step, keep=keep)
         else:
             bucket = common.raw_bucket_name()
             with common.chain_progress(s3_key.rsplit("/", 1)[-1]) as on_step:
-                results, tmp_dir, filed = run_check_s3_single_table(
+                results, filed = run_check_s3_single_table(
                     bucket, table, s3_key, run_by, on_step=on_step, keep=keep)
-        _finish_supply(results, filed, tmp_dir)
+        _finish_supply(results, filed)
         sys.exit(1 if has_failures(results) else 0)
 
     if s3_delivery is not None:
@@ -722,10 +713,10 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         bucket = common.raw_bucket_name()
         run_by = get_run_by() if commit else "trial:not-recorded"
         with common.chain_progress(s3_delivery.rstrip("/").rsplit("/", 1)[-1]) as on_step:
-            results, tmp_dir, filed = run_check_s3_delivery(
+            results, filed = run_check_s3_delivery(
                 bucket, s3_delivery, s3_reference_delivery, run_by, on_step=on_step,
                 keep=common.keep_from_flags(commit, trial))
-        _finish_supply(results, filed, tmp_dir)
+        _finish_supply(results, filed)
         sys.exit(1 if has_failures(results) else 0)
 
     if folder_path is not None:
@@ -737,10 +728,10 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
                 "--folder requires --reference-folder (a known-good delivery folder to compare against).")
         run_by = get_run_by() if commit else "trial:not-recorded"
         with common.chain_progress(os.path.basename(folder_path.rstrip("/"))) as on_step:
-            results, tmp_dir, filed = run_check_local_folder(
+            results, filed = run_check_local_folder(
                 folder_path, reference_folder, run_by, on_step=on_step,
                 keep=common.keep_from_flags(commit, trial))
-        _finish_supply(results, filed, tmp_dir)
+        _finish_supply(results, filed)
         sys.exit(1 if has_failures(results) else 0)
 
     if run_id is None:
@@ -749,7 +740,10 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         run_qa_interactive(commit_default=commit)
         return
 
-    run_by = get_run_by() if commit else "local-check:not-persisted"
+    keep = common.keep_from_flags(commit, trial)
+    run_by = get_run_by() if keep else "trial:not-recorded"
     with common.chain_progress(run_id) as on_step:
-        results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id, on_step=on_step)
-    _finish_flag_mode(results, run_id, tmp_dir, commit)
+        results, recorded_run_id = run_check(run_id, run_by, reference_run_id=reference_run_id,
+                                              on_step=on_step, keep=keep)
+    _report_synthetic(results, recorded_run_id, keep, interactive=False)
+    sys.exit(1 if has_failures(results) else 0)
