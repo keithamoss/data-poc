@@ -379,7 +379,14 @@ def embed() -> None:
         periods = schedule.periods_for_calendar(cal.name)
         datasets = []
         for entry in hierarchy.all_datasets():
-            if schedule.calendar_for_dataset(entry.dataset_id).name != cal.name:
+            try:
+                if schedule.calendar_for_dataset(entry.dataset_id).name != cal.name:
+                    continue
+            except schedule.NoCalendarAgreed:
+                # No calendar, so no runway on this one (REQ-PIPE-106
+                # criterion 1). Nothing to warn about, and warning would
+                # ask somebody to author dates for a schedule nobody has
+                # agreed.
                 continue
             owed = [p for p in schedule.periods_for_dataset(entry.dataset_id) if p.expected]
             # A dataset's OWN last period, not the calendar's. They
@@ -445,10 +452,14 @@ def embed() -> None:
         try:
             sequences["datasetCalendar"][entry.dataset_id] = \
                 schedule.calendar_for_dataset(entry.dataset_id).name
-        except Exception:
-            # A dataset with no calendar is REQ-PIPE-106's subject rather
-            # than an error here - the picker simply has no period
-            # arithmetic to do for it.
+        except schedule.NoCalendarAgreed:
+            # REQ-PIPE-106's subject, and NOT an error: the picker simply
+            # has no period arithmetic to do for this dataset. Narrowed
+            # from a bare `except Exception` on 2026-09-28, when the
+            # declaration gained an exception of its own - catching
+            # everything here would also have swallowed a genuinely
+            # misconfigured calendar, which is the one thing the schedule
+            # gate exists to make loud.
             sequences["datasetCalendar"][entry.dataset_id] = None
     html = _replace_const(html, "PERIOD_SEQUENCES",
                            json.dumps(sequences, separators=(",", ":")))

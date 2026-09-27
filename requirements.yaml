@@ -20001,7 +20001,7 @@ requirements:
       extraction for a project, I want the same thing permanently,
       because that data has supplies and no cadence at all.
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-27"
@@ -20125,6 +20125,63 @@ requirements:
         rollups, the dashboard and the schedule gate at once.
     dependencies: [REQ-PIPE-087, REQ-PIPE-089]
     decisions:
+      - >
+        BUILT IN STAGES, and this records where it got to on 2026-09-28 so
+        nobody infers it from the code. `in_progress` rather than `built`
+        because the register's gate forbids evidence on anything not built,
+        and a status that overclaims is worse than one that cannot carry
+        the detail.
+
+        DONE - the CONFIGURATION AND EXCLUSION layer, criteria 1, 2, 3, 4,
+        5, 11, 12 and 16. A dataset declares `no_calendar: not-yet-agreed`
+        or `no_calendar: never`; `schedule.calendar_for_dataset()` raises a
+        DISTINCT `NoCalendarAgreed` rather than a config error, which is
+        what lets the filing rule, the runway warning and the dashboard
+        embed carry on rather than stop; the schedule gate accepts the
+        declaration and still fails a bare omission, a typo'd calendar
+        name, both at once, an unrecognised value, and a declaration that
+        also subsets a calendar it does not have; `supply_db.SAMPLE_SCHEMA`
+        exists beside staging and rejected and is already in the
+        publisher's forbidden prefixes; `schedule.owes_from()` is
+        criterion 16's record. 27 tests.
+
+        NOT DONE - everything that runs or renders. Criteria 6, 7 and 10
+        (QA over sample data, recorded as in-development), 8, 9 and 15 (the
+        in-words label and the rollup exclusion, both sides), 13 and 14
+        (cross-table checks over calendar-less datasets), and 17, 18 and 19
+        (discarding pre-graduation data from the terminal, never
+        automatically).
+
+        GROUNDWORK THAT ALREADY EXISTS for those, so the next session does
+        not rebuild it: `qa_store.IN_DEVELOPMENT` and the `supply_state`
+        column are there and every read already defaults to AGREED, so a
+        caller has to ASK for in-development verdicts to see them - which
+        is criterion 10 already enforced structurally, with nothing writing
+        them yet.
+      - >
+        TESTED AGAINST A FIXTURE HIERARCHY RATHER THAN BY SHIPPING A
+        SAMPLE DATASET, and that is a deliberate call worth your reaction.
+        Criterion 12 asks the system to SUPPORT any number of
+        calendar-less datasets, not to ship one - and shipping one would
+        drag a contract, its checks and generated data behind it, for no
+        additional coverage of this requirement. The tests build the REAL
+        contract/data-asset.yaml with its datasets replaced, so the
+        calendars, claim windows and hierarchy shape are the real ones.
+
+        The cost is that nothing exercises this end to end on the real
+        dashboard yet, which is exactly what you said you wanted from
+        REQ-GEN-044 for the supply scenarios - see the dashboard half
+        above, still to build.
+      - >
+        `calendar:` BECAME OPTIONAL IN THE PYDANTIC MODEL, and the choice
+        between it and `no_calendar:` is enforced by the gate rather than
+        by the schema. Recorded because it looks like a weakening and is
+        not: the model cannot express "exactly one of these two", and
+        leaving `calendar` required would have pydantic reject a
+        legitimately calendar-less dataset before any of that reasoning
+        ran - so a correct file would get "calendar is required and is not
+        there". The gate fails every wrong combination and says what the
+        two declarations mean, which is the message worth showing.
       - >
         PRE-GRADUATION DATA IS DISCARDED, BY A PERSON, FROM THE TUI
         (Keith, 2026-09-27, settling criterion 12's three-way fork and

@@ -130,6 +130,25 @@ STAGING_SCHEMA = "staging"
 #: Where a supply goes when it was recognised and could not be loaded.
 REJECTED_SCHEMA = "rejected"
 
+#: WHERE DATA FOR A DATASET WITH NO AGREED SCHEDULE LANDS (REQ-PIPE-106
+#: criterion 4) - sample data somebody is developing checks against, or a
+#: one-off extraction for a project that will never have a cadence.
+#:
+#: A SCHEMA OF ITS OWN IS THE WHOLE MECHANISM, and criterion 5 says so in
+#: as many words: such data is excluded from every period, slot, lateness
+#: and promotion computation BY CONSTRUCTION, not by a flag. The
+#: alternative - a `sample boolean` column on the staged table, or a
+#: naming convention - fails in the direction that matters: one WHERE
+#: clause out of thirty forgets it, and sample data starts counting toward
+#: a real dataset's quality history, silently. Nothing here can forget a
+#: schema it never reads.
+#:
+#: IT IS NOT STAGING AND NOT A PERIOD, deliberately both. Staging is where
+#: a supply waits for a filing decision, and this data is never filed;
+#: a period schema holds what was promoted into a period, and this data
+#: belongs to no period.
+SAMPLE_SCHEMA = "sample"
+
 #: WHAT THIS ENGINE CAN DO, DECLARED RATHER THAN DISCOVERED
 #: (REQ-PIPE-087 criterion 9). PostgreSQL moves a table between
 #: schemas with `ALTER TABLE ... SET SCHEMA`, which rewrites the
@@ -833,7 +852,7 @@ def ensure_schemas(conn) -> None:
     schemas in the database, and an empty period schema and a period
     nobody has promoted into are the same fact stated twice.
     """
-    for schema in (STAGING_SCHEMA, REJECTED_SCHEMA):
+    for schema in (STAGING_SCHEMA, REJECTED_SCHEMA, SAMPLE_SCHEMA):
         conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
 
 

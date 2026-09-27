@@ -458,13 +458,49 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
         dataset_id = dataset.get("id")
         scope = f"dataset {dataset_id!r}"
         named = dataset.get("calendar")
+        declared_none = dataset.get(schedule.NO_CALENDAR_KEY)
+
+        # A DATASET MAY SAY IT HAS NO CALENDAR, DELIBERATELY (REQ-PIPE-106
+        # criterion 2) - and only deliberately. This branch is what lets
+        # the gate below keep failing on a mere omission, which is the
+        # requirement's own second NFR: without that, a typo'd calendar
+        # name leaves a dataset silently expecting nothing, and a dataset
+        # expecting nothing never reports a missing supply.
+        if declared_none is not None:
+            if declared_none not in schedule.NO_CALENDAR_VALUES:
+                out.append(ConfigError(
+                    src.name, scope,
+                    f"declares `{schedule.NO_CALENDAR_KEY}: {declared_none!r}`, which is not "
+                    f"one of {', '.join(schedule.NO_CALENDAR_VALUES)}.",
+                    f"`{schedule.NOT_YET_AGREED}` is sample data before a schedule is agreed, "
+                    f"and it will graduate. `{schedule.NEVER}` is a one-off extraction that "
+                    f"has supplies and no cadence at all."))
+            elif named:
+                out.append(ConfigError(
+                    src.name, scope,
+                    f"declares BOTH `calendar: {named}` and "
+                    f"`{schedule.NO_CALENDAR_KEY}: {declared_none}`.",
+                    "Keep one. A dataset either has an agreed schedule or says it has none, "
+                    "and carrying both leaves no way to tell which was meant."))
+            elif dataset.get("delivery_months") or dataset.get("dates"):
+                out.append(ConfigError(
+                    src.name, scope,
+                    f"declares `{schedule.NO_CALENDAR_KEY}: {declared_none}` and still "
+                    f"subsets or overrides a calendar.",
+                    "`delivery_months:` and `dates:` both describe which of a calendar's "
+                    "periods this dataset takes part in, and there is no calendar here to "
+                    "take part in."))
+            continue
 
         if not named:
             out.append(ConfigError(
                 src.name, scope,
                 "names no `calendar:`.",
-                f"Add one of: {options}. Without it "
-                f"there is nothing to judge this dataset's supplies against."))
+                f"Add one of: {options}, or declare "
+                f"`{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}` if no schedule has "
+                f"been agreed for it yet (or `{schedule.NEVER}` for a one-off extraction). "
+                f"Without either there is nothing to judge this dataset's supplies against, "
+                f"and a typo'd calendar name would leave it silently expecting nothing."))
             continue
         if named not in calendars:
             out.append(ConfigError(

@@ -195,6 +195,20 @@ releases:
               files in the repository and the dashboard as something GitHub
               builds. Each now says what the system actually does, and says
               what it used to say, so nothing reads as two conflicting rules.
+          - headline: A dataset can exist before its delivery schedule is agreed
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              You can add a dataset, say plainly that no schedule has been
+              agreed for it yet, and it will not be reported as owing anything.
+              A one-off extraction for a project says so differently, because it
+              is never going to gain one.
+          - headline: Saying nothing about a schedule is still an error
+            components: ["Pipeline & publishing"]
+            description: >
+              Declaring that a dataset has no calendar is now allowed; leaving
+              the calendar out by accident, or mistyping its name, still fails
+              the configuration check. A dataset that silently expects nothing
+              never reports a missing delivery.
           - headline: A retired design cannot quietly come back
             components: ["Testing & dev tooling", "Docs & process"]
             description: >

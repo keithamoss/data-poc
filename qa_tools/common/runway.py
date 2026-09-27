@@ -102,8 +102,19 @@ def _authored_calendars() -> list[schedule.Calendar]:
 
 
 def _datasets_on(calendar_name: str) -> list[str]:
+    # A DATASET WITH NO CALENDAR IS ON NO CALENDAR (REQ-PIPE-106
+    # criterion 1). It cannot run out of runway, and warning that it has
+    # none would be telling somebody to author dates for a schedule
+    # nobody has agreed - or, for a one-off extraction, will ever agree.
     return [d.dataset_id for d in hierarchy.all_datasets()
-            if schedule.calendar_for_dataset(d.dataset_id).name == calendar_name]
+            if _calendar_name(d.dataset_id) == calendar_name]
+
+
+def _calendar_name(dataset_id: str) -> str | None:
+    try:
+        return schedule.calendar_for_dataset(dataset_id).name
+    except schedule.NoCalendarAgreed:
+        return None
 
 
 def _threshold(calendar: schedule.Calendar) -> int:
@@ -168,7 +179,10 @@ def exhausted_datasets(as_of: date) -> dict[str, str]:
     """
     out: dict[str, str] = {}
     for dataset in hierarchy.all_datasets():
-        calendar = schedule.calendar_for_dataset(dataset.dataset_id)
+        try:
+            calendar = schedule.calendar_for_dataset(dataset.dataset_id)
+        except schedule.NoCalendarAgreed:
+            continue            # owes nothing, so cannot be exhausted
         if calendar.current.is_cadence_rule:
             continue
         owed = [p for p in schedule.periods_for_dataset(dataset.dataset_id) if p.expected]

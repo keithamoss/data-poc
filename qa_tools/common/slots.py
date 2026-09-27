@@ -219,6 +219,14 @@ def is_owed_supplies(dataset_id: str) -> bool:
 
     try:
         calendar = schedule.calendar_for_dataset(dataset_id)
+    except schedule.NoCalendarAgreed:
+        # CRITERION 1 OF REQ-PIPE-106, and it is the answer this whole
+        # function exists to give: a dataset with no agreed schedule owes
+        # nothing, so nothing it sends is unexpected and nothing it fails
+        # to send is missing. Caught SEPARATELY from the config error
+        # below, because that one means somebody got the configuration
+        # wrong and this one means they got it right.
+        return False
     except (schedule.ScheduleConfigError, KeyError):
         return False
     if calendar.current.is_cadence_rule:

@@ -372,6 +372,116 @@ def _dataset_schedules() -> dict[str, dict]:
     return out
 
 
+#: The key a dataset uses to say it has NO calendar, DELIBERATELY
+#: (REQ-PIPE-106 criterion 2), and the two things that can mean.
+#:
+#: WHY A KEY OF ITS OWN rather than allowing `calendar:` to be absent.
+#: Absence already means something: `validate_schedule.py` fails a dataset
+#: with no calendar, on purpose, because without that a typo'd calendar
+#: name leaves a dataset silently expecting nothing - and a dataset
+#: expecting nothing reports no missing supply, ever. Allowing absence
+#: would destroy a gate that catches a real class of error, which this
+#: requirement's own second NFR forbids explicitly. A deliberate
+#: declaration is what separates "nobody has agreed a schedule" from
+#: "somebody mistyped one".
+NO_CALENDAR_KEY = "no_calendar"
+
+#: SAMPLE DATA, BEFORE ANY SUPPLY IS AGREED. It will graduate: a schedule
+#: gets agreed, and from that point it owes supplies like anything else.
+NOT_YET_AGREED = "not-yet-agreed"
+
+#: A ONE-OFF EXTRACTION FOR A PROJECT. It has supplies and no cadence at
+#: all, permanently, and criterion 3 is explicit that it must NOT be made
+#: to graduate. Kept apart from the case above because the two look
+#: identical in the data and mean opposite things to a person reading the
+#: dashboard: one is waiting for something, the other is finished.
+NEVER = "never"
+
+NO_CALENDAR_VALUES = (NOT_YET_AGREED, NEVER)
+
+
+class NoCalendarAgreed(Exception):
+    """This dataset has declared that it has no delivery calendar.
+
+    A DISTINCT EXCEPTION, NOT A ScheduleConfigError, and the difference is
+    the whole of REQ-PIPE-106 criterion 1: a config error means somebody
+    got it wrong and the pipeline should stop, while this means the
+    configuration is exactly as intended and there is simply no period
+    arithmetic to do. Callers that should carry on - the filing rule, the
+    runway warning, the rollups - catch this one and skip the dataset;
+    nothing catches ScheduleConfigError.
+    """
+
+    def __init__(self, dataset_id: str, kind: str):
+        self.dataset_id, self.kind = dataset_id, kind
+        agreed = ("no schedule has been agreed for it yet"
+                   if kind == NOT_YET_AGREED
+                   else "it is a one-off extraction and will never have one")
+        super().__init__(
+            f"dataset {dataset_id!r} has no delivery calendar because {agreed} "
+            f"({NO_CALENDAR_KEY}: {kind}). It owes no supply and is filed to no period.")
+
+
+def no_calendar(dataset_id: str) -> str | None:
+    """Which kind of no-calendar dataset this is, or None where it has one.
+
+    Reads the declaration and validates it here rather than only in the
+    gate, so a value nobody recognises cannot be read as "not yet agreed"
+    by accident - which would be the quiet direction.
+    """
+    hierarchy.dataset(dataset_id)
+    raw = _dataset_schedules()[dataset_id]
+    declared = raw.get(NO_CALENDAR_KEY)
+    if declared is None:
+        return None
+    if declared not in NO_CALENDAR_VALUES:
+        raise ScheduleConfigError(
+            f"dataset {dataset_id!r}: {NO_CALENDAR_KEY}: {declared!r} is not one of "
+            f"{', '.join(NO_CALENDAR_VALUES)}. {NOT_YET_AGREED} means sample data before a "
+            f"schedule is agreed, and it will graduate; {NEVER} means a one-off extraction "
+            f"that has supplies and no cadence at all.")
+    if raw.get("calendar"):
+        raise ScheduleConfigError(
+            f"dataset {dataset_id!r} declares both `calendar: {raw['calendar']}` and "
+            f"`{NO_CALENDAR_KEY}: {declared}`. One of those is wrong and this will not guess "
+            f"which - a dataset either has an agreed schedule or says it has none.")
+    return declared
+
+
+def will_graduate(dataset_id: str) -> bool:
+    """Whether a dataset with no calendar is expected to gain one.
+
+    Criterion 3. False for a one-off extraction, which must never be
+    presented as waiting for a schedule somebody has to agree.
+    """
+    return no_calendar(dataset_id) == NOT_YET_AGREED
+
+
+def owes_from(dataset_id: str) -> date | None:
+    """The date a graduated dataset started owing supplies, or None.
+
+    CRITERION 16'S RECORD OF WHEN IT GRADUATED, and it is CONFIGURATION
+    rather than an observed event on purpose: graduation IS the
+    configuration change - a calendar gets named - so the date it took
+    effect is authored beside it and reviewed with it. An observed
+    "when did we first notice a calendar appear" would need the system to
+    remember the previous config, which is state about configuration, and
+    would date the graduation to whenever the pipeline next happened to
+    run.
+
+    It also does real work rather than only recording: a dataset that
+    graduated in November must not be reported as having owed supplies
+    all year, and this is what every period before that date is judged
+    against.
+    """
+    hierarchy.dataset(dataset_id)
+    raw = _dataset_schedules()[dataset_id]
+    value = raw.get("owes_from")
+    if value is None:
+        return None
+    return _as_date(value, f"dataset {dataset_id!r} owes_from")
+
+
 def calendar_for_dataset(dataset_id: str) -> Calendar:
     """The calendar a dataset names, resolved through the hierarchy.
 
@@ -379,14 +489,24 @@ def calendar_for_dataset(dataset_id: str) -> Calendar:
     calendar no calendar defines - a dataset named in one place and
     absent from the other must be a detectable error, never a silent
     mismatch.
+
+    RAISES `NoCalendarAgreed` FOR A DATASET THAT SAYS IT HAS NONE
+    (REQ-PIPE-106), which is a different thing from the config error
+    below: one means the configuration is as intended, the other that
+    somebody got it wrong.
     """
     hierarchy.dataset(dataset_id)  # raises UnknownDatasetError, naming the known ids
+    declared = no_calendar(dataset_id)
+    if declared is not None:
+        raise NoCalendarAgreed(dataset_id, declared)
     raw = _dataset_schedules()[dataset_id]
     name = raw.get("calendar")
     if not name:
         raise ScheduleConfigError(
-            f"dataset {dataset_id!r} names no `calendar:`. Every dataset names exactly one - "
-            f"without it there is nothing to judge its supplies against.")
+            f"dataset {dataset_id!r} names no `calendar:` and does not declare "
+            f"`{NO_CALENDAR_KEY}:` either. Every dataset does one or the other - without "
+            f"either there is nothing to judge its supplies against, and a typo'd calendar "
+            f"name would leave it silently expecting nothing.")
     return calendar(name)
 
 

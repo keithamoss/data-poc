@@ -151,7 +151,7 @@ def show_command(dataset: str | None, until, show_all: bool) -> None:
         console.print(f"  [dim]in force from {version.effective_from} "
                        f"({len(cal.versions)} version(s))[/dim]")
         users = [d.dataset_id for d in hierarchy.all_datasets()
-                 if schedule.calendar_for_dataset(d.dataset_id).name == cal.name]
+                 if _calendar_name(schedule, d.dataset_id) == cal.name]
         console.print(f"  used by: {', '.join(users)}")
         if not version.is_cadence_rule:
             table = Table("Period", "Date", box=None, pad_edge=False)
@@ -160,9 +160,37 @@ def show_command(dataset: str | None, until, show_all: bool) -> None:
             console.print(table)
 
 
+def _calendar_name(schedule, dataset_id: str) -> str | None:
+    """The calendar this dataset names, or None where it says it has none
+    (REQ-PIPE-106 criterion 1)."""
+    try:
+        return schedule.calendar_for_dataset(dataset_id).name
+    except schedule.NoCalendarAgreed:
+        return None
+
+
 def _show_dataset(dataset: str, until: date | None, show_all: bool,
                    hierarchy, schedule) -> None:
     entry = hierarchy.dataset(dataset)
+    declared = schedule.no_calendar(dataset)
+    if declared is not None:
+        # SAID IN WORDS, and said differently for the two kinds
+        # (REQ-PIPE-106 criteria 3 and 8). "Not yet agreed" is somebody's
+        # outstanding job; "never" is a finished decision about a one-off
+        # extraction, and presenting the second as the first would put a
+        # permanent item on somebody's list.
+        console.print(f"\n[bold]{entry.dataset_name}[/bold] ({entry.dataset_id})")
+        if declared == schedule.NOT_YET_AGREED:
+            console.print("  [yellow]No delivery schedule has been agreed for this "
+                           "dataset yet.[/yellow]")
+            console.print("  [dim]It owes no supply and is filed to no period. Data it "
+                           "receives is held apart so checks can be developed against "
+                           "it.[/dim]")
+        else:
+            console.print("  [dim]A one-off extraction: it has supplies and no cadence at "
+                           "all, and never will.[/dim]")
+            console.print("  [dim]It owes no supply and is filed to no period.[/dim]")
+        return
     cal = schedule.calendar_for_dataset(dataset)
     months = schedule.delivery_months(dataset)
     console.print(f"\n[bold]{entry.dataset_name}[/bold] ({entry.dataset_id})")
