@@ -22,7 +22,6 @@ def _s3_created_event(bucket: str, key: str) -> dict:
 
 
 def test_bdm_handler_skips_an_unmatched_key(monkeypatch):
-    monkeypatch.setattr(bdm_ingest_handler, "RESULTS_BUCKET_NAME", None)
     fake_boto3 = MagicMock()
     monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
 
@@ -44,8 +43,6 @@ def test_bdm_handler_downloads_matched_file_and_calls_run_single(monkeypatch, tm
     fake_boto3 = MagicMock()
     fake_boto3.client.return_value = fake_client
     monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
-    monkeypatch.setattr(bdm_ingest_handler, "RESULTS_BUCKET_NAME", None)
-    monkeypatch.setattr(bdm_ingest_handler, "patch_write_qa_result_for_lambda", lambda *a, **k: None)
 
     captured = {}
 
@@ -71,35 +68,43 @@ def test_bdm_handler_downloads_matched_file_and_calls_run_single(monkeypatch, tm
     assert body["fail"] == 1
 
 
-def test_bdm_handler_uploads_written_results_to_the_results_bucket(monkeypatch, tmp_path):
+def test_bdm_handler_uploads_nothing_anywhere(monkeypatch, tmp_path):
+    """WHAT THIS REPLACED, because the absence is the assertion.
+
+    The handler used to write QA results as JSON files into Lambda's
+    /tmp - the one writable path in that runtime - and then upload each
+    one to a results bucket, so a sync workflow could lay them into the
+    repository's committed qa_results/ tree. The test here checked the
+    uploaded key matched the tree's own layout.
+
+    REQ-PIPE-089 records results in the database, so there is nothing to
+    upload and no bucket to upload to: the redirection, the upload, the
+    sync workflow, the bucket and both Lambdas' bucket-wide S3 write
+    grants all went together. A handler that started writing files again
+    would be silently accumulating them in a container that is about to
+    be thrown away, which is why this asserts rather than assumes.
+    """
     fake_client = MagicMock()
     fake_client.download_file.side_effect = lambda bucket, key, local_path: open(local_path, "w").close()
     fake_boto3 = MagicMock()
     fake_boto3.client.return_value = fake_client
     monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
-    monkeypatch.setattr(bdm_ingest_handler, "RESULTS_BUCKET_NAME", "my-results-bucket")
-
-    qa_results_root_holder = {}
-
-    def fake_patch(modules, qa_results_root):
-        qa_results_root_holder["root"] = qa_results_root
-        run_dir = __import__("pathlib").Path(qa_results_root) / "registry-services" / "civil-registration" / "run_099"
-        # simulate what patch_write_qa_result_for_lambda's real target
-        # would eventually cause write_qa_result() to produce
-        run_dir.mkdir(parents=True)
-        (run_dir / "dataset_stats.json").write_text("{}")
-
-    monkeypatch.setattr(bdm_ingest_handler, "patch_write_qa_result_for_lambda", fake_patch)
-    monkeypatch.setattr(bdm_ingest_handler, "tempfile", MagicMock(
-        gettempdir=lambda: str(tmp_path), TemporaryDirectory=__import__("tempfile").TemporaryDirectory))
     monkeypatch.setattr(bdm_ingest_handler.orchestrate_bdm, "run_single", lambda *a, **k: [])
 
     bdm_ingest_handler.handler(_s3_created_event("raw-bucket", "bdm/birth_registrations_run_099.csv"))
 
-    fake_client.upload_file.assert_called_once()
-    uploaded_local_path, uploaded_bucket, uploaded_key = fake_client.upload_file.call_args[0]
-    assert uploaded_bucket == "my-results-bucket"
-    assert uploaded_key == "registry-services/civil-registration/run_099/dataset_stats.json"
+    fake_client.upload_file.assert_not_called()
+    fake_client.put_object.assert_not_called()
+
+
+def test_neither_handler_can_reach_a_results_bucket_at_all(monkeypatch):
+    """Asserted on the module rather than on a call, so that a handler
+    reintroducing the name has to notice this test rather than a review
+    having to."""
+    for handler in (bdm_ingest_handler, cp_ingest_handler):
+        assert not hasattr(handler, "RESULTS_BUCKET_NAME")
+        assert not hasattr(handler, "upload_qa_result")
+        assert not hasattr(handler, "patch_write_qa_result_for_lambda")
 
 
 def test_cp_handler_loads_a_table_arrival_without_running_the_full_pipeline(monkeypatch, tmp_path):
@@ -108,8 +113,6 @@ def test_cp_handler_loads_a_table_arrival_without_running_the_full_pipeline(monk
     fake_boto3 = MagicMock()
     fake_boto3.client.return_value = fake_client
     monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
-    monkeypatch.setattr(cp_ingest_handler, "RESULTS_BUCKET_NAME", None)
-    monkeypatch.setattr(cp_ingest_handler, "patch_write_qa_result_for_lambda", lambda *a, **k: None)
 
     captured = {}
     monkeypatch.setattr(cp_ingest_handler.build_cp_warehouses, "add_table_to_run",
@@ -145,8 +148,6 @@ def test_cp_handler_runs_the_full_pipeline_only_once_the_marker_confirms_all_key
     fake_boto3 = MagicMock()
     fake_boto3.client.return_value = fake_client
     monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
-    monkeypatch.setattr(cp_ingest_handler, "RESULTS_BUCKET_NAME", None)
-    monkeypatch.setattr(cp_ingest_handler, "patch_write_qa_result_for_lambda", lambda *a, **k: None)
 
     captured = {}
 
@@ -188,8 +189,6 @@ def test_cp_handler_skips_the_full_pipeline_when_the_marker_lists_a_key_that_doe
     fake_boto3 = MagicMock()
     fake_boto3.client.return_value = fake_client
     monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
-    monkeypatch.setattr(cp_ingest_handler, "RESULTS_BUCKET_NAME", None)
-    monkeypatch.setattr(cp_ingest_handler, "patch_write_qa_result_for_lambda", lambda *a, **k: None)
     run_single_called = []
     monkeypatch.setattr(cp_ingest_handler.orchestrate_cp, "run_single", lambda *a, **k: run_single_called.append(1))
 

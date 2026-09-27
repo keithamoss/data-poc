@@ -117,22 +117,31 @@ def run_command(collection: str, sequential: bool, snapshot: bool) -> None:
 
 @pipeline_group.command("regenerate-history")
 @click.option("--collection", type=click.Choice(["bdm", "cp", "all"]), default="all",
-              help="Which collection's committed history to delete and rebuild. Default: both.")
+              help="Which collection's recorded history to delete and rebuild. Default: both.")
 @click.option("--sequential", is_flag=True,
               help="Run the manifest's checks one at a time instead of in parallel.")
 @click.option("--yes", is_flag=True,
               help="Skip the confirmation prompt. For a scripted or unattended run.")
 def regenerate_history_command(collection: str, sequential: bool, yes: bool) -> None:
-    """Delete this collection's committed qa_results/ history and write it again from scratch.
+    """Delete this collection's recorded QA history and write it again from scratch.
 
     REQ-PIPE-038 criteria 4-7. DELETES rather than migrates, which is Keith's own call
-    (2026-09-21): the data is synthetic, so re-running is honest where reshaping committed
-    files in place would not be. Runs locally and only locally - CI never regenerates,
-    opens or queries anything under data/.
-    """
-    import shutil
+    (2026-09-21): the data is synthetic, so re-running is honest where reshaping recorded
+    results in place would not be.
 
-    from qa_tools.common.qa_results_writer import QA_RESULTS_DIR
+    IT USED TO DELETE A COMMITTED TREE of JSON files, and the change is worth stating
+    because the command's NAME did not change with it. REQ-PIPE-089 made the history rows
+    in the `qa` schema, so this deletes runs - and their results, tool output, tables_read
+    and dataset_stats, which cascade off them - rather than directories. What it does has
+    not changed; where it does it has.
+
+    THE CONFIRMATION PROMPT STAYS, and its reasoning changed rather than weakening. It used
+    to be "this destroys thousands of tracked files, and git holds them but recoverable is
+    not the same as intended". Nothing is tracked now, so git holds nothing: the recorded
+    history is the only copy, which is a stronger reason to ask, not a weaker one. What
+    makes it safe at all is that the pipeline is seeded, so the rebuild is deterministic.
+    """
+    from qa_tools.common import qa_store, supply_db
 
     scopes = []
     if collection in ("bdm", "all"):
@@ -140,56 +149,57 @@ def regenerate_history_command(collection: str, sequential: bool, yes: bool) -> 
     if collection in ("cp", "all"):
         scopes.append(("child-protection-family-support", "child-protection"))
 
-    targets = [QA_RESULTS_DIR / agency / coll for agency, coll in scopes]
-    existing = [t for t in targets if t.is_dir()]
-    n_files = sum(len(list(t.rglob("*.json"))) for t in existing)
+    with supply_db.connect(label="mothman:regenerate-history") as conn:
+        qa_store.ensure_schema(conn)
+        counts = {(a, c): len(qa_store.runs_for(conn, a, c)) for a, c in scopes}
 
-    console.print(f"About to DELETE {n_files} committed result file(s) across "
-                   f"{len(existing)} collection(s) and write them again from the real tools.",
-                   style="yellow")
-    for target in existing:
-        console.print(f"  {target.relative_to(QA_RESULTS_DIR.parent)}", style="dim")
-    # WHY A PROMPT AT ALL, when every other mothman command just runs.
-    # This is the one command whose whole job is destroying committed
-    # history, and it is a one-way change to thousands of tracked
-    # files. Git holds the old tree, so it is recoverable - but
-    # recoverable is not the same as intended.
+    total = sum(counts.values())
+    console.print(f"About to DELETE {total} recorded run(s) across {len(scopes)} collection(s) "
+                   "and check them again with the real tools.", style="yellow")
+    for (agency, coll), n in counts.items():
+        console.print(f"  {agency}/{coll}: {n} run(s)", style="dim")
+
     if not yes and not click.confirm("Delete and regenerate?", default=False):
         console.print("Nothing deleted.", style="dim")
         return
 
-    for target in existing:
-        shutil.rmtree(target)
-    console.print(f"Deleted {n_files} file(s). Regenerating...", style="dim")
+    with supply_db.connect(label="mothman:regenerate-history") as conn:
+        qa_store.ensure_schema(conn)
+        deleted = sum(qa_store.delete_history(conn, agency, coll) for agency, coll in scopes)
+    console.print(f"Deleted {deleted} run(s). Regenerating...", style="dim")
 
     if collection in ("bdm", "all"):
         _run_bdm(sequential)
     if collection in ("cp", "all"):
         _run_cp(sequential)
 
-    # CRITERION 5: nothing may be left in the old shape. Asserted here
-    # rather than trusted, because the failure is silent - a stale run
-    # directory at collection level reads as a dataset called
-    # `run_014`, and every reader that walks the collection picks it up
-    # as one.
+    # CRITERION 5 SURVIVES THE MOVE AS AN ASSERTION ABOUT SCOPES, not
+    # about directories. Nothing may be left in the old shape, and the
+    # failure it guards is still silent: a scope that is neither a
+    # dataset nor a reserved name reads as a dataset nobody configured,
+    # and every reader that walks a collection picks it up as one. It
+    # was a stray `run_014` directory at collection level before; it is
+    # a stray value in the scope column now.
     from qa_tools.common import tables_read as tables_read_mod
     from qa_tools.common.hierarchy import datasets_in_collection
 
-    for agency, coll in scopes:
-        known = {d.dataset_id for d in datasets_in_collection(coll)}
-        base = QA_RESULTS_DIR / agency / coll
-        if not base.is_dir():
-            continue
-        strays = sorted(d.name for d in base.iterdir()
-                         if d.is_dir()
-                         and not tables_read_mod.is_reserved_scope(d.name)
-                         and d.name not in known)
-        if strays:
-            raise click.ClickException(
-                f"{agency}/{coll} still holds {len(strays)} scope(s) that are neither a "
-                f"dataset nor a reserved name: {', '.join(strays)}")
+    with supply_db.connect(label="mothman:regenerate-history") as conn:
+        for agency, coll in scopes:
+            known = {d.dataset_id for d in datasets_in_collection(coll)}
+            found = {row[0] for row in conn.execute(
+                f'SELECT DISTINCT dataset_id FROM "{qa_store.SCHEMA}".check_result cr '
+                f'JOIN "{qa_store.SCHEMA}".run r ON r.run_key = cr.run_key '
+                "WHERE r.agency_id = ? AND r.collection_id = ?", [agency, coll]).fetchall()}
+            strays = sorted(name for name in found
+                             if name
+                             and not tables_read_mod.is_reserved_scope(name)
+                             and name not in known)
+            if strays:
+                raise click.ClickException(
+                    f"{agency}/{coll} still holds {len(strays)} scope(s) that are neither a "
+                    f"dataset nor a reserved name: {', '.join(strays)}")
 
-    console.print("Committed history regenerated under the per-dataset model.", style="green")
+    console.print("Recorded history regenerated under the per-dataset model.", style="green")
 
 
 @pipeline_group.command("bootstrap")

@@ -8,8 +8,6 @@ whose status carried it.
 """
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from qa_tools.common import qa_results_reader as reader
@@ -29,86 +27,83 @@ def _a_real_cross_table_check_id() -> str:
 
 
 class TestItIsRecordedInItsOwnScope:
-    """Criteria 1 and 2."""
+    """Criteria 1 and 2.
 
-    def test_a_cross_table_result_lands_in_the_reserved_scope(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("MOTHMAN_SUPPLY_DB", str(tmp_path / "absent.duckdb"))
+    THESE USED TO READ FILES, and asserted that a cross-table record
+    landed in a `_cross-table/` directory and left no copy in the
+    dataset's own. REQ-PIPE-089 made the scope a column, so they ask the
+    reader instead - which is a better test of the same rule, because
+    the reader is what every real consumer uses.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _fresh(self, clean_qa_history, finish_runs):
         writer._declared_reads_tables.cache_clear()
+        self.finish = finish_runs
+
+    def _write(self, verified, raw=None):
+        writer.write_qa_result(
+            AGENCY, COLLECTION, "run_1", "2026-09-26T09:00:00+08:00", "dbt", raw or {},
+            verified=verified, run_by="a@b.c")
+        self.finish("run_1", agency=AGENCY, collection=COLLECTION,
+                    when="2026-09-26T09:00:00+08:00", run_by="a@b.c")
+
+    def test_a_cross_table_result_lands_in_the_reserved_scope(self):
         check_id = _a_real_cross_table_check_id()
+        self._write([{"check_id": check_id, "dataset_id": "cp-placements", "status": "fail"}])
 
-        writer.write_qa_result(
-            AGENCY, COLLECTION, "run_1", "2026-09-26T09:00:00+08:00", "dbt", {},
-            verified=[{"check_id": check_id, "dataset_id": "cp-placements", "status": "fail"}],
-            results_dir=tmp_path / "qa_results")
+        found = reader.read_cross_table_results(AGENCY, COLLECTION)
+        assert [r["check_id"] for r in found] == [check_id]
 
-        cross = (tmp_path / "qa_results" / AGENCY / COLLECTION
-                  / tr.CROSS_TABLE_SCOPE / "run_1" / "dbt.json")
-        assert cross.is_file(), "the cross-table result was not written to the reserved scope"
-        assert json.loads(cross.read_text())["verified"][0]["check_id"] == check_id
-
-    def test_it_LEAVES_the_dataset_file_rather_than_being_copied(self, tmp_path, monkeypatch):
+    def test_it_LEAVES_the_dataset_results_rather_than_being_copied(self):
         """Criterion 2. Two records saying one thing is two records to
-        keep in step, and they diverge the first time one is rewritten."""
-        monkeypatch.setenv("MOTHMAN_SUPPLY_DB", str(tmp_path / "absent.duckdb"))
-        writer._declared_reads_tables.cache_clear()
+        keep in step, and they diverge the first time one is rewritten.
 
-        writer.write_qa_result(
-            AGENCY, COLLECTION, "run_1", "2026-09-26T09:00:00+08:00", "dbt", {},
-            verified=[{"check_id": _a_real_cross_table_check_id(),
-                        "dataset_id": "cp-placements", "status": "fail"}],
-            results_dir=tmp_path / "qa_results")
+        cp-placements is the dataset the check was DECLARED under, so
+        that is where the record would have landed."""
+        self._write([{"check_id": _a_real_cross_table_check_id(),
+                       "dataset_id": "cp-placements", "status": "fail"}])
 
-        # cp-placements is the dataset the check was DECLARED under, so
-        # that is the file the record would have landed in. Since
-        # REQ-PIPE-038 a dataset with nothing to record gets no file at
-        # all, which is a stronger form of "it left" than an empty one.
-        dataset_dir = tmp_path / "qa_results" / AGENCY / COLLECTION / "cp-placements"
-        assert not dataset_dir.exists(), "the record was copied rather than moved"
+        assert reader.read_one(AGENCY, COLLECTION, "run_1", "dbt",
+                                dataset="cp-placements") == [], \
+            "the record was copied rather than moved"
 
-    def test_an_ordinary_check_stays_where_it_was(self, tmp_path, monkeypatch):
+    def test_an_ordinary_check_stays_where_it_was(self):
         """The change must not sweep up single-table checks - 235 of the
         259 checks in this repo read only their own table."""
-        monkeypatch.setenv("MOTHMAN_SUPPLY_DB", str(tmp_path / "absent.duckdb"))
-        writer._declared_reads_tables.cache_clear()
+        self._write([{"check_id": "not-a-cross-table-check",
+                       "dataset_id": "cp-placements", "status": "pass"}])
 
-        writer.write_qa_result(
-            AGENCY, COLLECTION, "run_1", "2026-09-26T09:00:00+08:00", "dbt", {},
-            verified=[{"check_id": "not-a-cross-table-check",
-                        "dataset_id": "cp-placements", "status": "pass"}],
-            results_dir=tmp_path / "qa_results")
+        own = reader.read_one(AGENCY, COLLECTION, "run_1", "dbt", dataset="cp-placements")
+        assert [r["check_id"] for r in own] == ["not-a-cross-table-check"]
+        assert reader.read_cross_table_results(AGENCY, COLLECTION) == []
 
-        collection_dir = tmp_path / "qa_results" / AGENCY / COLLECTION
-        own = collection_dir / "cp-placements" / "run_1" / "dbt.json"
-        assert len(json.loads(own.read_text())["verified"]) == 1
-        assert not (collection_dir / tr.CROSS_TABLE_SCOPE).exists()
-
-    def test_the_raw_output_is_not_duplicated_into_the_scope(self, tmp_path, monkeypatch):
+    def test_the_raw_output_is_not_duplicated_into_the_scope(self):
         """One tool invocation's native output covers the whole
-        collection, and raw_output is already 61% of committed history.
-        Copying it would double that to say the same thing twice."""
-        monkeypatch.setenv("MOTHMAN_SUPPLY_DB", str(tmp_path / "absent.duckdb"))
-        writer._declared_reads_tables.cache_clear()
+        collection, and raw_output was 61% of the committed history it
+        replaced. Recording it per scope would double that to say the
+        same thing twice - so it is recorded ONCE, against the
+        invocation, and reachable by asking for it rather than by
+        arriving attached to a scope's records."""
+        self._write([{"check_id": _a_real_cross_table_check_id(),
+                       "dataset_id": "cp-placements", "status": "fail"}],
+                     raw={"a-big": "raw payload"})
 
-        writer.write_qa_result(
-            AGENCY, COLLECTION, "run_1", "2026-09-26T09:00:00+08:00", "dbt",
-            {"a-big": "raw payload"},
-            verified=[{"check_id": _a_real_cross_table_check_id(),
-                        "dataset_id": "cp-placements", "status": "fail"}],
-            results_dir=tmp_path / "qa_results")
-
-        cross = (tmp_path / "qa_results" / AGENCY / COLLECTION
-                  / tr.CROSS_TABLE_SCOPE / "run_1" / "dbt.json")
-        assert json.loads(cross.read_text())["raw_output"] is None
+        for record in reader.read_cross_table_results(AGENCY, COLLECTION):
+            assert "raw_output" not in record
+            assert "a-big" not in record
+        assert reader.read_raw(AGENCY, COLLECTION, "run_1", "dbt")["raw_output"] == {
+            "a-big": "raw payload"}
 
 
 class TestTheScopeIsNotMistakenForARun:
     """The reserved folder is a SIBLING of the run directories, so
     anything walking that level has to skip it."""
 
-    def test_the_scope_is_not_listed_as_a_run(self, real_committed_history):
+    def test_the_scope_is_not_listed_as_a_run(self, deployment_history):
         assert tr.CROSS_TABLE_SCOPE not in reader.list_run_ids(AGENCY, COLLECTION)
 
-    def test_the_scope_is_not_reported_as_an_incomplete_run(self, real_committed_history):
+    def test_the_scope_is_not_reported_as_an_incomplete_run(self, deployment_history):
         """It holds four tool files, not six - so a walk that read it as
         a run would report it permanently missing dataset_stats and
         tables_read."""
@@ -128,7 +123,7 @@ class TestTheRebuildPathReadsTheScope:
     every cross-table check when the scope was first introduced -
     3,204 results live against 2,772 rebuilt, with nothing saying so."""
 
-    def test_the_committed_scope_holds_real_cross_table_results(self, deployment_history, real_committed_history):
+    def test_the_recorded_scope_holds_real_cross_table_results(self, deployment_history):
         found = reader.read_cross_table_results(AGENCY, COLLECTION)
         assert found, "no cross-table results in the committed scope"
         from qa_tools.common.validate_check_lifecycle import collect_checks

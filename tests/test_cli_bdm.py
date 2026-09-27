@@ -4,9 +4,7 @@ bdm_duckdb_dir fixtures tests/test_check_cli.py already built (real
 generator output, not hand-crafted rows), and drives the Click commands
 through click.testing.CliRunner, same as that file."""
 from __future__ import annotations
-import json
 
-from qa_tools.common import tables_read
 from qa_tools.common import hand_filing
 import os
 import re
@@ -199,25 +197,31 @@ def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
     assert not list(Path(raw_copy / "deliveries").glob("manifest.json"))
 
 
-def test_qa_command_flag_mode_reports_real_results_and_never_touches_real_qa_results(
+def test_qa_command_flag_mode_without_commit_is_a_trial(
         monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
+    """IT USED TO SAY "local-only check", and the results went to a
+    throwaway directory that was simply never promoted. REQ-PIPE-089
+    records results as a run completes, so "do not keep this" had to
+    become a real thing rather than the absence of a later step: the run
+    takes a TRIAL identity, which records nothing that survives it
+    (REQ-PIPE-103)."""
     _patch_bdm_dirs(monkeypatch, bdm_raw_dir, bdm_duckdb_dir)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
 
     result = _runner.invoke(bdm.qa_command,
                              ["--run-id", _ARRIVAL_REF_RUN_ID, "--reference-run-id", _ARRIVAL_REF_RUN_ID])
 
     assert result.exit_code == 0, result.output
-    assert "local-only check" in result.output
-    assert not fake_qa_results.exists()
+    assert "TRIAL" in result.output
+    assert "nothing was recorded" in result.output
 
 
-def test_qa_command_flag_mode_commit_promotes_into_the_patched_qa_results_dir(
-        monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
+def test_qa_command_flag_mode_commit_records_the_run_under_its_own_id(
+        monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir, clean_qa_history):
+    """The kept case: the run keeps the manifest's own identity and its
+    results are readable afterwards, attributed to whoever ran it."""
+    from qa_tools.common import qa_results_reader as reader
+
     _patch_bdm_dirs(monkeypatch, bdm_raw_dir, bdm_duckdb_dir)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
     monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(bdm.qa_command,
@@ -225,18 +229,17 @@ def test_qa_command_flag_mode_commit_promotes_into_the_patched_qa_results_dir(
                               "--commit"])
 
     assert result.exit_code == 0, result.output
-    assert "Promoted" in result.output
-    dataset_stats_path = (fake_qa_results / bdm.AGENCY_ID / bdm.COLLECTION_ID
-                           / tables_read.RAW_SCOPE / _ARRIVAL_REF_RUN_ID
-                           / "dataset_stats.json")
-    assert dataset_stats_path.exists()
-    with open(dataset_stats_path) as f:
-        assert json.load(f)["run_by"] == "test@example.com"
+    assert "Recorded" in result.output
+    assert "TRIAL" not in result.output
+    provenance = reader.read_run_provenance(bdm.AGENCY_ID, bdm.COLLECTION_ID,
+                                             _ARRIVAL_REF_RUN_ID)
+    assert provenance is not None, "the kept run recorded nothing"
+    assert provenance["run_by"] == "test@example.com"
 
 
-def test_qa_command_reports_real_failures_and_exits_nonzero(monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
+def test_qa_command_reports_real_failures_and_exits_nonzero(monkeypatch, tmp_path, bdm_raw_dir,
+                                                             bdm_duckdb_dir):
     _patch_bdm_dirs(monkeypatch, bdm_raw_dir, bdm_duckdb_dir)
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", tmp_path / "unused")
 
     result = _runner.invoke(bdm.qa_command,
                              ["--run-id", _ARRIVAL_DIRTY_RUN_ID, "--reference-run-id", _ARRIVAL_REF_RUN_ID])
@@ -310,8 +313,6 @@ def test_qa_command_local_file_is_a_trial_when_nobody_said_to_keep_it(
     raw_dir = str(tmp_path / "raw")
     os.makedirs(raw_dir)
     _patch_bdm_dirs(monkeypatch, raw_dir, None)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
 
     result = _runner.invoke(bdm.qa_command, [
         "--file", os.path.join(bdm_raw_dir, f"{_DIRTY_RUN_ID}.csv"),
@@ -321,13 +322,12 @@ def test_qa_command_local_file_is_a_trial_when_nobody_said_to_keep_it(
     assert result.exit_code == 1, result.output
     assert "fail" in result.output.lower()
     assert "nothing was filed and nothing was recorded" in _flat(result.output)
-    assert not fake_qa_results.exists()
     assert not (Path(raw_dir) / "deliveries").exists(), \
         "a trial filed a delivery"
 
 
-def test_qa_command_local_file_commit_files_a_real_delivery_and_promotes(
-        monkeypatch, tmp_path, bdm_raw_dir, bdm_delivery_dirs):
+def test_qa_command_local_file_commit_files_a_real_delivery_and_records_it(
+        monkeypatch, tmp_path, bdm_raw_dir, bdm_delivery_dirs, clean_qa_history):
     """The other half of criterion 1: keeping files the supply as a
     real delivery BEFORE anything runs, and the run's id comes back
     from recognition rather than from the file's name.
@@ -340,8 +340,6 @@ def test_qa_command_local_file_commit_files_a_real_delivery_and_promotes(
     raw_dir = tmp_path / "raw"
     (raw_dir).mkdir()
     _patch_bdm_dirs(monkeypatch, str(raw_dir), None)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
     monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
 
     supplied = tmp_path / "birth_registrations_2026-01-01.csv"
@@ -353,17 +351,20 @@ def test_qa_command_local_file_commit_files_a_real_delivery_and_promotes(
         "--commit",
     ])
 
+    from qa_tools.common import qa_results_reader as reader
+
     assert result.exit_code == 0, result.output
-    assert "Promoted" in result.output
     # THE RUN IS AN ORDINARY ARRIVAL, first in an empty tree.
     assert "recognised as run_001" in _flat(result.output)
     assert "is a real arrival" in _flat(result.output)
     assert (raw_dir / "deliveries").exists(), "keeping filed no delivery"
-    matches = list(fake_qa_results.glob(
-        f"{bdm.AGENCY_ID}/{bdm.COLLECTION_ID}/{tables_read.RAW_SCOPE}/*/dataset_stats.json"))
-    assert len(matches) == 1
-    with open(matches[0]) as f:
-        assert json.load(f)["run_by"] == "test@example.com"
+
+    # AND ITS RESULTS ARE RECORDED, under the id recognition gave it -
+    # which used to be checked by globbing for a dataset_stats.json.
+    recorded = reader.list_run_ids(bdm.AGENCY_ID, bdm.COLLECTION_ID)
+    assert recorded == ["run_001"], recorded
+    assert reader.read_run_provenance(bdm.AGENCY_ID, bdm.COLLECTION_ID,
+                                       "run_001")["run_by"] == "test@example.com"
 
 
 def test_qa_command_local_file_commit_refuses_a_name_recognition_cannot_place(
@@ -591,7 +592,7 @@ def test_qa_command_s3_key_flag_mode_downloads_and_runs_real_checks(monkeypatch)
                             s3_client=None, keep=None, **kwargs):
         captured.update(bucket=bucket, key=key, reference_key=reference_key,
                         run_by=run_by, run_id=run_id, keep=keep)
-        return ([{"status": "pass"}], "/tmp/fake-results",
+        return ([{"status": "pass"}],
                 hand_filing.Filed("", "trial_x", (key,), None))
 
     monkeypatch.setattr(bdm, "run_check_s3", _fake_run_check_s3)

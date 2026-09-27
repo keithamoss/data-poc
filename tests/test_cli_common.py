@@ -1,9 +1,11 @@
 """Tests for cli/common.py - the mothman CLI's shared TUI helpers
 (plans/tooling.md #1): the non-TTY guard, confirm-by-default+--yes, the
-back-navigation-aware select(), and the tmp-dir-first Promote pattern."""
+back-navigation-aware select(), and the record-or-trial decision.
+
+The "tmp-dir-first Promote pattern" this used to cover is gone with
+REQ-PIPE-089 - see test_report_recorded_* and test_decide_record_* below
+for what replaced it and why."""
 from __future__ import annotations
-import os
-import shutil
 
 import pytest
 
@@ -108,91 +110,94 @@ def test_confirm_without_yes_asks_and_returns_the_real_answer(monkeypatch):
     assert common.confirm("Promote?", yes=False) is True
 
 
-def test_promote_copies_every_scope_of_the_run_into_the_real_tree(tmp_path):
-    """A run is SEVERAL directories since REQ-PIPE-038 - one per
-    dataset it wrote a result for, plus `_raw`. Copying one of them
-    promotes a run that looks complete and is missing most of itself.
+def test_report_recorded_states_the_real_count_and_says_nothing_is_published(
+        capsys, monkeypatch):
+    """WHAT THIS REPLACED. `report_promoted()` said how many FILES had
+    landed in the committed tree and where. There is no tree and there
+    are no files (REQ-PIPE-089), so the count is of recorded results -
+    but the affordance survived the change, because Keith asked for it
+    by name: "after the user confirms promotion of results, they should
+    get a success message rather than being bumped straight back to the
+    menu". This is the most consequential action in the tool and it must
+    not look like the end of a no-op.
     """
-    from qa_tools.common import tables_read
-
-    tmp_root = tmp_path / "tmp_qa_results"
-    collection = tmp_root / "agency-x" / "collection-y"
-    for scope, filename in [(tables_read.RAW_SCOPE, "dataset_stats.json"),
-                             ("dataset-a", "soda.json"),
-                             ("dataset-b", "soda.json"),
-                             (tables_read.CROSS_TABLE_SCOPE, "soda.json")]:
-        run_dir = collection / scope / "run_001"
-        run_dir.mkdir(parents=True)
-        (run_dir / filename).write_text('{"raw_output": {}}')
-    # Another run's directory, which must NOT be dragged along.
-    (collection / "dataset-a" / "run_002").mkdir(parents=True)
-    (collection / "dataset-a" / "run_002" / "soda.json").write_text("{}")
-
-    fake_real_qa_results = tmp_path / "real_qa_results"
-    common_module_qa_results = common.QA_RESULTS_DIR
-    try:
-        common.QA_RESULTS_DIR = fake_real_qa_results
-        dst = common.promote(str(tmp_root), "agency-x", "collection-y", "run_001")
-    finally:
-        common.QA_RESULTS_DIR = common_module_qa_results
-
-    promoted = fake_real_qa_results / "agency-x" / "collection-y"
-    assert dst == promoted / tables_read.RAW_SCOPE / "run_001"
-    assert (dst / "dataset_stats.json").exists()
-    assert (promoted / "dataset-a" / "run_001" / "soda.json").exists()
-    assert (promoted / "dataset-b" / "run_001" / "soda.json").exists()
-    assert (promoted / tables_read.CROSS_TABLE_SCOPE / "run_001" / "soda.json").exists()
-    assert not (promoted / "dataset-a" / "run_002").exists()
-
-
-def test_new_tmp_results_dir_returns_a_real_fresh_empty_directory():
-    d = common.new_tmp_results_dir()
-    try:
-        assert os.path.isdir(d)
-        assert os.listdir(d) == []
-    finally:
-        shutil.rmtree(d, ignore_errors=True)
-
-
-def _promoted_run_dir(tmp_path, n_files: int = 5):
-    dst = tmp_path / "qa_results" / "agency-x" / "dataset-y" / "run_001"
-    dst.mkdir(parents=True)
-    for i in range(n_files):
-        (dst / f"tool_{i}.json").write_text("{}")
-    return dst
-
-
-def test_report_promoted_states_the_real_file_count_and_destination(tmp_path, capsys, monkeypatch):
-    monkeypatch.setattr(common.sys.stdin, "isatty", lambda: False)
-    common.report_promoted(_promoted_run_dir(tmp_path))
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    common.report_recorded("run_042", 137)
     out = capsys.readouterr().out
-    assert "Promoted" in out
-    assert "5 result files" in out
-    assert "run_001" in out
-    # The real "you still have to push this" follow-up has to survive the
-    # move into a panel - it's the whole point of the message.
-    assert "commit and push" in out
+    assert "137" in out
+    assert "run_042" in out
 
 
-def test_report_promoted_waits_for_a_keypress_in_a_real_terminal(tmp_path, monkeypatch):
-    """Keith's own ask (2026-09-19): a confirmed Promote must not bump the
-    user straight back to the main menu."""
-    monkeypatch.setattr(common.sys.stdin, "isatty", lambda: True)
-    monkeypatch.setattr(common.sys.stdout, "isatty", lambda: True)
-    asked = []
+def test_report_recorded_no_longer_tells_anyone_to_commit_and_push(capsys, monkeypatch):
+    """The sentence it used to end with - "commit and push qa_results/
+    yourself to publish. That push is what triggers the real CI rebuild"
+    - is false twice over now: there is nothing to commit, and a git
+    push is not what publishes (REQ-PIPE-092). Asserted rather than
+    assumed, because a stale instruction in a success panel is exactly
+    the kind of thing that survives a refactor and misleads someone
+    months later."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    common.report_recorded("run_042", 1)
+    out = capsys.readouterr().out
+    assert "commit" not in out.lower()
+    assert "push" not in out.lower()
+
+
+def test_report_recorded_waits_for_a_keypress_in_a_real_terminal(monkeypatch):
+    pressed = []
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
     monkeypatch.setattr(common.questionary, "press_any_key_to_continue",
-                         lambda *a, **k: type("Q", (), {"ask": lambda self: asked.append(True)})())
-    common.report_promoted(_promoted_run_dir(tmp_path))
-    assert asked == [True]
+                        lambda *a, **k: type("A", (), {"ask": lambda self: pressed.append(True)})())
+    common.report_recorded("run_042", 3)
+    assert pressed == [True]
 
 
-def test_report_promoted_never_blocks_when_stdout_is_not_a_terminal(tmp_path, monkeypatch):
-    """A piped/scripted run must never hang on a keypress that can't come."""
-    monkeypatch.setattr(common.sys.stdin, "isatty", lambda: True)
-    monkeypatch.setattr(common.sys.stdout, "isatty", lambda: False)
+def test_report_recorded_never_blocks_when_stdout_is_not_a_terminal(monkeypatch):
+    """The scriptable paths must not hang waiting for a keypress nobody
+    is there to give."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
 
-    def _explode(*a, **k):
-        raise AssertionError("must not prompt when stdout isn't a terminal")
+    def _never(*a, **k):
+        raise AssertionError("asked for a keypress with no terminal to answer it")
 
-    monkeypatch.setattr(common.questionary, "press_any_key_to_continue", _explode)
-    common.report_promoted(_promoted_run_dir(tmp_path))
+    monkeypatch.setattr(common.questionary, "press_any_key_to_continue", _never)
+    common.report_recorded("run_042", 3)
+
+
+def test_decide_record_takes_the_flags_answer_without_asking(monkeypatch):
+    """`--commit`/`--trial` stop the prompt entirely rather than
+    pre-filling it, so a scripted caller never needs a terminal."""
+    def _never(*a, **k):
+        raise AssertionError("prompted despite having been told the answer")
+
+    monkeypatch.setattr(common, "confirm", _never)
+    assert common.decide_record("run_01", keep=True) is True
+    assert common.decide_record("run_01", keep=False) is False
+
+
+def test_decide_record_defaults_to_a_trial_with_no_terminal_and_no_flag(monkeypatch, capsys):
+    """The two wrong answers are not equally wrong. A trial that should
+    have been recorded costs a re-run; a recorded run that should not
+    have been is a verdict in a dataset's permanent quality history that
+    nobody chose."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    assert common.decide_record("run_01", keep=None) is False
+    assert "TRIAL" in capsys.readouterr().out
+
+
+def test_decide_record_asks_before_the_run_rather_than_after(monkeypatch):
+    """REQ-PIPE-089 criterion 8. It used to be asked afterwards, as
+    "promote this run?", which worked only because the results sat in a
+    throwaway directory until somebody accepted them. Asserted on the
+    WORDING because that is what a user reads: the question has to be
+    about what will happen, not about what already did."""
+    asked = []
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.setattr(common, "confirm", lambda q, **k: asked.append(q) or True)
+    common.decide_record("run_07", keep=None)
+    assert asked and "run_07" in asked[0]
+    assert "promote" not in asked[0].lower()

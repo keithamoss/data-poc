@@ -78,7 +78,7 @@ def test_read_one_returns_the_verified_list(tmp_path):
         "run_id": "run_01", "run_timestamp": "2026-01-01T00:00:00+00:00",
     }]
     write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00+00:00", "dbt",
-                     {"raw": True}, verified=[dict(verified[0])], results_dir=tmp_path)
+                     {"raw": True}, verified=[dict(verified[0])])
     _done("run_01")
 
     assert read_one("agency", "dataset", "run_01", "dbt") == verified
@@ -89,11 +89,11 @@ def test_read_one_returns_empty_list_for_a_missing_file(tmp_path):
 
 def test_read_qa_results_concatenates_every_run_and_tool_in_order(tmp_path):
     write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "dbt", {},
-                     verified=[{"check_id": "dbt:a", "check_name": "dbt:a", "status": "pass"}], results_dir=tmp_path)
+                     verified=[{"check_id": "dbt:a", "check_name": "dbt:a", "status": "pass"}])
     write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "soda", {},
-                     verified=[{"check_id": "soda:a", "check_name": "soda:a", "status": "pass"}], results_dir=tmp_path)
+                     verified=[{"check_id": "soda:a", "check_name": "soda:a", "status": "pass"}])
     write_qa_result("agency", "dataset", "run_02", "2026-01-02T00:00:00Z", "dbt", {},
-                     verified=[{"check_id": "dbt:b", "check_name": "dbt:b", "status": "pass"}], results_dir=tmp_path)
+                     verified=[{"check_id": "dbt:b", "check_name": "dbt:b", "status": "pass"}])
 
     _done("run_01", "run_02")
 
@@ -116,11 +116,11 @@ def test_list_run_ids_and_read_qa_results_sort_numerically_not_lexicographically
     # own comment on the same bug). Written deliberately out of numeric
     # order so a no-op "sort" couldn't accidentally still pass.
     write_qa_result("agency", "dataset", "run_100", "2026-04-10T00:00:00Z", "dbt", {},
-                     verified=[{"check_id": "dbt:hundred", "check_name": "dbt:hundred", "status": "pass"}], results_dir=tmp_path)
+                     verified=[{"check_id": "dbt:hundred", "check_name": "dbt:hundred", "status": "pass"}])
     write_qa_result("agency", "dataset", "run_3", "2026-01-03T00:00:00Z", "dbt", {},
-                     verified=[{"check_id": "dbt:three", "check_name": "dbt:three", "status": "pass"}], results_dir=tmp_path)
+                     verified=[{"check_id": "dbt:three", "check_name": "dbt:three", "status": "pass"}])
     write_qa_result("agency", "dataset", "run_20", "2026-01-20T00:00:00Z", "dbt", {},
-                     verified=[{"check_id": "dbt:twenty", "check_name": "dbt:twenty", "status": "pass"}], results_dir=tmp_path)
+                     verified=[{"check_id": "dbt:twenty", "check_name": "dbt:twenty", "status": "pass"}])
 
     _done("run_100", "run_3", "run_20")
 
@@ -134,7 +134,7 @@ def test_read_qa_results_skips_a_tool_with_no_committed_file_for_a_run(tmp_path)
     # e.g. a run that only has dbt/soda/datacontract committed, no evidently -
     # shouldn't error, just contribute nothing for that tool.
     write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "dbt", {},
-                     verified=[{"check_id": "dbt:a", "check_name": "dbt:a", "status": "pass"}], results_dir=tmp_path)
+                     verified=[{"check_id": "dbt:a", "check_name": "dbt:a", "status": "pass"}])
 
     _done("run_01")
 

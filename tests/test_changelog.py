@@ -31,32 +31,33 @@ from qa_tools.common.qa_results_writer import finish_run, open_run, write_qa_res
 
 
 @pytest.fixture(autouse=True)
-def history(clean_qa_history, tmp_path):
+def history(clean_qa_history):
     """An empty QA history per test - what `tmp_path` used to give.
 
-    `tmp_path` is still here for a reason that outlives the move:
-    `write_qa_result` writes FILES as well as rows until REQ-PIPE-089's
-    last phase deletes the tree, and a default `results_dir` is the real
-    committed one. Two of these tests wrote `qa_results/agency-a/` into
-    project history before this was noticed - the session guard in
-    conftest covers the delivery log, the processing log, observations
-    and filings, and has never covered qa_results/.
+    IT ALSO TOOK `tmp_path` UNTIL REQ-PIPE-089'S LAST PHASE, and the
+    reason is worth keeping as a caution rather than deleting with the
+    parameter: `write_qa_result` wrote FILES as well as rows, and its
+    default results directory was the real committed one, so two of
+    these tests wrote `qa_results/agency-a/` into project history before
+    anybody noticed. The session guard in conftest covers the delivery
+    log, the processing log, observations and filings, and never covered
+    qa_results/. There are no files to misdirect now; a test that starts
+    writing somewhere real again will have the same lack of a guard.
     """
     return clean_qa_history
 
 
-def _event(agency, collection, run_id, when, run_by, results_dir):
+def _event(agency, collection, run_id, when, run_by):
     """One recorded QA event, written and completed the real way."""
     open_run(agency, collection, run_id, when, run_by)
     write_qa_result(agency, collection, run_id, when, "dataset_stats",
-                     {"arrival_record": {"run_id": run_id}}, run_by=run_by,
-                     results_dir=results_dir)
+                     {"arrival_record": {"run_id": run_id}}, run_by=run_by)
     finish_run(run_id)
 
 
-def test_build_changelog_resolves_run_by_and_run_timestamp(tmp_path):
+def test_build_changelog_resolves_run_by_and_run_timestamp():
     _event("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
-           "keith@example.com", tmp_path)
+           "keith@example.com")
 
     events = changelog.build_changelog("agency-a", "dataset-a")
 
@@ -70,7 +71,7 @@ def test_build_changelog_resolves_run_by_and_run_timestamp(tmp_path):
         "an event with no landing time cannot be placed on a feed"
 
 
-def test_build_changelog_keeps_separate_datasets_apart(tmp_path):
+def test_build_changelog_keeps_separate_datasets_apart():
     """The exact scenario that motivated grouping by (agency, dataset,
     run_timestamp) rather than by commit: someone QAs two datasets in
     one go. Each dataset's changelog must show only its own event.
@@ -80,9 +81,9 @@ def test_build_changelog_keeps_separate_datasets_apart(tmp_path):
     minutes apart in one sitting.
     """
     _event("agency-a", "birth-registrations", "run_01", "2026-01-01T09:00:00+00:00",
-           "keith@example.com", tmp_path)
+           "keith@example.com")
     _event("agency-b", "child-protection", "cp_run_01", "2026-01-01T09:05:00+00:00",
-           "colleague@example.com", tmp_path)
+           "colleague@example.com")
 
     bdm_events = changelog.build_changelog("agency-a", "birth-registrations")
     cp_events = changelog.build_changelog("agency-b", "child-protection")
@@ -93,11 +94,11 @@ def test_build_changelog_keeps_separate_datasets_apart(tmp_path):
     assert cp_events[0]["run_by"] == "colleague@example.com"
 
 
-def test_build_changelog_orders_events_across_several_runs(tmp_path):
+def test_build_changelog_orders_events_across_several_runs():
     _event("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
-           "keith@example.com", tmp_path)
+           "keith@example.com")
     _event("agency-a", "dataset-a", "run_02", "2026-01-08T09:00:00+00:00",
-           "colleague@example.com", tmp_path)
+           "colleague@example.com")
 
     events = changelog.build_changelog("agency-a", "dataset-a")
 
@@ -108,7 +109,7 @@ def test_build_changelog_orders_events_across_several_runs(tmp_path):
     assert all(e["committed_at"] is not None for e in events)
 
 
-def test_an_unfinished_run_is_not_on_the_feed(tmp_path):
+def test_an_unfinished_run_is_not_on_the_feed():
     """A run that never completed has not published anything, so it has
     no place on a "who published what" feed - which is criterion 13
     holding at one more reader rather than a special case here."""
@@ -116,7 +117,7 @@ def test_an_unfinished_run_is_not_on_the_feed(tmp_path):
              "keith@example.com")
     write_qa_result("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
                      "dataset_stats", {"arrival_record": {}},
-                     run_by="keith@example.com", results_dir=tmp_path)
+                     run_by="keith@example.com")
 
     assert changelog.build_changelog("agency-a", "dataset-a") == []
 

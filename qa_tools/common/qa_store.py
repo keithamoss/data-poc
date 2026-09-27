@@ -745,6 +745,35 @@ def runs_for(conn: supply_db.SupplyConnection, agency_id: str,
         "ORDER BY run_instant, run_key", [agency_id, collection_id]))
 
 
+def delete_history(conn: supply_db.SupplyConnection, agency_id: str,
+                   collection_id: str) -> int:
+    """Delete one collection's whole recorded QA history. Returns the
+    number of runs removed.
+
+    THE ONLY DESTRUCTIVE READER-FACING OPERATION IN THIS MODULE, and it
+    exists for one caller: `mothman pipeline regenerate-history`
+    (REQ-PIPE-038 criteria 4-7), whose whole job is to throw a
+    collection's history away and write it again from the real tools.
+    Keith's own call, 2026-09-21: the data is synthetic, so re-running is
+    honest where reshaping in place would not be.
+
+    ONE DELETE, NOT SEVEN. Everything hangs off `run` by a foreign key
+    with ON DELETE CASCADE, so removing the runs removes their results,
+    tool output, tables_read and dataset_stats with them - which is the
+    point of having modelled it that way. A per-table sweep would be
+    seven statements that can disagree about what a collection is.
+
+    IT DELETES INCOMPLETE RUNS TOO, deliberately: this reads `run`
+    rather than `run_visible`. A crashed run's wreckage is exactly what
+    somebody regenerating wants gone, and leaving it would make the
+    regenerated history carry a run nothing can read.
+    """
+    deleted = conn.execute(
+        f'DELETE FROM "{SCHEMA}".run WHERE agency_id = ? AND collection_id = ?',
+        [agency_id, collection_id]).rowcount
+    return deleted or 0
+
+
 def incomplete_runs(conn: supply_db.SupplyConnection) -> list[str]:
     """Runs that started and never said they finished.
 

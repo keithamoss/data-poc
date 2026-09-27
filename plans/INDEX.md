@@ -397,7 +397,7 @@ one when this line suggests it matters.
   - *touches:* `qa_tools/common/leaderboard.py`, `contract/people.yaml`, `tests/test_leaderboard.py`
 - **#4** `investigate` 2026-09-18 - GitHub Issues -> Microsoft Teams integration (research first).
 - **#5** `done` 2026-09-19 - Staff adoption - two threads.
-  - *touches:* `qa_tools/common/file_arrival.py`, `qa_tools/cp/completion_tracker.py`, `qa_tools/common/results_s3_sink.py`, `qa_tools/common/lambda_results_dir.py`, `aws/cdk/app.py`, `qa_tools/common/git_identity.py` +1 more
+  - *touches:* `qa_tools/common/file_arrival.py`, `qa_tools/cp/completion_tracker.py`, `aws/cdk/app.py`, `qa_tools/common/git_identity.py`, `contract/people.yaml`
 - **#6** `done` 2026-09-18 - Read-only tension: accepting/rejecting Amber supplies.
   - *touches:* `qa_tools/common/ticket_sync.py`, `qa_tools/common/acceptance_sync.py`
 - **#7** `done` 2026-09-18 - Business requirements page on the dashboard.

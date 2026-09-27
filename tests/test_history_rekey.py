@@ -1,20 +1,28 @@
-"""REQ-PIPE-038 - committed history is keyed per dataset.
+"""REQ-PIPE-038 - recorded history is keyed per dataset.
 
 Three scopes under a collection, and each answers a different question:
-the dataset directories hold the results that describe that table, the
+a dataset's own scope holds the results that describe that table, the
 `_cross-table` one holds the records that span tables (REQ-QAC-037), and
 `_raw` holds the one genuinely-unmodified output per tool invocation
 plus the two pseudo-tools that describe a RUN.
 
-Written against a temporary tree rather than the real committed one for
-most of this, because the point is the RULE - what a write produces and
-what a read finds - and a fixture can hold the awkward cases the real
-history does not happen to contain today.
+THIS USED TO ASSERT ON A DIRECTORY TREE, and the rewrite is the point
+rather than a tidy-up. REQ-PIPE-089 made the history rows in the `qa`
+schema, so the three scopes are a column instead of three directories -
+but every RULE below is unchanged, because the scopes were always about
+what a record DESCRIBES rather than about where it was kept. Each test
+now asks the reader what it finds, which is what a real consumer does;
+the old ones asked the filesystem what was written, which only the
+writer could answer.
+
+WHAT WENT WITH THE TREE, so nobody looks for it: the assertions about
+the real committed history's own shape (every child of a collection is a
+dataset or a reserved scope; both collections keyed by the same rule).
+There is no tree to walk. The claim they protected is now the
+regeneration command's own closing check, which refuses to finish with a
+stray scope recorded - see TestTheRegenerationCommand.
 """
 from __future__ import annotations
-
-import json
-from pathlib import Path
 
 import pytest
 
@@ -37,7 +45,7 @@ def _verified(dataset_id: str, tail: str, run_id: str = "r1") -> dict:
 
 
 @pytest.fixture
-def tree(tmp_path, clean_qa_history, finish_runs):
+def recorded(clean_qa_history, finish_runs):
     """One run of one tool, spanning two datasets.
 
     THE RUN IS FINISHED HERE, which REQ-PIPE-089 criterion 13 makes a
@@ -45,121 +53,111 @@ def tree(tmp_path, clean_qa_history, finish_runs):
     their run says it completed, so a fixture that writes and stops is
     correctly invisible to every reader below.
     """
-    write_qa_result(AGENCY, COLLECTION, "r1", "2026-09-26T10:00:00+08:00", "soda",
+    write_qa_result(AGENCY, COLLECTION, "r1", _WHEN, "soda",
                      {"scanStartTimestamp": "2026-09-26T10:00:00", "hasErrors": False},
                      [_verified("cp-clients", "missing_count_soda"),
                       _verified("cp-carers", "missing_count_soda"),
                       _verified("cp-clients", "duplicate_count_soda")],
-                     results_dir=tmp_path)
-    finish_runs("r1", agency=AGENCY, collection=COLLECTION,
-                when="2026-09-26T10:00:00+08:00", run_by="a@b.c")
-    return tmp_path
+                     run_by="a@b.c")
+    finish_runs("r1", agency=AGENCY, collection=COLLECTION, when=_WHEN, run_by="a@b.c")
 
 
 class TestAResultIsStoredUnderTheDatasetItDescribes:
     """Criterion 1."""
 
-    def test_one_invocation_fans_out_to_one_file_per_dataset(self, tree):
-        written = sorted(str(p.relative_to(tree)) for p in tree.rglob("*.json"))
-        assert written == [
-            f"{AGENCY}/{COLLECTION}/_raw/r1/soda.json",
-            f"{AGENCY}/{COLLECTION}/cp-carers/r1/soda.json",
-            f"{AGENCY}/{COLLECTION}/cp-clients/r1/soda.json",
-        ]
+    def test_one_invocation_fans_out_to_one_record_set_per_dataset(self, recorded):
+        found = reader.read_one(AGENCY, COLLECTION, "r1", "soda")
+        by_dataset = {}
+        for record in found:
+            by_dataset.setdefault(record["dataset_id"], []).append(record)
+        assert {k: len(v) for k, v in sorted(by_dataset.items())} == {
+            "cp-carers": 1, "cp-clients": 2}
 
-    def test_each_dataset_file_holds_only_its_own_records(self, tree):
-        for dataset, expected in [("cp-clients", 2), ("cp-carers", 1)]:
-            path = tree / AGENCY / COLLECTION / dataset / "r1" / "soda.json"
-            records = json.loads(path.read_text())["verified"]
-            assert len(records) == expected
-            assert {r["dataset_id"] for r in records} == {dataset}
+    def test_each_dataset_holds_only_its_own_records(self, recorded):
+        for dataset in ("cp-clients", "cp-carers"):
+            found = reader.read_one(AGENCY, COLLECTION, "r1", "soda", dataset=dataset)
+            assert found, dataset
+            assert {r["dataset_id"] for r in found} == {dataset}
 
-    def test_the_result_is_filed_by_what_it_says_not_by_how_it_was_invoked(self, tree):
-        """The whole point. A Child Protection Soda scan is invoked
-        against the collection, and before this every one of its
-        results landed in a single collection-level file - so finding
-        one table's history meant filtering that file through a map
-        somebody maintained by hand."""
-        assert not (tree / AGENCY / COLLECTION / "r1").exists()
-        assert (tree / AGENCY / COLLECTION / "cp-clients" / "r1").is_dir()
+    def test_the_result_is_filed_by_what_it_says_not_by_how_it_was_invoked(self, recorded):
+        """The tool was invoked against the COLLECTION, and not one
+        record is stored against it - each went to the dataset its own
+        record named."""
+        found = reader.read_one(AGENCY, COLLECTION, "r1", "soda")
+        assert COLLECTION not in {r["dataset_id"] for r in found}
+        assert "cp-clients" in {r["dataset_id"] for r in found}
 
 
 class TestRawOutputIsRecordedOnce:
-    """The decision Keith settled 2026-09-26: recorded where it is
-    true, rather than copied into each dataset or filtered per
-    dataset."""
+    """Criterion 2 - it describes the INVOCATION, not a dataset, so
+    neither copying it per dataset nor filtering it down was acceptable."""
 
-    def test_it_lives_in_its_own_scope(self, tree):
-        raw = json.loads((tree / AGENCY / COLLECTION / "_raw" / "r1" / "soda.json").read_text())
-        assert raw["raw_output"] == {"scanStartTimestamp": "2026-09-26T10:00:00",
-                                      "hasErrors": False}
+    def test_it_lives_in_its_own_scope(self, recorded):
+        """read_raw() returns the whole ENVELOPE - the payload plus the
+        provenance the run recorded - rather than the payload alone, and
+        that is its contract rather than an accident: the two are stored
+        apart precisely so a verdict query does not drag megabytes of
+        tool output it never wanted, and reassembled here for a caller
+        that does."""
+        envelope = reader.read_raw(AGENCY, COLLECTION, "r1", "soda")
+        assert envelope["raw_output"]["hasErrors"] is False
+        assert envelope["run_by"] == "a@b.c"
 
-    def test_no_dataset_file_claims_a_raw_output_of_its_own(self, tree):
-        """A copy would have each of six files assert that it is the
-        output of a scan that covered all six."""
+    def test_no_dataset_record_claims_a_raw_output_of_its_own(self, recorded):
+        """Asserted through the reader rather than by counting files:
+        the raw output is reachable once, by asking for it, and never
+        arrives attached to a dataset's results."""
         for dataset in ("cp-clients", "cp-carers"):
-            payload = json.loads(
-                (tree / AGENCY / COLLECTION / dataset / "r1" / "soda.json").read_text())
-            assert payload["raw_output"] is None
+            for record in reader.read_one(AGENCY, COLLECTION, "r1", "soda", dataset=dataset):
+                assert "raw_output" not in record
+                assert "hasErrors" not in record
 
-    def test_it_is_not_filtered_down_to_one_dataset_anywhere(self, tree):
-        """Filtering would break the genuinely-unmodified guarantee
-        that is the only reason raw_output is kept at all - a Soda
-        document's hasErrors is a fact about the invocation."""
-        raw = json.loads((tree / AGENCY / COLLECTION / "_raw" / "r1" / "soda.json").read_text())
-        assert set(raw["raw_output"]) == {"scanStartTimestamp", "hasErrors"}
-
-    def test_the_write_returns_the_raw_path(self, tmp_path):
-        """It used to return the dataset-scoped path, which no longer
-        exists for a tool that produced no record for any dataset."""
-        path = write_qa_result(AGENCY, COLLECTION, "r1", _WHEN, "evidently", {"x": 1}, [],
-                                results_dir=tmp_path)
-        assert path == tmp_path / AGENCY / COLLECTION / "_raw" / "r1" / "evidently.json"
-        assert path.is_file()
+    def test_it_is_not_filtered_down_to_one_dataset_anywhere(self, recorded):
+        envelope = reader.read_raw(AGENCY, COLLECTION, "r1", "soda")
+        assert envelope["raw_output"] == {
+            "scanStartTimestamp": "2026-09-26T10:00:00", "hasErrors": False}
 
 
 class TestThePseudoToolsDescribeARun:
-    def test_dataset_stats_writes_no_dataset_file(self, tmp_path):
-        write_qa_result(AGENCY, COLLECTION, "r1", _WHEN, "dataset_stats",
-                         {"row_counts": {"cp_clients": 5}}, run_by="a@b.c",
-                         results_dir=tmp_path)
-        written = [str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*.json")]
-        assert written == [f"{AGENCY}/{COLLECTION}/_raw/r1/dataset_stats.json"]
+    def test_dataset_stats_records_nothing_against_a_dataset(self, clean_qa_history,
+                                                              finish_runs):
+        write_qa_result(AGENCY, COLLECTION, "r9", _WHEN, "dataset_stats",
+                         {"row_counts": {"cp_clients": 3}}, run_by="a@b.c")
+        finish_runs("r9", agency=AGENCY, collection=COLLECTION, when=_WHEN, run_by="a@b.c")
+        assert reader.read_one(AGENCY, COLLECTION, "r9", "dataset_stats") == []
 
-    def test_its_provenance_is_still_readable(self, tmp_path, clean_qa_history,
-                                              finish_runs):
-        write_qa_result(AGENCY, COLLECTION, "r1", "2026-09-26T10:00:00+08:00",
-                         "dataset_stats", {"row_counts": {}}, run_by="a@b.c",
-                         results_dir=tmp_path)
-        finish_runs("r1", agency=AGENCY, collection=COLLECTION,
-                    when="2026-09-26T10:00:00+08:00", run_by="a@b.c")
-        assert reader.read_run_provenance(AGENCY, COLLECTION, "r1") == {
-            "run_timestamp": "2026-09-26T10:00:00+08:00", "run_by": "a@b.c"}
+    def test_its_provenance_is_still_readable(self, clean_qa_history, finish_runs):
+        write_qa_result(AGENCY, COLLECTION, "r9", _WHEN, "dataset_stats",
+                         {"row_counts": {"cp_clients": 3}}, run_by="a@b.c")
+        finish_runs("r9", agency=AGENCY, collection=COLLECTION, when=_WHEN, run_by="a@b.c")
+        stats = reader.read_dataset_stats(AGENCY, COLLECTION, "r9")
+        assert stats["row_counts"] == {"cp_clients": 3}
 
     def test_both_pseudo_tools_are_named_as_run_scoped(self):
-        assert tr.RUN_SCOPED_TOOLS == ("dataset_stats", "tables_read")
+        assert tr.is_reserved_scope(tr.RAW_SCOPE)
+        assert tr.is_reserved_scope(tr.CROSS_TABLE_SCOPE)
 
 
 class TestReadingItBack:
-    def test_runs_are_listed_from_the_raw_scope(self, tree):
-        """Not from a dataset, which would lose a run entirely if no
-        tool had anything to say about that one table."""
-        assert reader.list_run_ids(AGENCY, COLLECTION, tree) == ["r1"]
+    def test_runs_are_listed_whatever_any_one_dataset_has_to_say(self, recorded):
+        """Not derived from a dataset's own results, which would lose a
+        run entirely if no tool had anything to say about that table."""
+        assert reader.list_run_ids(AGENCY, COLLECTION) == ["r1"]
 
-    def test_a_scope_is_never_listed_as_a_run(self, tree):
-        assert tr.RAW_SCOPE not in reader.list_run_ids(AGENCY, COLLECTION, tree)
-        assert tr.CROSS_TABLE_SCOPE not in reader.list_run_ids(AGENCY, COLLECTION, tree)
+    def test_a_scope_is_never_listed_as_a_run(self, recorded):
+        listed = reader.list_run_ids(AGENCY, COLLECTION)
+        assert tr.RAW_SCOPE not in listed
+        assert tr.CROSS_TABLE_SCOPE not in listed
 
-    def test_reading_a_tool_without_naming_a_dataset_reads_them_all(self, tree):
-        found = reader.read_one(AGENCY, COLLECTION, "r1", "soda", tree)
-        assert len(found) == 3
+    def test_reading_a_tool_without_naming_a_dataset_reads_them_all(self, recorded):
+        assert len(reader.read_one(AGENCY, COLLECTION, "r1", "soda")) == 3
 
-    def test_reading_one_dataset_is_opening_one_directory(self, tree):
-        found = reader.read_one(AGENCY, COLLECTION, "r1", "soda", tree, dataset="cp-clients")
+    def test_reading_one_dataset_reads_only_that_one(self, recorded):
+        found = reader.read_one(AGENCY, COLLECTION, "r1", "soda", dataset="cp-clients")
         assert {r["dataset_id"] for r in found} == {"cp-clients"}
 
-    def test_a_dataset_with_no_history_reads_as_nothing(self, tree):
-        assert reader.read_one(AGENCY, COLLECTION, "r1", "soda", tree,
+    def test_a_dataset_with_no_history_reads_as_nothing(self, recorded):
+        assert reader.read_one(AGENCY, COLLECTION, "r1", "soda",
                                 dataset="cp-investigations") == []
 
     def test_an_absent_collection_reads_as_nothing(self, clean_qa_history):
@@ -169,10 +167,10 @@ class TestReadingItBack:
 
 class TestCompletenessIsWhatThisDatasetActuallyOwes:
     """Keith, 2026-09-26. Evidently defines one check in the whole
-    collection, so a fixed six-file rule would call five of six
+    collection, so a fixed six-tool rule would call five of six
     datasets permanently incomplete."""
 
-    def test_only_cp_notifications_owes_an_evidently_file(self):
+    def test_only_cp_notifications_owes_an_evidently_result(self):
         assert "evidently" in reader.expected_tools_for("cp-notifications")
         for dataset in ("cp-clients", "cp-carers", "cp-case-workers",
                          "cp-investigations", "cp-placements"):
@@ -189,18 +187,16 @@ class TestCompletenessIsWhatThisDatasetActuallyOwes:
         source = inspect.getsource(reader.expected_tools_for)
         assert "collect_checks" in source
 
-    def test_a_run_missing_a_raw_file_is_incomplete_and_says_which(self, tree):
-        missing = reader.missing_tools(AGENCY, COLLECTION, "r1", tree)
+    def test_a_run_missing_a_tools_raw_output_is_incomplete_and_says_which(self, recorded):
+        missing = reader.missing_tools(AGENCY, COLLECTION, "r1")
         assert "_raw/dbt" in missing
         assert "_raw/soda" not in missing
 
-    def test_a_dataset_missing_a_tool_it_owes_is_named(self, tree):
-        missing = reader.missing_tools(AGENCY, COLLECTION, "r1", tree)
-        assert "cp-clients/dbt" in missing
+    def test_a_dataset_missing_a_tool_it_owes_is_named(self, recorded):
+        assert "cp-clients/dbt" in reader.missing_tools(AGENCY, COLLECTION, "r1")
 
-    def test_a_dataset_is_not_asked_for_a_tool_that_does_not_check_it(self, tree):
-        missing = reader.missing_tools(AGENCY, COLLECTION, "r1", tree)
-        assert "cp-clients/evidently" not in missing
+    def test_a_dataset_is_not_asked_for_a_tool_that_does_not_check_it(self, recorded):
+        assert "cp-clients/evidently" not in reader.missing_tools(AGENCY, COLLECTION, "r1")
 
 
 class TestOneAgreedOrdering:
@@ -231,7 +227,7 @@ class TestOneAgreedOrdering:
         reasoning that a tool's own order for one table is identical
         down both paths. It is not - a live run holds cross-table
         records interleaved where the tool emitted them, a rebuild
-        appends them after the dataset files. 1,494 of 3,204 records
+        appends them after the dataset ones. 1,494 of 3,204 records
         landed in a different position, which is what this catches.
         """
         records = [{"run_id": "r1", "dataset_id": "a", "check_id": f"x.y.{n}_dbt"}
@@ -243,7 +239,7 @@ class TestOneAgreedOrdering:
         # into any order come out identical.
         assert reader.canonical_order(records) == reader.canonical_order(records[::-1])
 
-    def test_the_real_committed_history_has_a_unique_key_to_sort_on(self):
+    def test_the_real_recorded_history_has_a_unique_key_to_sort_on(self):
         """A total order is only available because one run produces one
         result per check. If that ever stops being true the ordering
         silently goes back to depending on input order."""
@@ -262,7 +258,7 @@ class TestOneAgreedOrdering:
 
     def test_both_orchestrators_and_both_rebuilds_apply_it(self):
         """Asserted structurally. A path that skipped it would produce
-        a file that differs from the others for no reason a reader
+        results that differ from the others for no reason a reader
         could see."""
         import importlib
         import inspect
@@ -285,62 +281,46 @@ class TestTheRegenerationCommand:
         assert "regenerate-history" in pipeline_group.commands
 
     def test_it_deletes_rather_than_migrating(self):
+        """It deleted directories and now deletes runs - criterion 4
+        says SHALL NOT migrate, reshape or patch, and a regeneration
+        that quietly edited recorded results in place would satisfy
+        every other criterion."""
         import inspect
 
         from cli import pipeline
 
         source = inspect.getsource(pipeline.regenerate_history_command.callback)
-        assert "rmtree" in source
-        # No reshaping of committed files in place - criterion 4 says
-        # SHALL NOT migrate, reshape or patch, and a regeneration that
-        # quietly edited would satisfy every other criterion.
-        assert "json.load" not in source
+        assert "delete_history" in source
+        assert "UPDATE" not in source
 
-    def test_it_refuses_to_finish_with_a_stray_scope_left_behind(self):
-        """Criterion 5. A leftover run directory at collection level
-        reads as a dataset called `run_014`, which is silent."""
+    def test_one_delete_takes_a_runs_whole_record_with_it(self, clean_qa_history,
+                                                           finish_runs):
+        """Not seven statements that can disagree about what a
+        collection is - everything hangs off `run` by a foreign key
+        with ON DELETE CASCADE, which is the point of modelling it that
+        way."""
+        from qa_tools.common import qa_store
+
+        write_qa_result(AGENCY, COLLECTION, "r1", _WHEN, "soda", {"hasErrors": False},
+                         [_verified("cp-clients", "missing_count_soda")], run_by="a@b.c")
+        finish_runs("r1", agency=AGENCY, collection=COLLECTION, when=_WHEN, run_by="a@b.c")
+        assert reader.read_one(AGENCY, COLLECTION, "r1", "soda")
+
+        with __import__("qa_tools.common.supply_db", fromlist=["x"]).connect(
+                label="test-regenerate") as conn:
+            qa_store.ensure_schema(conn)
+            assert qa_store.delete_history(conn, AGENCY, COLLECTION) == 1
+
+        assert reader.list_run_ids(AGENCY, COLLECTION) == []
+        assert reader.read_one(AGENCY, COLLECTION, "r1", "soda") == []
+        assert reader.read_raw(AGENCY, COLLECTION, "r1", "soda") is None
+
+    def test_it_refuses_to_finish_with_a_stray_scope_recorded(self):
+        """Criterion 5. A scope that is neither a dataset nor a reserved
+        name reads as a dataset nobody configured, which is silent."""
         import inspect
 
         from cli import pipeline
 
         assert "is_reserved_scope" in inspect.getsource(
             pipeline.regenerate_history_command.callback)
-
-
-class TestTheRealCommittedHistory:
-    """The tree CI actually publishes from."""
-
-    def _collections(self):
-        return [("registry-services", "civil-registration"),
-                (AGENCY, COLLECTION)]
-
-    def test_every_child_of_a_collection_is_a_dataset_or_a_reserved_scope(self):
-        """Criterion 5, against the real tree - nothing left in the old
-        shape, where a run directory sat at collection level."""
-        from qa_tools.common.hierarchy import datasets_in_collection
-
-        root = Path("qa_results")
-        for agency, collection in self._collections():
-            base = root / agency / collection
-            if not base.is_dir():
-                pytest.skip(f"{base} is not present in this checkout")
-            known = {d.dataset_id for d in datasets_in_collection(collection)}
-            for child in base.iterdir():
-                if not child.is_dir():
-                    continue
-                assert tr.is_reserved_scope(child.name) or child.name in known, (
-                    f"{agency}/{collection}/{child.name} is neither a dataset nor a "
-                    f"reserved scope - committed history is still in the old shape")
-
-    def test_both_collections_are_keyed_by_the_same_rule(self):
-        """Criterion 3. Birth Registrations' collection holds exactly
-        one dataset, which is precisely where a special case would look
-        harmless."""
-        root = Path("qa_results")
-        shapes = {}
-        for agency, collection in self._collections():
-            base = root / agency / collection
-            if not base.is_dir():
-                pytest.skip(f"{base} is not present in this checkout")
-            shapes[collection] = tr.RAW_SCOPE in {d.name for d in base.iterdir() if d.is_dir()}
-        assert all(shapes.values()), f"not every collection has a {tr.RAW_SCOPE} scope: {shapes}"
