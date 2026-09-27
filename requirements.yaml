@@ -17706,14 +17706,24 @@ requirements:
     open_questions: []
     decisions:
       - >
-        FILE FIRST, THEN CHECK - Keith's own ordering, and it is what
-        makes the rest fall out. A supply filed before the check is
-        recognised like any other, so its run id comes from
-        recognition and its staged table is named for its receipt
-        instant. The alternative considered and rejected was filing at
-        promote time, which would leave the check running against an
-        unfiled supply under a minted id, and the recorded results
-        keyed by an id recognition would never assign.
+        FILE FIRST, THEN CHECK - Keith's own ordering, and it is
+        what makes the rest fall out. A supply filed before the check
+        runs is recognised like any other, so it takes its run id
+        from recognition and its staged table is named for its
+        receipt instant.
+
+        REJECTED: FILING AT THE END, WHEN THE OPERATOR COMMITS. It
+        looks tidier - nothing is created unless they say yes - and
+        it cannot work, because the check has to run before they
+        decide. At check time the supply would not be filed, so
+        recognition would not know it existed and it would have no
+        run id; one would have to be invented. The checks would run
+        and record their results under that invented id. Only
+        afterwards, on commit, would the delivery be filed - and
+        recognition would see it for the first time and call it
+        `run_043`. One run, two names, and the results already
+        written carrying the wrong one. Filing first means nothing is
+        invented, so nothing has to be renamed.
       - >
         THE PROMPT IS WHAT MAKES "ALWAYS FILE" SAFE. Filing
         unconditionally was the first proposal and its real cost was
@@ -17737,11 +17747,17 @@ requirements:
         nothing behind; after this they are either a real arrival,
         which needs no special word at all, or a deliberate
         throwaway - and `trial` says what declining the prompt means
-        while staying honest that real dbt, Soda, datacontract-cli and
-        Evidently runs happened. Rejected: `dry run`, which implies
-        they did not; `scratch`, which describes the record rather
-        than the intent; `unfiled`, which is precise against this
-        model and defines the thing by what it is not. Same length as
+        while staying honest that real dbt, Soda, datacontract-cli
+        and Evidently runs happened against real staged rows.
+
+        REJECTED: `dry run`. It normally means going through the
+        motions WITHOUT doing the thing, and these runs genuinely
+        execute all four tools and produce real verdicts - the only
+        thing that does not happen is keeping the record, so the name
+        would suggest the checks were simulated. Also rejected:
+        `scratch`, which describes the record rather than what the
+        operator is doing; and `unfiled`, precise against this model
+        but defining the thing by what it is not. Same length as
         `adhoc`, so no name-length arithmetic moves.
       - >
         SUB-SECOND PRECISION REPLACES THE STEM for an unfiled run.
