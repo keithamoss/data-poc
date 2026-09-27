@@ -79,12 +79,21 @@ instead.** The template is the real, hand-authored UI source (HTML/CSS/
 JS), committed and edited directly; `dashboard/embed_dashboard_data.py`
 reads it and writes the real, viewable `.html` file, which is gitignored
 and never committed (2026-09-16, `plans/publishing-and-history.md` Phase
-3). CI (`.github/workflows/deploy-pages.yml`) rebuilds it fresh from
-committed `qa_results/` history on every relevant push, gates the
-result, and deploys — it doesn't commit anything back to git either.
-Running the pipeline locally still builds the file for your own
-viewing; there's just nothing to accidentally commit any more, since
-git never tracks that path.
+3). It is rebuilt fresh from the recorded QA results on every publish,
+gated, and deployed — nothing is committed back to git either.
+
+**CI no longer builds it** (REQ-PIPE-089/092). It used to:
+`.github/workflows/deploy-pages.yml` rebuilt the whole dashboard from the
+committed `qa_results/` tree on every relevant push and was the only path
+to the published site. The results are rows in a PostgreSQL database now,
+which a GitHub runner has no route to, so the build moved to the
+environment that can read them and that workflow is replaced by
+`.github/workflows/validate-config.yml` — every gate that reads only
+committed configuration, and nothing that needs the results.
+
+Running the pipeline locally still builds the file for your own viewing;
+there's just nothing to accidentally commit, since git never tracks that
+path.
 
 Pass `--snapshot` (`./mothman pipeline run --snapshot`, same effect as
 `SNAPSHOT_DASHBOARD=1`) to also archive the freshly re-embedded
@@ -105,8 +114,8 @@ regenerated automatically — every `mothman pipeline run` run backfills them
 regardless of the `--snapshot` flag above, so the picker works
 even when opening the dashboard straight off disk via `file://`. On the
 published GitHub Pages site the same decompression happens at deploy time
-instead (`.github/workflows/deploy-pages.yml`) — either way, only the
-`.gz` files are ever actually committed to git.
+instead, in whichever step publishes — either way, only the `.gz` files
+are ever actually committed to git.
 
 ## What's actually running
 
