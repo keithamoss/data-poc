@@ -114,6 +114,28 @@ releases:
       The warehouse is now PostgreSQL, and every QA tool checks what was
       loaded into it rather than the file that arrived.
     changes:
+      - category: Improved
+        items:
+          - headline: Your QA history lives in the warehouse now, not in the repository
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Every check result, every tool's own raw output and every run's
+              own record are stored alongside the data they describe. You no
+              longer commit anything to keep a run, and the history is the
+              same history whoever is looking at it.
+          - headline: Keeping a run, or not, is now something you decide before it runs
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              The wizard asks whether to record a check before it starts
+              rather than offering to promote the results afterwards. Say no
+              and it runs as a trial, which leaves nothing behind.
+          - headline: The dashboard is no longer built by GitHub
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              Building it needs the QA history, and that is somewhere GitHub
+              cannot reach. The checks that only read configuration still run
+              there on every push, so a bad contract or a stale index is
+              still caught before anything else happens.
       - category: New
         items:
           - headline: A file you were emailed can now become a real arrival

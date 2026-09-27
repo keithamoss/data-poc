@@ -268,7 +268,7 @@ Rough layout:
 | `synthetic_data_generator/` | A separate, population-scale (millions), cross-agency-identity-linked synthetic data generator - not currently wired into the pipeline (see `plans/data-generation.md` #3). Also a real package, invoked via `mothman population` (Tier 4, explicitly exploratory - `plans/tooling.md` #1 Phase 5, never a bare `python3 -m synthetic_data_generator.<module>`). |
 | `pipeline/` | Dashboard-data reshaping and the cadence/label helpers around it - **nothing here touches a warehouse any more**. It used to hold `orchestrate.py`/`load.py`, which generated the synthetic runs and loaded every one of them into one combined DuckDB file at `data/warehouse.duckdb`; that file's only reader was the dashboard build's own direct chart queries, and it lost that reader in Phase 3 of `plans/publishing-and-history.md` when the build became a pure function of committed results. It kept being written with nothing reading it until REQ-PIPE-087 criterion 1 (2026-09-27) deleted both modules - all supply data is in the one PostgreSQL database and none of it in a DuckDB file, and staging happens per arrival as QA runs (REQ-PIPE-068). `mothman bdm generate-synthetic-data` now calls the generator directly, exactly as `mothman cp generate-synthetic-data` always did. `build_dashboard_data.py`/`build_cp_dashboard_data.py` reshape `reports/results_bdm.json`/`results_cp.json` (check results + `dataset_stats`, both from committed `qa_results/` history) into dashboard JSON - pure functions of that one file since Phase 3, no DuckDB import or live query of their own any more. Also a real package - invoked via `mothman dashboard build-data`/`mothman pipeline run` (`cli/`'s own modules), never bare. |
 | `qa_tools/` | The actual dbt-core/Soda Core/datacontract-cli/Evidently runs - the only pipeline path now (no more "_real" suffix on any of this - see `plans/qa-pipeline.md` #84's follow-up for why it dropped, once `engines/` was gone there was nothing left to distinguish it from). A proper Python package: `bdm/` and `cp/` (one per dataset, invoked via `mothman pipeline run`/`mothman bdm qa`/`mothman cp qa`/`mothman debug run-*` - `cli/`'s own modules, never a bare `python3 -m qa_tools.bdm.orchestrate_bdm` from outside them) plus `common/` (tool-generic subprocess/API invocation shared between them, including `qa_results_writer.py`, `qa_results_reader.py`, `check_lifecycle.py`, `git_identity.py`, and `changelog.py` - see the `qa_results/` entry below). `bdm/build_results_from_history.py`/`cp/build_results_from_history.py` rebuild `reports/results_bdm.json`/`results_cp.json` purely from committed `qa_results/` history, no real tool re-run needed - the Phase 2 counterpart to `orchestrate_bdm.py`/`orchestrate_cp.py`'s live-run path, same output shape either way (verified byte-identical, `generated_at` aside). (An earlier `engines/` directory of hand-written Python/DuckDB stand-ins, from before real tool access existed, was removed once it had drifted out of sync - see `plans/qa-pipeline.md` #83. Git history holds it if ever needed.) |
-| `qa_results/` | Committed per-run tool output, written by every `qa_tools/*/run_*.py` module via `qa_tools/common/qa_results_writer.py`. **Keyed per DATASET since REQ-PIPE-038 (2026-09-26)**, in three scopes under a collection: `qa_results/<agency>/<collection>/<dataset>/<run_id>/<tool>.json` holds that dataset's own `verified` records; `<collection>/_cross-table/<run_id>/` holds the records that span datasets (REQ-QAC-037); and `<collection>/_raw/<run_id>/<tool>.json` holds the one genuinely-unmodified `raw_output` per tool invocation, plus the two pseudo-tools (`dataset_stats`, `tables_read`) that describe a RUN rather than a dataset. One `write_qa_result()` call therefore writes several files - a Child Protection Soda scan is one `Scan()` over six tables, and its 50 results fan out to six dataset files while its scan document is recorded once. A leading underscore is a RESERVED name the hierarchy gate refuses for any agency, collection or dataset id, which is what keeps every child of a collection unambiguously a scope. Before this both collections wrote one file per tool per run at collection level, so finding one table's history meant filtering a collection-level file through a map maintained by hand. Committed to git, not gitignored - unlike `reports/*.json` (still gitignored/ephemeral - a reshaped VIEW of this data, not the source of it), this is the real, permanent source of truth for QA history, potentially spanning years - see `plans/publishing-and-history.md` Thread B. Each file holds two things side by side: `raw_output` (that tool's native, genuinely unmodified output - a real dbt `run_results.json`, a real Soda `scan_results` dict, etc.) and `verified` (the same fully-resolved, dashboard-ready check-result records `evaluate_*()` builds in memory every run, captured here too so reading this history back later - `qa_tools/common/qa_results_reader.py`, Phase 2 - needs no live per-run DuckDB/CSV access; dbt's two known-bad-failure-count bugs (dbt-labs/dbt-core#11312, plus a second still-unexplained one - `plans/qa-pipeline.md` items 34/38) and Soda's missing row-count totals only resolve correctly via such a live connection, which won't exist once the run is over - see `qa_results_writer.py`'s own docstring for the full account). A 5th pseudo-tool file per run, `dataset_stats.json` (written the same way, `tool="dataset_stats"`, not a real QA tool), holds the presentation-layer data the dashboard needs (value-count distributions, arrival-lag stats, per-check failing-value aggregates, and that run's own manifest entry) - computed once by `orchestrate_bdm.py`/`orchestrate_cp.py` at the one point with a legitimate live warehouse connection (`qa_tools/bdm/dataset_stats.py`/`qa_tools/cp/dataset_stats.py`), so nothing downstream ever needs one - Phase 3, Keith's hard rule: CI must never touch data, real or (in this PoC) synthetic-standing-in-for-real. Every file also carries a top-level `run_by` field alongside `run_timestamp` (only the `dataset_stats` write passes it - one value per run is all the changelog feature below needs) - `qa_tools/common/git_identity.py`'s `get_run_by()` (the local `git config user.email`, read once per `orchestrate_bdm.py`/`orchestrate_cp.py` invocation, hard error if unset - never falls back to a placeholder). `qa_tools/common/changelog.py`'s `build_changelog(agency, dataset)` reshapes this into "who QA'd what, when" feed events - Phase 3's changelog/activity-feed DATA logic (its own UI is Phase 5): `run_by`/`run_timestamp` come straight from file content (grouped by `run_timestamp`, not by git commit, since one commit can legitimately bundle multiple datasets' events); `committed_at`/`commit_sha` are resolved by a single walk of that dataset's own git history (never self-recorded pre-push - see the module's own docstring for why a commit made locally can still be rebased before it reaches the shared branch, rewriting its SHA and committer date). Every check across all 4 tools also carries hand-authored lifecycle metadata (`check_id`/`introduced_date`/`description`/`changelog`) directly in its own definition (dbt's `meta:`, Soda's `attributes:`, the ODCS contract's `customProperties:`, a plain dict for Evidently) - parsed and validated by `qa_tools/common/check_lifecycle.py` (globally-unique `check_id`, no undocumented config changes) - see that file's own docstring and `plans/publishing-and-history.md` Thread D. |
+| ~~`qa_results/`~~ | **GONE (REQ-PIPE-089, built 2026-09-27).** It was the committed per-run tool output - 924 files, 28MB, three scopes under a collection (`<agency>/<collection>/<dataset>/<run_id>/<tool>.json` for a dataset's own records, `_cross-table/` for the records spanning datasets, `_raw/` for the one unmodified `raw_output` per invocation plus the `dataset_stats` and `tables_read` pseudo-tools). Every one of those facts is now a row in the `qa` metadata schema instead, and the three scopes survived as a COLUMN rather than a directory, because they were always about what a record DESCRIBES rather than where it was kept. `qa_tools/common/qa_store.py` is the schema, `qa_results_writer.py` records, `qa_results_reader.py` reads, and neither touches the filesystem. Nothing is gitignored in its place - the path does not exist. **Do not reintroduce a committed results tree**: Keith's rule is that the repository holds configuration, not state, and results are state. What the move cost, deliberately: a reader with no database access can no longer read the history, and the dashboard build had to leave GitHub Actions, which cannot reach the database (REQ-PIPE-092). |
 | `dashboard/qa-reporting-dashboard.template.html` | The single-file static dashboard's real, committed source - hand-authored UI (HTML/CSS/JS), edited directly, with placeholder consts (`REAL_BIRTH_REG_DATA`/`REAL_CP_DATA`/`SNAPSHOT_MANIFEST`/`AS_OF_OFFSET_DAYS`/`CHANGELOG_FEED`/`RELEASE_NOTES` - `null`/`[]`/`null` here, never real data). **`dashboard/qa-reporting-dashboard.html` (no `.template`) is the BUILD OUTPUT - gitignored, never committed** (2026-09-16, Keith's call, `plans/publishing-and-history.md` Phase 3): `dashboard/embed_dashboard_data.py` reads the template, embeds real data from `reports/birth_registrations_dashboard.json`/`child_protection_dashboard.json` into the two `REAL_*` consts, `contract/data-asset.yaml` into `AS_OF_OFFSET_DAYS`, (Phase 5a, 2026-09-17) `qa_tools/common/changelog.py`'s `build_changelog()` output - merged across both real dataset scopes, newest-published-first, capped to 30 entries - into `CHANGELOG_FEED`, and the repo-root `CHANGELOG.yaml` - the hand-maintained "What's New" feed tracking the PoC/tool's own development history (a genuinely different feed from `CHANGELOG_FEED`'s QA-publish activity), parsed by `dashboard/changelog_yaml.py`'s `parse_changelog()` - into `RELEASE_NOTES`. Rewritten 2026-09-20 (REQ-DOCS-028) from hand-written Keep-a-Changelog Markdown into structured YAML written for READERS rather than maintainers: grouped by day with a one-sentence summary per day, each item a headline plus one or two second-person sentences, tagged with the same 7-part component taxonomy `plans/*.md` items use. The Release Notes panel renders those tags WITHOUT the per-component emoji (dropped the same day, Keith's call - the Plans tab's own filter chips keep theirs, which is why `COMPONENT_ICON` still exists). `mothman dashboard validate-changelog` gates the schema and the component tags in CI. Then writes the result to that gitignored path - what CI deploys to Pages and what `mothman pipeline run`/`mothman dashboard embed` builds for local viewing. Since `CHANGELOG_FEED` needs `qa_tools.common.changelog` importable, `embed_dashboard_data.py` is always invoked via `mothman dashboard embed`/`mothman pipeline run` (`cli/dashboard.py`'s own `_embed()`, itself calling `python3 -m dashboard.embed_dashboard_data`'s real module import path - never a bare script path like `python3 dashboard/embed_dashboard_data.py`, which only puts `dashboard/` on `sys.path`, not the repo root, so cross-package imports fail) - matches how `dashboard/check_dashboard_renders.py`/`dashboard/snapshot_dashboard.py` are invoked (`mothman dashboard check-renders`/`mothman dashboard snapshot`). `dashboard/snapshot_dashboard.py` separately re-embeds `SNAPSHOT_MANIFEST` into that same built file from the real, committed `dashboard/snapshots/manifest.json`. Since this split (previously one hybrid file holding both hand-authored UI AND embedded real data, with the real-data half either committed directly or, briefly, committed back by CI - see `plans/publishing-and-history.md` Phase 3 for that full history) git can never see a diff on the build output to accidentally stage or commit - the earlier problem ("don't commit a local rebuild") is now structurally impossible rather than something to remember or a pre-commit hook has to catch. `.github/workflows/deploy-pages.yml` rebuilds the whole dashboard from committed `qa_results/` history on every relevant push (no real tool re-run - CI is the only publish path, per Thread A), gates the result (structural + check-lifecycle + real-browser render checks - see `qa_tools/common/validate_check_lifecycle.py`/`dashboard/check_dashboard_renders.py`), and only then deploys - it doesn't commit anything back to git either. "What was published when" is a deterministic rebuild from `qa_results/` (same pipeline CI runs) or GitHub Pages' own deployment history (tied to the exact commit SHA each deployment was built from) - `qa_results/` itself (the real source of truth, Thread B) is untouched by any of this. `dashboard/snapshots/*.html.gz` below remains the separate, unaffected point-in-time archive mechanism. Also (`plans/running-thoughts.md` #10, 2026-09-18 evening, `plans/dashboard.md` #7): a `const PLANS` - this project's own `plans/*.md` planning memory, parsed by the new `dashboard/plans_md.py`'s `parse_plans()` straight from the committed `plans/` directory - powers a genuinely new top-level tab (`STATE.tier==="plans"`, a real `/plans` URL), not another header side-panel, with search and status/component/file filter chips. Also (`plans/tooling.md` #1 Phase 6, 2026-09-19, scoped via AskUserQuestion): a `const DEMO_CAST` - the real asciinema recording at `dashboard/demos/qa_wizard.cast`, embedded as a raw string by `embed_dashboard_data.py` - powers another genuinely new top-level tab (`STATE.tier==="demo"`, a real `/demo` URL, same not-a-side-panel treatment as Plans), rendering the vendored `dashboard/vendor/asciinema-player.min.js` widget lazily (only once the tab is actually opened) against that embedded recording via its `data:`-style source option (never the player's own `url:`/`fetch()` option - see the template's own const comment for why). |
 | `dashboard/snapshots/` | "Time travel" archive - gzipped, timestamped, fully self-contained copies of the dashboard HTML (`dashboard/snapshot_dashboard.py`, opt-in via `SNAPSHOT_DASHBOARD=1`), each independently openable with nothing but a browser years from now. The `.html.gz` files are committed to git, not gitignored - unlike everything else generated by this pipeline, these are meant to accumulate, not get regenerated away. Decompressed `.html` siblings (same name, no `.gz`) also live alongside them for local/offline viewing - those ARE gitignored (`dashboard/snapshots/*.html`) and regenerated on every `mothman pipeline run`/`mothman dashboard snapshot` run via `sync_local_snapshots()`, same as any other generated artifact; only the `.gz` originals are the source of truth. Also touches `dashboard/`, so a commit adding one does trigger a (harmless, no-op-content) GitHub Pages redeploy alongside the real dashboard publish above - see `plans/dashboard.md` #5. |
 | `dashboard/demos/` | The "Demo" tab's real source recording (`plans/tooling.md` #1 Phase 6, 2026-09-19) - `qa_wizard.cast`, a real asciinema v2 recording of the actual `mothman` CLI/TUI (Quality Assurance wizard, Birth Registrations, Synthetic mode), captured by `scripts/dev/record_cast.py`'s own real pty-capture-and-script tool (dev-only, same throwaway status as `scripts/dev/tui_screenshot.py`) and committed as plain, uncompressed text (a `.cast` file is JSON-lines, small enough - ~22KB here - that HTTP-level gzip transfer encoding already covers compression; unlike `dashboard/snapshots/*.html.gz`, no app-level decompression step is needed). `dashboard/embed_dashboard_data.py` embeds its raw text content into the template's `const DEMO_CAST` placeholder as a plain string (never fetched by the player at runtime - a `fetch()` of a sibling file is blocked by real browser CORS under a plain `file://` open, this dashboard's own supported local/offline viewing path, so embedding sidesteps that entirely - same "no live external dependency at render time" treatment every other embedded const already uses). |
@@ -349,20 +349,32 @@ Rough layout:
   not delete it.
 
   **What still breaks the rule, so nobody has to re-derive the list.**
-  `qa_results/` is the big one - the whole committed per-run QA history,
-  still in the tree as of 2026-09-27. `qa_tools/common/qa_store.py` is
-  the metadata schema that replaces it, real and tested since
-  REQ-PIPE-089's first build phase, but nothing writes to it yet, so the
-  table entry below still describes committed files because committed
-  files are still what is there. **Do not describe the destination as
-  the present.** There is no migration path and there will not be one:
-  Keith chose to regenerate rather than migrate (REQ-PIPE-089 criterion
-  25), so `qa_results_migrate.py` was deleted rather than finished.
+  **`qa_results/` WAS the big one, and it is gone** - REQ-PIPE-089 is
+  built as of 2026-09-27, and the whole committed per-run QA history is
+  rows in the `qa` metadata schema (`qa_tools/common/qa_store.py`). There
+  was no migration and there will not be one: Keith chose to regenerate
+  rather than migrate (criterion 25), so `qa_results_migrate.py` was
+  deleted rather than finished.
 
-  When the move itself lands, it takes `deploy-pages.yml` with it: the dashboard cannot be
-  built in GitHub Actions from a database GitHub cannot reach, so the
-  build moves to the environment that can - which is Keith's own answer
-  to the same question about the decision log, 2026-09-26.
+  It took `deploy-pages.yml` with it, exactly as this note predicted: the
+  dashboard cannot be built in GitHub Actions from a database GitHub
+  cannot reach, so that workflow is replaced by
+  `.github/workflows/validate-config.yml` - every gate that reads only
+  committed configuration, and nothing that needs the results. The build
+  itself moves to the environment that can read them (REQ-PIPE-092), and
+  `.github/workflows/ticket-sync.yml` is DISABLED for the same reason
+  with its old trigger kept in a comment: its replacement inverts the
+  integration's direction, which is `plans/running-thoughts.md` #53 and
+  not scoped yet.
+
+  **WHAT STILL BREAKS THE RULE, so nobody has to re-derive the list.**
+  `data/deliveries/` and `data/receipts/` are the supplier's own files and
+  our receipts, which are arguably state; `data/generator_bookkeeping.json`
+  looks like state on disk and is unexamined. REQ-PIPE-104 and
+  REQ-PIPE-105 own the filing and receipt records. The one deliberate
+  exception remains `dashboard/snapshots/*.html.gz`, whose whole purpose is
+  to be openable years later with nothing but a browser - which a row in a
+  database it cannot reach is not.
 
   `dashboard/snapshots/*.html.gz` is the deliberate exception and stays:
   a snapshot's whole purpose is to be openable years later with nothing
@@ -370,19 +382,15 @@ Rough layout:
 
 - `data/raw/`, `reports/*.json` etc. are
   gitignored and fully regenerated - never hand-edit or try to commit
-  them. `dashboard/snapshots/*.html.gz` and `qa_results/` are the
-  deliberate exceptions - both ARE committed, on purpose (see each
-  path's own table entry above) - don't gitignore them or delete old
-  entries as "generated cruft". `qa_results/` specifically holds the
-  real per-run tool output history (plans/publishing-and-history.md
-  Thread B) - every real pipeline run adds to it, nothing in it should
-  ever be deleted or regenerated away the way `reports/*.json` is.
-  **Read that last sentence with the rule above, not against it**: what
-  it protects is the HISTORY, never the file format. Deleting
-  `qa_results/` once it has been migrated into the database is the rule
-  above being carried out; deleting a run's results because they look
-  like generated cruft is the thing this sentence forbids, and always
-  was.
+  them. `dashboard/snapshots/*.html.gz` is now the ONLY committed
+  exception - don't gitignore it or delete old entries as "generated
+  cruft". `qa_results/` used to be the other one, and the sentence that
+  protected it is worth keeping in its new form: what it protected was
+  the HISTORY, never the file format. Deleting the tree once its records
+  were in the database was the rule above being carried out; deleting a
+  run's recorded results because they look like generated cruft is the
+  thing that sentence always forbade, and the database is where it
+  applies now.
   Regenerate via `mothman pipeline run` (the whole pipeline end to end
   for both datasets by default, ~45s+ - `--collection bdm`/`--collection cp`
   to scope to one; `--sequential` if debugging one specific run, since
@@ -390,8 +398,8 @@ Rough layout:
   for lower-level single-tool debugging against a run already on disk,
   `mothman debug run-dbt --collection bdm --run-id <id>` (and the `run-soda`/
   `run-datacontract`/`run-evidently` equivalents - see `cli/debug.py`'s
-  own docstring for why these ALSO write real qa_results/ history, same
-  as any other real tool invocation, not a side-effect-free dry run).
+  own docstring for why these ALSO record real QA history, same as any
+  other real tool invocation, not a side-effect-free dry run).
   `qa_tools`, `generator`, `pipeline`, and `synthetic_data_generator` are
   all real Python packages (`cli/`'s own modules invoke them via `-m`-
   style absolute imports, never a bare script path like `python3
@@ -531,10 +539,12 @@ Rough layout:
   run once `uv run playwright install chromium` has been done (same
   one-time step this project's other Playwright-based tools already
   need - see that dev dependency's own comment in `pyproject.toml`).
-  These build the real dashboard first (the same CI-safe chain
-  `deploy-pages.yml` runs - committed `qa_results/` history only, never
-  `data/`), so expect this one test module to take longer than the rest
-  of the suite.
+  These build the real dashboard first, from the recorded QA results and
+  never from `data/`, so expect this one test module to take longer than
+  the rest of the suite. It used to be "the same CI-safe chain
+  `deploy-pages.yml` runs"; CI does not build the dashboard any more
+  (REQ-PIPE-089/092), so the chain is the same one `mothman dashboard
+  rebuild` runs locally.
 - **A passing local `uv run pytest` is NOT evidence CI is green - after
   pushing to this branch, actually check the real GitHub Actions run
   (the GitHub MCP tools' `actions_list`/`get_job_logs`, or the Actions
@@ -756,6 +766,15 @@ Rough layout:
   run, eighty seconds, because they passed a `raw_dir` the loader had
   stopped reading. Full `mothman check` 268s; JS suite 351 tests.
 
+  -> **~244s/2155 tests (2026-09-27, REQ-PIPE-089's last phase)**. Up
+  ~33s on 106 more tests since the entry above, and the count moved for a
+  reason worth knowing: ten test modules were rewritten against the
+  database rather than the committed tree, and several gained tests
+  they could not have had before - "it writes no files at all" is only
+  assertable once that is true. No new hot spot. Three runs are in this
+  figure's history rather than one: 55 failed / 22 errors, then 13
+  failed, then green, which is what a wide refactor's sweep looks like.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
@@ -914,10 +933,12 @@ Rough layout:
     resolution rather than a cost of the move. Worth starting early
     rather than discovering it is needed. It is a no-op when the database already
     holds staged tables; `--force` rebuilds anyway, and the pipeline is
-    seeded so the content is the same either way. Note it also rewrites
-    `qa_results/` with fresh timestamps - ~900 files - so discard that
-    churn (`git checkout -- qa_results/`) unless the run was meant to
-    add history.
+    seeded so the content is the same either way. IT USED TO LEAVE ~900
+    CHANGED FILES BEHIND, rewriting `qa_results/` with fresh timestamps,
+    and the instruction here was to discard that churn with `git checkout
+    -- qa_results/`. There is no tree and there is no churn since
+    REQ-PIPE-089 - a bootstrap touches the database and leaves the working
+    tree alone.
 
     **SINCE REQ-PIPE-089, A BOOTSTRAP IS NOT OPTIONAL FOR THE TEST
     SUITE.** This is the part that changed on 2026-09-27 and the part a

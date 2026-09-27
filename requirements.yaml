@@ -538,7 +538,7 @@ requirements:
       - >
         CI must never open or query anything under data/, even though this PoC's data is synthetic. A pipeline that is only safe because today's data happens to be fake is one accident away from not being safe.
     implemented_by:
-      - .github/workflows/deploy-pages.yml
+      - .github/workflows/validate-config.yml
       - dashboard/check_dashboard_renders.py::main
       - qa_tools/common/validate_check_lifecycle.py::main
       - dashboard/snapshot_dashboard.py::prepare_deploy_site
@@ -2517,7 +2517,7 @@ requirements:
       - qa_tools/common/validate_check_lifecycle.py::_looks_like_sentinel
       - qa_tools/common/check_lifecycle.py::is_self_evident
       - cli/dashboard.py::validate_check_lifecycle_command
-      - .github/workflows/deploy-pages.yml
+      - .github/workflows/validate-config.yml
     linked_tests:
       - tests/test_validate_check_lifecycle.py::test_a_check_with_no_description_is_an_error
       - tests/test_validate_check_lifecycle.py::test_an_active_check_with_no_failure_indicates_is_an_error
@@ -4414,7 +4414,7 @@ requirements:
       - qa_tools/common/qa_results_reader.py::canonical_order
       - qa_tools/common/qa_results_reader.py::read_raw
       - cli/pipeline.py::regenerate_history_command
-      - cli/common.py::promote
+      - qa_tools/common/qa_store.py::delete_history
     evidence:
       - >
         2026-09-26: regenerated from scratch, both collections, and the
@@ -5711,7 +5711,7 @@ requirements:
       - dashboard/embed_dashboard_data.py::embed
       - dashboard/qa-reporting-dashboard.template.html::renderChangelogPanel
       - cli/dashboard.py::validate_changelog_command
-      - .github/workflows/deploy-pages.yml
+      - .github/workflows/validate-config.yml
     evidence:
       - >
         2026-09-20: the rewrite replaced 1 file of ~100 hand-written
@@ -15740,10 +15740,86 @@ requirements:
       failure of this check since we started" is one question, and the
       repository stops carrying the data it was never meant to hold.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-09-27"
+    linked_tests:
+      - tests/test_qa_store.py
+      - tests/test_qa_results_writer.py
+      - tests/test_qa_results_reader.py
+      - tests/test_qa_results_fan_out.py
+      - tests/test_history_rekey.py
+      - tests/test_cross_table_scope.py
+      - tests/test_tables_read.py
+      - tests/test_changelog.py
+      - tests/test_publisher_role.py
+      - tests/test_load_log.py
+      - tests/test_arrival_history.py
+      - tests/test_run_schema_lifecycle.py
+      - tests/test_cli_common.py
+      - tests/test_cli_bdm.py
+      - tests/test_cli_cp.py
+      - tests/test_lambda_handlers.py
+      - tests/test_status_parity.py
+    implemented_by:
+      - qa_tools/common/qa_store.py::ensure_schema
+      - qa_tools/common/qa_store.py::record_results
+      - qa_tools/common/qa_store.py::complete_run
+      - qa_tools/common/qa_store.py::delete_history
+      - qa_tools/common/qa_store.py::ensure_publisher_role
+      - qa_tools/common/qa_results_writer.py::write_qa_result
+      - qa_tools/common/qa_results_reader.py::read_qa_results
+      - qa_tools/common/qa_results_reader.py::read_raw
+      - qa_tools/common/load_log.py::latest_for
+      - qa_tools/common/delivery_log.py::records_carrying
+      - qa_tools/common/backlog.py::unprocessed
+      - qa_tools/common/trial.py::discard
+      - qa_tools/common/changelog.py::build_changelog
+      - cli/pipeline.py::regenerate_history_command
+      - cli/common.py::report_recorded
+      - cli/common.py::decide_record
+      - .github/workflows/validate-config.yml
+    evidence:
+      - >
+        THE WHOLE SUITE GREEN AFTER THE MOVE: 2155 passed, zero failed,
+        243.74s (2026-09-27, measured after the last change rather than
+        reused from earlier in the session). The sweep that got there
+        started at 55 failed and 22 errors across ten files, every one of
+        them rewritten against the store rather than deleted, because in
+        each case the rule being asserted survived and only the thing that
+        could observe it changed.
+      - >
+        THE TREE IS GONE: 924 files, 28MB, removed from git and from disk,
+        with nothing gitignored in its place because the path no longer
+        exists. processing_log/ and delivery_log/ went earlier in the same
+        requirement.
+      - >
+        THREE REAL CONCURRENCY AND IDENTITY BUGS FOUND BY BUILDING IT, each
+        covered by a test confirmed failing first. A `CREATE SCHEMA IF NOT
+        EXISTS` race that killed Child Protection outright in a real
+        bootstrap, fixed with an advisory lock and tested with eight
+        threads through a barrier. A deadlock where ensure_schema ran the
+        whole DDL on every write, so ALTER TABLE contended with parallel
+        workers' foreign-key row locks and PostgreSQL killed a dbt run -
+        fixed with a SCHEMA_VERSION marker, tested by holding an ACCESS
+        SHARE lock. And a staging/identity ordering bug in Child
+        Protection's run_check, where a trial identity taken after the
+        tables were staged left dbt looking for six tables that did not
+        exist under that name.
+      - >
+        TWO REGRESSIONS CAUGHT TWO TRANSFORMS DOWNSTREAM, which is the
+        lesson CLAUDE.md already records: the reader dropped NULL keys and
+        added a `tool` key, breaking the dashboard build with a KeyError,
+        and `run_timestamp` was normalised to UTC, losing the recorded
+        offset REQ-PIPE-048 requires. Both fixed against the
+        corpus-counted 20-key record shape and a two-column timestamp
+        split.
+      - >
+        RECORDING COSTS 0.64ms PER VERDICT, measured - so a whole run's
+        ~4,000 verdicts are under three seconds. A bootstrap is 266s over
+        163 staged tables against 237s over 151 before the move, which is
+        noise at this resolution rather than a cost of the move.
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26) - his own
       question, whether qa_results/ needs an equivalent in the
@@ -15912,6 +15988,48 @@ requirements:
     dependencies: [REQ-PIPE-087]
     open_questions: []
     decisions:
+      - >
+        CARRIED FROM plans/publishing-and-history.md THREAD B, deleted in
+        the same change that built this (2026-09-27). Thread B was the
+        design this requirement replaces - "each QA run's raw tool output
+        gets committed to the repo, as-is in each tool's own native
+        format" - and three of its decisions are still live under the new
+        storage, so they move here rather than going with the prose.
+      - >
+        SCOPE IS TOOL RESULTS ONLY, never the underlying data records
+        (Keith, Thread B). `data/raw/` stays gitignored, regenerated and
+        ephemeral. This is the oldest form of the line that has since
+        become "a build may read recorded QA results, never actual data,
+        and never anything else", and it was drawn before there was a
+        database to draw it in.
+      - >
+        RETENTION IS FOREVER, no thinning (Keith, Thread B) - the same
+        policy as the dashboard snapshots, revisited only if storage
+        genuinely becomes a problem. Recorded rows inherit it unchanged.
+      - >
+        NESTING STAYS AT DATASET LEVEL, NOT TABLE LEVEL, for both check
+        DEFINITIONS and results (Keith, 2026-09-16, Thread B). His own
+        first instinct was table-level and he was explicitly fine with
+        the runtime cost of invoking each tool once per table - what
+        changed it was the ODCS constraint laid out concretely: one
+        contract document IS one data product, carrying document-level
+        identity, version, team, support and as-of config plus ten real
+        cross-table checks with no single owning table to live under. The
+        call was to keep all four tools uniformly at dataset level rather
+        than carve out ODCS as the one exception while the other three
+        fragment. REQ-PIPE-038 later keyed RESULTS per dataset, which is
+        a different axis and does not disturb this.
+      - >
+        NOT CARRIED, deliberately, because each is spent: Thread B's
+        "exact path/naming layout not yet pinned down" (there are no
+        paths), its note that committing results reverses CLAUDE.md's
+        gitignored-and-regenerated rule (this reverses it back), and the
+        real `run_evidently_cp.py` bug it recorded - that tool wrote
+        under a table-scoped dataset id instead of the collection id,
+        landing each run's output in a stray sibling directory. That was
+        fixed in 2026-09-16 and its own regression test lives in
+        plans/qa-pipeline.md item 50; the directory it created cannot
+        exist now.
       - >
         SAMPLE QA IS DISTINGUISHED BY A SCOPE ON THE RESULT, decided
         here at Keith's own call (2026-09-27) rather than deferred to

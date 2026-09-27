@@ -45,75 +45,36 @@ cadence, some quarterly. Two real problems surfaced:
    ago" beyond the opt-in, coarse "time travel" snapshots (whole-page
    freezes, not queryable data).
 
-## Thread B - committed per-run tool-output files (build first)
+## Thread B - per-run tool output (superseded)
 
-**Status:** done (2026-09-16) · **Category:** Pipeline & publishing
+**Status:** superseded (2026-09-27) · **Category:** Pipeline & publishing
 
-**Decision:** each QA run's raw tool output - one file per tool per
-dataset per run (a real dbt run-results file, a real Soda scan result, a
-real Evidently report, etc.) - gets committed to the repo, as-is in each
-tool's own native format, not reshaped into a common schema first. This
-becomes the actual source of truth for QA history, potentially spanning
-years, independent of whatever the dashboard currently renders.
+**Replaced by REQ-PIPE-089, which is built.** Thread B's design was that
+each QA run's raw tool output gets COMMITTED to the repository, one file
+per tool per dataset per run, in each tool's own native format - the
+source of truth for QA history, potentially spanning years. That tree
+existed for a year of this project's life and is gone: 924 files, 28MB,
+removed once the same records were rows in the `qa` metadata schema.
 
-A separate "dashboard pipeline" step reads the full committed history
-and merges/reshapes it into the reporting layer - deliberate separation
-of concerns between the checks layer and the reporting layer, since
-either might get swapped independently (tools narrowed down post-PoC;
-the dashboard itself rebuilt or replaced).
+**What replaced it and why**, so nobody reads this as a design still
+waiting to be built: Keith's own standing rule of 2026-09-27 is that the
+repository holds CONFIGURATION, not STATE, and QA results are state -
+they accumulate, nobody reviews them, and a second person running the
+pipeline legitimately produces different bytes.
 
-**Confirmed explicitly with Keith:**
-- Scope is tool RESULTS only (what `reports/*.json` already holds today)
-  - NOT the underlying raw synthetic data records (`data/raw/`), which
-    stays exactly as it is: gitignored, regenerated, ephemeral.
-- This reverses CLAUDE.md's current documented rule that `reports/*.json`
-  etc. are gitignored/regenerated - needs an explicit doc update as part
-  of this work, not a silent contradiction (see "Doc updates needed"
-  below).
-- Retention: keep everything forever, same policy as the dashboard
-  snapshots (item 26) - no thinning, revisit only if storage genuinely
-  becomes a problem.
-- Format: native/raw tool output, unmodified - the dashboard pipeline
-  does all reshaping when reading history back, not at commit time.
+**Its live decisions were carried into REQ-PIPE-089's own `decisions:`
+before this prose went** - scope is tool results only and never the data
+records, retention is forever with no thinning, and nesting stays at
+dataset level rather than table level for both check definitions and
+results. That last one has the most reasoning behind it and REQ-PIPE-089
+records the whole of it, including what changed Keith's own first
+instinct.
 
-**Not yet pinned down** (implementation detail, propose a default when
-building, not a real fork worth a round of questions): exact path/
-naming layout for these files. Something like `qa_results/<agency>/
-<dataset>/<run_timestamp>/<tool>.<ext>` is the obvious shape, consistent
-with how `data/raw/`/`data/cp_raw/` already lay out by dataset - confirm
-against the real per-tool output formats when this gets built (dbt's
-`run_results.json`, Soda's scan result, Evidently's report format may
-each want slightly different handling).
-
-**Scoped and decided, 2026-09-16 (Keith): per-table nesting stays
-dataset-level everywhere, not table-level** - both for check DEFINITION
-files and for `qa_results/` output. Keith's own initial instinct was
-table-level (Child Protection has 6 tables, and he was explicitly fine
-with the real-tool run time cost of invoking each tool once per table
-instead of once per dataset), but once the ODCS/datacontract-cli
-constraint was laid out concretely - one contract document IS one data
-product, carrying document-level identity/version/team/support/as-of
-config plus 10 real cross-table FK/business-rule checks that don't have
-a single owning table to live under - Keith's final call was to keep
-every tool (dbt/Soda/ODCS/Evidently) uniformly at dataset level, not
-carve out ODCS as the one exception while the other three fragment.
-Nothing about `qa_results/`'s existing `<agency>/<dataset>/<run_id>/
-<tool>.json` layout needed to change to honor this - it was already
-dataset-level for 3 of 4 CP tools.
-
-**A real bug found while confirming that, not a design gap**: tracing
-CP's actual on-disk `qa_results/` layout to answer this turned up that
-`run_evidently_cp.py` was the one genuine outlier - it wrote under its
-own table-scoped dataset id (`cp_common.TABLE_DATASET_ID
-["cp_notifications"]`) instead of the collection id every other CP tool
-uses, landing each run's `evidently.json` in a stray sibling directory
-instead of alongside that run's other 4 files. Fixed (write path only -
-each result's own per-table `dataset_id` field is untouched, still
-needed for dashboard grouping), verified via a real full `orchestrate_
-cp.py` run diffed against the previously-committed history (only
-`run_timestamp` changed, same 2832-result pass/warn/fail distribution),
-stale directory removed. Full account, including the regression tests,
-in `plans/qa-pipeline.md` item 50 - not re-derived here.
+**What went with the prose, because each is spent:** the path/naming
+layout it left unpinned (there are no paths), its note that committing
+results reverses CLAUDE.md's gitignored-and-regenerated rule (this
+reverses it back), and a real `run_evidently_cp.py` bug it recorded and
+that was fixed in 2026-09-16 - see `plans/qa-pipeline.md` item 50.
 
 ## Thread D - check lifecycle: retirement + definition changes (build together with B)
 
