@@ -274,7 +274,7 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     target_path = str(supply_db.dbt_target_path(run_id))
     run_dbt("build", ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
             PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
-            run_schema=supply_db.run_schema(run_id))
+            run_schema=supply_db.run_schema(run_id), run_id=run_id)
 
     with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)
@@ -283,7 +283,7 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
 
     nodes = test_nodes(manifest)
     # Unqualified names resolve to dbt's own schema - see connect_dbt().
-    conn = supply_db.connect_dbt()
+    conn = supply_db.connect_dbt(run_id)
     # CLOSED IN A `finally` (2026-09-27). It used to close on the
     # last line of the happy path, which leaks the connection on
     # every exception - and an audit-table query raising is exactly the case nobody is watching.

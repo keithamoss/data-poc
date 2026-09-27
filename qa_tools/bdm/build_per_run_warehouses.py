@@ -31,6 +31,9 @@ from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, r
 from qa_tools.common import arrivals, asset_time, load_log, supply_db
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
+#: Where the ad-hoc `mothman bdm qa --local-file` path drops a file
+#: it was handed. NOT where build_all() looks - that reads the
+#: delivery tree (see its own docstring).
 RAW_DIR = os.path.join(ROOT, "data", "raw")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
 
@@ -154,13 +157,20 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
     return physical
 
 
-def build_all(raw_dir: str = RAW_DIR, dsn: str | None = None,
+def build_all(dsn: str | None = None,
                deliveries_dir=None, receipts_dir=None) -> list[str]:
     """Stage every recognised arrival.
 
-    `raw_dir` is kept for callers that still pass it and is no longer
-    read: since REQ-GEN-043 the runs come from deliveries on disk, not
-    from a manifest in a raw directory.
+    NO `raw_dir` ANY MORE, and removing it was a bug fix rather than a
+    tidy-up (2026-09-27). Since REQ-GEN-043 the runs come from
+    deliveries on disk, not from a manifest in a raw directory, so the
+    parameter had been accepted and ignored - which reads exactly like
+    a way to point this somewhere else. A test passed its own temporary
+    directory, got the whole real `data/deliveries/` tree staged
+    instead, and the CP fixture had already hit the same thing once
+    ("18 real CP warehouses into a pytest tmp dir while the fixture's
+    own two sat unread"). `deliveries_dir`/`receipts_dir` are the real
+    way to redirect this, and now they are the only way.
     """
     staged = []
     for arrival in arrivals.arrivals_for("civil-registration", "run_",

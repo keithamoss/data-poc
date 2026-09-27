@@ -20,7 +20,7 @@ from qa_tools.common import supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
-    close_scan_connections,
+    execute_scan,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
@@ -80,14 +80,9 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
         sampler = CaptureSampler()
         scan.sampler = sampler
         scan.disable_telemetry()
-        # See the BDM counterpart: Soda's own teardown closes an empty dict,
-        # so without this each scan leaves a backend idle in transaction
-        # holding ACCESS SHARE on every table it read.
-        try:
-            scan.execute()
-            scan_results = scan.get_scan_results()
-        finally:
-            close_scan_connections(scan)
+        # See the BDM counterpart and execute_scan()'s own docstring -
+        # never `scan.execute()` directly.
+        scan_results = execute_scan(scan)
         metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
 
         results = []

@@ -55,8 +55,9 @@ class TestWhetherThereIsAnythingHere:
     def test_a_table_in_another_schema_does_not_count(self, empty_db):
         """Only STAGING says a supply has arrived. dbt's own schema
         holds models, which exist whether or not anything was supplied."""
-        empty_db.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.DBT_SCHEMA}"')
-        empty_db.execute(f'CREATE TABLE "{supply_db.DBT_SCHEMA}".some_model (id int)')
+        dbt = supply_db.dbt_schema("run_001")
+        empty_db.execute(f'CREATE SCHEMA IF NOT EXISTS "{dbt}"')
+        empty_db.execute(f'CREATE TABLE "{dbt}".some_model (id int)')
         assert not boot.already_populated(empty_db)
 
 

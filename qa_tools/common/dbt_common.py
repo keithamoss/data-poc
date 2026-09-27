@@ -36,15 +36,23 @@ def parse_threshold(spec: str | None) -> float | None:
 
 def run_dbt(command: str, select: list[str], target_path: str,
             profiles_dir: str, project_dir: str, root: str,
-            run_schema: str | None = None) -> None:
+            run_schema: str | None = None, run_id: str | None = None) -> None:
     """Run dbt against the one PostgreSQL database.
 
     `db_path` IS GONE from this signature (REQ-PIPE-087). It used to name
     dbt's own scratch DuckDB file, which existed because dbt writes and
     DuckDB gives a writer an exclusive lock over the whole file while
-    these calls fan out over a process pool. PostgreSQL has no such
-    contention, so dbt writes into its own schema in the same database
-    and there is no second database to name.
+    these calls fan out over a process pool.
+
+    `run_id` REPLACED IT, and the correction is worth stating because
+    the first version of this docstring got it wrong. It said
+    PostgreSQL "has no such contention, so dbt writes into its own
+    schema in the same database" - true about the FILE LOCK, wrong about
+    what the per-run file was really buying. Two runs writing one
+    schema race on the TABLES: `dbt build` drops and recreates its
+    models, so one run reads `stg_birth_registrations` while another
+    rebuilds it and gets "relation does not exist". So the schema is
+    per-run now, exactly as target_path already was.
 
     `run_schema` is unchanged and still load-bearing: it is the view
     schema this run's sources resolve through, so a bare table name in a
@@ -62,7 +70,14 @@ def run_dbt(command: str, select: list[str], target_path: str,
     env["DBT_PG_USER"] = fields["user"]
     env["DBT_PG_PASSWORD"] = fields["password"]
     env["DBT_PG_DBNAME"] = fields["dbname"]
-    env["DBT_PG_SCHEMA"] = supply_db.DBT_SCHEMA
+    # PER RUN. Without a run_id there is no isolation to give, so this
+    # refuses rather than silently sharing one schema again - which is
+    # the bug this parameter exists to prevent.
+    if not run_id:
+        raise ValueError(
+            "run_dbt needs a run_id: dbt's schema is per-run, and sharing one "
+            "lets concurrent runs drop each other's models mid-read")
+    env["DBT_PG_SCHEMA"] = supply_db.dbt_schema(run_id)
     if run_schema:
         env["DBT_RUN_SCHEMA"] = run_schema
     env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"

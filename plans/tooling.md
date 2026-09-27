@@ -2704,7 +2704,7 @@ testing before anyone treats it as the easy option.
     `CLAUDE.md`'s own standing lesson describes; the text above was
     read with `curl`.
 
-26. **[investigate, 2026-09-27]** **[Testing & dev tooling]** The suite is FLAKY under the parallel default - different tests fail on each full run, and a green result is therefore weaker than it looks.
+26. **[done, 2026-09-27]** **[Testing & dev tooling]** The suite was FLAKY under the parallel default - different tests failed on each full run, and a green result was therefore weaker than it looked. **Root cause found and fixed: Soda Core reloads this repo's `.env` over the process environment, which silently repointed the warehouse.**
 
     Found while profiling for item 24, and it matters more than the
     thing I was looking for: **two consecutive full runs of the same
@@ -2743,21 +2743,67 @@ testing before anyone treats it as the easy option.
        databases mean this cannot bite ACROSS workers, but it can
        within one whenever anything fans out.
 
-    **Which one it is has not been established**, and guessing would be
-    the same mistake the lock hunt made before the server was asked
-    directly. The cheap decisive test: run the suite with the dbt
-    schema made per-run and see whether the failures stop; separately,
-    run it with `data/` made per-worker.
+    **NEITHER OF THOSE WAS IT, and recording that matters as much as
+    recording the answer.** Both candidates were real defects and both
+    are now fixed - dbt's schema is per-run, and the rebuild tests no
+    longer stage the real delivery tree - but neither explained the
+    flakiness. The suite kept failing, differently, after each.
 
-    **Why this outranks item 24's remaining fix.** Making the e2e module
-    parallel is worth ~100s. A suite that fails a different four tests
-    every run costs more than that in re-runs and in trust - and it
-    quietly weakens every "gates green" claim in this project's commit
-    messages, including the ones from today. Fix the flakiness first.
+    **THE ACTUAL CAUSE: Soda Core rewrites the process environment
+    from `.env`.** Its `EnvHelper` is a singleton built during scan
+    CONSTRUCTION, and its constructor calls
+    `dotenv.load_dotenv(override=True)` - which walks up from its own
+    file in site-packages, finds this repo's `.env`, and writes every
+    name in it over what the process already had. `MOTHMAN_SUPPLY_DSN`
+    is one of those names.
 
-    Not caused by the 2026-09-27 work, but made visible by it: those
-    changes added four modules and shifted the timing. The runtime log
-    in CLAUDE.md should carry this caveat until it is resolved.
+    So the first real Soda scan on an xdist worker moved that worker
+    off its own isolated database and onto the developer's real
+    `supply` one, for every test that followed it. Which tests failed
+    depended entirely on how `--dist loadfile` had distributed the
+    modules that run scans, which is why the set changed every run and
+    why every one of them passed in isolation. The symptom - "a staged
+    table that was there a moment earlier" - was accurate: the table
+    was there, in the database the test had stopped looking at.
+
+    **It left real evidence, which is how sure we can be**: fourteen
+    pytest-fixture staged tables and five `qa_adhoc_pytest_*` schemas
+    were found sitting in the real `supply` database, at arrival
+    instants (2026-01-01, 2026-04-01) that no real receipt in
+    `data/receipts/` has.
+
+    **Reproduced in five lines** before anything was changed, which is
+    what took this from a theory to a cause:
+
+    ```
+    MOTHMAN_SUPPLY_DSN=postgresql://.../mothman_test_master uv run python3 -c "
+    from qa_tools.common import supply_db; print(supply_db.supply_db_dsn())
+    from soda.scan import Scan; Scan().set_data_source_name('x')
+    print(supply_db.supply_db_dsn())"
+    # before: .../mothman_test_master
+    # after : .../supply
+    ```
+
+    **THE FIX IS IN PRODUCTION CODE, NOT IN A FIXTURE**, because this
+    is not a test-only bug: `MOTHMAN_SUPPLY_DSN=... mothman pipeline
+    run` is a legitimate thing for an operator to type, and the first
+    Soda scan of that run discarded it. A pipeline that quietly writes
+    to a different database than the one it was told to is the same
+    family as the CI rule about never reaching real data.
+    `qa_tools/common/soda_common.py` now builds the singleton once, on
+    our terms, and puts the environment back
+    (`_defuse_sodas_dotenv_reload()`), and `execute_scan()` restores it
+    again around every scan as a second line of defence.
+    `tests/test_soda_leaves_the_environment_alone.py` asserts the
+    OUTCOME rather than Soda's internals, so it still says whether the
+    invariant holds if a future release changes this.
+
+    **The method lesson, which is the same one the lock hunt taught:**
+    two plausible causes were in hand, both were genuinely broken, and
+    fixing both changed nothing. What found it was instrumenting the
+    actual value at each test phase - a four-line pytest hook printing
+    `os.environ[MOTHMAN_SUPPLY_DSN]` at setup, call and teardown -
+    rather than reasoning about which shared resource looked riskiest.
 
 25. **[todo, 2026-09-26]** **[Testing & dev tooling]** `mothman` never deletes its own temp directories - 4,218 of them, 1.3GB, found while tidying `/tmp`.
 

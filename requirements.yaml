@@ -15086,13 +15086,18 @@ requirements:
         repository.
       - >
         THE SYSTEM SHALL give dbt its own schema in the same database
-        as the supply data, and SHALL NOT attach a separate scratch
-        database for it.
+        as the supply data, one per run, and SHALL NOT attach a
+        separate scratch database for it or share one schema between
+        concurrent runs.
       - >
         IF the database is unreachable, THEN THE SYSTEM SHALL fail
         loudly, naming the environment and the host it tried, and
         SHALL NOT fall back to a local file, an in-memory database or
         a previous result.
+      - >
+        THE SYSTEM SHALL use the connection details it was started
+        with for the whole of a run, and SHALL NOT let a tool it
+        invokes replace them by reloading a configuration file.
     non_functional_requirements:
       - >
         Everything here is reached through `mothman` and nothing else
@@ -16436,6 +16441,15 @@ requirements:
         THE SYSTEM SHALL keep each test's assertions true whether or
         not a gitignored artifact happens to exist on the machine
         running it.
+      - >
+        THE SYSTEM SHALL keep a test worker on its own database for
+        the whole of its run, including after a real QA tool has run,
+        and SHALL NOT let a tool's own configuration loading redirect
+        it to another database.
+      - >
+        THE SYSTEM SHALL let a test that means "my own fixture data"
+        say so, and SHALL NOT accept a parameter that names a source
+        it no longer reads.
     non_functional_requirements:
       - >
         RUNTIME, and it should be measured rather than estimated: the
@@ -16512,6 +16526,50 @@ requirements:
         warehouse-touching part - the runtime question #45 names and
         does not answer.
     decisions:
+      - >
+        THE FLAKINESS WAS A LIBRARY REWRITING THE ENVIRONMENT, not a
+        shared resource, and two plausible wrong answers were fixed
+        first. Soda Core builds a singleton EnvHelper during scan
+        CONSTRUCTION whose constructor calls
+        `dotenv.load_dotenv(override=True)` - so the first real scan
+        on an xdist worker moved that worker off its own database and
+        onto whatever `.env` named, for every test after it. Which
+        tests failed depended on how `--dist loadfile` had distributed
+        the scanning modules, so the set changed every run and each one
+        passed alone. Evidence rather than inference: fourteen pytest
+        fixture tables and five `qa_adhoc_pytest_*` schemas were found
+        in the real `supply` database at arrival instants no receipt in
+        `data/receipts/` has.
+      - >
+        REJECTED: fixing it in a fixture. It is not a test-only fault -
+        `MOTHMAN_SUPPLY_DSN=... mothman pipeline run` is a legitimate
+        thing to type and the first scan discarded it, so the fix
+        belongs in `soda_common`. Also REJECTED: pre-seeding Soda's
+        name-mangled private singleton so the constructor never runs,
+        and restoring only `MOTHMAN_SUPPLY_DSN`. The defect is "a
+        library reloads a file over our process configuration", not
+        "it overwrites one name" - `MOTHMAN_ENVIRONMENT` decides where
+        a build publishes and sits in the same file - so the whole
+        environment is restored, and the guard is a test that asserts
+        the outcome rather than Soda's internals.
+      - >
+        A PARAMETER THAT NAMES A SOURCE IT NO LONGER READS IS A BUG,
+        not clutter. `build_all(raw_dir=...)` had been accepted and
+        ignored since deliveries replaced the manifest, so a caller
+        that thought it had redirected the loader got the whole real
+        `data/deliveries/` tree instead - the CP fixture hit it once
+        ("18 real CP warehouses into a pytest tmp dir"), the rebuild
+        tests hit it again. Removed from the BDM loader;
+        `deliveries_dir`/`receipts_dir` are now the only way to
+        redirect it.
+      - >
+        DBT GETS A SCHEMA PER RUN, not one shared `dbt` schema. Under
+        the retired engine each run had its own scratch FILE, so models
+        were per-run by construction; a single schema let two
+        concurrent runs drop and recreate each other's models
+        mid-read. This was one of the two candidate causes of the
+        flakiness above - a real defect that turned out not to be the
+        cause, and worth fixing on its own terms.
       - >
         ONE STRATEGY WORKS IN EVERY ENVIRONMENT, and that is what
         settles it: the suite takes a CONNECTION STRING and never

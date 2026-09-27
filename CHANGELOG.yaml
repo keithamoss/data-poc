@@ -175,6 +175,20 @@ releases:
               If something does hold a table open, a load now gives up
               after thirty seconds and tells you what it was waiting for,
               rather than hanging with nothing in the log to say why.
+          - headline: A scan can no longer move your database
+            components: ["QA checks & contract"]
+            description: >
+              Running Soda quietly reloaded your `.env` over everything
+              you had already set, so a run told to use one database
+              carried on against another. Whatever you set when you
+              started a command now stays set.
+          - headline: The test suite stays in its own database
+            components: ["Testing & dev tooling"]
+            description: >
+              A side effect of the above had tests drifting onto the real
+              warehouse partway through a run, so they failed differently
+              every time and left tables behind. Each one now stays where
+              it was put.
       - category: New
         items:
           - headline: You need a PostgreSQL to run this

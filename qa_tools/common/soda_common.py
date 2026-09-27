@@ -7,8 +7,55 @@ plans/qa-pipeline.md #84.
 """
 from __future__ import annotations
 
+import os
+
 from soda.sampler.sampler import Sampler
 from soda.sampler.sample_ref import SampleRef
+
+def _defuse_sodas_dotenv_reload() -> None:
+    """Build Soda's EnvHelper now, and put the environment back.
+
+    WHY THIS RUNS AT IMPORT. Soda constructs a singleton `EnvHelper` the
+    first time a scan needs it, and that constructor calls
+    `dotenv.load_dotenv(override=True)` - it walks up from its own file,
+    finds this repo's `.env`, and writes every name in it over whatever
+    the process already had. `MOTHMAN_SUPPLY_DSN` is one of those names,
+    so the first scan of a run silently moved the warehouse to whatever
+    the file said: it discarded an operator's explicit
+    `MOTHMAN_SUPPLY_DSN=... mothman pipeline run`, and in the test suite
+    it sent every test after a Soda test on the same xdist worker at the
+    developer's real database instead of its own isolated one. That is
+    how ~14 pytest fixture tables came to be sitting in `supply`.
+
+    IT HAPPENS DURING SCAN CONSTRUCTION, not during `execute()`, which
+    is why containing `execute()` alone was not enough - and why this is
+    here rather than in `execute_scan()` below. Getting the singleton
+    built once, on our terms, means no scan anywhere can do it later: a
+    rule that needs no discipline at any future call site.
+
+    PUBLIC NAMES ONLY (`EnvHelper`, `Logs`), and both are singletons
+    Soda itself reuses across scans, so this is indistinguishable from
+    having run one scan already. It never raises: a Soda release that
+    renames or drops this leaves a process that behaves exactly as it
+    does today, and
+    tests/test_soda_leaves_the_environment_alone.py is what says whether
+    the invariant still holds.
+    """
+    before = dict(os.environ)
+    try:
+        from soda.common.env_helper import EnvHelper
+        from soda.common.logs import Logs
+
+        EnvHelper(Logs())
+    except Exception:  # noqa: BLE001 - see the docstring: never fatal
+        pass
+    finally:
+        if os.environ != before:
+            os.environ.clear()
+            os.environ.update(before)
+
+
+_defuse_sodas_dotenv_reload()
 
 ENGINE_TAG = "Soda Core 3.5"
 
@@ -86,6 +133,54 @@ def threshold(spec: dict | None) -> float | None:
     # side) - "upper bound wins for a single scalar" convention, same one
     # the now-removed equivalent engine's _numeric_threshold() used.
     return next(iter(spec.values()), None)
+
+
+def execute_scan(scan):
+    """Run a Soda scan and return its results, leaving nothing behind.
+
+    TWO THINGS SODA DOES NOT CLEAN UP, both found on 2026-09-27 and both
+    fixed here rather than at each call site, because a scan that raises
+    leaks in exactly the same way and that is the case nobody is
+    watching.
+
+    THE CONNECTION - see close_scan_connections() below for the full
+    account. Soda's own teardown iterates an empty dict, so every scan
+    otherwise leaves a PostgreSQL backend sitting `idle in transaction`.
+
+    THE ENVIRONMENT, which is the worse of the two. Soda builds a
+    singleton `EnvHelper` on the first scan in a process, and its
+    constructor calls `dotenv.load_dotenv(override=True)`: it walks up
+    from its own file, finds this repo's `.env`, and writes every name
+    in it over whatever the process already had. `MOTHMAN_SUPPLY_DSN` is
+    one of those names, so the first scan of a run silently moved the
+    warehouse to whatever the file said - discarding an operator's
+    explicit `MOTHMAN_SUPPLY_DSN=... mothman pipeline run`, and, in the
+    test suite, sending every test after a Soda test on the same worker
+    at the developer's real database instead of its own.
+
+    RESTORING THE WHOLE ENVIRONMENT rather than the one name we know
+    about. The defect is not "Soda overwrites the DSN", it is "a library
+    reloads a file over our process configuration"; `MOTHMAN_ENVIRONMENT`
+    decides where a build publishes and is in the same file. Naming the
+    variables here would mean remembering to add the next one.
+
+    NOT A WORKAROUND FOR SOMETHING WE COULD ASK SODA TO STOP DOING -
+    there is no configuration for it, and the alternative was
+    pre-seeding a name-mangled private singleton so its constructor
+    never ran. Containing the effect is both smaller and honest about
+    what it is. The guard against Soda changing is
+    tests/test_soda_leaves_the_environment_alone.py, which asserts the
+    outcome rather than the mechanism.
+    """
+    before = dict(os.environ)
+    try:
+        scan.execute()
+        return scan.get_scan_results()
+    finally:
+        close_scan_connections(scan)
+        if os.environ != before:
+            os.environ.clear()
+            os.environ.update(before)
 
 
 def close_scan_connections(scan) -> int:

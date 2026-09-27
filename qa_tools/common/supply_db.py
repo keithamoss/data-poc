@@ -132,10 +132,23 @@ REJECTED_SCHEMA = "rejected"
 
 #: A per-run view schema carries this prefix so one left behind by an
 #: interrupted run is identifiable on its own terms (criterion 6) -
+#:
+#: SHORTENED FROM `qa_run_` ON 2026-09-27 (Keith, reading a schema
+#: name: "why have the duplicate run_run"). Every BDM run id already
+#: starts with `run_`, so the old prefix produced `qa_run_run_001`, and
+#: Child Protection managed `qa_run_cp_run_001`. Shortening the PREFIX
+#: rather than stripping `run_` out of the ID is what keeps this
+#: exactly reversible: stripping a substring that can appear anywhere
+#: has no unambiguous inverse, so `qa_run_cp_001` could not say whether
+#: the run was `cp_001` or `cp_run_001`.
+#:
+#: It does NOT collide with qa_store's metadata schema, which is
+#: exactly `qa` and never `qa_something` - there is a test pinning
+#: that, because the two are one character apart.
 #: without a manifest, a log, or any other record to cross-reference.
 #: At ~30 datasets with years of history, orphaned schemas are a real
 #: operational cost rather than untidiness.
-RUN_SCHEMA_PREFIX = "qa_run_"
+RUN_SCHEMA_PREFIX = "qa_"
 
 #: Identifiers are quoted everywhere below, so this is not what keeps
 #: the SQL safe - it is what keeps a schema or table name READABLE, and
@@ -481,7 +494,7 @@ def soda_config_yaml(data_source_name: str, schema: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def connect_dbt(read_only: bool = True) -> SupplyConnection:
+def connect_dbt(run_id: str, read_only: bool = True) -> SupplyConnection:
     """A connection whose UNQUALIFIED names are dbt's own models.
 
     Replaces the retired connect_dbt_scratch(), and keeps the one
@@ -497,7 +510,11 @@ def connect_dbt(read_only: bool = True) -> SupplyConnection:
     conn = connect(read_only=read_only, label="mothman:read-dbt-output")
     # SET is allowed inside a read-only session; it changes name
     # resolution, not data.
-    conn.raw.execute(f'SET search_path TO "{DBT_SCHEMA}", public')
+    #
+    # THIS RUN'S dbt SCHEMA, not a shared one (2026-09-27) - otherwise
+    # a reader can resolve `stg_birth_registrations` to a model another
+    # run is midway through rebuilding.
+    conn.raw.execute(f'SET search_path TO "{dbt_schema(run_id)}", public')
     return conn
 
 
@@ -801,19 +818,32 @@ def run_schemas(conn) -> list[str]:
     listed here is an orphan - a run that was interrupted before it
     could discard its schema.
     """
+    # THE UNDERSCORE IS ESCAPED, and it matters more now the prefix is
+    # short. `_` is a single-character WILDCARD in SQL LIKE, so a bare
+    # `qa_%` would also match `qax...` - and with the old seven-character
+    # `qa_run_%` the literal text made a false match unlikely enough to
+    # go unnoticed. Three characters is not that forgiving.
     rows = conn.execute(
         "SELECT schema_name FROM information_schema.schemata "
-        "WHERE schema_name LIKE ?", [RUN_SCHEMA_PREFIX + "%"]).fetchall()
+        "WHERE schema_name LIKE ? ESCAPE '!'",
+        [RUN_SCHEMA_PREFIX.replace("_", "!_") + "%"]).fetchall()
     return sorted(r[0] for r in rows)
 
 
 def drop_orphan_run_schemas(conn, keep: Sequence[str] = ()) -> list[str]:
-    """Remove every per-run view schema except the ones named in
-    `keep`. Returns what it dropped, so a caller can say so rather than
-    tidying up silently."""
-    spared = {run_schema(r) for r in keep}
+    """Remove every per-run schema except the ones named in `keep`.
+    Returns what it dropped, so a caller can say so rather than tidying
+    up silently.
+
+    BOTH KINDS, since 2026-09-27: a run's view schema AND its dbt
+    schema. dbt's became per-run the same day, and a per-run thing that
+    nothing deletes is just a leak with a tidier name - at ~30 datasets
+    on a quarterly cadence that would be thousands of abandoned schemas
+    in a year.
+    """
+    spared = {run_schema(r) for r in keep} | {dbt_schema(r) for r in keep}
     dropped = []
-    for schema in run_schemas(conn):
+    for schema in run_schemas(conn) + dbt_schemas(conn):
         if schema in spared:
             continue
         conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
@@ -843,14 +873,41 @@ def drop_orphan_run_schemas(conn, keep: Sequence[str] = ()) -> list[str]:
 # one database share one, which is correct because they share its
 # tables too.
 #
-# DBT_SCHEMA is where dbt's own models land. Named, not defaulted: dbt
+# dbt_schema(run_id) is where dbt's own models land. Named, not defaulted: dbt
 # would otherwise use `public`, and a model sitting in `public` beside
 # real supply schemas is exactly the ambiguity this design removes.
 # ---------------------------------------------------------------------------
 
-#: dbt's own schema in the one database - its models and its
+#: The prefix for dbt's own schemas - its models and its
 #: --store-failures audit tables. Never a supply schema.
-DBT_SCHEMA = "dbt"
+#:
+#: ONE PER RUN, not one shared (2026-09-27). It was a single `dbt`
+#: schema, on the reasoning that DuckDB's exclusive file lock was the
+#: only thing the retired per-run scratch FILE had been working around,
+#: and PostgreSQL has no such lock. That reasoning was wrong about
+#: WHICH contention mattered: the file lock was about concurrent
+#: writers to a database, and the real problem is concurrent writers to
+#: the same TABLES. `dbt build` drops and recreates its models, so two
+#: runs sharing a schema race - one reads `stg_birth_registrations`
+#: while the other is rebuilding it, and gets "relation does not
+#: exist". The retired file gave each run its own by construction; this
+#: restores that, the same way dbt_target_path() already does for dbt's
+#: on-disk artefacts.
+DBT_SCHEMA_PREFIX = "dbt_"
+
+
+def dbt_schema(run_id: str) -> str:
+    """Where dbt's models and audit tables go for ONE run."""
+    return DBT_SCHEMA_PREFIX + _ident(run_id, "run id")
+
+
+def dbt_schemas(conn) -> list[str]:
+    """Every per-run dbt schema currently in the database."""
+    rows = conn.execute(
+        "SELECT schema_name FROM information_schema.schemata "
+        "WHERE schema_name LIKE ? ESCAPE '!'",
+        [DBT_SCHEMA_PREFIX.replace("_", "!_") + "%"]).fetchall()
+    return sorted(r[0] for r in rows)
 
 def scratch_dir() -> Path:
     """Where this database's file-shaped scratch lives.

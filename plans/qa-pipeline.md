@@ -5427,6 +5427,44 @@ relative, not a schedule — this is weeks of work, not months.
     recording, and that this repo's own committed history really does
     carry the recording in the shape the code expects.
 
+88. **[investigate, 2026-09-27]** **[Pipeline & publishing]** Staging still writes a copy of every Child Protection file into `data/cp_raw/`, and nothing needs it any more.
+
+    Found while answering Keith's own question - "why would tools
+    restage from `data/` when they should all be reading from the
+    database now?" - which turned out to have three separate answers.
+
+    1. **`data/deliveries/` is the ARRIVAL area, not a warehouse.** It
+       holds the supplier's own files. Staging reads them and loads
+       them into PostgreSQL, so a test that exercises staging touches
+       that tree by definition. Correct and not going anywhere.
+    2. **`build_all(raw_dir=...)` was a dead parameter**, accepted and
+       ignored since deliveries replaced the manifest, so a caller
+       that thought it had redirected the loader silently got the real
+       tree. Removed from the BDM loader the same day - see
+       `plans/tooling.md` #26.
+    3. **CP's `add_table_to_run()` copies each delivered CSV to
+       `data/cp_raw/<run_id>/<table>.csv`**, and THIS is the real
+       leftover. It exists because the CP datacontract and Evidently
+       runners used to read those CSVs. Both now read the warehouse -
+       datacontract outright, Evidently with the CSV only as a
+       fallback - so the copy has one remaining consumer, the ad-hoc
+       `mothman cp qa --local-dir` browse path, which does not need a
+       copy of something already staged.
+
+    **Why it is worth doing rather than leaving.** It writes generated
+    state into the working tree on every run, which is exactly what
+    Keith's 2026-09-27 configuration-not-state rule is about, and it
+    doubles the on-disk footprint of every CP supply for nothing.
+
+    **The open question is what happens to the two fallbacks**, and it
+    is a real fork rather than a detail. `run_evidently_cp.py`'s
+    `_current_frame()` catches a bare `Exception` and falls back to
+    the CSV - so a genuine database failure (a lock, a missing view, a
+    wrong schema) currently produces a drift number computed from a
+    file instead of an error. That is a permissive fallback of the
+    kind this project has argued against elsewhere, and removing the
+    copy forces the decision rather than creating it.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

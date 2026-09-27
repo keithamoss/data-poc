@@ -42,7 +42,7 @@ def test_a_run_id_is_always_a_usable_schema_name():
                  "/tmp/a folder with spaces/", "2026 extract.csv"]:
         run_id = run_id_from_path(path)
         # Raises SupplyDbError if the id is not a usable identifier.
-        assert supply_db.run_schema(run_id).startswith("qa_run_")
+        assert supply_db.run_schema(run_id).startswith(supply_db.RUN_SCHEMA_PREFIX)
         assert supply_db.run_id_of(supply_db.run_schema(run_id)) == run_id, \
             "a run id must survive the schema round trip exactly"
 

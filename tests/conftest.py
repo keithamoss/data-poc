@@ -185,7 +185,16 @@ def supply_dsn(worker_id):
     info["dbname"] = name
     dsn = psycopg.conninfo.make_conninfo(**info)
 
-    from qa_tools.common import supply_db
+    # BEFORE ANY SODA SCAN CAN RUN, and this import is the whole point
+    # of the line rather than a stylistic one. Soda builds a singleton
+    # EnvHelper whose constructor reloads this repo's `.env` OVER the
+    # process environment, which would undo the redirection below and
+    # send every test after a Soda test on this worker at the
+    # developer's real database. Importing soda_common defuses that
+    # once - see its own _defuse_sodas_dotenv_reload(). Doing it here
+    # makes the isolation guaranteed rather than dependent on which
+    # module a worker happens to import first.
+    from qa_tools.common import soda_common, supply_db  # noqa: F401
 
     before = os.environ.get(supply_db.SUPPLY_DSN_ENV)
     os.environ[supply_db.SUPPLY_DSN_ENV] = dsn

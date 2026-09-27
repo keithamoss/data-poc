@@ -704,6 +704,18 @@ Rough layout:
   the flattering one; this log should carry the suite figure.
   Measured on a real PostgreSQL, which every run from here needs.
 
+  -> **~211s/2049 tests (2026-09-27, after the Soda dotenv fix)**. Down
+  ~83s on 42 more tests, and the drop is the point rather than the
+  count: the suite had been FLAKY - three full runs failed eight, then
+  four, then one different tests, all passing in isolation - because
+  Soda Core reloads this repo's `.env` over the process environment on
+  its first scan, moving that xdist worker off its own database and
+  onto the real `supply` one for every test after it
+  (`plans/tooling.md` #26). Part of the time went with it: two tests
+  were staging the whole real forty-two-arrival delivery tree on every
+  run, eighty seconds, because they passed a `raw_dir` the loader had
+  stopped reading. Full `mothman check` 268s; JS suite 351 tests.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
@@ -849,6 +861,20 @@ Rough layout:
     distinguish the two. `sudo -u postgres psql -c "\du"` is what
     answers it in one line. So run all of the above on a fresh
     container, not just the first one.
+
+    **A running server is not a populated one**, and the two are
+    separate steps on purpose - the session-start hook does the first
+    and reports on the second rather than doing it. `mothman pipeline
+    bootstrap` generates both collections' synthetic data and runs the
+    real checks over every supply; **measured 2026-09-27 against an
+    empty database, 237 seconds** (~4 minutes, 151 staged tables, 3,204
+    CP check results), so it is worth starting early rather than
+    discovering it is needed. It is a no-op when the database already
+    holds staged tables; `--force` rebuilds anyway, and the pipeline is
+    seeded so the content is the same either way. Note it also rewrites
+    `qa_results/` with fresh timestamps - ~900 files - so discard that
+    churn (`git checkout -- qa_results/`) unless the run was meant to
+    add history.
   - `uv run dbt deps --project-dir dbt_project --profiles-dir
     qa_tools/dbt_profiles` (installs `dbt_utils`, whose macros several
     real dbt checks need - without it 8 real tests fail)
