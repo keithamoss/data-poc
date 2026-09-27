@@ -19187,6 +19187,15 @@ requirements:
         SHALL run, record and report it exactly as it does a cross-table
         check over datasets that have one.
       - >
+        THE SYSTEM SHALL let a cross-table check span a dataset without a
+        calendar and a dataset with one, and SHALL NOT refuse it because
+        its participants differ in that respect.
+      - >
+        THE SYSTEM SHALL record such a check's result as in-development
+        and report it against the dataset without a calendar, and SHALL
+        NOT let it contribute to the status of any dataset that has a
+        calendar, nor to any collection-level or asset-level rollup.
+      - >
         WHEN a dataset gains a calendar, THE SYSTEM SHALL graduate it -
         from that point it owes supplies, is filed to periods, and is
         rolled up like any other - and SHALL record when it graduated.
@@ -19227,17 +19236,6 @@ requirements:
         and discovering the permanent one later means rework in the
         rollups, the dashboard and the schedule gate at once.
     dependencies: [REQ-PIPE-087, REQ-PIPE-089]
-    open_questions:
-      - >
-        WHETHER A CROSS-TABLE CHECK MAY SPAN A SAMPLE DATASET AND AN
-        AGREED ONE in the same collection, and if so how its verdict is
-        attributed. Criterion 13 covers checks among samples, which is
-        what Keith named. The mixed case collides with criterion 9's
-        rollup exclusion, and the recommendation in this requirement's
-        decisions is to allow it while recording the result as
-        in-development and excluding it from the agreed dataset's status
-        and every rollup. It affects one criterion rather than the
-        requirement's shape, so the rest is buildable while this is open.
     decisions:
       - >
         PRE-GRADUATION DATA IS DISCARDED, BY A PERSON, FROM THE TUI
@@ -19271,10 +19269,13 @@ requirements:
         every participant has a calendar - and each would then have to be
         undone rather than extended.
       - >
-        WHAT HIS ANSWER DOES NOT COVER, recorded rather than guessed: a
+        A MIXED CROSS-TABLE CHECK IS ALLOWED AND CANNOT MOVE THE AGREED
+        DATASET (Keith, 2026-09-27: "allow it, but don't let it affect the
+        agreed data set"). Criteria 14 and 15 state it. The case is a
         cross-table check spanning a sample dataset AND an agreed one in
-        the same collection. He named checks among SAMPLES, which
-        criterion 13 states. The mixed case is plausible and arguably the
+        the same collection - he had named checks among SAMPLES, which
+        criterion 13 covers, and this was left open for a turn rather than
+        assumed. The mixed case is plausible and arguably the
         strongest reason to develop checks early - a new dataset joining
         an existing collection - and it collides with criterion 9, since
         a mixed check's verdict attributed to the agreed dataset would
