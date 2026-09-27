@@ -8861,9 +8861,10 @@ requirements:
         plain out-of-range message and its one-click reset, and the page
         itself still rendered underneath it. 5 passed.
       - >
-        tests-js: 25 files, 375 tests passing, including the new
+        tests-js: 25 files, 377 tests passing, including the new
         tests-js/asof-range.test.js (16). tests/test_embed_dashboard_data.py
-        18 passed.
+        18 passed. Full `mothman check`: all eleven gates green, pytest
+        2189 passed in 257s.
     signed_off:
       by: Keith
       date: "2026-09-27"

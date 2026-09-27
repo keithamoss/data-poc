@@ -775,6 +775,11 @@ Rough layout:
   figure's history rather than one: 55 failed / 22 errors, then 13
   failed, then green, which is what a wide refactor's sweep looks like.
 
+  -> **~257s/2189 tests (2026-09-28, REQ-DASH-054)**. Up ~46s on 140
+  more tests since the entry above; nothing pointed at a new hot spot.
+  Full `mothman check` 300s, of which pytest is 257s and `npm test`
+  ~41s (377 tests).
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
