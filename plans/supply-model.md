@@ -2341,9 +2341,15 @@ mechanism. That is the real remaining fork in the whole switchover, and
   green on a real runner with the service container. Both workflows green.
 - **Repository still holds state.** `qa_results/` is still a committed
   tree. `qa_tools/common/qa_store.py` (the metadata schema - my call, per
-  your delegation) and `qa_results_migrate.py` both exist and are tested,
-  but nothing is wired to either, and wiring them is what forces the
-  publishing question above. So I stopped there rather than half-move it.
+  your delegation) exists, but nothing is wired to it, and wiring it is
+  what forces the publishing question above. So I stopped there rather
+  than half-move it. **Corrected 2026-09-27**: this entry said that
+  module and `qa_results_migrate.py` were both "tested", and neither
+  was - qa_store.py had no test at all until REQ-PIPE-089's first build
+  phase wrote sixteen, four of which it failed. An unexecuted module
+  reads as finished, which is the whole reason that claim was worth
+  checking rather than repeating. The migrator is now deleted, per
+  criterion 25's choice to regenerate rather than migrate.
 - **Two things I did NOT do** and would rather you saw first: the
   `REQ-DOCS-101` sweep, and anything that changes how the dashboard is
   published.

@@ -15902,15 +15902,31 @@ requirements:
         agency rather than for this PoC. What changes is that the
         question is now answerable at all.
       - >
-        THE EXISTING DELIVERY AND LOAD RECORDS ARE MIGRATED, NOT
-        REGENERATED, by this requirement (criterion 21) - and note
-        that Keith separately chose REGENERATION for the delivery log
-        in a different context, when it gains automated-vs-human,
-        route and operator fields. That work is parked until this one
-        lands (plans/running-thoughts.md #52), so the order is:
-        migrate what exists here, regenerate with the new fields
-        there. Doing it the other way round would regenerate into a
-        tree this requirement then deletes.
+        SUPERSEDED 2026-09-27, BEFORE ANY OF IT WAS BUILT, and kept
+        rather than deleted because a reader finding only criterion 25
+        would not know this had been considered and dropped. It said:
+        the existing delivery and load records are MIGRATED rather than
+        regenerated, on the grounds that Keith separately chose
+        regeneration for the delivery log in a different context, when
+        it gains automated-vs-human, route and operator fields
+        (plans/running-thoughts.md #52).
+
+        IT CONTRADICTED CRITERION 25, which says to regenerate
+        everything and delete the migration code, and it cited
+        "criterion 21" for something criterion 21 does not say -
+        criterion 21 is the REQ-PIPE-061 amendment. Put to Keith with
+        both readings on 2026-09-27, he chose criterion 25: rebuild
+        everything. The generator is seeded, so deliveries, receipts
+        and loads regenerate identically, which is why there is nothing
+        to migrate.
+
+        WHAT SURVIVES from it is the ordering it was protecting: #52's
+        delivery-log regeneration with the new fields still comes AFTER
+        this requirement, because doing it first would regenerate into
+        a tree this requirement then deletes.
+
+        `qa_tools/common/qa_results_migrate.py` was deleted the same
+        day. It had never been wired to anything.
       - >
         REQ-PIPE-038's FATE IS NOT DECIDED HERE. It re-keyed the
         committed tree per dataset eleven days before this retires

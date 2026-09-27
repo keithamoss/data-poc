@@ -351,12 +351,15 @@ Rough layout:
   **What still breaks the rule, so nobody has to re-derive the list.**
   `qa_results/` is the big one - the whole committed per-run QA history,
   still in the tree as of 2026-09-27. `qa_tools/common/qa_store.py` is
-  the metadata schema that replaces it and
-  `qa_tools/common/qa_results_migrate.py` migrates the tree into it, but
-  nothing is wired to either yet, so the table entry below still
-  describes committed files because committed files are still what is
-  there. **Do not describe the destination as the present.** When it
-  lands, it takes `deploy-pages.yml` with it: the dashboard cannot be
+  the metadata schema that replaces it, real and tested since
+  REQ-PIPE-089's first build phase, but nothing writes to it yet, so the
+  table entry below still describes committed files because committed
+  files are still what is there. **Do not describe the destination as
+  the present.** There is no migration path and there will not be one:
+  Keith chose to regenerate rather than migrate (REQ-PIPE-089 criterion
+  25), so `qa_results_migrate.py` was deleted rather than finished.
+
+  When the move itself lands, it takes `deploy-pages.yml` with it: the dashboard cannot be
   built in GitHub Actions from a database GitHub cannot reach, so the
   build moves to the environment that can - which is Keith's own answer
   to the same question about the decision log, 2026-09-26.
