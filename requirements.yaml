@@ -16127,6 +16127,37 @@ requirements:
         environment has its own database and its own dashboard, so the
         honest unit is the page-level statement REQ-DASH-094 requires,
         not a label on every event.
+      - >
+        THE FEED'S GAP NOTE IS DELETED RATHER THAN REPURPOSED (Keith,
+        2026-09-27). The UI computed the difference between
+        `run_timestamp` and `committed_at` and rendered "QA ran 40
+        minutes earlier"; its own comment says it existed for the "QA'd
+        today but not published for days" signal. That signal cannot
+        occur any more - both timestamps describe the same run, so the
+        gap is the run's own duration wearing a label that implies a
+        publishing delay, which is misleading rather than merely
+        redundant. REJECTED: repurposing it as "the run took 40
+        minutes". Run duration may well be worth showing, and it is a
+        genuinely new fact this requirement does not ask for, so it
+        gets its own requirement and its own label rather than
+        inheriting a field that used to mean something else.
+      - >
+        FOUR OF THE SIX CRITERIA WERE ALREADY MET BY REQ-PIPE-089'S OWN
+        BUILD, and the two that were not are the reason this is worth
+        recording. C1-C4 landed in `changelog.py` when the git walk
+        went: the feed is one SELECT over `qa.run_visible`, the actor is
+        that run's recorded `run_by`, the walk is gone with a test
+        asserting it stays gone, and the ordering is by run timestamp.
+        C5 and C6 were NOT met, and both sat in the dashboard template
+        rather than in the Python - the field still named
+        `committed_at`, an empty state reading "commit not found in this
+        checkout's history" for a state that can no longer occur, a
+        documentation block still describing the field as landing on the
+        shared branch, and the gap note above. Reporting this
+        requirement as already-done after reading only the Python was
+        one step away, and CLAUDE.md's own standing lesson is exactly
+        that: a green data layer says nothing about a render layer with
+        its own transform.
   - id: REQ-PIPE-091
     title: "The decision log is a table in the metadata schema, and a filing decision and its entry are one transaction"
     date_written: "2026-09-26"
