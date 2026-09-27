@@ -12430,8 +12430,17 @@ requirements:
         one dataset's decisions costs nothing in the size of any other
         dataset's history.
       - >
-        THE SYSTEM SHALL commit the log to the repository, and SHALL NOT
-        hold it only in the warehouse.
+        SUPERSEDED BY REQ-PIPE-091 (Keith, 2026-09-27, approving the
+        amendment inside that requirement's own change). It read "THE
+        SYSTEM SHALL commit the log to the repository, and SHALL NOT hold
+        it only in the warehouse", and it is now the opposite: the log is
+        a table in the metadata schema and there is no committed copy
+        beside it. The reason is REQ-PIPE-091 criterion 2 - a decision's
+        entry and its effect on the warehouse must land in one
+        transaction, and no mechanism makes a git commit atomic with a
+        database write, so a committed log can say a promotion happened
+        that did not. Left here rather than deleted because criteria are
+        referred to by number.
       - >
         THE SYSTEM SHALL answer, for any dataset, the identity of its
         most recently promoted supply, from that log alone.
@@ -12439,10 +12448,17 @@ requirements:
         THE SYSTEM SHALL be readable by the dashboard build with no
         access to anything under data/.
       - >
-        THE SYSTEM SHALL write each decision as its own file under that
-        dataset's directory, named so that entries sort in the order
-        they took effect, and SHALL NOT append to a file shared with
-        another decision.
+        SUPERSEDED BY REQ-PIPE-091, same amendment as criterion 11 above.
+        It read "THE SYSTEM SHALL write each decision as its own file
+        under that dataset's directory, named so that entries sort in the
+        order they took effect, and SHALL NOT append to a file shared
+        with another decision" - a rule about file layout, which stops
+        applying once there are no files. What it was PROTECTING survives
+        and is now criterion 11 of REQ-PIPE-091: one dataset's decisions
+        readable at a cost independent of every other dataset's history,
+        which an index on (dataset_id, effective_at, id) gives directly
+        rather than by a directory shape. The ordering half survives too,
+        as ORDER BY on the instant the decision took effect.
     non_functional_requirements:
       - >
         LAYOUT MIRRORS qa_results/, KEY FOR KEY (Keith, 2026-09-26):
@@ -12490,6 +12506,29 @@ requirements:
     dependencies: [REQ-PIPE-062, REQ-PIPE-034]
     open_questions:
       - >
+        RESOLVED 2026-09-27, IN FAVOUR OF THE DATABASE, and REQ-PIPE-091
+        is the requirement that carries it - signed off by Keith the same
+        day and built on 2026-09-28. Every property the question below
+        was waiting to judge against something real turned out to hold:
+        one serialisation point, and a transaction that makes judging a
+        decision permissible and appending it a single atomic act. The
+        sequencing it asked for happened too - PostgreSQL came into the
+        PoC first (REQ-PIPE-087), so this was decided against a running
+        database rather than by reasoning.
+
+        ONE THING IN IT WENT THE OTHER WAY and is worth naming, because
+        the question below states it as settled: it says the dashboard
+        build would still read committed files alone, so a database log
+        would have to be exported to them. That is not what happened.
+        Keith's own line on 2026-09-27 moved the rule instead - "a build
+        may read recorded QA results, never actual data, and never
+        anything else" - so the build reads the database over a
+        least-privilege grant and there is no export, and no second
+        record to keep in step. The question's own worry about criterion
+        1 therefore does not arise.
+
+        The rest is kept below as the reasoning that got here.
+      - >
         WHETHER THE LOG LIVES IN THE REPOSITORY OR IN THE WAREHOUSE
         DATABASE IS REOPENED (Keith, 2026-09-26, stepping back from a
         narrower question about a stale terminal clone). Criterion 11
@@ -12524,6 +12563,26 @@ requirements:
         file, cannot exercise. Nothing in the supply sprints is built,
         so the cost of changing later is requirement edits rather than
         code.
+      - >
+        WHAT STATUS SHOULD THIS REQUIREMENT CARRY NOW? Everything it asks
+        for is built, by REQ-PIPE-091, on 2026-09-28 - the table, the
+        content rules, the append-only guarantee enforced by the
+        database, the refusal of an anonymous entry, the one-entry
+        re-file, reversal as a new entry, and answering the most recently
+        promoted supply from the log alone. Criteria 11 and 14 are
+        superseded rather than met, with your own approval.
+
+        It is left at `not_started` deliberately rather than flipped. The
+        register's own schema requires a `signed_off` on anything past
+        `not_started`, this requirement has never had one, and the
+        sign-off gate exists precisely so nothing is built against
+        criteria nobody read - so marking it built to tidy the register
+        would be the tidy version of that failure.
+
+        Two ways out, and nothing is blocked either way: sign it off
+        retroactively and it becomes `built` on REQ-PIPE-091's evidence,
+        or say it is wholly superseded and it can be deleted with its
+        decisions carried into 091.
     decisions:
       - >
         Decided the committed log is the SYSTEM OF RECORD and any input
@@ -16542,7 +16601,87 @@ requirements:
       slot, and so the record can never disagree with what actually
       happened to the data.
     moscow: must
-    status: not_started
+    status: built
+    implemented_by:
+      - qa_tools/common/decision_log.py::apply_decision
+      - qa_tools/common/decision_log.py::Decision
+      - qa_tools/common/decision_log.py::DecisionRefused
+      - qa_tools/common/decision_log.py::record_automatic
+      - qa_tools/common/decision_log.py::promoted_into
+      - qa_tools/common/decision_log.py::promoted_supply
+      - qa_tools/common/decision_log.py::decisions_for
+      - qa_tools/common/decision_log.py::all_decisions
+      - qa_tools/common/qa_store.py::ensure_schema
+      - qa_tools/common/qa_store.py::ensure_publisher_role
+      - cli/supply.py::decisions_command
+    linked_tests:
+      - tests/test_decision_log.py::TestItLivesInTheMetadataSchema
+      - tests/test_decision_log.py::TestADecisionAndItsEffectAreOneTransaction
+      - tests/test_decision_log.py::TestItIsJudgedAgainstTheLogInsideTheTransaction
+      - tests/test_decision_log.py::TestNothingCanChangeAnEntry
+      - tests/test_decision_log.py::TestAnUnattributedDecisionIsRefused
+      - tests/test_decision_log.py::TestEveryFactIsRecorded
+      - tests/test_decision_log.py::TestNoDatabaseMeansNoDecision
+      - tests/test_decision_log.py::TestWhatAPeriodResolvedTo
+      - tests/test_decision_log.py::TestOneDatasetsHistoryCostsNothingForAnother
+      - tests/test_decision_log.py::TestAReaderWithNoWriteAccess
+      - tests/test_cli_supply.py::TestReadingTheDecisionLog
+    evidence:
+      - >
+        Built 2026-09-28. `qa.decision` in the metadata schema, schema
+        version 4 -> 5. 45 tests in tests/test_decision_log.py and 6 in
+        tests/test_cli_supply.py, all passing.
+      - >
+        THE TRANSACTION IS PROVEN BY REMOVING IT, not asserted. With
+        `conn.raw.transaction()` replaced by `if True:` four tests fail -
+        an entry survives an effect that raised, a second connection sees
+        the entry mid-decision, and neither of the two lock tests holds.
+        Restored, 45 pass. That is criterion 2 demonstrated rather than
+        described: without one transaction the log says a promotion
+        happened that did not.
+      - >
+        APPEND-ONLY IS THE DATABASE'S, not this code's. A statement-level
+        trigger raises on UPDATE and DELETE, and a second on TRUNCATE -
+        two triggers because PostgreSQL refuses TRUNCATE alongside any
+        other event. A trigger rather than only a grant, because a grant
+        is bypassed by the table's owner, which is the role every
+        developer connects as: grants alone would make the guarantee true
+        of the dashboard's reader and false of whoever could do the
+        damage. Verified against real UPDATE, DELETE and TRUNCATE
+        statements, each refused with a message naming what to do instead.
+      - >
+        THE LOCK IS ON THE SLOT, NOT THE SUPPLY, and that is the story's
+        own failure being prevented: two decisions about DIFFERENT
+        supplies competing for the same slot are the dangerous pair, and
+        a supply-keyed lock lets both through. Verified with
+        `pg_try_advisory_xact_lock` from a second connection, which
+        returns false for every slot a decision names while it is open. A
+        re-file takes both slots in sorted order, so two concurrent
+        re-files in opposite directions cannot deadlock.
+      - >
+        Criterion 8 gives up an offline promise deliberately, so it is
+        asserted two ways: an unreachable database raises and names the
+        host, and structurally the module contains no `open(` and no
+        `Path(` at all. The second is the one that matters, because a
+        local queue is the kind of thing somebody adds later as a
+        robustness fix.
+      - >
+        Criterion 11 asserted on the real planner with `enable_seqscan`
+        off, which asks whether the index is USABLE rather than whether a
+        small table happened to be scanned.
+      - >
+        REQ-PIPE-074's criteria 11 and 14 are amended in this change, with
+        Keith's approval on 2026-09-27: the log is not committed to the
+        repository and a decision is not a file. What criterion 14 was
+        protecting survives as this requirement's criterion 11, met by an
+        index rather than by a directory shape.
+      - >
+        `mothman supply decisions` reads it, because criterion 10's
+        read-without-write property is only meaningful if there is a read.
+        Smoke-tested against a real database: it renders the instant on
+        the ASSET'S clock (a 9:30am Perth promotion reads as 9:30am, not
+        the 1:30am UTC psycopg returns) and marks a rule's decision as a
+        rule's.
     signed_off:
       by: Keith
       date: "2026-09-27"

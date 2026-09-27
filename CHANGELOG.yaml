@@ -136,6 +136,28 @@ releases:
               The date box now stops at the earliest and latest periods it
               has. If an old link carries a date outside them, the page says
               so, names the range it covers and offers one click back.
+      - category: New
+        items:
+          - headline: There is now one record of who decided what happened to a supply
+            components: ["Pipeline & publishing"]
+            description: >
+              Promoting, rejecting, demoting or re-filing a supply is written
+              down as it happens, with who decided it and why. Nothing can
+              change or remove an entry afterwards - a change of mind is a new
+              one. See it with mothman supply decisions.
+          - headline: A decision and what it does to the data are now one step
+            components: ["Pipeline & publishing"]
+            description: >
+              The record and the change land together or not at all, so the log
+              can never say a supply was promoted when the promotion failed.
+              Two people cannot both be told yes for the same delivery period.
+          - headline: Rejecting a supply or using a bad one now asks you why
+            components: ["Pipeline & publishing"]
+            description: >
+              A rejection, using a supply whose checks came back red, or
+              replacing one already in use all need a reason. A routine
+              promotion does not - reasons you are made to give for everything
+              stop meaning anything.
   - date: "2026-09-27"
     summary: >
       The warehouse is now PostgreSQL, and every QA tool checks what was

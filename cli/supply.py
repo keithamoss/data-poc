@@ -436,6 +436,79 @@ def filings_command(dataset_id: str, limit: int) -> None:
     console.print(table)
 
 
+@supply_group.command("decisions")
+@click.option("--dataset", "dataset_id", default=None,
+               help="One dataset's decisions. Omit for the whole log.")
+@click.option("--as-at", "as_at", default=None,
+               help="What the log said at a past instant - an ISO timestamp. "
+                    "Reads the instant a decision TOOK EFFECT, not when it was "
+                    "recorded, so a decision made in January and written up in "
+                    "March counts from January.")
+@click.option("--limit", default=20, show_default=True,
+               help="How many entries to list.")
+def decisions_command(dataset_id: str | None, as_at: str | None, limit: int) -> None:
+    """Who decided what happened to a supply, and why (REQ-PIPE-091).
+
+    The single system of record for every filing decision - promote,
+    reject, demote and re-file. It is append-only and the database
+    enforces that, so what this prints is what was decided rather than
+    what somebody tidied up afterwards.
+
+    READ-ONLY, and that is the point of having it: criterion 10 is that
+    the whole history is readable without write access, and a log nobody
+    can read is a log nobody trusts.
+    """
+    from qa_tools.common import (decision_log, display_time, hierarchy, qa_store,
+                                  supply_db)
+
+    if dataset_id:
+        hierarchy.dataset(dataset_id)
+
+    with supply_db.connect(read_only=True, label="mothman:supply-decisions") as conn:
+        qa_store.ensure_schema(conn)
+        entries = (decision_log.decisions_for(conn, dataset_id, as_at=as_at)
+                    if dataset_id else decision_log.all_decisions(conn, limit=limit))
+        promoted = (decision_log.promoted_supply(conn, dataset_id, as_at=as_at)
+                     if dataset_id else None)
+
+    where = f" for [bold]{dataset_id}[/bold]" if dataset_id else ""
+    if not entries:
+        console.print(f"No filing decision has been recorded{where} yet.")
+        return
+
+    # Newest first whichever read produced them - a reader opens this
+    # asking what happened most recently, and decisions_for() is ordered
+    # the other way because that is the order a history reads in.
+    shown = list(reversed(entries))[:limit] if dataset_id else entries
+    console.print(f"[bold]{len(entries)}[/bold] decision(s){where}"
+                   + (f", as at {as_at}" if as_at else "") + "\n")
+    table = Table("Took effect", "Action", "Supply", "Slot", "Who", "Why",
+                   box=None, pad_edge=False)
+    for entry in shown:
+        slot = (f"{entry['from_slot']} -> {entry['to_slot']}"
+                 if entry["action"] == decision_log.REFILE
+                 else (entry["to_slot"] or entry["from_slot"] or ""))
+        who = entry["actor"]
+        if entry["actor_kind"] == decision_log.RULE:
+            who = f"[dim]{who} (rule)[/dim]"
+        # ON THE ASSET'S CLOCK (REQ-DASH-071). The column stores an
+        # INSTANT, so psycopg hands it back in UTC whatever offset it was
+        # written with - printing that raw would tell a Perth reader a
+        # 9:30am promotion happened at 1:30am, which is the exact defect
+        # the display standard exists to prevent.
+        table.add_row(display_time.format_instant(entry["effective_at"]),
+                       entry["action"], entry["supply"],
+                       slot, who, entry["reason"] or "[dim]-[/dim]")
+    console.print(table)
+
+    if dataset_id:
+        if promoted:
+            console.print(f"\nCurrently promoted: [bold]{promoted['supply']}[/bold] "
+                           f"into {promoted['to_slot']}")
+        else:
+            console.print("\nNothing is promoted for this dataset.")
+
+
 @supply_group.command("holds")
 def holds_command() -> None:
     """Supplies nothing could place, waiting on a person.

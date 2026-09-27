@@ -3825,25 +3825,32 @@ Belongs with batch 5's check work.
     the same "not final until it lands" property.
 
     **WHAT THIS BREAKS OR CHANGES, enumerated now rather than
-    discovered one at a time. Nothing below is amended yet.**
+    discovered one at a time.** The three `REQ-PIPE-074` items are
+    SETTLED as of 2026-09-28; everything about `REQ-GHUB-082` below is
+    still live, and 082 is still unsigned.
 
-    - **`REQ-PIPE-074` criterion 11** ("commit the log, and SHALL NOT
-      hold it only in the warehouse") is still literally satisfied -
-      the log is not held ONLY in the warehouse. But it was written to
-      make the REPOSITORY the system of record, and now the repository
-      holds a derived export. Its meaning shifts even though its words
-      hold. **074 is SIGNED, so this needs Keith's eyes.**
-    - **`REQ-PIPE-074` criterion 1** ("SHALL NOT keep a second record
-      of any of them anywhere else") needs an explicit reconciliation:
-      the export is a DERIVED PUBLICATION, regenerated and never
-      hand-edited, with the database authoritative. Without that
-      sentence somebody will correctly read the export as the second
-      record the criterion forbids.
-    - **`REQ-PIPE-074`'s one-file-per-decision decision** was argued
-      from git merge conflicts between two write routes. Nothing
-      appends concurrently to a regenerated export, so the layout may
-      still be sensible but its REASONING is gone and should not be
-      cited as though it still applies.
+    **THE THREE 074 ITEMS, settled by `REQ-PIPE-091` being built
+    (2026-09-28), and the resolution is not the one this block
+    predicted.** All three turned on the repository holding a DERIVED
+    EXPORT of the log beside the database. There is no export. Keith's
+    own line on 2026-09-27 - "a build may read recorded QA results,
+    never actual data, and never anything else" - moved the rule
+    instead, so the dashboard build reads the database over a
+    least-privilege grant and the repository holds nothing. That makes
+    all three questions disappear rather than get answered: criterion 11
+    is superseded outright and says so in the register, criterion 1's
+    "second record" worry cannot arise because there is no second
+    record, and one-file-per-decision is superseded as criterion 14. The
+    scale property it was protecting survives as `REQ-PIPE-091`
+    criterion 11, met by an index on `(dataset_id, effective_at, id)`.
+
+    Keith approved the amendment on 2026-09-27, which is what this block
+    asked for ("074 is SIGNED, so this needs Keith's eyes") - note that
+    074 was in fact NEVER signed, which its own open questions now
+    record along with what status it should carry.
+
+    **AND THE IMPLIED NEW REQUIREMENT AT THE END OF THIS LIST IS NOT
+    NEEDED.** It was for the export. There is none.
     - **`REQ-GHUB-082` criterion 18's open question RESOLVES.** A
       database has one serialisation point, so "the instant its entry
       is appended" is unambiguous and the four workarounds are moot.
@@ -3863,17 +3870,19 @@ Belongs with batch 5's check work.
       transaction commits, so the outbound comment can follow directly
       rather than waiting for a push.
     - **`REQ-GHUB-082` criterion 17** (say so when reading a
-      non-current copy of the log) is moot for the database path, since
-      there is one copy - but still applies to anything reading the
-      committed export.
+      non-current copy of the log) is moot OUTRIGHT as of 2026-09-28,
+      not just for the database path: there is one copy and no export,
+      so there is no non-current copy for anything to read.
     - **`REQ-PIPE-075` criterion 9** stays true and its mechanism
       collapses: "write the entry only after the tables are durably
       present" is automatic inside one transaction rather than an
       ordering rule to implement.
-    - **A NEW REQUIREMENT IS IMPLIED** and nothing owns it: the export
-      itself - when it runs, what it contains (the full history, since
-      `REQ-PIPE-081`'s "as at T" needs it), where it lands, and the
-      rule that it is regenerated rather than edited.
+    - ~~**A NEW REQUIREMENT IS IMPLIED** and nothing owns it: the
+      export itself.~~ **Struck 2026-09-28: there is no export** - see
+      the note above the list. `REQ-PIPE-081`'s "as at T" is answered
+      from the table directly, by `decision_log.promoted_into(...,
+      as_at=...)`, which reads the instant a decision TOOK EFFECT rather
+      than when it was recorded.
 
 46. **[done, 2026-09-27]** **[Pipeline & publishing]** Keith: stop encoding schema names - normalise them instead, and refuse a collision where the names are defined.
 

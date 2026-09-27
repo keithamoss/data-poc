@@ -270,3 +270,76 @@ class TestOneDatasetsOwnTimeline:
         assert "5 other dataset(s)" in result.output, (
             "a whole-collection delivery has to stay distinguishable from several "
             "coincidental arrivals")
+
+
+class TestReadingTheDecisionLog:
+    """`mothman supply decisions` - REQ-PIPE-091 criterion 10, as something
+    a person can actually reach.
+
+    A log nobody can read is a log nobody trusts, and criterion 10's
+    read-without-write-access property is only meaningful if there is a
+    read.
+    """
+
+    @pytest.fixture
+    def logged(self, supply_dsn):
+        """One person's decision and one rule's, in this worker's own
+        database."""
+        from qa_tools.common import decision_log as dl
+        from qa_tools.common import qa_store, supply_db
+
+        with supply_db.connect(label="test-cli-decisions") as conn:
+            qa_store.ensure_schema(conn)
+            base = dict(agency_id="child-protection-family-support",
+                        collection_id="child-protection", dataset_id="cp-clients",
+                        action=dl.PROMOTE, to_slot="2026-Q3")
+            with dl.apply_decision(conn, dl.Decision(
+                    **base, supply="cp_clients__20260801090000000000",
+                    actor="keith@example.gov.au", actor_kind=dl.PERSON,
+                    effective_at="2026-08-01T09:30:00+08:00")):
+                pass
+            dl.record_automatic(conn, dl.Decision(
+                **{**base, "dataset_id": "cp-carers"},
+                supply="cp_carers__20260801090000000000",
+                actor="auto-promotion", actor_kind=dl.RULE,
+                effective_at="2026-08-01T09:31:00+08:00"))
+            yield conn
+
+    def test_it_is_in_the_supply_group(self):
+        assert "decisions" in CliRunner().invoke(cli, ["supply", "--help"]).output
+
+    def test_an_empty_log_says_so_rather_than_printing_a_bare_table(self, supply_dsn):
+        from qa_tools.common import qa_store, supply_db
+
+        with supply_db.connect(label="test-cli-decisions-empty") as conn:
+            qa_store.ensure_schema(conn)
+        result = _run(["decisions", "--dataset", "cp-placements"])
+        assert result.exit_code == 0, result.output
+        assert "No filing decision" in result.output
+
+    def test_it_lists_one_datasets_decisions_and_what_is_promoted(self, logged):
+        result = _run(["decisions", "--dataset", "cp-clients"])
+        assert result.exit_code == 0, result.output
+        assert "promote" in result.output
+        assert "Currently promoted" in result.output
+
+    def test_it_distinguishes_a_rule_from_a_person(self, logged):
+        """REQ-PIPE-074 criterion 4 reaching a reader. "Promoted by
+        auto-promotion" and "promoted by Keith" are different facts."""
+        result = _run(["decisions", "--dataset", "cp-carers"])
+        assert result.exit_code == 0, result.output
+        assert "rule" in result.output
+
+    def test_the_instant_is_rendered_on_the_assets_clock(self, logged):
+        """REQ-DASH-071's display standard, and this is the exact shape it
+        exists for: the column stores an INSTANT, so psycopg returns it in
+        UTC whatever offset it was written with. Printed raw, a 9:30am
+        Perth promotion reads as 1:30am.
+        """
+        result = _run(["decisions", "--dataset", "cp-clients"])
+        assert "9:30am" in result.output, result.output
+        assert "1:30am" not in result.output
+
+    def test_an_unknown_dataset_is_refused_before_a_database_is_opened(self, logged):
+        result = _run(["decisions", "--dataset", "not-a-dataset"])
+        assert result.exit_code != 0

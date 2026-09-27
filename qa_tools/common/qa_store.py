@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -374,6 +374,118 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery_file (
 CREATE INDEX IF NOT EXISTS delivery_file_dataset
     ON "{SCHEMA}".delivery_file (dataset_id);
 
+-- WHO DECIDED WHAT (REQ-PIPE-091, carrying REQ-PIPE-074's content
+-- across). THE SINGLE SYSTEM OF RECORD for every filing decision -
+-- there is no committed decision log beside it, which is REQ-PIPE-074
+-- criteria 11 and 14 amended rather than met (Keith, 2026-09-27).
+--
+-- IT LIVES IN THIS SCHEMA, AND THAT IS THE WHOLE POINT rather than
+-- tidiness: a decision and its effect on the warehouse have to land in
+-- ONE transaction, and a transaction cannot span two databases. The
+-- earlier design had the log as committed files and the effect in the
+-- warehouse, which no mechanism can make atomic - so the record could
+-- say a supply was promoted while the promotion had failed, or the
+-- reverse, and nothing would say which happened.
+--
+-- IT HANGS OFF NOTHING. Every other table here cascades from `qa.run`,
+-- and this one deliberately does not: a decision is not part of a QA
+-- run, it is a person acting on what a run found, and `DELETE FROM run`
+-- must never take a decision with it. It is also why regenerating QA
+-- history leaves the log alone - the results can be recomputed, the
+-- decisions cannot.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".decision (
+    id             bigserial PRIMARY KEY,
+    agency_id      text NOT NULL,
+    collection_id  text NOT NULL,
+    dataset_id     text NOT NULL,
+    action         text NOT NULL
+        CHECK (action IN ('promote', 'reject', 'demote', 'refile')),
+    -- The supply acted on, by the identity the rest of the system uses
+    -- for one: a physical staged table name. Not a run id - a run is a
+    -- check over a supply, and the same supply can be checked twice.
+    supply         text NOT NULL CHECK (supply <> ''),
+    -- A SLOT PAIR, so that a RE-FILE IS ONE ENTRY (REQ-PIPE-074
+    -- criterion 9) rather than a demotion followed by a promotion.
+    -- Expressed as two rows it would be two decisions with two reasons
+    -- and an instant between them where the period had nothing at all,
+    -- and a reader a year later could not tell that pair from somebody
+    -- genuinely changing their mind twice.
+    from_slot      text,
+    to_slot        text,
+    CHECK (from_slot IS NOT NULL OR to_slot IS NOT NULL),
+    CHECK (action <> 'refile' OR (from_slot IS NOT NULL AND to_slot IS NOT NULL)),
+    -- NO DEFAULT, NO PLACEHOLDER, NO 'unknown' (criterion 6, and
+    -- REQ-PIPE-074 criterion 5). The empty-string check is the half
+    -- that NOT NULL misses, and '' is exactly what a CLI passes when
+    -- somebody hits return at a prompt.
+    actor          text NOT NULL CHECK (actor <> ''),
+    -- A PERSON OR A RULE (REQ-PIPE-074 criterion 4). "Promoted by
+    -- auto-promotion" and "promoted by Keith" are different facts, and
+    -- an audit that cannot separate them cannot answer the only
+    -- question it exists for.
+    actor_kind     text NOT NULL CHECK (actor_kind IN ('person', 'rule')),
+    -- NULLABLE, because a routine promotion legitimately has none
+    -- (REQ-PIPE-074 criterion 7) while a rejection, a red promotion and
+    -- a supersession all require one (criterion 6). Which of those
+    -- applies depends on the log as it stands, so it is judged in
+    -- decision_log.py inside the transaction rather than by a column
+    -- constraint that cannot see the other rows.
+    reason         text,
+    -- TWO INSTANTS, and they are different facts. `effective_at` is when
+    -- the decision took effect on the warehouse; `recorded_at` is when
+    -- this row was written. They are equal for anything this system
+    -- does itself and are not for a decision taken earlier and recorded
+    -- after the fact, which is the case an audit asks about.
+    effective_at   timestamptz NOT NULL,
+    recorded_at    timestamptz NOT NULL DEFAULT now()
+);
+
+--   one dataset's decisions, in the order they took effect, at a cost
+--   that does not grow with any other dataset's history (criterion 11).
+CREATE INDEX IF NOT EXISTS decision_dataset_order
+    ON "{SCHEMA}".decision (dataset_id, effective_at, id);
+
+--   "what is promoted into this slot", which is the judgement every
+--   decision is made against.
+CREATE INDEX IF NOT EXISTS decision_slot
+    ON "{SCHEMA}".decision (dataset_id, to_slot, effective_at)
+    WHERE to_slot IS NOT NULL;
+
+-- APPEND-ONLY, ENFORCED BY THE DATABASE (criterion 5).
+--
+-- A TRIGGER RATHER THAN ONLY A GRANT, and both are here rather than
+-- either. A grant is bypassed by a superuser and by the table's owner,
+-- which in this project is the role every developer connects as - so
+-- grants alone would leave the guarantee true of the dashboard's reader
+-- and false of everybody who could actually do the damage. A trigger
+-- applies to every role including the owner.
+--
+-- IT RAISES rather than silently doing nothing. `DO INSTEAD NOTHING`
+-- would make an UPDATE report success having changed nothing, which is
+-- worse than either outcome: the caller believes it worked.
+CREATE OR REPLACE FUNCTION "{SCHEMA}".decision_is_append_only()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION
+        'qa.decision is append-only: a % is not permitted. Express a reversal '
+        'as a new entry.', lower(TG_OP);
+END;
+$$;
+
+-- TWO TRIGGERS, because PostgreSQL refuses TRUNCATE alongside any other
+-- event in one trigger - and TRUNCATE is the one that matters most here,
+-- being the fastest way to lose the whole log by accident. This schema's
+-- own fixtures truncate `qa.run` routinely.
+DROP TRIGGER IF EXISTS decision_append_only ON "{SCHEMA}".decision;
+CREATE TRIGGER decision_append_only
+    BEFORE UPDATE OR DELETE ON "{SCHEMA}".decision
+    FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".decision_is_append_only();
+
+DROP TRIGGER IF EXISTS decision_no_truncate ON "{SCHEMA}".decision;
+CREATE TRIGGER decision_no_truncate
+    BEFORE TRUNCATE ON "{SCHEMA}".decision
+    FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".decision_is_append_only();
+
 -- THE VISIBLE VIEWS carry criterion 13 for readers that come over a
 -- GRANT rather than through this module - which is how the dashboard
 -- build gets the rule for free (criteria 7 and 23). The publisher role
@@ -525,6 +637,23 @@ def ensure_publisher_role(conn: supply_db.SupplyConnection, role: str,
     conn.execute(f'GRANT SELECT ON ALL TABLES IN SCHEMA "{SCHEMA}" TO {quoted}')
     conn.execute(
         f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{SCHEMA}" GRANT SELECT ON TABLES TO {quoted}')
+
+    # WRITE IS REVOKED EXPLICITLY, not merely never granted
+    # (REQ-PIPE-091 criteria 5 and 10). Never-granted is the true
+    # statement today and is not the one worth relying on: the grant
+    # above is `SELECT ON ALL TABLES`, and the next person who needs this
+    # role to write one thing will widen that line rather than add a
+    # second. A REVOKE standing beside it says the absence was decided.
+    #
+    # It also makes criterion 10 real rather than incidental - a reader
+    # with no write access can read the WHOLE decision history, including
+    # the entries append-only would stop even a writer from changing.
+    conn.execute(
+        f'REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA "{SCHEMA}" '
+        f"FROM {quoted}")
+    conn.execute(
+        f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{SCHEMA}" '
+        f"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLES FROM {quoted}")
 
     # BELT AND BRACES ON THE PUBLIC SCHEMA, which PostgreSQL grants to
     # every role by default in versions before 15 and which a supply
