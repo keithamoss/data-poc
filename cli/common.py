@@ -294,6 +294,37 @@ def decide_keep(paths, *, keep: bool | None) -> bool:
     return confirm("Keep this check?", yes=False, default=False)
 
 
+def offer_to_publish() -> None:
+    """After an interactive check that was kept, ask whether to publish
+    (REQ-PIPE-092 criterion 14).
+
+    A PROMPT, NEVER AUTOMATIC, and the criterion says so in as many
+    words. Publishing is the one act in this tool with an audience
+    outside it - everything else changes what this environment knows,
+    and this changes what other people see. Somebody who has just run
+    QA to look at a number should not discover they have republished a
+    public site.
+
+    IT REACHES THE SITE BY THE SAME PATH THE COMMAND USES (criterion
+    15): cli.dashboard.publish(), which builds, gates and pushes. Not a
+    lighter version of it - a prompt that skipped the render gate would
+    be the second publish path criterion 10 forbids, wearing a
+    friendlier face.
+
+    SILENT WITH NO TERMINAL. There is nobody to ask, and the safe answer
+    to "shall I change what the public sees" asked of nobody is no.
+    """
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return
+    if not confirm("Publish the dashboard now?", yes=False, default=False):
+        console.print("Not published - the published dashboard is unchanged. "
+                       "`mothman dashboard publish` when you want to.", style="dim")
+        return
+    from cli import dashboard as dashboard_cli
+
+    dashboard_cli.publish()
+
+
 def decide_record(run_id: str, *, keep: bool | None) -> bool:
     """Record this Synthetic-mode check, or run it as a trial?
 

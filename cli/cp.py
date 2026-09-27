@@ -445,6 +445,11 @@ def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
                        "nothing was recorded.", style="dim")
     elif interactive:
         common.report_recorded(recorded_run_id, len(results))
+        # AND THEN, ONLY THEN, THE OFFER (REQ-PIPE-092 criterion 14).
+        # After the panel rather than before it: the operator has just
+        # been told what was recorded, which is what they need in order
+        # to answer this.
+        common.offer_to_publish()
     else:
         console.print(f"Recorded {len(results)} results for {recorded_run_id}", style="green")
 

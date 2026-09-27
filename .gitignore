@@ -57,6 +57,14 @@ node_modules/
 # recording on: filings/ is committed history from that point.
 filings/
 
+# The built Pages site (REQ-PIPE-092). `mothman dashboard publish` builds
+# it here, pushes its CONTENT to the gh-pages branch, and leaves the
+# directory behind. It is a build output like
+# dashboard/qa-reporting-dashboard.html, and for the same reason: the
+# published content must never be committable alongside the code that
+# produced it.
+_site/
+
 # Claude Code personal settings - never committed (this repo is public)
 .claude/settings.local.json
 

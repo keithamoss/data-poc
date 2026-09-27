@@ -212,3 +212,182 @@ def rebuild_command() -> None:
     console.print("Gate - dashboard structural + real-browser render check...", style="dim")
     _check_renders()
     console.print("Rebuilt -> dashboard/qa-reporting-dashboard.html", style="green")
+
+
+#: The branch GitHub Pages serves the published dashboard from
+#: (REQ-PIPE-092 criteria 12 and 13). A branch rather than a directory on
+#: the source branch, so a build output can never be staged or committed
+#: alongside the code that produced it - the two share no working tree at
+#: any point.
+PAGES_BRANCH = "gh-pages"
+
+
+def publish(*, dry_run: bool = False, branch: str | None = None) -> None:
+    """Build the dashboard, gate it, and publish it. THE one publish path
+    (REQ-PIPE-092 criteria 10, 11 and 15).
+
+    EVERY ROUTE TO A PUBLISHED SITE COMES THROUGH HERE - the command
+    below, `mothman pipeline run --publish`, and the prompt the QA wizard
+    offers. Criterion 10 is that there is exactly one way to get content
+    published, and criterion 15 that the prompt reaches the site by the
+    same path the command uses. Three entry points to one function is
+    that; three functions that each push would not be, however carefully
+    they matched today.
+
+    THE GATE IS NOT OPTIONAL AND CANNOT BE SKIPPED (criteria 4 and 5).
+    It runs a real browser against the built artifact, here, where the
+    build happened - it used to run in the GitHub Actions job that built
+    it, and moved with the build rather than being dropped. Nothing is
+    pushed unless it passes, which is why the render check sits between
+    the build and the push rather than beside them.
+
+    WHAT HAPPENS IF THE DATABASE IS UNREACHABLE (criterion 8): the build
+    fails, this raises, and NOTHING is pushed - so the previously
+    published dashboard stays exactly as it is. That is the behaviour
+    worth having rather than a placeholder page: a stale dashboard whose
+    build stamp says when it was built is honest, and an empty one that
+    replaced it would not be.
+    """
+    branch = branch or PAGES_BRANCH
+    from pathlib import Path as _Path
+
+    from dashboard.snapshot_dashboard import prepare_deploy_site
+
+    console.print("Rebuilding check results from the recorded QA history...", style="dim")
+    _rebuild_results()
+    console.print("Reshaping into dashboard JSON...", style="dim")
+    _build_data()
+    console.print("Embedding real data into the dashboard...", style="dim")
+    _embed()
+
+    console.print("Gate - dashboard structural + real-browser render check...", style="dim")
+    _check_renders()
+
+    # ONE SNAPSHOT PER PUBLISH (criterion 6), and the "per publish" is the
+    # part worth stating. Snapshots used to be opt-in via
+    # SNAPSHOT_DASHBOARD=1, because CI published on every relevant push and
+    # archiving each one would have buried the archive. Publishing is a
+    # deliberate act now, so archiving what was published is exactly the
+    # criterion: a self-contained copy of what people were shown, openable
+    # years later with nothing but a browser. That is also why
+    # `dashboard/snapshots/*.html.gz` stays committed while everything else
+    # moved into the database - a row in a database it cannot reach is not
+    # openable with a browser.
+    #
+    # AFTER THE GATE, not before, so nothing is archived that was not good
+    # enough to publish. And never on a dry run: a committed artifact is
+    # not what "tell me what would happen" means.
+    if not dry_run:
+        from dashboard.snapshot_dashboard import take_snapshot
+        console.print(f"Snapshot archived -> {take_snapshot()}", style="dim")
+
+    site = _Path("_site")
+    prepare_deploy_site(site_dir=site)
+    _publish(site, branch=branch, dry_run=dry_run)
+
+
+@dashboard_group.command("publish")
+@click.option("--dry-run", is_flag=True,
+              help="Build and gate, and say what would be pushed without pushing it.")
+@click.option("--branch", default=None,
+              help=f"The branch GitHub Pages serves. Default: {PAGES_BRANCH}.")
+def publish_command(dry_run: bool, branch: str | None) -> None:
+    """Build the dashboard from the recorded QA history, gate it, and publish it."""
+    publish(dry_run=dry_run, branch=branch)
+
+
+def _publish(site_dir, branch: str, dry_run: bool) -> None:
+    """Push a built, gated site to the branch GitHub Pages serves.
+
+    WHY A BRANCH AT ALL (REQ-PIPE-092 criterion 12). The dashboard used to
+    reach Pages through a GitHub Actions job that built it and called
+    actions/deploy-pages. That job cannot build it any more: the QA results
+    are in a PostgreSQL database and a runner has no route to it, and
+    giving one a database credential is exactly the wrong thing to build.
+    So the build happens where the data is and the ARTIFACT travels, by the
+    one mechanism GitHub Pages will serve without running anything: a
+    branch it reads directly.
+
+    WHY A WORKTREE rather than checking the branch out here (criterion 13).
+    The published content and the source must never share a working tree -
+    not for tidiness, but because every other arrangement puts a build
+    output somewhere `git add -A` on the source branch can reach it, and
+    this project has already had that exact problem with a committed
+    dashboard build. A detached worktree cannot: the source branch's index
+    is untouched throughout, so there is no moment when the two are
+    confusable.
+
+    ORPHAN HISTORY, deliberately. The published branch shares no ancestry
+    with the source branch and each publish is one commit replacing the
+    last, because its history answers a different question - "what was
+    published, and when" - and interleaving it with the code's history
+    would make both harder to read. GitHub Pages serves the tip and cares
+    about nothing else.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    site_dir = Path(site_dir)
+    index = site_dir / "index.html"
+    if not index.is_file():
+        raise click.ClickException(
+            f"{index} is missing - a publish must follow a real build, and nothing was built here.")
+
+    sha = _short_sha()
+    message = f"Publish the dashboard{f' built from {sha}' if sha else ''}"
+
+    if dry_run:
+        files = sum(1 for p in site_dir.rglob("*") if p.is_file())
+        console.print(f"--dry-run: would push {files} file(s) from {site_dir} to "
+                       f"{branch!r} as {message!r}.", style="yellow")
+        return
+
+    worktree = Path(tempfile.mkdtemp(prefix="mothman-publish-"))
+    try:
+        # A worktree with no branch and no history, populated from the
+        # built site alone - so nothing from the source tree can ride
+        # along even by accident.
+        _git("worktree", "add", "--detach", str(worktree))
+        _git("checkout", "--orphan", branch, cwd=worktree)
+        _git("rm", "-rf", "--quiet", ".", cwd=worktree, allow_failure=True)
+        for child in site_dir.iterdir():
+            dst = worktree / child.name
+            shutil.copytree(child, dst) if child.is_dir() else shutil.copy2(child, dst)
+        # .nojekyll, because Pages otherwise runs the content through
+        # Jekyll, which silently drops any file or directory beginning with
+        # an underscore. Nothing in the site starts with one today; a
+        # published page that vanished for that reason would be very hard
+        # to diagnose from the outside.
+        (worktree / ".nojekyll").write_text("")
+        _git("add", "-A", cwd=worktree)
+        if not subprocess.run(["git", "diff", "--cached", "--quiet"],
+                               cwd=worktree).returncode:
+            console.print("Nothing changed since the last publish - nothing pushed.", style="dim")
+            return
+        _git("commit", "--quiet", "-m", message, cwd=worktree)
+        _git("push", "--force", "origin", f"HEAD:refs/heads/{branch}", cwd=worktree)
+        console.print(f"Published -> {branch} ({message})", style="green")
+    finally:
+        shutil.rmtree(worktree, ignore_errors=True)
+        _git("worktree", "prune", allow_failure=True)
+
+
+def _git(*args: str, cwd=None, allow_failure: bool = False) -> str:
+    import subprocess
+
+    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    if result.returncode and not allow_failure:
+        raise click.ClickException(
+            f"git {' '.join(args)} failed: {(result.stderr or result.stdout).strip()}")
+    return result.stdout.strip()
+
+
+def _short_sha() -> str | None:
+    from qa_tools.common.github_links import current_commit_sha
+
+    try:
+        return current_commit_sha()[:7]
+    except Exception:
+        return None

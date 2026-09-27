@@ -1601,6 +1601,26 @@ const ASSET_TIMEZONE = null;
 // "4s ago" at seven seconds per seven seconds, so the number a reader
 // saw was the age of their own browser tab.
 const BUILT_AT = null;
+// BUILD_PROVENANCE - REQ-PIPE-092 criteria 7 and 17. WHICH environment
+// built this page, and from WHICH commit of the code.
+//
+// WHY A PAGE HAS TO SAY THIS NOW. The dashboard used to be built in one
+// place - a GitHub Actions job, from committed results - so there was
+// only ever one artifact and nothing to confuse it with. The results are
+// in a database now and the build happens wherever that database is
+// reachable, which means a dashboard built in production and a dashboard
+// built on somebody's laptop are DIFFERENT ARTIFACTS THAT LOOK
+// IDENTICAL. Keith's own words, 2026-09-27: "this dashboard here is
+// physically separate to a dashboard from my development or production
+// or another user".
+//
+// The commit is here for the other half of the same question: an
+// environment says whose data this is, and a commit says which version
+// of the code read it. A page can then be traced to both.
+//
+// NULL HERE is the raw template, same as BUILT_AT - it was never built,
+// so it was built by nobody from nothing.
+const BUILD_PROVENANCE = null;
 const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
@@ -5757,6 +5777,29 @@ function renderBuildStamp(){
     return;
   }
   el.textContent = `Built ${fmtInstant(BUILT_AT)}`;
+
+  // WHERE FROM, and from WHICH commit (REQ-PIPE-092 criteria 7 and 17).
+  // Appended to the same line rather than given its own, because it
+  // answers the same question a reader is already asking of it - "how
+  // current is this, and is it mine" - and a second line in the masthead
+  // competes with the one thing the masthead is for.
+  if(BUILD_PROVENANCE){
+    const bits = [];
+    if(BUILD_PROVENANCE.environment) bits.push(BUILD_PROVENANCE.environment.label
+      || BUILD_PROVENANCE.environment.id);
+    // SHORT, because a reader recognises a seven-character sha and does
+    // not read a forty-character one. The full value stays in the title.
+    if(BUILD_PROVENANCE.commit) bits.push(BUILD_PROVENANCE.commit.slice(0, 7));
+    if(bits.length){
+      el.textContent += ` · ${bits.join(" · ")}`;
+      el.title = [
+        BUILD_PROVENANCE.environment
+          ? `Built in: ${BUILD_PROVENANCE.environment.label || BUILD_PROVENANCE.environment.id}`
+          : null,
+        BUILD_PROVENANCE.commit ? `Commit: ${BUILD_PROVENANCE.commit}` : null,
+      ].filter(Boolean).join("\n");
+    }
+  }
 }
 renderBuildStamp();
 

@@ -190,6 +190,7 @@ from dashboard.plans_md import parse_plans
 from qa_tools.common.sprint_state import dependency_data
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common import asset_time
+from qa_tools.common import environments
 from qa_tools.common import hierarchy
 from qa_tools.common import outstanding
 from qa_tools.common import scenario_map
@@ -319,6 +320,41 @@ def embed() -> None:
     built_at = asset_time.now()
     html = _replace_const(html, "BUILT_AT", json.dumps(built_at.isoformat()))
     print(f"Re-embedded BUILT_AT = {built_at.isoformat()}")
+
+    # BUILD_PROVENANCE - REQ-PIPE-092 criteria 7 and 17. WHICH environment
+    # built this page, and from WHICH commit.
+    #
+    # The build used to happen in exactly one place, so there was nothing
+    # to confuse a page with. It happens wherever the database is
+    # reachable now, which makes a production build and a developer's
+    # build two different artifacts that look identical.
+    #
+    # BOTH HALVES TOLERATE ABSENCE, and differently. An environment is
+    # unset on a checkout nobody has configured, which is ordinary - the
+    # page then says only when it was built, as it always did. A commit is
+    # unavailable when git is not there or the checkout is not a
+    # repository, which is also ordinary in a container built from a
+    # tarball. Neither is worth failing a build over; claiming a value for
+    # either would be.
+    # current_commit_sha() rather than a second rev-parse of our own - it
+    # already prefers GITHUB_SHA and falls back to the working tree, and
+    # two implementations of "which commit is this" would be two things to
+    # keep in step. It RAISES where git is absent or the directory is not
+    # a repository, which is ordinary in a container built from a tarball,
+    # so absence is tolerated here rather than failing a build: the page
+    # then says only when it was built, as it always did.
+    try:
+        commit = current_commit_sha()
+    except Exception:
+        commit = None
+    provenance = {"environment": None, "commit": commit}
+    env = environments.current_or_none()
+    if env is not None:
+        provenance["environment"] = {"id": env.id, "label": env.label}
+    html = _replace_const(html, "BUILD_PROVENANCE",
+                           json.dumps(provenance, separators=(",", ":")))
+    print(f"Re-embedded BUILD_PROVENANCE = {provenance['environment'] or 'unset'}, "
+          f"commit {provenance['commit'] or 'unknown'}")
     print(f"Re-embedded HIERARCHY = {len(tree['agencies'])} agenc(ies), "
           f"{sum(len(a['collections']) for a in tree['agencies'])} collection(s), "
           f"{len(hierarchy.all_datasets())} dataset(s)")

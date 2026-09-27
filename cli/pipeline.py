@@ -63,11 +63,21 @@ def pipeline_group() -> None:
                    "easier to debug one specific run's stack trace.")
 @click.option("--snapshot", is_flag=True,
               help="Also archive a dashboard snapshot afterward (same as SNAPSHOT_DASHBOARD=1).")
-def run_command(collection: str, sequential: bool, snapshot: bool) -> None:
+@click.option("--publish", "do_publish", is_flag=True,
+              help="Also publish the built dashboard. OPT-IN: a run without this builds for "
+                   "local viewing and publishes nothing.")
+def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: bool) -> None:
     """Replaces run_pipeline.sh: regenerate synthetic data, run the real tools against every
-    run in the manifest (writing fresh qa_results/ history), then rebuild and embed the
-    dashboard. Same real, permanent qa_results/ write as any other real pipeline run - not a
-    dry run."""
+    run in the manifest (recording fresh QA history), then rebuild and embed the dashboard.
+    Records real QA history like any other real pipeline run - not a dry run.
+
+    PUBLISHING IS OPT-IN (REQ-PIPE-092 criterion 16), and that was decided the other way
+    first. Opt-out reads as friendlier and is wrong here: a debugging run, a batch and a
+    scheduled run would each publish a dashboard nobody asked for, and the one that matters
+    is the debugging run - somebody reproducing a problem would put their reproduction on
+    the public site. `--publish` goes through the same single path
+    `mothman dashboard publish` uses (criterion 10).
+    """
     import os
 
     from qa_tools.common import delivery_log
@@ -113,6 +123,13 @@ def run_command(collection: str, sequential: bool, snapshot: bool) -> None:
         console.print(f"Dashboard snapshot written -> {out_path}", style="green")
 
     console.print("Pipeline run complete -> dashboard/qa-reporting-dashboard.html", style="green")
+
+    if do_publish:
+        # THE SAME FUNCTION the command and the wizard's prompt call, not a
+        # copy of its steps - criterion 10 is that there is exactly one way
+        # to get content published. It rebuilds and re-embeds, which this
+        # run has just done; paying that twice is worth one publish path.
+        dashboard_cli.publish()
 
 
 @pipeline_group.command("regenerate-history")
