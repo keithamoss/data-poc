@@ -843,7 +843,17 @@ to the exact right file/line/folder with zero console errors.
     into a build.
 
 
-54. **[investigate, 2026-09-27]** **[Pipeline & publishing]** An amber accept/reject and a filing decision are both decisions, and there are two logs.
+54. **[done, 2026-09-27]** **[Pipeline & publishing]** An amber accept/reject and a filing decision are both decisions, and there are two logs.
+
+    **OUTCOME, so nobody reads the analysis below as live: an amber
+    `/accept` is NOT a decision and is NOT logged.** Keith withdrew his
+    own comment the same evening, once told that REQ-PIPE-075 criterion
+    1 already auto-promotes a green OR AMBER supply - so by the time
+    anybody comments on a ticket the supply is already the period's
+    answer and an accept moves nothing. An amber `/reject` IS a filing
+    decision and is logged, unchanged. The reasoning is carried by
+    REQ-PIPE-091's own `decisions:`; what follows is the working that
+    got there, kept until 091 is built.
 
     Keith, 2026-09-27, when asked whether REQ-PIPE-091 really blocks
     REQ-PIPE-092: "both of those things feel like decisions to me -
@@ -897,12 +907,12 @@ to the exact right file/line/folder with zero console errors.
     rather than a filing action - "somebody has looked at this" - which
     is a different fact from "this is what Q3 resolves to".
 
-    **RESOLVED, 2026-09-27, Keith: "'accept this amber supply' is a
-    decision worth logging too."** It goes in the one log. And once it
-    does, the two operations map onto the supply model already
-    specified rather than needing a new one - which is worth writing
-    out, because the mapping is not symmetric and that is the
-    interesting part.
+    **~~RESOLVED, 2026-09-27, Keith: "'accept this amber supply' is a
+    decision worth logging too."~~ WITHDRAWN by him the same evening -
+    see the outcome above.** It was going to go in the one log. The
+    mapping worked out below is what showed why it should not: the two
+    operations are not symmetric, and once that was on the page the
+    accept half had nothing left to record.
 
     **A HUMAN'S ACCEPT OR REJECT ALWAYS COMES AFTER AUTOMATIC
     PROMOTION.** REQ-PIPE-075 C1 promotes a green OR AMBER supply into
@@ -941,6 +951,12 @@ to the exact right file/line/folder with zero console errors.
     it follows from C7 rather than from anything anybody decided about
     accept, which is the kind of thing worth noticing before rather
     than after.
+
+    **This evaporated with the withdrawal.** No accept entry means no
+    recorded person-decision, so C7's permanent bar never attaches and
+    nobody has to live with it. Kept because the bar itself is real and
+    the next thing to propose a benign-looking entry type will meet it
+    again.
 
     **WHAT IT CHANGES IMMEDIATELY, whichever way it goes.** If an
     accept/reject becomes an entry in the one log, then REQ-PIPE-091 IS

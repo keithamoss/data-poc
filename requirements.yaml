@@ -16131,11 +16131,11 @@ requirements:
     title: "The decision log is a table in the metadata schema, and a filing decision and its entry are one transaction"
     date_written: "2026-09-26"
     story: >
-      As an operator filing a supply, I want the decision I take and
-      the entry recording it to be one indivisible act against one
-      shared log, so that permissibility is judged against what is
-      actually true at that instant rather than against a copy of the
-      log that may already be out of date.
+      As a data engineer deciding which supply a period should use, I
+      want the system to check the log and write my decision in one
+      step, so that two people cannot both be told yes for the same
+      slot, and so the record can never disagree with what actually
+      happened to the data.
     moscow: must
     status: not_started
     source: >
@@ -16222,34 +16222,61 @@ requirements:
         - REQ-PIPE-074's own NFR, and it now holds by construction
         rather than by discipline.
     dependencies: [REQ-PIPE-089, REQ-PIPE-074]
-    open_questions:
-      - >
-        WHETHER A READER WITH NO DATABASE ACCESS NEEDS A ROUTE TO THE
-        LOG AT ALL. The committed export is gone and the argument for
-        dropping it is sound: the dashboard, which is what actually
-        reads the log, now runs where the database is. What that
-        argument does not cover is a reader who is neither the
-        dashboard nor an operator - an auditor, or somebody asked a
-        year later why a supply was rejected. Criterion 10 already
-        requires the log to be readable with no WRITE access, so the
-        answer may simply be a read-only grant plus the dashboard. If
-        it has to be something a person can be handed with no database
-        access whatsoever, that is a further requirement and nobody
-        owns it.
-      - >
-        Whether each entry carries the environment it was taken in -
-        belt and braces where each environment has its own database,
-        but it makes a misrouted decision visible rather than silent
-        (Keith raised it himself, #45). Relayed as question set D.
-      - >
-        REQ-PIPE-074 IS SIGNED and this requirement contradicts its
-        criterion 11 (commit the log, and do not hold it only in the
-        warehouse), criterion 13 (readable by the dashboard build with
-        no access to anything under data/) and criterion 14 (one file
-        per decision under that dataset's directory), plus three of
-        its NFRs. It needs Keith's own amendment rather than a
-        reinterpretation by whoever builds this.
     decisions:
+      - >
+        AN AUDITOR READS THE LOG THROUGH THE DASHBOARD (Keith,
+        2026-09-27, closing this requirement's own open question):
+        "yeah, we'd just give them dashboard access". So no
+        credential-free artifact is owed to anybody, and criterion 10's
+        read-without-write grant plus the dashboard is the whole
+        answer. REJECTED by that answer: a regenerated export of the
+        decision log for readers with no database access at all, which
+        would have restored a credential-free audit record at the cost
+        of re-creating the committed-operational-records shape this
+        batch exists to remove.
+      - >
+        AN ENTRY DOES NOT CARRY THE ENVIRONMENT IT WAS TAKEN IN (Keith,
+        2026-09-27, answering his own question from #45): "no, protect
+        this higher up so you can't mistakenly make changes to the
+        wrong environment". The reasoning is worth keeping, because it
+        rejects the mechanism rather than the concern - a column
+        recording which environment a decision was taken in makes a
+        misrouted decision VISIBLE after the fact, and what he wants is
+        for it to be IMPOSSIBLE. That guard belongs above the decision
+        log, where it protects every write rather than this one table,
+        and REQ-PIPE-107 owns it.
+      - >
+        "ACCEPT THIS AMBER SUPPLY" IS NOT A DECISION AND THERE IS NO
+        ACKNOWLEDGEMENT ENTRY TYPE (Keith, 2026-09-27, withdrawing his
+        own comment of the same day once told that amber already
+        auto-promotes). The sequence matters, because the idea is
+        plausible enough to be re-proposed: REQ-PIPE-075 criterion 1
+        promotes a green OR AMBER supply into an unfilled slot when QA
+        completes, so by the time anybody comments on a ticket the
+        supply is already the period's answer and an accept moves
+        nothing. His withdrawal leaves REQ-PIPE-074 criterion 1's
+        operation list unchanged. What is NOT withdrawn: REQ-QAC-017's
+        `/reject` on an amber supply is a rejection under REQ-PIPE-076
+        criterion 1, so it is a filing decision and it is in this log.
+        CONSEQUENCE THAT EVAPORATES WITH IT: an accept would have been
+        a recorded person-decision, and REQ-PIPE-076 criterion 7 bars
+        automatic promotion of any supply a person has decided on for
+        the life of that supply - so accepting an amber supply would
+        have permanently barred it. Nobody has to live with that now.
+      - >
+        REQ-PIPE-074'S CRITERIA 11, 13 AND 14 ARE AMENDED AS PART OF
+        THIS REQUIREMENT'S OWN CHANGE (Keith, 2026-09-27, approving the
+        approach rather than a wording). 074 is signed and this
+        contradicts it outright, so the amendment is his to make and
+        not a reinterpretation by whoever builds this. The shape
+        approved: restate what criterion 11 was protecting - the log is
+        durable, readable, and not lost with one database - and drop
+        the commit-it mechanism; rewrite criterion 13 as readable by
+        the dashboard build, which now runs where the database is;
+        delete criterion 14 outright, along with the merge-conflict
+        reasoning behind it, which argued one file per decision
+        entirely from git conflicts between two write routes appending
+        to the same end of a file. Nothing merges here.
       - >
         THE DECISION LOG LIVES IN THE DATABASE (Keith, 2026-09-26),
         earlier than his own planned sequencing, because the switch's
@@ -19172,3 +19199,117 @@ requirements:
         file it to the first period, discard it, or leave it in its own
         schema - are a real fork, and it belongs with the promotion
         side rather than being guessed now.
+
+  - id: REQ-PIPE-107
+    title: "A checkout refuses to act against a database belonging to another data asset or environment"
+    date_written: "2026-09-27"
+    story: >
+      As a data engineer with access to more than one environment, I
+      want the tool to stop me the moment I point it at the wrong
+      database, so that I find out before I have changed somebody
+      else's data rather than afterwards from the record of what I did.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-27, answering REQ-PIPE-091's question set D - "no,
+      protect this higher up so you can't mistakenly make changes to
+      the wrong environment". Drafted in the same conversation, from
+      his answer rather than from a plans thread. NOT through
+      delivery-scoper.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL record, in the database itself, which data
+        asset and which environment that database belongs to, written
+        once when its schema is created.
+      - >
+        THE SYSTEM SHALL verify that recorded identity against the
+        identity the checkout is configured for before issuing any
+        statement that reads or writes supply rows or recorded QA
+        metadata, and SHALL refuse where they differ.
+      - >
+        IF the two differ, THEN THE SYSTEM SHALL say which identity it
+        found and which it expected, and SHALL NOT include any part of
+        the connection string in that message.
+      - >
+        IF a database carries no recorded identity, THEN THE SYSTEM
+        SHALL refuse to act against it, and SHALL NOT adopt, infer or
+        default the identity from the configuration it was invoked
+        with.
+      - >
+        THE SYSTEM SHALL refuse before performing any part of the
+        requested work, such that a refused invocation leaves the
+        database exactly as it found it.
+      - >
+        THE SYSTEM SHALL apply this check to every connection the
+        system opens, including a test worker's own database and every
+        connection a QA tool opens on the system's behalf, and SHALL
+        NOT exempt any route.
+      - >
+        THE SYSTEM SHALL change a database's recorded identity only
+        through an explicit, separate re-marking operation, and SHALL
+        NOT change it as a side effect of any ordinary command.
+    non_functional_requirements:
+      - >
+        THIS IS A GUARD, SO ITS COST IS PAID ON EVERY CONNECTION. One
+        round trip at connect time is acceptable; a check per statement
+        is not.
+      - >
+        A CONNECTION STRING IS A CREDENTIAL. The refusal message is the
+        one place a session is most likely to paste into a chat or a
+        ticket, which is exactly why criterion 3 forbids the DSN
+        appearing in it.
+      - >
+        THE FAILURE MODE THIS PREVENTS IS SILENT AND IRREVERSIBLE, so
+        the guard must fail closed. A check that cannot determine the
+        answer refuses; there is no permissive path, in line with this
+        project's standing stance against permissive fallbacks.
+      - >
+        IT MUST NOT BECOME THE THING PEOPLE TURN OFF. If the check is
+        awkward on a developer's own machine it will be bypassed, and a
+        bypassed guard is worse than none because it is trusted. Making
+        the sandbox setup mark its own database is part of the work,
+        not a follow-up.
+    dependencies: [REQ-PIPE-087, REQ-PIPE-089]
+    decisions:
+      - >
+        A COLUMN ON EACH DECISION RECORDING ITS ENVIRONMENT WAS
+        REJECTED IN FAVOUR OF THIS (Keith, 2026-09-27). He raised the
+        column himself in plans/running-thoughts.md #45 and then turned
+        it down when it came back as REQ-PIPE-091's question set D. The
+        reasoning is the part to keep: a column makes a misrouted
+        decision VISIBLE after the fact, and he wants it to be
+        IMPOSSIBLE. A guard above the log also covers every other write
+        - staged rows, promotions, recorded results - which a column on
+        one table cannot.
+      - >
+        THE GUARD IS ABOUT THE DATABASE'S OWN IDENTITY, NOT THE DSN.
+        Comparing connection strings would be the obvious cheap
+        version and it does not work: the same environment is reached
+        by different hostnames from inside and outside, and two
+        environments can legitimately differ only by a hostname a
+        person mistypes. Asking the database who it is answers the
+        actual question.
+      - >
+        EXEMPTING TESTS WAS CONSIDERED AND REJECTED (criterion 6). Test
+        workers create and drop databases constantly, so exempting them
+        is the obvious convenience - and the suite is precisely where a
+        misconfigured DSN has already caused real damage in this
+        project: Soda Core reloading .env moved a worker onto the real
+        supply database mid-run (plans/tooling.md #26), and a
+        benchmarking script truncated a real bootstrap's results.
+        Both are exactly what this guard is for.
+    open_questions:
+      - >
+        WHETHER "ENVIRONMENT" IS A NAME A PERSON CHOOSES OR SOMETHING
+        DERIVED. A chosen name is simple and can be typed wrong twice
+        in the same way; something derived from the deployment is
+        harder to get wrong and harder to explain. Not resolved, and it
+        changes what criterion 1 writes.
+      - >
+        WHETHER THIS SHOULD ALSO REFUSE A DATABASE WHOSE SCHEMA VERSION
+        IS NEWER THAN THE CHECKOUT EXPECTS. It is the same class of
+        mistake - a tool acting on something it does not understand -
+        and REQ-PIPE-089's own SCHEMA_VERSION marker already makes the
+        answer cheap to reach. Deliberately not folded in without
+        Keith's say, because it widens this from "wrong place" to
+        "wrong version" and those may deserve different treatment.
