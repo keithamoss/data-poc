@@ -22832,14 +22832,56 @@ requirements:
         rather than exercised, and it is covered by a test that makes
         two runs read one table on purpose.
 
-        THE WIRING IS STILL NOT DONE, and that is now the only thing
-        between this and `built`: both orchestrators pass
-        `manifest[0]["run_id"]` down to the Evidently step, and it
-        should be `reference_run_for(conn, <the drift dataset>, <that
-        arrival's period>)`. A real change to two orchestrators and two
-        Evidently modules rather than a repoint, and it wants a clear
-        head. The fork's original text follows, kept because the
+        THE WIRING IS STILL NOT DONE, and it is coupled to criterion 5
+        in a way worth setting out before anybody starts - see the next
+        decision. The fork's original text follows, kept because the
         reasoning in it is the reasoning somebody would repeat.
+
+      - >
+        THE WIRING AND CRITERION 5 HAVE TO LAND TOGETHER, and the
+        analysis is written down here rather than attempted at 02:45
+        because the change touches what a CHECK RESULT's status may be -
+        which flows into promotion gating, the dashboard's rollups and
+        both languages' copies of the status vocabulary.
+
+        THE WIRING, narrowly: both orchestrators pass
+        `manifest[0]["run_id"]` to the Evidently step. It should be
+        `drift_reference.reference_run_for(conn, <the drift dataset>,
+        <that arrival's period>)`, computed inside `_run_one_inner()`
+        rather than passed down the batch, because the reference is per
+        DATASET and per PERIOD and a batch-level argument cannot be
+        either. Each collection drifts exactly one dataset today
+        (`run_evidently_cp.DATASET_ID` is cp-notifications,
+        `run_evidently_bdm.DATASET_ID` is birth-registrations), so one
+        reference per run is the right shape rather than a
+        simplification.
+
+        WHY CRITERION 5 CANNOT WAIT. The moment the reference is
+        computed per period, the FIRST period of any dataset
+        legitimately has none - and
+        `evidently_common.status_for_psi(psi, is_reference)` returns
+        "pass" in exactly that case today. Wiring without fixing it
+        would ship a false pass into the one direction this project
+        treats as dangerous, and criterion 5 forbids it in as many
+        words: "SHALL report the check as having no reference, and SHALL
+        NOT report it as passing".
+
+        WHAT THE FIX COSTS, so nobody discovers it halfway. A check
+        result would carry a fifth tool status - `nodata` is the
+        existing word and `dataset_status._QUIET_PRECEDENCE` already
+        knows it - which means
+        `dataset_status._DASHBOARD_STATUS_BY_TOOL_STATUS` gains an entry
+        (without one, `promotion.status_of()` raises
+        UnreadableVerdictError on every drift check with no reference),
+        the JS side's own copy of the vocabulary has to agree, and every
+        rollup has to be checked against a quiet status arriving from a
+        CHECK rather than from a dataset. `worst_of` already orders
+        nodata at -1 so it can never win, which is most of the work
+        already done.
+
+        REJECTED: falling back to the old fixed run where there is no
+        reference. It is precisely what criterion 4 forbids, and it
+        would hide the very state criterion 5 exists to surface.
 
       - >
         THE FORK AS ORIGINALLY WRITTEN, now withdrawn - see the decision
