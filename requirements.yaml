@@ -15228,6 +15228,26 @@ requirements:
         responsible for on each invocation rather than only the slots
         that run touched.
       - >
+        WHEN a person performs an operation that changes a slot's state
+        - through the CLI, the TUI or any other route - THE SYSTEM SHALL
+        reconcile through the SAME pass, and SHALL NOT post an update of
+        that operation's own devising.
+      - >
+        THE SYSTEM SHALL reconcile only AFTER the change is durably
+        recorded, so that a ticket can never say something the decision
+        log does not.
+      - >
+        WHERE the ticketing service cannot be reached, THE SYSTEM SHALL
+        NOT fail the operation that prompted the reconciliation. The
+        change stands on its durable record, and the next pass brings
+        the ticket up to date.
+      - >
+        THE SYSTEM SHALL accept the set of slots to reconcile,
+        defaulting to every slot it is responsible for, so that an
+        interactive caller may reconcile only what it changed. A
+        narrowed invocation SHALL be the same pass over fewer slots,
+        never a second code path.
+      - >
         THE SYSTEM SHALL scope a failure for one slot to that slot, and
         SHALL NOT stop reconciliation for any other.
       - >
@@ -15332,6 +15352,31 @@ requirements:
         than each person going and looking. Recorded because it changes
         what `needs-action` has to cover, not just how the story reads.
       - >
+        A CLI OR TUI OPERATION RE-RUNS THE SAME PASS RATHER THAN POSTING
+        FOR ITSELF (Keith, 2026-09-28, his own answer to his own
+        question: "rerunning the same reconciliation pathway for
+        everything seems to me to make the most sense"). Promoting from
+        the TUI does not compose a ticket update; it records the
+        decision and then reconciles, exactly as a QA run or a Lambda
+        would.
+
+        REJECTED the alternative it was weighed against - each operation
+        posting its own update at the moment it happens - which is the
+        event-emitting shape this requirement was reframed away from. It
+        would mean every operation carrying its own idea of what the
+        ticket should now say, so the ten-odd write paths would drift,
+        and a state reached by a route nobody wired up would go
+        unreported. One pass has one answer.
+
+        TWO CONSEQUENCES FALL OUT, both now criteria. Reconciliation
+        happens AFTER the change is durably recorded, never before, so a
+        ticket cannot claim something the decision log does not. And a
+        ticketing service that cannot be reached does not fail the
+        promotion - the change stands on its own record, and the next
+        pass catches the ticket up. That second one is only safe BECAUSE
+        this is a reconciler: an event-emitter that failed to post would
+        have lost the event for good.
+      - >
         THE DASHBOARD STAYS THE PRIMARY INTERFACE, AND THIS IS THE
         MANAGEMENT SIDE (Keith, 2026-09-28). Tickets are not a second
         place to read QA - reading QA and seeing status is what the
@@ -15345,8 +15390,9 @@ requirements:
         THE CALLER IS EVERY QA RUN (Keith, 2026-09-28, answering the
         trigger question the reframe left open). On AWS he expects
         there may ALSO be a Lambda running alongside, and was explicit
-        that he is not certain - which is exactly why criterion 16 says
-        the reconciler must not depend on which trigger called it. Two
+        that he is not certain - which is exactly why this requirement
+        insists the reconciler must not depend on which trigger called
+        it. Two
         callers is a supported shape rather than a problem to design
         out, because reconciling twice over an unchanged world changes
         nothing.
