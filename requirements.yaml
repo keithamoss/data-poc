@@ -22812,8 +22812,38 @@ requirements:
         NOT DONE - criteria 1 and 7, and the second half of 4.
 
       - >
-        A FORK THAT STOPPED THE SECOND HALF, for Keith rather than for
-        me to settle unattended. Criterion 4 forbids taking the
+        THE FORK BELOW IS WITHDRAWN, 2026-09-29, about two hours after
+        it was written. It said the run that checked a supply could not
+        be found from the records, and that was WRONG: the arrival key
+        is recorded on both sides. A supply is
+        `cp-carers@202608010100000000`; the table it staged into is
+        `cp_carers__202608010100000000`. `qa.filing` holds the first and
+        `qa.tables_read` holds the second, and they share the key.
+        Nothing had to be added - the question had to be asked of the
+        right column. `drift_reference.run_for()` asks it, and
+        `reference_run_for()` joins the two halves.
+
+        WHAT REMAINS OF IT is the ordering rule, which is a rule rather
+        than a fork: where several runs read one physical table - which
+        happens when a run BORROWS one, REQ-PIPE-068's partial-resupply
+        case - the EARLIEST is the one that staged it, because a borrow
+        always comes after. No physical table in this deployment's 150
+        is read by more than one run today, so the rule is dormant
+        rather than exercised, and it is covered by a test that makes
+        two runs read one table on purpose.
+
+        THE WIRING IS STILL NOT DONE, and that is now the only thing
+        between this and `built`: both orchestrators pass
+        `manifest[0]["run_id"]` down to the Evidently step, and it
+        should be `reference_run_for(conn, <the drift dataset>, <that
+        arrival's period>)`. A real change to two orchestrators and two
+        Evidently modules rather than a repoint, and it wants a clear
+        head. The fork's original text follows, kept because the
+        reasoning in it is the reasoning somebody would repeat.
+
+      - >
+        THE FORK AS ORIGINALLY WRITTEN, now withdrawn - see the decision
+        above. Criterion 4 forbids taking the
         reference from "a fixed run chosen once", and both orchestrators
         do exactly that today: `reference_run_id = manifest[0]["run_id"]`
         - a stale constant computed fresh, measuring every supply

@@ -109,3 +109,63 @@ def reference_for(conn: supply_db.SupplyConnection, dataset_id: str,
         f"no earlier period holds a promoted supply for {dataset_id}, so there "
         f"is nothing to measure {current_period} against. This is a check with "
         f"no reference, not a check that passed.")
+
+
+def run_for(conn: supply_db.SupplyConnection, dataset_id: str,
+            supply: str) -> str | None:
+    """The run that CHECKED this supply, or None.
+
+    THE MAPPING NOBODY THOUGHT WAS RECORDED, and it is - in the physical
+    table's own name. A supply is `cp-carers@202608010100000000` and the
+    table it staged into is `cp_carers__202608010100000000`: the same
+    ARRIVAL KEY, recorded on one side by `qa.filing` and on the other by
+    `qa.tables_read`. Nothing had to be added; the question had to be
+    asked of the right column.
+
+    Worth saying because it was written up as a fork needing a decision
+    a couple of hours before this function existed. The options put
+    forward were a heuristic, a new recorded relationship, or waiting
+    for REQ-PIPE-079's wiring. None was needed.
+
+    THE EARLIEST RUN THAT READ IT, where several did. A run reads a
+    table it did not stage when it BORROWS one (REQ-PIPE-068's
+    borrow_views, for the partial-resupply case), and a borrow always
+    happens after the staging - so the first run to read a physical
+    table is the one that brought it. No physical table in this
+    deployment's 150 is read by more than one run today, which makes
+    this rule dormant rather than wrong.
+    """
+    from qa_tools.common import hierarchy, qa_store
+
+    if "@" not in (supply or ""):
+        return None
+    arrival = supply.rsplit("@", 1)[1]
+    try:
+        logical = hierarchy.dataset(dataset_id).table
+    except hierarchy.UnknownDatasetError:
+        return None
+
+    rows = conn.execute(
+        f'SELECT t.run_key FROM "{qa_store.SCHEMA}".tables_read t '
+        f'JOIN "{qa_store.SCHEMA}".run r ON r.run_key = t.run_key '
+        "WHERE t.logical_table = ? AND t.physical_table LIKE ? "
+        "ORDER BY r.run_instant, t.run_key LIMIT 1",
+        [logical, f"{logical}__{arrival}%"]).fetchall()
+    return rows[0][0] if rows else None
+
+
+def reference_run_for(conn: supply_db.SupplyConnection, dataset_id: str,
+                      current_period: str) -> str | None:
+    """The run whose recorded distribution a drift check compares against.
+
+    reference_for() answers WHICH PERIOD; this answers which run's
+    recorded numbers describe it. Returns None where the reference
+    period's supply has no run - which is a real state rather than an
+    error, and one the caller must report as "no reference" rather than
+    as a pass (criterion 5).
+
+    RAISES NOTHING OF ITS OWN. reference_for()'s NoReference is the
+    caller's to handle; this narrows it to "there is a period but no
+    recorded run for it", which reads the same way to whoever is told.
+    """
+    return run_for(conn, dataset_id, reference_for(conn, dataset_id, current_period).supply)

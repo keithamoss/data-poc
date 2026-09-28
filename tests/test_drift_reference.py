@@ -165,3 +165,63 @@ class TestNoReferenceIsNotAPass:
                                                           calendar):
         with pytest.raises(drift_reference.NoReference, match="not a period"):
             drift_reference.reference_for(conn, dataset, "not-a-period")
+
+
+class TestWhichRunCheckedASupply:
+    """The mapping that was written up as a fork needing a decision, and
+    turned out to be recorded all along.
+
+    A supply is `cp-carers@202608010100000000`; the table it staged into
+    is `cp_carers__202608010100000000`. The same ARRIVAL KEY, recorded
+    on one side by qa.filing and on the other by qa.tables_read. Nothing
+    had to be added - the question had to be asked of the right column.
+    """
+
+    def _run_reading(self, conn, run_key, logical, physical, when):
+        from qa_tools.common import qa_store
+        conn.execute(
+            f'INSERT INTO "{qa_store.SCHEMA}".run '
+            "(run_key, agency_id, collection_id, run_timestamp, run_instant) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [run_key, AGENCY, COLLECTION, when, when])
+        conn.execute(
+            f'INSERT INTO "{qa_store.SCHEMA}".tables_read '
+            "(run_key, logical_table, physical_table) VALUES (?, ?, ?)",
+            [run_key, logical, physical])
+
+    def test_it_finds_the_run_by_the_arrival_key_in_the_table_name(self, conn):
+        self._run_reading(conn, f"r_{uuid.uuid4().hex[:8]}", "cp_carers",
+                           "cp_carers__209901010100000000",
+                           "2099-01-01T09:00:00+08:00")
+        got = drift_reference.run_for(conn, "cp-carers",
+                                       "cp-carers@209901010100000000")
+        assert got is not None
+
+    def test_a_supply_nothing_ever_read_has_no_run(self, conn):
+        assert drift_reference.run_for(
+            conn, "cp-carers", "cp-carers@209912310100000000") is None
+
+    def test_a_supply_id_of_the_wrong_shape_is_not_an_error(self, conn):
+        """A caller with a malformed id gets None rather than a
+        traceback: the reference is a comparison, and a comparison that
+        cannot be made is a check with no reference."""
+        assert drift_reference.run_for(conn, "cp-carers", "no-at-sign") is None
+        assert drift_reference.run_for(conn, "cp-carers", "") is None
+
+    def test_a_dataset_the_tree_does_not_know_has_no_run(self, conn):
+        assert drift_reference.run_for(
+            conn, "not-a-dataset", "not-a-dataset@209901010100000000") is None
+
+    def test_the_EARLIEST_run_wins_where_several_read_it(self, conn):
+        """A run reads a table it did not stage when it BORROWS one, and
+        a borrow always happens after the staging - so the first run to
+        read a physical table is the one that brought it."""
+        arrival = "209902020100000000"
+        physical = f"cp_carers__{arrival}"
+        first, second = f"r_{uuid.uuid4().hex[:8]}", f"r_{uuid.uuid4().hex[:8]}"
+        self._run_reading(conn, second, "cp_carers", physical,
+                           "2099-02-05T09:00:00+08:00")
+        self._run_reading(conn, first, "cp_carers", physical,
+                           "2099-02-02T09:00:00+08:00")
+        assert drift_reference.run_for(
+            conn, "cp-carers", f"cp-carers@{arrival}") == first
