@@ -4182,6 +4182,99 @@ instant carries its own offset. That covers recorded facts. Versioning
 covers instants COMPUTED from config, which had nothing protecting
 them.
 
+### Where the calendar batch actually stands - read this before picking it up
+
+**Status:** in-progress (2026-09-28) · **Category:** Pipeline & publishing
+
+Written at the end of 2026-09-28 at Keith's own ask, because the next
+session on this will otherwise re-derive an evening's verification.
+
+**The four requirements EXIST and are LANDED, unsigned.**
+`REQ-PIPE-110` (one file for the agreement, 19 criteria), `REQ-PIPE-111`
+(history cannot be edited, 19), `REQ-PIPE-112` (versioned timezone, 12)
+and `REQ-PIPE-113` (due instant and the gap invariant, 14). All four are
+`not_started`, none is signed, and the sign-off gate applies - they are
+PROPOSALS. They came from a real `delivery-scoper` pass against this
+thread read in full, so the provenance rule is satisfied and can be
+stated when the batch is presented.
+
+**They were landed UNREAD in detail, and that is the one caveat.** The
+scoper's analysis was verified (below); its 64 acceptance criteria were
+not read line by line. They went into the register rather than staying
+in a scratchpad because the scratchpad does not survive the container,
+and an unsigned requirement in the register is exactly what the register
+is for. Read them properly before presenting them.
+
+**KEITH'S DECISION, 2026-09-28 evening, and it is the important one: a
+changelog entry must NOT clear the gate.** His words: "a change log
+entry shouldn't clear and offer an escape hatch". Made KNOWINGLY, after
+being told it reverses a decision he took five days earlier.
+
+**Why that matters more than it looks.** `REQ-PIPE-050` is SIGNED and
+BUILT, and its own `[BUILD]` decision says, verbatim: *"A changelog
+entry on the version clears it - this is a say-what-you-did gate, not a
+freeze, which is what Thread E actually asks for."* The gate is real
+code, shipping since 2026-09-23 in
+`qa_tools/common/validate_schedule.py::_retrospective_edit_errors`,
+wired into the same pre-commit hook this batch proposes using. So:
+
+- **The batch is NOT purely additive.** `REQ-PIPE-050`'s criteria and
+  its two `[BUILD]` decisions have to be amended in the SAME change, on
+  the `REQ-DOCS-101` precedent, or the register will carry two
+  contradictory accounts of one gate.
+- **`REQ-PIPE-111` is an amendment, not a new build.** It repoints an
+  existing gate at `calendar.yaml` and removes one clause. Its criteria
+  8 and 9 already say so.
+- **One question is still open on it** and is a fair one: is `git commit
+  --no-verify` accepted as out of scope? "No escape hatch" is a promise
+  about what this tool OFFERS; it cannot stop somebody bypassing the
+  hook, which is what the CI gate catches. Worth confirming that
+  reading rather than assuming it.
+
+**And a correction worth keeping, because it is the reason the reversal
+went unnoticed for a whole evening.** Three options for "what counts as
+historical" were put to Keith that evening as though the field were
+open. It was not: a gate implementing option B minus the escape hatch
+had been running for five days, and nobody checked before offering the
+menu. The real question was always the narrow one he has now answered.
+
+**What was VERIFIED rather than relayed** (2026-09-28, against the real
+code, after the scoper reported):
+
+| Scoper's claim | Verdict |
+|---|---|
+| `slots.py` already computes `due_at`, `late_after`, `claim_opens_at` | Confirmed - `qa_tools/common/slots.py:63-82,128` |
+| A retrospective-edit gate already ships, as a say-what-you-did gate | Confirmed - `validate_schedule.py:778`, wired at `:896` |
+| Comparing against `HEAD` reintroduces a closed hole; use `diff_base()` | Confirmed - `qa_tools/common/diff_base.py:55` |
+| The gap invariant holds today with real margin | Re-measured independently, identical: daily 19:00:00 over 495 slots, the quarterly datasets 74d 16:00 over 20, `cp-case-workers` 166d 16:00 over 10 |
+| Draft validates with 6 errors, all cross-references | Re-run, identical |
+| Carry-over check is complete | Ten claims spot-checked, all held - `const PERIOD_SEQUENCES` is real and embedded, the `element:` default/override comment is real, both rejected runtime-derivation alternatives are on `REQ-PIPE-049`, every "already carried" item appears in `048`-`053` |
+
+So **"today NOTHING computes a due instant" (written in the subsection
+above) is WRONG** and should be read as "nothing in `schedule.py` does".
+`REQ-PIPE-113` is therefore smaller than its brief: re-source and
+version the inputs, and add the invariant.
+
+**Also flagged by the scoper and still outstanding:** this thread now
+holds TWO disagreeing config sketches - the older "Config sketch"
+subsection still shows per-dataset slot properties in `slaProperties:`,
+which the newer subsection deletes. Mark the older one superseded when
+the batch lands. The thread warns about exactly this failure twice and
+has now committed it again.
+
+**Still needing Keith before the batch can be signed** - four that would
+change what gets built (where participation lives and whether
+`participates` replaces `delivery_months`/`not_expected`; whether
+`expected_time` is versioned on the calendar or effective-dated on the
+dataset; what happens to `REQ-PIPE-050`'s existing guard, now answered
+in principle but not in the register; whether `slaProperties:` goes
+entirely or only its schedule properties) and four non-functional (one
+file at ~30 datasets; what the gate does when it cannot compare - a
+shallow clone, a branch's first push; what happens if the move changes
+even one recorded arrival verdict; whether the timezone versioning is
+worth building before a second zone exists). The scoper's full report
+has them written out ready to relay.
+
 ## Thread D - Arrival classification
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
 

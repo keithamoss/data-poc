@@ -22398,3 +22398,198 @@ requirements:
         terminal recording made in a development environment is already
         published to whoever opens that tab. Criterion 6 exists because
         of an artifact that exists.
+
+  - id: REQ-PIPE-110
+    title: contract/calendar.yaml is the one place a delivery agreement lives
+    date_written: "2026-09-28"
+    story: "As the person who agreed a delivery with a supplier, I want the whole agreement for an asset written in one file, so that a dataset's cadence and its calendar can never quietly disagree about what was promised."
+    moscow: must
+    status: not_started
+    source: "Keith, designed in conversation across the morning of 2026-09-28 and written into plans/supply-model.md Thread C that evening (the subsection `contract/calendar.yaml` - one file per asset, and `slaProperties` goes). Scoped by delivery-scoper, 2026-09-28."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL hold every delivery agreement belonging to a data asset in one file, contract/calendar.yaml."
+      - "THE SYSTEM SHALL carry each named calendar in that file as effective-dated versions, in the same shape check lifecycle and today's calendars already use."
+      - "THE SYSTEM SHALL carry each dataset's own expected time of day and its own grace allowance in that file."
+      - "THE SYSTEM SHALL NOT read a dataset's expected time, grace allowance, claim window or cadence from an ODCS contract."
+      - "THE SYSTEM SHALL let a collection name a calendar, and SHALL apply that calendar to every dataset in the collection that names none of its own."
+      - "WHERE a dataset names its own calendar, THE SYSTEM SHALL use it in preference to the one its collection names."
+      - "THE SYSTEM SHALL let a dataset state which of its calendar's slots it participates in, and SHALL let it state a reason for a period in which it is owed nothing."
+      - "THE SYSTEM SHALL show a period a dataset is owed nothing in, together with that reason, and SHALL NOT omit it."
+      - "IF a dataset declares neither participation nor an exclusion, THEN THE SYSTEM SHALL treat it as participating in every period its calendar generates."
+      - "THE SYSTEM SHALL express each version's changelog as entries carrying a date, an author and a description of the change."
+      - "IF a changelog entry is a plain string rather than those three fields, THEN THE SYSTEM SHALL reject the configuration."
+      - "THE SYSTEM SHALL delete the slaProperties block from every ODCS contract in the repository."
+      - "WHEN slaProperties is deleted, THE SYSTEM SHALL repoint every reader of it at contract/calendar.yaml, and SHALL NOT leave any reader falling back to a default or to a hardcoded value."
+      - "IF a fact contract/calendar.yaml now owns is also stated in an ODCS contract, THEN THE SYSTEM SHALL reject the configuration rather than choosing between the two."
+      - "WHEN the repository's gates run, THE SYSTEM SHALL validate contract/calendar.yaml under the existing schedule gate, naming the file, the calendar or dataset at fault, and the correction to make."
+      - "THE SYSTEM SHALL produce, for the configuration in force on the day of the move, exactly the periods, slots, due instants and arrival verdicts it produced before the move."
+      - "THE SYSTEM SHALL NOT change any period name or any warehouse schema name as part of this move."
+      - "WHEN each ODCS contract has had slaProperties removed, THE SYSTEM SHALL still lint that contract against datacontract-cli's own bundled ODCS schema."
+      - "THE SYSTEM SHALL read contract/calendar.yaml without opening or querying any database, any warehouse schema or anything under data/."
+    non_functional_requirements:
+      - "CORRECTNESS OVER CONVENIENCE, and a half-done move is worse than none: the whole point of this requirement is that a delivery agreement is stated once, so a state in which two files both plausibly own a dataset's expected time is worse than today's, where at least one file is unambiguously the source. The rejection criterion above is what makes the difference, and it has to be mechanical rather than a matter of review."
+      - "At the real target of ~30 datasets on the quarterly asset, this file has to stay readable by eye - that readability is the whole anti-drift argument for one calendar over thirty date lists. If 30 datasets times four dates times several versions cannot be read in one sitting, the shape is wrong and it is cheaper to find that out now than after the second asset exists."
+      - "BEHAVIOUR-PRESERVING, and provably so: pin the current verdicts BEFORE the move rather than after, the way REQ-PIPE-048 did. tests/fixtures/arrival_semantics_golden.json already pins every arrival's classification and is the natural pin; confirm it actually bites by perturbing a value and watching it fail, rather than trusting that it would."
+      - "This is a shape change with several consumers, so enumerate them mechanically before calling it done - pipeline/cadence.py, qa_tools/common/slots.py, qa_tools/common/schedule.py, both dashboard data builders, dashboard/embed_dashboard_data.py's PERIOD_SEQUENCES and SCHEDULE_RUNWAY embeds, cli/schedule.py, and the validators. Assert at the last transform before a reader, not only at the parser."
+      - "Config only, no data access, so both the schedule gate and the dashboard build can read this file under the standing rule that a build may read recorded QA results, never actual data, and never anything else."
+      - "The 188 staged tables and every recorded QA result are keyed on period names and schema names. Nothing here may rename either, because a rename is a re-key of recorded history rather than an edit."
+      - "One file PER ASSET, which means the path is a property of a deployment rather than of this repository. Nothing may hardcode a per-dataset or per-collection path to it, because the second asset is a separate deployment of the same codebase."
+      - "The file is read on a laptop with no database, inside a pre-commit hook, and inside a build. It must need nothing but `uv run mothman` and the committed tree."
+      - "What a wrong answer costs is the reason this is a must rather than a should: a supply judged against dates nobody agreed. That failure is silent, it looks exactly like a correct verdict, and the supplier is the one it is unfair to."
+    dependencies:
+      - REQ-PIPE-049
+      - REQ-PIPE-050
+      - REQ-PIPE-051
+      - REQ-PIPE-052
+    decisions:
+      - "THE PROBLEM THIS SOLVES is that the same facts are configured twice. An asset's delivery calendars live in contract/data-asset.yaml while each dataset's cadence, expected time and latency live in that dataset's own ODCS contract under slaProperties. The two can disagree, nothing checks that they do not, and slaProperties cannot be versioned - so changing a cadence silently re-judges history."
+      - "Decided slaProperties is DELETED rather than left in place as a deprecated copy. A second copy nobody reads is a second copy somebody edits, and the version that is read is decided by whichever parser ran - which is precisely the class of disagreement this requirement exists to end."
+      - "Decided a COLLECTION may name a calendar, not only a dataset (Keith, 2026-09-28), because a whole collection usually shares one. Child Protection's six datasets naming `quarterly` six times is six chances to disagree for no gain, and at thirty datasets that arithmetic gets worse rather than better."
+      - "Decided the changelog becomes STRUCTURED - date, author and change per entry - rather than the prose strings contract/data-asset.yaml carries today (Keith asked for this specifically, 2026-09-28). A prose string cannot be filtered, attributed or rendered, and the immutability gate's error messages read better when they can name who last changed a version."
+      - "Decided a dataset that is owed nothing in a period says so WITH A REASON rather than being silently absent. The reason is not decoration: `no November file` with nothing beside it is indistinguishable, six months later, from somebody having forgotten to configure November, and those are opposite problems. This preserves the rule REQ-PIPE-049 already settled for not_expected."
+      - "CARRIED FORWARD from REQ-PIPE-049 and not reopened by this move: quarterly uses authored dates and daily uses a cadence rule; the asset owns the calendar and a dataset owns its participation; month names in full only; a calendar date carries NO time of day; a period's name is authored rather than derived; the dates ARE the supplier agreement, so a holiday library predicts it and never constitutes it."
+      - "CARRIED FORWARD and specifically at risk in this move: per-dataset expected times are a definite need (Keith, 2026-09-22). The case that decided it is worth restating because a single file invites re-flattening - three slots in one period, births due 09:00, cp_clients due 09:00, cp_placements due 17:00; births arriving at 16:00 reads ON TIME with the deadline on the period and LATE with it on the slot, and the wrong one is a FALSE GREEN."
+      - "Decided the Child Protection override is about HOW EARLY a supply may arrive, not about its expected time (Keith corrected this explicitly, 2026-09-28). It widens the claim window; it does not move the deadline. Recorded here because a single file makes the two look like the same kind of setting."
+      - "Rejected moving the asset's timezone into this file, which a first reading of `one place a delivery agreement lives` suggests. The zone is asset-wide - the dashboard's asset clock, REQ-DASH-071's timestamps, arrival classification - so putting a general fact inside one consumer's file would misplace it. See REQ-PIPE-112, which is where the zone's own versioning lands."
+      - "Recorded because the move is the risky part rather than the file: pipeline/cadence.py's _sla_properties_to_dict already had a real defect of exactly this shape, keying on `property` alone and discarding `element:`, so Child Protection's single expectedTime block silently governed all six datasets. That was found by reading the parser rather than the config, and the same discipline applies here - reading the new file and inferring what the code does with it is not verification."
+    open_questions:
+      - "WHERE PARTICIPATION LIVES, and whether `participates: {slots, reason}` REPLACES today's `delivery_months` and `not_expected`. Thread C's newest subsection names `participates` per dataset without saying whether it supersedes the two keys that already do this job in contract/data-asset.yaml's hierarchy, or sits beside them, or whether participation moves into calendar.yaml at all. This changes what gets built: `delivery_months` carries its own reasoned naming decision (it names when a supply ARRIVES, not the period it covers) and replacing it with a slot list would retire that decision rather than restate it."
+      - "WHETHER A DATASET'S EXPECTED TIME IS A VERSIONED PROPERTY OF THE CALENDAR, or a property of the dataset's participation with its own effective dating. If it sits inside a calendar version, then one dataset moving its due time by an hour authors a new version of a calendar that thirty datasets share - readable, but heavy. If it sits on the dataset with its own versioning, there are two versioning axes to reason about when asking what was in force. REQ-PIPE-113 cannot be built without this answer."
+      - "WHETHER slaProperties GOES ENTIRELY or only its five schedule properties. `frequency` is an ODCS-standard property that says something a human reader of the contract wants (this feed is daily), and deleting it removes that statement from the contract even though nothing computes with it."
+  - id: REQ-PIPE-111
+    title: A calendar's history cannot be edited, and there is no way round it
+    date_written: "2026-09-28"
+    story: "As whoever is accountable for a red supply history, I want a delivery date that has already passed to be impossible to change, so that nobody can make a breach disappear by editing what we agreed after the fact."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-09-28 evening - the first of two decisions added to plans/supply-model.md Thread C, with the freeze rule chosen as option B of three and the no-escape-hatch fork settled the same evening. Scoped by delivery-scoper, 2026-09-28."
+    acceptance_criteria:
+      - "WHEN a commit changes the calendar configuration, THE SYSTEM SHALL compare it against the previously committed state of that file and SHALL refuse the commit if any rule below is broken."
+      - "IF an entry whose own date has already passed is changed, THEN THE SYSTEM SHALL refuse the commit."
+      - "IF an entry whose own date has already passed is removed, THEN THE SYSTEM SHALL refuse the commit."
+      - "IF an entry carrying a date already in the past is ADDED, THEN THE SYSTEM SHALL refuse the commit."
+      - "WHILE an entry's own date is still in the future, THE SYSTEM SHALL allow that entry to be added, changed or removed freely."
+      - "IF a version-level property is changed on a version whose effective-from date has already passed, THEN THE SYSTEM SHALL refuse the commit."
+      - "WHILE a version's effective-from date is still in the future, THE SYSTEM SHALL allow that version's own properties to be changed freely."
+      - "THE SYSTEM SHALL NOT offer any flag, environment variable, configuration key or documented procedure that allows a refused change to be committed."
+      - "THE SYSTEM SHALL NOT accept a new changelog entry as licence for a change these rules refuse."
+      - "THE SYSTEM SHALL run this check at commit time, through the repository's existing pre-commit hook."
+      - "THE SYSTEM SHALL run the same check in the repository's gates, so that a commit made without the hook is still caught."
+      - "THE SYSTEM SHALL decide whether a date is past or future on the data asset's own clock, and SHALL NOT use the machine's."
+      - "THE SYSTEM SHALL compare against the base of the whole push rather than only against its most recent commit."
+      - "IF there is no previous committed state available to compare against, THEN THE SYSTEM SHALL pass rather than fail."
+      - "WHEN a change is refused, THE SYSTEM SHALL name the entry or property, what it was, what it became, and that authoring a new effective-dated version is how to make the correction."
+      - "THE SYSTEM SHALL decide whether a change is legal from committed configuration alone, and SHALL NOT open or query any database, warehouse schema or anything under data/."
+      - "WHERE a calendar is expressed as a cadence rule rather than authored dates, THE SYSTEM SHALL apply the version-level rule to it and SHALL have no dated entries to freeze."
+      - "WHERE the asset carries any other effective-dated configuration, including its versioned timezone, THE SYSTEM SHALL apply the same freeze rule to it."
+      - "THE SYSTEM SHALL complete within the time budget the repository's other config-only gates already meet, so that it stays in the fast group rather than joining the slow tail."
+    non_functional_requirements:
+      - "A GATE THAT FIRES ON LEGITIMATE WORK GETS TURNED OFF, and the common case here is legitimate: authoring next year's dates. Keith's own words on the choice were that he does not want adding future days to the quarterly calendar to be that annoying, and the freeze rule was chosen to make that four appended lines plus one changelog entry inside the existing version. Any implementation that makes the ordinary case harder has misread the requirement."
+      - "A pre-commit hook runs on a laptop with no database, no network and possibly no populated data/ - which is why the freeze rule is `freeze by what the thing governs` rather than `freeze by what has been judged`. That constraint is load-bearing, not incidental, and it is the same rule as this repository holding configuration and not state."
+      - "NO ESCAPE HATCH MEANS THE ERROR MESSAGE IS THE DOCUMENTATION. A person who has just been refused a commit has to be able to see the sanctioned route from what they are told, because there is nowhere else for them to look and no flag for them to reach for."
+      - "The hook is not a security control and should not be described as one: anyone can bypass a pre-commit hook. The gate in the repository's CI is the actual backstop, and the honest framing is that the hook is there to catch the mistake early, not to stop a determined person."
+      - "Comparison must stay one read of one file at the depth CI already checks out. The existing sibling guard measures about 3ms for exactly that, and the deep-clone version of this idea was rejected once already on cost - re-adopting it by accident would be a real regression."
+      - "Git history is the comparison basis, so a shallow checkout and a branch's first push must both degrade to passing. A checkout that cannot see far enough is a weaker check, never a broken build."
+      - "At thirty datasets and years of authored dates the file keeps growing, so the comparison should be on parsed entries rather than on text, or the first reordering of the file produces a wall of false refusals."
+    dependencies:
+      - REQ-PIPE-110
+    decisions:
+      - "THIS IS THE LOAD-BEARING COMPLEMENT TO A REJECTION ALREADY RECORDED, and the pair only makes sense together. Thread C rejected `derive the date at runtime and freeze the computed due instant onto the result` on the grounds that the dates ARE the supplier agreement and QA judges against the agreement. But that rejection removed the thing that was protecting history: if a judgement does not carry its own frozen inputs, then editing the agreement retroactively re-judges every past supply against dates nobody agreed at the time. Immutability puts that protection back, on the config rather than on the record."
+      - "IT HAS TO BE A COMMIT-TIME GATE rather than a runtime one, because by the time anything runs the damage is already committed and the old values are only recoverable by reading git."
+      - "THE FREEZE RULE IS `FREEZE BY WHAT THE THING GOVERNS` (Keith, 2026-09-28, option B of three shown to him). An entry is frozen once its OWN date has passed; a version-level property such as the claim window is frozen once THAT VERSION takes effect, because it already governed periods that have been judged. It rests on one observation that an earlier draft missed: ADDING A FUTURE DATE IS NOT A CHANGE TO HISTORY, and `editing a version` and `changing what a past supply was judged against` are different things."
+      - "THE THIRD CLAUSE IS THE ONE A NAIVE WORDING LOSES: everything future-dated is freely editable. A rule phrased as `existing entries cannot change` would forbid exactly the maintenance task this design depends on somebody doing once a year."
+      - "REJECTED (A) FREEZE THE WHOLE VERSION once its effective-from has passed. A version is a complete statement of the agreement, so adding four dates would mean restating all twenty you did not touch - an unreadable diff, and two copies of the same dates that can silently disagree. Its obvious escape, letting each version state only its DELTA, is worse: `what was in force on 3 May 2025` then needs versions replayed in order, and the file stops being readable by eye."
+      - "REJECTED (C) FREEZE BY WHETHER ANYTHING HAS BEEN JUDGED against an entry - a slot existing in the database for that period. Theoretically the most precise rule and practically the wrong one: a pre-commit hook has to run on a laptop with no database, and a config gate that queries the warehouse to decide whether a config edit is legal inverts this project's own rule that the repository holds configuration, not state."
+      - "NO ESCAPE HATCH (Keith, explicitly, 2026-09-28). There is no flag, no override and no `I know what I am doing` path. A past date that was wrong is exactly the case immutability exists for: supplies were judged against it, and quietly changing it makes the record disagree with what happened. A correction that genuinely needs making is a new version with its own effective-from and its own changelog entry, which is visible rather than silent - and the real history stays in git either way."
+      - "THIS SUPERSEDES THE GUARD REQ-PIPE-050 ALREADY BUILT, and that is a change to shipped, signed behaviour rather than a new capability beside it. qa_tools/common/validate_schedule.py's _retrospective_edit_errors is deliberately a SAY-WHAT-YOU-DID gate - its own docstring says so - where a new changelog entry on the version clears a past-date edit. Under this requirement a changelog entry clears nothing, and the gate also has to cover two cases it does not see today: a past-dated entry being ADDED, and a version-level property changing. REQ-PIPE-050's criteria and its [BUILD] decisions need amending in the same change, or the register carries two contradictory accounts of one gate."
+      - "Decided the daily calendar is untouched by the entry rule, because it is a cadence rule rather than a date list and has no dated entries to freeze. Its version-level properties are still frozen on the same terms."
+      - "NOT BUILT HERE, deliberately: the SEAL (plans/running-thoughts.md #44) - a committed record of what a calendar was when it was last used to judge data, so the gate needs no git history at all. That is the stronger mechanism and it is the same artefact as the check-configuration seal that item exists to design; building a calendar-shaped copy of it now would be building the throwaway version."
+    open_questions:
+      - "WHETHER A REFUSAL IS A GOVERNANCE EVENT worth recording anywhere beyond the terminal of the person refused. A supplier agreement being edited retrospectively is the kind of thing an auditor would want to see attempted, not only prevented - but recording it needs somewhere to record it, and the pre-commit hook has no database. Left open because it changes scope rather than detail."
+      - "WHETHER `git commit --no-verify` IS ACCEPTED as out of scope. The no-escape-hatch decision is about this tool offering no override; it cannot stop a person bypassing the hook entirely, and the gate in CI is what catches that. Worth Keith confirming that reading, because `no escape hatch` could reasonably be read as a stronger promise than the mechanism can make."
+  - id: REQ-PIPE-112
+    title: The asset's timezone is versioned, and every reader asks as at when
+    date_written: "2026-09-28"
+    story: "As whoever reads a due instant computed years from now, I want it computed in the timezone that was in force when the supply was due, so that moving an asset's clock does not silently re-judge everything that already happened."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-09-28 evening - the second of two decisions added to plans/supply-model.md Thread C, settled the same evening as `the timezone IS versioned`. Scoped by delivery-scoper, 2026-09-28."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL express the data asset's timezone as effective-dated versions rather than as a single value."
+      - "WHEN a wall-clock time is interpreted as an instant, THE SYSTEM SHALL use the timezone version in force on the date being interpreted."
+      - "WHEN the current instant or today's date is needed, THE SYSTEM SHALL use the timezone version in force now."
+      - "THE SYSTEM SHALL require every caller to state the date or instant its answer is as at, and SHALL NOT offer a timezone lookup that takes none."
+      - "IF no timezone version covers the date being interpreted, THEN THE SYSTEM SHALL fail loudly naming that date, and SHALL NOT fall back to the newest version."
+      - "THE SYSTEM SHALL NOT reinterpret any already-stored instant when a timezone version is added or changed."
+      - "THE SYSTEM SHALL produce, for the single version the asset carries today, exactly the instants it produces before this change."
+      - "THE SYSTEM SHALL name an IANA zone in each version, and SHALL NOT accept a fixed UTC offset."
+      - "THE SYSTEM SHALL carry each timezone version's own changelog entry in the same structured shape a calendar version's changelog uses."
+      - "WHEN the dashboard is built, THE SYSTEM SHALL embed enough of the timezone history for the page to interpret a past date without asking a backend."
+      - "THE SYSTEM SHALL repoint every consumer of the asset's timezone at the as-at form, including the value embedded into the built dashboard."
+      - "THE SYSTEM SHALL read the timezone configuration without opening or querying any database, warehouse schema or anything under data/."
+    non_functional_requirements:
+      - "THIS IS A SHAPE CHANGE WITH MANY CONSUMERS, which is the class CLAUDE.md's own item-74 lesson covers: enumerate every caller mechanically rather than by memory, and assert at the LAST transform before a reader rather than at the parser. There are roughly twenty-three references to the asset timezone in Python plus one embedded const in the dashboard template, and the page has its own separate interpretation of it."
+      - "A BARE NO-ARGUMENT LOOKUP IS THE BUG THIS INVITES, and Thread C says so in as many words. The API should make the wrong call impossible rather than discouraged - remove the zero-argument function rather than deprecating it, so a caller that has not thought about `as at when` does not compile rather than quietly getting today's answer for a date in 2024."
+      - "PIN THE CURRENT VERDICTS BEFORE THE CHANGE, not after, the way REQ-PIPE-048 did for the same value. tests/fixtures/arrival_semantics_golden.json is the natural pin, and it should be confirmed to bite by perturbing the zone and watching real verdicts move."
+      - "The cost today is essentially all API churn and none of it benefit: the asset carries one zone, Western Australia does not observe daylight saving, and no second version exists. That is worth stating plainly at sign-off, because the argument for doing it now is that it is cheap while there is one version and expensive once instants have been computed under two."
+      - "The dashboard's asset clock updates in the browser, so resolving a version must not become a per-render cost. Resolve once per page rather than per timestamp."
+      - "Config only, no data access, so the gate, the pipeline and the build can all read it under the standing rule."
+      - "A second asset in a daylight-saving jurisdiction is the case this exists for, and it is the case with no test data. Whatever is built should be exercised against a zone that actually observes daylight saving, even if only in tests, or the first real deployment is the first real test."
+    dependencies:
+      - REQ-PIPE-048
+    decisions:
+      - "THE TIMEZONE IS VERSIONED (Keith, 2026-09-28), which makes it the same shape as everything else in this design: a wall-clock expected time is interpreted in the zone in force when the supply was DUE, exactly as a date is read from the calendar version in force then. Without that, changing an asset's zone would silently move every past due instant - the same retroactive re-judgement the calendar freeze rule exists to prevent, arriving by a different door."
+      - "IT STAYS IN contract/data-asset.yaml, becoming a versioned list rather than the scalar `timezone: Australia/Perth` there today. This was the scoping session's call rather than Keith's and is easily reversed: the zone is asset-wide and used well beyond the calendars - the dashboard's asset clock, REQ-DASH-071's timestamps, arrival classification - so moving it into contract/calendar.yaml would put a general fact inside one consumer's file."
+      - "EVERY READER BECOMES `AS AT WHEN`. A due instant asks for the zone in force at its own date; a display clock asks for the current one. That is a real cost of versioning and is written down because a bare timezone lookup with no instant is the bug this invites."
+      - "THE FREEZE RULE APPLIES TO TIMEZONE VERSIONS TOO, on the same freeze-by-what-it-governs line: a timezone version that has taken effect is frozen, because it already governed instants that have been judged. The mechanism is REQ-PIPE-111's; this requirement only supplies the thing to freeze."
+      - "Rejected a per-calendar or per-dataset timezone (Keith, 2026-09-28: not per-calendar, not per-dataset, and never the timezone of whatever machine happens to be running). An asset is a deployment rather than a row in the data, so its clock is a property of the deployment."
+      - "CARRIED FORWARD from contract/data-asset.yaml's existing comment, because it is still true and answers a DIFFERENT question: changing the zone reinterprets nothing ALREADY STORED, since every recorded instant carries its own offset. That covers recorded facts. Versioning covers instants COMPUTED from config, which had nothing protecting them."
+      - "CARRIED FORWARD from REQ-PIPE-048 and not reopened: an IANA zone name rather than an offset, because an offset is one zone's answer for one moment; a naive timestamp is an error rather than something to interpret; and `as at a date` means end of day in the asset's own timezone."
+    open_questions:
+      - "WHETHER THE ZONE STAYS IN contract/data-asset.yaml or moves into contract/calendar.yaml. The recommendation above is that it stays, on the grounds that it is used well beyond the calendars, but the counter-argument is real: this batch's organising idea is that one file holds the delivery agreement, and a wall-clock expected time is meaningless without the zone that interprets it. It is a cheap decision to take now and an annoying one to reverse later."
+      - "WHETHER THE API CHURN IS WORTH IT TODAY, given that there is exactly one timezone version and a second is hypothetical. The alternative is to leave the scalar in place and revisit if an asset ever needs a second zone, accepting that the instants computed in the meantime would be re-judged by that change. Recorded as a genuine fork rather than presented as settled, because it is the only requirement in this batch whose benefit is entirely in the future."
+  - id: REQ-PIPE-113
+    title: A slot's due instant comes from the agreement, and overlapping windows are refused at config time
+    date_written: "2026-09-28"
+    story: "As whoever has to explain why a supply was filed where it was, I want two consecutive slots' windows never to overlap, so that an arrival can only ever have belonged to one of them."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-09-28 - the gap invariant recorded in plans/supply-model.md Thread C's `contract/calendar.yaml` subsection, stated as `claim_window + grace < the gap between consecutive due instants`, concretely `claim_opens_at(N+1) > late_after(N)`. Scoped by delivery-scoper, 2026-09-28."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL compute each slot's due instant from its period's date, its dataset's expected time of day, and the timezone version in force on that date."
+      - "THE SYSTEM SHALL take a slot's expected time of day and its grace allowance from the calendar configuration in force on that period's own date."
+      - "WHEN a calendar version changes a dataset's expected time of day, THE SYSTEM SHALL leave every earlier slot's due instant unchanged."
+      - "THE SYSTEM SHALL express a supply due on the evening before its period's date, and SHALL NOT require a separate rule to reinterpret the arrival afterwards."
+      - "THE SYSTEM SHALL check, for every dataset, that each slot's claim window opens strictly after the previous slot's lateness begins."
+      - "IF a configuration would make a slot's claim window open on or before the previous slot's lateness begins, THEN THE SYSTEM SHALL reject that configuration."
+      - "WHEN the configuration is rejected for this reason, THE SYSTEM SHALL name the dataset, the two consecutive periods, both instants, and by how much they overlap."
+      - "THE SYSTEM SHALL reject such a configuration when the configuration is validated, and SHALL NOT discover it when an ambiguous arrival occurs."
+      - "THE SYSTEM SHALL check every consecutive pair of slots a dataset's configuration produces, and SHALL NOT check only the pair around today."
+      - "THE SYSTEM SHALL check the pair that straddles a version boundary, where two consecutive slots take their timing from different calendar versions."
+      - "WHERE a calendar is expressed as a cadence rule, THE SYSTEM SHALL check the invariant against the gap that rule generates."
+      - "WHERE a dataset widens its claim window, THE SYSTEM SHALL treat that as changing how early a supply may arrive, and SHALL NOT let it move that dataset's due instant."
+      - "THE SYSTEM SHALL check the invariant without opening or querying any database, warehouse schema or anything under data/."
+      - "THE SYSTEM SHALL give REQ-GEN-044's generated history somewhere effective-dated to state a due time, so that its criteria 8 to 11 can be built."
+    non_functional_requirements:
+      - "THE REAL COMMITTED CONFIGURATION MUST SATISFY THE INVARIANT BEFORE THE CHECK SHIPS, or the gate lands red on day one and the first thing anybody does is turn it off. Check both calendars as they stand - the daily feed due 14:00 with sixty minutes of grace and a four-hour window, and the quarterly one due 09:00 with eight hours of grace and a fourteen-day window - and say what the real margin is rather than assuming it is comfortable."
+      - "THE MARGIN SHRINKS AS THE CLAIM WINDOW WIDENS, and widening Child Protection's window is exactly what this batch allows. So the invariant check has to land in the same change as the widening, not after it - a configuration that is legal today can be made ambiguous by the very feature it arrives with."
+      - "At ~30 datasets across years of periods this walks every consecutive pair, which is linear in slots rather than cheap-by-inspection. It runs inside a gate whose siblings are sub-second, so either keep it in that band or state plainly which bounded window it checks and why that is enough."
+      - "What a wrong answer costs is not an error, it is a silently wrong history: an arrival that two slots can both claim gets filed by whichever branch of the assignment rule happens to run first, and the record then says something nobody decided. That is the false-green direction, which is why this is refused rather than warned about."
+      - "Config only, no data access, so both the gate and the dashboard build can compute it under the standing rule."
+      - "The claim window is a genuine TRADE rather than a tuning knob - tight windows buy cascade-immunity at the price of boundary misfiling, wide ones do the reverse. This check must read as protecting that trade, not as an invitation to tune the window until the gate goes quiet."
+    dependencies:
+      - REQ-PIPE-110
+      - REQ-PIPE-112
+      - REQ-PIPE-052
+    decisions:
+      - "THE INVARIANT IS `claim_window + grace < the gap between consecutive due instants`, stated concretely as `claim_opens_at(N+1) > late_after(N)` (Keith, 2026-09-28). Without it, a slot's claim window overlaps the previous slot's lateness and an arrival is ambiguous between two slots."
+      - "IT IS REFUSED AT CONFIG TIME rather than handled at runtime (Keith, 2026-09-28). A runtime resolution would have to pick one of the two slots, and any rule for picking is a guess presented as a fact - the config that made it possible is the thing that is actually wrong."
+      - "A CORRECTION TO THREAD C, recorded because the thread states it the other way and somebody will read it: a due instant IS computed today. qa_tools/common/slots.py already gives every slot a due_at, a derived late_after and a claim_opens_at (REQ-PIPE-052, built). What Thread C's sentence is true of is qa_tools/common/schedule.py, which deliberately knows periods and not slots. So this requirement changes where a due instant's INPUTS come from and makes them versioned; it does not introduce the due instant."
+      - "THE CLAIM WINDOW OPENS BEFORE DUE AND NEVER CLOSES (REQ-PIPE-052), and this invariant is what makes that safe. There is no closes_at, deliberately: closing the window is the tempting fix for a boundary misfile and it is what would break late filing, since late is always allowed."
+      - "THIS ANSWERS THE FORK REQ-GEN-044 RECORDED and could not resolve. Its criteria 8 to 11 need the supply for day D due 22:00 on D-1, and a calendar version carried the claim window, the dates or the cadence rule and NOT the due time - which lived unversioned in each ODCS contract. The three options recorded there were to move the due time onto the calendar version, duplicate it there, or express the evening-before shape some third way. The answer is MOVE, which is REQ-PIPE-110's deletion of slaProperties, and this requirement is where the moved value becomes effective-dated."
+      - "THE EVENING-BEFORE SHAPE NEEDS NO CUTOFF RULE, which REQ-PIPE-052 already decided and this requirement inherits: `arrives 10pm, so it is for tomorrow` is not special handling, it is a due instant that genuinely falls on the previous calendar day, with the window opening accordingly."
+      - "Decided the Child Protection override widens the claim window and does not move the deadline (Keith corrected this explicitly, 2026-09-28). Recorded on this requirement as well as REQ-PIPE-110 because it is the override most likely to breach the invariant, and the two facts have to be read together."
+      - "Recorded because a quarterly gap is NOT uniform and an implementation will assume it is: February to May is 89 days, May to August is 92, and November to February is 92. An invariant checked against a nominal quarter rather than against real consecutive dates would pass a configuration that fails on the shortest gap of the year."
+    open_questions:
+      - "WHETHER THE INVARIANT IS CHECKED ACROSS A DATASET'S WHOLE HISTORY OR ONLY FORWARD FROM TODAY. Checking everything is the honest reading and makes a past configuration's ambiguity visible; it also means importing a historically ambiguous configuration fails the gate on work nobody can now change, which the freeze rule in REQ-PIPE-111 would then prevent anybody from fixing. Checking forward only avoids that and leaves a real past ambiguity unreported."
+      - "WHAT HAPPENS TO A CONFIGURATION ALREADY IN FORCE THAT BREACHES THE INVARIANT, if one is ever found. Rejecting it stops the pipeline for that dataset, which is REQ-PIPE-053's exhausted-schedule shape and is arguably right; refusing only the EDIT that introduces it is gentler and leaves a known ambiguity running. This does not arise for today's two calendars, which is exactly why it is cheap to decide now."
