@@ -4067,17 +4067,51 @@ be versioned - so changing a cadence silently re-judges history.
    Not per-calendar, not per-dataset, and never the timezone of
    whatever machine happens to be running.
 
-**Three forks these two raise, still open and worth settling before a
-requirement is drafted:**
+**What "historical" means - SETTLED, Keith 2026-09-28, option B of
+three shown to him.** The rule is **freeze by what the thing
+governs**, and it rests on one observation: ADDING A FUTURE DATE IS
+NOT A CHANGE TO HISTORY. The first draft of this section conflated
+"editing a version" with "changing what a past supply was judged
+against", and they are different things.
 
-- **What counts as "historical" - a VERSION or an ENTRY?** Freezing a
-  version once its `effective_from` has passed is simpler to validate
-  and matches the versioned model, but it means correcting NEXT
-  year's date requires a new version. Freezing individual elapsed
-  entries allows in-place edits to future dates within a live version,
-  but needs date-by-date comparison. The first is the stricter
-  discipline and my recommendation; it has a real cost, which is more
-  versions.
+- An **entry** is frozen once **its own date** has passed.
+- A **version-level property** (`claim_window`, and anything else that
+  governs a whole version) is frozen once **that version** takes
+  effect, because it already governed periods that have been judged.
+
+The validator rule, in three sentences, compared against `HEAD`: no
+entry whose date has passed may be changed or removed; **no entry with
+a past date may be ADDED either**, since that invents a slot nobody was
+ever owed; everything future-dated is freely editable. That last
+clause is easy to leave out and is the one a naive "existing entries
+cannot change" wording would miss.
+
+What it costs in the case that motivated the choice - Keith's own
+"I don't want adding future days to the quarterly calendar to be that
+annoying". Authoring 2028's four dates is four appended lines plus one
+changelog entry, inside the existing version. A new version stays
+reserved for what deserves one: the supplier changing the agreement,
+or the claim window changing. Note the daily calendar is a `cadence`
+rule rather than a date list, so none of this touches it.
+
+REJECTED, both worth not re-deriving:
+- **(A) Freeze the whole version once `effective_from` has passed.**
+  A version is a complete statement of the agreement, so adding four
+  dates means restating all twenty you did not touch - an unreadable
+  diff, and two copies of the same dates that can silently disagree.
+  Its obvious escape, letting each version state only its DELTA, is
+  worse: "what was in force on 3 May 2025" then needs versions
+  replayed in order, and the file stops being readable by eye.
+- **(C) Freeze by whether anything has been JUDGED against an entry**
+  - a slot existing in the database for that period. Theoretically the
+  most precise rule, and practically the wrong one: a pre-commit hook
+  has to run on a laptop with no database, and a config gate that
+  queries the warehouse to decide whether a config edit is legal
+  inverts this project's own "the repository holds configuration, not
+  state".
+
+**Two forks still open:**
+
 - **Is there an escape hatch?** My recommendation is no. A past date
   that was wrong is exactly the case immutability exists for - the
   supplies were judged against it, and quietly changing it makes the
@@ -4087,6 +4121,11 @@ requirement is drafted:**
   saving so this is theoretical here, but the general system is the
   one being designed. Either the timezone is versioned alongside the
   calendars, or this is accepted and written down as accepted.
+  Worth reading `contract/data-asset.yaml`'s own `timezone` comment
+  first: it already argues that changing the zone reinterprets
+  nothing stored, because every recorded instant carries its own
+  offset. A DUE instant computed from config is a different case,
+  which is why this is still a question.
 
 ## Thread D - Arrival classification
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing

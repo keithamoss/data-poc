@@ -788,7 +788,8 @@ one when this line suggests it matters.
   - The problem it solves: the same facts are configured twice. Today an asset's delivery calendars live in...
   - The shape agreed: One contract/calendar.yaml per data asset. It, A collection may name a calendar, participates: {slots, The Child Protection override is about HOW, The gap invariant, A structured changelog inside the file
   - Two decisions Keith added on the evening of 2026-09-28:
-  - Three forks these two raise, still open and worth settling before a requirement is drafted:
+  - What "historical" means - SETTLED, Keith 2026-09-28, option B of three shown to him. The rule is freeze by what the...
+  - Two forks still open:
 - **Thread D** `todo` 2026-09-21 - Arrival classification
   - *touches:* `pipeline/cadence.py`
   - SETTLED 2026-09-21 - the fix below was agreed, along with two corrections found while explaining it. The "not yet...
