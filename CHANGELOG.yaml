@@ -154,6 +154,13 @@ releases:
               page is written.
       - category: New
         items:
+          - headline: Each expected supply can have its own ticket
+            components: ["Pipeline & publishing"]
+            description: >
+              A ticket per expected supply, kept up to date with where that
+              supply has got to, and silent when nothing has changed. By
+              default only supplies that want somebody get one; set
+              ticket_policy to all for every one.
           - headline: A period standing in on an earlier one says so
             components: ["Dashboard UI"]
             description: >

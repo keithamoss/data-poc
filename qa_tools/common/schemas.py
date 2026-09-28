@@ -486,3 +486,8 @@ class DataAsset(_Strict):
     timezone: NonEmptyStr
     calendars: list[CalendarConfig] = Field(min_length=1)
     hierarchy: HierarchyConfig
+    #: Which slots get a ticket (REQ-PIPE-083 criterion 21). Optional
+    #: with a default, because an asset that has never thought about
+    #: ticketing should not have to declare that it has not - and the
+    #: default is the one that keeps the queue worth reading.
+    ticket_policy: Literal["all", "needs-action"] = "needs-action"

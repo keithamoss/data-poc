@@ -15808,6 +15808,43 @@ requirements:
     open_questions: []
     decisions:
       - >
+        THE SERVICE IS A PROTOCOL OF FIVE METHODS, and the reconciler
+        knows nothing else about ticketing. That is what lets the whole
+        of criteria 2 to 22 be driven in a test without a network, and
+        it is also what criterion 17 rests on: every one of those five
+        may raise, and the caller's operation still stands on its
+        durable record.
+
+        REJECTED: building against `ticket_sync.py` directly. That
+        module is REQ-GHUB-027's per-DATASET scheme and shells out to
+        `gh`, which this container does not have - so the real path
+        could not have been exercised here anyway, and a test suite that
+        opened real issues to prove a comparison would litter a public
+        repository to test the wrong thing.
+
+      - >
+        "THE STATE HAS CHANGED" IS A HASH OF WHAT THE COMMENT WOULD SAY,
+        not of the state object. Two states that render identically are
+        the same state as far as a reader is concerned, and posting for
+        a difference nobody can see is exactly the repetition criterion
+        5 forbids. Deriving it from the rendered body also makes a
+        change to the WORDING a change - which is right, because the
+        ticket would then be showing something it has never shown.
+
+      - >
+        `needs-action` IS THE DEFAULT AND THAT IS NOT TIMIDITY. At two
+        datasets `all` is a tidy idea. The scale this is a PoC for is
+        ~30 datasets on a quarterly asset with a daily feed beside it,
+        where `all` means a ticket per dataset per period whether or not
+        anything ever needed a person - which is how a team learns the
+        queue is mostly noise and stops reading it. The whole point of
+        the queue is that everything in it wants somebody.
+
+        AN UNKNOWN POLICY FALLS BACK AND SAYS SO rather than raising: a
+        typo in the asset config should not stop a pipeline run from
+        reconciling anything at all, which is the blast-radius rule this
+        batch applies everywhere.
+      - >
         STARTED 2026-09-29, AND THIS RECORDS EXACTLY HOW FAR.
         `in_progress` rather than `built` because the register's gate
         forbids evidence on anything not built, and a status that
@@ -15825,11 +15862,24 @@ requirements:
         between runs opens a second ticket instead of finding the first.
         16 tests in tests/test_slot_state.py.
 
-        NOT DONE - the RECONCILER itself, which is every other
-        criterion: finding or opening one ticket per slot, comparing
-        against what it last said, posting only on change, reopening one
-        a person closed, and the policy that decides which slots get a
-        ticket at all.
+        ALSO DONE, later the same night - THE RECONCILER'S LOGIC:
+        criteria 2, 4, 5, 9, 10, 11, 12, 17, 18, 20, 21 and 22.
+        `qa_tools/common/ticket_reconciler.py` finds or opens one ticket
+        per slot, compares the state against what IT last said, posts
+        only on a change, reopens one a person closed rather than
+        opening a second, never closes anything, scopes a failure to one
+        slot, and reads its policy from `contract/data-asset.yaml`'s new
+        `ticket_policy` - `needs-action` by default. 37 tests in
+        tests/test_ticket_reconciler.py.
+
+        NOT DONE - THE SERVICE AND THE CALLERS. Criterion 19 (never
+        touch a ticket from before this scheme) belongs to the real
+        GitHub client, which does not exist: `ticket_sync.py` is
+        REQ-GHUB-027's per-DATASET scheme and shells out to `gh`, which
+        this container does not have. Criterion 1's "when a period
+        opens" and criterion 13's "after every QA run" are call sites.
+        Criteria 14, 15 and 16 are the operator routes, REQ-GHUB-082's
+        and REQ-PIPE-099's.
 
       - >
         THE ORDER OF THE STATE RULES IS THE DESIGN, and it is worth

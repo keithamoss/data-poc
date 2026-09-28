@@ -89,6 +89,25 @@ timezone: Australia/Perth
 # supply is due comes from the dataset's own expectedTime in its own
 # contract, applied to the calendar's date - so a per-dataset deadline
 # stays per-dataset instead of being flattened into one per period.
+# WHICH SLOTS GET A TICKET (REQ-PIPE-083 criterion 21).
+#
+# `needs-action` - the default - opens a ticket for a slot that is
+# amber, red, overdue, late, held, or awaiting a person's decision
+# because automatic promotion did not apply. `all` opens one for every
+# slot in every period.
+#
+# THE DEFAULT IS NOT A TIMIDITY. At two datasets `all` is a tidy idea;
+# the scale this is a PoC for is ~30 datasets on a quarterly asset and a
+# daily feed beside it, where `all` means a ticket per dataset per
+# period whether or not anything ever needed a person - which is how a
+# team learns that the queue is mostly noise and stops reading it. The
+# whole point of the queue is that everything in it wants somebody.
+#
+# DATA-ASSET-LEVEL, not per dataset, because it is a statement about how
+# this team works rather than about any one supplier.
+ticket_policy: needs-action
+
+
 calendars:
   - name: quarterly
     # HOW FEW FUTURE SLOTS LEFT BEFORE WE SAY SO (REQ-PIPE-053).
