@@ -15337,8 +15337,11 @@ requirements:
         THE SYSTEM SHALL record the decision in the decision log with
         the operator, the period pointed at, and a reason.
       - >
-        WHEN a slot resolves this way, THE SYSTEM SHALL re-run QA for
-        that period so every check reading that table is re-evaluated.
+        WHEN a slot resolves this way, THE SYSTEM SHALL re-evaluate
+        every check in that period that declares a dependency on that
+        dataset AND every check that dataset's own checks depend on -
+        and SHALL NOT re-run the substituted table's OWN checks, whose
+        verdicts remain those of the run that earned them.
       - >
         IF no earlier GREEN supply exists, THEN THE SYSTEM SHALL refuse
         the decision and SHALL say why.
@@ -15347,8 +15350,11 @@ requirements:
         SYSTEM SHALL hold it for a person, SHALL NOT replace the
         indirection automatically, and SHALL NOT discard it.
       - >
-        THE SYSTEM SHALL allow the decision to be reversed by a later
-        recorded decision.
+        THE SYSTEM SHALL offer DE-SUBSTITUTE as an operator action, for
+        one dataset and one period at a time, which removes that
+        period's indirection so that nothing in it resolves to the
+        supply it stood on any longer, leaves the slot unfilled, and is
+        recorded with the operator and a reason.
       - >
         THE SYSTEM SHALL accept this decision from the same operator
         routes as every other filing decision.
@@ -15359,6 +15365,18 @@ requirements:
       - >
         THE SYSTEM SHALL NOT change what any period resolves to as a
         side effect of a decision taken about a different period.
+      - >
+        THE SYSTEM SHALL require an explicit confirmation before
+        de-substituting, on every route, and SHALL NOT re-create an
+        indirection a person has removed.
+      - >
+        WHEN a period's indirection is created or removed, THE SYSTEM
+        SHALL re-evaluate the checks criterion 6 names, on the same
+        terms in both directions.
+      - >
+        IF a period already holds a PROMOTED table for that dataset,
+        THEN THE SYSTEM SHALL refuse to substitute into it, and SHALL
+        say that the period already resolves to a real supply.
     non_functional_requirements:
       - >
         This is for DOWNSTREAM CONSUMERS rather than for reporting
@@ -15381,12 +15399,67 @@ requirements:
         schema further back, and reference_view() is already built and
         tested as a real cross-schema VIEW rather than a copy.
       - >
-        At ~30 datasets with a quarterly cadence, a persistent non-supplier could accumulate a chain of substitutions across
-        several periods. Whether a substitution may itself point at a
-        substituted period is a real question, and an unbounded chain
-        means a query silently reaching years back.
+        CHAINS ARE SETTLED - decision 10 rules that a substitution may
+        reach any earlier period that received a REAL supply and never
+        targets a substituted one, so no chain forms and there is no
+        depth to cap. What remains is a COST rather than a question,
+        and it is the one to watch at ~30 datasets on a quarterly
+        cadence: a persistent non-supplier leaves SEVERAL periods
+        standing on one old supply - each its own decision to make,
+        and, under criterion 11, each its own period to unpick before
+        that supply can be withdrawn. Four quarters standing on one
+        February is real work for one person on one afternoon.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-035]
     decisions:
+      - >
+        CRITERION 6 CONTRADICTED DECISION 9 AND IS REWRITTEN (Keith,
+        2026-09-28, at read-back). It said "re-run QA for that period",
+        while decision 9 says a substituted period REFERENCES the
+        original run's results and explicitly rejects re-running them.
+        Both were right about different things and the criterion was
+        what was wrong: the substituted table's OWN verdicts stay those
+        of the run that earned them, while checks in this period that
+        READ it must be re-evaluated, because their other participants
+        are this period's real data. Same distinction REQ-PIPE-099
+        criterion 11 makes, and stated in both directions for the same
+        reason - dependency runs both ways.
+      - >
+        DE-SUBSTITUTE IS A REAL OPERATION, NOT A REVERSIBILITY CLAUSE
+        (Keith, 2026-09-28). Criterion 9 said only that the decision
+        "may be reversed by a later recorded decision", which is far
+        weaker than REQ-PIPE-099's un-inherit - a named action with its
+        own confirmation, route parity and explicit removal of the
+        view. He asked for symmetry between the two dispositions, so
+        criterion 9 now specifies the operation and criterion 13
+        carries the confirmation and the no-automatic-restoration rule,
+        matching REQ-PIPE-099 criteria 4 and 10 clause for clause.
+      - >
+        A PERIOD THAT ALREADY HOLDS A PROMOTED TABLE CANNOT BE
+        SUBSTITUTED INTO (criterion 15, Keith, 2026-09-28), extended by
+        him from the identical rule he settled for inheritance on
+        REQ-PIPE-099. Same reasoning: a period resolving to a real
+        supply does not need to stand on anything, and substituting
+        would replace real data with a pointer to older data. Reachable
+        for the same reason - REQ-PIPE-057 criterion 11's unexpected
+        table.
+      - >
+        NON-FUNCTIONAL 4 WAS STALE AGAINST THIS REQUIREMENT'S OWN
+        DECISION 10, which settles that a substitution reaches any
+        earlier period holding a REAL supply and never targets a
+        substituted one - so chains cannot form and there is no depth
+        to cap. It still read as an open question about exactly that.
+        Rewritten to record what actually remains, which is a cost: a
+        persistent non-supplier leaves several periods standing on one
+        old supply, each its own decision and, under criterion 11, each
+        its own period to unpick before that supply can be withdrawn.
+      - >
+        A STALE CROSS-REFERENCE FIXED IN THE SAME PASS: decision 12
+        cited "criterion 18", which this requirement has never had - it
+        has twelve, now fifteen. It meant the one saying a decision
+        about one period must not change what another resolves to,
+        which is criterion 12. Recorded rather than silently corrected,
+        because it is the third stale criterion reference found in the
+        register today and the pattern is worth seeing.
       - >
         Decided this is a DATABASE action rather than a QA one - Keith's
         own framing, "less about QA and more about database stuff":
@@ -15547,8 +15620,8 @@ requirements:
         changes other periods; rejected dropping the dependent views so
         those periods go quiet, which is the most literal reading but
         loses an answer a previous real supply could still have given.
-        Both were rejected for the same reason, which criterion 18
-        above now states in general: a decision about one period must
+        Both were rejected for the same reason, which criterion 12
+        now states in general: a decision about one period must
         not change what another period resolves to.
         WHERE IT IS ENFORCED: this requirement creates the dependency,
         but the refusal is the shape `REQ-GHUB-082` criteria 19 to 21
