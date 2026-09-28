@@ -108,3 +108,43 @@ class TestAVerdictThisGateCannotReadStopsIt:
             [r("pass", dataset_id="cp-carers"),
              r("indeterminate", dataset_id="cp-placements", check_id="c2")],
             reads={}) == "green"
+
+
+class TestACheckWithNoReferenceIsNotEvidenceOfHealth:
+    """REQ-QAC-108 criterion 5 reaching the promotion gate.
+
+    A drift check whose reference period does not exist records
+    `nodata` - it measured nothing. Two things have to be true of that
+    at once, and they pull in opposite directions, which is why they are
+    tested together.
+    """
+
+    def test_it_never_outranks_a_real_verdict(self):
+        """One unmeasurable drift check must not hold up a dataset whose
+        real checks are green - it would make every dataset's first
+        supply wait for a person, for ever, for no reason."""
+        assert promotion.status_of(
+            "cp-carers",
+            [r("pass", dataset_id="cp-carers"),
+             r("nodata", dataset_id="cp-carers", check_id="drift")],
+            reads={}) == "green"
+
+    def test_it_never_loses_a_red_either(self):
+        assert promotion.status_of(
+            "cp-carers",
+            [r("fail", dataset_id="cp-carers"),
+             r("nodata", dataset_id="cp-carers", check_id="drift")],
+            reads={}) == "red"
+
+    def test_a_dataset_whose_EVERY_check_is_quiet_does_not_read_green(self):
+        """THE FALSE GREEN THIS LINE EXISTS FOR. worst_of() is a reduce
+        seeded at green, so a dataset with nothing but quiet verdicts
+        rolled up to green and promoted itself on the strength of
+        nothing having been measured. Caught by writing the test rather
+        than by anything failing, which is why it is written down."""
+        got = promotion.status_of(
+            "cp-carers", [r("nodata", dataset_id="cp-carers", check_id="drift")],
+            reads={})
+        assert got == "nodata"
+        assert got not in promotion.PROMOTES_ITSELF, \
+            "a supply nobody measured must not promote itself"

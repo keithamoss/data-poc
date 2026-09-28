@@ -169,3 +169,38 @@ def reference_run_for(conn: supply_db.SupplyConnection, dataset_id: str,
     recorded run for it", which reads the same way to whoever is told.
     """
     return run_for(conn, dataset_id, reference_for(conn, dataset_id, current_period).supply)
+
+
+def reference_run_for_arrival(dataset_id: str, received_at) -> str | None:
+    """The reference run for the supply an arrival brought, or None.
+
+    THE ORCHESTRATORS' ENTRY POINT. They know an arrival and a dataset;
+    this answers with the run whose recorded numbers a drift or volume
+    check measures against. Everything between - which period that
+    supply was filed to, how far back the last real promotion was, which
+    run checked it - is this module's and filing's business rather than
+    the orchestrator's.
+
+    NONE RATHER THAN AN EXCEPTION, because "there is nothing earlier to
+    measure against" is an ordinary state rather than a fault: it is
+    true of every dataset's first supply, for ever. What is NOT ordinary
+    is reporting it as a pass, which criterion 5 forbids in as many
+    words - so the caller turns this None into a check with no
+    reference, never into a green one.
+
+    ITS OWN CONNECTION, read-only, for the reason filing.filled_slots()
+    and promotion_state.state_for() both give: a narrow reader can only
+    answer questions about records, where a connection handed in could
+    answer any question at all.
+    """
+    from qa_tools.common import filing
+
+    period = filing.period_of(dataset_id, received_at)
+    if not period:
+        return None
+    with supply_db.connect(read_only=True,
+                            label="mothman:drift-reference") as conn:
+        try:
+            return reference_run_for(conn, dataset_id, period)
+        except NoReference:
+            return None

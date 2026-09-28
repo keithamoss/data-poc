@@ -23335,6 +23335,80 @@ requirements:
         carry-forward or an inherited view, which are exactly the two
         things criterion 6 excludes. The title says PROMOTED because
         nothing else in this domain means only what was promoted.
+      - >
+        THE WIRING AND CRITERION 5 LANDED TOGETHER, 2026-09-29, exactly
+        as the analysis above said they had to. Criteria 2, 3, 4, 5, 6
+        and 7 are met; criterion 1 - the relative volume check on each
+        of Child Protection's six datasets - is the one thing left, and
+        is deliberately its own piece of work rather than being folded
+        into a change that was already reaching into both orchestrators,
+        both Evidently modules, the promotion gate and two CLI paths.
+      - >
+        WHAT `None` MEANS NOW, because it used to mean the opposite.
+        Both evaluate_evidently_* functions took a `reference_run_id`
+        defaulting to a module-level constant, so an absent reference
+        silently became a fixed run chosen once. It defaults to None
+        now, and None means THERE IS NO REFERENCE: the check records
+        `nodata`, computes nothing, and carries no metric value. A PSI
+        number beside a "no reference" status would say a comparison
+        happened against something nobody named.
+      - >
+        THE VOLUME CHECK MOVED TOO, and criterion 2 is why - it says
+        "every drift and volume check" rather than naming them
+        separately. Birth Registrations' row-count check compared
+        against the PREVIOUS ARRIVAL, whatever became of it, so a supply
+        that arrived and was rejected became the yardstick for the one
+        after it. It takes the same promoted reference now. That also
+        stopped a QA step walking data/deliveries/ from inside a check,
+        which made the check's answer depend on what happened to be on
+        disk rather than on what had been recorded.
+      - >
+        AND THE VOLUME CHECK NO LONGER VANISHES on a supply with no
+        reference. It used to be skipped entirely when there was no
+        previous run, which reads on the page as a check nobody defined
+        rather than as one with nothing to measure - and a check whose
+        absence means something is a check nobody can act on. It reports
+        `nodata` and stays.
+      - >
+        A FALSE GREEN FOUND WHILE BUILDING, in promotion.status_of().
+        It rolled its contributing verdicts up with worst_of(), which is
+        a reduce seeded at GREEN - so a dataset whose every contributing
+        check carried a quiet status rolled up green and promoted itself
+        on the strength of nothing having been measured. Adding a fifth
+        verdict is what would have made that reachable. Changed to
+        rollup_statuses(), which returns the quiet status instead and is
+        identical on every mixed input. Covered by a test that fails
+        against the old line.
+      - >
+        DELETED RATHER THAN RE-TESTED: cli/bdm.py's default_reference()
+        and its three tests. It picked the last run whose results
+        existed and fell back to the manifest's first entry, which is
+        criterion 4's anchor receding into the past wearing a heuristic.
+        An operator naming a reference explicitly is a different thing
+        and is still honoured, all the way down. Child Protection's
+        default_reference() SURVIVES, for a different job that used to
+        share the same answer: which run's other five tables a
+        single-table check stands beside is a question about the
+        warehouse, not about what this supply is measured against.
+      - >
+        A SECOND LATENT HOLE THE FIFTH VERDICT EXPOSED: all four
+        `summary` blocks - both orchestrators and both history rebuilds -
+        counted pass, warn, fail and error, while `total_checks` was the
+        length of the whole list. So the parts silently stopped adding
+        up to the whole the moment a fifth status existed. Nothing on
+        the dashboard would have noticed, because it reads `results`
+        rather than `summary`; what noticed was
+        tests/test_build_results_from_history.py, which asserts the sum.
+        Fixed in all four, and the test now names the uncounted verdicts
+        rather than only failing.
+      - >
+        ALSO DELETED: run_evidently_bdm._previous_run_id(), and the test
+        of a run compared against ITSELF. That test asserted "pass" and
+        was honest about the code at the time - the batch chose one
+        reference, so the first supply genuinely was its own. A run
+        cannot be its own reference any more, so the state it stood in
+        for is now `reference_run_id=None`, and the test in its place
+        asserts the opposite verdict for the same situation.
 
   - id: REQ-GHUB-109
     title: >

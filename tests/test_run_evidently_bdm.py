@@ -56,17 +56,65 @@ def _run(monkeypatch, bdm_delivery_dirs, run_id, run_timestamp, **kw):
     )
 
 
-def test_reference_run_against_itself_has_no_psi_drift(monkeypatch, bdm_delivery_dirs, bdm_duckdb_dir):
-    """run_id == reference_run_id is the real "first run, nothing to
-    compare against yet" case status_for_psi() special-cases."""
-    results = _run(monkeypatch, bdm_delivery_dirs, _REF_RUN_ID, "2026-01-01T06:30:00Z")
+class TestASupplyWithNothingToMeasureAgainst:
+    """REQ-QAC-108 criterion 5, in as many words: "SHALL report the
+    check as having no reference, and SHALL NOT report it as passing".
 
-    psi = next(r for r in results if r["check_name"] == "drift:PSI")
-    assert psi["status"] == "pass"
-    assert psi["engine"] == run_evidently_bdm.ENGINE_TAG
-    # The first arrival recognised on disk - no previous run to compare
-    # row-count growth against, so only the PSI result should exist.
-    assert len(results) == 1
+    IT REPLACED A TEST OF THE OPPOSITE. That test drove
+    run_id == reference_run_id - a run compared against itself - and
+    asserted "pass", which was the honest reading of the code at the
+    time: the reference was one run the batch chose once, so the first
+    supply legitimately WAS its own reference. Criterion 4 removed that
+    arrangement, so a run can no longer be its own reference at all, and
+    the state it stood in for - a dataset's first supply, with nothing
+    earlier promoted - now arrives as `reference_run_id=None`.
+
+    A PASS HERE WOULD BE THE FALSE GREEN THIS PROJECT KEEPS PAYING FOR:
+    it says the supply was compared against what came before and found
+    fine, when nothing was compared at all.
+    """
+
+    def _results(self, monkeypatch, bdm_delivery_dirs):
+        return _run(monkeypatch, bdm_delivery_dirs, _REF_RUN_ID,
+                     "2026-01-01T06:30:00Z", reference_run_id=None)
+
+    def test_the_drift_check_says_no_reference_rather_than_pass(
+            self, monkeypatch, bdm_delivery_dirs, bdm_duckdb_dir):
+        psi = next(r for r in self._results(monkeypatch, bdm_delivery_dirs)
+                    if r["check_name"] == "drift:PSI")
+        assert psi["status"] == "nodata"
+        assert psi["metric_value"] is None, "a PSI value implies a comparison happened"
+        assert psi["reference_run_id"] is None
+        assert psi["engine"] == run_evidently_bdm.ENGINE_TAG
+
+    def test_the_volume_check_says_the_same_thing(
+            self, monkeypatch, bdm_delivery_dirs, bdm_duckdb_dir):
+        """Criterion 2 gives drift and volume ONE reference, so they
+        have one answer to having none."""
+        growth = next(r for r in self._results(monkeypatch, bdm_delivery_dirs)
+                       if r["check_name"] == "evidently:row_count_growth")
+        assert growth["status"] == "nodata"
+        assert growth["metric_value"] is None
+
+    def test_the_volume_check_still_appears_at_all(
+            self, monkeypatch, bdm_delivery_dirs, bdm_duckdb_dir):
+        """IT USED TO VANISH on the first run, which reads on the page
+        as a check nobody defined rather than as one with nothing to
+        measure. A check that disappears when it has no answer is a
+        check whose absence nobody can act on."""
+        results = self._results(monkeypatch, bdm_delivery_dirs)
+        assert len(results) == 2
+        assert {r["check_name"] for r in results} == {
+            "drift:PSI", "evidently:row_count_growth"}
+
+    def test_the_row_count_is_still_reported(
+            self, monkeypatch, bdm_delivery_dirs, bdm_duckdb_dir):
+        """Having no reference stops the COMPARISON, not the
+        measurement - how many rows arrived is a fact about this supply
+        alone."""
+        growth = next(r for r in self._results(monkeypatch, bdm_delivery_dirs)
+                       if r["check_name"] == "evidently:row_count_growth")
+        assert growth["row_count_total"] > 0
 
 
 def test_dirty_run_produces_a_real_row_count_drop_failure(monkeypatch, bdm_delivery_dirs, bdm_duckdb_dir):

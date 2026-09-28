@@ -25,7 +25,9 @@ from __future__ import annotations
 import os
 
 from . import bdm_common
-from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
+from qa_tools.common.evidently_common import (
+    ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, NO_REFERENCE, status_for_psi, compute_psi,
+)
 from qa_tools.common.qa_results_writer import write_qa_result
 from .evidently_check_lifecycle import PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_ID
 
@@ -36,9 +38,8 @@ AGENCY_ID = bdm_common.AGENCY_ID
 COLLECTION_ID = bdm_common.COLLECTION_ID
 DATASET_ID = bdm_common.DATASET_ID
 
-# A fallback default only - see run_evidently_cp.py's identical comment
-# and orchestrate_bdm.py for why real callers never rely on it.
-REFERENCE_RUN_ID = "run_01_2026-09-01"
+# THERE IS NO DEFAULT REFERENCE ANY MORE - see run_evidently_cp.py's
+# identical note for the full account (REQ-QAC-108 criterion 4).
 
 # Row-growth check: "some reduction in a daily refresh is fine" (Keith's
 # own words) - so only a genuinely large drop trips this, not any decrease
@@ -62,25 +63,18 @@ def _status_for_row_drop(rate_drop: float) -> str:
 
 
 
-def _previous_run_id(manifest: list[dict], run_id: str) -> str | None:
-    """The immediately preceding run in manifest order, or None for the
-    first run - unlike PSI's comparison against a fixed baseline run,
-    "did row count grow" is inherently about consecutive runs, not a
-    fixed reference.
+def _recorded_previous_count(reference_run_id: str) -> int | None:
+    """The row count that run RECORDED, or None where it recorded none.
 
-    Returns the RUN ID rather than its csv_path (2026-09-27): the count
-    now comes from what that run recorded, so its file is only a
-    fallback for a run that was never staged."""
-    for i, entry in enumerate(manifest):
-        if entry["run_id"] == run_id:
-            return manifest[i - 1]["run_id"] if i > 0 else None
-    return None
-
-
-def _recorded_previous_count(manifest: list[dict], previous_run_id: str) -> int | None:
+    `_previous_run_id(manifest, run_id)` used to sit beside this and
+    pick the immediately preceding ARRIVAL. It was removed 2026-09-29
+    with REQ-QAC-108: criterion 2 gives drift and volume ONE reference,
+    and criterion 4 rules out an arrival nobody promoted. A rejected
+    supply was becoming the yardstick for the one after it.
+    """
     from qa_tools.common.evidently_common import recorded_row_count
 
-    return recorded_row_count(AGENCY_ID, COLLECTION_ID, previous_run_id)
+    return recorded_row_count(AGENCY_ID, COLLECTION_ID, reference_run_id)
 
 
 def _row_count_of(df) -> tuple[int, dict]:
@@ -156,7 +150,7 @@ def _reference_frame(reference_run_id: str):
 
 
 def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
-                                 reference_run_id: str = REFERENCE_RUN_ID) -> list[dict]:
+                                 reference_run_id: str | None = None) -> list[dict]:
     """THE CURRENT RUN COMES FROM THE WAREHOUSE; THE REFERENCE COMES
     FROM WHAT WAS RECORDED (REQ-QAC-088, 2026-09-27).
 
@@ -179,12 +173,19 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
     which is the trap `build_all(raw_dir=...)` had already sprung
     once.
     """
-    reference = _reference_frame(reference_run_id)
     current = _current_frame(run_id)
     n_total = len(current)
 
-    psi, psi_snapshot = compute_psi(current, reference, "sex")
-    status = status_for_psi(psi, run_id == reference_run_id)
+    if reference_run_id is None:
+        # NOTHING TO MEASURE AGAINST (REQ-QAC-108 criterion 5). True of
+        # this dataset's first supply, and of any supply whose earlier
+        # periods hold only views. Reported as a check with no
+        # reference, never as a pass.
+        psi, psi_snapshot, status = None, None, NO_REFERENCE
+    else:
+        reference = _reference_frame(reference_run_id)
+        psi, psi_snapshot = compute_psi(current, reference, "sex")
+        status = status_for_psi(psi)
     raw_output = {"psi": psi_snapshot}
 
     results = [{
@@ -210,54 +211,66 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
         "reference_run_id": reference_run_id,
     }]
 
-    from qa_tools.common import arrivals
-    manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
-                for a in arrivals.arrivals_for("civil-registration", "run_")
-                if "birth-registrations" not in a.held]
-    previous_run_id = _previous_run_id(manifest, run_id)
-    if previous_run_id is not None:
-        # THE CURRENT COUNT IS MEASURED, THE PREVIOUS ONE WAS RECORDED.
-        # Both used to come from re-reading a CSV. The previous run's
+    # THE VOLUME CHECK TAKES THE SAME REFERENCE AS THE DRIFT ONE
+    # (REQ-QAC-108 criterion 2, which says "every drift and volume
+    # check" rather than naming them separately). It used to compare
+    # against the PREVIOUS ARRIVAL, whatever became of it - so a supply
+    # that arrived and was rejected became the yardstick for the one
+    # after it, which is the failure criterion 4 names. Both checks now
+    # measure against the last supply anybody actually promoted, and
+    # both report no reference where there is none.
+    #
+    # THIS ALSO STOPPED A QA STEP READING THE DELIVERY TREE. Finding the
+    # previous arrival meant walking data/deliveries/ from inside a
+    # check, so the check's answer depended on what happened to be on
+    # disk rather than on what had been recorded.
+    current_count, row_count_snapshot = _row_count_of(current)
+    raw_output["row_count"] = row_count_snapshot
+    if reference_run_id is None:
+        rate_drop, volume_status = None, NO_REFERENCE
+    else:
+        # THE CURRENT COUNT IS MEASURED, THE REFERENCE ONE WAS RECORDED.
+        # Both used to come from re-reading a CSV. The reference run's
         # count was written down by dataset_stats when that run was
         # checked, so re-deriving it is both unnecessary and less true -
         # the recording is what the warehouse actually held.
-        current_count, row_count_snapshot = _row_count_of(current)
-        previous_count = _recorded_previous_count(manifest, previous_run_id)
-        if previous_count is None:
-            # NOTHING RECORDED FOR THE PREVIOUS RUN, so count its rows
+        reference_count = _recorded_previous_count(reference_run_id)
+        if reference_count is None:
+            # NOTHING RECORDED FOR THE REFERENCE RUN, so count its rows
             # in the WAREHOUSE - never by re-reading a CSV
             # (REQ-PIPE-102). Its rows were staged when it was checked.
-            previous_count = _row_count_of(_current_frame(previous_run_id))[0]
-        raw_output["row_count"] = row_count_snapshot
-        rate_drop = (previous_count - current_count) / previous_count if previous_count else 0.0
-        results.append({
-            "agency_id": AGENCY_ID,
-            "collection_id": COLLECTION_ID,
-            "dataset_id": DATASET_ID,
-            "check_id": ROW_COUNT_GROWTH_CHECK_ID,
-            # No single column "owns" a whole-dataset row count; attributed
-            # to registration_number (the row-identifying primary key) as
-            # the least-arbitrary home, rather than "(table)" - which
-            # birth-registrations' dashboard builder silently drops (see
-            # pipeline/build_dashboard_data.py; there's no "(table-level
-            # checks)" pseudo-column here the way Child Protection has).
-            "column_name": "registration_number",
-            "check_name": "evidently:row_count_growth",
-            "dimension": "timeliness",
-            "label": "Row count vs. previous run",
-            "run_id": run_id,
-            "run_timestamp": run_timestamp,
-            "metric_value": round(rate_drop * 100, 2),
-            "unit": "%",
-            "warn_threshold": round(WARN_ROW_DROP * 100, 2),
-            "fail_threshold": round(FAIL_ROW_DROP * 100, 2),
-            "status": _status_for_row_drop(rate_drop),
-            "on_fail_action": "flag",
-            "row_count_total": current_count,
-            "row_count_invalid": None,
-            "engine": ENGINE_TAG,
-            "reference_run_id": None,
-        })
+            reference_count = _row_count_of(_current_frame(reference_run_id))[0]
+        rate_drop = ((reference_count - current_count) / reference_count
+                     if reference_count else 0.0)
+        volume_status = _status_for_row_drop(rate_drop)
+    results.append({
+        "agency_id": AGENCY_ID,
+        "collection_id": COLLECTION_ID,
+        "dataset_id": DATASET_ID,
+        "check_id": ROW_COUNT_GROWTH_CHECK_ID,
+        # No single column "owns" a whole-dataset row count; attributed
+        # to registration_number (the row-identifying primary key) as
+        # the least-arbitrary home, rather than "(table)" - which
+        # birth-registrations' dashboard builder silently drops (see
+        # pipeline/build_dashboard_data.py; there's no "(table-level
+        # checks)" pseudo-column here the way Child Protection has).
+        "column_name": "registration_number",
+        "check_name": "evidently:row_count_growth",
+        "dimension": "timeliness",
+        "label": "Row count vs. last promoted supply",
+        "run_id": run_id,
+        "run_timestamp": run_timestamp,
+        "metric_value": None if rate_drop is None else round(rate_drop * 100, 2),
+        "unit": "%",
+        "warn_threshold": round(WARN_ROW_DROP * 100, 2),
+        "fail_threshold": round(FAIL_ROW_DROP * 100, 2),
+        "status": volume_status,
+        "on_fail_action": "flag",
+        "row_count_total": current_count,
+        "row_count_invalid": None,
+        "engine": ENGINE_TAG,
+        "reference_run_id": reference_run_id,
+    })
 
     write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "evidently", raw_output, verified=results)
     return results
@@ -266,14 +279,15 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
 if __name__ == "__main__":
     from datetime import datetime, timezone
 
-    from qa_tools.common import arrivals
-    manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
-                for a in arrivals.arrivals_for("civil-registration", "run_")
-                if "birth-registrations" not in a.held]
-    ref = manifest[0]  # not the module-level REFERENCE_RUN_ID default - see orchestrate_bdm.py
-    for entry in manifest:
-        res = evaluate_evidently_bdm(entry["run_id"], datetime.now(timezone.utc).isoformat(),
-                                      reference_run_id=ref["run_id"])
+    from qa_tools.common import arrivals, drift_reference
+    found = [a for a in arrivals.arrivals_for("civil-registration", "run_")
+             if "birth-registrations" not in a.held]
+    for arrival in found:
+        entry = arrival.as_entry()
+        res = evaluate_evidently_bdm(
+            entry["run_id"], datetime.now(timezone.utc).isoformat(),
+            reference_run_id=drift_reference.reference_run_for_arrival(
+                DATASET_ID, arrival.received_at))
         psi, growth = res[0], (res[1] if len(res) > 1 else None)
         growth_str = f"row_growth={growth['metric_value']:+.1f}%  status={growth['status']:5s}" if growth else "row_growth=n/a (first run)"
         print(f"{entry['run_id']:25s} PSI={psi['metric_value']}  status={psi['status']:5s}  |  {growth_str}")

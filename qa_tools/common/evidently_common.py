@@ -19,9 +19,31 @@ WARN_THRESHOLD = 0.10
 FAIL_THRESHOLD = 0.25
 
 
-def status_for_psi(psi: float, is_reference: bool) -> str:
-    if is_reference:
-        return "pass"
+#: What a drift or volume check reports when it has nothing to measure
+#: against (REQ-QAC-108 criterion 5, 2026-09-29). It is the dashboard's
+#: existing quiet word rather than a new one, and the point is entirely
+#: what it is NOT: a check whose reference period does not exist has
+#: measured nothing, and "pass" would say the supply was compared and
+#: found fine.
+#:
+#: It can never win a rollup - dataset_status orders it below green - so
+#: one unmeasurable drift check does not hold up a dataset whose real
+#: checks are green. A dataset whose EVERY contributing check is quiet
+#: rolls up quiet, which promotion.status_of() refuses.
+NO_REFERENCE = "nodata"
+
+
+def status_for_psi(psi: float) -> str:
+    """The band this PSI value falls in.
+
+    `is_reference` WAS REMOVED 2026-09-29 with REQ-QAC-108. It returned
+    "pass" when a run was its own reference, which was reachable only
+    because the reference was a fixed run the batch chose once - the
+    thing criterion 4 forbids. The reference is now always an EARLIER
+    period's supply, so a run can never be its own, and the "no
+    reference at all" case is answered by NO_REFERENCE before this
+    function is reached rather than by a parameter inside it.
+    """
     if psi > FAIL_THRESHOLD:
         return "fail"
     if psi > WARN_THRESHOLD:

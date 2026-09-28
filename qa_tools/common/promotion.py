@@ -364,7 +364,15 @@ def status_of(dataset_id: str, results: Sequence[dict], *,
 
     if not contributing:
         return None
-    return dataset_status.worst_of(contributing)
+    # rollup_statuses(), NOT worst_of(), and the difference only shows
+    # in one case - which is the case this line exists for. worst_of()
+    # is a reduce seeded at green, so a dataset whose every contributing
+    # check carries a QUIET status (a drift check with no reference,
+    # REQ-QAC-108 criterion 5) rolls up to green and promotes itself on
+    # the strength of nothing having been measured. rollup_statuses()
+    # returns the quiet status instead, which should_promote() refuses.
+    # On every mixed input the two agree exactly.
+    return dataset_status.rollup_statuses(contributing)
 
 
 # ---------------------------------------------------------------------------

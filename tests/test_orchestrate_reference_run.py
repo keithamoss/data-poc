@@ -13,10 +13,20 @@ of raising - CP's manifest happened not to have a stale file under that
 exact old name, so it raised FileNotFoundError instead, which is what
 surfaced this.
 
-Fixed by having run_pipeline()/run_pipeline_cp() derive the reference
-run from the manifest's own first entry (run_01, always clean by
-RUN_PLAN construction) and thread it through _run_one() explicitly,
-rather than relying on the evaluator's own default. This test doesn't
+Fixed by threading the reference through _run_one() explicitly rather
+than relying on the evaluator's own default.
+
+WHAT THIS MODULE NOW GUARDS, since REQ-QAC-108 (2026-09-29), because
+the original fix was itself replaced. Deriving the reference from the
+manifest's first entry removed the stale LITERAL and kept the defect
+underneath it: every supply, for ever, measured against the beginning
+of history. Both the module-level constants and the batch-level choice
+are gone, `None` means THERE IS NO REFERENCE rather than "fall back",
+and the reference is resolved per supply from what was recorded. What
+is still worth asserting here is the narrower property these tests were
+always really about: an EXPLICIT reference - the one an operator names
+by hand - reaches the check unchanged, and nothing in between
+second-guesses it. This test doesn't
 invoke the real dbt/Soda/datacontract-cli/Evidently tools (out of
 pytest's scope - see test_build_dashboard_data.py's own docstring);
 it stubs out the three other real-tool evaluators and only checks what
@@ -99,14 +109,19 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     # id is unrelated to csv_path, which still holds.
     entry = {"run_id": "run_005",
              "csv_path": "/x/2099-01-drop/birth_registrations_2099-01-05.csv"}
-    # A reference deliberately different from run_evidently_bdm's own
-    # hardcoded REFERENCE_RUN_ID default - the whole point being that
-    # _run_one must forward exactly what it's given, not fall back.
+    # An explicit reference, which is what an operator naming one by
+    # hand produces - the whole point being that _run_one forwards
+    # exactly what it is given.
     orchestrate_bdm._run_one(entry, "2099-01-05T00:00:00Z", "test@example.com",
                               "run_01_2099-01-01")
 
+    # IT USED TO ASSERT "not the module's own stale default". There is
+    # no default any more (REQ-QAC-108 criterion 4): the constant was
+    # deleted, and `None` now means THERE IS NO REFERENCE rather than
+    # "fall back". So the claim worth making is the other one - an
+    # explicit reference is forwarded UNCHANGED, and nothing between
+    # here and the check second-guesses it.
     assert captured["reference_run_id"] == "run_01_2099-01-01"
-    assert captured["reference_run_id"] != orchestrate_bdm.run_evidently_bdm.REFERENCE_RUN_ID
     assert "reference_csv" not in captured, \
         "the reference is forwarded as a run id now, not a filename (REQ-PIPE-102)"
 
@@ -137,5 +152,10 @@ def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatc
     entry = {"run_id": "cp_run_005"}  # see the BDM fixture above on the hyphen
     orchestrate_cp._run_one(entry, "2099-02-02T00:00:00Z", "test@example.com", "cp_run_01_2099-01-01")
 
+    # IT USED TO ASSERT "not the module's own stale default". There is
+    # no default any more (REQ-QAC-108 criterion 4): the constant was
+    # deleted, and `None` now means THERE IS NO REFERENCE rather than
+    # "fall back". So the claim worth making is the other one - an
+    # explicit reference is forwarded UNCHANGED, and nothing between
+    # here and the check second-guesses it.
     assert captured["reference_run_id"] == "cp_run_01_2099-01-01"
-    assert captured["reference_run_id"] != orchestrate_cp.run_evidently_cp.REFERENCE_RUN_ID

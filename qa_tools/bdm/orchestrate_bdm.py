@@ -42,6 +42,7 @@ from . import bdm_common
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
 from qa_tools.common import decision_log
+from qa_tools.common import drift_reference
 from qa_tools.common import filing
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common import promotion
@@ -120,7 +121,8 @@ def _announce(on_step, label: str) -> None:
     if on_step is not None:
         on_step(label)
 
-def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str,
+def _run_one(entry: dict, run_timestamp: str, run_by: str,
+             reference_run_id: str | None = None,
              on_step: Callable[[str], None] | None = None) -> list[dict]:
     run_id = entry["run_id"]
     # The real file inside the delivery that arrived (REQ-GEN-043),
@@ -137,7 +139,7 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
 
 
 def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: str,
-                    run_by: str, reference_run_id: str,
+                    run_by: str, reference_run_id: str | None,
                     on_step: Callable[[str], None] | None) -> list[dict]:
     # BEFORE ANY TOOL WRITES, so the run exists with the identity only
     # this layer knows (REQ-PIPE-089 criterion 6). Each tool's own write
@@ -156,6 +158,27 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     _announce(on_step, RUN_STEPS[2])
     results.extend(_run_step(COLLECTION_ID, "datacontract-cli", run_id,
         lambda: run_datacontract_bdm.evaluate_datacontract_bdm(run_id, run_timestamp)))
+    # THE REFERENCE IS RESOLVED PER SUPPLY, HERE (REQ-QAC-108 criteria
+    # 2 and 4). It used to be one run chosen for the whole batch -
+    # `manifest[0]["run_id"]` - which measures every supply against the
+    # beginning of history, so drift stops being detectable about a
+    # year in. The reference is a property of THIS dataset and THIS
+    # period, and a batch-level argument can be neither.
+    #
+    # None is a real answer rather than a failure: the dataset's first
+    # supply has nothing earlier to be measured against, and so does one
+    # whose earlier periods hold only views. The Evidently step reports
+    # that as a check with NO REFERENCE and never as a pass, which is
+    # criterion 5.
+    #
+    # AFTER FILING, WHICH IS WHY THIS WORKS. parallel_orchestrate runs
+    # `before_each` (the filing) then the run then `after_each` (the
+    # promotion), one arrival at a time, so by the time this line runs
+    # the arrival has a period and every earlier arrival has been
+    # promoted or refused.
+    if reference_run_id is None:
+        reference_run_id = drift_reference.reference_run_for_arrival(
+            DATASET_ID, entry["received_at"])
     _announce(on_step, RUN_STEPS[3])
     results.extend(_run_step(COLLECTION_ID, "Evidently", run_id,
         lambda: run_evidently_bdm.evaluate_evidently_bdm(
@@ -389,15 +412,13 @@ def run_pipeline(sequential: bool = False) -> dict:
     manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
                 for a in found_arrivals if "birth-registrations" not in a.held]
 
-    # The first manifest entry (run_01, always clean by RUN_PLAN
-    # construction) - NOT run_evidently_bdm.REFERENCE_RUN_ID, a hardcoded
-    # literal that goes stale every time the anchor date rolls forward
-    # (generator/anchor_date.py). A real bug, found live: with the anchor
-    # date advanced, data/raw/'s actual run_01 file no longer matched that
-    # constant, and because old dated files aren't cleaned up between
-    # regenerations, evidently silently compared against a stale leftover
-    # file from a previous anchor date instead of failing loudly - see
-    # plans/qa-pipeline.md for the regression test this got.
+    # THE BATCH NO LONGER CHOOSES A REFERENCE RUN (REQ-QAC-108
+    # criterion 4, 2026-09-29). It used to take the first manifest
+    # entry, which was itself a fix for a hardcoded literal that went
+    # stale every time the anchor date rolled forward - and the fix
+    # carried the same defect one level up: every supply, for ever,
+    # measured against the beginning of history. _run_one_inner()
+    # resolves the reference per supply now, from what was recorded.
     # WHERE EACH SUPPLY BELONGS IS NOW RECORDED (REQ-PIPE-075 criterion
     # 7, 2026-09-28) - see the file_arrivals() call below, and
     # orchestrate_cp.py's identical one. Filings land in the database,
@@ -409,7 +430,6 @@ def run_pipeline(sequential: bool = False) -> dict:
     # committed history - a failure that would otherwise be found when
     # CI went red on paths nothing in this file mentions.
     run_id_guard.check(AGENCY_ID, COLLECTION_ID, found_arrivals)
-    reference_entry = manifest[0]
     run_timestamp = asset_time.now().isoformat()
 
     # Fails loudly here, before any real tool runs, if git identity isn't
@@ -440,7 +460,7 @@ def run_pipeline(sequential: bool = False) -> dict:
             effective_at=asset_time.now().isoformat()))
 
     all_results = parallel_orchestrate.run_manifest(
-        manifest, _run_one, run_timestamp, run_by, reference_entry["run_id"],
+        manifest, _run_one, run_timestamp, run_by, None,
         sequential=sequential, before_each=_file, after_each=_promote)
 
     # THE TICKETS CATCH UP WITH THE SLOTS (REQ-PIPE-083 criteria 13 and
@@ -490,6 +510,13 @@ def run_pipeline(sequential: bool = False) -> dict:
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")
     n_error = sum(1 for r in all_results if r["status"] == "error")
+    # THE FIFTH VERDICT (REQ-QAC-108 criterion 5, 2026-09-29). A drift
+    # or volume check with no reference period has measured nothing, and
+    # counting it under any of the four above would say it did. Left out
+    # of the summary entirely, the four stopped adding up to
+    # total_checks - which is what the history rebuild's own test
+    # noticed before anybody else did.
+    n_nodata = sum(1 for r in all_results if r["status"] == "nodata")
 
     output = {
         "generated_at": run_timestamp,
@@ -503,6 +530,7 @@ def run_pipeline(sequential: bool = False) -> dict:
             "warn": n_warn,
             "fail": n_fail,
             "error": n_error,
+            "nodata": n_nodata,
             "engines": sorted(set(r["engine"] for r in all_results)),
         },
     }
@@ -512,7 +540,8 @@ def run_pipeline(sequential: bool = False) -> dict:
         json.dump(output, f, indent=2, default=str)
 
     print(f"\n{len(all_results)} real check results ({n_pass} pass / {n_warn} warn / {n_fail} fail"
-          f"{f' / {n_error} error' if n_error else ''}) across {len(manifest)} runs -> {RESULTS_PATH}")
+          f"{f' / {n_error} error' if n_error else ''}"
+          f"{f' / {n_nodata} no reference' if n_nodata else ''}) across {len(manifest)} runs -> {RESULTS_PATH}")
     return output
 
 

@@ -202,7 +202,7 @@ requirement to `built`.
 
 **WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
 fresh session can pick up from a file rather than from the commit log.**
-Last updated 04:20 Perth, 43 commits in.
+Last updated 05:10 Perth, 43 commits in.
 
 **BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
 `REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
@@ -217,8 +217,11 @@ page).
 
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
 `REQ-PIPE-079` (decision layer done, wiring not), `REQ-PIPE-105`
-(criteria 7 and 8 done), `REQ-QAC-108` (the reference rule and the
-supply-to-run mapping done, the wiring not),
+(criteria 7 and 8 done), `REQ-QAC-108` (everything but criterion 1 -
+the reference rule, the supply-to-run mapping, the wiring into both
+orchestrators, and the fifth verdict a check with no reference
+carries; what is left is the relative volume check on each of Child
+Protection's six datasets, deliberately its own piece of work),
 `REQ-PIPE-083` (everything but criteria 14 and 15, the OPERATOR ROUTES -
 the slot state, the reconciler, a real GitHub ticket service fenced by
 its own label, and both orchestrators calling it after promotion. `gh`

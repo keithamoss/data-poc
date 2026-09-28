@@ -31,6 +31,7 @@ import sys
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
 from qa_tools.common import decision_log
+from qa_tools.common import drift_reference
 from qa_tools.common import filing
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
@@ -106,7 +107,8 @@ def _announce(on_step, label: str) -> None:
     if on_step is not None:
         on_step(label)
 
-def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str,
+def _run_one(entry: dict, run_timestamp: str, run_by: str,
+             reference_run_id: str | None = None,
              on_step: Callable[[str], None] | None = None) -> list[dict]:
     run_id = entry["run_id"]
     print(f"--- {run_id} ---")
@@ -146,7 +148,7 @@ def _discard_this_runs_schemas(run_id: str) -> None:
 
 
 def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
-                    reference_run_id: str,
+                    reference_run_id: str | None,
                     on_step: Callable[[str], None] | None) -> list[dict]:
     # Before any tool writes - see orchestrate_bdm.py's identical block.
     open_run(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, run_by)
@@ -161,6 +163,12 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     _announce(on_step, RUN_STEPS[2])
     results.extend(_run_step(cp_common.COLLECTION_ID, "datacontract-cli", run_id,
         lambda: run_datacontract_cp.evaluate_datacontract_cp(run_id, run_timestamp)))
+    # PER SUPPLY, NOT PER BATCH (REQ-QAC-108 criteria 2 and 4) - see
+    # orchestrate_bdm.py's identical block for the full account, and
+    # why None here means "no reference" rather than "use a default".
+    if reference_run_id is None:
+        reference_run_id = drift_reference.reference_run_for_arrival(
+            run_evidently_cp.DATASET_ID, entry["received_at"])
     _announce(on_step, RUN_STEPS[3])
     results.extend(_run_step(cp_common.COLLECTION_ID, "Evidently", run_id,
         lambda: run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id)))
@@ -196,7 +204,7 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     return results
 
 
-def run_single(entry: dict, reference_run_id: str, run_by: str | None = None,
+def run_single(entry: dict, reference_run_id: str | None = None, run_by: str | None = None,
                on_step: Callable[[str], None] | None = None) -> list[dict]:
     """The single-delivery counterpart to run_pipeline_cp()'s full-manifest
     batch loop - built for the AWS event-driven MVP (plans/running-
@@ -280,7 +288,8 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # this switch was flipped rather than with it.
 
     run_id_guard.check(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, found_arrivals)
-    reference_run_id = manifest[0]["run_id"]
+    # THE BATCH NO LONGER CHOOSES A REFERENCE RUN - see
+    # orchestrate_bdm.py's identical note (REQ-QAC-108 criterion 4).
     run_timestamp = asset_time.now().isoformat()
 
     # Fails loudly here, before any real tool runs - see orchestrate_bdm.py's
@@ -325,7 +334,7 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
             effective_at=asset_time.now().isoformat()))
 
     all_results = parallel_orchestrate.run_manifest(
-        manifest, _run_one, run_timestamp, run_by, reference_run_id,
+        manifest, _run_one, run_timestamp, run_by, None,
         sequential=sequential, before_each=_file, after_each=_promote)
 
     # THE TICKETS CATCH UP WITH THE SLOTS (REQ-PIPE-083 criteria 13 and
@@ -370,6 +379,13 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")
     n_error = sum(1 for r in all_results if r["status"] == "error")
+    # THE FIFTH VERDICT (REQ-QAC-108 criterion 5, 2026-09-29). A drift
+    # or volume check with no reference period has measured nothing, and
+    # counting it under any of the four above would say it did. Left out
+    # of the summary entirely, the four stopped adding up to
+    # total_checks - which is what the history rebuild's own test
+    # noticed before anybody else did.
+    n_nodata = sum(1 for r in all_results if r["status"] == "nodata")
 
     output = {
         "generated_at": run_timestamp,
@@ -384,6 +400,7 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
             "warn": n_warn,
             "fail": n_fail,
             "error": n_error,
+            "nodata": n_nodata,
             "engines": sorted(set(r["engine"] for r in all_results)),
         },
     }
@@ -393,7 +410,8 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
         json.dump(output, f, indent=2, default=str)
 
     print(f"\n{len(all_results)} real check results ({n_pass} pass / {n_warn} warn / {n_fail} fail"
-          f"{f' / {n_error} error' if n_error else ''}) across {len(manifest)} runs -> {RESULTS_PATH}")
+          f"{f' / {n_error} error' if n_error else ''}"
+          f"{f' / {n_nodata} no reference' if n_nodata else ''}) across {len(manifest)} runs -> {RESULTS_PATH}")
     return output
 
 

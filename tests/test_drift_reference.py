@@ -225,3 +225,56 @@ class TestWhichRunCheckedASupply:
                            "2099-02-02T09:00:00+08:00")
         assert drift_reference.run_for(
             conn, "cp-carers", f"cp-carers@{arrival}") == first
+
+
+class TestTheOrchestratorsEntryPoint:
+    """reference_run_for_arrival() - REQ-QAC-108 criterion 4's second
+    half, which is where the rule above actually reaches the pipeline.
+
+    THE HALF THAT WAS MISSING UNTIL 2026-09-29 was not the rule but its
+    CALLER: both orchestrators passed `manifest[0]["run_id"]` down to
+    every run in the batch, so a correct reference_for() sat beside a
+    batch measuring every supply against the beginning of history.
+    """
+
+    def test_an_arrival_nothing_was_filed_for_has_no_reference(
+            self, supply_dsn, dataset):
+        """None rather than an exception, and rather than a guess. A
+        supply with no confident slot is filed nowhere (REQ-PIPE-059),
+        so there is no period to walk back from - which the caller
+        reports as a check with no reference."""
+        assert drift_reference.reference_run_for_arrival(
+            dataset, "2026-09-29T09:00:00+08:00") is None
+
+    def test_it_asks_filing_for_the_period_rather_than_deriving_one(
+            self, monkeypatch, supply_dsn, dataset):
+        """The arrival instant is not the period. Deriving one here
+        would be a second naming scheme beside filing's own - the thing
+        filing._supply_id_for()'s docstring exists to prevent - and it
+        would get the held supply's `#1` suffix wrong.
+        """
+        from qa_tools.common import filing
+
+        asked = {}
+
+        def _period_of(dataset_id, received_at):
+            asked.update(dataset_id=dataset_id, received_at=received_at)
+            return None
+
+        monkeypatch.setattr(filing, "period_of", _period_of)
+        drift_reference.reference_run_for_arrival(dataset, "2026-09-29T09:00:00+08:00")
+        assert asked == {"dataset_id": dataset,
+                          "received_at": "2026-09-29T09:00:00+08:00"}
+
+    def test_a_first_period_has_no_reference_rather_than_an_error(
+            self, monkeypatch, supply_dsn, dataset, calendar):
+        """NoReference is reference_for()'s contract and the wrong
+        thing to hand an orchestrator: a dataset's first supply is an
+        ordinary event, for ever, and a QA run should not abort on one.
+        """
+        from qa_tools.common import filing
+
+        a, *_ = calendar
+        monkeypatch.setattr(filing, "period_of", lambda ds, at: a)
+        assert drift_reference.reference_run_for_arrival(
+            dataset, "2026-09-29T09:00:00+08:00") is None

@@ -59,3 +59,44 @@ def test_evaluate_evidently_cp_still_tags_its_own_result_with_the_table_dataset_
     results = run_evidently_cp.evaluate_evidently_cp("cp_run_02", "2026-01-01T00:00:00Z", reference_run_id="cp_run_01")
 
     assert results[0]["dataset_id"] == hierarchy.dataset_for_table("cp_notifications").dataset_id
+
+
+class TestNoReferenceIsNotAPass:
+    """REQ-QAC-108 criterion 5, Child Protection's side of it.
+
+    Its BDM twin (tests/test_run_evidently_bdm.py) drives the real tool
+    against real fixtures; this asserts the same rule on the unit that
+    decides it, and specifically that NOTHING IS COMPUTED - a PSI value
+    beside a "no reference" status would mean a comparison happened
+    against something nobody named.
+    """
+
+    def _run(self, monkeypatch, *, reference_run_id):
+        current = pd.DataFrame({"concern_type": ["neglect", "physical"]})
+        monkeypatch.setattr(run_evidently_cp, "_current_frame", lambda run_id: current)
+        monkeypatch.setattr(run_evidently_cp, "write_qa_result", lambda *a, **kw: None)
+
+        def _refuse(run_id):
+            raise AssertionError(
+                "the reference frame was built although there is no reference")
+
+        monkeypatch.setattr(run_evidently_cp, "_reference_frame", _refuse)
+        return run_evidently_cp.evaluate_evidently_cp(
+            "cp_run_02", "2026-01-01T00:00:00Z", reference_run_id=reference_run_id)
+
+    def test_it_reports_no_reference_rather_than_passing(self, monkeypatch):
+        psi = self._run(monkeypatch, reference_run_id=None)[0]
+        assert psi["status"] == "nodata"
+        assert psi["status"] != "pass"
+
+    def test_it_computes_nothing_at_all(self, monkeypatch):
+        """The stubbed _reference_frame raises if it is reached - so a
+        pass here is the assertion, not an accident of it not being
+        called."""
+        psi = self._run(monkeypatch, reference_run_id=None)[0]
+        assert psi["metric_value"] is None
+        assert psi["reference_run_id"] is None
+
+    def test_the_row_count_it_did_measure_is_still_there(self, monkeypatch):
+        psi = self._run(monkeypatch, reference_run_id=None)[0]
+        assert psi["row_count_total"] == 2

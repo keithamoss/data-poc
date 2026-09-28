@@ -104,6 +104,32 @@ def filings_of(dataset_id: str) -> list[dict]:
             "ORDER BY recorded_at, supply_id", [dataset_id]).fetchall()]
 
 
+def period_of(dataset_id: str, received_at) -> str | None:
+    """The period this dataset's supply from that arrival was filed to.
+
+    WHY IT LIVES HERE, for the same reason supplies_of() does: the
+    supply id is this module's answer, and a caller deriving one from
+    an arrival instant would be a second naming scheme to keep in step -
+    including the `#1` suffix a held supply carries, which is exactly
+    the part a second derivation gets wrong.
+
+    Matched on the ARRIVAL KEY rather than on the whole id, so the held
+    variant resolves to the same filing as the plain one. None where
+    nothing was filed for this dataset from that arrival, which is a
+    real state: a supply with no confident slot is filed nowhere.
+    """
+    from qa_tools.common import asset_time
+
+    key = asset_time.arrival_key(received_at)
+    for record in filings_of(dataset_id):
+        supply = record.get("supply_id") or ""
+        if "@" not in supply:
+            continue
+        if supply.rsplit("@", 1)[1].split("#", 1)[0] == key:
+            return record.get("slot")
+    return None
+
+
 def filled_slots(dataset_id: str) -> frozenset[str]:
     """Slots a supply has been PROMOTED into (REQ-PIPE-075 criterion 6).
 

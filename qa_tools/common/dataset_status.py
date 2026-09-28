@@ -162,11 +162,19 @@ def worst_of(statuses) -> str:
 # warn/fail pair cannot express every real rule (the ODCS `rowCount` rule
 # is a two-sided `mustBeBetween`, so neither bound exists as a single
 # number). plans/qa-pipeline.md item 74.
+#
+# `nodata` IS A REAL TOOL VERDICT, added 2026-09-29 for REQ-QAC-108
+# criterion 5. A drift check whose reference period does not exist -
+# the first supply a dataset ever had - has measured nothing, and the
+# criterion forbids reporting that as a pass in as many words. It maps
+# onto itself because the dashboard's quiet vocabulary already has the
+# word; what it must NOT map onto is green.
 _DASHBOARD_STATUS_BY_TOOL_STATUS = {
     "pass": "green",
     "warn": "amber",
     "fail": "red",
     "error": "red",
+    "nodata": "nodata",
 }
 
 

@@ -800,6 +800,13 @@ Rough layout:
   time rather than in parallel, which is a separate ~2.4x and has its
   own note under `mothman pipeline run` above.
 
+  -> **~300s/2724 tests (2026-09-29, REQ-QAC-108's wiring)**. Up ~43s
+  on 535 more tests since the entry above, which is where the growth
+  went - no new hot spot, and the count moved because two days of
+  sprint work landed without this log being updated. Full `mothman
+  check` 6m25s, of which pytest is 300s and `npm test` ~40s (440
+  tests). Measured against a `supply` database rebuilt from empty.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

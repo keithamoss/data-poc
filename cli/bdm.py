@@ -28,7 +28,6 @@ from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common import trial as trial_mod
 from qa_tools.common import hand_filing
-from qa_tools.common.qa_results_reader import list_run_ids
 
 from . import common
 from qa_tools.common import asset_time
@@ -116,31 +115,6 @@ def manifest_exists() -> bool:
     return bool(load_manifest())
 
 
-def default_reference(manifest: list[dict]) -> tuple[str, str]:
-    """The last Promoted run for this dataset (plans/tooling.md #1's own
-    design: Evidently's reference/baseline defaults to the last run whose
-    results were actually recorded), falling
-    back to the manifest's own first (always-clean-by-construction) entry
-    - the same reference run_pipeline() itself already uses - if nothing
-    has been Promoted yet, or if a previously-Promoted run is no longer
-    among the arrivals recognised on disk (RUN_PLAN's size has changed
-    across versions of this repo before; regeneration is deterministic
-    only for run_ids the CURRENT RUN_PLAN still produces).
-
-    "Still there" is asked of the RECOGNISED ARRIVALS, not of a
-    <run_id>.csv sitting in a raw directory (REQ-GEN-043). A delivery's file
-    is named by the supplier, not after our run_id, so the old check
-    asked a question the delivery tree cannot answer - and the path to
-    hand downstream is the arrival's own, not one built from a run_id."""
-    promoted = list_run_ids(AGENCY_ID, COLLECTION_ID)
-    if promoted:
-        candidate = promoted[-1]
-        entry = next((e for e in manifest if e["run_id"] == candidate), None)
-        if entry is not None:
-            return candidate
-    return manifest[0]["run_id"]
-
-
 def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
               on_step=None, *, keep: bool = True) -> tuple[list[dict], str]:
     """Runs the real check chain for one existing Synthetic manifest entry.
@@ -176,9 +150,16 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
             f"No manifest entry for run_id={run_id!r} - run generate-synthetic-data first?")
     entry = manifest[idx]
 
-    if reference_run_id is None:
-        reference_run_id = default_reference(manifest)
-    elif not any(e["run_id"] == reference_run_id for e in manifest):
+    # NO DEFAULT REFERENCE ANY MORE (REQ-QAC-108 criterion 4,
+    # 2026-09-29). `None` is passed straight through, and the
+    # orchestrator resolves the reference from what was RECORDED - the
+    # last period a supply was really promoted into. default_reference()
+    # picked the last run whose results existed, falling back to the
+    # manifest's first entry, which is the anchor receding into the past
+    # that criterion 4 forbids. An operator naming one explicitly is a
+    # different thing and still honoured.
+    if reference_run_id is not None and not any(
+            e["run_id"] == reference_run_id for e in manifest):
         raise click.ClickException(
             f"Reference run {reference_run_id!r} isn't among the arrivals recognised on disk - "
             f"run generate-synthetic-data first?")

@@ -17,7 +17,9 @@ import os
 import psycopg
 
 from qa_tools.common import hierarchy
-from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
+from qa_tools.common.evidently_common import (
+    ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, NO_REFERENCE, status_for_psi, compute_psi,
+)
 from qa_tools.common.csv_io import load_null_values_by_column
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
@@ -29,15 +31,15 @@ _NULL_VALUES = load_null_values_by_column(CONTRACT_PATH).get("cp_notifications",
 
 DATASET_ID = hierarchy.dataset_for_table("cp_notifications").dataset_id
 
-# A fallback default only, for calling this function directly with no
-# other context - real callers (orchestrate_cp.py, this file's own
-# __main__ block below) always pass the manifest's actual first run_id
-# instead, since this literal goes stale every time the anchor date rolls
-# forward (generator/anchor_date.py) and data/cp_raw/ isn't cleared
-# between regenerations, so a stale copy can sit there and get silently
-# used instead of raising - see orchestrate_cp.py and
-# plans/qa-pipeline.md for the bug this was found as.
-REFERENCE_RUN_ID = "cp_run_01_2026-07-06"
+# THERE IS NO DEFAULT REFERENCE ANY MORE (REQ-QAC-108 criterion 4,
+# 2026-09-29). This module carried a hardcoded REFERENCE_RUN_ID, and
+# then its callers carried `manifest[0]["run_id"]` to avoid it - which
+# is the same mistake computed fresh: every supply measured against the
+# beginning of history, so drift stops being detectable about a year in.
+# The reference is now the most recent EARLIER period a supply was
+# really promoted into, resolved per supply by
+# drift_reference.reference_run_for_arrival(), and `None` means there is
+# no such period rather than "use a default".
 
 
 _COLUMN = "concern_type"
@@ -109,16 +111,26 @@ def _reference_frame(reference_run_id: str):
 
 
 def evaluate_evidently_cp(run_id: str, run_timestamp: str,
-                                reference_run_id: str = REFERENCE_RUN_ID) -> list[dict]:
+                                reference_run_id: str | None = None) -> list[dict]:
     """Reads the warehouse for the current run and the RECORDED
     distribution for the reference (REQ-QAC-088, 2026-09-27) - the BDM
-    counterpart carries the full account."""
-    reference = _reference_frame(reference_run_id)
+    counterpart carries the full account.
+
+    `reference_run_id=None` MEANS THERE IS NOTHING TO MEASURE AGAINST
+    (REQ-QAC-108 criterion 5), which is true of every dataset's first
+    supply and of any supply whose earlier periods hold only views. The
+    check is then reported as having no reference, and specifically NOT
+    as passing - see evidently_common.NO_REFERENCE.
+    """
     current = _current_frame(run_id)
     n_total = len(current)
 
-    psi, psi_snapshot = compute_psi(current, reference, "concern_type")
-    status = status_for_psi(psi, run_id == reference_run_id)
+    if reference_run_id is None:
+        psi, psi_snapshot, status = None, None, NO_REFERENCE
+    else:
+        reference = _reference_frame(reference_run_id)
+        psi, psi_snapshot = compute_psi(current, reference, "concern_type")
+        status = status_for_psi(psi)
 
     results = [{
         "agency_id": cp_common.AGENCY_ID,
@@ -160,9 +172,12 @@ if __name__ == "__main__":
     from datetime import datetime, timezone
 
     from qa_tools.common import arrivals
-    manifest = [a.as_entry() for a in arrivals.arrivals_for("child-protection", "cp_run_")]
-    reference_run_id = manifest[0]["run_id"]  # not the module-level REFERENCE_RUN_ID default - see orchestrate_cp.py
-    for entry in manifest:
+    from qa_tools.common import drift_reference
+    manifest = [a for a in arrivals.arrivals_for("child-protection", "cp_run_")]
+    for arrival in manifest:
+        entry = arrival.as_entry()
+        reference_run_id = drift_reference.reference_run_for_arrival(
+            DATASET_ID, arrival.received_at)
         res = evaluate_evidently_cp(entry["run_id"], datetime.now(timezone.utc).isoformat(),
                                      reference_run_id=reference_run_id)
         r = res[0]

@@ -87,6 +87,13 @@ def build_results_from_history() -> dict:
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")
     n_error = sum(1 for r in all_results if r["status"] == "error")
+    # THE FIFTH VERDICT (REQ-QAC-108 criterion 5, 2026-09-29). A drift
+    # or volume check with no reference period has measured nothing, and
+    # counting it under any of the four above would say it did. Left out
+    # of the summary entirely, the four stopped adding up to
+    # total_checks - which is what the history rebuild's own test
+    # noticed before anybody else did.
+    n_nodata = sum(1 for r in all_results if r["status"] == "nodata")
 
     output = {
         "generated_at": asset_time.now().isoformat(),
@@ -101,6 +108,7 @@ def build_results_from_history() -> dict:
             "warn": n_warn,
             "fail": n_fail,
             "error": n_error,
+            "nodata": n_nodata,
             "engines": sorted(set(r["engine"] for r in all_results)),
         },
     }
@@ -110,7 +118,8 @@ def build_results_from_history() -> dict:
         json.dump(output, f, indent=2, default=str)
 
     print(f"\n{len(all_results)} real check results ({n_pass} pass / {n_warn} warn / {n_fail} fail"
-          f"{f' / {n_error} error' if n_error else ''}) across {len(manifest)} runs, "
+          f"{f' / {n_error} error' if n_error else ''}"
+          f"{f' / {n_nodata} no reference' if n_nodata else ''}) across {len(manifest)} runs, "
           f"from committed history -> {RESULTS_PATH}")
     return output
 

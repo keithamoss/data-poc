@@ -76,40 +76,12 @@ def test_the_cli_reports_where_the_generator_actually_wrote(monkeypatch):
     assert "deliveries" in bdm.generated_output_dir()
 
 
-def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promoted(monkeypatch):
-    manifest = [
-        {"run_id": "run_001", "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"},
-        {"run_id": "run_002", "csv_path": "/x/drop-4471/birth_registrations_2026-01-02.csv"},
-    ]
-
-    monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: [])
-    assert bdm.default_reference(manifest) == "run_001"
-
-
-def test_default_reference_uses_last_promoted_run_when_it_is_still_a_recognised_arrival(monkeypatch):
-    """RETURNS A RUN ID AND NOTHING ELSE since REQ-PIPE-102. It used
-    to hand back the arrival's own path as well, for Evidently to read
-    as a file; Evidently reads the warehouse, so the run id is the
-    whole answer."""
-    manifest = [{"run_id": "run_001",
-                 "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"},
-                {"run_id": "run_050",
-                 "csv_path": "/x/drop-4471/birth_registrations_2026-03-04.csv"}]
-
-    monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: ["run_010", "run_050"])
-    assert bdm.default_reference(manifest) == "run_050"
-
-
-def test_default_reference_falls_back_when_last_promoted_run_is_no_longer_recognised(monkeypatch):
-    """RUN_PLAN's size has changed across versions of this repo before -
-    a Promoted run_id from an older, larger RUN_PLAN might not regenerate
-    under today's code at all, in which case no delivery on disk carries
-    it and there is nothing to use as a reference."""
-    manifest = [{"run_id": "run_001",
-                 "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"}]
-
-    monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: ["run_999_no_longer_generated"])
-    assert bdm.default_reference(manifest) == "run_001"
+# THE THREE `default_reference` TESTS WERE DELETED 2026-09-29 with the
+# function they covered (REQ-QAC-108 criterion 4). It picked the last
+# run whose results existed and fell back to the manifest's first entry,
+# which is the anchor receding into the past the criterion forbids - so
+# the behaviour was removed rather than re-tested. What replaced it is
+# covered by tests/test_drift_reference.py.
 
 
 def test_picker_choices_and_run_id_from_choice_round_trip():
