@@ -247,6 +247,74 @@ OWASP's own repo.
    kept as a regression case, checking the agents report it rather than
    obey it.
 
+## 6. Agent architecture (researched 2026-09-29)
+
+Primary sources: Claude Code's own docs (sub-agents, skills, hooks,
+settings), Anthropic's "Building effective agents", the multi-agent
+research system post, the context-engineering post, the anthropics/skills
+repo (skill-creator), the official code-review plugin, and Google ADK's
+docs from its own source repo. The papers on LLM self-preference bias
+are snippet-only (arXiv is blocked here).
+
+**Claude Code mechanics that shape the design.** The first two were
+re-checked in the sub-agents docs.
+- **Subagents can now start subagents** (3 layers by default;
+  `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`). `AskUserQuestion` is still
+  unavailable inside any subagent, so human checkpoints must sit in
+  the main session. Leave `Agent` out of an agent's `tools` to stop it
+  spawning.
+- **`omitClaudeMd: true`** starts an agent without any CLAUDE.md, which
+  gives a genuinely cold reader.
+- **`skills:` in an agent's frontmatter preloads a whole SKILL.md.**
+  This is the recommended home for knowledge several agents share, with
+  bulky reference such as a glossary in sibling files read on demand.
+  A skill with `disable-model-invocation: true` can't be preloaded; use
+  `user-invocable: false` instead.
+- **`memory:` silently grants Read, Write and Edit.** Unknown or
+  misspelled frontmatter fields are silently ignored.
+- **Write paths can be enforced**, not just requested: a `PreToolUse`
+  hook in the agent's own frontmatter, matching `Write|Edit`, rejects
+  paths outside an allowed folder. Two caveats:
+  - Frontmatter hooks are skipped silently in an untrusted folder, so
+    back the hook up with a post-run diff check.
+  - Hooks can't see inside Bash, so write-restricted agents get none.
+- **A `SubagentStop` hook** can run a validator and send the agent
+  back to fix what it finds, with built-in loop guards.
+
+**Anthropic's guidance, applied.**
+- Prefer the simplest system that works. Separate agents earn their
+  place here through a fresh-context reviewer, enforced tool
+  restrictions and specialised prompts, not through parallelism.
+- **Pattern:** prompt chaining with programmatic gates, then an
+  evaluator-optimizer loop. Iterative writing is Anthropic's own
+  canonical example.
+- **Each brief carries** an objective, an output format, source and
+  tool guidance, and scope boundaries.
+- **Agents write artifacts to disk** and pass back references.
+- **Explain the why** rather than shouting MUST or NEVER, and give a
+  few diverse examples.
+- **Cap every loop.** The cookbook's own evaluator loop is uncapped, so
+  don't copy it.
+- **Reviewers asked to find gaps usually invent some.** "No findings"
+  must be a legitimate answer. Test against a clean page as well as
+  seeded defects.
+
+**Handoff and evaluation patterns worth copying.**
+- **skill-creator:** outputs on disk, and a grader that must show
+  evidence for every PASS.
+- **Official code-review plugin:** a per-finding verifier with a
+  confidence score, plus an explicit list of false-positive shapes.
+- **Cookbook evaluator:** returns PASS / NEEDS_IMPROVEMENT / FAIL and
+  never sees the generator's reasoning.
+- **Google ADK:** `LoopAgent(max_iterations=...)` for writer/critic
+  loops.
+- **Evals start small.** Build seeded-defect cases and a clean negative
+  control from real failures, grade with code first and a rubric
+  second, run each about three times in fresh sessions against a
+  baseline, and read the transcripts.
+
+How these were applied, decision by decision, is in `plans/explainers.md` #3.
+
 ## Network notes
 
 - **`github.com` refuses its web pages and API here, but `git clone`

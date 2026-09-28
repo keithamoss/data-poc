@@ -1675,6 +1675,13 @@ Rough layout:
       prompt-injection guidance (OWASP LLM01; Simon Willison coined
       the term), researched because Keith raised the risk directly.
     - **`roughjs.com`**, **`github.blog`** - low priority.
+    - **`arxiv.org`**, **`export.arxiv.org`**, **`agentskills.io`**,
+      **`google.github.io`** (2026-09-29, the agent-architecture
+      research for `plans/explainers.md` #3). arXiv held the papers on
+      LLM self-preference bias and self-correction, which are
+      snippet-only without it. Google's ADK docs were read
+      legitimately from their own source repo (`google/adk-docs`)
+      instead.
     - **`github.com` HTML and `api.github.com`** returned a plain HTTP
       403 rather than a tunnel failure, so that is probably GitHub
       itself (rate limiting, or no auth on the API) rather than this
