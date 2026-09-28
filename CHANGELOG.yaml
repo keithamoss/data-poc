@@ -111,9 +111,9 @@ intro: >
 releases:
   - date: "2026-09-28"
     summary: >
-      Looking at the dashboard as of an earlier date now follows the
-      delivery dates you actually agreed, and tells you which one you are
-      looking at.
+      Supplies that pass their checks now file themselves into the period
+      they were sent for, and looking at an earlier date follows the
+      delivery dates you actually agreed.
     changes:
       - category: Improved
         items:
@@ -146,6 +146,19 @@ releases:
               so, names the range it covers and offers one click back.
       - category: New
         items:
+          - headline: Good supplies now file themselves away
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply whose checks all pass or warn now moves itself into the
+              period it was sent for. A red one, or one arriving where a supply
+              already sits, waits for you and says which it is.
+          - headline: Deliveries are handled oldest first
+            components: ["Pipeline & publishing"]
+            description: >
+              Each delivery is now checked before the next one starts, so it
+              sees the periods the earlier ones filled. Five years of quarterly
+              extracts land in five years of quarters instead of piling into
+              the first.
           - headline: There is now one record of who decided what happened to a supply
             components: ["Pipeline & publishing"]
             description: >

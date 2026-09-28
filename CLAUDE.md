@@ -392,9 +392,20 @@ Rough layout:
   thing that sentence always forbade, and the database is where it
   applies now.
   Regenerate via `mothman pipeline run` (the whole pipeline end to end
-  for both datasets by default, ~45s+ - `--collection bdm`/`--collection cp`
-  to scope to one; `--sequential` if debugging one specific run, since
-  parallel workers interleave their print output and stack traces) or,
+  for both datasets by default - `--collection bdm`/`--collection cp`
+  to scope to one). **`--sequential` NO LONGER CHANGES ANYTHING, since
+  2026-09-28**: the batch path runs ONE ARRIVAL AT A TIME whatever the
+  flag says, because each arrival's filing goes to the oldest slot no
+  PROMOTION has filled and so depends on what the arrival before it
+  promoted. Measured the day it changed, on this 4-core sandbox: Child
+  Protection's 18 arrivals go 2m35s parallel -> 6m14s in receipt
+  order. What that buys is the whole model working - filing the batch
+  up front put all 108 supplies in 2023-Q1 and promoted six; in
+  receipt order they spread across all fifteen quarters and 67
+  promote. Budget accordingly: a full bootstrap is nearer ten minutes
+  than four. The obvious place to get the time back is WITHIN a run,
+  whose four tools are independent reads evaluated one after another.
+  Or,
   for lower-level single-tool debugging against a run already on disk,
   `mothman debug run-dbt --collection bdm --run-id <id>` (and the `run-soda`/
   `run-datacontract`/`run-evidently` equivalents - see `cli/debug.py`'s
@@ -779,6 +790,15 @@ Rough layout:
   more tests since the entry above; nothing pointed at a new hot spot.
   Full `mothman check` 300s, of which pytest is 257s and `npm test`
   ~41s (377 tests).
+
+  -> **~294s/2501 tests (2026-09-28 night, promotion wired into the
+  pipeline)**. Up ~37s on 312 more tests since the entry above, and
+  that is where the growth went - nothing pointed at a new hot spot.
+  Full `mothman check` 370s, of which pytest is 294s and `npm test`
+  ~40s (392 tests). Worth knowing before reading a slow BOOTSTRAP as a
+  regression on the same day: the pipeline now runs one arrival at a
+  time rather than in parallel, which is a separate ~2.4x and has its
+  own note under `mothman pipeline run` above.
 
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real

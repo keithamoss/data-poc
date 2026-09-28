@@ -282,41 +282,50 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     reference_run_id = manifest[0]["run_id"]
     run_timestamp = asset_time.now().isoformat()
 
-    # WHERE EACH SUPPLY BELONGS, RECORDED BEFORE ANY CHECK RUNS OVER IT
-    # (REQ-PIPE-075 criterion 7). This is the switch the long comment
-    # above said to turn on "in the sprint that lands promotion, not
-    # before", and this is that sprint: filing.filled_slots() now reads
-    # the decision log instead of returning an empty set, so the
-    # assignment rule can finally see which slots a promotion has taken.
-    #
-    # VERIFIED BEFORE FLIPPING IT, on a scratch database, because a
-    # filing is WRITE-ONCE and the artefact that kept this off was real:
-    # with every slot unfilled, 102 of 108 supplies landed on 2023-Q1.
-    # Replaying the same corpus with promotion in place, they spread
-    # across consecutive slots per dataset - 2023-Q1, Q2, Q3, Q4,
-    # 2024-Q1 - and the heaviest slot holds 15 of 108 rather than 102.
-    filing.file_arrivals(found_arrivals)
-
     # Fails loudly here, before any real tool runs - see orchestrate_bdm.py's
     # identical comment and git_identity.py's own docstring.
     run_by = get_run_by()
-    all_results = parallel_orchestrate.run_manifest(
-        manifest, _run_one, run_timestamp, run_by, reference_run_id, sequential=sequential)
 
-    # PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13), and
-    # is deliberately not inside it: a promotion that fails must be
-    # retryable without re-running QA, which it is only while the two
-    # are separable. tests/test_promotion_after_run.py asserts the
-    # separation against _run_one_inner's own AST rather than trusting
-    # this comment.
+    # IN RECEIPT ORDER, ONE ARRIVAL AT A TIME - file it, check it,
+    # promote it, then the next. The chain is real rather than
+    # cautious: a supply is filed to the oldest slot no PROMOTION has
+    # filled, so arrival N's filing depends on arrival N-1's promotion,
+    # which depends on arrival N-1's checks.
     #
-    # SEQUENTIAL, though the runs above were parallel. Promotion order
-    # decides which supply fills a slot - see after_runs()'s docstring.
-    promotion.report(promotion.after_runs(
-        found_arrivals, all_results,
-        agency_id=cp_common.AGENCY_ID, collection_id=cp_common.COLLECTION_ID,
-        actor=run_by, actor_kind=decision_log.RULE,
-        effective_at=asset_time.now().isoformat()))
+    # THIS COST THE CROSS-ARRIVAL PARALLELISM, and the measurement is in
+    # parallel_orchestrate.run_manifest's own docstring along with what
+    # it buys. Short version: filing every arrival up front put all 108
+    # supplies in 2023-Q1, because nothing was ever filled while the
+    # filings were being made.
+    by_run_id = {a.run_id: a for a in found_arrivals}
+
+    def _file(entry: dict) -> None:
+        # WHERE EACH SUPPLY BELONGS, RECORDED BEFORE ANY CHECK RUNS OVER
+        # IT (REQ-PIPE-075 criterion 7). filing.filled_slots() reads the
+        # decision log, so this sees what the arrivals before it filled.
+        #
+        # VERIFIED BEFORE FLIPPING IT, on a scratch database, because a
+        # filing is WRITE-ONCE and the artefact that kept this off was
+        # real: with every slot unfilled, 102 of 108 supplies landed on
+        # 2023-Q1.
+        filing.file_arrivals([by_run_id[entry["run_id"]]])
+
+    def _promote(entry: dict, got: list[dict]) -> None:
+        # PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13),
+        # and is deliberately not inside it: a promotion that fails must
+        # be retryable without re-running QA, which it is only while the
+        # two are separable. tests/test_promotion_after_run.py asserts
+        # that against _run_one_inner's own AST rather than trusting
+        # this comment.
+        promotion.report(promotion.after_runs(
+            [by_run_id[entry["run_id"]]], got,
+            agency_id=cp_common.AGENCY_ID, collection_id=cp_common.COLLECTION_ID,
+            actor=run_by, actor_kind=decision_log.RULE,
+            effective_at=asset_time.now().isoformat()))
+
+    all_results = parallel_orchestrate.run_manifest(
+        manifest, _run_one, run_timestamp, run_by, reference_run_id,
+        sequential=sequential, before_each=_file, after_each=_promote)
 
     # NOTHING TO SWEEP HERE ANY MORE (Keith, 2026-09-27). Each run
     # discards its own view and dbt schemas as it finishes - see

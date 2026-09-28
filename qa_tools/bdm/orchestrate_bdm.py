@@ -4,14 +4,17 @@ against every generated Birth Registrations run. Aggregates into
 reports/results_bdm.json. The Child Protection counterpart is
 qa_tools/cp/orchestrate_cp.py.
 
-Runs the manifest's runs IN PARALLEL by default (qa_tools/common/
-parallel_orchestrate.py, one process per CPU core - measured ~3.4x on
-this project's own 15-run manifest, see plans/performance.md #4), with a
---sequential flag for easier debugging (parallel workers interleave their
-print output and stack traces; a single run under investigation is
-simpler to chase down sequentially). Either way, results come back in
-manifest order, so output stays byte-for-byte reproducible for a given
-manifest.
+RUNS ONE ARRIVAL AT A TIME, IN RECEIPT ORDER, and this reversed on
+2026-09-28. It used to run the manifest IN PARALLEL by default
+(qa_tools/common/parallel_orchestrate.py, one process per CPU core -
+measured ~3.4x on this project's own 15-run manifest, see
+plans/performance.md #4). Promotion is what ended that: a supply is
+filed to the oldest slot no PROMOTION has filled, so arrival N's filing
+depends on arrival N-1's promotion, which depends on arrival N-1's
+checks. `--sequential` still exists and no longer changes anything.
+See parallel_orchestrate.run_manifest's own docstring for what the
+ordering cost and what it bought. Results still come back in manifest
+order, so output stays byte-for-byte reproducible for a given manifest.
 
 Assumes data/raw/ (generator output) exists - run_pipeline() below builds
 its own data/duckdb_runs/*.duckdb per-run real warehouses itself (via
@@ -408,27 +411,36 @@ def run_pipeline(sequential: bool = False) -> dict:
     reference_entry = manifest[0]
     run_timestamp = asset_time.now().isoformat()
 
-    # BEFORE ANY CHECK RUNS OVER IT (REQ-PIPE-075 criterion 7) - see
-    # orchestrate_cp.py's identical call for the verification that
-    # preceded turning this on.
-    filing.file_arrivals(found_arrivals)
     # Fails loudly here, before any real tool runs, if git identity isn't
     # configured (Keith's call, 2026-09-16) - see git_identity.py's own
     # docstring for why this can't fall back to "unknown".
     run_by = get_run_by()
+
+    # IN RECEIPT ORDER, ONE ARRIVAL AT A TIME - file, check, promote,
+    # next. See orchestrate_cp.py's identical block for the chain that
+    # forces it and parallel_orchestrate.run_manifest's docstring for
+    # what it cost and what it bought.
+    by_run_id = {a.run_id: a for a in found_arrivals}
+
+    def _file(entry: dict) -> None:
+        # BEFORE ANY CHECK RUNS OVER IT (REQ-PIPE-075 criterion 7) - see
+        # orchestrate_cp.py's identical call for the verification that
+        # preceded turning this on.
+        filing.file_arrivals([by_run_id[entry["run_id"]]])
+
+    def _promote(entry: dict, got: list[dict]) -> None:
+        # PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13) -
+        # see orchestrate_cp.py's identical block for why it is outside
+        # the run rather than inside it.
+        promotion.report(promotion.after_runs(
+            [by_run_id[entry["run_id"]]], got,
+            agency_id=AGENCY_ID, collection_id=COLLECTION_ID,
+            actor=run_by, actor_kind=decision_log.RULE,
+            effective_at=asset_time.now().isoformat()))
+
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, run_by, reference_entry["run_id"],
-        sequential=sequential)
-
-    # PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13) - see
-    # orchestrate_cp.py's identical block for why it is outside the run
-    # rather than inside it, and why it is sequential where the runs
-    # above were parallel.
-    promotion.report(promotion.after_runs(
-        found_arrivals, all_results,
-        agency_id=AGENCY_ID, collection_id=COLLECTION_ID,
-        actor=run_by, actor_kind=decision_log.RULE,
-        effective_at=asset_time.now().isoformat()))
+        sequential=sequential, before_each=_file, after_each=_promote)
 
     # NOTHING TO SWEEP HERE ANY MORE (Keith, 2026-09-27). Each run
     # discards its own view and dbt schemas as it finishes - see
