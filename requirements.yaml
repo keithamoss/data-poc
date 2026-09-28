@@ -18084,6 +18084,11 @@ requirements:
       - dashboard/embed_dashboard_data.py::embed
       - dashboard/qa-reporting-dashboard.template.html::renderBuildStamp
       - .github/workflows/validate-config.yml
+      - contract/environments.yaml
+      - qa_tools/common/environments.py::all_environments
+      - qa_tools/common/environments.py::get
+      - qa_tools/common/environments.py::current
+      - cli/env.py::env_group
     evidence:
       - >
         VERIFIED END TO END with a real `--dry-run`: rebuild-results ->
@@ -18601,6 +18606,19 @@ requirements:
     dependencies: [REQ-PIPE-087]
     open_questions:
       - >
+        PART OF THIS IS ALREADY BUILT, under another requirement, and a
+        future session should not rebuild it (noticed 2026-09-28 while
+        checking REQ-DASH-094's dependencies). REQ-PIPE-092's follow-on
+        work shipped contract/environments.yaml, qa_tools/common/
+        environments.py and MOTHMAN_ENVIRONMENT, which between them
+        already satisfy criterion 3 (refuse an unknown name) and the
+        unset half of criterion 2. That code is now listed on
+        REQ-PIPE-092's own implemented_by, where it belongs. This
+        requirement stays not_started because seven of its ten criteria
+        are genuinely untouched - the version declaration, the
+        production confirmation, and recording the environment on every
+        QA run - and because it is unsigned.
+      - >
         STILL GENUINELY UNREAD, and both bear on the version this
         requirement anchors - moved here from REQ-PIPE-087 on
         2026-09-27, since that one provides the engine and this one
@@ -18655,6 +18673,9 @@ requirements:
   - id: REQ-DASH-094
     title: "The dashboard says which environment's QA it is showing"
     date_written: "2026-09-26"
+    signed_off:
+      by: Keith
+      date: "2026-09-28"
     story: >
       As someone who might be handed a screenshot of this dashboard in
       a briefing, I want the page to say which environment it
@@ -22239,3 +22260,112 @@ requirements:
         that. Reading the last comment back is the only check that
         holds across a restart, a second caller, or a Lambda that has
         never seen this ticket before.
+
+  - id: REQ-TEST-114
+    title: "The terminal says which environment it is acting against"
+    date_written: "2026-09-28"
+    signed_off: null
+    story: >
+      As somebody driving the mothman CLI or TUI - often over a shared
+      screen, often on a machine that can reach more than one
+      environment - I want the terminal to say which environment I am
+      acting against without my asking, so that a development session
+      and a production one are never the same picture.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-28: "this should also be expanded to the TUI and
+      CLI", said while signing REQ-DASH-094. The dashboard sibling of
+      this requirement carries the reasoning; this one carries it into
+      the terminal, which REQ-DASH-094 cannot because it is a page.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL state, in the terminal, which environment the
+        command or session is acting against.
+      - >
+        THE SYSTEM SHALL show that statement in the TUI's own standing
+        chrome, so that it is visible throughout a session rather than
+        only on a command that writes.
+      - >
+        WHERE the environment is not production, THE SYSTEM SHALL make
+        that distinct in the text itself and SHALL NOT rely on colour
+        alone, because a terminal may have colour disabled, be piped to
+        a file, or be screenshotted and printed in greyscale.
+      - >
+        THE SYSTEM SHALL take the statement from the environment that
+        was actually RESOLVED, and SHALL NOT echo back what a person
+        typed.
+      - >
+        IF no environment resolves, THEN THE SYSTEM SHALL refuse rather
+        than present an unlabelled session - deferring to
+        REQ-PIPE-093's own refusal rather than restating it.
+      - >
+        WHERE the terminal produces an artifact somebody else will read
+        - a recorded demo cast, a captured screenshot - THE SYSTEM
+        SHALL carry the statement into it, on the same reasoning
+        REQ-DASH-094 criterion 4 gives for the snapshot archive.
+      - >
+        THE SYSTEM SHALL use the same words for an environment that the
+        dashboard uses, so that one vocabulary covers both surfaces.
+    non_functional_requirements:
+      - >
+        UNMISSABLE IN A SCREENSHOT, QUIET IN DAILY USE - the same bar
+        REQ-DASH-094 sets, and harder to meet in a terminal, where
+        there is no chrome to hang a banner on and every line spent on
+        standing furniture is a line not spent on the work. The TUI
+        already has a banner (cli/banner.py); the answer is most likely
+        there rather than in a new element.
+      - >
+        A TERMINAL IS NOT A PAGE, and three of its constraints have no
+        dashboard equivalent: output is frequently PIPED or redirected,
+        colour may be off (NO_COLOR, a dumb terminal, CI), and width
+        may be 80 columns. Anything that only works in a wide,
+        colour-capable interactive terminal fails exactly where it
+        matters, which is somebody else's machine.
+      - >
+        NO PER-COMMAND COST. Resolving the environment is a read of
+        configuration and an environment variable, so stating it must
+        not add a database round trip to every command - the CLI is
+        used interactively and a visible delay on `mothman env list`
+        would be absurd.
+      - >
+        THIS IS HONESTY FURNITURE, NOT A GUARD. It tells a person where
+        they are; it does not stop them doing anything. The guard is
+        REQ-PIPE-093 criterion 6's deliberate confirmation before a
+        production filing operation, and conflating the two would give
+        a false sense that being told is the same as being stopped.
+    dependencies: [REQ-PIPE-093, REQ-DASH-094]
+    open_questions:
+      - >
+        Whether a one-off command (not the TUI) states the environment
+        on EVERY invocation or only on one that writes. Always is more
+        honest and risks becoming noise a person stops reading;
+        write-only is quieter and means a read command gives no clue
+        where it read from. REQ-PIPE-093 criterion 5 already requires
+        it before anything that writes, so the open part is genuinely
+        just the read case.
+    decisions:
+      - >
+        A SEPARATE REQUIREMENT FROM REQ-DASH-094, NOT EXTRA CRITERIA ON
+        IT (2026-09-28). Same precedent REQ-DASH-085 set against
+        REQ-PIPE-084 and REQ-DASH-094 itself set against REQ-PIPE-093:
+        different surface, different owner, different toolchain. There
+        is also a register-mechanical reason - docs/components.md gives
+        `cli/` to TEST and the dashboard to DASH, so CLI criteria
+        inside a DASH requirement would make its own component tag
+        wrong, and the component tag is what a scoper reads to pick an
+        id.
+      - >
+        IT WIDENS REQ-PIPE-093 CRITERION 5 RATHER THAN DUPLICATING IT.
+        That criterion names the environment "before doing anything
+        that writes", which is a write-time disclosure. Keith's ask is
+        for the terminal to say where it is at all times, which is a
+        standing statement. Recorded because the two read similarly and
+        a builder could easily satisfy one and believe both are done.
+      - >
+        THE DEMO CAST IS A REAL CASE, NOT A HYPOTHETICAL. This repo
+        COMMITS a recorded terminal session - dashboard/demos/
+        qa_wizard.cast, rendered in the dashboard's own Demo tab - so a
+        terminal recording made in a development environment is already
+        published to whoever opens that tab. Criterion 6 exists because
+        of an artifact that exists.
