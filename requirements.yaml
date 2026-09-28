@@ -15152,11 +15152,13 @@ requirements:
       never a stream of events
     date_written: "2026-09-26"
     story: >
-      As an operator responsible for an asset where a supply may simply
-      never turn up, I want each expected supply to have one ticket that
-      opens when its period does and keeps telling me where that supply
-      has got to, so that I watch a work queue rather than go looking -
-      and so that nothing tells me the same thing twice.
+      As one of a team who share a single work queue, I want each
+      expected supply to have one ticket that opens when its period does
+      and keeps telling us where that supply has got to - still awaiting,
+      arrived and amber, red, held, overdue, never turned up at all - so
+      that the whole team watches one queue with everything visible in it
+      rather than each of us going looking, and so that nothing tells
+      anybody the same thing twice.
     moscow: must
     status: not_started
     source: >
@@ -15186,9 +15188,9 @@ requirements:
         slot's state has changed since the last update, and SHALL NOT
         repeat what the previous update already said.
       - >
-        THE SYSTEM SHALL reflect on the ticket every state a slot passes
-        through - awaiting, arrived, its QA verdict, held, overdue,
-        substituted, inherited, promoted, rejected and re-filed.
+        THE SYSTEM SHALL reflect on the ticket every state a slot can be
+        in - awaiting or overdue, arrived and its QA verdict, and every
+        state the decision log can record.
       - >
         THE SYSTEM SHALL derive a slot's state from the schedule, the
         filings and the decision log alone, and SHALL NOT read supply
@@ -15202,6 +15204,20 @@ requirements:
       - >
         WHEN a slot stops needing attention, THE SYSTEM SHALL record the
         outcome on its ticket and SHALL NOT close it automatically.
+      - >
+        THE SYSTEM SHALL distinguish its OWN comments on a ticket from
+        comments written by people, SHALL determine what it last said
+        from its own comments alone, and SHALL NOT treat a person's
+        comment as a state to reconcile or as a reason to post.
+      - >
+        WHEN a person has CLOSED a ticket and the slot's state
+        afterwards changes, THE SYSTEM SHALL REOPEN that same ticket and
+        post the new state, and SHALL NOT open a second ticket for the
+        same slot.
+      - >
+        THE SYSTEM SHALL be invoked after every QA run, and SHALL
+        reconcile every slot it is responsible for on each invocation
+        rather than only the slots that run touched.
       - >
         THE SYSTEM SHALL scope a failure for one slot to that slot, and
         SHALL NOT stop reconciliation for any other.
@@ -15233,6 +15249,22 @@ requirements:
         GitHub's own documentation rather than recalled - which is
         exactly the quiet stretch it exists to cover. Neither loses a
         state now; both delay it.
+
+        WHAT IS ACTUALLY ACCEPTED, Keith 2026-09-28: every QA run calls
+        the reconciler, and the cadence risk that leaves is the quiet
+        stretch where no dataset on the asset delivers at all. On the
+        quarterly asset that stretch is real and long. It is a STALENESS
+        window, not a lost state - the next run still catches up - and
+        the AWS deployment is expected to close it with a second caller
+        rather than this one having to.
+      - >
+        IT ASSUMES A PERSON DOES NOT EDIT THE TOOL'S OWN COMMENTS
+        (Keith, 2026-09-28). That assumption is what makes criterion 5
+        cheap: "what did I last say" is answered by reading back the
+        tool's own most recent comment, with no second store of its own
+        to keep in step. If the assumption is ever broken the failure is
+        a repeated or a skipped update rather than a wrong one, and the
+        next state change corrects it.
       - >
         IDEMPOTENCE IS THE MECHANISM, not a safeguard bolted onto one.
         Criteria 4 and 5 are what let the reconciler be invoked from any
@@ -15272,6 +15304,36 @@ requirements:
         requirement had rejected - riding on a QA run, and a scheduled
         workflow - stop being correctness failures and become cadence
         trade-offs, which is a question with an answer.
+      - >
+        THE QUEUE IS THE WHOLE TEAM'S, AND IT IS NOT JUST ABOUT ABSENCE
+        (Keith, 2026-09-28, widening the story). The first draft read as
+        though the problem were a supply that never turns up; that is
+        one state among several. A supply that arrives amber or red
+        needs the same ticket, and the point of putting it in tickets at
+        all is that everybody on the team sees the same queue rather
+        than each person going and looking. Recorded because it changes
+        what `needs-action` has to cover, not just how the story reads.
+      - >
+        THE CALLER IS EVERY QA RUN (Keith, 2026-09-28, answering the
+        trigger question the reframe left open). On AWS he expects
+        there may ALSO be a Lambda running alongside, and was explicit
+        that he is not certain - which is exactly why criterion 16 says
+        the reconciler must not depend on which trigger called it. Two
+        callers is a supported shape rather than a problem to design
+        out, because reconciling twice over an unchanged world changes
+        nothing.
+      - >
+        PEOPLE USE THE TICKET TOO, AND THE TOOL GETS OUT OF THEIR WAY
+        (Keith, 2026-09-28). Three consequences he asked for, and they
+        are one idea: a person's comment is conversation, not state, so
+        it is never reconciled and never a reason to post; a person may
+        CLOSE a ticket, and if the slot then changes the same ticket is
+        reopened rather than a second one opened beside it; and the tool
+        reads only its own comments to know what it last said, assuming
+        nobody edits them. The reason closing belongs to people is
+        already criterion 10 - the system records an outcome and never
+        closes a ticket itself - so reopening is the other half of that
+        same rule rather than a new one.
       - >
         THE TICKET IS PER SLOT, one dataset in one period (Keith,
         2026-09-28), closing the second open question. Shown both
