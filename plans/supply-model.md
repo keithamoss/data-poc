@@ -2230,7 +2230,7 @@ exist.
     load-time file check gates promotion, "possibly even QA". The second half
     is deliberately tentative and is his to settle when this is built.
 
-28. **[todo, 2026-09-26]** **[Pipeline & publishing]** **"Inherited": a dataset
+28. **[in-progress, 2026-09-29]** **[Pipeline & publishing]** **"Inherited": a dataset
     that does not participate in a period at all.** A view created when a
     period schema is born, pointing at the supply that is still current, for
     the datasets the schedule says owe nothing that period - plus inherit and

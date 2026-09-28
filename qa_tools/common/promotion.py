@@ -63,7 +63,14 @@ def promote(conn: supply_db.SupplyConnection, *,
     if decision_log.promoted_into(conn, dataset_id, period) == supply:
         return False
 
-    schema = period_schema.ensure_period_schema(conn, period)
+    # OPENED, NOT JUST CREATED (REQ-PIPE-098 criterion 4): a first
+    # promotion is one of the two ways a period comes into existence,
+    # and it is the moment every dataset that owes this period nothing
+    # inherits into it. Before the transaction below, because
+    # inheritance writes decisions of its own.
+    period_schema.open_period(conn, period, opened_by=actor,
+                               effective_at=effective_at)
+    schema = period_schema.period_schema(period)
     decision = decision_log.Decision(
         agency_id=agency_id,
         collection_id=collection_id,
@@ -147,7 +154,8 @@ def should_promote(*, status: str,
                    held_without_slot: bool,
                    has_active_checks: bool,
                    decided_by_a_person: bool = False,
-                   contested: bool = False) -> tuple[bool, str | None]:
+                   contested: bool = False,
+                   inherited: bool = False) -> tuple[bool, str | None]:
     """Whether automation may promote this supply, and why not if not.
 
     The reason is not decoration: "not promoted" with no explanation is
@@ -200,6 +208,16 @@ def should_promote(*, status: str,
         # Criterion 4, whatever the status.
         return False, ("this supply's slot is already filled by a promoted "
                        "supply, so a person decides what happens to it")
+    if inherited:
+        # REQ-PIPE-098 criterion 17, and it needs its own refusal rather
+        # than riding on the one above. A SUBSTITUTED period counts as
+        # filled, so a supply arriving into one is already caught. An
+        # INHERITED period deliberately does not - nothing was owed - so
+        # without this the rule would promote straight over the
+        # inherited view and nobody would be asked.
+        return False, ("nothing was owed for this period, so it stands on an "
+                       "earlier supply - a person decides whether this one "
+                       "replaces it")
     return True, None
 
 
@@ -506,7 +524,7 @@ def after_run(conn: supply_db.SupplyConnection, *,
     the thirtieth was odd is a step somebody turns off, which is the
     same blast-radius rule this batch applies everywhere.
     """
-    from qa_tools.common import rejection
+    from qa_tools.common import inheritance, rejection
 
     work: list[dict] = []
     refused: dict[str, str] = {}
@@ -533,6 +551,8 @@ def after_run(conn: supply_db.SupplyConnection, *,
             # gate's own comment on why that outranks the verdict.
             has_active_checks=status is not None,
             slot_filled=period in filled_slots(conn, dataset_id),
+            inherited=(period is not None
+                       and inheritance.inherited(conn, dataset_id, period) is not None),
             decided_by_a_person=rejection.decided_by_a_person(
                 conn, dataset_id, item["supply"]),
         )

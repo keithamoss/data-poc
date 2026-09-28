@@ -1,0 +1,250 @@
+"""A period nobody owed a supply for, filled with what is still current
+(REQ-PIPE-098).
+
+AN ANNUAL DATASET IN A QUARTERLY ASSET is the case. Somebody queries the
+warehouse for this quarter and finds `cp_carers` missing - not because a
+supplier failed, but because carers are supplied once a year and this is
+not the quarter. A missing table is the wrong answer to a question
+nobody should have had to ask: the current carers are the ones promoted
+in the annual period, and they are still current.
+
+SO THE RULE FILLS IT, and unlike a substitution nobody has to decide
+anything. That is the whole distinction (criterion 12), and it is worth
+holding onto because the two are identical in SQL - both are a view in a
+period's schema pointing at an earlier promoted table:
+
+  - SUBSTITUTION says a supply WAS owed and did not come, and a person
+    chose what to stand on. It is REQ-PIPE-084, it needs a reason, and
+    only a person can make one.
+  - INHERITANCE says nothing was owed at all. The schedule says so, the
+    rule acts on it, and there is nothing for a person to decide.
+
+Collapsing them would lose the difference between a supplier who missed
+a quarter and one who was never due, which is exactly the difference the
+dashboard exists to show.
+
+ONCE, WHEN THE PERIOD IS BORN (criteria 1 and 2). Not on every run, not
+on demand: a period's inherited views are decided at the moment it
+opens, from what was current then, and nothing recreates them
+afterwards. A rule that kept re-pointing them would silently change what
+a historical period resolved to every time something newer was
+promoted - which is a period quietly rewriting its own past.
+
+NON-PARTICIPATION COMES FROM THE SCHEDULE AND NOWHERE ELSE (criterion
+5). The tempting shortcut is "no supply arrived, so presumably none was
+due", and it is exactly backwards: a missing supply is the thing this
+system exists to report, and inferring agreement from absence would
+silence it.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from qa_tools.common import (decision_log, hierarchy, period_schema, schedule,
+                             supply_db)
+
+#: What a rule records as its own name in the decision log.
+RULE_ACTOR = "inheritance rule"
+
+
+@dataclass(frozen=True)
+class Inherited:
+    """One dataset's inheritance into one period."""
+
+    dataset_id: str
+    period: str
+    stands_on: str
+    supply: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class Refused:
+    """A dataset that does not participate and had nothing to stand on.
+
+    RECORDED AND SURFACED, never silent (criterion 10). An attempt that
+    could not complete is the state somebody has to know about: the
+    period genuinely has no table for this dataset, and the reason is
+    ours rather than the supplier's.
+    """
+
+    dataset_id: str
+    period: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class Outcome:
+    inherited: list[Inherited] = field(default_factory=list)
+    refused: list[Refused] = field(default_factory=list)
+
+    @property
+    def nothing_happened(self) -> bool:
+        return not (self.inherited or self.refused)
+
+
+def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]:
+    """`(True, the schedule's own reason)` where nothing is owed.
+
+    FROM THE SCHEDULE, which is criterion 5, and from the one function
+    that already answers it - schedule.not_expected_periods() returns
+    {period: reason} and refuses a period declared with no reason, so
+    criterion 6's "record the reason the schedule states" needs no
+    second source that could disagree with it.
+    """
+    reason = schedule.not_expected_periods(dataset_id).get(period_name)
+    return (True, reason) if reason else (False, "")
+
+
+def _most_recent_promoted(conn, dataset_id: str,
+                          before: str) -> tuple[str, str] | None:
+    """`(period, supply)` of the newest PROMOTED table, or None.
+
+    ONLY A PROMOTED ONE (criterion 14). A period that is itself
+    inherited or substituted holds a view, not a table, and pointing at
+    one would build a chain whose bottom nobody can see - the same
+    refusal REQ-PIPE-084 criterion 16 makes for substitution.
+
+    ORDERED BY THE PERIOD'S OWN DATE rather than by when the promotion
+    happened, because "the supply that is still current" is a statement
+    about the data's period, not about our paperwork.
+    """
+    rows = conn.execute(
+        f"SELECT to_slot, supply, action FROM {decision_log.TABLE} "
+        "WHERE dataset_id = ? AND to_slot IS NOT NULL "
+        "ORDER BY effective_at DESC, id DESC",
+        [dataset_id]).fetchall()
+    seen: set[str] = set()
+    best: tuple[str, str] | None = None
+    best_date = None
+    before_date = schedule.date_of(before, dataset_id)
+    for slot, supply, action in rows:
+        if slot in seen:
+            # The log is newest-first, so the first row for a slot is
+            # the one that decides what it holds now.
+            continue
+        seen.add(slot)
+        if action not in (decision_log.PROMOTE, decision_log.REFILE):
+            continue
+        when = schedule.date_of(slot, dataset_id)
+        if when is None:
+            # A period this dataset's calendar does not name - another
+            # calendar's, or one since renamed. Not a candidate rather
+            # than an error.
+            continue
+        if before_date is None or when >= before_date:
+            # Only what was current BEFORE this period. A later period's
+            # supply is not what this one inherits.
+            continue
+        if best_date is None or when > best_date:
+            best, best_date = (slot, supply), when
+    return best
+
+
+def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
+                 effective_at: str) -> Outcome:
+    """Fill this newly-opened period for every dataset that owes it
+    nothing.
+
+    CALLED ONCE, BY period_schema.open_period(), at the moment the
+    period is created. Calling it again is not forbidden by anything
+    here - it would simply find each view already recorded - but nothing
+    does, and criterion 2 is why: a rule that recreated these views
+    later would change what a historical period resolves to every time
+    something newer was promoted.
+    """
+    outcome = Outcome()
+    schema = period_schema.period_schema(period_name)
+    for entry in hierarchy.all_datasets():
+        try:
+            skipped, reason = _does_not_participate(entry.dataset_id, period_name)
+        except Exception as exc:  # noqa: BLE001 - one bad schedule must not stop the rest
+            print(f"note: cannot tell whether {entry.dataset_id} participates in "
+                  f"{period_name} ({type(exc).__name__}: {exc}) - not inherited.")
+            continue
+        if not skipped:
+            continue
+
+        source = _most_recent_promoted(conn, entry.dataset_id, period_name)
+        if source is None:
+            # CRITERION 9: no view, and nothing fabricated. An empty
+            # table would be a lie with a schema on it.
+            outcome.refused.append(Refused(
+                dataset_id=entry.dataset_id, period=period_name,
+                reason=("nothing is owed for this period and there is no earlier "
+                        "promoted supply to stand on, so the table is genuinely "
+                        "absent")))
+            _record(conn, entry, action=decision_log.INHERIT_REFUSED, supply="",
+                    period=period_name, stands_on=None,
+                    reason=outcome.refused[-1].reason, effective_at=effective_at)
+            continue
+
+        stands_on, supply = source
+        conn.execute(
+            f'CREATE OR REPLACE VIEW "{schema}".'
+            f'"{supply_db._ident(entry.table, "table name")}" AS SELECT * FROM '
+            f'"{period_schema.period_schema(stands_on)}".'
+            f'"{supply_db._ident(supply, "table name")}"')
+        outcome.inherited.append(Inherited(
+            dataset_id=entry.dataset_id, period=period_name, stands_on=stands_on,
+            supply=supply, reason=reason))
+        _record(conn, entry, action=decision_log.INHERIT, supply=supply,
+                period=period_name, stands_on=stands_on, reason=reason,
+                effective_at=effective_at)
+    return outcome
+
+
+def _record(conn, entry, *, action: str, supply: str, period: str,
+            stands_on: str | None, reason: str, effective_at: str) -> None:
+    """One decision-log entry, with THE RULE as the actor (criterion 8).
+
+    Written outside apply_decision's context manager because there is no
+    warehouse change to pair it with beyond the view already created -
+    and a nested transaction inside the one open_period() may itself be
+    called from is the kind of thing that works until it does not.
+    """
+    decision = decision_log.Decision(
+        agency_id=entry.agency_id, collection_id=entry.collection_id,
+        dataset_id=entry.dataset_id, action=action, supply=supply,
+        actor=RULE_ACTOR, actor_kind=decision_log.RULE,
+        effective_at=effective_at, to_slot=period, stands_on=stands_on,
+        reason=reason)
+    with decision_log.apply_decision(conn, decision):
+        pass
+
+
+def inherited(conn: supply_db.SupplyConnection, dataset_id: str,
+              period: str) -> Inherited | None:
+    """This dataset's inheritance into this period, or None.
+
+    FROM THE LOG, for the reason substitution.substituted() gives: a
+    view in a schema says an object exists, not what put it there or
+    whether it still means what it meant.
+    """
+    latest = decision_log.latest_for_slot(conn, dataset_id, period)
+    if not latest or latest[0] != decision_log.INHERIT:
+        return None
+    return Inherited(dataset_id=dataset_id, period=period, stands_on=latest[2],
+                     supply=latest[1], reason="")
+
+
+def refusals(conn: supply_db.SupplyConnection | None = None) -> list[Refused]:
+    """Every inheritance that could not complete, for the queue that
+    surfaces them at WARNING prominence (criterion 10).
+
+    OPENS ITS OWN CONNECTION WHEN NOT GIVEN ONE, and that is what lets
+    outstanding.py call it without opening a connection of its own - the
+    same shape as filing.filled_slots(). That module's docstring is
+    explicit about why it matters: a narrow reader can only answer
+    questions about RECORDS, where `supply_db.connect` can answer any
+    question at all, including ones about supply rows it must never ask.
+    """
+    if conn is None:
+        with supply_db.connect(read_only=True,
+                                label="mothman:inheritance-refusals") as opened:
+            return refusals(opened)
+    rows = conn.execute(
+        f"SELECT dataset_id, to_slot, reason FROM {decision_log.TABLE} "
+        "WHERE action = ? ORDER BY dataset_id, to_slot",
+        [decision_log.INHERIT_REFUSED]).fetchall()
+    return [Refused(dataset_id=d, period=p, reason=r or "") for d, p, r in rows]

@@ -13556,25 +13556,27 @@ requirements:
         queue an operator can work and one they stop trusting. This is a
         presentation consequence as much as a data one, and REQ-DASH-070's aggregated element is where it lands.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075]
-    unmet_criteria:
-      - criterion: >
-          Criterion 5's proviso - "SUBJECT TO REQ-PIPE-084 criterion 11,
-          which refuses the demotion outright while any later period
-          stands on that supply". The demotion itself is built and
-          tested; what is absent is the refusal, because nothing yet
-          makes a later period stand on a supply.
-        why: >
-          A later period stands on a supply through INHERITANCE, which is
-          REQ-PIPE-098, and through SUBSTITUTION, which is REQ-PIPE-084.
-          Neither is built, so there is no state for the refusal to read
-          and a check written now would be guarding a condition that
-          cannot arise - which is worse than an absent guard, because it
-          reads as covered.
-        owner: >
-          REQ-PIPE-084, which owns the criterion this defers to.
-        blocked_by:
-          requirements: [REQ-PIPE-084, REQ-PIPE-098]
     decisions:
+      - >
+        CRITERION 5's PROVISO IS MET AS OF 2026-09-28, and it was
+        deferred for three hours rather than a sprint. It reads "SUBJECT
+        TO REQ-PIPE-084 criterion 11, which refuses the demotion
+        outright while any later period stands on that supply", and was
+        recorded unmet because nothing could make a period stand on one.
+        REQ-PIPE-084 and REQ-PIPE-098 both landed the same night, so
+        both ways now exist and decision_log._judge() refuses a demote,
+        reject or re-file naming every period that blocks it.
+
+        THE SPRINTS GATE IS WHAT CAUGHT IT, which is the part worth
+        recording: it warned that this deferral's blockers had shipped,
+        and re-testing the criterion rather than clearing it turned up a
+        real gap - the refusal asked only about SUBSTITUTIONS, and an
+        inherited period stands on a supply just as hard. Covered by
+        tests/test_inheritance.py's own
+        TestASupplyAnInheritedPeriodStandsOnCannotMove, confirmed
+        failing first. That gate's own wording is exactly right: a
+        blocker shipping is evidence the criterion CAN now be met, never
+        that it has been.
       - >
         POINTER ADDED 2026-09-28 (Keith's approval to touch this signed
         requirement): criterion 5's demotion is REFUSED while a later
@@ -19777,7 +19779,74 @@ requirements:
       to the supply that is still current, so that a dataset nobody
       owes anything for does not read as a missing table.
     moscow: must
-    status: not_started
+    status: built
+    implemented_by:
+      - qa_tools/common/inheritance.py::inherit_into
+      - qa_tools/common/inheritance.py::inherited
+      - qa_tools/common/inheritance.py::refusals
+      - qa_tools/common/inheritance.py::Inherited
+      - qa_tools/common/inheritance.py::Refused
+      - qa_tools/common/period_schema.py::open_period
+      - qa_tools/common/period_schema.py::opened
+      - qa_tools/common/schedule.py::date_of
+      - qa_tools/common/decision_log.py::INHERIT
+      - qa_tools/common/decision_log.py::INHERIT_REFUSED
+      - qa_tools/common/outstanding.py::INHERITANCE_REFUSED
+      - qa_tools/common/promotion.py::should_promote
+    linked_tests:
+      - tests/test_inheritance.py::TestOpeningAPeriodIsARecordedEvent
+      - tests/test_inheritance.py::TestADatasetThatOwesNothingInheritsWhatIsCurrent
+      - tests/test_inheritance.py::TestNothingToStandOnIsRefusedRatherThanFabricated
+      - tests/test_inheritance.py::TestItPointsOnlyAtARealPromotedTable
+      - tests/test_inheritance.py::TestInheritanceIsNotSubstitution
+      - tests/test_inheritance.py::TestOpeningOnePeriodLeavesOthersAlone
+      - tests/test_inheritance.py::TestASupplyArrivingIntoAnInheritedPeriodWaitsForAPerson
+      - tests/test_inheritance.py::TestInheritingRunsNoChecks
+    evidence:
+      - >
+        Built 2026-09-28, overnight. `qa_tools/common/inheritance.py`,
+        two new decision-log actions, one new table - `qa.period`, whose
+        row is what makes "first created" a FACT rather than an
+        inference from the schema being present - and schema version 8
+        -> 9. 21 tests in tests/test_inheritance.py.
+
+      - >
+        THE TABLE EXISTS BECAUSE THE INFERENCE IS WRONG IN A SPECIFIC
+        WAY, and it is worth saying which: "does the schema exist"
+        cannot tell a period opened a second ago from one opened last
+        year whose schema was dropped and rebuilt. The second would
+        inherit all over again, from whatever is current NOW rather
+        than from what was current THEN - a period quietly rewriting
+        its own past, which is the one thing a period must never do.
+
+      - >
+        CRITERION 17 NEEDED ITS OWN REFUSAL rather than riding on the
+        filled-slot one, and the reason is criterion 7. A SUBSTITUTED
+        period counts as filled, so a supply arriving into one is
+        already caught by "the slot is already filled". An INHERITED
+        period deliberately does not count as filled - nothing was owed
+        - so without a refusal of its own the rule would promote
+        straight over the inherited view and nobody would be asked.
+
+      - >
+        A SCHEMA MIGRATION FAULT FOUND AND FIXED HERE, worth recording
+        because it will recur otherwise: the `action` column's list of
+        known values was an INLINE CHECK, which PostgreSQL names for
+        itself. `CREATE TABLE IF NOT EXISTS` does nothing to an existing
+        table, so a database created before the list grew kept the old
+        constraint and refused the new action while a fresh one accepted
+        it. The list now lives in a NAMED constraint that is dropped and
+        re-added on every ensure_schema, and the old generated name is
+        dropped too.
+
+      - >
+        `supply` ON THE DECISION LOG LOST ITS NOT NULL, narrowly.
+        Criterion 10 asks for a refused inheritance to be RECORDED, and
+        the thing it could not find IS a supply - so there is nothing
+        honest to put in the column. Every other action still requires
+        one, enforced by a CHECK that names `inherit-refused` as the
+        single exception, and decision_log refuses a refusal that DOES
+        carry a supply for the same reason.
     signed_off:
       by: Keith
       date: "2026-09-28"
@@ -19908,6 +19977,31 @@ requirements:
         necessary.
     dependencies: [REQ-PIPE-087, REQ-PIPE-084, REQ-PIPE-049]
     open_questions: []
+    unmet_criteria:
+      - criterion: >
+          All seventeen criteria are met by the code, and NONE of them
+          is exercised by this repository's own configuration: no
+          dataset declares a `not_expected` period, so inheritance never
+          fires on the real corpus. Every test states the schedule's
+          answer rather than reading it from contract/data-asset.yaml.
+        why: >
+          Declaring that a dataset is genuinely not due in some period
+          is a domain claim about a supplier's obligations, not a test
+          fixture. It belongs with Keith and with the generator's
+          scenario register (REQ-GEN-044), which is where the awkward
+          supply shapes get real instances.
+
+          FLAGGED RATHER THAN LEFT IMPLICIT because this project was
+          bitten by the opposite habit the same night:
+          outstanding._from_closed_slots() sat behind a guard that made
+          it unreachable, carried two faults, and ran for the first time
+          on the evening the guard stopped holding
+          (plans/post-build-review.md #63). A rule nothing exercises is
+          a rule nobody has seen work.
+        owner: >
+          Keith, for the domain claim; REQ-GEN-044 for the instance.
+        blocked_by:
+          requirements: [REQ-GEN-044]
     decisions:
       - >
         THREE CRITERIA BACKPORTED FROM REQ-PIPE-084 by the mirror-check

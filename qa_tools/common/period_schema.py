@@ -52,6 +52,7 @@ from dataclasses import dataclass, field
 from typing import Iterable, Mapping, Sequence
 
 from qa_tools.common import check_id as check_id_mod
+from qa_tools.common import qa_store
 from qa_tools.common import hierarchy
 from qa_tools.common import supply_db
 
@@ -169,6 +170,59 @@ def ensure_period_schema(conn, period_name: str) -> str:
     schema = period_schema(period_name)
     conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
     return schema
+
+
+def opened(conn, period_name: str) -> bool:
+    """Whether this period has been recorded as opened (criterion 3).
+
+    A FACT, NOT AN INFERENCE FROM THE SCHEMA BEING PRESENT, and that is
+    the whole reason the row exists. Inheritance happens once, at the
+    moment a period is born, and "does the schema exist" cannot tell a
+    period opened a second ago from one opened last year whose schema
+    was dropped and rebuilt - the second would inherit all over again,
+    from whatever is current now rather than from what was current then.
+    """
+    rows = conn.execute(
+        f'SELECT 1 FROM "{qa_store.SCHEMA}".period WHERE name = ?',
+        [period_name]).fetchall()
+    return bool(rows)
+
+
+def open_period(conn, period_name: str, *, opened_by: str,
+                effective_at: str | None = None) -> bool:
+    """Bring a period into existence, once, and fill what it owes
+    nothing for. Returns True where THIS call opened it.
+
+    ONE MECHANISM FOR BOTH WAYS IN (REQ-PIPE-098 criterion 4). A period
+    is opened by the first promotion into it or by an explicit
+    instruction, and afterwards the two are indistinguishable - which is
+    what makes "open next quarter early so somebody can look at it"
+    safe rather than a second kind of period.
+
+    NOT INSIDE ANOTHER TRANSACTION. Inheritance writes decision-log
+    entries of its own, so callers open the period BEFORE they begin
+    their own decision. promotion.promote() and substitution.substitute()
+    both do.
+
+    ensure_period_schema() REMAINS THE PLAIN, UNRECORDED CREATE, and the
+    two are not the same thing: that one is idempotent scaffolding a
+    view needs, this one is an event.
+    """
+    from qa_tools.common import asset_time, inheritance
+
+    schema = ensure_period_schema(conn, period_name)
+    if opened(conn, period_name):
+        return False
+    conn.execute(
+        f'INSERT INTO "{qa_store.SCHEMA}".period (name, opened_by) VALUES (?, ?) '
+        "ON CONFLICT (name) DO NOTHING",
+        [period_name, opened_by])
+    if not opened(conn, period_name):
+        # Somebody else won the race. Theirs inherited; ours must not.
+        return False
+    inheritance.inherit_into(conn, period_name,
+                              effective_at=effective_at or asset_time.now().isoformat())
+    return bool(schema)
 
 
 def period_schemas(conn) -> list[str]:

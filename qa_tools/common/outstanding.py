@@ -60,6 +60,7 @@ about records, and `supply_db.connect` can answer any question at all.
     the delivery record     held supplies, contested and unrecognised
                             files, receipt-time anomalies
     the load record         failed loads
+    the decision log        inheritances that could not complete
     observations/in_flight/ a delivery still being written when we
                             looked
     filings/                an assignment made under ambiguity
@@ -98,6 +99,13 @@ UNRECOGNISED_FILE = "unrecognised-file"
 IN_FLIGHT_DELIVERY = "in-flight-delivery"
 UNCERTAIN_ASSIGNMENT = "uncertain-assignment"
 CLOSED_UNFILLED_SLOT = "closed-unfilled-slot"
+#: An inheritance that could not complete (REQ-PIPE-098 criterion 10).
+#: WARNING rather than needs-action: there is nothing for a person to
+#: DO about it directly - the period genuinely has no earlier supply to
+#: stand on - but it is the reason a table is absent, and the reason is
+#: ours rather than the supplier's, which is exactly what somebody
+#: looking at an empty period needs told.
+INHERITANCE_REFUSED = "inheritance-refused"
 
 
 @dataclass(frozen=True)
@@ -465,6 +473,50 @@ def _from_closed_slots() -> list[Item]:
     return items
 
 
+def _from_inheritance_refusals() -> list[Item]:
+    """REQ-PIPE-098 criterion 10 - an inheritance that could not
+    complete, surfaced rather than silent.
+
+    THE ATTEMPT IS THE POINT. A period a dataset owes nothing for is
+    normally filled by the rule with whatever is still current; where
+    there is nothing earlier to stand on the rule correctly does
+    nothing, and the result is a genuinely absent table with an
+    explanation nobody can see unless it is put here.
+    """
+    from qa_tools.common import display_time, inheritance
+
+    items = []
+    try:
+        # THROUGH THE NARROW READER, never a connection of this module's
+        # own - see this file's own docstring on why that distinction is
+        # load-bearing rather than stylistic.
+        refused = inheritance.refusals()
+    except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
+        print(f"note: could not read inheritance refusals "
+              f"({type(exc).__name__}: {exc}) - the rest of the queue is unaffected.")
+        return items
+
+    for entry in refused:
+        try:
+            dataset = hierarchy.dataset(entry.dataset_id)
+        except hierarchy.UnknownDatasetError:
+            continue
+        shown = display_time.format_period(entry.period)
+        items.append(Item(
+            kind=INHERITANCE_REFUSED, severity=WARNING, blocking=False,
+            headline=f"{dataset.dataset_name} has no table at all for {shown}",
+            detail=(f"Nothing is owed for {shown}, so the period would normally "
+                     f"stand on this dataset's most recent supply - and no "
+                     f"earlier period holds one to stand on. The table is "
+                     f"genuinely absent, for a reason of ours rather than the "
+                     f"supplier's."),
+            agency_id=dataset.agency_id, collection_id=dataset.collection_id,
+            dataset_id=dataset.dataset_id,
+            responses=("file a supply into an earlier period",
+                        "accept that this dataset has no history yet")))
+    return items
+
+
 def _sort_key(item: Item) -> tuple:
     return (0 if item.blocking else 1,
             SEVERITY_ORDER.index(item.severity) if item.severity in SEVERITY_ORDER else 9,
@@ -482,5 +534,6 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
               + _from_loads()
               + _from_filings()
               + _from_closed_slots()
+              + _from_inheritance_refusals()
               + _from_in_flight(observations_dir))
     return Outstanding(items=tuple(sorted(items, key=_sort_key)))

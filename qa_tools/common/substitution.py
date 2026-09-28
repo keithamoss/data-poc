@@ -166,6 +166,10 @@ def substitute(conn: supply_db.SupplyConnection, *,
         conn, dataset_id=dataset_id, period=period, stands_on=stands_on,
         supply=supply, participates=participates)
 
+    # Same reason promotion.promote() does it here - see its comment.
+    period_schema.open_period(conn, period, opened_by=actor,
+                               effective_at=effective_at)
+
     decision = decision_log.Decision(
         agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
         action=decision_log.SUBSTITUTE, supply=supply, actor=actor,

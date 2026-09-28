@@ -20,6 +20,27 @@ import pytest
 from qa_tools.common import load_log, outstanding
 
 
+@pytest.fixture(autouse=True)
+def _this_workers_database(supply_dsn):
+    """EVERY test here runs against this worker's own database, and that
+    became necessary on 2026-09-28 rather than merely tidy.
+
+    Two of the queue's producers read the decision log through narrow
+    readers that open their own connection - closed slots through
+    filing.filled_slots(), refused inheritances through
+    inheritance.refusals(). Both were structurally EMPTY while nothing
+    was ever promoted, so a test that asked for no database at all got
+    an empty queue for free. The night promotion started working, the
+    real deployment's 84 promotions arrived in the middle of nine tests
+    asserting on totals.
+
+    Requested autouse rather than per-test, because the failure mode is
+    a test that forgets: it passes on an empty deployment and fails on a
+    populated one, which is a flake nobody can reproduce.
+    """
+    return supply_dsn
+
+
 def _delivery(conn, name="monday", **overrides):
     """One delivery record, straight into this worker's database.
 

@@ -83,11 +83,39 @@ REFILE = "refile"
 SUBSTITUTE = "substitute"
 DE_SUBSTITUTE = "de-substitute"
 
-ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE)
+#: INHERITANCE (REQ-PIPE-098), and it is kept apart from substitution on
+#: purpose (criterion 12). They look alike in SQL - both are a view in a
+#: period's schema pointing at an earlier promoted table - and they mean
+#: opposite things. A substitution says a supply was OWED and did not
+#: come, and a person decided what to stand on. An inheritance says
+#: nothing was owed at all, and the rule filled the period with what is
+#: still current. Collapsing them would lose the distinction between a
+#: supplier who missed a quarter and one who was never due.
+INHERIT = "inherit"
+#: An inheritance that could not complete, recorded rather than silent
+#: (criterion 10). It is the one action with NO supply, because the
+#: thing it could not find IS a supply.
+INHERIT_REFUSED = "inherit-refused"
+
+ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
+           INHERIT, INHERIT_REFUSED)
+
+#: The actions a RULE may take. Everything else is a person's, and
+#: rejection.py and substitution.py enforce that by not offering an
+#: actor_kind at all.
+AUTOMATIC_ACTIONS = (PROMOTE, INHERIT, INHERIT_REFUSED)
 
 #: The decisions that move a supply, and so are the ones criterion 11
 #: refuses while a later period stands on it.
 MOVES_A_SUPPLY = (REJECT, DEMOTE, REFILE)
+
+#: The decisions that make a period DEPEND on another period's supply.
+#: BOTH of them, and the second was missed for an hour: an inherited
+#: period stands on a supply just as hard as a substituted one - demote
+#: the supply and the inherited view points at a table that is no longer
+#: there. Found by the sprints gate noticing that REQ-PIPE-076's
+#: deferral had had its blockers shipped.
+STANDS_ON_A_SUPPLY = (SUBSTITUTE, INHERIT)
 
 #: What kind of thing decided (REQ-PIPE-074 criteria 3 and 4).
 PERSON = "person"
@@ -163,8 +191,12 @@ def _check_shape(decision: Decision) -> None:
         raise DecisionRefused(
             "a decision needs an actor - who or what decided this. There is no "
             "default and no 'unknown': record who it was, or do not record it.")
-    if not (decision.supply or "").strip():
+    if decision.action != INHERIT_REFUSED and not (decision.supply or "").strip():
         raise DecisionRefused("a decision needs the supply it acts on")
+    if decision.action == INHERIT_REFUSED and (decision.supply or "").strip():
+        raise DecisionRefused(
+            "a refused inheritance names no supply - that is what it could not "
+            "find. Recording one would say the opposite of what happened.")
     if not decision.slots:
         raise DecisionRefused(
             "a decision needs at least one slot - which period it acts on")
@@ -181,9 +213,14 @@ def _check_shape(decision: Decision) -> None:
         raise DecisionRefused(
             "a de-substitution names the period whose indirection is being "
             "removed, as the slot it empties.")
-    if decision.action != SUBSTITUTE and decision.stands_on:
+    if decision.action == INHERIT and not (decision.to_slot and decision.stands_on):
         raise DecisionRefused(
-            f"only a substitution stands on a period; {decision.action!r} does not")
+            "an inheritance names the period being filled and the period it "
+            "takes the supply from.")
+    if decision.action not in (SUBSTITUTE, INHERIT) and decision.stands_on:
+        raise DecisionRefused(
+            f"only a substitution or an inheritance stands on a period; "
+            f"{decision.action!r} does not")
 
 
 def promoted_into(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
@@ -223,6 +260,11 @@ def promoted_into(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
     # That is the point of it: the period answers, so nothing should
     # treat it as owed, and the next arrival for it is a supply landing
     # on a filled slot rather than the one that was missing.
+    # AN INHERITED PERIOD IS NOT A FILLED SLOT, and that is the whole of
+    # criterion 7: the dataset does not participate, so nothing was owed
+    # and there is no slot to fill. Counting it would make "filled"
+    # mean two different things - a supply arrived, and no supply was
+    # ever due - which is the distinction the dashboard exists to show.
     return supply if action in (PROMOTE, REFILE, SUBSTITUTE) else None
 
 
@@ -261,12 +303,13 @@ def periods_standing_on(conn: supply_db.SupplyConnection, dataset_id: str,
     """
     rows = conn.execute(
         f"SELECT DISTINCT to_slot FROM {TABLE} "
-        "WHERE dataset_id = ? AND supply = ? AND action = ? AND to_slot IS NOT NULL",
-        [dataset_id, supply, SUBSTITUTE]).fetchall()
+        "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?) "
+        "AND to_slot IS NOT NULL",
+        [dataset_id, supply, SUBSTITUTE, INHERIT]).fetchall()
     standing = []
     for (slot,) in rows:
         latest = latest_for_slot(conn, dataset_id, slot)
-        if latest and latest[0] == SUBSTITUTE and latest[1] == supply:
+        if latest and latest[0] in STANDS_ON_A_SUPPLY and latest[1] == supply:
             standing.append(slot)
     return tuple(sorted(standing))
 
@@ -325,8 +368,9 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
             raise DecisionRefused(
                 f"{decision.supply!r} cannot be {decision.action}d while "
                 f"{len(standing)} later period(s) stand on it: "
-                f"{', '.join(standing)}. De-substitute each of them first, or "
-                f"point it somewhere else.")
+                f"{', '.join(standing)}. Each of those resolves to this supply "
+                f"- by a substitution somebody decided, or because nothing was "
+                f"owed for it - so clear them first, or point them elsewhere.")
 
 
 def _lock(conn: supply_db.SupplyConnection, decision: Decision) -> None:
@@ -353,7 +397,7 @@ def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
         "from_slot, to_slot, actor, actor_kind, reason, effective_at, stands_on) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         [decision.agency_id, decision.collection_id, decision.dataset_id,
-         decision.action, decision.supply, decision.from_slot, decision.to_slot,
+         decision.action, decision.supply or None, decision.from_slot, decision.to_slot,
          decision.actor.strip(), decision.actor_kind,
          (decision.reason or "").strip() or None, decision.effective_at,
          decision.stands_on]).fetchall()

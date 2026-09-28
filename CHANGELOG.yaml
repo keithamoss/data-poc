@@ -154,6 +154,13 @@ releases:
               page is written.
       - category: New
         items:
+          - headline: A dataset that is not due stops reading as missing
+            components: ["Pipeline & publishing"]
+            description: >
+              An annual dataset now fills each quarter it is not due in with
+              the supply that is still current, so a query for this quarter
+              answers instead of finding nothing. Where there is nothing
+              earlier to stand on, the queue says so.
           - headline: A period nobody supplied can stand on an earlier one
             components: ["Pipeline & publishing"]
             description: >
