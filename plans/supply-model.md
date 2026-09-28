@@ -1581,7 +1581,16 @@ comparisons against the expected-supply sequence.
     scope); and the log **refusing to record a decision with no
     identity** (Thread G).
 
-    **Owns:** `REQ-PIPE-074`, `REQ-PIPE-076`, `REQ-PIPE-078`, `REQ-GHUB-082`
+    **Owns:** `REQ-PIPE-074`, `REQ-PIPE-076`, `REQ-PIPE-078`,
+    `REQ-GHUB-082`, `REQ-QAC-108`
+
+    *Scope grew 2026-09-28 (Keith's own placement)*: `REQ-QAC-108` -
+    the drift and volume reference - lands here rather than in sprint
+    11, because every one of its criteria needs promoted supplies to
+    compare against and sprint 11 is what creates them. Keith's call
+    was to do the whole requirement at that point rather than build
+    Child Protection's missing volume check early against a reference
+    that would then change.
 
     *Scope grew 2026-09-22*: the write path is GitHub Issues, from the
     standing principle that the dashboard is read-only. It extends

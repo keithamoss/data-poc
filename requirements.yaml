@@ -20030,15 +20030,25 @@ requirements:
         which of the two it used.
       - >
         THE SYSTEM SHALL evaluate each arrival against, for every
-        table the arrival did not itself carry, the NEWEST SUPPLY
-        STAGED FOR THAT PERIOD, falling back to the period's promoted
-        state where none is staged - and SHALL NOT restrict a run to
-        the tables of the single arrival that triggered it.
+        table the arrival did not itself carry, THE ONE VERSION OF
+        THAT TABLE STAGED FOR THAT PERIOD where exactly one is
+        staged, falling back to the period's promoted state where
+        none is - and SHALL NOT restrict a run to the tables of the
+        single arrival that triggered it.
       - >
-        THE SYSTEM SHALL resolve several staged versions of one
-        logical table within a period by taking the newest, on the
-        same rule the promoted side already uses, rather than
-        reporting the table ambiguous.
+        THE SYSTEM SHALL hold, never choose between, several staged
+        versions of one logical table within a period, on
+        REQ-PIPE-059's rule and regardless of whether they arrived
+        together or separately.
+      - >
+        THE SYSTEM SHALL apply "newest wins" only to PROMOTED
+        supplies, and SHALL decide which is newest by PROMOTION time
+        rather than by arrival time.
+      - >
+        THE SYSTEM SHALL treat a table held under the rule above as
+        ABSENT for the purposes of criterion 5's fallback, so that a
+        run reading it for context reads the period's promoted state
+        rather than one of the contested versions.
       - >
         THE SYSTEM SHALL amend REQ-PIPE-035 criterion 3 in the same
         change, since "the staged delivery's own tables" names a unit
@@ -20095,7 +20105,13 @@ requirements:
         genuinely not resupplied this period, which is the correct
         comparison in that case.
     dependencies: [REQ-PIPE-035, REQ-PIPE-036]
-    open_questions: []
+    open_questions:
+      - >
+        CRITERIA 5 TO 8 WERE REWRITTEN 2026-09-28 and are NOT covered by
+        the 2026-09-27 signature above, which was given against the
+        newest-wins wording those criteria replace. Keith asked to see
+        the whole requirement again before re-signing. Nothing in the
+        rewritten scope is to be built until he has.
     decisions:
       - >
         BUILT IN STAGES, and this records where it got to on 2026-09-28 so
@@ -20123,9 +20139,70 @@ requirements:
         change rather than ahead of it. Criterion 10's legible red for a
         table nothing has promoted is unbuilt.
       - >
-        A TENSION WITH REQ-PIPE-059 THAT THIS REQUIREMENT DOES NOT
-        ADDRESS, found while building and worth your eyes rather than my
-        guess. Criterion 6 says several staged versions of one logical
+        SETTLED 2026-09-28 (Keith), resolving the tension recorded
+        after this paragraph, and note the ANSWER IS NOT THE ONE THIS
+        REQUIREMENT PROPOSED. Criteria 5 to 8 were rewritten for it.
+        059 wins outright: several staged versions of one logical table
+        within a period are HELD, never resolved by taking the newest,
+        whether the files arrived together or separately. "Newest wins"
+        applies only on the PROMOTED side, and there it is decided by
+        PROMOTION time rather than arrival time.
+
+        THE PRINCIPLE UNDERNEATH IT, settled the same day and recorded
+        in plans/supply-model.md: no arrival-time-based DECISION is made
+        against anything in staging. "Newest by receipt instant" is
+        exactly that, so the rule kills it rather than this requirement
+        conceding it case by case. Arrival time is a fact ABOUT a
+        supply, not a basis for choosing between supplies, and staging
+        is where nothing has been chosen yet.
+
+        CRITERION 5 NEEDED AMENDING TOO, which this requirement's author
+        did not spot until the rewrite: "the NEWEST SUPPLY STAGED FOR
+        THAT PERIOD" was the same forbidden decision stated for context
+        tables. The reconciliation is that "newest" is only a CHOICE
+        where there are several - one staged version is not a choice at
+        all - so criterion 5 now reads the single staged version and
+        defers the contested case to criterion 6. That preserves Keith's
+        2026-09-27 argument intact: the run triggered by a delivery's
+        last file still reads every table staged for the period, so
+        cross-table checks resolve with nothing promoted and the reds
+        stay transient.
+
+        THE FALLBACK QUESTION DISSOLVED rather than being decided. Asked
+        whether a held table falls back to the promoted version or reads
+        as absent, the answer turned out to be already in the code:
+        create_run_views() treats "two or more with no basis to choose"
+        as a kind of ABSENCE, so criterion 5's existing promoted
+        fallback covers it with no new rule. Criterion 8 states it so a
+        reader does not have to infer it. It is honest at both stages
+        without a special case - today nothing is promoted, so a held
+        table falls back to nothing and reads red; once REQ-PIPE-075
+        lands it falls back to the accepted supply.
+
+        THE COST, accepted by Keith the same day: a LEGITIMATE RESUPPLY
+        within a period now holds, because two staged versions is two
+        staged versions. He had already accepted the identical cost on
+        REQ-PIPE-059 ("HOLD EVERY TIME, including the legitimate split
+        extract"), and his own framing here is that a resupply would
+        mostly have been held anyway by REQ-PIPE-075 criterion 4, the
+        slot being already filled by a promoted version. Stated as one
+        rule: the only supply that goes through unattended is a green or
+        amber one into an UNFILLED slot; everything else holds. Note it
+        catches something criterion 4 misses - a resupply into an
+        unfilled slot, where the first supply was red and never
+        promoted, so there is no filled slot to trip that carve-out.
+
+        WHAT IT COSTS TO BUILD is smaller than it reads. The resolution
+        logic does not change at all: one candidate becomes a view, zero
+        is absence, several is ambiguous. Only the SCOPE of the
+        candidate query changes, from candidates_in(arrival=...) to
+        period-scoped. Everything downstream already behaves correctly
+        once it is asked the right question.
+
+        SUPERSEDED BELOW, kept for its reasoning rather than its
+        conclusion - A TENSION WITH REQ-PIPE-059 THAT THIS REQUIREMENT
+        DOES NOT ADDRESS, found while building and worth your eyes
+        rather than my guess. Criterion 6 says several staged versions of one logical
         table within a period resolve to the NEWEST rather than being
         reported ambiguous. REQ-PIPE-059 holds a supply when two files in
         one arrival both claim one dataset, and refuses to choose between
@@ -20852,10 +20929,10 @@ requirements:
       recent (plans/running-thoughts.md #57).
     story: >
       As the person accountable for what reaches the warehouse, I want a
-      supply that is wildly unlike the previous period's ACCEPTED supply
-      to be flagged loudly, so that a plausible-looking wrong file - a
-      test extract, a truncated export - cannot pass quietly into a slot
-      nobody was watching.
+      supply that is wildly unlike the last one we PROMOTED to be flagged
+      loudly, so that a plausible-looking wrong file - a test extract, a
+      truncated export - cannot pass quietly into a slot nobody was
+      watching.
     acceptance_criteria:
       - >
         THE SYSTEM SHALL apply a relative volume check to Child
@@ -20863,7 +20940,8 @@ requirements:
         both collections judge volume the same way.
       - >
         THE SYSTEM SHALL take the reference for every drift and volume
-        check from the PREVIOUS PERIOD'S PROMOTED SUPPLY.
+        check from the MOST RECENT EARLIER PERIOD IN WHICH A SUPPLY FOR
+        THAT DATASET WAS PROMOTED, however many periods ago that was.
       - >
         THE SYSTEM SHALL NOT take that reference from a supply in the
         CURRENT period, so that a resupply is never measured against the
@@ -20872,9 +20950,9 @@ requirements:
         THE SYSTEM SHALL NOT take that reference from an arrival that
         was never promoted, nor from a fixed run chosen once.
       - >
-        WHERE no previous period has a promoted supply, THE SYSTEM SHALL
-        report the check as having no reference, and SHALL NOT report it
-        as passing.
+        WHERE no earlier period has a promoted supply for that dataset,
+        THE SYSTEM SHALL report the check as having no reference, and
+        SHALL NOT report it as passing.
       - >
         THE SYSTEM SHALL let both the drift and volume checks reach a
         RED verdict, so that a supply failing either is ineligible for
@@ -20892,12 +20970,29 @@ requirements:
     dependencies: [REQ-PIPE-075, REQ-PIPE-079]
     decisions:
       - >
-        THE REFERENCE IS THE PREVIOUS PERIOD'S PROMOTED SUPPLY (Keith,
-        2026-09-28), and his own correction is the part worth keeping. A
-        plain "previous promoted supply" reads as including one in the
-        CURRENT period, so a resupply would be measured against the
-        supply it is correcting - which measures our own churn rather
-        than drift.
+        THE REFERENCE IS THE LAST PERIOD THAT ACTUALLY PROMOTED ONE
+        (Keith, 2026-09-28), arrived at in two corrections of his. The
+        first: a plain "previous promoted supply" reads as including one
+        in the CURRENT period, so a resupply would be measured against
+        the supply it is correcting - which measures our own churn
+        rather than drift. The second: "the previous PERIOD's" is wrong
+        for a dataset that arrives once a year onto the quarterly
+        calendar, because three of its four periods promote nothing, so
+        the check would report no reference nearly every time. It has to
+        be the most recent EARLIER period that actually promoted a
+        supply, however far back that is - his own words, "comparing to
+        the last time it actually physically arrived and was promoted".
+      - >
+        CARRY-FORWARD VIEWS DO NOT EXIST, which is worth recording
+        because Keith's question assumed they might. He asked that the
+        reference not be "the views we create" for a period a dataset
+        was not due in. There are none: period_schema.py's own docstring
+        records that Thread J killed cross-period composition, and
+        red-for-unrun replaced it - a cross-table check runs only where
+        every participating table has a filled slot for that period, so
+        nothing is ever carried forward into a period it did not arrive
+        in. His instinct found a real defect; the mechanism behind it is
+        just a different one, and the fix is the same either way.
       - >
         REJECTED the previous ARRIVAL, which is what Birth
         Registrations' row-drop check uses today via _previous_run_id().
