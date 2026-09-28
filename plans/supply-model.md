@@ -47,6 +47,37 @@ every other plans file.
 
 ## Next steps
 
+**Priority: REQ-PIPE-093 is queued, Keith 2026-09-28 evening, his own
+words: "let's not forget PIPE-093 either. We'll tackle it next or after
+the scoper comes back."** It is `not_started`, UNSIGNED, and has FIVE
+open questions - so the sign-off gate applies and at least three of the
+five would change what gets built.
+
+What it needs before it can be signed, in the order they can be dealt
+with:
+- **Two of the questions are RESEARCH, not decisions**, and are
+  answerable without Keith: Aurora 16.8's own extension allowlist, and
+  how long Aurora keeps major version 16 available - the counter-
+  argument for targeting 17.7 instead. `docs.aws.amazon.com` is
+  reachable, so these are unread rather than unreachable, and they were
+  moved here from REQ-PIPE-087 on 2026-09-27 because this requirement
+  is the one that declares the version.
+- **Three are genuinely Keith's**: how an environment is STATED (a
+  mandatory flag, a mandatory environment variable, or both with the
+  flag winning); what production's extra friction actually is (typing
+  the name back, a separate explicit flag, or a per-environment setting
+  saying which need confirming); and whether the decision log carries
+  the environment on each entry.
+- **Where the declared PostgreSQL version lives** - `contract/
+  data-asset.yaml`, a committed file of its own, or alongside
+  `.python-version`, which is the precedent it borrows from.
+
+Note before anyone plans the build: part of this requirement is ALREADY
+BUILT under REQ-PIPE-092's follow-on work - see this requirement's own
+first open question, which records exactly which criteria and why it
+still reads `not_started`. REQ-TEST-114 (the terminal saying which
+environment it is acting against) depends on it and is also unsigned.
+
 **Priority: work through in THIS ORDER (Keith, 2026-09-21 night, his own
 words setting the queue): "let's work through the still open items that
 you've got logged... and then we'll do one last stress test using chaos
