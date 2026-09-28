@@ -47,6 +47,75 @@ every other plans file.
 
 ## Next steps
 
+**Priority: THE OVERNIGHT BUILD PLAN, 2026-09-28 (Keith's own ask -
+build the signed-and-unbuilt backlog unattended while he sleeps).**
+Written down before starting so it survives the container. Four
+questions were put to him and answered before any code was written;
+his answers are the standing authority for the run.
+
+**What is signed and unbuilt: 16 requirements, 225 acceptance
+criteria.** Twelve signed on the 27th/28th, plus FOUR signed on the
+26th that everything else rests on - `REQ-PIPE-074`, `075`, `076`,
+`079`. `REQ-DASH-056` has been `not_started` since the 27th for exactly
+this reason; its own note says nothing records promotion state yet.
+This is more than one night. The sprints are ordered so that stopping
+anywhere leaves a coherent result.
+
+**Keith's four answers, 2026-09-28:**
+1. **`REQ-PIPE-074` is BUILT BY `REQ-PIPE-091`**, with criteria 11 and
+   14 recorded as SUPERSEDED by the configuration-not-state rule (they
+   say commit the log to the repository). No new code; a register
+   reconciliation with the reasoning in `decisions:`.
+2. **The `083` -> `098` -> `084` -> `083` cycle breaks at `084`.**
+   Build substitution first, then inheritance, then the ticket
+   reconciler - because `083`'s dependency on `098` is only "have a
+   state to report", satisfied once both dispositions exist.
+3. **Amend a built requirement when a signed one says to**, recording
+   the amendment in BOTH requirements' `decisions:` and naming it in
+   the commit message. This is what `REQ-PIPE-105` criteria 9 and 10
+   require of `REQ-PIPE-035`/`036`, and it follows the `REQ-PIPE-050`
+   precedent set the same evening.
+4. **On an unforeseen design fork: SKIP that requirement and carry on.**
+   Write up the fork with its options, move to the next requirement.
+   Nothing gets built on a guess.
+
+**The sprints, in dependency order:**
+
+- **Sprint 0 - unblocked now** (~20 criteria). `REQ-DASH-094` (the page
+  says which environment built it) and `REQ-PIPE-105` (every arriving
+  file its own arrival; already `in_progress`, and the one needing
+  answer 3). `REQ-DASH-094` names `REQ-PIPE-093` as a dependency, which
+  is unsigned - but the mechanism it actually needs (the build
+  recording its environment) shipped with `REQ-PIPE-092`, so it is
+  buildable.
+- **Sprint A - the spine** (45). `REQ-PIPE-075` promotion, `076`
+  rejection and un-decide, `079` QA against the filed period. Plus the
+  `074` reconciliation from answer 1. Everything below needs this.
+- **Sprint B - dispositions** (42). `REQ-PIPE-084` substitution, `098`
+  inheritance, `REQ-QAC-108` drift and volume reference. Order fixed by
+  answer 2.
+- **Sprint C - tickets** (28). `REQ-PIPE-083` reconciler, `REQ-GHUB-109`
+  post-on-change. Note `109` amends `REQ-GHUB-027`'s built behaviour,
+  which answer 3 authorises.
+- **Sprint D - operator routes and dashboard** (76). `REQ-GHUB-082`,
+  `REQ-PIPE-099`, `REQ-DASH-085`, `100`, `056`. Largest and last;
+  unlikely to be reached in one night.
+
+**Realistic expectation, stated in advance rather than reported at
+6am:** Sprint 0 and A should land solidly, B is plausible, C and D
+probably not.
+
+**Standing rules for the run**, all of them this project's existing
+ones rather than new: a real failing test first for every defect;
+`mothman check` before each commit and never a commit after an edit
+that postdates its gate; never a test skipped, disabled or quarantined
+to reach green; every number in a commit message from a run that
+happened after the last change; and requirements get `linked_tests`,
+`implemented_by`, `evidence` and `decisions` when they flip to `built`.
+A `CHANGELOG.yaml` entry for anything release-note-worthy, and the
+superseded `plans/*.md` prose deleted in the commit that flips a
+requirement to `built`.
+
 **Priority: REQ-PIPE-093 is queued, Keith 2026-09-28 evening, his own
 words: "let's not forget PIPE-093 either. We'll tackle it next or after
 the scoper comes back."** It is `not_started`, UNSIGNED, and has FIVE
