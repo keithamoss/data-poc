@@ -885,3 +885,55 @@ building starts, and the entry comes out when it lands.
    - **Two uncontroversial map fixes from the sweep, applied:** overdue
      moves from group 3 to the calendar (group 2), and datasets that
      never get a calendar move to group 1.
+
+   **Style round 2 (2026-09-29):**
+   - **Oxford comma: always** ("red, amber, and green"). This is a
+     deliberate departure from the Style Manual, which uses it only
+     for clarity. It is one of Keith's own preferences layered on top.
+   - **Banned outright, all four kinds:**
+     - "AI voice" words: delve, tapestry, crucial, leverage, seamless,
+       robust, landscape, "it's worth noting", and so on.
+     - Condescension: just, simply, obviously, easy, of course.
+     - Corporate filler: utilise, facilitate, going forward, synergy,
+       empower.
+     - Rhetorical tics: "it's not X, it's Y", "here's the thing",
+       rule-of-three padding, and ending a section on a punchy
+       one-liner.
+   - **Sentences: aim for about 15-20 words, capped at 25.** The critic
+     flags anything over the cap.
+   - **Dates follow the Style Manual's default** ("29 September 2026"),
+     even though the dashboard has its own single date format
+     (REQ-DASH-071). Keith chose this over matching the dashboard, so
+     an explainer and the dashboard may show a date differently.
+
+   **Style round 3 (2026-09-29):**
+   - **New terms:** the first use on a page is in bold, with a plain
+     one-clause definition in the same sentence and a link to the
+     glossary entry. Later uses are plain text.
+   - **Identifiers only in a sources section.** The body stays clean
+     for managers: no requirement ids, file names or code identifiers
+     mid-sentence. Every page ends with a "where this comes from" list,
+     for engineers and for the fact-checker.
+   - **Prose first; lists only for real sets** (for example, the seven
+     filing decisions). This is Diátaxis's discursive voice.
+   - **Bold is reserved for a new term's first appearance**, so bold
+     always means "this is a defined word".
+
+   **Style round 4 (2026-09-29):**
+   - **Sounds like a colleague at a whiteboard**: a senior engineer who
+     built this, explaining it to a smart new hire over coffee.
+     Relaxed, precise, and happy to admit where it is fiddly.
+   - **Status names in lowercase, plain**: "the dataset turns red", "an
+     amber supply". The colour pills on the page carry the visual.
+   - **Numbers:** numerals from 2 upward and words for zero and one,
+     which is believed to be the current Style Manual's rule. **This is
+     unverified**, because `www.stylemanual.gov.au` is blocked; check
+     it before the house standard is finalised.
+   - **Exemplars:**
+     - **Model:** `CHANGELOG.yaml`'s reader voice (the "What's New"
+       entries, REQ-DOCS-028).
+     - **Anti-model:** the dense, caveat-heavy internal prose of
+       `plans/` and `CLAUDE.md` is marked as the thing NOT to sound
+       like.
+     - **Still to come:** Keith will name external examples himself.
+     - NOT picked as a model: the check explanations from REQ-QAC-024.
