@@ -20983,16 +20983,35 @@ requirements:
         supply, however far back that is - his own words, "comparing to
         the last time it actually physically arrived and was promoted".
       - >
-        CARRY-FORWARD VIEWS DO NOT EXIST, which is worth recording
-        because Keith's question assumed they might. He asked that the
-        reference not be "the views we create" for a period a dataset
-        was not due in. There are none: period_schema.py's own docstring
-        records that Thread J killed cross-period composition, and
-        red-for-unrun replaced it - a cross-table check runs only where
-        every participating table has a filled slot for that period, so
-        nothing is ever carried forward into a period it did not arrive
-        in. His instinct found a real defect; the mechanism behind it is
-        just a different one, and the fix is the same either way.
+        A PERIOD WHOSE TABLE IS A VIEW ONTO AN EARLIER SUPPLY IS NOT A
+        REFERENCE (criterion 6), and this is the case Keith raised
+        directly. TWO scoped mechanisms produce one: sprint 28's
+        INHERITED view (REQ-PIPE-098/099/100), created when a period
+        schema is born for a dataset the schedule says owes nothing
+        that period - which is precisely the annual dataset on the
+        quarterly calendar; and sprint 25's CARRY-FORWARD
+        (REQ-PIPE-083/084/085), where a supply never arrives and a
+        human points the period at the previous one. Keith's own
+        candidate names for the second are backfill and patch, and the
+        naming is still open.
+      - >
+        THE TRAP IS SPECIFICALLY THAT A CARRIED-FORWARD SLOT COUNTS AS
+        FILLED (sprint 25, Keith 2026-09-24, settled directly). So an
+        implementation reaching for "the most recent period with a
+        filled slot" picks exactly the period this requirement must
+        skip, and the check then compares a supply against itself and
+        reports no drift for ever. Criteria 2 and 6 say PROMOTED and
+        say it twice for that reason.
+      - >
+        A CORRECTION RECORDED RATHER THAN QUIETLY FIXED, because the
+        wrong version was committed first. This session told Keith no
+        such views existed, citing period_schema.py's account of Thread
+        J killing cross-period composition. That conflates two
+        different things: a QA RUN does not compose tables across
+        periods, which is true and is what Thread J settled, and a
+        PERIOD SCHEMA never holds a view onto an earlier supply, which
+        is false and is sprints 25 and 28. He remembered the design
+        correctly and the register did not.
       - >
         REJECTED the previous ARRIVAL, which is what Birth
         Registrations' row-drop check uses today via _previous_run_id().
