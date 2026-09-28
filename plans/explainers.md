@@ -118,8 +118,39 @@ building starts, and the entry comes out when it lands.
    domains were flagged for allow-listing rather than routed around;
    the list is in `CLAUDE.md`'s blocked-domains bullet.
 
-   Still open: the research findings, then turning them into agent
-   designs to scope with Keith before anything is built.
+   **Research done (2026-09-28)**, written up in full in
+   `docs/explainer-agents-research.md`: existing agents pulled apart,
+   Diátaxis's explanation type, Mermaid's hand-drawn look, the style
+   references, and prompt-injection mitigations. The most useful single
+   find: Anthropic's own `doc-coauthoring` skill already has a
+   fresh-context "reader test" that is almost exactly the critic we
+   described. It gives a subagent ONLY the page, with no repo and no
+   `CLAUDE.md` (`omitClaudeMd: true`), plus the questions a real reader
+   would ask.
+
+   **Fourth round, Keith's calls on the research (same day):**
+   - **Hand-drawn only where it fits**, and only on the four diagram
+     types Mermaid actually supports it for: flowchart, state, class
+     and ER. Anything else (timelines, sequence) renders in the plain
+     look. The research flagged a real tension here: the first topic,
+     delivery calendars and claim windows, is naturally a timeline,
+     which has no hand-drawn support. Not resolved yet - it is a
+     per-diagram call for the illustrator when that topic is scoped.
+   - **Vendor `@mermaid-js/tiny`** (12.0.0: 2.9 MB raw, ~0.78 MB
+     gzipped, keeps hand-drawn, drops mindmap/architecture/maths),
+     loaded only when an explainer is opened, like the Demo tab's
+     player.
+   - **GitHub rendering: test it empirically.**
+     `docs/mermaid-render-test.md` (temporary) shows GitHub's Mermaid
+     version and the same flowchart hand-drawn and plain side by side.
+     Record the answer here, then delete that file. Either way,
+     diagrams must make sense in the plain look, because the dashboard
+     is the only place the version is pinned.
+   - **Commit a trimmed version of the research**:
+     `docs/explainer-agents-research.md`.
+
+   Still open: the GitHub render result, then turning the research
+   into agent designs to scope with Keith before anything is built.
 
 2. **[todo, 2026-09-28]** **[Docs & process]** Separate technical
    pipeline documentation, as its own track apart from the concept
