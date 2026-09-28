@@ -140,17 +140,24 @@ building starts, and the entry comes out when it lands.
      gzipped, keeps hand-drawn, drops mindmap/architecture/maths),
      loaded only when an explainer is opened, like the Demo tab's
      player.
-   - **GitHub rendering: test it empirically.**
-     `docs/mermaid-render-test.md` (temporary) shows GitHub's Mermaid
-     version and the same flowchart hand-drawn and plain side by side.
-     Record the answer here, then delete that file. Either way,
-     diagrams must make sense in the plain look, because the dashboard
-     is the only place the version is pinned.
+   - **GitHub rendering: tested empirically, and it works.** Keith
+     viewed a temporary test page on GitHub (2026-09-28, since
+     deleted): GitHub renders with **Mermaid 11.17.2**, a hand-drawn
+     flowchart looked visibly different from the same flowchart in the
+     plain look, and a hand-drawn state diagram rendered hand-drawn.
+     11.17.2 is past every version the four chosen types need (class
+     11.4, ER 11.5), so the markdown copy of an explainer on GitHub and
+     the dashboard copy can both show the sketch look. Two things still
+     hold. We vendor 12.x and GitHub renders 11.x, and v12 changed
+     several defaults, so every diagram states `look` and `theme`
+     explicitly rather than relying on either version's default. And
+     diagrams must still make sense in the plain look, because GitHub
+     picks its own version and could change it.
    - **Commit a trimmed version of the research**:
      `docs/explainer-agents-research.md`.
 
-   Still open: the GitHub render result, then turning the research
-   into agent designs to scope with Keith before anything is built.
+   Still open: turning the research into agent designs to scope with
+   Keith before anything is built.
 
 2. **[todo, 2026-09-28]** **[Docs & process]** Separate technical
    pipeline documentation, as its own track apart from the concept

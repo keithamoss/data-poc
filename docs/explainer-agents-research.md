@@ -144,12 +144,16 @@ flowchart LR
 and only on flowchart, state, class and ER diagrams. We vendor the tiny
 build.
 
-**GitHub's own rendering is unknown.** Its docs confirm fenced `mermaid`
-blocks render but give no version and say nothing about `look`. The only
-authoritative test is to view a block containing just `info` on GitHub,
-which is what `docs/mermaid-render-test.md` is for. Whatever it shows,
-**diagrams must still make sense in the plain look.** The dashboard,
-where we pin the version, is the only place the sketch is guaranteed.
+**GitHub renders the hand-drawn look (tested 2026-09-28).** Its docs
+confirm fenced `mermaid` blocks render but give no version and say
+nothing about `look`, so it was tested directly. A temporary page viewed
+on GitHub, with an `info` block, showed **Mermaid 11.17.2**. The same
+flowchart rendered visibly differently in hand-drawn and plain, and a
+hand-drawn state diagram rendered hand-drawn. Two things follow:
+- GitHub is on 11.x while we vendor 12.x, so always state `look` and
+  `theme` explicitly rather than relying on either version's defaults.
+- **Diagrams must still make sense in the plain look**, because GitHub
+  chooses its own version and could change it.
 
 ## 4. Style references
 
