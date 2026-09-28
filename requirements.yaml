@@ -15337,6 +15337,9 @@ requirements:
       default.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-28"
     source: >
       plans/supply-model.md delivery sprint 25, Keith 2026-09-24: "a
       data set's been red and no data supplied all throughout the
@@ -18853,6 +18856,10 @@ requirements:
       - >
         THE SYSTEM SHALL NOT change what any other period resolves to
         when creating these views.
+      - >
+        THE SYSTEM SHALL point an inherited view only at a physical
+        PROMOTED table, and SHALL NEVER point it at a period that is
+        itself inherited or substituted.
     non_functional_requirements:
       - >
         CORRECTNESS DEPENDS ON THE RECORDED-BIRTH EVENT, and today
@@ -18906,6 +18913,16 @@ requirements:
     dependencies: [REQ-PIPE-087, REQ-PIPE-084, REQ-PIPE-049]
     open_questions: []
     decisions:
+      - >
+        AN INHERITED VIEW NEVER STANDS ON A STAND-IN EITHER (Keith,
+        2026-09-28, asking for the same criterion REQ-PIPE-084 gained
+        so chains cannot form here either). Criterion 1's "most recent
+        PROMOTED supply" already implies it, and implication is what
+        this pair of requirements has twice now been caught relying on:
+        REQ-PIPE-084 decision 10 said chains never form "by
+        construction" and nothing made the system hold it. Both
+        dispositions now state it as a rule rather than leave it as a
+        property somebody has to know.
       - >
         THE OPEN QUESTION IS CLOSED, AND THE ANSWER IS NEITHER OPTION
         THAT WAS DRAFTED (Keith, 2026-09-28). It asked whether an
