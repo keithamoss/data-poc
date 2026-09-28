@@ -4385,3 +4385,38 @@ Belongs with batch 5's check work.
     Sits directly on top of REQ-PIPE-103, which is built and which
     meets its own criteria - this is the fact those criteria did not
     ask about.
+
+57. **[investigate, 2026-09-28]** **[QA checks & contract]** The drift
+    reference is the FIRST arrival ever, not the previous period - so
+    the check measures distance from the beginning of history rather
+    than change.
+
+    Found while answering Keith's challenge on whether a relative
+    volume check would be safer than the absolute band we have
+    (`row_count` on `cp_clients`: warn < 300, fail < 100 or > 2000).
+    Not part of that answer - a separate observation about the check
+    itself, logged here rather than folded into a promotion argument
+    it does not belong to.
+
+    Both orchestrators pass `manifest[0]` as the Evidently reference -
+    the first arrival in the recognised history - and deliberately
+    NOT `run_evidently_cp.REFERENCE_RUN_ID`, the hardcoded literal
+    that went stale every time the anchor date rolled forward. That
+    fix was right for the bug it fixed. What it did not ask is
+    whether the first arrival is the right reference at all.
+
+    Over a PoC's twenty-odd runs it is fine. Over years it is a fixed
+    anchor receding into the past, so a slowly-changing population
+    drifts from it permanently: the check either sits red for ever,
+    or its threshold gets widened until it says nothing. Neither is a
+    drift check. And the thing it cannot see is the one drift
+    actually exists to catch - a supply unlike the one BEFORE it,
+    where the population has moved gradually and legitimately for
+    three years.
+
+    Worth scoping alongside `REQ-PIPE-079` (QA runs against the
+    period a supply is filed to), which is what makes
+    previous-period comparison possible at all. Not urgent, and
+    explicitly NOT a promotion-safety measure - see the reasoning in
+    this item's own opening paragraph for why I stopped claiming it
+    was one.
