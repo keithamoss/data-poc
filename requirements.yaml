@@ -18805,9 +18805,10 @@ requirements:
     acceptance_criteria:
       - >
         WHEN a period's schema is first created, THE SYSTEM SHALL
-        create, for each dataset the schedule says does not
-        participate in that period, a view resolving that dataset's
-        logical name to its most recent promoted supply.
+        INHERIT, for each dataset the schedule says does not
+        participate in that period, that dataset's most recent
+        promoted supply - creating in the new period's schema a view
+        that resolves the dataset's logical name to it.
       - >
         THE SYSTEM SHALL create such a view only at that moment, and
         SHALL NOT create one later by any automatic rule.
@@ -18913,6 +18914,15 @@ requirements:
     dependencies: [REQ-PIPE-087, REQ-PIPE-084, REQ-PIPE-049]
     open_questions: []
     decisions:
+      - >
+        CRITERION 1 NOW NAMES THE ACT (Keith, 2026-09-28, after this
+        requirement was signed). It defined the mechanism - create a
+        view resolving a logical name - without ever saying INHERIT,
+        while criteria 8 and 10 both speak of "inheritance" as though
+        the term had been introduced. A reader meeting criterion 1
+        first had to infer that this was the thing the rest of the
+        requirement, REQ-PIPE-099 and REQ-DASH-100 all call by name.
+        The rule is unchanged; only the wording is.
       - >
         AN INHERITED VIEW NEVER STANDS ON A STAND-IN EITHER (Keith,
         2026-09-28, asking for the same criterion REQ-PIPE-084 gained
