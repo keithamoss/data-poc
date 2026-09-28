@@ -202,19 +202,23 @@ requirement to `built`.
 
 **WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
 fresh session can pick up from a file rather than from the commit log.**
-Last updated 03:40 Perth, 41 commits in.
+Last updated 04:20 Perth, 43 commits in.
 
 **BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
 `REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
 into both orchestrators), **`REQ-PIPE-076`** (rejection; its deferral
 cleared), **`REQ-PIPE-084`** (substitution), **`REQ-PIPE-098`**
-(inheritance), **`REQ-DASH-056`** (arrived versus promoted).
+(inheritance), **`REQ-DASH-056`** (arrived versus promoted),
+**`REQ-DASH-085`** and **`REQ-DASH-100`** (the qualifier AND the
+drill-through - a period showing an earlier one's data says whose
+results are on the page, drills through to the period that earned them,
+frames the arrival, and carries that framing in the URL for exactly one
+page).
 
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
 `REQ-PIPE-079` (decision layer done, wiring not), `REQ-PIPE-105`
 (criteria 7 and 8 done), `REQ-QAC-108` (the reference rule and the
-supply-to-run mapping done, the wiring not), `REQ-DASH-085` and
-`REQ-DASH-100` (the qualifier done, the drill-through not),
+supply-to-run mapping done, the wiring not),
 `REQ-PIPE-083` (everything but criteria 14 and 15, the OPERATOR ROUTES -
 the slot state, the reconciler, a real GitHub ticket service fenced by
 its own label, and both orchestrators calling it after promotion. `gh`

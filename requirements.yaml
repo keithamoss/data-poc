@@ -16747,7 +16747,7 @@ requirements:
       status, so that I cannot look at it and think this quarter's data
       arrived and was fine.
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: "2026-09-28"
@@ -16838,6 +16838,25 @@ requirements:
         toolchains, per this project's standing rule for anything
         touching the template.
     dependencies: [REQ-PIPE-084, REQ-DASH-041, REQ-DASH-070]
+    implemented_by:
+      - dashboard/qa-reporting-dashboard.template.html
+    linked_tests:
+      - tests-js/standing-in.test.js
+      - tests-js/standing-in-drill.test.js
+      - tests/test_dashboard_e2e.py::TestAPeriodStandingInOnAnEarlierOne
+      - tests/test_dashboard_e2e.py::TestDrillingThroughToThePeriodThatEarnedTheResults
+    evidence:
+      - >
+        2026-09-29. Vitest, 21 tests in tests-js/standing-in-drill.test.js
+        plus the 16 already in standing-in.test.js; Playwright, 18 tests
+        across the two real-browser classes, run together against the real
+        built page. The drill-through is driven end to end in a real
+        Chromium: the detail block's own button moves the as-of date to
+        2026-05-01 and writes `from=2026-Q3`, the banner says "You have
+        left 2026-Q3", the way back restores 2026-08-01 and removes
+        `from`, and a breadcrumb click afterwards leaves `asof` in place
+        and takes `from` with it. Zero console errors through the whole
+        sequence.
     decisions:
       - >
         THE QUALIFIER IS BUILT; THE DRILL-THROUGH IS NOT, and this
@@ -16998,6 +17017,50 @@ requirements:
         row shape, and the row must say which run the verdict came from
         - the results are real, they were simply earned in another
         period.
+      - >
+        THE DRILL-THROUGH IS BUILT, 2026-09-29, and criteria 9, 10 and
+        11 close with it. The shape, because the obvious reading of
+        "drill into the check results" is the wrong one here: this page
+        has no per-period route to navigate TO. A period is chosen by
+        the as-of date, so drilling to the period that earned the
+        results IS an as-of move, and the whole feature is
+        `drillToPeriod(date, fromPeriod)` - the existing `applyAsOf()`
+        with one extra argument, which it now calls with null.
+        `periodDateFor()` is the inverse of the page's own
+        `periodNameFor()`, reading the same embedded calendar sequence
+        rather than doing date arithmetic in the browser.
+      - >
+        REJECTED - a pushState for the drill. Browser back would then
+        change the URL's `asof` without changing CURRENT_AS_OF, because
+        the as-of date has deliberately never been part of STATE (see
+        asOfFromUrl()'s own comment: it is a filter over the whole page,
+        not a navigable state somebody steps back through one change at
+        a time). So the drill replaces, and the way back is the banner's
+        own button - which criterion 10 asks for by name anyway.
+      - >
+        REJECTED - rendering the framing only when a matching
+        standing-in record is present. That would drop it on exactly the
+        shared and refreshed links criterion 11 exists to protect, since
+        the record depends on the as-of date the link carries. A
+        hand-edited `?from=` is honoured instead: it claims only that
+        the reader arrived from that period, and the worst case is a way
+        back to a period they were never on, which costs one click.
+      - >
+        THE SENTENCE IS NOT THE LINK. Criterion 9's "SHALL NOT present a
+        substituted period's check results as belonging to the period
+        being viewed" is not satisfied by offering a drill - a reader
+        who never clicks still reads the checks as this period's. So the
+        page says whose results they are in words, and offers the drill
+        second.
+      - >
+        FOUND WHILE BUILDING: renderDataset() has a second branch that
+        replaces the page when a dataset has nothing as of the chosen
+        date, and it is a LIKELY destination of a backwards drill rather
+        than an edge case. Without the banner there a reader lands on an
+        empty page with no way back to where they were. Both branches
+        now render it and share one `wireArrivalContext()`, because two
+        copies of a listener is how one of them stops being added.
+
   - id: REQ-PIPE-086
     title: The terminal runs the whole supply lifecycle, using the automated path's own logic
     date_written: "2026-09-26"
@@ -20664,7 +20727,7 @@ requirements:
       it is standing on, so that I neither read it as this quarter's
       data arriving fine nor as something missing.
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: "2026-09-28"
@@ -20748,6 +20811,22 @@ requirements:
         of its own.
     dependencies: [REQ-PIPE-098, REQ-DASH-085]
     open_questions: []
+    implemented_by:
+      - dashboard/qa-reporting-dashboard.template.html
+    linked_tests:
+      - tests-js/standing-in.test.js
+      - tests-js/standing-in-drill.test.js
+      - tests/test_dashboard_e2e.py::TestAPeriodStandingInOnAnEarlierOne
+      - tests/test_dashboard_e2e.py::TestDrillingThroughToThePeriodThatEarnedTheResults
+    evidence:
+      - >
+        2026-09-29. The same machinery and the same two suites as
+        REQ-DASH-085 - one piece of navigation serves both, which is why
+        they were built together. The inherited half is covered by its own
+        Vitest cases (the drill from an inherited period resolves
+        2026-Q1's own date, and the banner names "an inherited period"
+        rather than "a substitution"), and by the real-browser class's
+        INHERITED parametrisation.
     decisions:
       - >
         BUILT ALONGSIDE REQ-DASH-085 AND SHARING ITS MACHINERY, on
@@ -20871,6 +20950,20 @@ requirements:
         Separated from REQ-PIPE-098 on the same grounds REQ-DASH-085
         was separated from REQ-PIPE-084: the database change and the
         labelling have different owners, tests and toolchains.
+      - >
+        THE DRILL-THROUGH IS BUILT, 2026-09-29, closing criteria 8, 9
+        and 10. It is REQ-DASH-085's, unchanged: one piece of navigation
+        serves both qualifiers, and the only thing that differs is the
+        word the banner uses for what was followed. Building two would
+        have been two places for the URL contract to drift.
+      - >
+        THE COMMON CASE STILL HAS TO BE QUIET (this requirement's own
+        first non-functional constraint). The drill adds one sentence
+        and one link inside the detail block that a standing-in period
+        already renders - nothing new appears on a period holding its
+        own supply, and nothing at all appears for a reader who
+        navigated directly.
+
   - id: REQ-DOCS-101
     title: "Every requirement and document still saying the dashboard is built from committed files is brought into line, once"
     date_written: "2026-09-26"

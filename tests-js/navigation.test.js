@@ -268,6 +268,32 @@ describe("a URL pointing at a column or check that no longer exists", () => {
     expect(w.hashToState().checkKey).toBeUndefined();
   });
 
+  // FOUND 2026-09-29, while building REQ-DASH-085's drill-through and
+  // looking at every place this page writes a URL. The repair built the
+  // new address as `stateToHash(STATE) + location.search`, which puts
+  // the query string INSIDE the hash - so a reader whose stale link
+  // also carried an as-of date got
+  // `#/.../dataset/birth-registrations?asof=2026-05-01`, and the repair
+  // that was supposed to make the link shareable made it unresolvable:
+  // on the next load the dataset id parses as
+  // `birth-registrations?asof=2026-05-01` and nothing is found.
+  //
+  // Reproduced before fixing, which is how the duplication showed up at
+  // all - `location.search` is empty in every other test here, so the
+  // concatenation looked harmless.
+  it("repairs the URL without folding the query string into the hash", () => {
+    dashboard = loadDashboard({
+      hierarchy: MINIMAL_HIERARCHY,
+      url: "http://localhost/?asof=2026-05-01",
+    });
+    const w = dashboard.window;
+    w.location.hash = w.stateToHash({ ...DATASET, columnName: "a_column_that_was_dropped" });
+    w.dispatchEvent(new w.PopStateEvent("popstate", { state: null }));
+    expect(w.location.hash).not.toContain("?");
+    expect(new w.URLSearchParams(w.location.search).get("asof")).toBe("2026-05-01");
+    expect(w.hashToState()).toEqual(DATASET);
+  });
+
   // THE MUST-NOT-CHANGE HALF LIVES IN THE PLAYWRIGHT SUITE, not here,
   // and deliberately: this harness carries only a hierarchy, so its
   // datasets have zero columns and EVERY column name is stale in it.

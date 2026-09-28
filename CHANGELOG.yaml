@@ -146,6 +146,12 @@ releases:
               so, names the range it covers and offers one click back.
       - category: Fixed
         items:
+          - headline: A repaired link no longer breaks itself
+            components: ["Dashboard UI"]
+            description: >
+              Opening an old link to a column that no longer exists tidies the
+              address so you can share it again. With a date set, that tidy-up
+              used to leave a link nobody could open. It does not now.
           - headline: Daily periods are named in words again
             components: ["Dashboard UI"]
             description: >
@@ -168,6 +174,13 @@ releases:
               supply has got to, and silent when nothing has changed. By
               default only supplies that want somebody get one; set
               ticket_policy to all for every one.
+          - headline: Whose results are these, and a way back
+            components: ["Dashboard UI"]
+            description: >
+              A period showing an earlier one's data now says the checks on
+              the page belong to that earlier period, and offers one click
+              through to it. You are told you have left, and given a way
+              back, on a link that survives being shared.
           - headline: A period standing in on an earlier one says so
             components: ["Dashboard UI"]
             description: >

@@ -3811,3 +3811,34 @@ twice. It deliberately did not re-find the `TypeError`.
     nothing about the code that tells them apart. Mint them differently
     in the fixture, even when it costs a line - the cost is one line
     and the saving is the first real user finding it.
+
+65. **[done, 2026-09-29]** **[Dashboard UI]** **Repairing a stale link
+    broke it, whenever an as-of date was set.**
+    Found while building REQ-DASH-085's drill-through, by reading every
+    place this page writes a URL rather than by a critic.
+
+    `forgetStaleSegment()` is the repair for a URL naming a column or a
+    check the dataset no longer has (#11): it renders the dataset page,
+    drops the dead segment from STATE, rewrites the address and puts a
+    notice above the page. It built the new address as
+    `stateToHash(STATE) + location.search`.
+
+    That concatenation puts the query string INSIDE the hash. With an
+    as-of date set, the repaired URL reads
+    `#/.../dataset/birth-registrations?asof=2026-05-01`, so on the next
+    load `pathToState()` takes the dataset id to be
+    `birth-registrations?asof=2026-05-01`, finds nothing, and renders
+    not-found. The repair whose whole purpose was to stop a broken
+    segment being re-shared produced a URL that was broken outright.
+
+    **WHY NOTHING CAUGHT IT.** `location.search` is empty in every
+    existing test of this path, and empty concatenates harmlessly. The
+    bug needed one more thing to be true at the same time - a filter
+    the tests had no reason to set - which is the shape of most things
+    that survive a suite.
+
+    Fixed by building the address with `URL` rather than by
+    concatenation, in the same `navUrl()` the drill-through needed
+    anyway. A repair of the page the reader is already on keeps the
+    arrival framing, because they have not gone anywhere.
+    Reproduced first, in `tests-js/navigation.test.js`.

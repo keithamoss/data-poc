@@ -523,6 +523,17 @@ button{font:inherit; color:inherit;}
 .promo-cell .v{font-size:13px; color:var(--ink); overflow-wrap:anywhere;}
 .promo-sub{font-size:11.5px; color:var(--ink-faint); margin-top:2px; overflow-wrap:anywhere;}
 .promo-why{font-size:12.5px; color:var(--ink-muted); margin-top:10px;}
+.promo-actions{margin-top:10px;}
+/* The framing a reader gets ONLY when they arrived by following a
+   substitution or an inheritance (REQ-DASH-085 criterion 10,
+   REQ-DASH-100 criterion 9). Its own class rather than
+   .stale-link-notice, for the reason that rule's own comment gives:
+   that class is COUNTED by tests/test_dashboard_e2e.py, so a second
+   thing wearing it breaks an assertion about the first. */
+.arrival-notice{border:1px solid var(--line-strong); border-left:3px solid var(--accent);
+  border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13.5px;
+  color:var(--ink); background:var(--surface); max-width:72ch;}
+.arrival-notice b{display:block; margin-bottom:4px;}
 .supply-history{margin-block:8px 30px;}
 .supply-history-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
 .supply-history-head h3{font-size:16px; font-family:"Public Sans",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);}
@@ -2013,6 +2024,25 @@ function periodNameFor(datasetId, dateStr){
   return found ? found.period : null;
 }
 
+// THE INVERSE of periodNameFor(): a period's NAME to the as-of date
+// that lands inside it (REQ-DASH-085 criterion 9, REQ-DASH-100
+// criterion 8). Drilling from a period into the one that earned its
+// check results means moving the as-of date, and the only thing the
+// decision log records is the period's NAME.
+//
+// FROM THE SAME EMBEDDED SEQUENCE the forward direction reads, rather
+// than from a second source or from date arithmetic in the browser -
+// periodStartDate()'s own comment records what a JS port of the
+// calendar cost last time. Round-trips exactly: periodNameFor() picks
+// the last entry whose date is <= the one asked for, and this returns
+// that entry's own date.
+function periodDateFor(datasetId, periodName){
+  if(!periodName) return null;
+  const periods = periodsFor(datasetId) || [];
+  const hit = periods.find(e=> e.period === periodName);
+  return hit ? hit.date : null;
+}
+
 function periodForCalendar(calendarName, dateStr){
   // The period a date falls in on ONE NAMED CALENDAR, rather than for one
   // dataset (criterion 6). The panel is asset-wide - it is not looking at
@@ -2565,8 +2595,35 @@ function setAsOfInUrl(dateStr, defaultDateStr){
   const url = new URL(location.href);
   if(dateStr === defaultDateStr) url.searchParams.delete("asof");
   else url.searchParams.set("asof", dateStr);
+  // `from` is the ARRIVAL CONTEXT, and it never survives a date change
+  // (REQ-DASH-085 criterion 11, REQ-DASH-100 criterion 10). Written
+  // back separately by drillToPeriod(), which is the one caller
+  // entitled to set it.
+  if(ARRIVAL_FROM) url.searchParams.set("from", ARRIVAL_FROM);
+  else url.searchParams.delete("from");
   history.replaceState(STATE, "", url.pathname + url.search + location.hash);
 }
+
+// WHICH PERIOD THE READER LEFT TO GET HERE (REQ-DASH-085 criteria 10
+// and 11, REQ-DASH-100 criteria 9 and 10).
+//
+// IN THE URL, not in a variable alone, because the framing has to
+// survive a refresh and a shared link - a reader who pastes the link
+// they were sent should be told the same thing the person who sent it
+// was told, and a page that silently drops the framing on reload tells
+// two readers different stories about the same URL.
+//
+// AND IT BELONGS TO ONE PAGE. Both requirements say so in the same
+// words - "SHALL NOT travel onto any page the reader goes to next" -
+// because a banner saying "you have left 2026-Q3" is true of exactly
+// the page it was followed to, and is a lie everywhere else. So
+// navigate() and every date change clear it; nothing but the drill
+// itself sets it.
+function arrivalFromUrl(){
+  const v = new URLSearchParams(location.search).get("from");
+  return v || null;
+}
+let ARRIVAL_FROM = arrivalFromUrl();
 
 const DEFAULT_AS_OF = defaultAsOf();
 let CURRENT_AS_OF = asOfFromUrl() || DEFAULT_AS_OF;
@@ -3173,7 +3230,92 @@ function standingInDetail(d){
       </div>
       ${who}
       ${st.reason ? `<div class="promo-why">${escHtml(String(st.reason))}</div>` : ""}
+      ${standingInDrill(d)}
     </div>`;
+}
+
+// WHOSE RESULTS THESE ARE, said out loud, and the way through to the
+// period that earned them (REQ-DASH-085 criterion 9, REQ-DASH-100
+// criterion 8).
+//
+// THE SENTENCE IS THE CRITERION'S FIRST HALF and the button is its
+// second. "SHALL NOT present a substituted period's check results as
+// belonging to the period being viewed" is not satisfied by a link -
+// a reader who never clicks it still reads the checks below as this
+// period's, which is the whole false-green this pair of requirements
+// exists to stop. So the page says it in words first, and offers the
+// drill second.
+//
+// NOTHING AT ALL WHEN THE DATE CANNOT BE RESOLVED. A period name the
+// embedded calendar sequence does not carry - a snapshot built before
+// that period existed, or a dataset with no calendar - has no as-of
+// date to drill to, and a button that does nothing is worse than no
+// button. The sentence still renders; only the drill goes.
+function standingInDrill(d){
+  const st = d && d.promotionState && d.promotionState.standingIn;
+  if(!st) return "";
+  const from = fmtPeriodName(st.standsOn) || st.standsOn;
+  const here = fmtPeriodName(st.period) || st.period;
+  const to = periodDateFor(d.id, st.standsOn);
+  const said = `<div class="promo-why">The checks on this page ran against
+    ${escHtml(String(from))}'s supply. They are not
+    ${escHtml(String(here))}'s own results.</div>`;
+  if(!to) return said;
+  return said + `<div class="promo-actions"><button type="button" class="link-btn"
+    data-standing-drill data-to="${escAttr(to)}" data-from="${escAttr(String(st.period))}"
+    data-testid="standing-in-drill">View ${escHtml(String(from))} — the period that earned them</button></div>`;
+}
+
+// THE FRAMING A READER GETS ONLY WHEN THEY FOLLOWED A SUBSTITUTION OR
+// AN INHERITANCE HERE (REQ-DASH-085 criterion 10, REQ-DASH-100
+// criterion 9), and the "only" is half the requirement: a reader who
+// navigated to this period directly is looking at its own page and has
+// left nothing, so telling them they have would be a false alarm.
+//
+// IT READS FROM THE URL rather than from a flag set by the click, so a
+// refresh and a shared link say the same thing (criterion 11 / 10).
+//
+// A HAND-EDITED `?from=` IS STILL HONOURED, deliberately. It says the
+// reader arrived from that period, which is all the banner claims; the
+// worst case is a way back to a period they were never on, which costs
+// one click. Refusing to render unless a matching standing-in record
+// exists would instead drop the framing on exactly the shared links
+// this is meant to survive.
+// The drill into the period that earned these results, and the way
+// back out of it (REQ-DASH-085 criteria 9 and 10, REQ-DASH-100 criteria
+// 8 and 9). Both move the as-of date; only the first says where the
+// reader came from, because only the first is an arrival.
+//
+// ONE FUNCTION CALLED FROM BOTH of renderDataset()'s branches rather
+// than wiring written out twice - the second branch was added for a
+// reason (a backwards drill can land on a date with nothing in it) and
+// two copies of a listener is how one of them stops being added.
+function wireArrivalContext(view){
+  view.querySelectorAll("[data-standing-drill]").forEach(btn=>
+    btn.addEventListener("click", ()=> drillToPeriod(btn.dataset.to, btn.dataset.from)));
+  view.querySelectorAll("[data-arrival-back]").forEach(btn=>
+    btn.addEventListener("click", ()=> drillToPeriod(btn.dataset.to, null)));
+}
+
+function arrivalBanner(ds){
+  if(!ARRIVAL_FROM) return "";
+  const left = fmtPeriodName(ARRIVAL_FROM) || ARRIVAL_FROM;
+  const st = ds && ds.promotionState && ds.promotionState.standingIn;
+  const earned = st && st.standsOn ? (fmtPeriodName(st.standsOn) || st.standsOn) : null;
+  const what = st && st.kind === "inherited" ? "an inherited period" : "a substitution";
+  const back = periodDateFor(ds && ds.id, ARRIVAL_FROM);
+  const detail = earned
+    ? `You followed ${what} out of <b style="display:inline">${escHtml(String(left))}</b>.
+       What you are looking at now is ${escHtml(String(earned))} — the period whose supply
+       ${escHtml(String(left))} stands on.`
+    : `You followed ${what} out of <b style="display:inline">${escHtml(String(left))}</b>.
+       What you are looking at now is a different period.`;
+  const way = back
+    ? `<div class="promo-actions"><button type="button" class="link-btn" data-arrival-back
+        data-to="${escAttr(back)}" data-testid="arrival-back">Back to ${escHtml(String(left))}</button></div>`
+    : "";
+  return `<div class="arrival-notice" role="status" data-testid="arrival-notice">
+    <b>You have left ${escHtml(String(left))}.</b>${detail}${way}</div>`;
 }
 
 // WHAT ARRIVED VERSUS WHAT IS PROMOTED (REQ-DASH-056).
@@ -3486,6 +3628,26 @@ function collectionCrossTableSection(ag, col){
 }
 
 function stateToHash(state){ return "#" + stateToPath(state); }
+// The URL a real navigation lands on: today's path and query string,
+// plus the new hash, minus the arrival context. pushState() given a
+// bare "#..." keeps the current query string - which is what asof= and
+// panel= rely on and what `from` must NOT have.
+//
+// BUILT WITH URL RATHER THAN BY CONCATENATION, and that is not a
+// tidy-up: `stateToHash(STATE) + location.search` puts the query string
+// INSIDE the hash, so a reader who had an as-of date set ended up with
+// `#/.../dataset/birth-registrations?asof=2026-05-01` and a dataset id
+// that resolves to nothing on the next load. forgetStaleSegment() did
+// exactly that, and the repair that was meant to make a stale link
+// shareable made it unresolvable (found 2026-09-29).
+//
+// `dropArrival` is false for a repair of the page the reader is ALREADY
+// on: they have not gone anywhere, so the framing still applies.
+function navUrl({dropArrival = true} = {}){
+  const url = new URL(location.href);
+  if(dropArrival) url.searchParams.delete("from");
+  return url.pathname + url.search + stateToHash(STATE);
+}
 function hashToState(){
   try {
     const raw = location.hash.slice(1);
@@ -3523,11 +3685,17 @@ let STATE = stateFromLocation();
 
 function navigate(next){
   STATE = next;
+  // THE ARRIVAL CONTEXT BELONGS TO ONE PAGE (REQ-DASH-085 criterion 11,
+  // REQ-DASH-100 criterion 10). Cleared BEFORE render(), or the banner
+  // draws once more on the page the reader has just moved to - and
+  // cleared out of the URL below, because pushState() with a bare hash
+  // keeps the query string, so `from` would otherwise ride along.
+  ARRIVAL_FROM = null;
   hideCheckPanel();
   hideDrawer();
   hideAllPanelsDom();
   render();
-  history.pushState(STATE, "", stateToHash(STATE));
+  history.pushState(STATE, "", navUrl());
   window.scrollTo({top:0, behavior:"smooth"});
   // FOCUS FOLLOWS THE NAVIGATION (#10). Without this the document
   // replaces itself under the reader and focus stays on body, so the
@@ -4011,7 +4179,7 @@ function renderNotFound(view, what, id){
 // through the broken link they just arrived on.
 function forgetStaleSegment(what, id, patch){
   STATE = {...STATE, ...patch};
-  history.replaceState(STATE, "", stateToHash(STATE) + location.search);
+  history.replaceState(STATE, "", navUrl({dropArrival: false}));
   const view = document.getElementById("view");
   if(!view) return;
   const notice = document.createElement("div");
@@ -4320,6 +4488,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         </div>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill("nodata")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
+      ${arrivalBanner(ds)}
       <div class="notice-exhausted" role="status">
         <b>Nothing had been supplied by this date.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
@@ -4329,6 +4498,13 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         </div>
       </div>
     `;
+    // THE WAY BACK HAS TO EXIST ON THIS BRANCH TOO, and this is the
+    // branch that needs it most: drilling back to the period that
+    // earned some results can legitimately land on a date this dataset
+    // has nothing for, and a reader stranded there with no banner has
+    // no affordance back to where they were (REQ-DASH-085 criterion 10,
+    // REQ-DASH-100 criterion 9).
+    wireArrivalContext(view);
     return;
   }
   const rowDelta = ds.rowCount - ds.prevRowCount;
@@ -4340,6 +4516,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
+    ${arrivalBanner(ds)}
     ${exhaustedBanner}
     ${ds.noDataAsOf ? `
     <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">
@@ -4364,6 +4541,8 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     <div class="col-grid" id="col-grid"></div>
     <div id="supply-history-wrap"></div>
   `;
+  wireArrivalContext(view);
+
   const grid = document.getElementById("col-grid");
   // Item 57 brought Tier 2's sparkline down to Tier 3, narrower still -
   // Phase 5e (#60) redesigned what it shows (see aggregateSparkline()'s
@@ -6144,9 +6323,25 @@ function renderAsOfRangeNotice(){
   if(reset) reset.addEventListener("click", ()=> applyAsOf(DEFAULT_AS_OF));
 }
 function applyAsOf(dateStr){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+  // A date the reader chose themselves is not an arrival from anywhere,
+  // so it clears the framing - the second half of REQ-DASH-085
+  // criterion 11 and REQ-DASH-100 criterion 10.
+  drillToPeriod(dateStr, null);
+}
+
+// THE DRILL-THROUGH ITSELF: move the as-of date into the period that
+// earned these results, and say where the reader came from.
+//
+// A REPLACE RATHER THAN A PUSH, matching what "as of" has always done
+// here (see asOfFromUrl()'s own comment - it is a filter over the whole
+// page, not a navigable state somebody wants to step back through one
+// change at a time). The way back is the banner's own button, which
+// both requirements ask for by name rather than leaving to the browser.
+function drillToPeriod(dateStr, fromPeriod){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || "")) return;
   CURRENT_AS_OF = dateStr;
   DATA = buildData(CURRENT_AS_OF);
+  ARRIVAL_FROM = fromPeriod || null;
   setAsOfInUrl(CURRENT_AS_OF, DEFAULT_AS_OF);
   updateAsOfButtonLabel();
   renderAsOfPeriods(dateStr);

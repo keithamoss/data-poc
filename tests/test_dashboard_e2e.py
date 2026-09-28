@@ -3234,3 +3234,127 @@ class TestAPeriodStandingInOnAnEarlierOne:
         self._with_state(clean_page, built_dashboard_html, getattr(self, kind))
         assert clean_page.locator('[data-testid="standing-in"]').count() >= 1
         assert errors == []
+
+
+class TestDrillingThroughToThePeriodThatEarnedTheResults:
+    """REQ-DASH-085 criteria 9-11 and REQ-DASH-100 criteria 8-10.
+
+    THE STATE IS SET ON THE EMBEDDED SOURCE, not on the built DATA tree,
+    and the difference is the whole reason this class exists separately
+    from the one above. Drilling REBUILDS DATA for the new as-of date,
+    so a standing-in record patched onto DATA disappears on the first
+    click - which would make every assertion after it about a page in a
+    state the test never set up. Patching REAL_CP_DATA, which buildData()
+    reads, survives the rebuild exactly as a real record would.
+
+    Still not a real decision, for the reason the class above states:
+    writing one into an append-only log to make a test pass would be
+    fabricating an operator's decision.
+    """
+
+    SUBSTITUTED = {
+        "kind": "substituted", "level": "warning", "period": "2026-Q3",
+        "standsOn": "2026-Q2", "supply": "cp-carers@202605010100000000",
+        "decidedBy": "Keith", "byAPerson": True,
+        "reason": "the supplier confirmed no extract will be sent this quarter",
+    }
+    # The two dates the real quarterly calendar gives those period names.
+    # Written out rather than computed, so a change to the calendar shows
+    # up here as a failing assertion rather than as a test that quietly
+    # agrees with whatever it now says.
+    PERIOD_DATE = "2026-08-01"
+    STANDS_ON_DATE = "2026-05-01"
+    WHERE = {"tier": "dataset", "agencyId": "child-protection-family-support",
+              "collectionId": "child-protection", "datasetId": "cp-carers"}
+
+    def _open(self, page, html, standing_in=None):
+        _goto(page, html, state=self.WHERE)
+        if standing_in is not None:
+            page.evaluate(
+                """(st) => {
+                     const d = REAL_CP_DATA.datasets.find(x => x.id === "cp-carers");
+                     d.promotionState = Object.assign({}, d.promotionState,
+                                                       {standingIn: st});
+                     DATA = buildData(CURRENT_AS_OF);
+                     renderFromState();
+                   }""", standing_in)
+
+    def _params(self, page):
+        return dict(urllib.parse.parse_qsl(
+            urllib.parse.urlparse(page.url).query))
+
+    def test_the_page_says_whose_results_these_are_before_offering_the_drill(
+            self, clean_page, built_dashboard_html):
+        """Criterion 9's first half. A reader who never clicks still
+        reads the checks below as this period's, which is the whole
+        false green - so the sentence is not optional decoration around
+        the link."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        text = " ".join(clean_page.locator(
+            '[data-testid="standing-in-detail"]').inner_text().split())
+        assert "ran against 2026-Q2's supply" in text
+        assert "not 2026-Q3's own results" in text
+
+    def test_drilling_moves_the_as_of_date_and_records_where_from(
+            self, clean_page, built_dashboard_html):
+        """Criterion 9's second half, and criterion 11's first: the
+        framing is in the URL, so a refresh or a shared link says the
+        same thing."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        params = self._params(clean_page)
+        assert params.get("asof") == self.STANDS_ON_DATE
+        assert params.get("from") == "2026-Q3"
+
+    def test_the_reader_is_told_they_have_left_the_period_they_were_on(
+            self, clean_page, built_dashboard_html):
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        notice = clean_page.locator('[data-testid="arrival-notice"]')
+        assert notice.count() == 1
+        assert "You have left 2026-Q3" in notice.inner_text()
+
+    def test_the_way_back_returns_and_takes_the_framing_with_it(
+            self, clean_page, built_dashboard_html):
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        clean_page.locator('[data-testid="arrival-back"]').click()
+        params = self._params(clean_page)
+        assert params.get("asof") == self.PERIOD_DATE
+        assert "from" not in params
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
+
+    def test_a_reader_who_came_here_directly_is_told_nothing(
+            self, clean_page, built_dashboard_html):
+        """The 'only' in criterion 10 is half of it: telling somebody
+        they have left a period they were never on is a false alarm."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
+
+    def test_the_framing_does_not_travel_onto_the_next_page(
+            self, clean_page, built_dashboard_html):
+        """Criterion 11's second half. A banner saying 'you have left
+        2026-Q3' is true of the one page it was followed to and a lie
+        everywhere else - and pushState() with a bare hash keeps the
+        query string, so this does not happen by itself."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        assert self._params(clean_page).get("from") == "2026-Q3"
+        clean_page.locator("#rail .crumb").first.click()
+        clean_page.wait_for_function(
+            "() => !new URLSearchParams(location.search).get('from')")
+        params = self._params(clean_page)
+        assert "from" not in params
+        # The orthogonal query state a navigation has always kept stays.
+        assert params.get("asof") == self.STANDS_ON_DATE
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
+
+    def test_the_whole_drill_reports_no_console_errors(
+            self, clean_page, built_dashboard_html):
+        errors = []
+        clean_page.on("console",
+                       lambda m: errors.append(m.text) if m.type == "error" else None)
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        clean_page.locator('[data-testid="arrival-back"]').click()
+        assert errors == []
