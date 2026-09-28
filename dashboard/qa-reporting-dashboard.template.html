@@ -135,6 +135,16 @@ button{font:inherit; color:inherit;}
    built" marker, and goes grey when it was not. */
 .live .dot{width:7px;height:7px;border-radius:50%;background:var(--good); box-shadow:0 0 0 3px var(--good-soft);}
 .live.unbuilt .dot{background:var(--ink-faint); box-shadow:none;}
+/* NOT THE PUBLISHED BUILD (REQ-DASH-094 criterion 3). The distinction is
+   carried by the WORDS renderBuildStamp() writes - "not production", or
+   "environment unknown" - and this only reinforces them, which is the
+   whole point of the criterion's "not colour alone": a dashed outline
+   survives greyscale printing and a reader who does not perceive the
+   colour, and the sentence survives even a stylesheet that never loaded. */
+.live.non-production{
+  border-style:dashed; border-color:var(--warn, var(--ink-faint));
+}
+.live.non-production .dot{background:var(--warn, var(--ink-faint)); box-shadow:none;}
 
 /* ============ Breadcrumb / zoom rail ============ */
 .rail{display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding-block:16px; font-size:13.5px;}
@@ -6056,17 +6066,33 @@ function renderBuildStamp(){
   // competes with the one thing the masthead is for.
   if(BUILD_PROVENANCE){
     const bits = [];
-    if(BUILD_PROVENANCE.environment) bits.push(BUILD_PROVENANCE.environment.label
-      || BUILD_PROVENANCE.environment.id);
+    const env = BUILD_PROVENANCE.environment;
+    // WHICH ENVIRONMENT, AND WHETHER IT IS THE REAL ONE (REQ-DASH-094).
+    // A screenshot of development QA in a briefing is indistinguishable
+    // from production's unless the page says otherwise, so anything that
+    // is not the published build says so IN WORDS - never by colour
+    // alone, because this gets printed and it gets read by people who
+    // do not perceive the colour. The class is for the styling; the
+    // words are what actually carry it.
+    if(env){
+      bits.push(env.label || env.id);
+      if(!env.publishes) bits.push("not production");
+    }else{
+      // NO environment recorded. Saying nothing here is what the
+      // criterion forbids: an unlabelled page reads as the real one,
+      // which is the exact confusion this exists to prevent.
+      bits.push("environment unknown");
+    }
+    if(!env || !env.publishes) el.closest(".live")?.classList.add("non-production");
     // SHORT, because a reader recognises a seven-character sha and does
     // not read a forty-character one. The full value stays in the title.
     if(BUILD_PROVENANCE.commit) bits.push(BUILD_PROVENANCE.commit.slice(0, 7));
     if(bits.length){
       el.textContent += ` · ${bits.join(" · ")}`;
       el.title = [
-        BUILD_PROVENANCE.environment
-          ? `Built in: ${BUILD_PROVENANCE.environment.label || BUILD_PROVENANCE.environment.id}`
-          : null,
+        env
+          ? `Built in: ${env.label || env.id}${env.publishes ? "" : " - NOT the published environment"}`
+          : "Built in: an environment this artifact did not record",
         BUILD_PROVENANCE.commit ? `Commit: ${BUILD_PROVENANCE.commit}` : null,
       ].filter(Boolean).join("\n");
     }

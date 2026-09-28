@@ -117,6 +117,14 @@ releases:
     changes:
       - category: Improved
         items:
+          - headline: A dashboard now tells you when it is not the real one
+            components: ["Dashboard UI"]
+            description: >
+              A dashboard built anywhere other than the published
+              environment now says so on the page, in words rather than
+              just a colour, so a screenshot of development results can
+              never be mistaken for production's. One that does not know
+              where it was built says that too, instead of staying quiet.
           - headline: As-of viewing now follows your real delivery dates
             components: ["Dashboard UI"]
             description: >

@@ -18705,13 +18705,46 @@ requirements:
     signed_off:
       by: Keith
       date: "2026-09-28"
+    linked_tests:
+      - tests-js/build-environment.test.js
+      - tests/test_publish.py
+      - tests/test_embed_dashboard_data.py
+    implemented_by:
+      - dashboard/qa-reporting-dashboard.template.html::renderBuildStamp
+      - dashboard/embed_dashboard_data.py::embed
+    evidence:
+      - >
+        FOUR OF THE SEVEN CRITERIA WERE ALREADY MET before this change,
+        by REQ-PIPE-092's BUILD_PROVENANCE - established by reading the
+        real template rather than assumed, and worth recording because
+        it is why this was a small build rather than a seven-criterion
+        one. The page already stated its environment (criterion 1), in
+        the masthead where nothing has to be opened or scrolled (2),
+        from an embedded const a reader cannot change (5).
+      - >
+        THE TWO THAT WERE NOT are the two that make a screenshot safe.
+        Criterion 3 - a non-published build had IDENTICAL styling and
+        wording to the published one. Criterion 6 - with no environment
+        recorded the page rendered NOTHING at all, which is exactly the
+        failure that criterion names: an unlabelled page reads as the
+        real one.
+      - >
+        VERIFIED BY TESTS THAT FAILED FIRST. tests-js/
+        build-environment.test.js was written before the change and run
+        against the unmodified template: 3 failed, 3 passed - and the
+        three that passed are precisely the ones REQ-PIPE-092 had
+        already satisfied, which is the cleanest confirmation of the
+        split above. After the change: 6 passed. Full JS suite 392
+        passed in 26 files; tests/test_embed_dashboard_data.py 18
+        passed; tests/test_publish.py and tests/test_environments.py 44
+        passed.
     story: >
       As someone who might be handed a screenshot of this dashboard in
       a briefing, I want the page to say which environment it
       describes, so that a picture of development QA can never be
       mistaken for production's.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26) - one of the
       four things he named as needing environment awareness, with his
@@ -18763,6 +18796,36 @@ requirements:
         as every other embedded const.
     dependencies: [REQ-PIPE-093, REQ-PIPE-092]
     decisions:
+      - >
+        THE DISTINCTION IS CARRIED BY THE WORDS, and the styling only
+        reinforces it. A non-published build appends "not production"
+        to the masthead text and an unrecorded one says "environment
+        unknown"; the `.non-production` class adds a DASHED border and
+        a neutral dot. That ordering is the criterion's "not colour
+        alone" taken literally: the sentence survives greyscale
+        printing, a reader who does not perceive the colour, and a
+        stylesheet that never loaded, and a class that only changed a
+        colour would have passed a DOM test while failing a person.
+      - >
+        THE PAGE ASKS `publishes`, NEVER THE ENVIRONMENT'S NAME. The
+        embed now carries `publishes` alongside id and label, so the
+        template never has to know WHICH environment is the published
+        one. That is configuration and it changes per deployment -
+        hard-coding "prod" in the page would have been the obvious
+        shortcut and would break the first time an asset named its
+        environments differently.
+      - >
+        AN ABSENT ENVIRONMENT AND A NON-PUBLISHED ONE GET THE SAME
+        TREATMENT, deliberately. Both are "not the published build",
+        and the honest reading of an artifact that did not record where
+        it came from is that it cannot be trusted as production - not
+        that it is fine. The two differ in WORDS, so a reader can tell
+        them apart, but not in prominence.
+      - >
+        THE COMMIT AND THE ENVIRONMENT STILL FAIL INDEPENDENTLY, which
+        REQ-PIPE-092 established and a test now pins: an artifact with
+        no environment still shows its short sha. One missing must not
+        suppress the other.
       - >
         Separated from REQ-PIPE-093 deliberately, following the
         precedent REQ-DASH-085 set against REQ-PIPE-084: the action is
