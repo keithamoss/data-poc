@@ -14610,9 +14610,12 @@ requirements:
       - >
         THE SYSTEM SHALL accept promote, reject, demote, re-file,
         substitute, inherit and un-inherit as structured filing
-        decisions raised on a dataset's own GitHub ticket, and every
-        criterion below that says "a filing decision" SHALL mean any
-        one of those seven.
+        decisions raised on the GitHub ticket for the SLOT they concern
+        - one dataset in one period, per REQ-PIPE-083 - so that the
+        period a decision applies to comes from the ticket's own
+        identity rather than from anything stated in the body. Every
+        criterion below that says "a filing decision" SHALL mean any one
+        of those seven.
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
@@ -14625,6 +14628,11 @@ requirements:
         a GitHub-raised decision, and SHALL NOT accept an actor stated
         in the body of that input.
       - >
+        THE SYSTEM SHALL ignore a comment carrying no known command
+        outright, and SHALL ignore the prose AROUND a known command, so
+        that a person may raise a decision in their own words and may
+        talk on the thread without being read as instructing anything.
+      - >
         IF the person raising a decision cannot be identified, THEN THE
         SYSTEM SHALL refuse it.
       - >
@@ -14633,10 +14641,11 @@ requirements:
         state back out of an issue.
       - >
         WHEN a decision's entry is committed to the decision log, THE
-        SYSTEM SHALL report its outcome on that dataset's ticket
-        whichever route raised it, so that a decision taken in the
-        terminal appears there in the same way one raised on the
-        ticket does.
+        SYSTEM SHALL reconcile that slot's ticket through REQ-PIPE-083's
+        own pass whichever route raised the decision, and SHALL NOT
+        compose an update of its own - so that a decision taken in the
+        terminal appears there in the same way one raised on the ticket
+        does, said once and in the same words.
       - >
         THE SYSTEM SHALL require explicit confirmation for a re-file
         whether or not its target slot already holds a promoted supply,
@@ -14664,7 +14673,9 @@ requirements:
         THE SYSTEM SHALL offer the supply-scoped filing decisions -
         promote, reject, demote and re-file - from a standing queue of
         supplies awaiting a decision, reachable from the main menu
-        without doing a QA run first.
+        without doing a QA run first, and SHALL derive that queue from
+        the same definition of "awaiting a person" that REQ-PIPE-083's
+        `needs-action` ticket policy uses, never a second one.
       - >
         WHERE a real QA run a person has just done leaves its supply
         awaiting a decision, THE SYSTEM SHALL offer that decision in
@@ -14697,7 +14708,10 @@ requirements:
         on, and SHALL NOT fail silently.
       - >
         WHERE that decision was raised on GitHub, THE SYSTEM SHALL
-        give that reason as a comment on the ticket that raised it.
+        give that reason as a comment on the ticket that raised it,
+        posted DIRECTLY rather than through REQ-PIPE-083's pass - a
+        refusal appends nothing to the decision log, so the pass would
+        correctly find nothing changed and say nothing.
       - >
         THE SYSTEM SHALL apply that same judgement on both routes, from
         the one implementation, and SHALL NOT let either route permit
@@ -14793,7 +14807,7 @@ requirements:
         GitHub Actions job and a one-time gh auth login locally - the
         same one-time-setup shape as playwright install chromium, and
         worth documenting where the other one is.
-    dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-GHUB-027]
+    dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-GHUB-027, REQ-PIPE-083, REQ-GHUB-109]
     decisions:
       - >
         NEITHER ROUTE IS PRIMARY - BOTH ARE FIRST-CLASS AND BOTH ARE
@@ -14910,6 +14924,48 @@ requirements:
         disambiguated by context, which is exactly the collision
         plans/supply-model.md's concept inventory warns about for the
         word "delivery".
+      - >
+        THE TICKET A DECISION IS RAISED ON IS A SLOT'S, NOT A DATASET'S
+        (2026-09-28, following REQ-PIPE-083's reframe). This requirement
+        was drafted against per-dataset tickets, which could not say
+        WHICH PERIOD a promote or a substitute applied to - the body
+        would have had to carry it and be parsed, and a body is
+        untrusted input. Per slot, the period comes from the ticket's
+        own identity. It also gives substitute, inherit and un-inherit
+        the home criterion 29 always wanted: those three are reached per
+        period and dataset, which is a slot exactly.
+      - >
+        A DECISION'S OUTCOME IS RECONCILED, NOT REPORTED (2026-09-28,
+        applying REQ-PIPE-083's same-pass rule). Criterion 7 used to
+        have this requirement post the outcome itself, which is the
+        event-emitting shape 083 was reframed away from: every write
+        route carrying its own idea of what the ticket should now say.
+        Criterion 27 already said the TUI route must not call GitHub and
+        that "the ticket is updated by whatever already has it" - this
+        makes the same true of the GitHub route, so neither composes an
+        update.
+      - >
+        A REFUSAL IS THE EXCEPTION, ON ALL THREE REQUIREMENTS (Keith,
+        2026-09-28). It appends nothing to the decision log, so nothing
+        about the slot changed, so REQ-PIPE-083's pass would correctly
+        say nothing and the person would hear nothing back. It is
+        therefore posted directly, and REQ-GHUB-109 exempts it from
+        post-on-change so that asking twice is answered twice.
+      - >
+        PROSE AROUND A COMMAND IS IGNORED, AND A COMMENT WITH NO COMMAND
+        IS IGNORED OUTRIGHT (Keith, 2026-09-28, his own refinement while
+        agreeing the two-readers boundary on REQ-PIPE-083). It is what
+        lets a person raise a decision in their own words, and lets the
+        team talk on a ticket without the tool reading conversation as
+        instruction - which matters more now that tickets are the
+        management surface for a whole team rather than a machine log.
+      - >
+        THE STANDING QUEUE AND THE TICKET POLICY SHARE ONE DEFINITION
+        (2026-09-28). Criterion 14's "supplies awaiting a decision" and
+        REQ-PIPE-083's `needs-action` are the same question asked by two
+        surfaces. Two implementations of it would drift, and the drift
+        would show as a supply visible in the terminal with no ticket,
+        or a ticket for something the queue does not list.
       - >
         THE FOUR OPERATIONS HAVE TWO TUI ENTRY POINTS, NOT ONE (Keith,
         2026-09-26). A standing queue off the main menu is the general
