@@ -343,6 +343,15 @@ MISSING_TABLE = "missing-table"
 MISSING_REFERENCE_PERIOD = "missing-reference-period"
 NO_PRIOR_PERIOD = "no-prior-period"
 
+#: WHY a table a check reads has no promoted supply (REQ-PIPE-079
+#: criteria 14, 15 and 16). All four look identical from inside a
+#: check - the table is not there - and each has a different next
+#: action for whoever reads the result, which is the whole reason they
+#: are told apart rather than collapsed into one red.
+NOT_YET_DUE = "not-yet-due"
+PAST_DUE = "past-due"
+STAGED_AWAITING_DECISION = "staged-awaiting-decision"
+
 
 @dataclass(frozen=True)
 class Unrunnable:
@@ -365,14 +374,47 @@ class Unrunnable:
         if self.reason == MISSING_REFERENCE_PERIOD:
             return (f"could not run - {listed} was owed but has no filled slot, so "
                      f"there is nothing to compare against")
+        if self.reason == NOT_YET_DUE:
+            return (f"{listed} has not been supplied for this period yet and is "
+                     f"not yet overdue")
+        if self.reason == PAST_DUE:
+            return f"could not run - {listed} is overdue for this period"
+        if self.reason == STAGED_AWAITING_DECISION:
+            return (f"could not run - a supply for {listed} is staged awaiting a "
+                     f"decision, so nothing is promoted for this period yet")
         return ("no data - no prior period was ever owed for this dataset, so there "
                  "is nothing to compare against yet")
+
+
+#: Most specific first. Criterion 4 defers to "the more specific cases
+#: in this requirement", and where several are true at once the one
+#: reported should name an action the reader can actually take: a
+#: staged supply means "go and decide", where "overdue" would send them
+#: to chase a supplier who has already sent it.
+_MISSING_PRECEDENCE = (STAGED_AWAITING_DECISION, PAST_DUE, NOT_YET_DUE)
+
+
+def _why_missing(missing: Sequence[str], supply_states: dict[str, str]) -> "Unrunnable":
+    """Which of REQ-PIPE-079's cases explains these absent tables.
+
+    NOT RED FOR A SUPPLY THAT IS NOT DUE YET (criterion 14). Nothing is
+    wrong in that case, and a red that fires when nothing is wrong is
+    how a check earns the reputation that makes people ignore it.
+    """
+    for reason in _MISSING_PRECEDENCE:
+        named = sorted(n for n in missing if supply_states.get(n) == reason)
+        if named:
+            status = NODATA if reason == NOT_YET_DUE else RED
+            return Unrunnable(status=status, reason=reason, names=tuple(named))
+    # Criterion 4's fallback, and every caller that knows no state.
+    return Unrunnable(status=RED, reason=MISSING_TABLE, names=tuple(sorted(missing)))
 
 
 def check_readiness(depends_on: Sequence[str], resolution: PeriodResolution, *,
                      reference_period: str | None = None,
                      reference_filled: bool = False,
-                     any_prior_period_owed: bool = True) -> Unrunnable | None:
+                     any_prior_period_owed: bool = True,
+                     supply_states: dict[str, str] | None = None) -> Unrunnable | None:
     """Whether a check may be evaluated, or why not.
 
     Returns None where the check should run normally.
@@ -391,7 +433,7 @@ def check_readiness(depends_on: Sequence[str], resolution: PeriodResolution, *,
     """
     missing = [name for name in depends_on if name not in resolution.resolution.resolved]
     if missing:
-        return Unrunnable(status=RED, reason=MISSING_TABLE, names=tuple(sorted(missing)))
+        return _why_missing(missing, supply_states or {})
     if reference_period is None:
         return None
     if reference_filled:
