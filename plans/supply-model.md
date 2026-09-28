@@ -3414,8 +3414,8 @@ need a person, so a human waiting on it is the correct output of the
 gate rather than a defect in it. The error was treating "something is
 waiting for a human" as a failure mode when it is the purpose.
 
-**TIME-BASED JUDGEMENTS BELONG TO THE PERIOD SCHEMA, AND ARE MADE ON
-PROMOTION TIME (Keith, 2026-09-28).** His own words: "there should
+**TIME-BASED JUDGEMENTS BELONG TO THE PERIOD SCHEMA, AND WHAT IS
+JUDGED THERE IS JUDGED ON PROMOTION TIME (Keith, 2026-09-28).** His own words: "there should
 never be an arrival-time-based decision made against anything in
 staging - that only applies in the period schema, and when it's in a
 period schema it should be based on promotion time, not arrival time."
@@ -3435,38 +3435,66 @@ nothing has been chosen yet.
 WHY IT IS ALSO A FIX RATHER THAN ONLY A CONSTRAINT. Today a supply can
 arrive on time, be red, never be promoted, and still leave the slot
 reading as met on time. `REQ-PIPE-075` criterion 6 already says a slot
-is filled ONLY by a recorded promotion - so classifying punctuality on
-arrival contradicts a rule this same sprint states. Promotion time is
-simply when the slot was actually filled, and "late" then means the
-honest thing: when the data became available.
+is filled ONLY by a recorded promotion - so a slot that reads MET
+while nothing has been promoted into it contradicts a rule this same
+sprint states. What was missing is not a different punctuality
+verdict; it is that nothing measured the gap between arriving and
+being accepted, so the gap was invisible.
 
-WHAT IT COSTS, and it has to be paid rather than absorbed. Promotion
-time conflates two accountabilities - the supplier's punctuality and
-our own processing latency. A supplier who delivered at 13:55 against
-a 14:00 deadline, whose red supply a person accepts three days later,
-is not late; the slot is. So the receipt instant stays recorded and
-stays SHOWN, labelled as the supplier's fact, beside the slot's own
-verdict. Losing that distinction would make an agency look late for
-our delay, which at ~30 datasets across agencies is not a cosmetic
-problem.
+THE VERDICT DOES NOT MOVE - THREE FACTS ARE SHOWN INSTEAD (Keith,
+2026-09-28, correcting this section's own first draft). That draft had
+the punctuality verdict recomputed on promotion time, which would have
+made an agency look late for OUR delay. His answer is better and
+resolves it without a caveat: keep the arrival verdict, and add a
+SECOND indicator beside it for how long we then took to decide.
 
-WHAT IT CHANGES IN WORK ALREADY DONE. `REQ-PIPE-067` is built and
-recomputes an arrival verdict against the slot a supply is FILED to -
-and filing happens in staging, before QA. `REQ-PIPE-080` criterion 1
-records the classification against the filed slot on the same basis.
-Both move to promotion. Criterion 6 of 080 already half-anticipates
-it ("a supply with no filing presents as unfiled rather than as a
-punctuality verdict"); this extends that from unfiled to unpromoted.
+Three different facts, three different owners, none standing in for
+another:
+- **"Arrived on time"** - about the SUPPLIER. Receipt instant against
+  the slot it is filed to. Unchanged from what REQ-PIPE-067 already
+  built.
+- **"Took us three days to decide"** - about US. Receipt instant to
+  the promotion decision.
+- **"The slot was filled on Thursday"** - about AVAILABILITY.
+  REQ-PIPE-075 criterion 6 already makes this promotion-based.
 
-TWO THINGS STILL OPEN, both put to Keith 2026-09-28:
-- ASSIGNMENT is arrival-time-based and happens in staging, which the
-  rule forbids as literally stated. `REQ-PIPE-075` decision 3 calls
-  assignment a DERIVATION with no human in it, and QA must run
-  against a filed period (`REQ-PIPE-079`), so moving it to promotion
-  would leave QA nothing to check against. Read as: assignment keeps
-  using arrival time; the VERDICT does not. Needs confirming.
-- Whether the arrival instant is shown beside the verdict, as the
-  paragraph above argues it must be.
+The hole above closes through the second of those rather than by
+recomputing the first: an on-time supply nobody ever promoted now
+shows an ever-growing decision latency instead of sitting quietly as
+a met slot.
+
+THE PLUMBING IS THERE AND THE EVENTS ARE NOT. `qa.decision` already
+carries `action='promote'`, `actor_kind` (person or rule) and
+`effective_at`, and the receipt instant is on `qa.delivery`, so the
+latency is a subtraction of two existing columns. What does not exist
+is anything WRITING a promote row, because promotion is sprint 11. So
+this is display work that has nothing to display until that sprint
+lands, which is why Keith put it there rather than ahead of it.
+
+ASSIGNMENT IS NOT CAUGHT BY THE RULE (Keith, 2026-09-28, confirming).
+It is arrival-time-based and it happens in staging, so the rule
+catches it as literally worded - and it stays as it is, because it is
+a DERIVATION from arrival time rather than a decision, exactly as
+REQ-PIPE-075 decision 3 already frames it. The alternative is
+circular: QA runs against the period a supply is filed to
+(REQ-PIPE-079), and promotion is gated on the QA result, so deferring
+assignment to promotion would leave QA with no period to check
+against and promotion waiting on a check that cannot run.
+
+THE DRIFT REFERENCE IS THE PREVIOUS PERIOD'S PROMOTED SUPPLY (Keith,
+2026-09-28), and his own sharpening of it is the part worth keeping:
+"previous promoted supply" is wrong, because a strict reading includes
+a supply in THIS period, so a resupply would be measured against the
+thing it is correcting - which measures our own churn rather than
+drift. Applies to both the PSI check and the volume check, on both
+collections.
+
+Rejected, by the same reasoning already in this section: the previous
+ARRIVAL, which is what Birth Registrations' row-drop check uses today.
+A supply that arrived and was rejected should never be anybody's
+baseline. Also retires `plans/running-thoughts.md` #57's complaint,
+since the fixed first-arrival anchor goes with it.
+
 
 **Operators drive promotion PRIMARILY FROM GITHUB, with the TUI as a
 second route** (Keith, 2026-09-26, correcting this paragraph's own

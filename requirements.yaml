@@ -14013,6 +14013,22 @@ requirements:
         THE SYSTEM SHALL make these retirements in the same change that
         turns on recording, and SHALL NOT retire the old derivation
         before the new one produces a real answer.
+      - >
+        THE SYSTEM SHALL keep a supply's arrival classification computed
+        from OUR RECEIPT INSTANT against the slot it is filed to, and
+        SHALL NOT recompute it from the instant it was promoted.
+      - >
+        THE SYSTEM SHALL present, alongside that classification, the
+        interval between our receipt of the supply and the decision to
+        promote it.
+      - >
+        WHERE a supply has been filed but never promoted, THE SYSTEM
+        SHALL present that interval as still open, measured to now,
+        rather than as absent or as zero.
+      - >
+        THE SYSTEM SHALL present when the slot was FILLED as a fact
+        distinct from when the supply ARRIVED, and SHALL NOT present
+        either in place of the other.
     non_functional_requirements:
       - >
         This legitimately CHANGES PUBLISHED NUMBERS. Today's history
@@ -14072,6 +14088,37 @@ requirements:
         with the supply, the dashboard's JS never recomputes
         classification, so the duplicated-logic surface shrinks rather
         than grows.
+      - >
+        THREE FACTS, NOT ONE RECOMPUTED VERDICT (Keith, 2026-09-28,
+        criteria 8 to 11). "Arrived on time" is about the SUPPLIER,
+        "took us three days to decide" is about US, and "the slot was
+        filled on Thursday" is about AVAILABILITY. Each has a different
+        owner and none may stand in for another.
+      - >
+        REJECTED recomputing the punctuality verdict on the promotion
+        instant, which is what this session proposed first and what
+        Keith overruled. It looks like a tidy consequence of
+        REQ-PIPE-075 criterion 6 (a slot is filled only by a recorded
+        promotion) and it silently reassigns blame: a supplier who
+        delivered at 13:55 against a 14:00 deadline, whose red supply a
+        person accepts three days later, is not late - the slot is. At
+        ~30 datasets across agencies that is an agency being shown as
+        late for our own delay, which is not a presentation detail.
+      - >
+        The real defect that proposal was reaching for is narrower, and
+        criteria 9 and 10 are what close it: a supply could arrive on
+        time, never be promoted, and leave the slot reading as met,
+        because nothing measured the gap between arriving and being
+        accepted. An open, still-growing interval makes that visible
+        without touching the verdict.
+      - >
+        THE PLUMBING EXISTS AND THE EVENTS DO NOT, which is why this
+        sits in the promotion sprint rather than ahead of it (Keith,
+        2026-09-28). qa.decision already carries action='promote',
+        actor_kind and effective_at, and the receipt instant is on
+        qa.delivery, so the interval is a subtraction of two existing
+        columns - but nothing writes a promote row until REQ-PIPE-075
+        is built, so the display would have nothing to render.
 
   - id: REQ-PIPE-081
     title: "\"As at T\" is answered from filing events, so a later decision cannot silently rewrite an earlier view"
@@ -20788,3 +20835,105 @@ requirements:
         answer cheap to reach. Deliberately not folded in without
         Keith's say, because it widens this from "wrong place" to
         "wrong version" and those may deserve different treatment.
+
+  - id: REQ-QAC-108
+    title: >
+      A supply unlike the previous period's accepted one is flagged, and
+      the reference is never whatever happened to arrive
+    date_written: "2026-09-28"
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-28, in conversation about what actually stops a
+      wrong file auto-promoting. Two findings behind it: Birth
+      Registrations already has a relative row-drop check and Child
+      Protection has none, and both collections' PSI check references
+      the first arrival in the whole history rather than anything
+      recent (plans/running-thoughts.md #57).
+    story: >
+      As the person accountable for what reaches the warehouse, I want a
+      supply that is wildly unlike the previous period's ACCEPTED supply
+      to be flagged loudly, so that a plausible-looking wrong file - a
+      test extract, a truncated export - cannot pass quietly into a slot
+      nobody was watching.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL apply a relative volume check to Child
+        Protection's datasets, with a warn band and a fail band, so that
+        both collections judge volume the same way.
+      - >
+        THE SYSTEM SHALL take the reference for every drift and volume
+        check from the PREVIOUS PERIOD'S PROMOTED SUPPLY.
+      - >
+        THE SYSTEM SHALL NOT take that reference from a supply in the
+        CURRENT period, so that a resupply is never measured against the
+        supply it is correcting.
+      - >
+        THE SYSTEM SHALL NOT take that reference from an arrival that
+        was never promoted, nor from a fixed run chosen once.
+      - >
+        WHERE no previous period has a promoted supply, THE SYSTEM SHALL
+        report the check as having no reference, and SHALL NOT report it
+        as passing.
+      - >
+        THE SYSTEM SHALL let both the drift and volume checks reach a
+        RED verdict, so that a supply failing either is ineligible for
+        automatic promotion under REQ-PIPE-075 criterion 3.
+    non_functional_requirements:
+      - >
+        The reference lookup runs where a warehouse connection is
+        legitimately open - the orchestrator's own run step - and never
+        in a build path. CLAUDE.md's standing rule: a build may read
+        recorded QA results, never actual data, and never anything else.
+      - >
+        Thresholds are configuration, not literals in a tool script, so
+        that a dataset whose volume legitimately swings can be widened
+        without a code change.
+    dependencies: [REQ-PIPE-075, REQ-PIPE-079]
+    decisions:
+      - >
+        THE REFERENCE IS THE PREVIOUS PERIOD'S PROMOTED SUPPLY (Keith,
+        2026-09-28), and his own correction is the part worth keeping. A
+        plain "previous promoted supply" reads as including one in the
+        CURRENT period, so a resupply would be measured against the
+        supply it is correcting - which measures our own churn rather
+        than drift.
+      - >
+        REJECTED the previous ARRIVAL, which is what Birth
+        Registrations' row-drop check uses today via _previous_run_id().
+        A supply that arrived and was rejected should never be anybody's
+        baseline.
+      - >
+        REJECTED the fixed first-arrival anchor, which is what both PSI
+        checks use today (manifest[0], itself a fix for an even more
+        stale hardcoded literal). Over years it is an anchor receding
+        into the past, so a slowly-changing population drifts from it
+        permanently: the check either sits red for ever or gets widened
+        until it says nothing.
+      - >
+        RECORDED AS A CORRECTION TO THIS SESSION'S OWN ADVICE. A
+        relative volume check was first proposed as a promotion-safety
+        measure, then withdrawn on four objections - the threshold is
+        the same guess one level up, a previous-period reference is
+        poisonable by the promotion it guards, legitimate step changes
+        redden it, and REQ-PIPE-075 promotes on amber anyway so a
+        "looks unusual" signal would not fire. Three of those survive
+        and are why this is scoped as a CHECK rather than as a gate.
+        The poisoning objection is answered by the reference being the
+        previous period's PROMOTED supply: comparing against data
+        somebody accepted is not the same as comparing against whatever
+        turned up.
+      - >
+        IT WAS NEVER THE DISCRIMINATOR FOR THE TWO-FILE CASE, which is
+        what prompted the conversation. A second supply for one period
+        is already handled by slot state - REQ-PIPE-075 criterion 4
+        refuses to auto-promote into a filled slot and a person decides.
+        This requirement earns its place only in the LONE wrong file
+        case, where nothing ever contests the supply and content is the
+        only evidence there is.
+      - >
+        Thresholds for Child Protection are deliberately arbitrary
+        (Keith, 2026-09-28: "just make something up... in terms of the
+        thresholds"). Mirroring Birth Registrations' existing bands
+        keeps one convention across both collections rather than
+        inventing a second.
