@@ -154,3 +154,140 @@ class TestTheBarOnAutomaticPromotion:
                           physical_tables=[other], actor="promotion-gate",
                           actor_kind=dl.RULE, effective_at=LATER)
         assert rejection.decided_by_a_person(conn, dataset, table) is True
+
+
+class TestRejectingAPromotedSupplyTakesOneDecision:
+    """Criterion 4 - and the person does not have to demote it first.
+
+    Making them would be asking for two entries to describe one
+    intention: "not this one" is a single thing to have decided."""
+
+    def test_the_slot_is_left_unfilled(self, conn, dataset, period):
+        table = a_staged_table(conn)
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=table, period=period,
+                          physical_tables=[table], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        assert dl.promoted_into(conn, dataset, period) == table
+        rejection.reject(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                         dataset_id=dataset, supply=table, physical_tables=[table],
+                         actor="keith", effective_at=LATER, from_slot=period,
+                         reason="wrong quarter's file, spotted after promotion",
+                         promoted=True)
+        assert dl.promoted_into(conn, dataset, period) is None
+
+    def test_and_it_is_ONE_decision_not_two(self, conn, dataset, period):
+        table = a_staged_table(conn)
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=table, period=period,
+                          physical_tables=[table], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        before = len(dl.decisions_for(conn, dataset))
+        rejection.reject(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                         dataset_id=dataset, supply=table, physical_tables=[table],
+                         actor="keith", effective_at=LATER, from_slot=period,
+                         reason="wrong quarter's file", promoted=True)
+        assert len(dl.decisions_for(conn, dataset)) == before + 1
+
+
+class TestDemoteReturnsItToTheQueue:
+    """Criterion 5. The refusal while a LATER period stands on this
+    supply is REQ-PIPE-084 criterion 11's and is not built here - 084 is
+    a separate requirement in a later sprint."""
+
+    def test_the_table_goes_back_to_staging(self, conn, dataset, period):
+        table = a_staged_table(conn)
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=table, period=period,
+                          physical_tables=[table], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        rejection.demote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                         dataset_id=dataset, supply=table, physical_tables=[table],
+                         actor="keith", effective_at=LATER, from_slot=period,
+                         reason="want another look before this counts")
+        assert table in tables_in(conn, supply_db.STAGING_SCHEMA)
+
+    def test_and_the_slot_is_unfilled(self, conn, dataset, period):
+        table = a_staged_table(conn)
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=table, period=period,
+                          physical_tables=[table], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        rejection.demote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                         dataset_id=dataset, supply=table, physical_tables=[table],
+                         actor="keith", effective_at=LATER, from_slot=period,
+                         reason="want another look")
+        assert dl.promoted_into(conn, dataset, period) is None
+
+    def test_a_demoted_supply_does_NOT_promote_itself_again(self, conn, dataset, period):
+        """The point of criterion 5 read with criterion 7: it comes back
+        to the PERSON, not to the next automatic run."""
+        table = a_staged_table(conn)
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=table, period=period,
+                          physical_tables=[table], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        rejection.demote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                         dataset_id=dataset, supply=table, physical_tables=[table],
+                         actor="keith", effective_at=LATER, from_slot=period,
+                         reason="want another look")
+        may, why = promotion.should_promote(
+            status="green", slot_filled=False, held_without_slot=False,
+            has_active_checks=True,
+            decided_by_a_person=rejection.decided_by_a_person(conn, dataset, table))
+        assert may is False and "person" in why.lower()
+
+
+class TestTellingAnUndecidedSupplyFromAReturnedOne:
+    """Criterion 6."""
+
+    def test_an_untouched_supply_is_awaiting_a_decision(self, conn, dataset):
+        table = a_staged_table(conn)
+        assert rejection.staged_state(conn, dataset, table) == "awaiting-decision"
+
+    def test_a_returned_one_says_so(self, conn, dataset, period):
+        table = a_staged_table(conn)
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=table, period=period,
+                          physical_tables=[table], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        rejection.demote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                         dataset_id=dataset, supply=table, physical_tables=[table],
+                         actor="keith", effective_at=LATER, from_slot=period,
+                         reason="want another look")
+        assert rejection.staged_state(conn, dataset, table) == "returned-by-a-person"
+
+
+class TestARedSupplyNobodyDecidedOnStaysPut:
+    """Criterion 8 - red is not the same as rejected, and only a person
+    rejects. A red supply sitting in staging is the queue doing its job."""
+
+    def test_it_is_still_in_staging(self, conn, dataset):
+        table = a_staged_table(conn)
+        assert table in tables_in(conn, supply_db.STAGING_SCHEMA)
+        assert table not in tables_in(conn, supply_db.REJECTED_SCHEMA)
+
+    def test_and_reads_as_awaiting_a_decision(self, conn, dataset):
+        table = a_staged_table(conn)
+        assert rejection.staged_state(conn, dataset, table) == "awaiting-decision"
+
+
+class TestAReversalKeepsBothEntries:
+    """Criterion 9 - the log is append-only, so a reversal is a new
+    entry rather than an edit. Verified rather than assumed."""
+
+    def test_both_the_rejection_and_its_reversal_are_kept(self, conn, dataset, period):
+        table = a_staged_table(conn)
+        rejection.reject(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                         dataset_id=dataset, supply=table, physical_tables=[table],
+                         actor="keith", effective_at=WHEN, from_slot=period,
+                         reason="thought it was a duplicate")
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=table, period=period,
+                          physical_tables=[table], actor="keith",
+                          actor_kind=dl.PERSON, effective_at=LATER,
+                          reason="it was not a duplicate after all",
+                          from_schema=supply_db.REJECTED_SCHEMA)
+        actions = [e["action"] for e in dl.decisions_for(conn, dataset)]
+        assert dl.REJECT in actions and dl.PROMOTE in actions
+        assert len(actions) == 2, "a reversal is a new entry, never an edit"

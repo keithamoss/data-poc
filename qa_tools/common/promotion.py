@@ -44,7 +44,8 @@ def promote(conn: supply_db.SupplyConnection, *,
             actor_kind: str,
             effective_at: str,
             reason: str | None = None,
-            supply_is_red: bool = False) -> bool:
+            supply_is_red: bool = False,
+            from_schema: str | None = None) -> bool:
     """Move this supply's tables into `period` and record the decision.
 
     Returns True where it promoted, False where the supply was already
@@ -76,9 +77,14 @@ def promote(conn: supply_db.SupplyConnection, *,
         supply_is_red=supply_is_red,
     )
 
+    # A supply usually comes from staging, but a rejection being
+    # reversed comes from the rejected schema - criterion 9's "reversed
+    # by a later recorded decision".
+    source = from_schema or supply_db.STAGING_SCHEMA
+
     def move() -> None:
         for physical in physical_tables:
-            supply_db.move_table(conn, physical, supply_db.STAGING_SCHEMA, schema)
+            supply_db.move_table(conn, physical, source, schema)
 
     # ONE TRANSACTION, entry and move together - see this module's
     # docstring on why that is STRONGER than criterion 9's literal

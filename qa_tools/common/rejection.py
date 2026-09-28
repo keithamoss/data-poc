@@ -38,7 +38,8 @@ def reject(conn: supply_db.SupplyConnection, *,
            effective_at: str,
            reason: str,
            from_slot: str,
-           actor_kind: str = decision_log.PERSON) -> None:
+           actor_kind: str = decision_log.PERSON,
+           promoted: bool = False) -> None:
     """Move this supply to the rejected schema and record the decision.
 
     `from_slot` IS REQUIRED, not optional, because the decision log
@@ -63,6 +64,21 @@ def reject(conn: supply_db.SupplyConnection, *,
             "but saying a supplier's file will not be used is somebody's decision "
             f"to own (actor_kind was {actor_kind!r})")
 
+    # WHERE IT COMES FROM depends on whether it was ever promoted.
+    # Criterion 4 says a person rejecting a PROMOTED supply does not
+    # have to demote it first, so the tables may be sitting in the
+    # period's schema rather than in staging.
+    #
+    # A BOOLEAN RATHER THAN A SCHEMA NAME, deliberately. The first
+    # version took `from_schema` and a caller promptly passed a PERIOD
+    # where a SCHEMA belonged - caught by supply_db's own identifier
+    # check, which is a good error to get and a better one not to need.
+    # The slot is already an argument, so the schema is derivable and
+    # the caller cannot get it wrong.
+    from qa_tools.common import period_schema
+
+    source = period_schema.period_schema(from_slot) if promoted \
+        else supply_db.STAGING_SCHEMA
     schema = supply_db.REJECTED_SCHEMA
     conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
     decision = decision_log.Decision(
@@ -72,7 +88,7 @@ def reject(conn: supply_db.SupplyConnection, *,
         from_slot=from_slot, reason=reason)
     with decision_log.apply_decision(conn, decision):
         for physical in physical_tables:
-            supply_db.move_table(conn, physical, supply_db.STAGING_SCHEMA, schema)
+            supply_db.move_table(conn, physical, source, schema)
 
 
 def decided_by_a_person(conn: supply_db.SupplyConnection,
@@ -99,3 +115,62 @@ def decided_by_a_person(conn: supply_db.SupplyConnection,
         "WHERE dataset_id = ? AND supply = ? AND actor_kind = ? LIMIT 1",
         [dataset_id, supply, decision_log.PERSON]).fetchall()
     return bool(rows)
+
+
+def demote(conn: supply_db.SupplyConnection, *,
+           agency_id: str,
+           collection_id: str,
+           dataset_id: str,
+           supply: str,
+           physical_tables: Sequence[str],
+           actor: str,
+           effective_at: str,
+           reason: str,
+           from_slot: str,
+           actor_kind: str = decision_log.PERSON) -> None:
+    """Return a promoted supply to staging, leaving its slot unfilled.
+
+    The un-decide. A demoted supply comes back to the PERSON rather
+    than to the next automatic run - criterion 5 read with criterion 7,
+    since the demotion is itself a person's decision and so bars
+    automatic promotion of that supply thereafter.
+
+    WHAT THIS DOES NOT DO: refuse the demotion while a LATER period
+    stands on this supply. That is REQ-PIPE-084 criterion 11's rule,
+    belongs with substitution, and is not built here.
+    """
+    if actor_kind != decision_log.PERSON:
+        raise NotAPersonsDecision(
+            "only a person demotes a supply - automation promotes, and pulling "
+            f"something back is somebody's decision to own (actor_kind was {actor_kind!r})")
+
+    from qa_tools.common import period_schema
+
+    decision = decision_log.Decision(
+        agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
+        action=decision_log.DEMOTE, supply=supply, actor=actor,
+        actor_kind=actor_kind, effective_at=effective_at,
+        from_slot=from_slot, reason=reason)
+    with decision_log.apply_decision(conn, decision):
+        for physical in physical_tables:
+            supply_db.move_table(conn, physical,
+                                 period_schema.period_schema(from_slot),
+                                 supply_db.STAGING_SCHEMA)
+
+
+#: What a staged supply is waiting for (criterion 6).
+AWAITING_DECISION = "awaiting-decision"
+RETURNED_BY_A_PERSON = "returned-by-a-person"
+
+
+def staged_state(conn: supply_db.SupplyConnection,
+                 dataset_id: str, supply: str) -> str:
+    """Whether anybody has looked at this staged supply (criterion 6).
+
+    The distinction an operator's queue turns on: a supply nobody has
+    decided on is work to do, and one a person looked at and returned is
+    work somebody has already thought about. Both sit in staging, which
+    is why the queue cannot tell them apart by location.
+    """
+    return RETURNED_BY_A_PERSON if decided_by_a_person(conn, dataset_id, supply) \
+        else AWAITING_DECISION
