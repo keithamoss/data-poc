@@ -29,6 +29,7 @@ same division decision_log.Decision already makes for `supply_is_red`.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 
 from qa_tools.common import decision_log, period_schema, supply_db
 
@@ -171,17 +172,24 @@ def should_promote(*, status: str,
         # having decided outranks whatever the checks now say.
         return False, ("a person has already decided about this supply, and "
                        "automation defers to them permanently")
-    if status not in PROMOTES_ITSELF:
-        # Criterion 3.
-        return False, (f"this supply's status is {status} rather than green or "
-                       "amber, so it waits for a person")
     if not has_active_checks:
         # Criterion 12, and the dangerous direction: a table nobody wrote
         # a check for computes as green by having no failures, and would
         # otherwise promote itself on the strength of nothing having been
         # asked of it.
+        #
+        # AHEAD OF THE VERDICT, because the two arrive together:
+        # status_of() returns None where nothing contributed, which IS
+        # the check-free case. Reporting "its status is None rather than
+        # green or amber" sends an operator looking for a failing check
+        # that does not exist. If nothing was asked, there is no answer
+        # to report.
         return False, ("this table has no ACTIVE checks, so nothing was "
                        "asked of it and green means only that")
+    if status not in PROMOTES_ITSELF:
+        # Criterion 3.
+        return False, (f"this supply's status is {status} rather than green or "
+                       "amber, so it waits for a person")
     if slot_filled:
         # Criterion 4, whatever the status.
         return False, ("this supply's slot is already filled by a promoted "
@@ -252,6 +260,14 @@ def promote_each(conn: supply_db.SupplyConnection,
     return promoted, failures
 
 
+class UnreadableVerdictError(RuntimeError):
+    """A check result whose status this gate cannot map to a verdict.
+
+    Its own type because the CALLER has to tell it apart from a red
+    supply: one is a supply waiting for a person, the other is a bug or
+    a new tool status nobody taught this about."""
+
+
 def status_of(dataset_id: str, results: Sequence[dict], *,
               reads: dict[str, list[str]]) -> str | None:
     """This dataset's status, from EVERY check that contributes to it
@@ -295,12 +311,32 @@ def status_of(dataset_id: str, results: Sequence[dict], *,
 
     contributing = []
     for record in results:
-        if record.get("dataset_id") == dataset_id:
-            contributing.append(record["status"])
+        mine = record.get("dataset_id") == dataset_id
+        if not mine:
+            declared = reads.get(record.get("check_id") or "")
+            mine = bool(declared and own_tables.intersection(declared))
+        if not mine:
             continue
-        declared = reads.get(record.get("check_id") or "")
-        if declared and own_tables.intersection(declared):
-            contributing.append(record["status"])
+        # A RECORDED RESULT CARRIES ITS TOOL'S OWN VERDICT - `pass`,
+        # `warn`, `fail`, `error` - and the gate speaks the dashboard's
+        # green/amber/red. The first version of this fed the raw verdict
+        # straight into worst_of(), which orders only the second
+        # vocabulary, so EVERY real result raised. Found by writing a
+        # test against the shape qa.check_result actually holds rather
+        # than the shape the gate wished for.
+        verdict = dataset_status.dashboard_status(record.get("status"))
+        if verdict is None:
+            # AN UNREADABLE VERDICT IS NOT EVIDENCE OF HEALTH, and
+            # dropping it would be exactly that - the supply would
+            # promote itself on the strength of a result nobody could
+            # read. Raised rather than mapped to red, because "it is
+            # red" sends an operator looking for a failing check and
+            # the real problem is that we do not understand the answer.
+            raise UnreadableVerdictError(
+                f"check {record.get('check_id')!r} recorded status "
+                f"{record.get('status')!r}, which is not a verdict this gate "
+                f"can read - so nothing can be concluded about {dataset_id}")
+        contributing.append(verdict)
 
     if not contributing:
         return None
@@ -392,3 +428,228 @@ def newest_promoted(conn: supply_db.SupplyConnection,
     if action in (decision_log.PROMOTE, decision_log.REFILE):
         return supply
     return None
+
+
+# ---------------------------------------------------------------------------
+# The step that follows a QA run (criteria 1 and 13)
+#
+# EVERYTHING ABOVE IS A DECISION MADE IN ISOLATION - one gate, one move,
+# one entry. This is the one place that assembles them into the act the
+# pipeline performs: take what a run just found, ask the gate about each
+# supply it carried, and promote the ones that qualify.
+#
+# IT IS DELIBERATELY NOT PART OF THE RUN. Criterion 13's reason is
+# retryability - a promotion that fails must be repeatable without
+# re-running QA - and the structural consequence is that the
+# orchestrators' own run function must not call this. A test asserts
+# that against the AST rather than trusting the comment
+# (tests/test_promotion_after_run.py).
+# ---------------------------------------------------------------------------
+
+#: What an automatic promotion records as its reason. A rule does not
+#: have to justify itself the way a person does, but an entry that says
+#: nothing is one a reader has to reconstruct the gate to understand.
+AUTOMATIC_REASON = ("every check contributing to this dataset passed or warned, "
+                    "and its slot for this period was unfilled")
+
+
+@dataclass(frozen=True)
+class AfterRun:
+    """What the promotion step did, in three lists that mean three things.
+
+    `refused` and `failed` are NOT the same and collapsing them would
+    lose the distinction an operator needs. A refusal is the gate
+    working - red, a filled slot, no confident slot - and the supply is
+    waiting for a person. A failure is something going wrong, and the
+    supply is waiting for a retry.
+    """
+
+    promoted: tuple[str, ...] = ()
+    refused: dict[str, str] = field(default_factory=dict)
+    failed: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def nothing_happened(self) -> bool:
+        return not (self.promoted or self.refused or self.failed)
+
+
+def after_run(conn: supply_db.SupplyConnection, *,
+              agency_id: str,
+              collection_id: str,
+              supplies: Sequence[dict],
+              results: Sequence[dict],
+              reads: dict[str, list[str]],
+              actor: str,
+              actor_kind: str,
+              effective_at: str) -> AfterRun:
+    """Promote whatever this run's supplies earned, one decision each.
+
+    `supplies` is what the run actually carried, one dict per dataset:
+      dataset_id, supply, period (None where nothing could be filed),
+      physical_tables, and the two refusals only the caller can see -
+      `held` (REQ-PIPE-059 could not choose between two files) and
+      `contested` (REQ-PIPE-079 criterion 13).
+
+    `results` is this run's check results and `reads` is check_id -> the
+    tables each declares, which together are how status_of() finds every
+    check contributing to a dataset - including the cross-table ones
+    filed under a sibling (criterion 2).
+
+    NOTHING HERE RAISES for one supply's sake. At ~30 datasets on the
+    quarterly asset a step that abandons twenty-nine promotions because
+    the thirtieth was odd is a step somebody turns off, which is the
+    same blast-radius rule this batch applies everywhere.
+    """
+    from qa_tools.common import rejection
+
+    work: list[dict] = []
+    refused: dict[str, str] = {}
+
+    for item in supplies:
+        dataset_id = item["dataset_id"]
+        period = item.get("period")
+        try:
+            status = status_of(dataset_id, results, reads=reads)
+        except UnreadableVerdictError as exc:
+            # A REFUSAL rather than a failure: retrying will not make the
+            # verdict readable, so this is a supply waiting for a person.
+            refused[dataset_id] = str(exc)
+            continue
+        ok, why = should_promote(
+            # NO PERIOD IS THE SAME REFUSAL AS A HELD SUPPLY, and saying
+            # so here rather than inventing a fourth reason keeps the
+            # operator-facing text down to the five the gate already
+            # owns. A supply nothing could file has no slot to fill.
+            held_without_slot=bool(item.get("held")) or period is None,
+            contested=bool(item.get("contested")),
+            status=status,
+            # Nothing contributed means nothing was asked - see the
+            # gate's own comment on why that outranks the verdict.
+            has_active_checks=status is not None,
+            slot_filled=period in filled_slots(conn, dataset_id),
+            decided_by_a_person=rejection.decided_by_a_person(
+                conn, dataset_id, item["supply"]),
+        )
+        if not ok:
+            refused[dataset_id] = why or "refused"
+            continue
+        work.append({"dataset_id": dataset_id, "supply": item["supply"],
+                     "period": period,
+                     "physical_tables": item["physical_tables"],
+                     "reason": AUTOMATIC_REASON})
+
+    promoted, failed = promote_each(
+        conn, work, agency_id=agency_id, collection_id=collection_id,
+        # Each item carries its own; this is the fallback for a caller
+        # that promotes one period's worth, and promote_each prefers the
+        # item's every time.
+        period="", actor=actor, actor_kind=actor_kind,
+        effective_at=effective_at)
+    return AfterRun(promoted=tuple(promoted), refused=refused, failed=failed)
+
+
+def after_runs(found_arrivals, results: Sequence[dict], *,
+               agency_id: str,
+               collection_id: str,
+               actor: str,
+               actor_kind: str,
+               effective_at: str) -> AfterRun:
+    """Run the promotion step over a whole batch, one arrival at a time.
+
+    The batch counterpart to after_run(), and the shape both
+    orchestrators call. Returns the three lists MERGED across arrivals,
+    because what an operator wants at the end of a run is "what got
+    promoted and what did not", not a per-arrival breakdown they have
+    to fold themselves.
+
+    IN RECEIPT ORDER, AND STRICTLY SEQUENTIALLY, even though the QA runs
+    that produced these results were parallel. Promotion order decides
+    which supply fills a slot: two supplies for one dataset and period
+    are a race, and the loser must see the slot filled rather than both
+    seeing it empty. The runs can be parallel because they only read;
+    this writes.
+
+    ONE CONNECTION FOR THE WHOLE BATCH rather than one per arrival. Each
+    promotion is still its own transaction - promote() sees to that -
+    and re-opening a connection thirty times to prove it would only add
+    failure modes.
+
+    `results` is every result in the batch; each arrival's step is given
+    the subset carrying its own run_id. A result with no run_id belongs
+    to no run and is left out rather than counted everywhere.
+    """
+    from qa_tools.common import filing
+
+    merged = AfterRun(promoted=(), refused={}, failed={})
+    promoted: list[str] = []
+    by_run: dict[str, list[dict]] = {}
+    for record in results:
+        run_id = record.get("run_id")
+        if run_id:
+            by_run.setdefault(run_id, []).append(record)
+
+    reads = _declared_reads()
+    with supply_db.connect(label="mothman:promote-after-run") as conn:
+        for arrival in sorted(found_arrivals, key=lambda a: (a.sequence, a.run_id)):
+            outcome = after_run(
+                conn, agency_id=agency_id, collection_id=collection_id,
+                supplies=filing.supplies_of(conn, arrival),
+                results=by_run.get(arrival.run_id, []),
+                reads=reads, actor=actor, actor_kind=actor_kind,
+                effective_at=effective_at)
+            promoted.extend(outcome.promoted)
+            # LAST WORD WINS on a dataset seen twice, which is the right
+            # answer rather than a shortcut: a later arrival's refusal
+            # ("the slot is already filled") is the current state, and
+            # the earlier arrival's success is already in the log.
+            merged.refused.update(outcome.refused)
+            merged.failed.update(outcome.failed)
+    return AfterRun(promoted=tuple(promoted), refused=merged.refused,
+                     failed=merged.failed)
+
+
+def _declared_reads() -> dict[str, list[str]]:
+    """check_id -> the logical tables it declares it reads.
+
+    Wrapped so that a configuration problem in the declarations cannot
+    stop the promotion step: an empty mapping means cross-table checks
+    are attributed only to the dataset they are filed under, which is
+    the pre-criterion-2 behaviour and STRICTLY LESS PERMISSIVE than
+    being wrong in the other direction - a missing declaration can only
+    ever cost a promotion, never grant one.
+    """
+    from qa_tools.common import tables_read
+    from qa_tools.common.validate_check_lifecycle import collect_checks
+
+    try:
+        # `None` is the working tree's own checks, which is what a live
+        # run is checking against - the same call
+        # pipeline/build_cp_dashboard_data.py makes. Configuration, not
+        # state, so this is a legitimate read from anywhere.
+        return tables_read.declared_by_check_id(collect_checks(None))
+    except Exception as exc:  # noqa: BLE001 - see the docstring
+        print(f"note: could not read the cross-table declarations "
+              f"({type(exc).__name__}: {exc}) - the promotion gate will see only "
+              f"each dataset's own results, which can refuse a promotion but "
+              f"never grant one.")
+        return {}
+
+
+def report(outcome: AfterRun) -> None:
+    """Say what the promotion step did, in the terminal, every run.
+
+    NOT SILENT ON SUCCESS. A promotion moves a supplier's data into the
+    period the dashboard reads; somebody running the pipeline should see
+    that happen rather than discover it later. And a REFUSAL is the
+    line that matters most - it is the queue of things waiting for a
+    person, which is exactly what nobody looks for unless it is put in
+    front of them.
+    """
+    if outcome.promoted:
+        print(f"\npromoted {len(outcome.promoted)} supply/supplies: "
+              f"{', '.join(sorted(outcome.promoted))}")
+    for dataset_id, why in sorted(outcome.refused.items()):
+        print(f"not promoted - {dataset_id}: {why}")
+    for dataset_id, why in sorted(outcome.failed.items()):
+        print(f"PROMOTION FAILED - {dataset_id}: {why} "
+              f"(the QA results are recorded; re-run to retry the promotion)")

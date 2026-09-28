@@ -100,6 +100,21 @@ class TestACheckFreeTableCannotPromoteItself:
             **a_supply(status="green", has_active_checks=False))
         assert promote is False
 
+    def test_the_reason_is_the_silence_rather_than_the_missing_verdict(self):
+        """status_of() returns None where nothing contributed, which is
+        exactly the check-free case - so the two arrive together and the
+        gate has to report the useful one.
+
+        "Its status is None rather than green or amber" sends an
+        operator looking for a failing check. There is no check. If
+        nothing was asked, there is no answer to report, so the silence
+        outranks the missing verdict.
+        """
+        _, why = promotion.should_promote(
+            **a_supply(status=None, has_active_checks=False))
+        assert "None" not in why
+        assert "ACTIVE checks" in why
+
 
 class TestAutomationDefersToAPersonPermanently:
     """REQ-PIPE-076 criterion 7, which this gate has to honour even though

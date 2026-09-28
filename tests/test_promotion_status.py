@@ -19,28 +19,39 @@ as a supply promoting itself past a red check.
 """
 from __future__ import annotations
 
+import pytest
+
 from qa_tools.common import promotion
 
 
 def r(status, *, dataset_id=None, check_id="c1", scope="dataset"):
+    """One recorded result, in the vocabulary qa.check_result holds.
+
+    A REAL RESULT CARRIES ITS TOOL'S OWN VERDICT - pass, warn, fail,
+    error - not the dashboard's green/amber/red. These tests used to be
+    written in the second vocabulary, which is how status_of() shipped
+    feeding raw verdicts into a rollup that orders only the first: every
+    real result would have raised. The test was self-consistent and
+    wrong about the world, so it proved nothing.
+    """
     return {"status": status, "dataset_id": dataset_id, "check_id": check_id,
             "scope": scope}
 
 
 class TestItFoldsTheDatasetsOwnChecks:
     def test_all_green_is_green(self):
-        assert promotion.status_of("cp-carers", [r("green", dataset_id="cp-carers"),
-                                                 r("green", dataset_id="cp-carers")],
+        assert promotion.status_of("cp-carers", [r("pass", dataset_id="cp-carers"),
+                                                 r("pass", dataset_id="cp-carers")],
                                    reads={}) == "green"
 
     def test_one_red_makes_it_red(self):
-        assert promotion.status_of("cp-carers", [r("green", dataset_id="cp-carers"),
-                                                 r("red", dataset_id="cp-carers")],
+        assert promotion.status_of("cp-carers", [r("pass", dataset_id="cp-carers"),
+                                                 r("fail", dataset_id="cp-carers")],
                                    reads={}) == "red"
 
     def test_an_amber_among_greens_is_amber(self):
-        assert promotion.status_of("cp-carers", [r("green", dataset_id="cp-carers"),
-                                                 r("amber", dataset_id="cp-carers")],
+        assert promotion.status_of("cp-carers", [r("pass", dataset_id="cp-carers"),
+                                                 r("warn", dataset_id="cp-carers")],
                                    reads={}) == "amber"
 
 
@@ -49,16 +60,16 @@ class TestItFoldsCrossTableChecksItParticipatesIn:
     are filed under'."""
 
     def test_a_red_cross_table_check_filed_under_ANOTHER_dataset_counts(self):
-        results = [r("green", dataset_id="cp-carers"),
+        results = [r("pass", dataset_id="cp-carers"),
                    # Filed under placements, but it READS carers.
-                   r("red", dataset_id="cp-placements", check_id="xt1")]
+                   r("fail", dataset_id="cp-placements", check_id="xt1")]
         reads = {"xt1": ["cp_placements", "cp_carers"]}
         assert promotion.status_of("cp-carers", results, reads=reads) == "red", \
             "gating on its own results alone is the false-green direction"
 
     def test_a_cross_table_check_that_does_NOT_read_it_is_ignored(self):
-        results = [r("green", dataset_id="cp-carers"),
-                   r("red", dataset_id="cp-placements", check_id="xt1")]
+        results = [r("pass", dataset_id="cp-carers"),
+                   r("fail", dataset_id="cp-placements", check_id="xt1")]
         reads = {"xt1": ["cp_placements", "cp_clients"]}
         assert promotion.status_of("cp-carers", results, reads=reads) == "green", \
             "another pair's failure is not this dataset's problem"
@@ -71,3 +82,29 @@ class TestAbsenceIsNotGreen:
 
     def test_no_results_is_not_green(self):
         assert promotion.status_of("cp-carers", [], reads={}) is None
+
+
+class TestAVerdictThisGateCannotReadStopsIt:
+    """An unknown tool status is not evidence of health, so it can never
+    be dropped - that would promote a supply on the strength of a result
+    nobody could read.
+
+    RAISED RATHER THAN MAPPED TO RED, because "it is red" sends an
+    operator looking for a failing check when the real problem is that a
+    verdict arrived in a vocabulary nothing here knows."""
+
+    def test_it_raises_and_names_the_check_and_the_status(self):
+        with pytest.raises(promotion.UnreadableVerdictError) as exc:
+            promotion.status_of(
+                "cp-carers",
+                [r("pass", dataset_id="cp-carers"),
+                 r("indeterminate", dataset_id="cp-carers", check_id="c2")],
+                reads={})
+        assert "c2" in str(exc.value) and "indeterminate" in str(exc.value)
+
+    def test_a_result_belonging_to_another_dataset_is_not_our_problem(self):
+        assert promotion.status_of(
+            "cp-carers",
+            [r("pass", dataset_id="cp-carers"),
+             r("indeterminate", dataset_id="cp-placements", check_id="c2")],
+            reads={}) == "green"

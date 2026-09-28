@@ -30,9 +30,11 @@ import sys
 
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
+from qa_tools.common import decision_log
 from qa_tools.common import filing
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common import promotion
 from qa_tools.common import trial
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -300,6 +302,21 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     run_by = get_run_by()
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, run_by, reference_run_id, sequential=sequential)
+
+    # PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13), and
+    # is deliberately not inside it: a promotion that fails must be
+    # retryable without re-running QA, which it is only while the two
+    # are separable. tests/test_promotion_after_run.py asserts the
+    # separation against _run_one_inner's own AST rather than trusting
+    # this comment.
+    #
+    # SEQUENTIAL, though the runs above were parallel. Promotion order
+    # decides which supply fills a slot - see after_runs()'s docstring.
+    promotion.report(promotion.after_runs(
+        found_arrivals, all_results,
+        agency_id=cp_common.AGENCY_ID, collection_id=cp_common.COLLECTION_ID,
+        actor=run_by, actor_kind=decision_log.RULE,
+        effective_at=asset_time.now().isoformat()))
 
     # NOTHING TO SWEEP HERE ANY MORE (Keith, 2026-09-27). Each run
     # discards its own view and dbt schemas as it finishes - see

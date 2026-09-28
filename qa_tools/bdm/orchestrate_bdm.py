@@ -38,8 +38,10 @@ from datetime import date
 from . import bdm_common
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
+from qa_tools.common import decision_log
 from qa_tools.common import filing
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common import promotion
 from qa_tools.common import trial
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -417,6 +419,16 @@ def run_pipeline(sequential: bool = False) -> dict:
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, run_by, reference_entry["run_id"],
         sequential=sequential)
+
+    # PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13) - see
+    # orchestrate_cp.py's identical block for why it is outside the run
+    # rather than inside it, and why it is sequential where the runs
+    # above were parallel.
+    promotion.report(promotion.after_runs(
+        found_arrivals, all_results,
+        agency_id=AGENCY_ID, collection_id=COLLECTION_ID,
+        actor=run_by, actor_kind=decision_log.RULE,
+        effective_at=asset_time.now().isoformat()))
 
     # NOTHING TO SWEEP HERE ANY MORE (Keith, 2026-09-27). Each run
     # discards its own view and dbt schemas as it finishes - see
