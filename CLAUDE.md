@@ -1675,17 +1675,22 @@ Rough layout:
       prompt-injection guidance (OWASP LLM01; Simon Willison coined
       the term), researched because Keith raised the risk directly.
     - **`roughjs.com`**, **`github.blog`** - low priority.
-    - **`arxiv.org`**, **`export.arxiv.org`**, **`agentskills.io`**,
-      **`google.github.io`** (2026-09-29, the agent-architecture
-      research for `plans/explainers.md` #3). arXiv held the papers on
-      LLM self-preference bias and self-correction, which are
-      snippet-only without it. Google's ADK docs were read
-      legitimately from their own source repo (`google/adk-docs`)
-      instead.
-    - **`aclanthology.org`** (2026-09-29, the RAG research for
-      `plans/explainers.md` #3) - the usual non-arXiv home of NLP papers
-      (citation evaluation, "Lost in the Middle"). Worth allow-listing
-      alongside arXiv.
+    - **`export.arxiv.org`**, **`agentskills.io`**, **`google.github.io`**
+      (2026-09-29, the agent-architecture research for
+      `plans/explainers.md` #3). `export.arxiv.org` is arXiv's search
+      API, a separate host from `arxiv.org` itself, and it stayed
+      blocked after `arxiv.org` was allowed. Paper pages and PDFs come
+      from `arxiv.org`, so this blocks only programmatic search. Google's
+      ADK docs were read legitimately from their own source repo
+      (`google/adk-docs`) instead.
+    - ~~**`arxiv.org`**, **`aclanthology.org`**~~ - ALLOW-LISTED by
+      Keith 2026-09-29 and re-verified with a real `curl` (both 200).
+      Both were first hit that day researching the explainer agents
+      (`plans/explainers.md` #3). arXiv holds the papers on LLM
+      self-preference bias, self-consistency and judge reliability;
+      the ACL Anthology is the usual non-arXiv home of NLP papers
+      (citation evaluation, "Lost in the Middle"). Findings from them
+      recorded before that date are labelled snippet-only.
     - **`github.com` HTML and `api.github.com`** returned a plain HTTP
       403 rather than a tunnel failure, so that is probably GitHub
       itself (rate limiting, or no auth on the API) rather than this
