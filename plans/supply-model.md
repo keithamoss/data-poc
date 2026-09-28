@@ -3998,6 +3998,96 @@ have fewer than 2 supplies remaining"); 30 individual banners is
 noise. Same for staleness - the top-level view summarises rather than
 enumerates.
 
+### `contract/calendar.yaml` - one file per asset, and `slaProperties` goes
+
+**Status:** todo (2026-09-28) · **Category:** Pipeline & publishing
+
+Designed with Keith across the morning of 2026-09-28 and written down
+that evening, on noticing it existed in NO file - only in a chat
+session that had already been compacted once. **Nothing here is a
+requirement yet.** The sign-off gate applies: this is the material a
+`delivery-scoper` pass and a read-back should be built from, not a
+licence to start building.
+
+**The problem it solves: the same facts are configured twice.** Today
+an asset's delivery calendars live in `contract/data-asset.yaml` while
+each dataset's cadence, expected time and latency live in that
+dataset's own ODCS contract under `slaProperties:`. The two can
+disagree, nothing checks that they don't, and `slaProperties` cannot
+be versioned - so changing a cadence silently re-judges history.
+
+**The shape agreed:**
+- **One `contract/calendar.yaml` per data asset.** It holds the named
+  calendars (quarterly, daily, ...), each as EFFECTIVE-DATED VERSIONS,
+  the same shape check lifecycle already uses. `slaProperties:` is
+  DELETED from both ODCS contracts rather than left to rot.
+- **A collection may name a calendar, not only a dataset** - Keith's
+  own ask, since a whole collection usually shares one.
+- **`participates: {slots, reason}`** per dataset, so a dataset that
+  is owed nothing in a period says so with a reason a reader can see,
+  rather than being silently absent.
+- **The Child Protection override is about HOW EARLY a supply may
+  arrive**, not about its expected time - Keith corrected this
+  explicitly. It widens the claim window; it does not move the
+  deadline.
+- **The gap invariant, rejected at CONFIG time rather than discovered
+  at runtime:** `claim_window + grace < the gap between consecutive
+  due instants`. Stated concretely: `claim_opens_at(N+1) >
+  late_after(N)`. Without it, a slot's claim window overlaps the
+  previous slot's lateness and an arrival is ambiguous between two
+  slots.
+- **A structured changelog** inside the file - `date`, `author`,
+  `change` per entry - rather than prose comments. Keith asked for
+  this specifically.
+
+**Two decisions Keith added on the evening of 2026-09-28:**
+
+1. **A calendar's HISTORY IS IMMUTABLE, enforced by a validation
+   command wired into the existing pre-commit hook.** Historical
+   entries cannot be changed; the check refuses the commit.
+
+   This is the load-bearing complement to a rejection already recorded
+   two sections above, and the pair only makes sense together. This
+   thread rejected "derive at runtime, freeze the computed `due_at`
+   onto the result", on the grounds that **the dates ARE the supplier
+   agreement and QA judges against the agreement**. But that rejection
+   removes the thing that was protecting history: if a judgement does
+   not carry its own frozen inputs, then editing the agreement
+   retroactively re-judges every past supply against dates nobody
+   agreed at the time. Immutability is what puts that protection back,
+   on the config rather than on the record.
+
+   It also has to be a COMMIT-time gate rather than a runtime one,
+   because by the time anything runs, the damage is already committed
+   and the old values are only recoverable by reading git.
+
+2. **Times are interpreted in the timezone from the data asset's own
+   config.** `contract/data-asset.yaml` already carries `timezone`, so
+   an `expected_time` of `14:00` is wall-clock in the ASSET's zone.
+   Not per-calendar, not per-dataset, and never the timezone of
+   whatever machine happens to be running.
+
+**Three forks these two raise, still open and worth settling before a
+requirement is drafted:**
+
+- **What counts as "historical" - a VERSION or an ENTRY?** Freezing a
+  version once its `effective_from` has passed is simpler to validate
+  and matches the versioned model, but it means correcting NEXT
+  year's date requires a new version. Freezing individual elapsed
+  entries allows in-place edits to future dates within a live version,
+  but needs date-by-date comparison. The first is the stricter
+  discipline and my recommendation; it has a real cost, which is more
+  versions.
+- **Is there an escape hatch?** My recommendation is no. A past date
+  that was wrong is exactly the case immutability exists for - the
+  supplies were judged against it, and quietly changing it makes the
+  record disagree with what happened.
+- **Is the TIMEZONE itself versioned?** If an asset's zone ever
+  changed, every past due instant would move. WA has no daylight
+  saving so this is theoretical here, but the general system is the
+  one being designed. Either the timezone is versioned alongside the
+  calendars, or this is accepted and written down as accepted.
+
 ## Thread D - Arrival classification
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
 
