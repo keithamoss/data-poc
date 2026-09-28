@@ -18866,12 +18866,15 @@ requirements:
     title: "Inherit and un-inherit are operator actions, and un-inherit is what frees a blocked withdrawal"
     date_written: "2026-09-26"
     story: >
-      As an operator, I want to make a period stand on an earlier
-      supply, and to undo it, so that a withdrawal blocked by later
-      periods is something I can clear rather than a deadlock, and an
-      inheritance nobody wants can be removed.
+      As an operator, I want to say that a period stands on an earlier
+      supply, and to take that back, so that a dataset nobody owes a
+      file for still has something to show - and so that removing an
+      old supply is not blocked by later periods leaning on it.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-28"
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26), from three
       questions he asked about how an operator actually works this -
@@ -18914,6 +18917,17 @@ requirements:
       - >
         THE SYSTEM SHALL require an explicit confirmation before
         un-inheriting, on every route.
+      - >
+        WHEN a period's view for a dataset is created or removed by an
+        operator action, THE SYSTEM SHALL re-evaluate every check in
+        that period that declares a dependency on that dataset AND
+        every check that dataset's own checks depend on, and SHALL NOT
+        leave a verdict standing that was computed against what the
+        period resolved to before.
+      - >
+        IF a period already holds a PROMOTED table for that dataset,
+        THEN THE SYSTEM SHALL refuse to inherit into it, and SHALL say
+        that the period already resolves to a real supply.
     non_functional_requirements:
       - >
         THESE DO NOT BELONG IN THE AWAITING-DECISION QUEUE (Keith,
@@ -18942,20 +18956,70 @@ requirements:
     dependencies: [REQ-PIPE-098, REQ-PIPE-084, REQ-GHUB-082]
     open_questions:
       - >
-        REQ-GHUB-082 NAMES FOUR OPERATIONS ACROSS FIVE CRITERIA and
-        knows nothing of substitute, inherit or un-inherit. Its own
-        decision records the count as now SEVEN and defers the
-        widening to its pending rewrite; two of the three new ones are
-        this requirement's, so that rewrite has to land before either
-        route can offer them. Flagged rather than assumed, because 082
-        is unsigned and five of its criteria are already pending
-        rewrite for other reasons.
-      - >
-        Whether re-inheriting after a withdrawal is a distinct
-        operation from inheriting - the acts are identical and the
-        reasons differ, and REQ-PIPE-074's re-file decision is the
-        precedent for preferring one atomic entry over a composition.
+        REQ-GHUB-082 IS A SEQUENCING DEPENDENCY RATHER THAN A DESIGN
+        FORK, and it is unsigned. It names four operations across five
+        criteria and knows nothing of substitute, inherit or
+        un-inherit; two of those three are this requirement's. Keith
+        agreed 2026-09-28 that 082 should be widened, so NEITHER
+        operator route can offer these until that lands. Signing this
+        requirement does not make it buildable.
     decisions:
+      - >
+        RE-INHERITING IS NOT A SEPARATE OPERATION (Keith, 2026-09-28,
+        closing this requirement's own open question). The acts are
+        identical and only the reasons differ, so the operator inherits
+        again and writes a different sentence in the reason field. A
+        second name for one act would mean two code paths doing one
+        thing, and a log no easier to read - the reason already carries
+        the difference. Follows REQ-PIPE-074's re-file precedent of one
+        atomic entry over a composition.
+      - >
+        NO AUTOMATIC RESTORATION AFTER AN UN-INHERIT, confirmed by
+        Keith 2026-09-28 against non-functional 2: "this is such a
+        narrow edge case that humans can go through multiple uses of
+        the tools and just make stuff right." Two reasons and the
+        second is the one that lasts. Mechanically there is nothing to
+        run it - REQ-PIPE-098's non-functional 4, no scheduler, and a
+        cron on a public repository is disabled after 60 days of quiet.
+        And an inheritance is a RECORDED decision with a named actor:
+        restoring three periods automatically would file three entries
+        nobody authored, in a log whose whole job is answering "why
+        does Q3 stand on Q1's data?" a year later.
+      - >
+        NOTHING IS AUTOMATICALLY QUEUED WHEN A WITHDRAWAL IS FREED
+        (Keith, 2026-09-28), and this is an ABSENCE of logic rather
+        than a rule. Once the periods are un-inherited and the
+        demotion, rejection or re-file goes through, whatever happens
+        next is whatever the ordinary rules do with a slot that is now
+        free - this requirement adds no special path, and should not.
+      - >
+        A PERIOD THAT ALREADY HOLDS A PROMOTED TABLE CANNOT BE
+        INHERITED INTO (criterion 12, Keith, 2026-09-28) - a gap
+        neither this requirement, REQ-PIPE-084 nor REQ-PIPE-098
+        mentioned, and a reachable one: a dataset that does not
+        participate in Q3 can still have had a supply arrive and be
+        promoted there, which REQ-PIPE-057 criterion 11 already calls
+        an unexpected table. Refused on the same footing as criterion
+        9: a period resolving to a real supply does not need to stand
+        on anything, and inheriting would replace real data with a
+        pointer to older data. Keith extended it to SUBSTITUTION on the
+        same terms, which is REQ-PIPE-084's to carry.
+      - >
+        AND THE CONVERSE SHAPE IS A TEST RATHER THAN A RULE (Keith,
+        2026-09-28): a period is inherited first, and only then does an
+        unscheduled supply arrive for it. That supply is staged and
+        QA'd normally and is HELD, because the slot is filled -
+        REQ-PIPE-075 criterion 4 - so no new mechanism is needed. It is
+        listed as a scenario precisely because it works by existing
+        rules and would otherwise never be exercised.
+      - >
+        RE-EVALUATION IS NOT LIMITED TO CROSS-TABLE CHECKS (criterion
+        11, Keith's own widening, 2026-09-28). Creating or removing a
+        view changes what the period resolves to, so every check that
+        DECLARES a dependency on that dataset and every check its own
+        checks depend on has to be re-evaluated - dependency runs both
+        ways, and stating only the cross-table half would leave
+        verdicts standing against a table that is no longer there.
       - >
         INHERIT AND UN-INHERIT ARE REAL OPERATOR ACTIONS (Keith,
         2026-09-26). He was never describing derived state, and that
