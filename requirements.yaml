@@ -22022,7 +22022,9 @@ requirements:
       - >
         THE SYSTEM SHALL post a comment on an open ticket ONLY where
         what it would say has changed since the last comment on that
-        ticket.
+        ticket. A REFUSAL is not subject to that rule: it answers a
+        person who asked, so THE SYSTEM SHALL post it even where an
+        identical refusal stands above it.
       - >
         THE SYSTEM SHALL retire REQ-GHUB-027 criterion 7's rule that a
         comment is posted even when identical to the previous one, and
@@ -22031,7 +22033,8 @@ requirements:
         THE SYSTEM SHALL make a ticket's CURRENT state readable without
         relying on the most recent comment being recent - so that a
         thread quiet for a month still says where the supply has got
-        to.
+        to - and SHALL keep that state in the TICKET'S OWN BODY,
+        rewritten in place, so that one slot's state is in one place.
       - >
         THE SYSTEM SHALL compare against what the LAST COMMENT SAID
         rather than against the last state it computed, so that a
@@ -22072,6 +22075,26 @@ requirements:
         explicitly allows, on a schedule AND after a QA run.
     dependencies: [REQ-GHUB-027, REQ-PIPE-083]
     decisions:
+      - >
+        A REFUSAL IS EXEMPT FROM POST-ON-CHANGE (Keith, 2026-09-28,
+        carried over from REQ-PIPE-083's own refusal rule). Two
+        identical refusals are not a duplicate to suppress - they are
+        answers to a person who asked twice, and the second silence
+        would read as the tool having stopped working. The rule this
+        requirement exists to impose is about STATE, which repeats
+        because nothing changed; a refusal repeats because somebody
+        acted again.
+      - >
+        THE CURRENT STATE LIVES IN THE TICKET'S BODY (Keith,
+        2026-09-28). Criterion 3 asked for state readable without a
+        recent comment and deliberately did not say where, because when
+        it was drafted a ticket was per DATASET and a body could not
+        sensibly hold "current state" for a dataset spanning every
+        period. REQ-PIPE-083 made tickets per SLOT, and a body is then
+        exactly right: one slot, one state, rewritten in place. It also
+        gives the human-closed-then-reopened case somewhere coherent to
+        show what changed. Considered and not chosen: labels, which say
+        a state in a word but cannot carry a reason or name a stand-in.
       - >
         RETIRE THROUGH A SUCCESSOR, DO NOT AMEND IN PLACE (Keith,
         2026-09-28). This session first rewrote REQ-GHUB-027 criterion
