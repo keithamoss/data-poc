@@ -15750,6 +15750,9 @@ requirements:
       arrived and was fine.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-28"
     source: >
       Keith, 2026-09-24, in his own words: "no one could look at it and
       go, oh, it's green and it's good. No, it's green. And then next to
@@ -15781,13 +15784,18 @@ requirements:
           run it claims to report.
       - >
         THE SYSTEM SHALL render the qualifier at WARNING level, on the
-        dataset's own page and on its card in the agency view.
+        dataset's own page and on its card in the agency view - and
+        SHALL render it at a level DISTINCT from the information level
+        an inherited period carries (REQ-DASH-100), so that a reader
+        can tell a person's decision about a missing supply from a
+        dataset behaving as agreed.
       - >
         THE SYSTEM SHALL carry, on the qualifier itself, a tooltip
-        naming the period the data came from - and SHALL name that
-        period, or failing that its date, in the qualifier's own label
-        where the layout allows it, so a reader learns where the data
-        came from at a glance rather than only on hover.
+        naming the period the data came from AND WHO DECIDED IT - and
+        SHALL name that period, or failing that its date, in the
+        qualifier's own label where the layout allows it, so a reader
+        learns where the data came from at a glance rather than only
+        on hover.
       - >
         THE SYSTEM SHALL NOT present a substituted period's check
         results as belonging to the period being viewed, and SHALL take
@@ -15830,6 +15838,20 @@ requirements:
         touching the template.
     dependencies: [REQ-PIPE-084, REQ-DASH-041, REQ-DASH-070]
     decisions:
+      - >
+        THE TOOLTIP NAMES THE ACTOR TOO (criterion 7, Keith,
+        2026-09-28). "Where did this come from" and "who decided it"
+        are the two questions a reader has on meeting the qualifier,
+        and the second is what separates a substitution from an
+        inheritance - so answering only the first would leave the more
+        distinguishing half behind a drill-down.
+      - >
+        CRITERION 6 STATES THE CONTRAST RATHER THAN JUST THE LEVEL
+        (Keith, 2026-09-28). Naming warning alone would let a builder
+        satisfy it while giving inheritance the same styling, and the
+        whole point is that a reader can TELL THEM APART at a glance.
+        The requirement now names the other side and cites
+        REQ-DASH-100, which states the same contrast from its end.
       - >
         WARNING LEVEL HERE, INFORMATION LEVEL FOR INHERITANCE (Keith,
         2026-09-28, criterion 6). A substitution is a person deciding a
@@ -19404,10 +19426,12 @@ requirements:
         substitution, where a supply that WAS owed never came.
       - >
         THE SYSTEM SHALL carry, on the qualifier itself, a tooltip
-        naming the period the data came from - and SHALL name that
-        period, or failing that its date, in the qualifier's own label
-        where the layout allows it, so a reader learns where the data
-        came from at a glance rather than only on hover.
+        naming the period the data came from AND SAYING THAT IT WAS
+        INHERITED AUTOMATICALLY, no person having decided it - and
+        SHALL name that period, or failing that its date, in the
+        qualifier's own label where the layout allows it, so a reader
+        learns where the data came from at a glance rather than only
+        on hover.
       - >
         THE SYSTEM SHALL render with zero console errors in a real
         browser.
@@ -19428,6 +19452,14 @@ requirements:
     dependencies: [REQ-PIPE-098, REQ-DASH-085]
     open_questions: []
     decisions:
+      - >
+        THE TOOLTIP SAYS IT WAS AUTOMATIC (criterion 7, extending
+        Keith's 2026-09-28 ask on REQ-DASH-085 that the tooltip name
+        the actor). For a substitution the actor is a PERSON; for an
+        inheritance there is none, and saying so is what makes the
+        two read differently on hover as well as in styling. The pair
+        is deliberately symmetrical - a reader gets the same two
+        answers, and one of them is "nobody decided this".
       - >
         INFORMATION LEVEL HERE, WARNING LEVEL FOR SUBSTITUTION (Keith,
         2026-09-28, naming both halves). The earlier decision below
