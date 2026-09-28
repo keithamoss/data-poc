@@ -152,6 +152,31 @@ from volume and shape rather than a measurement, and the first version
 of it was wrong about the ordering, so treat it as a guide rather than
 a commitment.
 
+**Two more, granted later the same night, and the second one changes
+what is safe to attempt:**
+- **THE DATABASE MAY BE WIPED AND REBUILT.** Keith's own words: "if you
+  get stuck at any point in the night and it would help unblock you,
+  feel free to wipe the database and start again fresh. It's all just
+  synth data and our POC data - so nothing is lost." What that unblocks
+  is bigger than being stuck: a FILING IS WRITE-ONCE, which is why
+  turning on `filing.file_arrivals()` in the orchestrators was being
+  treated as the night's riskiest step - a wrong assignment bakes into
+  permanent history. With permission to wipe, the cost of getting it
+  wrong drops from "permanent" to "one bootstrap, about four minutes".
+  Still verify on a throwaway database first; the wipe is a recovery,
+  not a substitute for looking.
+- **REQ-GEN-044 IS BACK ON THE LIST**, after the rest, "if it opens up
+  any of the stuff we wanted to inject there". It does, and the
+  connection is real: this file's own test scenario register is full of
+  scenarios that turn on promotion - auto-promotes, holds because the
+  slot is filled, promoted-then-resupplied, the cross-table check that
+  only runs once a sibling is promoted. Criterion 1 asks for a real
+  instance of every scenario the register names, and a large share of
+  them could not be generated while promotion did not exist. NOTE the
+  limit: criteria 8-11 need effective-dated SCHEDULE VERSIONS, which is
+  the calendar batch (REQ-PIPE-110..113) and still unsigned - so this
+  can move a long way without finishing.
+
 **Two permissions Keith granted for this run specifically, 2026-09-28
 night, and they do not generalise beyond it:**
 - **Real GitHub issues and comments may be created** in
