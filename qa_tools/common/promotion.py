@@ -289,3 +289,48 @@ def status_of(dataset_id: str, results: Sequence[dict], *,
     if not contributing:
         return None
     return dataset_status.worst_of(contributing)
+
+
+# ---------------------------------------------------------------------------
+# When a promotion needs QA running again (criteria 16 and 17).
+#
+# A check's verdict is a statement about a supply READ ALONGSIDE a
+# particular period's other tables. Move the supply to a different
+# period and it sits beside different tables, so a referential check
+# that passed against August's carers says nothing about May's.
+# Re-running is not caution - the old verdict answers a different
+# question.
+# ---------------------------------------------------------------------------
+
+
+def needs_requalification(*, qa_ran_against: str | None,
+                          promoted_into: str,
+                          actor_kind: str | None = None) -> bool:
+    """Whether promoting into `promoted_into` needs QA run again.
+
+    `actor_kind` is accepted and deliberately IGNORED. Criterion 16 is
+    about a person's promotion and criterion 17 about any promotion or
+    re-file, and both turn on the PERIOD rather than on who asked - a
+    verdict computed against one period is no more applicable because a
+    person rather than a rule moved it. The parameter exists so a caller
+    passing it is not silently wrong about what decides this.
+
+    AN UNKNOWN QA PERIOD RE-RUNS. Not knowing what a verdict was
+    computed against is not evidence that it still applies, and the
+    cost of being wrong the other way is a stale verdict presented as a
+    current one.
+    """
+    if qa_ran_against is None:
+        return True
+    return qa_ran_against != promoted_into
+
+
+def checks_reading(table: str, *, reads: dict[str, list[str]]) -> set[str]:
+    """The checks that read this logical table (criterion 17's second half).
+
+    From the check DEFINITIONS - what tables_read.declared_by_check_id()
+    returns - rather than from a new record of its own. A check absent
+    from one run still reads what it declares, and the dashboard already
+    answers this question the same way.
+    """
+    return {check_id for check_id, tables in reads.items() if table in tables}
