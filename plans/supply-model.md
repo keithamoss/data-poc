@@ -140,6 +140,18 @@ from volume and shape rather than a measurement, and the first version
 of it was wrong about the ordering, so treat it as a guide rather than
 a commitment.
 
+**Two permissions Keith granted for this run specifically, 2026-09-28
+night, and they do not generalise beyond it:**
+- **Real GitHub issues and comments may be created** in
+  `keithamoss/data-poc` where a requirement needs them. Asked because
+  they are outward-facing artefacts in a PUBLIC repository that he
+  would have to clean up; he said yes. Still prefer a fake client for
+  the bulk of the tests - exercising the real thing once is evidence,
+  a hundred times is litter.
+- **Self-scheduled wake-ups are allowed**, because an unattended run
+  otherwise stops when a turn ends. Each firing reads this plan,
+  continues from the last committed state, and schedules the next.
+
 **Standing rules for the run**, all of them this project's existing
 ones rather than new: a real failing test first for every defect;
 `mothman check` before each commit and never a commit after an edit
