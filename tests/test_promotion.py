@@ -1,0 +1,166 @@
+"""REQ-PIPE-075 - a slot is filled only by a recorded promotion.
+
+The spine of the supply model: a green or amber supply promotes itself
+into an empty slot, everything else waits for a person, and a slot counts
+as filled only where a promotion says so.
+
+WHAT THESE TESTS PIN, beyond the obvious happy path, is the ORDERING and
+the MOVE - the two things that are easy to build the other way round and
+expensive to discover later:
+
+  - criterion 9: the decision-log entry is written only AFTER the tables
+    are durably in the period schema, so an interrupted promotion is
+    repeated rather than skipped. Written the other way, a crash between
+    the two leaves a log saying a supply was promoted and a period schema
+    that does not hold it - and nothing would ever retry, because the log
+    says it is done.
+  - criterion 15: promotion MOVES the tables out of staging rather than
+    copying them, so staging holds only supplies nobody has decided on.
+"""
+from __future__ import annotations
+
+import uuid
+
+import pytest
+
+from qa_tools.common import decision_log as dl
+from qa_tools.common import period_schema, promotion, qa_store, supply_db
+
+AGENCY = "child-protection-family-support"
+COLLECTION = "child-protection"
+WHEN = "2026-09-28T10:00:00+08:00"
+
+
+@pytest.fixture
+def conn(supply_dsn):
+    with supply_db.connect(label="test-promotion") as c:
+        qa_store.ensure_schema(c)
+        yield c
+
+
+@pytest.fixture
+def dataset():
+    """A dataset id nothing else in the suite has decided anything about."""
+    return f"cp-{uuid.uuid4().hex[:12]}"
+
+
+@pytest.fixture
+def period():
+    """A period of this test's own, so its schema cannot collide."""
+    return f"2099-T{uuid.uuid4().hex[:6]}"
+
+
+def a_staged_table(conn, logical: str) -> str:
+    """One real staged table, named the way the loader names them."""
+    physical = f"{logical}__a{uuid.uuid4().hex[:8]}"
+    conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
+    conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
+    conn.execute(f'INSERT INTO "{supply_db.STAGING_SCHEMA}"."{physical}" VALUES (1)')
+    return physical
+
+
+def tables_in(conn, schema: str) -> set[str]:
+    rows = conn.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
+        [schema]).fetchall()
+    return {r[0] for r in rows}
+
+
+class TestPromotionMovesRatherThanCopies:
+    """Criterion 15."""
+
+    def test_the_table_is_in_the_period_schema_afterwards(self, conn, dataset, period):
+        physical = a_staged_table(conn, "clients")
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=physical, period=period,
+                          physical_tables=[physical], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        assert physical in tables_in(conn, period_schema.period_schema(period))
+
+    def test_and_is_GONE_from_staging(self, conn, dataset, period):
+        """The half that is easy to get wrong. A copy would pass the test
+        above and leave staging holding a supply somebody has decided on,
+        which is exactly what criterion 15 forbids."""
+        physical = a_staged_table(conn, "clients")
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=physical, period=period,
+                          physical_tables=[physical], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        assert physical not in tables_in(conn, supply_db.STAGING_SCHEMA)
+
+    def test_the_rows_survive_the_move(self, conn, dataset, period):
+        physical = a_staged_table(conn, "clients")
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=physical, period=period,
+                          physical_tables=[physical], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        schema = period_schema.period_schema(period)
+        assert conn.execute(f'SELECT count(*) FROM "{schema}"."{physical}"').fetchall()[0][0] == 1
+
+
+class TestTheEntryIsWrittenLast:
+    """Criterion 9 - so an interrupted promotion repeats rather than skips."""
+
+    def test_a_failure_moving_the_tables_leaves_NO_decision(self, conn, dataset, period):
+        # A table that does not exist cannot be moved, which is the
+        # cheapest way to make the move fail for real rather than by
+        # patching something out.
+        with pytest.raises(Exception):
+            promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                              dataset_id=dataset, supply="ghost__aaaaaaaa",
+                              period=period, physical_tables=["ghost__aaaaaaaa"],
+                              actor="promotion-gate", actor_kind=dl.RULE, effective_at=WHEN)
+        assert dl.decisions_for(conn, dataset) == [], \
+            "an entry written before the move would say a supply is promoted that is not"
+
+    def test_so_the_slot_is_still_unfilled_and_the_promotion_can_be_retried(
+            self, conn, dataset, period):
+        with pytest.raises(Exception):
+            promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                              dataset_id=dataset, supply="ghost__aaaaaaaa",
+                              period=period, physical_tables=["ghost__aaaaaaaa"],
+                              actor="promotion-gate", actor_kind=dl.RULE, effective_at=WHEN)
+        assert dl.promoted_into(conn, dataset, period) is None
+
+
+class TestPromotingTwiceChangesNothing:
+    """Criterion 10."""
+
+    def test_the_second_promotion_adds_no_entry(self, conn, dataset, period):
+        physical = a_staged_table(conn, "clients")
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=physical, period=period,
+                          physical_tables=[physical], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        before = len(dl.decisions_for(conn, dataset))
+        again = promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                                  dataset_id=dataset, supply=physical, period=period,
+                                  physical_tables=[physical], actor="promotion-gate",
+                                  actor_kind=dl.RULE, effective_at=WHEN)
+        assert again is False, "a repeat promotion reports that it changed nothing"
+        assert len(dl.decisions_for(conn, dataset)) == before
+
+
+class TestASlotIsFilledOnlyByAPromotion:
+    """Criterion 6, and the reason filing.filled_slots() has been a
+    deliberate stub returning nothing since it was written."""
+
+    def test_an_unfilled_slot_reads_as_unfilled(self, conn, dataset, period):
+        assert promotion.filled_slots(conn, dataset) == frozenset()
+
+    def test_a_promoted_slot_reads_as_filled(self, conn, dataset, period):
+        physical = a_staged_table(conn, "clients")
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=physical, period=period,
+                          physical_tables=[physical], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        assert promotion.filled_slots(conn, dataset) == frozenset({period})
+
+    def test_it_comes_from_the_LOG_rather_than_the_catalogue(self, conn, dataset, period):
+        """Criterion 6 says so in as many words. A table sitting in a
+        period schema that no decision promoted is not a filled slot -
+        it is a table somebody put there, and reading the catalogue
+        would call it filled."""
+        schema = period_schema.ensure_period_schema(conn, period)
+        conn.execute(f'CREATE TABLE "{schema}"."clients__aimposter" (id integer)')
+        assert promotion.filled_slots(conn, dataset) == frozenset()
