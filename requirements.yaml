@@ -9308,7 +9308,62 @@ requirements:
       can tell "their latest file is bad" apart from "the data everyone
       downstream is using is bad" - which today look identical.
     moscow: should
-    status: not_started
+    status: built
+    implemented_by:
+      - qa_tools/common/promotion_state.py::state_for
+      - qa_tools/common/promotion_state.py::State
+      - qa_tools/common/promotion_state.py::WHY_NOT
+      - pipeline/build_dashboard_data.py::build
+      - pipeline/build_cp_dashboard_data.py::build_one_table
+    linked_tests:
+      - tests/test_promotion_state.py::TestItIsQuietWhenTheyAgree
+      - tests/test_promotion_state.py::TestItShowsBothWhenTheyDiffer
+      - tests/test_promotion_state.py::TestItSaysWhyTheArrivalIsNotPromoted
+      - tests/test_promotion_state.py::TestAPromotionSinceTakenBackOutIsNotPromoted
+      - tests/test_promotion_state.py::TestItReadsRecordsAndNeverSupplyRows
+      - tests/test_dashboard_e2e.py::TestArrivedVersusPromoted
+    evidence:
+      - >
+        Built 2026-09-29, once REQ-PIPE-075 had made promotion state a
+        recorded fact - which is exactly what this requirement's own
+        open question said it was waiting for, and the question is
+        answered rather than still open. 10 tests in
+        tests/test_promotion_state.py, 11 in
+        tests-js/promotion-split.test.js, 6 real-browser tests in
+        tests/test_dashboard_e2e.py.
+
+      - >
+        REAL ON THE REAL DATA, which is worth stating because the
+        requirement's own risk was a panel stuck in one permanent state.
+        Both datasets in this deployment show a genuine difference: Birth
+        Registrations reads Tuesday, 22 September 2026 as promoted
+        against a Friday, 25 September arrival, and cp-carers reads
+        2026-Q2 against 2026-Q3. Neither is fabricated for the page.
+
+      - >
+        THE PERIOD LEADS AND THE IDENTIFIER FOLLOWS. A supply is named
+        `cp-carers@202608010100000000`, which is the right identifier
+        and the wrong headline - the thing a reader is telling apart is
+        WHICH DELIVERY, and a period says that in words. The identifier
+        stays, small, because it is what somebody quotes in a ticket.
+
+      - >
+        A DAILY PERIOD NAME IS A BARE ISO DATE, so the panel needed the
+        same treatment REQ-DASH-071 gives every other date. The
+        template's fmtPeriodName() mirrors
+        display_time.format_period() on the Python side - the same rule
+        in two languages, which is a duplication this page already
+        carries deliberately for status rollups, and one the e2e test
+        holds to account rather than trusting.
+
+      - >
+        THE SUPPLY ID AND THE PHYSICAL TABLE ARE DIFFERENT STRINGS, and
+        conflating them broke the first version of the tests.
+        `cp-carers@202608010100000000` is how a filing and a decision
+        name a supply; `cp_carers__202608010100000000` is what the
+        warehouse can call a table, because dbt and Soda write the name
+        into their own SQL unquoted. promote() takes both. Worth
+        recording because the two look interchangeable and are not.
     signed_off:
       by: Keith
       date: "2026-09-27"
@@ -9392,44 +9447,29 @@ requirements:
         thing clearly. A viewer who needs to know whether the latest
         arrival is the promoted supply is already looking at that
         dataset, which is the panel.
-    open_questions:
       - >
-        FOUND WHILE BUILDING, 2026-09-27, and it is why this is still
-        not_started while everything either side of it in the build order
-        shipped: NOTHING RECORDS PROMOTION STATE YET, so criterion 1 has
-        no second supply to show and criterion 4 has no reason to give.
-        All three declared dependencies are built - the blocker is
-        somewhere else, which is why the sign-off check did not catch it.
+        THE OPEN QUESTION IS ANSWERED, 2026-09-29, and by the thing it
+        named. It said this could not be built because NOTHING RECORDED
+        PROMOTION STATE - so criterion 1 had no second supply to show,
+        criterion 4 had no reason to give, and criterion 3's quiet case
+        was unreachable, which would have put the distinction on all
+        thirty datasets at once.
 
-        Precisely what is missing. Only a promotion puts a table in a
-        period schema, and promotion belongs to the promotion sprint;
-        qa_tools/common/period_schema.py says so in as many words, and
-        its create_overlay_views() - the one function that would record
-        which tables a run read FROM the period rather than from staging,
-        and so the only recorded source of "what is currently promoted" -
-        is called by nothing. The recorded shape confirms it rather than
-        just the prose: qa.tables_read carries logical_table and
-        physical_table and no period or source at all.
+        REQ-PIPE-075 made promotion a recorded decision the same night,
+        so all three now have a real source. The question's own
+        recommendation - build it after REQ-PIPE-091, and if the
+        promoted supply still has no recorded source afterwards, ask
+        Keith - did not need its second half: the source exists.
 
-        So every arrival is unpromoted today, which makes criterion 3's
-        quiet case unreachable and would put the distinction on all 30
-        datasets at once - the exact noise this requirement's own third
-        NFR forbids. A panel section in one permanent state is not a
-        build of this requirement, it is a placeholder that reads like
-        one.
-
-        THE RECOMMENDATION, and it needs no decision to proceed with:
-        build it AFTER REQ-PIPE-091, which makes a filing decision a
-        recorded row and so supplies criterion 4's "awaiting a decision"
-        and "rejected" directly. That is a reordering of two adjacent
-        items in the agreed overnight order rather than a change of
-        scope. What 091 does NOT supply is criterion 1's promoted
-        supply itself, so if that still has no recorded source after
-        091, this needs Keith: either it waits for the promotion sprint,
-        or the mechanism gets built against the real rule with today's
-        honest answer being "nothing is promoted in this deployment
-        yet", which is the pattern REQ-PIPE-065 already used and which
-        the noise NFR would then have to be read against.
+        WHAT IT GOT WRONG, worth recording because the reasoning was
+        otherwise sound: it expected the answer to come from
+        create_overlay_views() recording which tables a run read FROM the
+        period, and it does not. It comes from the DECISION LOG, which
+        says what was promoted into which period and by whom - a better
+        source, because it survives the run schema being dropped and it
+        carries the reason a supply was not promoted, which a table
+        listing never could.
+    open_questions: []
 
   - id: REQ-PIPE-057
     title: A delivery is recognised from the transport, and what it cannot place it reports

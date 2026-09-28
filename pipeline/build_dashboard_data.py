@@ -34,6 +34,7 @@ from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import classify_arrival, parse_cadence_from_contract
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
+from qa_tools.common import promotion_state
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -470,6 +471,10 @@ def build() -> dict:
             "arrivedAt": earliest_extract,
             "arrivalStatus": latest_status,
         },
+        # See build_cp_dashboard_data.py's identical block
+        # (REQ-DASH-056).
+        "promotionState": promotion_state.state_for(
+            "birth-registrations").as_record(),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
         "rowCount": dataset_stats[latest_run]["row_count"],

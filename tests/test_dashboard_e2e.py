@@ -3046,3 +3046,86 @@ class TestCrossTableChecks:
             return realColumns(ds).map(c=>c.name);
         }""")
         assert "cp_client_id" not in invented, invented
+
+
+class TestArrivedVersusPromoted:
+    """REQ-DASH-056, in a real browser against the real built page.
+
+    Driven here rather than only in tests-js because the thing being
+    checked is a chain: a decision in the log, through the build, into
+    the embedded data, into a rendered panel. Each link is tested on its
+    own; only this asserts at the layer a person actually sees, which is
+    the lesson plans/qa-pipeline.md item 74 paid for - a green data
+    layer says nothing about a render layer with its own transform.
+    """
+
+    DATASETS = (
+        ("registry-services", "civil-registration", "birth-registrations"),
+        ("child-protection-family-support", "child-protection", "cp-carers"),
+    )
+
+    def _open(self, page, html, agency, collection, dataset_id):
+        _goto(page, html, state={"tier": "dataset", "agencyId": agency,
+                                  "collectionId": collection, "datasetId": dataset_id})
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
+    def test_the_panel_agrees_with_the_data_about_whether_to_show_at_all(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        """Criteria 1 and 3 together, and asserting them as ONE claim is
+        deliberate: "show both" and "stay quiet" are the same rule read
+        from its two sides, and a test for either alone passes on a page
+        that always does that one thing."""
+        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        differs = clean_page.evaluate(
+            """(id) => {
+                 const ds = DATA.agencies.flatMap(a=>a.collections)
+                   .flatMap(c=>c.datasets).find(d=>d.id === id);
+                 return Boolean(ds && ds.promotionState && ds.promotionState.differs);
+               }""", dataset_id)
+        shown = clean_page.locator('[data-testid="promotion-split"]').count()
+        assert shown == (1 if differs else 0), (
+            f"{dataset_id}: promotionState.differs is {differs} and the panel "
+            f"rendered {shown} time(s)")
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
+    def test_where_it_shows_it_names_both_supplies_and_says_why(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        panel = clean_page.locator('[data-testid="promotion-split"]')
+        if panel.count() == 0:
+            pytest.skip(f"{dataset_id}'s latest arrival IS what is promoted")
+        text = panel.inner_text()
+        state = clean_page.evaluate(
+            """(id) => DATA.agencies.flatMap(a=>a.collections)
+                 .flatMap(c=>c.datasets).find(d=>d.id === id).promotionState""",
+            dataset_id)
+        assert state["arrived"]["supply"] in text
+        if state["promoted"]:
+            assert state["promoted"]["supply"] in text
+        # CASE-INSENSITIVELY, because the labels are uppercased by CSS
+        # and inner_text() reports what is rendered. The claim is that
+        # the two are LABELLED rather than left to the reader's guess at
+        # the order (criterion 2) - which letter-case they are in is the
+        # stylesheet's business.
+        lower = text.lower()
+        assert "promoted" in lower and "latest arrival" in lower
+        assert state["explanation"] and state["explanation"] in text
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
+    def test_it_shows_no_raw_period_code(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        """A DAILY calendar names its periods by the day, so the period
+        name is a bare ISO date - the one thing REQ-DASH-071 says a
+        reader never sees. The panel is the newest place one could leak
+        in."""
+        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        panel = clean_page.locator('[data-testid="promotion-split"]')
+        if panel.count() == 0:
+            pytest.skip(f"{dataset_id}'s latest arrival IS what is promoted")
+        # The supply IDENTIFIER legitimately carries digits, so the line
+        # holding it is excluded rather than the whole panel: an
+        # identifier is what somebody quotes in a ticket, not a date
+        # being shown to them.
+        prose = [ln for ln in panel.inner_text().splitlines() if "@" not in ln]
+        raw = [ln for ln in prose if re.search(r"\b\d{4}-\d{2}-\d{2}\b", ln)]
+        assert not raw, f"{dataset_id} shows a raw period code: {raw}"

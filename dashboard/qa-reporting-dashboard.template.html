@@ -496,6 +496,14 @@ button{font:inherit; color:inherit;}
 .sla-tile .v.mono{font-family:"IBM Plex Mono",monospace; font-size:15px;}
 
 /* Phase 5j Stage 2 - supply/resupply history */
+.promo-split{border:1px solid var(--line); border-left:3px solid var(--warn-fill); border-radius:8px; padding:12px 14px; margin-block:8px 16px; background:var(--surface);}
+.promo-head{font-size:13px; font-weight:700; color:var(--ink); margin-bottom:10px;}
+.promo-row{display:flex; flex-wrap:wrap; gap:24px;}
+.promo-cell{min-width:0; flex:1 1 260px;}
+.promo-cell .k{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); margin-bottom:3px;}
+.promo-cell .v{font-size:13px; color:var(--ink); overflow-wrap:anywhere;}
+.promo-sub{font-size:11.5px; color:var(--ink-faint); margin-top:2px; overflow-wrap:anywhere;}
+.promo-why{font-size:12.5px; color:var(--ink-muted); margin-top:10px;}
 .supply-history{margin-block:8px 30px;}
 .supply-history-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
 .supply-history-head h3{font-size:16px; font-family:"Public Sans",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);}
@@ -1889,6 +1897,11 @@ function buildRealDataset(d){
       // it and made the real instant unrecoverable downstream.
       arrivedAt: d.lastArrival.arrivedAt,
       arrivalStatus: d.lastArrival.arrivalStatus },
+    // REQ-DASH-056. Carried WHOLE rather than field by field, for the
+    // reason plans/qa-pipeline.md item 74 records: a hand-maintained
+    // allowlist of copied fields drops a new one in silence, and the
+    // silence reads as green.
+    promotionState: d.promotionState,
     arrivalHistory,
     rowCount: d.rowCount, prevRowCount: d.prevRowCount,
     columns,
@@ -3069,6 +3082,64 @@ function unagreedMarker(d){
   return `<span class="pill unagreed sm" title="This dataset is not counted in any \
 collection or asset rollup."><span class="ico"></span>${words}</span>`;
 }
+// WHAT ARRIVED VERSUS WHAT IS PROMOTED (REQ-DASH-056).
+//
+// THE TWO LOOK IDENTICAL ON THIS PAGE WITHOUT IT, and that is the whole
+// problem: a data engineer triaging a red dataset cannot tell "their
+// latest file is bad" from "the data everyone downstream is using is
+// bad". The first is a supplier's problem and nothing has changed for
+// anyone reading the warehouse; the second is an incident.
+//
+// NOTHING AT ALL WHEN THEY AGREE (criterion 3), which is the ordinary
+// state of a healthy dataset. A section saying "these are the same" on
+// thirty datasets is the noise this requirement's own non-functional
+// constraint forbids, and is how people learn to skip a panel.
+//
+// EACH SUPPLY IS LABELLED (criterion 2). The failure without labels is
+// not confusion, it is a reader taking the wrong one for the live data -
+// so "Promoted" and "Latest arrival" are on the row rather than implied
+// by order.
+function promotionSplit(ds){
+  const st = ds && ds.promotionState;
+  if(!st || !st.differs) return "";
+  const arrived = st.arrived ? st.arrived.supply : null;
+  const promoted = st.promoted ? st.promoted.supply : null;
+  // THE PERIOD LEADS, not the supply id. A supply is named by its
+  // dataset and its arrival instant - "birth-registrations@2026092206..."
+  // - which is the right identifier and the wrong headline: the thing a
+  // reader is telling apart is WHICH DELIVERY, and a period says that in
+  // words. The identifier stays, small, because it is what they would
+  // quote in a ticket.
+  const promotedCell = promoted
+    ? `<div class="v">${fmtPeriodName(st.promoted.period)}</div><div class="promo-sub mono">${promoted}</div>`
+    : `<div class="v">Nothing promoted yet</div><div class="promo-sub">no supply has reached the warehouse for this dataset</div>`;
+  return `
+    <div class="promo-split" data-testid="promotion-split">
+      <div class="promo-head">What is in the warehouse is not the latest file</div>
+      <div class="promo-row">
+        <div class="promo-cell">
+          <div class="k">Promoted — what everyone downstream reads</div>
+          ${promotedCell}
+        </div>
+        <div class="promo-cell">
+          <div class="k">Latest arrival — not promoted</div>
+          <div class="v">${st.arrived && st.arrived.period ? fmtPeriodName(st.arrived.period) : "not filed to any period"}</div>
+          <div class="promo-sub mono">${arrived || "—"}</div>
+        </div>
+      </div>
+      <div class="promo-why">${st.explanation || ""}</div>
+    </div>`;
+}
+
+// A period NAME written for a person, mirroring
+// qa_tools/common/display_time.py's own format_period(): a DAILY
+// calendar names its periods by the day, and a bare ISO date is the one
+// thing REQ-DASH-071 says a reader never sees.
+function fmtPeriodName(name){
+  if(!name) return "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(name) ? fmtDay(new Date(name + "T00:00:00")) : name;
+}
+
 // Item 76's UI-integration follow-up (plans/qa-pipeline.md, 2026-09-18) -
 // a small badge next to a dataset's own status pill linking straight to
 // its real, currently-open GitHub Issue (TICKET_STATUS, embedded by
@@ -4183,6 +4254,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       so the figures below show its full real history, but no column reads red/amber/green as CURRENT status.
     </div>` : ""}
     ${outstandingQueue("dataset", ds.id)}
+    ${promotionSplit(ds)}
     <div class="sla-strip">
       <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${cadenceLabel(ds.sla.cadence)}</div></div>
       <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)} <span title="${ARRIVAL_FOLLOWS_FILING}">${ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : ""}</span> ${ambiguityChip(ds.id)}</div></div>

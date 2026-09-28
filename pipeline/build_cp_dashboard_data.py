@@ -29,7 +29,7 @@ import json
 import os
 from datetime import date, datetime
 
-from qa_tools.common import hierarchy, qa_store
+from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
@@ -485,6 +485,13 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             "arrivedAt": str(earliest_extract),
             "arrivalStatus": latest_status,
         },
+        # WHAT ARRIVED VERSUS WHAT IS PROMOTED (REQ-DASH-056). From
+        # the recorded filing and the recorded decision, never from
+        # supply rows - both are facts somebody WROTE DOWN, which is
+        # what criterion 5 protects. Quiet when they agree: `differs`
+        # is False in the ordinary case and the page renders nothing
+        # extra, which is the point at thirty datasets.
+        "promotionState": promotion_state.state_for(dataset_id).as_record(),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
         "rowCount": dataset_stats[latest_run]["row_counts"][table],
