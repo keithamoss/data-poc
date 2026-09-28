@@ -20,6 +20,30 @@ status (`todo` / `investigate` / `in-progress` / `blocked` / `parked` /
 requirement in `requirements.yaml` and is signed off by Keith before
 building starts, and the entry comes out when it lands.
 
+## Open work queue
+
+Priority: work through today, in this order (Keith, 2026-09-29 morning:
+"we'll work through that gradually today"). Written into the file so it
+survives context compaction. Tick items off here as they land.
+
+1. [in progress] Finish the paper check: the snippet-only research
+   claims re-verified against arXiv and ACL papers, now reachable.
+   Report any design decision that should change.
+2. [todo] **Naming session.** One canonical word per naming hazard
+   (#4's concept sweep lists them); the others become glossary aliases.
+3. [todo] **Triage the 33 missed concepts** (#4's sweep, one by one).
+   Keith says what he does NOT want included.
+4. [todo] **Tiering** for the concepts that survive triage: own page,
+   section, or glossary entry only.
+5. [todo] **The cast draft**: 4-5 characters for Keith to react to
+   (#3, round 12).
+6. [todo] **Keith names external writing exemplars** (#3, style round
+   4).
+7. [todo] **Requirements via `delivery-scoper`**, drafting from items
+   1-4, then Keith's sign-off. Nothing is built before this.
+8. [todo] Confirm the Style Manual's rule on numbers once
+   `www.stylemanual.gov.au` is reachable (#3, style round 4).
+
 1. **[investigate, 2026-09-28]** **[Docs & process]** **[Dashboard UI]**
    A technical-writing subagent team that explains this project's own
    invented concepts plainly, with hand-drawn-style diagrams and short
