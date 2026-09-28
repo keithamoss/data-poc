@@ -365,3 +365,247 @@ class TestASupplyAnInheritedPeriodStandsOnCannotMove:
         with dl.apply_decision(conn, decision):
             pass
         assert dl.promoted_into(conn, annual.dataset_id, first) is None
+
+
+class TestAnOperatorAsksForOneInheritance:
+    """REQ-PIPE-099 criteria 1, 2, 9 and 12.
+
+    NOT A SECOND IMPLEMENTATION of the rule's own pass. That one fills a
+    whole period at its birth for every dataset that owes it nothing;
+    this fills ONE dataset's place in a period that already exists,
+    because a person asked - which is the case criterion 6 creates,
+    where an operator un-inherited a period to free a demotion and now
+    has to put each one back by hand.
+    """
+
+    def test_it_creates_the_view_and_records_the_PERSON(
+            self, conn, annual, periods, owes_nothing):
+        first, second = periods
+        _promote_into(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+
+        got = inheritance.inherit_one(
+            conn, dataset_id=annual.dataset_id, period=second, actor="Keith",
+            reason="putting it back after the demotion", effective_at=WHEN)
+
+        assert got.stands_on == first
+        found = inheritance.inherited(conn, annual.dataset_id, second)
+        assert found is not None and found.stands_on == first
+        latest = dl.latest_for_slot(conn, annual.dataset_id, second)
+        assert latest[0] == dl.INHERIT
+        entry = dl.decisions_for(conn, annual.dataset_id)[-1]
+        assert entry["action"] == dl.INHERIT
+        assert entry["actor"] == "Keith"
+        assert entry["actor_kind"] == dl.PERSON, (
+            "an inheritance an operator asked for is not the rule's")
+
+    def test_the_view_really_resolves_to_the_earlier_supply(
+            self, conn, annual, periods, owes_nothing):
+        first, second = periods
+        _promote_into(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+        inheritance.inherit_one(conn, dataset_id=annual.dataset_id, period=second,
+                                 actor="Keith", reason="r", effective_at=WHEN)
+
+        schema = period_schema.period_schema(second)
+        rows = conn.execute(f'SELECT id FROM "{schema}"."{annual.table}"').fetchall()
+        assert [r[0] for r in rows] == [3]
+
+    def test_it_refuses_a_period_the_dataset_DOES_participate_in(
+            self, conn, annual, periods, owes_nothing):
+        """Criterion 9. A supply is owed for that period, and standing
+        it on an earlier one hides exactly the gap this system exists to
+        report."""
+        first, _second = periods
+        _promote_into(conn, annual, first)
+        with pytest.raises(inheritance.InheritanceRefused) as exc:
+            inheritance.inherit_one(conn, dataset_id=annual.dataset_id,
+                                     period=first, actor="Keith", reason="r",
+                                     effective_at=WHEN)
+        assert "is owed" in str(exc.value)
+
+    def test_it_refuses_a_period_that_already_holds_a_real_supply(
+            self, conn, annual, periods, owes_nothing, monkeypatch):
+        """Criterion 12, and it is a different refusal from the one
+        above: that period owes nothing AND has a promoted table in it
+        anyway, which happens when a supply arrives for a period nobody
+        expected one in."""
+        _first, second = periods
+        _promote_into(conn, annual, second)
+        with pytest.raises(inheritance.InheritanceRefused) as exc:
+            inheritance.inherit_one(conn, dataset_id=annual.dataset_id,
+                                     period=second, actor="Keith", reason="r",
+                                     effective_at=WHEN)
+        assert "already resolves to a real supply" in str(exc.value)
+
+    def test_it_refuses_without_a_reason(self, conn, annual, periods, owes_nothing):
+        first, second = periods
+        _promote_into(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+        with pytest.raises(inheritance.InheritanceRefused):
+            inheritance.inherit_one(conn, dataset_id=annual.dataset_id, period=second,
+                                     actor="Keith", reason="   ", effective_at=WHEN)
+
+    def test_it_refuses_where_there_is_nothing_earlier_to_stand_on(
+            self, conn, annual, periods, owes_nothing):
+        _first, second = periods
+        period_schema.ensure_period_schema(conn, second)
+        with pytest.raises(inheritance.InheritanceRefused) as exc:
+            inheritance.inherit_one(conn, dataset_id=annual.dataset_id, period=second,
+                                     actor="Keith", reason="r", effective_at=WHEN)
+        assert "genuinely absent" in str(exc.value)
+
+
+class TestUnInheriting:
+    """REQ-PIPE-099 criteria 3, 4, 5, 6 and 10.
+
+    WHAT IT IS FOR reads like tidying and is not. A demotion, rejection
+    or re-file is REFUSED while a later period stands on that supply,
+    and an inherited period stands on one just as hard as a substituted
+    one. Un-inheriting is how an operator clears that obstacle - and the
+    obstacle exists to make somebody look, so clearing it is a decision
+    in its own right.
+    """
+
+    def _inherited(self, conn, annual, periods):
+        first, second = periods
+        supply = _promote_into(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+        inheritance.inherit_one(conn, dataset_id=annual.dataset_id, period=second,
+                                 actor="Keith", reason="standing it up",
+                                 effective_at=WHEN)
+        return supply
+
+    def test_the_view_is_gone_and_the_decision_is_recorded(
+            self, conn, annual, periods, owes_nothing):
+        _first, second = periods
+        self._inherited(conn, annual, periods)
+
+        inheritance.un_inherit(conn, dataset_id=annual.dataset_id, period=second,
+                                actor="Keith", reason="freeing the demotion",
+                                effective_at=WHEN, confirmed=True)
+
+        schema = period_schema.period_schema(second)
+        found = conn.execute(
+            "SELECT 1 FROM information_schema.views WHERE table_schema = ? "
+            "AND table_name = ?", [schema, annual.table]).fetchall()
+        assert not found, "the view survived the un-inheritance"
+        assert inheritance.inherited(conn, annual.dataset_id, second) is None
+        assert dl.latest_for_slot(conn, annual.dataset_id, second)[0] == dl.UN_INHERIT
+
+    def test_it_needs_an_explicit_confirmation(self, conn, annual, periods, owes_nothing):
+        """Criterion 10, and a required argument rather than a prompt -
+        a prompt inside the function would be skipped by the first
+        caller that is not a terminal."""
+        _first, second = periods
+        self._inherited(conn, annual, periods)
+        with pytest.raises(inheritance.InheritanceRefused) as exc:
+            inheritance.un_inherit(conn, dataset_id=annual.dataset_id, period=second,
+                                    actor="Keith", reason="r", effective_at=WHEN)
+        assert "confirmation" in str(exc.value)
+        assert inheritance.inherited(conn, annual.dataset_id, second) is not None
+
+    def test_it_needs_a_reason(self, conn, annual, periods, owes_nothing):
+        _first, second = periods
+        self._inherited(conn, annual, periods)
+        with pytest.raises(inheritance.InheritanceRefused):
+            inheritance.un_inherit(conn, dataset_id=annual.dataset_id, period=second,
+                                    actor="Keith", reason="", effective_at=WHEN,
+                                    confirmed=True)
+
+    def test_it_refuses_a_period_holding_no_inheritance(
+            self, conn, annual, periods, owes_nothing):
+        _first, second = periods
+        period_schema.ensure_period_schema(conn, second)
+        with pytest.raises(inheritance.InheritanceRefused) as exc:
+            inheritance.un_inherit(conn, dataset_id=annual.dataset_id, period=second,
+                                    actor="Keith", reason="r", effective_at=WHEN,
+                                    confirmed=True)
+        assert "no inheritance" in str(exc.value)
+
+    def test_a_SUBSTITUTION_is_not_un_inherited(self, conn, annual, periods,
+                                                 owes_nothing):
+        """The two are identical in SQL and opposite in meaning, so the
+        log should say which of them is being undone. A person decided
+        the substitution; the rule made the inheritance."""
+        from qa_tools.common import substitution
+
+        first, second = periods
+        supply = _promote_into(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+        substitution.substitute(
+            conn, agency_id=annual.agency_id, collection_id=annual.collection_id,
+            dataset_id=annual.dataset_id, logical_table=annual.table,
+            period=second, stands_on=first, supply=supply, actor="Keith",
+            reason="the supplier confirmed nothing is coming", effective_at=WHEN)
+
+        with pytest.raises(inheritance.InheritanceRefused) as exc:
+            inheritance.un_inherit(conn, dataset_id=annual.dataset_id, period=second,
+                                    actor="Keith", reason="r", effective_at=WHEN,
+                                    confirmed=True)
+        assert "SUBSTITUTION" in str(exc.value)
+
+
+class TestUnInheritingIsWhatFreesABlockedWithdrawal:
+    """REQ-PIPE-099 criterion 5, end to end - the reason the operation
+    exists at all.
+
+    Driven as the real sequence rather than asserted, because the claim
+    is about three decisions in order: a demotion refused, an
+    un-inheritance, the same demotion permitted.
+    """
+
+    def test_the_demotion_is_refused_then_permitted(
+            self, conn, annual, periods, owes_nothing):
+        first, second = periods
+        supply = _promote_into(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+        inheritance.inherit_one(conn, dataset_id=annual.dataset_id, period=second,
+                                 actor="Keith", reason="nothing owed",
+                                 effective_at=WHEN)
+
+        from qa_tools.common import rejection
+
+        def _demote():
+            rejection.demote(
+                conn, agency_id=annual.agency_id, collection_id=annual.collection_id,
+                dataset_id=annual.dataset_id, supply=supply, physical_tables=[supply],
+                actor="Keith", effective_at=WHEN, reason="wrong file", from_slot=first)
+
+        with pytest.raises(dl.DecisionRefused) as exc:
+            _demote()
+        # CRITERION 25 OF REQ-GHUB-082: the refusal names the remedy,
+        # not just the obstacle. Told only which period blocks them, an
+        # operator still has to work out which of two decisions clears
+        # it - and the wrong one is refused.
+        assert second in str(exc.value)
+        assert dl.UN_INHERIT in str(exc.value)
+
+        inheritance.un_inherit(conn, dataset_id=annual.dataset_id, period=second,
+                                actor="Keith", reason="freeing the demotion",
+                                effective_at=WHEN, confirmed=True)
+        _demote()
+        assert dl.promoted_into(conn, annual.dataset_id, first) is None
+
+    def test_a_SUBSTITUTED_period_is_told_to_de_substitute_instead(
+            self, conn, annual, periods, owes_nothing):
+        """The same refusal, the other remedy. Naming the wrong one
+        sends an operator to a route that will refuse them."""
+        from qa_tools.common import rejection, substitution
+
+        first, second = periods
+        supply = _promote_into(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+        substitution.substitute(
+            conn, agency_id=annual.agency_id, collection_id=annual.collection_id,
+            dataset_id=annual.dataset_id, logical_table=annual.table,
+            period=second, stands_on=first, supply=supply, actor="Keith",
+            reason="the supplier confirmed nothing is coming", effective_at=WHEN)
+
+        with pytest.raises(dl.DecisionRefused) as exc:
+            rejection.demote(
+                conn, agency_id=annual.agency_id, collection_id=annual.collection_id,
+                dataset_id=annual.dataset_id, supply=supply, physical_tables=[supply],
+                actor="Keith", effective_at=WHEN, reason="wrong file", from_slot=first)
+        assert dl.DE_SUBSTITUTE in str(exc.value)
+        assert dl.UN_INHERIT not in str(exc.value)

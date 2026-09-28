@@ -202,7 +202,7 @@ requirement to `built`.
 
 **WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
 fresh session can pick up from a file rather than from the commit log.**
-Last updated 05:20 Perth, 44 commits in.
+Last updated 06:20 Perth, 45 commits in.
 
 **BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
 `REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
@@ -220,7 +220,10 @@ page).
 
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
 `REQ-PIPE-079` (decision layer done, wiring not), `REQ-PIPE-105`
-(criteria 7 and 8 done),
+(criteria 7 and 8 done), `REQ-PIPE-099` (the inherit and un-inherit
+OPERATIONS are built and accountable; what is unbuilt is the operator
+ROUTES that reach them, which are REQ-GHUB-082's, and the cross-table
+re-evaluation, which needs REQ-PIPE-079's unbuilt re-run),
 `REQ-PIPE-083` (everything but criteria 14 and 15, the OPERATOR ROUTES -
 the slot state, the reconciler, a real GitHub ticket service fenced by
 its own label, and both orchestrators calling it after promotion. `gh`
@@ -2291,7 +2294,7 @@ exist.
     load-time file check gates promotion, "possibly even QA". The second half
     is deliberately tentative and is his to settle when this is built.
 
-28. **[in-progress, 2026-09-29]** **[Pipeline & publishing]** **"Inherited": a dataset
+28. **[blocked, 2026-09-29]** **[Pipeline & publishing]** **"Inherited": a dataset
     that does not participate in a period at all.** A view created when a
     period schema is born, pointing at the supply that is still current, for
     the datasets the schedule says owe nothing that period - plus inherit and

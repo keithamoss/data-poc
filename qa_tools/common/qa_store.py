@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -538,13 +538,20 @@ ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_action_known;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
     CHECK (action IN ('promote', 'reject', 'demote', 'refile',
                       'substitute', 'de-substitute',
-                      'inherit', 'inherit-refused'));
+                      'inherit', 'inherit-refused', 'un-inherit'));
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_substitute_shape;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_substitute_shape
     CHECK (action <> 'substitute' OR (stands_on IS NOT NULL AND to_slot IS NOT NULL));
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_de_substitute_shape;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_de_substitute_shape
     CHECK (action <> 'de-substitute' OR from_slot IS NOT NULL);
+-- An un-inheritance names the period whose view is being removed, the
+-- same shape a de-substitution has and for the same reason: it leaves
+-- that period unfilled rather than moving anything into it
+-- (REQ-PIPE-099 criterion 3).
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_un_inherit_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_un_inherit_shape
+    CHECK (action <> 'un-inherit' OR from_slot IS NOT NULL);
 
 --   criterion 11's question, asked of every demote, reject and re-file:
 --   does any period stand on this supply?

@@ -248,3 +248,143 @@ def refusals(conn: supply_db.SupplyConnection | None = None) -> list[Refused]:
         "WHERE action = ? ORDER BY dataset_id, to_slot",
         [decision_log.INHERIT_REFUSED]).fetchall()
     return [Refused(dataset_id=d, period=p, reason=r or "") for d, p, r in rows]
+
+
+class InheritanceRefused(Exception):
+    """An inheritance or un-inheritance this module will not perform.
+
+    ONE EXCEPTION TYPE, the same shape substitution.SubstitutionRefused
+    has and for the same reason: the caller's response is identical in
+    every case - tell the operator what is wrong and touch nothing.
+    """
+
+
+def inherit_one(conn: supply_db.SupplyConnection, *, dataset_id: str,
+                period: str, actor: str, reason: str,
+                effective_at: str) -> Inherited:
+    """One dataset, one period, at an operator's asking (REQ-PIPE-099
+    criterion 1).
+
+    NOT A SECOND IMPLEMENTATION OF inherit_into(). That one fills a
+    whole period at its birth, for every dataset that owes it nothing,
+    with the RULE as the actor; this fills ONE dataset's place in a
+    period that already exists, because a person asked - the case
+    criterion 6 creates, where an operator un-inherited a period to free
+    a demotion and now has to put each one back explicitly.
+
+    THE PERSON IS THE ACTOR (criterion 2, and REQ-GHUB-082 criterion
+    33's second half). An inheritance the rule performed and one an
+    operator asked for are different facts about who is accountable, and
+    the log has to be able to tell them apart.
+
+    TWO REFUSALS, both of them about the period rather than about the
+    supply:
+      - a period the dataset DOES participate in (criterion 9). A supply
+        is owed for it, and standing it on an earlier one would hide
+        exactly the gap this system exists to report.
+      - a period that already holds a PROMOTED table (criterion 12).
+        It resolves to a real supply already; a view over the top would
+        be an indirection nobody could see past.
+    """
+    if not (reason or "").strip():
+        raise InheritanceRefused(
+            "an inheritance an operator asks for needs a reason, on the same "
+            "terms as every other filing decision a person makes.")
+
+    entry = hierarchy.dataset(dataset_id)
+    skipped, schedule_reason = _does_not_participate(dataset_id, period)
+    if not skipped:
+        raise InheritanceRefused(
+            f"{dataset_id} DOES participate in {period}, so a supply is owed "
+            f"for it. Inheriting would stand this period on an earlier supply "
+            f"and hide a gap somebody should see. If the supply is genuinely "
+            f"not coming, that is a substitution - a person deciding what to "
+            f"stand on - rather than an inheritance.")
+
+    already = period_schema.promoted_in(conn, period, [entry.table]).get(entry.table)
+    if already:
+        raise InheritanceRefused(
+            f"{period} already resolves to a real supply for {dataset_id} "
+            f"({', '.join(already)}). There is nothing to inherit into.")
+
+    source = _most_recent_promoted(conn, dataset_id, period)
+    if source is None:
+        raise InheritanceRefused(
+            f"there is no earlier promoted supply for {dataset_id} to stand "
+            f"{period} on. The table is genuinely absent, and an empty one "
+            f"would be a lie with a schema on it.")
+
+    stands_on, supply = source
+    schema = period_schema.period_schema(period)
+    decision = decision_log.Decision(
+        agency_id=entry.agency_id, collection_id=entry.collection_id,
+        dataset_id=dataset_id, action=decision_log.INHERIT, supply=supply,
+        actor=actor, actor_kind=decision_log.PERSON, effective_at=effective_at,
+        to_slot=period, stands_on=stands_on, reason=reason)
+    with decision_log.apply_decision(conn, decision):
+        conn.execute(
+            f'CREATE OR REPLACE VIEW "{schema}".'
+            f'"{supply_db._ident(entry.table, "table name")}" AS SELECT * FROM '
+            f'"{period_schema.period_schema(stands_on)}".'
+            f'"{supply_db._ident(supply, "table name")}"')
+    return Inherited(dataset_id=dataset_id, period=period, stands_on=stands_on,
+                      supply=supply, reason=schedule_reason or reason)
+
+
+def un_inherit(conn: supply_db.SupplyConnection, *, dataset_id: str,
+               period: str, actor: str, reason: str, effective_at: str,
+               confirmed: bool = False) -> None:
+    """Take a period's inheritance back out (REQ-PIPE-099 criterion 3).
+
+    WHAT IT IS FOR is criterion 5, and it is worth stating because the
+    operation reads like tidying and is not: a demotion, rejection or
+    re-file is REFUSED while a later period stands on that supply
+    (REQ-PIPE-084 criterion 11), and an inherited period stands on one
+    just as hard as a substituted one. Un-inheriting is how an operator
+    clears that obstacle. The obstacle exists to make somebody look, so
+    clearing it is a decision in its own right and is recorded as one.
+
+    THE VIEW GOES, so nothing in that period depends on the supply any
+    more. A period left with a view pointing at a table that is about to
+    move is the state this whole refusal exists to prevent.
+
+    NOTHING PUTS IT BACK (criterion 4 and criterion 6). inherit_into()
+    runs once, at a period's birth, so it will not revisit this one;
+    inherit_one() is the only way back and an operator has to ask for it
+    per period, which is the criterion's own "explicitly afterwards".
+
+    EXPLICIT CONFIRMATION (criterion 10), as a required argument rather
+    than a prompt inside the function - the same reasoning
+    substitution.de_substitute() records: a prompt here would be skipped
+    by the first caller that is not a terminal.
+    """
+    if not confirmed:
+        raise InheritanceRefused(
+            f"un-inheriting {period} needs an explicit confirmation. Anything "
+            f"reading that period for {dataset_id} will stop resolving the "
+            f"moment this is done.")
+    if not (reason or "").strip():
+        raise InheritanceRefused(
+            "an un-inheritance needs a reason, on the same terms as the "
+            "inheritance it reverses.")
+
+    current = inherited(conn, dataset_id, period)
+    if current is None:
+        raise InheritanceRefused(
+            f"{period} holds no inheritance for {dataset_id} to remove. Either "
+            f"it never inherited, somebody has already removed it, or what it "
+            f"holds is a SUBSTITUTION - which is de-substituted rather than "
+            f"un-inherited, because a person decided it and the log should say "
+            f"which of the two is being undone.")
+
+    entry = hierarchy.dataset(dataset_id)
+    decision = decision_log.Decision(
+        agency_id=entry.agency_id, collection_id=entry.collection_id,
+        dataset_id=dataset_id, action=decision_log.UN_INHERIT,
+        supply=current.supply, actor=actor, actor_kind=decision_log.PERSON,
+        effective_at=effective_at, from_slot=period, reason=reason)
+    schema = period_schema.period_schema(period)
+    with decision_log.apply_decision(conn, decision):
+        conn.execute(
+            f'DROP VIEW IF EXISTS "{schema}".'
+            f'"{supply_db._ident(entry.table, "table name")}"')

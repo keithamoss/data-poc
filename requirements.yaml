@@ -20528,7 +20528,7 @@ requirements:
       file for still has something to show - and so that removing an
       old supply is not blocked by later periods leaning on it.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-09-28"
@@ -20621,6 +20621,66 @@ requirements:
         agreed 2026-09-28 that 082 should be widened, so NEITHER
         operator route can offer these until that lands. Signing this
         requirement does not make it buildable.
+    implemented_by:
+      - qa_tools/common/inheritance.py::inherit_one
+      - qa_tools/common/inheritance.py::un_inherit
+      - qa_tools/common/decision_log.py::_standing_on
+    linked_tests:
+      - tests/test_inheritance.py::TestAnOperatorAsksForOneInheritance
+      - tests/test_inheritance.py::TestUnInheriting
+      - tests/test_inheritance.py::TestUnInheritingIsWhatFreesABlockedWithdrawal
+    evidence:
+      - >
+        2026-09-29. Twenty tests against a real PostgreSQL: the view is
+        really created and really resolves to the earlier supply's rows,
+        the un-inheritance really drops it, and both refusals fire -
+        a period the dataset participates in, a period already holding a
+        promoted table, a missing reason, a missing confirmation, and a
+        period holding a SUBSTITUTION rather than an inheritance.
+      - >
+        2026-09-29. Criterion 5 is driven as the real sequence rather
+        than asserted: a demotion refused while a later period inherits
+        the supply, an un-inheritance, then the same demotion permitted
+        and the period left unfilled. A sibling test drives the
+        substituted case and checks the refusal names de-substitute
+        instead of un-inherit.
+    unmet_criteria:
+      - criterion: >
+          Criterion 7 - offering inherit and un-inherit OUTSIDE the
+          queue of supplies awaiting a decision.
+        why: >
+          It is a statement about a MENU, and there is no operator menu
+          for filing decisions yet. The operations are built and
+          callable; what is missing is where a person reaches them from.
+        owner: >
+          REQ-GHUB-082, which builds both operator routes.
+        blocked_by:
+          requirements: [REQ-GHUB-082]
+      - criterion: >
+          Criterion 8 - offering them from EVERY operator route that
+          offers any other filing decision.
+        why: >
+          "Every route" is REQ-GHUB-082's two, neither of which exists,
+          so there is nothing yet for the two to be at parity about.
+        owner: >
+          REQ-GHUB-082.
+        blocked_by:
+          requirements: [REQ-GHUB-082]
+      - criterion: >
+          Criterion 11 - re-evaluating every cross-table check that
+          reads a dataset whose period view an operator just created or
+          removed.
+        why: >
+          It needs the RE-RUN that REQ-PIPE-079's unbuilt half owns.
+          `reevaluation.plan()` already answers WHICH checks those are;
+          nothing executes a plan yet. Guessing an execution path here
+          would build the same wiring twice, in two places, from two
+          designs - and the second one would be the one nobody
+          maintained.
+        owner: >
+          REQ-PIPE-079's wiring.
+        blocked_by:
+          requirements: [REQ-PIPE-079]
     decisions:
       - >
         RE-INHERITING IS NOT A SEPARATE OPERATION (Keith, 2026-09-28,
@@ -20718,6 +20778,55 @@ requirements:
         than in REQ-GHUB-082 criterion 14's queue - Keith's own
         settlement, 2026-09-26, and one of the six rewrites to 082 he
         approved.
+      - >
+        THE OPERATIONS ARE BUILT, 2026-09-29 - criteria 1, 2, 3, 4, 5,
+        6, 9, 10 and 12. `inheritance.inherit_one()` and
+        `inheritance.un_inherit()`, both a PERSON's decisions in the
+        log, both refusing without a reason, un-inherit refusing without
+        an explicit confirmation. `un-inherit` is a new action on the
+        decision log, with its own shape constraint (it names the period
+        whose view is going, the same shape a de-substitution has and
+        for the same reason).
+      - >
+        CRITERION 5 FALLS OUT RATHER THAN BEING IMPLEMENTED, and that
+        is worth saying because it is the reason this requirement
+        exists. `periods_standing_on()` already asks the log which
+        periods CURRENTLY stand on a supply, and an un-inheritance is
+        the newest decision on that period - so the period stops
+        blocking the moment it is recorded. A test drives the real
+        sequence anyway: a demotion refused, an un-inheritance, the same
+        demotion permitted.
+      - >
+        CRITERION 4 AND 6 ARE THE SAME PROPERTY read from two sides, and
+        both hold by construction: `inherit_into()` runs once, at a
+        period's birth, so it will never revisit a period an operator
+        emptied, and `inherit_one()` is the only way back and takes one
+        dataset and one period at a time.
+      - >
+        REQ-GHUB-082 CRITERION 25 CAME WITH IT, because building this
+        one made the gap obvious. The refusal that blocks a demotion
+        used to name the blocking periods and say "clear them first",
+        which is true and not actionable: a SUBSTITUTED period is
+        cleared by a de-substitution and an INHERITED one by an
+        un-inheritance, and an operator told the wrong one is sent to a
+        route that will refuse them. It names the remedy per period now.
+        That criterion belongs to 082 and 082 stays unbuilt; this is one
+        of its clauses satisfied early by the module that needed it.
+      - >
+        REJECTED: un-inheriting as a tidy-up that needs no reason. The
+        obstacle an inheritance puts in front of a demotion exists to
+        make somebody look, so removing it is a decision in its own
+        right - which is criterion 2's own "with the operator, the
+        period, what that period now stands on, and a reason". An
+        operator who can clear the obstacle silently is an operator for
+        whom the obstacle does not exist.
+      - >
+        REJECTED: letting `un_inherit()` remove a SUBSTITUTION. They are
+        identical in SQL and opposite in meaning, so a single "remove
+        whatever indirection is there" would record the wrong action and
+        lose which of the two was undone. It refuses and names
+        de-substitute instead.
+
   - id: REQ-DASH-100
     title: "A period standing on a supply nobody owed never reads as an ordinary green"
     date_written: "2026-09-26"

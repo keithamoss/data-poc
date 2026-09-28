@@ -96,9 +96,16 @@ INHERIT = "inherit"
 #: (criterion 10). It is the one action with NO supply, because the
 #: thing it could not find IS a supply.
 INHERIT_REFUSED = "inherit-refused"
+#: The operator action that takes an inheritance back out (REQ-PIPE-099
+#: criteria 1 and 3). ALWAYS A PERSON'S - the rule inherits, and only a
+#: person un-inherits, because what un-inheriting is FOR is freeing a
+#: demotion, rejection or re-file the inheritance was blocking. A rule
+#: that could undo its own inheritance would quietly remove the
+#: obstacle that exists to make somebody look.
+UN_INHERIT = "un-inherit"
 
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
-           INHERIT, INHERIT_REFUSED)
+           INHERIT, INHERIT_REFUSED, UN_INHERIT)
 
 #: The actions a RULE may take. Everything else is a person's, and
 #: rejection.py and substitution.py enforce that by not offering an
@@ -301,6 +308,26 @@ def periods_standing_on(conn: supply_db.SupplyConnection, dataset_id: str,
     counting it would make a supply permanently undeletable on the
     strength of a decision somebody already reversed.
     """
+    return tuple(slot for slot, _how in _standing_on(conn, dataset_id, supply))
+
+
+#: How a blocking period is cleared, by how it came to stand on the
+#: supply (REQ-GHUB-082 criterion 25). The remedy differs, and telling
+#: an operator the wrong one sends them to a route that will refuse
+#: them: a SUBSTITUTED period is de-substituted, because a person chose
+#: it; an INHERITED one is un-inherited, because the rule did.
+UNBLOCKED_BY = {SUBSTITUTE: DE_SUBSTITUTE, INHERIT: UN_INHERIT}
+
+
+def _standing_on(conn: supply_db.SupplyConnection, dataset_id: str,
+                  supply: str) -> tuple[tuple[str, str], ...]:
+    """`(period, how)` for every period currently standing on this
+    supply, where `how` is SUBSTITUTE or INHERIT.
+
+    The pair rather than the period alone, because the two are cleared
+    by different decisions and a refusal that says "clear them first"
+    leaves an operator to guess which.
+    """
     rows = conn.execute(
         f"SELECT DISTINCT to_slot FROM {TABLE} "
         "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?) "
@@ -310,7 +337,7 @@ def periods_standing_on(conn: supply_db.SupplyConnection, dataset_id: str,
     for (slot,) in rows:
         latest = latest_for_slot(conn, dataset_id, slot)
         if latest and latest[0] in STANDS_ON_A_SUPPLY and latest[1] == supply:
-            standing.append(slot)
+            standing.append((slot, latest[0]))
     return tuple(sorted(standing))
 
 
@@ -363,14 +390,21 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
     # also the only useful answer: told about one, an operator
     # de-substitutes it and hits the next.
     if decision.action in MOVES_A_SUPPLY:
-        standing = periods_standing_on(conn, decision.dataset_id, decision.supply)
+        standing = _standing_on(conn, decision.dataset_id, decision.supply)
         if standing:
+            # THE REMEDY, PER PERIOD (REQ-GHUB-082 criterion 25). "Clear
+            # them first" was true and not actionable: a substituted
+            # period is cleared by a de-substitution and an inherited
+            # one by an un-inheritance, and an operator told the wrong
+            # one is sent to a route that will refuse them.
+            how = ", ".join(f"{slot} ({UNBLOCKED_BY[action]} it)"
+                             for slot, action in standing)
             raise DecisionRefused(
                 f"{decision.supply!r} cannot be {decision.action}d while "
-                f"{len(standing)} later period(s) stand on it: "
-                f"{', '.join(standing)}. Each of those resolves to this supply "
-                f"- by a substitution somebody decided, or because nothing was "
-                f"owed for it - so clear them first, or point them elsewhere.")
+                f"{len(standing)} later period(s) stand on it: {how}. Each of "
+                f"those resolves to this supply - by a substitution somebody "
+                f"decided, or because nothing was owed for it - so clear them "
+                f"first, or point them elsewhere.")
 
 
 def _lock(conn: supply_db.SupplyConnection, decision: Decision) -> None:
