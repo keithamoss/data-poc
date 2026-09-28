@@ -13331,7 +13331,9 @@ requirements:
       - >
         WHEN a person demotes a promoted supply back to staging, THE
         SYSTEM SHALL leave its slot unfilled, return the supply to the
-        queue awaiting a decision, and record the decision.
+        queue awaiting a decision, and record the decision - SUBJECT TO
+        REQ-PIPE-084 criterion 11, which refuses the demotion outright
+        while any later period stands on that supply.
       - >
         THE SYSTEM SHALL distinguish, among staged supplies, one nobody
         has decided on from one a person has looked at and returned.
@@ -13376,6 +13378,13 @@ requirements:
         presentation consequence as much as a data one, and REQ-DASH-070's aggregated element is where it lands.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075]
     decisions:
+      - >
+        POINTER ADDED 2026-09-28 (Keith's approval to touch this signed
+        requirement): criterion 5's demotion is REFUSED while a later
+        period stands on the supply - REQ-PIPE-084 criterion 11. The
+        constraint is created there and enforced on the operator route,
+        but a reader of this criterion alone would not know demotion can
+        be refused at all.
       - >
         Decided REJECTED means A PERSON DECIDED AGAINST THIS SUPPLY, not
         "this was bad" (Thread B, 2026-09-23), and WIDENED at sign-off
@@ -14213,7 +14222,10 @@ requirements:
         WHEN a supply is demoted, THE SYSTEM SHALL return its physical
         table to the staging schema, so that a period schema holds
         exactly the supplies currently promoted into it and nothing
-        else.
+        else - SUBJECT TO REQ-PIPE-084 criterion 11, which refuses the
+        demotion while any later period stands on that supply, because
+        a PostgreSQL view binds to the object and would follow the
+        table out.
       - >
         THE SYSTEM SHALL perform that move and its decision-log entry
         such that neither can be observed without the other, and SHALL
@@ -14346,6 +14358,15 @@ requirements:
         generated event sequences rather than only worked examples.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-DASH-041]
     decisions:
+      - >
+        POINTER ADDED 2026-09-28 (Keith's approval to touch this signed
+        requirement): criterion 9's demotion is REFUSED while a later
+        period stands on the supply - REQ-PIPE-084 criterion 11. Worth
+        naming HERE in particular, because this criterion is about the
+        physical table MOVING, and the move is exactly what makes the
+        refusal necessary: a PostgreSQL view binds to the object rather
+        than the name, so a dependent view follows the table out of the
+        period schema and goes on serving data somebody just withdrew.
       - >
         Decided the composition rule was WRONG as originally written and
         is corrected here (Thread H wrinkle 1). Thread A said "as at T:
@@ -15303,15 +15324,18 @@ requirements:
         right.
 
   - id: REQ-PIPE-084
-    title: "A period whose supply never arrives resolves to the last good one, by a person's decision"
+    title: >
+      A period nobody supplied is SUBSTITUTED onto an earlier real
+      supply, by a person's decision and never by default
     date_written: "2026-09-26"
     story: >
       As someone querying the warehouse for the current period, I want a
-      period nobody supplied to resolve to the last good supply rather
-      than to an empty table, so that my query returns something
-      defensible instead of breaking, and so that the substitution was a
-      decision somebody made rather than a silent default.
-    moscow: should
+      period nobody supplied to be SUBSTITUTED onto an earlier real
+      supply rather than returning an empty table, so that my query
+      answers with something defensible instead of breaking - and so
+      that the substitution was somebody's decision rather than a silent
+      default.
+    moscow: must
     status: not_started
     source: >
       plans/supply-model.md delivery sprint 25, Keith 2026-09-24: "a
@@ -15323,11 +15347,14 @@ requirements:
     acceptance_criteria:
       - >
         WHEN a person decides a slot's supply will not arrive, THE
-        SYSTEM SHALL make that period resolve, for that table, to the
-        most recent GREEN supply of an earlier period.
+        SYSTEM SHALL make that period resolve, for that table, to a
+        PROMOTED supply of an earlier period that the person chooses -
+        of any status, since a period that held an amber or red supply
+        held one, and it is the person who confirms it is the right
+        thing to stand on.
       - >
-        THE SYSTEM SHALL implement that resolution as an indirection in
-        the period's own schema, and SHALL NOT copy the data.
+        THE SYSTEM SHALL implement that resolution as a DATABASE VIEW
+        in the period's own schema, and SHALL NOT copy the data.
       - >
         THE SYSTEM SHALL make the indirection visible to anything
         querying the period by the table's logical name.
@@ -15338,13 +15365,13 @@ requirements:
         the operator, the period pointed at, and a reason.
       - >
         WHEN a slot resolves this way, THE SYSTEM SHALL re-evaluate
-        every check in that period that declares a dependency on that
-        dataset AND every check that dataset's own checks depend on -
-        and SHALL NOT re-run the substituted table's OWN checks, whose
-        verdicts remain those of the run that earned them.
+        every CROSS-TABLE check that reads that dataset, whichever
+        dataset it is filed under - and SHALL NOT re-run the dataset's
+        own table-level and column-level checks, whose verdicts remain
+        those of the run that earned them.
       - >
-        IF no earlier GREEN supply exists, THEN THE SYSTEM SHALL refuse
-        the decision and SHALL say why.
+        IF no earlier PROMOTED supply exists, THEN THE SYSTEM SHALL
+        refuse the decision and SHALL say why.
       - >
         IF a supply for that slot arrives after the decision, THEN THE
         SYSTEM SHALL hold it for a person, SHALL NOT replace the
@@ -15370,13 +15397,16 @@ requirements:
         de-substituting, on every route, and SHALL NOT re-create an
         indirection a person has removed.
       - >
-        WHEN a period's indirection is created or removed, THE SYSTEM
-        SHALL re-evaluate the checks criterion 6 names, on the same
-        terms in both directions.
+        WHEN a period's view is created or removed, THE SYSTEM SHALL
+        re-evaluate the checks criterion 6 names, on the same terms.
       - >
         IF a period already holds a PROMOTED table for that dataset,
         THEN THE SYSTEM SHALL refuse to substitute into it, and SHALL
         say that the period already resolves to a real supply.
+      - >
+        THE SYSTEM SHALL point a substitution only at a physical
+        PROMOTED table, and SHALL NEVER point it at a period that is
+        itself substituted or inherited.
     non_functional_requirements:
       - >
         This is for DOWNSTREAM CONSUMERS rather than for reporting
@@ -15392,8 +15422,15 @@ requirements:
         last quarter's child-protection records answering a query about
         this quarter. It is defensible only while it is unmistakably
         labelled at every point of consumption, which is why the
-        labelling has its own requirement, and it is worth asking
-        whether a warehouse consumer sees any label at all.
+        labelling has its own requirement.
+
+        IN THE DASHBOARD the indication is at WARNING level (Keith,
+        2026-09-28) and appears BOTH on the dataset's own page AND on
+        its card in the agency view, so a reader scanning an agency
+        sees it without drilling in. FOR A WAREHOUSE CONSUMER he is
+        open on the mechanism and does not require a label in the data
+        itself - recorded so a later session does not read the silence
+        as a decision either way.
       - >
         The mechanism already exists: this is the logical-name-to-physical-table indirection REQ-PIPE-035 establishes, aimed one
         schema further back, and reference_view() is already built and
@@ -15411,6 +15448,61 @@ requirements:
         February is real work for one person on one afternoon.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-035]
     decisions:
+      - >
+        A SUBSTITUTION STANDS ON ANY PROMOTED SUPPLY, NOT ONLY A GREEN
+        ONE (Keith, 2026-09-28, criteria 1 and 7, reversing this
+        requirement's original rule). A period that held an amber or
+        red supply held one, and a previously promoted red supply is a
+        legitimate thing to stand on - the PERSON confirms it is the
+        right choice, which is the whole point of the disposition being
+        a decision rather than a default. Rejected the green-only rule,
+        which reads as safer and is not: it silently skips past the
+        real most recent state and can leave a period standing on
+        nothing where the last green supply is far behind or never
+        existed.
+
+        NOTE THIS CONVERGES SUBSTITUTION WITH INHERITANCE, which
+        REQ-PIPE-098 decision 10 had recorded as deliberately
+        DIFFERENT. That decision is amended rather than left to
+        mislead.
+      - >
+        A SUBSTITUTION NEVER STANDS ON A STAND-IN (criterion 16, Keith,
+        2026-09-28): the target must be a physical promoted table,
+        never a period that is itself substituted or inherited.
+        Decision 10 already said chains never form "by construction",
+        but nothing stated it as a rule the system enforces - so it was
+        a property somebody had to know rather than one the code holds.
+      - >
+        IT IS A PLAIN DATABASE VIEW (criterion 2, Keith, 2026-09-28,
+        on how he pictures it). "Indirection" was accurate and vague;
+        reference_view() is already built and tested as a real
+        cross-schema VIEW, so the criterion may as well say what the
+        thing is. Never a copy, which was never in doubt.
+      - >
+        WHAT RE-RUNS IS THE CROSS-TABLE CHECKS, AND NOTHING ELSE
+        (criterion 6, Keith, 2026-09-28, working through it aloud and
+        landing somewhere better than where he started). His difficulty
+        was real: if the dataset's own checks that depend on another
+        dataset re-ran, a period would hold a mix of freshly-run
+        verdicts and verdicts pointed at from an earlier period, which
+        he called messy and is. What resolved it is that a CROSS-TABLE
+        CHECK IS SEPARATE FROM THE DATASET - REQ-QAC-037's own model.
+        So the dataset's own table-level and column-level verdicts are
+        referenced whole, every cross-table check touching it re-runs
+        whichever dataset it is filed under, and the two can display
+        differently. Applies identically to inheritance.
+      - >
+        THE DASHBOARD INDICATION IS AT WARNING LEVEL, ON THE DATASET
+        PAGE AND ON ITS AGENCY CARD (Keith, 2026-09-28, non-functional
+        2) - so somebody scanning an agency sees it without drilling
+        in. He is open on whether a WAREHOUSE consumer sees any label
+        at all, which is recorded as open rather than settled, because
+        silence in a requirement reads as a decision later.
+      - >
+        RAISED TO `must` from `should` (Keith, 2026-09-28). It was the
+        only one of sprint 25 and 28's four at `should`, and
+        REQ-PIPE-099's un-inherit now depends on the refusal this
+        requirement creates.
       - >
         CRITERION 6 CONTRADICTED DECISION 9 AND IS REWRITTEN (Keith,
         2026-09-28, at read-back). It said "re-run QA for that period",
@@ -18921,6 +19013,15 @@ requirements:
         open question). Criterion 9 refuses rather than inventing a
         state.
       - >
+        AMENDED 2026-09-28: THE TWO RULES HAVE SINCE CONVERGED. Keith
+        changed substitution to stand on any PROMOTED supply as well,
+        so the contrast this decision draws no longer holds. It is kept
+        for its reasoning about inheritance rather than for the
+        difference it asserts. Both dispositions now stand on a
+        promoted supply; what still differs is that a PERSON CHOOSES
+        which one for a substitution, while inheritance takes the most
+        recent automatically.
+
         INHERITANCE STANDS ON THE MOST RECENT PROMOTED SUPPLY, NOT THE
         MOST RECENT GREEN ONE (Keith, 2026-09-26), confirming
         criterion 1 as drafted and deliberately NOT copying
@@ -18992,11 +19093,12 @@ requirements:
         un-inheriting, on every route.
       - >
         WHEN a period's view for a dataset is created or removed by an
-        operator action, THE SYSTEM SHALL re-evaluate every check in
-        that period that declares a dependency on that dataset AND
-        every check that dataset's own checks depend on, and SHALL NOT
-        leave a verdict standing that was computed against what the
-        period resolved to before.
+        operator action, THE SYSTEM SHALL re-evaluate every CROSS-TABLE
+        check that reads that dataset, whichever dataset it is filed
+        under, and SHALL NOT leave a verdict standing that was computed
+        against what the period resolved to before - while the
+        dataset's own table-level and column-level verdicts remain
+        those of the run that earned them.
       - >
         IF a period already holds a PROMOTED table for that dataset,
         THEN THE SYSTEM SHALL refuse to inherit into it, and SHALL say
