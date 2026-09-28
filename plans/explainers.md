@@ -584,31 +584,71 @@ building starts, and the entry comes out when it lands.
    they are written.
 
    **Groups, as a numbered learning path** (Keith's call: read in this
-   order, but anyone can jump in anywhere):
+   order, but anyone can jump in anywhere). Revised 2026-09-29 after
+   Keith's review: he added an overview page, flagged that the asset's
+   shape varies, split "judging quality" in two, and confirmed that
+   every group is a real concept, unlike the four QA tools.
+
+   0. **The overview page** (Keith: "I'm assuming there's an overall
+      page"). A very high-level introduction to the whole thing and a
+      tour of the groups below.
    1. **The shape of the data asset**: data asset; agency, collection,
       dataset and column; environments; same code, separate deployment
-      per asset.
+      per asset. **This group must flag that the shape VARIES.** The
+      tool is meant to be generic and generalisable, so it will also
+      run on one-off project extractions (supplies with no cadence) and
+      on sample data, not only on recurring multi-agency assets. Keith:
+      "we don't have language for that yet, but it is something that
+      will change." So this group's pages are the ones most likely to
+      be revisited. Also here (round 16): the DATA CONTRACT, where a
+      dataset's columns, checks, due times and file patterns come
+      from; a dataset that exists before its schedule is agreed, or
+      never gets one (moved from group 2); and which environment a
+      dashboard shows.
    2. **The calendar** (Keith's first topic): delivery calendar,
-      schedule, period, slot, due time and grace, claim window, a
-      dataset that joins a calendar or never has one, and a schedule
-      that runs out.
+      schedule, period, slot, due time and grace, claim window,
+      overdue (moved from group 3: it is about what did NOT arrive),
+      and a schedule that runs out.
    3. **What arrives** (his second): delivery (one physical drop),
       supply (one table's version), receipt, recognising files by
       pattern, two files for one dataset being held, a hand-filed
-      supply, and early / on time / late / overdue.
+      supply, and early / on time / late.
    4. **Filing a supply** (his third): staging, slot assignment (the
       claim rule), held for a human, promotion, rejection, demotion,
       un-decide, re-file, resupply (an arrival into a filled slot), the
-      mixed-period delivery, and the decision log.
+      mixed-period delivery, the decision log, and accepting or
+      rejecting an amber supply (moved here in round 14).
    5. **Filling the gaps** (his "patch in via a view"): a period
       standing in on the last good one, inherit and un-inherit (an
       annual dataset on a quarterly asset), and why neither reads as an
       ordinary green.
-   6. **Judging quality**: check and `check_id`; check scopes (column,
-      dataset, supply, cross-table, file); red/amber/green and the
-      worst-of rollup; red-for-unrun; amber accept/reject; retiring a
-      check; what drift is measured against.
-   7. **Looking back in time**: as-of viewing, "as at T" answered from
+   6. **When a person is needed** (new in round 16). Holds, the
+      asset's single count of everything needing a person, QA
+      tickets, overdue tickets, and where decisions are taken (a
+      GitHub ticket or the terminal, never the dashboard). It sits
+      after filing and filling the gaps, which are where most of
+      those decisions arise.
+   7. **How status works** (settled in round 15: status only, no
+      checks). Red, amber and green; the worst-of rollup up the
+      hierarchy (column, dataset, collection, agency); red-for-unrun;
+      timeliness verdicts (early, on time, late, overdue) and
+      freshness capping a headline; anomalies aggregated rather than
+      read as a data verdict. The overview page gives a short
+      red/amber/green primer first, so every earlier group can use the
+      words (round 15).
+   8. **The checks, by level** (Keith's ask for "the broad types of
+      column checks", organised BY LEVEL in round 14). Column checks,
+      dataset checks, supply-level checks, cross-table checks, and file
+      (shape) checks, which are claims about the file, never a verdict
+      on the data. Within each level, the types use the five real
+      categories every check carries, the ODCS standard's own quality
+      dimensions (`qa_tools/common/check_lifecycle.py`
+      `CHECK_CATEGORIES`): completeness, uniqueness, conformity,
+      consistency, timeliness. Also here: drift and volume and what
+      they are measured against, a check's identity (`check_id`), and
+      retiring a check. Keith: "we have other checks at data set level
+      that I forget" - the concept sweep lists them.
+   9. **Looking back in time**: as-of viewing, "as at T" answered from
       filing events, snapshots, and the activity feed.
 
    **A known trap to guard against: "delivery" changed meaning.** It
@@ -631,6 +671,217 @@ building starts, and the entry comes out when it lands.
    - **The concept map lives here** until it moves into the real
      glossary and group pages.
 
-   **Still open:** Keith's own review of the list above (what's
-   missing or misplaced, and whether anything on it isn't really a
-   concept), asked as an open question.
+   **Still open:** follow-up questions on the revision above, and a
+   sweep of `requirements.yaml` and `plans/*.md` for concepts the map
+   has missed (Keith's ask).
+
+   **Round 14 - the revised map (2026-09-29):**
+   - **The overview page covers three things: the problem, one journey,
+     and a tour.** It opens with the problem this solves, follows a
+     single supply from arriving to being judged to appearing on the
+     dashboard, and then tours the groups as the reading path.
+   - **Group 1 gets placeholder names now** for the asset shapes that
+     have no language yet (one-off project extractions, sample data),
+     entered in the glossary as draft. Keith approves the names; see
+     round 15.
+   - **Amber accept/reject belongs in group 4**, with the other actions
+     on a supply. Keith added: "but maybe the statuses get explained
+     easier as well?" This is read as "EARLIER" (a likely dictation
+     artefact): red/amber/green should be met before the reader reaches
+     filing. Confirmed in round 15.
+   - **Group 7 is organised by LEVEL, not by the five categories.**
+     Column checks, dataset checks, cross-table checks and file checks,
+     each with its types. That overlaps group 6's "what each layer is
+     judged on", so the split between groups 6 and 7 is settled in
+     round 15.
+
+   **Round 15 - follow-ups on the revised map (2026-09-29):**
+   - **"Earlier" confirmed.** Red, amber and green are first explained
+     as a short primer inside the overview page's one-supply journey,
+     so every group can use the words. The full detail stays in group
+     6.
+   - **Groups 6 and 7 divide cleanly: 6 is status, 7 is checks.** Group
+     6 is purely how STATUS works. Group 7 is every CHECK, by level.
+     The group list above has been updated to match.
+   - **Placeholder names for the asset shapes, named by how supplies
+     arrive** (draft, for the glossary):
+     - a **scheduled asset**: supplies owed on a calendar, today's
+       shape;
+     - a **one-off extraction**: supplies with no schedule, for a
+       single project;
+     - a **sample**: practice or test data, never real.
+   - **The cast is introduced in the overview's one-supply journey**,
+     so every later story can assume the reader knows them.
+
+   **Style round 1 (2026-09-29).** These answers are for the house
+   standard; Keith approves the exact wording before it is written:
+   - **Voice: a mix of "you" and "we".** "You" when addressing the
+     reader; "we" when explaining a choice the project made ("we chose
+     X because...").
+   - **Humour: wry asides and puns in headings.** For example, the odd
+     dry line acknowledging that something is genuinely fiddly, or
+     occasional wordplay in a heading or caption. NOT picked: Australian
+     references and idiom, or keeping all the humour inside the cast's
+     stories.
+   - **Dashes: a spaced en dash ( – ),** the Australian Government
+     Style Manual's convention for a break in a sentence.
+   - **Headings: mostly questions** ("Why does a slot have a claim
+     window?"), mirroring the Diátaxis why-question and telling a
+     skimmer what each section answers.
+
+   **Concept sweep (2026-09-29).** Keith asked for a pass through
+   `requirements.yaml` and `plans/*.md` for concepts the map missed.
+   A subagent read all 108 requirements and the plans files; its
+   headline claims were spot-checked against `requirements.yaml`.
+
+   **Missed concepts, most-needed first**, with requirement ids.
+   B = built, NB = not built, P = partly built; the proposed group is
+   in brackets:
+   1. The data contract (ODCS) itself, where checks, due times and
+      file patterns come from (B) [1 or 7].
+   2. What a check is, and warn versus fail thresholds, the thing that
+      makes a result amber rather than red (REQ-QAC-047) (B) [needed
+      before 6].
+   3. Statuses beyond red/amber/green: "No data", "No rule defined",
+      "Schedule ended", "unfiled", "unknown", none of them a quality
+      verdict (REQ-PIPE-053, REQ-DASH-070) (B) [6].
+   4. Qualifiers, meaning a status plus a word rather than a new
+      colour: substituted, inherited, uncertain, in development
+      (REQ-DASH-085/100, REQ-PIPE-106) (P) [6].
+   5. Arrived versus promoted: a dataset's latest arrival and its
+      promoted supply are different things (REQ-PIPE-034,
+      REQ-DASH-056) (P) [3/4].
+   6. Where a supply physically lives: the staging, period, rejected
+      and sample schemas (REQ-PIPE-087/060/075/076) (P) [4; possibly
+      pipeline docs].
+   7. The automatic promotion gate, and "automation defers to a person,
+      permanently" (REQ-PIPE-075/076/077) (NB) [4].
+   8. The actor on every decision (person or rule), required reasons,
+      and the people allowlist (REQ-PIPE-074, REQ-GHUB-082) (P) [4].
+   9. The seven filing decisions: four about a supply (promote,
+      reject, demote, re-file) and three about a period (substitute,
+      inherit, un-inherit), taken from a ticket or the terminal, never
+      the dashboard (REQ-GHUB-082) (NB) [4].
+   10. Check scopes, and cross-table verdicts counting against EVERY
+       dataset they read (REQ-QAC-037) (B) [6/7].
+   11. Check dependencies (`depends_on`) and temporal reference
+       (REQ-PIPE-035/079) (P) [7].
+   12. Why a check could not run, which is the reasons behind
+       red-for-unrun (REQ-PIPE-079) (NB) [6].
+   13. Load failure (REQ-PIPE-060) (B) [3].
+   14. The event severity vocabulary (informational / warning / needs
+       action), which is never drawn in red/amber/green (REQ-DASH-070)
+       (B) [6].
+   15. What recognition cannot place: an unrecognised artefact, an
+       unexpected table, an unplaceable delivery, a delivery still in
+       flight (REQ-PIPE-057) (B) [3].
+   16. The unfiled supply (REQ-PIPE-066) (P) [4].
+   17. An assignment made under ambiguity, which defaults backward and
+       is marked uncertain (REQ-PIPE-065) (B) [4].
+   18. A slot closed unfilled (REQ-PIPE-063) (B) [4].
+   19. An arrival verdict follows its filing (REQ-PIPE-067) (B) [3].
+   20. Arrived, promoted and filled as three different moments
+       (REQ-PIPE-080) (NB) [3].
+   21. Calendar detail:
+       - not-expected periods and delivery months (REQ-PIPE-049) (B);
+       - calendar versions (B);
+       - authored dates versus a cadence rule (B);
+       - runway (REQ-PIPE-053) (B);
+       - the asset's clock, where a bare date means end of day
+         (REQ-PIPE-048) (B);
+       - supplies for the following period (NB).
+
+       All [2].
+   22. Pre-agreement datasets and graduation (REQ-PIPE-106) (B) [1].
+   23. The project extraction and its recipe (sprint 29, no
+       requirements) (NB) [1].
+   24. A trial: checking without keeping (REQ-PIPE-103) (P) [3?].
+   25. Staleness shown as "No data as of", distinct from the unbuilt
+       freshness capping (REQ-PIPE-007) (B) [6/8].
+   26. The BUILT, status-inferred resupply chain (REQ-QAC-008) (B)
+       [3/8].
+   27. QA and overdue tickets (REQ-GHUB-027/015, REQ-PIPE-083) (P)
+       [new group?].
+   28. A check's plain-English fields (REQ-QAC-024) (B) [7?].
+   29. Check definition changes and the check changelog (REQ-QAC-006)
+       (B) [7].
+   30. Recorded QA history (REQ-PIPE-089) (B) [8?].
+   31. The as-corrected view versus what the page said
+       ("In place on", REQ-PIPE-081) (NB) [8].
+   32. Newest PROMOTED wins (REQ-PIPE-105) (P) [4].
+   33. Which environment a dashboard shows (REQ-DASH-094) (NB) [1].
+
+   **Dataset-level judgements** (Keith: "other checks at data set
+   level that I forget"):
+   - the rollup of its column checks;
+   - supply-level row count;
+   - table-level business rules, plus a content-recency check ("recent
+     births present");
+   - volume and drift, measured against the last promoted earlier
+     period (REQ-QAC-108, NB);
+   - the cross-table checks it takes part in;
+   - missing-dependency red;
+   - arrival timeliness, and an overdue slot;
+   - "No data as of", and schedule ended plus low runway;
+   - not-expected, inherited and substituted periods;
+   - the in-development label;
+   - amber accept/reject;
+   - arrived versus promoted;
+   - columns with no rule defined.
+
+   There are further judgements at supply, file, delivery, collection
+   and asset level (e.g. the asset's single count of everything
+   needing a person, REQ-DASH-070).
+
+   **Naming hazards the glossary must settle:**
+   - **delivery**: the obligation sense survives in "delivery
+     calendar"; REQ-PIPE-105 also splits delivery (one drop) from
+     arrival (one file).
+   - **resupply**: the built chain versus the model's arrival into a
+     filled slot.
+   - **carry forward / substitute / patch / stand in / last good one**:
+     all one concept, but "carry forward" also means supplies for the
+     following period.
+   - **demote / un-decide**: un-decide IS demote-to-staging (verified
+     in REQ-PIPE-076's decisions). Demote can also go to rejected.
+   - **reject**: an amber reject is a filing reject; an amber accept is
+     not logged.
+   - **promote**: also "save QA results" in the TUI (being renamed).
+   - **as of** is being relabelled "In place on".
+   - **timeliness**: as a check category it means CONTENT recency, not
+     arrival timeliness.
+   - Also: no data; stale / freshness / recency / overdue; run;
+     blocked; cycle versus period; and the several names for a
+     pre-agreement dataset.
+
+   **Suggested fixes to the map:**
+   - move overdue out of group 3 (it is about what did NOT arrive);
+   - move the never-a-calendar dataset to group 1;
+   - mark groups 4-5 as read-first for drift and volume;
+   - badge freshness capping (no requirement yet);
+   - the anomaly activity feed is unscoped and differs from the built
+     one;
+   - explain the built resupply chain where supply history appears.
+
+   Outcomes are in the round below.
+
+   **Round 16 - absorbing the sweep (2026-09-29):**
+   - **Three tiers.** A big idea gets its own concept page, a medium
+     one becomes a section inside a related page, and a small one is a
+     glossary entry only. The main session proposes a tier for each
+     concept, and Keith adjusts.
+   - **Foundations go in group 1.** The data contract is part of what
+     a dataset IS, so group 1 introduces it. A "what's a check" page,
+     with warn and fail thresholds, opens the checks group (now 8).
+     The overview's red/amber/green primer covers the reader until
+     then.
+   - **A new group: "When a person is needed"** (now group 6, and the
+     later groups renumbered to 7-9).
+   - **Naming: a session with Keith.** The main session brings each
+     naming hazard with its candidates, where each is used, and a
+     recommendation. Keith picks the canonical word, and the others
+     become aliases listed in the glossary. Picks that imply renaming
+     things in code or requirements get flagged as follow-up work.
+   - **Two uncontroversial map fixes from the sweep, applied:** overdue
+     moves from group 3 to the calendar (group 2), and datasets that
+     never get a calendar move to group 1.
