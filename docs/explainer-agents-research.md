@@ -354,7 +354,11 @@ snippet-only (arXiv and ACL Anthology are blocked here).
   cited. So the SOURCE SET needs its own check.
 - **Prompted citations aren't guaranteed valid.** The API's Citations
   feature is, but subagents can't use it. A script that checks each
-  quote appears verbatim in its cited source gives the same guarantee.
+  quote appears verbatim in its cited source proves the quote EXISTS,
+  not that it supports the claim (corrected after the paper check in
+  `plans/explainers.md` #3). Support has to be judged sentence by
+  sentence against the whole cited set, as ALCE (Gao et al., EMNLP
+  2023) scores it.
 - **Retrieval:**
   - below ~200k tokens, load everything rather than retrieve;
   - use exact-match lookup for identifiers;

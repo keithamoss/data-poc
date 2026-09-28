@@ -26,10 +26,10 @@ Priority: work through today, in this order (Keith, 2026-09-29 morning:
 "we'll work through that gradually today"). Written into the file so it
 survives context compaction. Tick items off here as they land.
 
-1. [in progress] Finish the paper check: the snippet-only research
+1. [done] Finish the paper check: the snippet-only research
    claims re-verified against arXiv and ACL papers, now reachable.
    Report any design decision that should change.
-2. [todo] **Naming session.** One canonical word per naming hazard
+2. [done] **Naming session.** One canonical word per naming hazard
    (#4's concept sweep lists them); the others become glossary aliases.
 3. [todo] **Triage the 33 missed concepts** (#4's sweep, one by one).
    Keith says what he does NOT want included.
@@ -43,6 +43,14 @@ survives context compaction. Tick items off here as they land.
    1-4, then Keith's sign-off. Nothing is built before this.
 8. [todo] Confirm the Style Manual's rule on numbers once
    `www.stylemanual.gov.au` is reachable (#3, style round 4).
+9. [todo, NOT explainer work] Renames the naming session implies in
+   code and requirements, flagged rather than done. Each needs its own
+   scoping:
+   - "delivery calendar" to "supply calendar";
+   - the `sample` schema, which clashes with the "sample" asset shape;
+   - the amber `/accept` command to "acknowledge";
+   - "cycle" to "period";
+   - "stale" wording to "no data".
 
 1. **[investigate, 2026-09-28]** **[Docs & process]** **[Dashboard UI]**
    A technical-writing subagent team that explains this project's own
@@ -961,3 +969,154 @@ survives context compaction. Tick items off here as they land.
        like.
      - **Still to come:** Keith will name external examples himself.
      - NOT picked as a model: the check explanations from REQ-QAC-024.
+
+   **Paper check (2026-09-29).** With arXiv and the ACL Anthology now
+   reachable, the snippet-only claims behind rounds 3 and 13 were
+   checked against the papers themselves. Three spot-checks were
+   re-verified by the main session: that three of the papers exist
+   (arXiv 2606.13685, 2410.21819, 2404.13076) and a verbatim quote from
+   Zheng et al. Corrections, recorded beside the rounds rather than
+   rewriting them:
+   - **Self-preference bias is real but weaker evidence than assumed.**
+     - Zheng et al. 2023 (arXiv 2306.05685) state: "cannot determine
+       whether the models exhibit a self-enhancement bias".
+     - Panickssery et al. 2024 (arXiv 2404.13076) do find it, but did
+       not control for true quality.
+     - Wataoka et al. 2024 (arXiv 2410.21819) find it tracks how
+       FAMILIAR text is to the judge, not who wrote it. So a Sonnet
+       critic probably shares much of Opus's bias.
+
+     Round 3's "test both models" stands, but for a different reason:
+     the planted-defect evals decide, and switching models should NOT
+     be expected to remove the bias.
+   - **"About 11 runs for a stable vote"** comes from one unreviewed
+     2026 paper (arXiv 2606.13685). It tested two OpenAI mini models on
+     29 deliberately close pairwise choices, and three runs already
+     reached about 90% reliability. Do not cite 11 runs as a
+     requirement; round 3's three runs per eval stands.
+   - **Running the fact-checker twice is not self-consistency.** Wang et
+     al. (arXiv 2203.11171) support majority VOTING, and two runs can't
+     form a majority. Round 13's decision stands, described honestly:
+     - the union catches more at the cost of more false flags, which
+       works because Keith reviews every flag;
+     - disagreement between runs IS a supported warning sign;
+     - if the union proves too noisy, the backed alternative is three
+       runs with a majority vote per claim.
+   - **The verbatim-quote script is NOT the same guarantee as the
+     Citations feature** (correcting research section 7). ALCE (Gao et
+     al., EMNLP 2023) scores a sentence as supported only when its cited
+     passages, TOGETHER, back it up, and scores a sentence with no
+     citation as zero. A verbatim match proves a quote exists, not that
+     it supports the claim. So:
+     - the fact-checker judges support sentence by sentence against
+       the whole cited set;
+     - it flags sentences with no citation;
+     - it treats partial support as "not found";
+     - the script stays as a separate gate against invented quotes.
+   - **Self-correction limits hold, reframed.** Huang et al. (ICLR 2024)
+     found that models revising their own reasoning without outside
+     feedback got worse. A same-model critic in a fresh context is not
+     outside feedback, so the design's real safety comes from the
+     sources, the scripts and Keith, not from the critic being a
+     separate agent. The paper's "equal effort" point is adopted:
+     whatever the critic checks for also goes into the writer's brief.
+   - **Lost in the Middle holds, and is cheap to apply** (Liu et al.,
+     TACL 2024; tested only at 2-16K tokens on 2023 models). Order each
+     agent's context with the defining requirements first, peripheral
+     sources in the middle, and the task last (named briefly at the top
+     as well).
+
+   All of these papers test 2022-2025 models on tasks unlike this one.
+   How far the findings carry over to current Claude models is a
+   judgement, not a measurement.
+
+   **Naming session, round 1 (2026-09-29).** Two hazards were already
+   settled in signed requirements, so they were not re-opened. The date
+   control reads "In place on", not "as of" (REQ-PIPE-081). The seven
+   filing decisions already have names (REQ-GHUB-082). "Backfill" was a
+   false alarm: it means filling in missing fields, not a synonym.
+   Keith's picks:
+   - **"Demote", always with its destination.** "Demote to staging"
+     (put it back in the queue) or "demote to rejected". "Un-decide"
+     becomes a glossary alias. This matches REQ-GHUB-082 (35 uses of
+     demote versus 13 of un-decide).
+   - **"Substitute" plus "inherit"; "carry forward" is retired.**
+     "Substitute" is a person's decision that a period stands on an
+     earlier period's supply, shown as "substituted". "Inherit" is the
+     automatic case for a dataset that owed nothing that period.
+     "Standing in" and "last good one" are plain-English aliases.
+     "Carry forward" is retired entirely, because it also means
+     supplies for the following period.
+   - **"Resupply" takes the model's meaning**: a supply arriving for a
+     slot that is already filled. The BUILT status-inferred chain
+     (REQ-QAC-008) is explained where supply history appears, badged
+     as "how the dashboard guesses today, until the model is built".
+   - **"Supply calendar"** replaces "delivery calendar", because
+     "delivery" now means one physical drop. **Follow-up flagged:** the
+     old phrase appears in code (about 12 uses) and requirements (4).
+     The config key is already a plain `calendars`. Renaming the rest is
+     separate work, not part of the explainers.
+
+   **Naming session, round 2 (2026-09-29):**
+   - **"In development"** is the one name for a dataset that exists
+     before its schedule is agreed. It matches the label readers
+     already see on the dashboard (REQ-PIPE-106). "Pre-agreement",
+     "calendar-less" and "not yet agreed" become aliases. **"Sample"
+     stays reserved for the practice-data asset shape**, which clears
+     a clash with the `sample` schema. The schema name is a code
+     detail; renaming it is flagged as follow-up, not explainer work.
+   - **"Recency" for the check category** (the ODCS standard calls it
+     "timeliness"). "Early", "on time" and "late" are only ever about
+     arrivals. No code change is needed.
+   - **Amber "accept" becomes "acknowledge"**, which is what it does,
+     so it never sounds like a decision that changes anything.
+     "Reject" keeps its meaning as a filing reject. **Follow-up
+     flagged:** renaming the `/accept` ticket command.
+   - **Four distinct staleness terms, and "stale" retired:**
+     - "overdue": a slot whose due time has passed with nothing filed;
+     - "no data": nothing to judge as of the chosen date;
+     - "recency": a check on the content;
+     - "freshness": the (unbuilt) cap on a headline.
+
+     "Stale" is retired as ambiguous, and becomes an alias of "no
+     data".
+
+   **Naming session, round 3, and CLOSED (2026-09-29):**
+   - **Delivery, arrival and supply are three words, tightly defined.**
+     - A **delivery** is one drop from a supplier, which may hold
+       several files.
+     - An **arrival** is one file we received, with its receipt time
+       (REQ-PIPE-105).
+     - A **supply** is one table's version, which gets filed and
+       judged.
+
+     The glossary shows the three nested in one small diagram.
+   - **Readers only ever see "QA run".** A trial is always "a trial",
+     never "a trial run". `run_id` and rehearsal-versus-real stay out
+     of the explainers, as tooling.
+   - **"Waiting on a person" for a supply that needs a decision.**
+     "Blocked" is kept only for a healthy table whose check cannot run
+     because a neighbouring table is missing or held.
+   - **"Cycle" is retired**: "period" everywhere, and "cycle" becomes
+     an alias noting the older wording.
+
+   **Glossary canon from the naming session.** Canonical word, then
+   aliases:
+   - demote (to staging / to rejected) - un-decide;
+   - substitute / substituted - standing in, last good one;
+   - inherit - (distinct from substitute);
+   - carry forward - RETIRED;
+   - resupply (arrival into a filled slot) - the built status chain is
+     explained separately;
+   - supply calendar - delivery calendar;
+   - in development - pre-agreement, calendar-less, not yet agreed;
+   - sample - reserved for the practice-data asset shape;
+   - recency (a check category) - ODCS "timeliness";
+   - acknowledge (amber) - accept;
+   - overdue, no data, recency and freshness are distinct; stale -
+     alias of "no data";
+   - delivery, arrival and supply are distinct;
+   - QA run, and trial;
+   - waiting on a person, and blocked (a neighbour);
+   - period - cycle;
+   - In place on - as of (already settled in REQ-PIPE-081).
