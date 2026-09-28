@@ -101,6 +101,12 @@ already scoped.
   `plans/qa-pipeline.md` (real bugs found running the real tools) just
   because it turns out to be one of those after investigation; write
   down what was seen first, move it once it's understood.
+- `plans/explainers.md` - the plain-English concept explainers and the
+  subagent team (writer, illustrator, reader-critic) being designed to
+  write them, plus the separate technical pipeline documentation track.
+  Created 2026-09-28 at Keith's own ask. Not required reading up front;
+  read it before writing any explainer, touching the agent team, or
+  adding a concept to its list.
 - `plans/post-build-review.md` - what the post-build critic agents
   found when turned at work that is already BUILT AND SHIPPED, and what
   was decided about each finding. Created 2026-09-24 at Keith's own
@@ -1585,14 +1591,14 @@ Rough layout:
     `"wh"."staging"."placements"` to `"wh"."promoted"."carers"`. Prefer
     that route first for any question about a tool that is installed
     here; it outranks the docs.
-  - **`www.anthropic.com`** - Anthropic's own published multi-agent
-    design guidance ("Building Effective Agents", the multi-agent
-    research system writeup), wanted for the `delivery-*` subagent work
-    (`plans/wider.md` #10). Note bare `anthropic.com` is NOT separately
-    reachable: it returns a real 301 to `www.anthropic.com`, which is
-    the blocked host, so the redirect is not a way around it.
-    `code.claude.com` (Claude Code's own docs) remains reachable and
-    needs no workaround.
+  - ~~**`www.anthropic.com`**~~ - NOW REACHABLE: re-verified with a real
+    `curl` 2026-09-28 (200 on `/engineering/building-effective-agents`),
+    and both engineering posts were read in full for the explainer
+    agent research (`plans/explainers.md` #1). Kept here because older
+    `plans/*.md` prose calls it blocked. It holds Anthropic's own
+    published multi-agent design guidance ("Building Effective
+    Agents", the multi-agent research system writeup), first wanted
+    for the `delivery-*` subagent work (`plans/wider.md` #10).
   - **`docs.evidentlyai.com`** and **`www.evidentlyai.com`** - Evidently's
     own documentation, and the one remaining QA tool whose docs are not
     reachable (dbt, Soda and datacontract-cli all are). Hit 2026-09-27
@@ -1645,6 +1651,34 @@ Rough layout:
     (`raw.githubusercontent.com/cli-guidelines/cli-guidelines/main/
     content/_index.md`) - same repo, same content, a real primary
     source rather than a bypass.
+  - **Research for the technical-writing agent team** (`plans/
+    explainers.md` #1), hit 2026-09-28, every one a real `curl:
+    (56) CONNECT tunnel failed, response 403`:
+    - **`diataxis.fr`**, **`mermaid.js.org`** - the two primary
+      references the writer and illustrator will be grounded in. Both
+      were read legitimately from their own source repos on
+      `raw.githubusercontent.com` instead. Worth allow-listing anyway,
+      because the rendered site is what a person follows a link to.
+    - **`cdn.jsdelivr.net`** - how Mermaid's docs and most examples
+      load it. Not needed for vendoring (`registry.npmjs.org` is
+      reachable and serves the tarball), so low priority.
+    - **`jvns.ca`**, **`wizardzines.com`**, **`www.cncf.io`** - Julia
+      Evans' zines and the Illustrated Children's Guide to Kubernetes,
+      the two style references Keith liked. No source repo, so
+      snippet-only without allow-listing.
+    - **`www.stylemanual.gov.au`**, **`www.gov.uk`**,
+      **`developers.google.com`** - plain-language writing standards.
+      The Australian Government Style Manual is the obvious house
+      reference for a WA government audience, so it's the one most
+      worth allowing.
+    - **`owasp.org`**, **`genai.owasp.org`**, **`simonwillison.net`** -
+      prompt-injection guidance (OWASP LLM01; Simon Willison coined
+      the term), researched because Keith raised the risk directly.
+    - **`roughjs.com`**, **`github.blog`** - low priority.
+    - **`github.com` HTML and `api.github.com`** returned a plain HTTP
+      403 rather than a tunnel failure, so that is probably GitHub
+      itself (rate limiting, or no auth on the API) rather than this
+      proxy. `raw.githubusercontent.com` works for reading repo files.
 
   **Now reachable** (allow-listed by Keith; kept here rather than
   deleted so a future session reading an old `plans/*.md` reference to

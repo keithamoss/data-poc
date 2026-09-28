@@ -4420,3 +4420,22 @@ Belongs with batch 5's check work.
     explicitly NOT a promotion-safety measure - see the reasoning in
     this item's own opening paragraph for why I stopped claiming it
     was one.
+
+58. **[todo, 2026-09-28]** **[Testing & dev tooling]** The
+    session-start hook reports "Node modules already installed" when
+    they are installed but out of date.
+
+    Hit for real 2026-09-28: a container was cloned from the stale
+    default branch, ran `npm ci` there, and then fast-forwarded 511
+    commits onto the active branch. The hook, resuming, said the
+    modules were already installed, because the directory existed. But
+    the lockfile had since gained `yaml`, so `tests-js/
+    implemented-by.test.js` failed to load ("Cannot find package
+    'yaml'") and `mothman check` reported `npm test` FAILED. This read
+    like a code regression and was not one. `npm ci` fixed it.
+
+    Cheap fix, not scoped: have the hook compare `package-lock.json`
+    against `node_modules/.package-lock.json` (npm writes that file on
+    every install) and re-run `npm ci` when they differ. The same shape
+    probably applies to `uv sync` and `dbt deps`, which the hook also
+    treats as present-therefore-current.
