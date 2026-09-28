@@ -4110,22 +4110,46 @@ REJECTED, both worth not re-deriving:
   inverts this project's own "the repository holds configuration, not
   state".
 
-**Two forks still open:**
+**Both remaining forks SETTLED, Keith 2026-09-28.**
 
-- **Is there an escape hatch?** My recommendation is no. A past date
-  that was wrong is exactly the case immutability exists for - the
-  supplies were judged against it, and quietly changing it makes the
-  record disagree with what happened.
-- **Is the TIMEZONE itself versioned?** If an asset's zone ever
-  changed, every past due instant would move. WA has no daylight
-  saving so this is theoretical here, but the general system is the
-  one being designed. Either the timezone is versioned alongside the
-  calendars, or this is accepted and written down as accepted.
-  Worth reading `contract/data-asset.yaml`'s own `timezone` comment
-  first: it already argues that changing the zone reinterprets
-  nothing stored, because every recorded instant carries its own
-  offset. A DUE instant computed from config is a different case,
-  which is why this is still a question.
+**No escape hatch.** There is no flag, no override, no "I know what I
+am doing" path past the gate. A past date that was wrong is exactly
+the case immutability exists for: supplies were judged against it, and
+quietly changing it makes the record disagree with what happened. A
+correction that genuinely needs making is a new version with its own
+`effective_from` and its own changelog entry, which is visible rather
+than silent - and the real history stays in git either way.
+
+**The timezone IS versioned.** Which makes it the same shape as
+everything else here: a wall-clock `expected_time` is interpreted in
+the zone **in force when the supply was due**, exactly as a date is
+read from the calendar version in force then. Without that, changing
+an asset's zone would silently move every past due instant, which is
+the same retroactive re-judgement the calendar rule exists to prevent.
+
+Three consequences, so nobody has to re-derive them:
+- **It stays in `contract/data-asset.yaml`, becoming a versioned list
+  rather than the scalar `timezone: Australia/Perth` there today.** My
+  call rather than Keith's, and easily reversed: the zone is
+  asset-wide, used well beyond the calendars - the dashboard's asset
+  clock, REQ-DASH-071's timestamps, arrival classification - so moving
+  it into `calendar.yaml` would put a general fact inside one
+  consumer's file.
+- **Every reader becomes "as at when".** A due instant asks for the
+  zone in force at its own date; a display clock asks for the current
+  one. That is a real cost of versioning and the reason to write it
+  down: a bare `asset_timezone()` with no instant is the bug this
+  invites.
+- **The immutability rule applies to it too**, on the same freeze-by-
+  what-it-governs line: a timezone version that has taken effect is
+  frozen, because it already governed instants that have been judged.
+
+Worth keeping from the existing comment in `contract/data-asset.yaml`,
+because it is still true and answers a different question: changing
+the zone reinterprets nothing ALREADY STORED, since every recorded
+instant carries its own offset. That covers recorded facts. Versioning
+covers instants COMPUTED from config, which had nothing protecting
+them.
 
 ## Thread D - Arrival classification
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
