@@ -1758,7 +1758,7 @@ comparisons against the expected-supply sequence.
     "promotion and rejection" reads like a complete set of outcomes and
     is not.
 
-12. **[todo, 2026-09-21]** **[Pipeline & publishing]** **The decision
+12. **[in-progress, 2026-09-28]** **[Pipeline & publishing]** **The decision
     log, and the GitHub Issues write path.** Append-only; who, when,
     what, which, why; automated decisions recorded the same way with the
     rule as actor; demotion stickiness; **re-filing** (confirmed in
