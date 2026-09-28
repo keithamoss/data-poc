@@ -13105,6 +13105,18 @@ requirements:
         reason where the log requires one, for each supply a person
         promotes, and SHALL NOT offer an operation that promotes several
         supplies on one decision.
+      - >
+        THE SYSTEM SHALL MOVE a promoted supply's tables out of staging
+        into the period schema, and SHALL NOT leave a copy in staging,
+        so that staging holds only supplies nobody has decided on.
+      - >
+        WHEN a person promotes a supply into the period its QA was
+        already run against, THE SYSTEM SHALL NOT re-run QA.
+      - >
+        WHEN a supply is promoted or re-filed into a DIFFERENT period
+        from the one its QA was run against, THE SYSTEM SHALL re-run QA
+        against that period, and SHALL re-evaluate the cross-table
+        checks that read it.
     non_functional_requirements:
       - >
         This is the keystone of the batch and it turns on two things
@@ -13151,6 +13163,26 @@ requirements:
         GREEN two transforms downstream.
     dependencies: [REQ-PIPE-074, REQ-PIPE-062, REQ-PIPE-035, REQ-PIPE-064]
     decisions:
+      - >
+        PROMOTION MOVES, IT DOES NOT COPY (criterion 15; Keith,
+        2026-09-28). The settled storage model already said tables can
+        move between schemas and only their CONTENTS are immutable, but
+        no criterion said it, and REQ-PIPE-105 was nearly built on the
+        assumption that a promoted supply's staged table stays put. It
+        does not, and that matters beyond tidiness: leaving a copy makes
+        every resupply into a period look like two competing staged
+        versions, which would have made a legitimate resupply
+        uncheckable.
+      - >
+        QA IS NOT RE-RUN FOR A PROMOTION INTO THE PERIOD IT WAS ALREADY
+        ASSESSED AGAINST (criteria 16 and 17; Keith, 2026-09-28,
+        correcting a looser description that had every promotion
+        re-running it). The verdict is already about that period's data,
+        so re-running would produce the same answer at the cost of the
+        whole tool chain. What DOES require a re-run is the supply
+        moving: promoted or re-filed into a different period, where the
+        cross-table checks were resolved against tables that are not the
+        ones it now sits beside.
       - >
         Decided QA GATES promotion on STATUS, settled 2026-09-21
         (Keith): amber and green auto-promote, red never does. A supply
@@ -20029,26 +20061,30 @@ requirements:
         use our own clock at the moment of receipt, and SHALL record
         which of the two it used.
       - >
-        THE SYSTEM SHALL evaluate each arrival against, for every
-        table the arrival did not itself carry, THE ONE VERSION OF
-        THAT TABLE STAGED FOR THAT PERIOD where exactly one is
-        staged, falling back to the period's promoted state where
-        none is - and SHALL NOT restrict a run to the tables of the
-        single arrival that triggered it.
+        THE SYSTEM SHALL read a table the arrival ITSELF carried from
+        that arrival, and SHALL evaluate it against, for every table
+        the arrival did not carry, the one version of that table
+        staged for that period where exactly one is staged, falling
+        back to the period's promoted state where none is - and SHALL
+        NOT restrict a run to the tables of the single arrival that
+        triggered it.
       - >
-        THE SYSTEM SHALL hold, never choose between, several staged
-        versions of one logical table within a period, on
-        REQ-PIPE-059's rule and regardless of whether they arrived
-        together or separately.
+        THE SYSTEM SHALL hold, never choose between, several files
+        claiming one dataset within ONE arrival, on REQ-PIPE-059's
+        rule - the case where nothing says which file is the supply.
+        A supply arriving separately is NOT that case: it SHALL be
+        checked against its own data, and held at PROMOTION instead,
+        under REQ-PIPE-075 criterion 4.
       - >
         THE SYSTEM SHALL apply "newest wins" only to PROMOTED
         supplies, and SHALL decide which is newest by PROMOTION time
         rather than by arrival time.
       - >
-        THE SYSTEM SHALL treat a table held under the rule above as
-        ABSENT for the purposes of criterion 5's fallback, so that a
-        run reading it for context reads the period's promoted state
-        rather than one of the contested versions.
+        THE SYSTEM SHALL treat a table as ABSENT when an arrival that
+        did not carry it finds either several staged versions for that
+        period or one held under criterion 6, so that the run reads
+        the period's promoted state rather than choosing between
+        them.
       - >
         THE SYSTEM SHALL amend REQ-PIPE-035 criterion 3 in the same
         change, so that what is overlaid on a period's promoted state
@@ -20150,6 +20186,44 @@ requirements:
         11 split the carry-forward clause out of criterion 10. Worth saying rather than silently fixing: a stale
         criterion reference in a decision is the kind of thing a later
         reader trusts without re-checking.
+      - >
+        CRITERION 6 NARROWED 2026-09-28, SAME DAY IT WAS WRITTEN, because
+        the first version made a legitimate resupply UNCHECKABLE. It held
+        several staged versions of a table in a period "regardless of
+        whether they arrived together or separately" - and staging only
+        grows, so any resupply made two staged versions, tripped the
+        hold, and got no view at all. Its own data could not be read, so
+        no verdict existed for the person deciding whether to accept the
+        correction.
+
+        REQ-PIPE-059's own decision is what shows this is the wrong
+        shape: a held supply is not QA'd because "assignment is what
+        unblocks QA" - a human assigns each file to a slot and checking
+        follows. A resupply has nothing to assign. We know which file
+        arrived and which period it is for, so the hold blocked QA with
+        no resolving action available, which is the dead end 059 was
+        explicitly designed not to be.
+
+        THE DISTINCTION, and it is clean: 059's hold is about NOT KNOWING
+        WHICH FILE IS THE ARRIVAL - two files landing together, both
+        matching one dataset, nothing to tell them apart. A resupply does
+        not have that problem. So an arrival always reads its own table
+        (criterion 5), the hold is only within one arrival (criterion 6),
+        and several staged versions make a table absent when read as
+        CONTEXT by somebody else (criterion 8). No arrival-time choice is
+        made anywhere, so the principle is untouched.
+      - >
+        AND THE COMMON CASE RESOLVES STRUCTURALLY RATHER THAN BY THIS
+        NARROWING (Keith, 2026-09-28, asking why a promoted supply's
+        staged table stays in staging at all). It should not: the settled
+        storage model already says tables MOVE between schemas, and the
+        only reason they do not today is that nothing promotes yet.
+        REQ-PIPE-075 gains a criterion saying so. Once promotion moves, a
+        resupply into a filled slot sees ONE staged version, so the
+        ambiguity never arises - and staging holds only undecided
+        supplies, which also retires candidates_in()'s own worry that
+        "staging only ever grows ... the fastest-growing thing in this
+        design".
       - >
         SIGNED TWICE, and the second signature is the one that counts.
         Keith signed the 2026-09-27 draft, whose criteria 5 and 6 said
