@@ -23044,7 +23044,7 @@ requirements:
       PROMOTED, never against a view or an arrival nobody promoted
     date_written: "2026-09-28"
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: "2026-09-28"
@@ -23110,6 +23110,41 @@ requirements:
         evidently_check_lifecycle.py, which already carries that
         check's category, introduced_date and prose.
     dependencies: [REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-098]
+    implemented_by:
+      - qa_tools/common/drift_reference.py::reference_run_for_arrival
+      - qa_tools/common/drift_reference.py::reference_for
+      - qa_tools/common/filing.py::period_of
+      - qa_tools/common/evidently_common.py::status_for_row_drop
+      - qa_tools/common/evidently_common.py::recorded_row_counts
+      - qa_tools/cp/run_evidently_cp.py::_volume_results
+      - qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp
+      - qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm
+    linked_tests:
+      - tests/test_drift_reference.py
+      - tests/test_filing.py::TestWhichPeriodAnArrivalWasFiledTo
+      - tests/test_promotion_status.py::TestACheckWithNoReferenceIsNotEvidenceOfHealth
+      - tests/test_run_evidently_bdm.py::TestASupplyWithNothingToMeasureAgainst
+      - tests/test_run_evidently_cp.py::TestNoReferenceIsNotAPass
+      - tests/test_run_evidently_cp_real.py::TestARelativeVolumeCheckOnEveryDataset
+      - tests/test_orchestrate_reference_run.py
+    evidence:
+      - >
+        2026-09-29. Verified against a `supply` database rebuilt from
+        empty, twice - a re-bootstrap over an existing decision log
+        cannot show criterion 5 at all, because every dataset already
+        has an earlier promoted period. run_001 records `nodata` with no
+        metric value; run_002 references run_001; run_005 references
+        run_003, skipping run_004, which was not promoted. Drift
+        produces 2 fails and 13 warns where everything had been measured
+        against the first run for ever.
+      - >
+        2026-09-29. Criterion 1's six relative volume checks are driven
+        against the real staged Child Protection fixture, both sides of
+        the comparison counted from the real warehouse: six checks, six
+        datasets, six check ids, both bands on each, reaching pass,
+        warn, fail and no-reference on demand, and never flagging a
+        supply that GREW. The lifecycle gate counts 265 checks where it
+        counted 259.
     decisions:
       - >
         BUILT IN TWO HALVES, and this records which is which on
@@ -23409,6 +23444,57 @@ requirements:
         cannot be its own reference any more, so the state it stood in
         for is now `reference_run_id=None`, and the test in its place
         asserts the opposite verdict for the same situation.
+      - >
+        CRITERION 1 IS BUILT, 2026-09-29, and the requirement closes.
+        SIX CHECKS RATHER THAN ONE, because the question is about a
+        TABLE: Birth Registrations needed one because it has one table,
+        not because one is the right number, and a collection-wide count
+        would tell a reader something shrank without saying what.
+      - >
+        THE BANDS MOVED TO evidently_common RATHER THAN BEING COPIED.
+        Criterion 1's own reason for existing is "so that both
+        collections judge volume the same way", which two copies of two
+        numbers stop being true of on the first day somebody tunes one.
+        Keith's call on the numbers, 2026-09-28: mirror Birth
+        Registrations' existing 10%/25% rather than invent a second set.
+      - >
+        IT RENDERS AS A SUPPLY-LEVEL CHECK, using the `(table)` column
+        name plus a name in the CP builder's own supply-level set -
+        REQ-DASH-033's mechanism rather than a lookalike beside it.
+        "Did this arrive the right size" is exactly what that section
+        is for, and it is where the three ABSOLUTE row-count checks
+        already sit, which is the comparison a reader wants: a fixed
+        lower bound cannot tell a table that has doubled in three years
+        from one that arrived truncated. Birth Registrations attributes
+        its own volume check to a real column because its builder has
+        no such section.
+      - >
+        A MISSING TABLE IS NOT A ZERO. Single-table mode stages one
+        table and borrows the rest, and a partial resupply is a real
+        shape (REQ-PIPE-068), so a run with no view for a table has
+        nothing to say about it rather than something alarming. The
+        evaluator asks the catalogue which tables are present and skips
+        the others - written that way after catching the error instead
+        left the transaction aborted, so every table after the missing
+        one failed too.
+      - >
+        A REFERENCE THAT RECORDED NOTHING FOR A TABLE reads as no
+        reference rather than as a total loss. Dividing by zero is an
+        error and calling a supply an infinite drop from nothing is not
+        a measurement.
+      - >
+        THE TEST FIXTURE STAGES BOTH RUNS AND CHECKS NEITHER, so there
+        are no recorded dataset_stats for the reference - a fact about
+        the fixture rather than about the code, and one that would
+        otherwise make every volume assertion read "no reference" and
+        prove nothing. The tests count the reference run's OWN REAL
+        STAGED TABLES and hand those numbers in, so both sides are real
+        and only the recording step is skipped. Each table's reference
+        is then derived from its own current count rather than by
+        scaling them all by one multiplier - the dirty fixture perturbs
+        cp_notifications, so one multiplier put it in a different band
+        from the other five and made the test about how far the fixture
+        happened to move rather than about the bands.
 
   - id: REQ-GHUB-109
     title: >

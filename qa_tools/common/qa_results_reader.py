@@ -95,13 +95,20 @@ def expected_tools_for(dataset: str) -> tuple[str, ...]:
     """The tools a given DATASET owes a file, derived from the checks
     actually defined against it (REQ-PIPE-038, Keith 2026-09-26).
 
-    Not the fixed list above. Evidently defines exactly one check in
-    the whole Child Protection collection, on cp-notifications, so a
-    fixed rule would report the other five datasets permanently
-    incomplete - and a completeness signal that is always false says
-    nothing about the thing it exists to catch. Rejected writing an
-    empty evidently.json under the other five: a file that exists
-    asserts the tool ran, and it did not.
+    Not the fixed list above. A fixed rule reports a dataset
+    permanently incomplete for a tool that does not check it, and a
+    completeness signal that is always false says nothing about the
+    thing it exists to catch. Rejected writing an empty record for the
+    tools that did not run: a record that exists asserts the tool ran,
+    and it did not.
+
+    THE WORKED EXAMPLE THIS DOCSTRING USED TO GIVE has changed sides,
+    which is the best evidence being derived was worth it. Evidently
+    defined exactly ONE check in the whole Child Protection collection,
+    on cp-notifications, so five of six datasets owed it nothing.
+    REQ-QAC-108 gave every Child Protection dataset a relative volume
+    check on 2026-09-29, so all six owe one now - and nothing had to be
+    configured for that to become true.
 
     Derived rather than configured, so adding a dataset's first
     Evidently check changes what that dataset owes with no list to

@@ -26,7 +26,8 @@ import os
 
 from . import bdm_common
 from qa_tools.common.evidently_common import (
-    ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, NO_REFERENCE, status_for_psi, compute_psi,
+    ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, NO_REFERENCE, WARN_ROW_DROP, FAIL_ROW_DROP,
+    status_for_psi, status_for_row_drop, compute_psi,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 from .evidently_check_lifecycle import PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_ID
@@ -41,25 +42,17 @@ DATASET_ID = bdm_common.DATASET_ID
 # THERE IS NO DEFAULT REFERENCE ANY MORE - see run_evidently_cp.py's
 # identical note for the full account (REQ-QAC-108 criterion 4).
 
-# Row-growth check: "some reduction in a daily refresh is fine" (Keith's
-# own words) - so only a genuinely large drop trips this, not any decrease
-# at all. Same two-tier-band-is-our-convention-not-the-tool's approach as
-# PSI: Evidently's RowCount metric does support a built-in Reference-based
-# test (gte(Reference(relative=...))), tried first, but that only gives
-# one pass/fail band and buries the actual reference value inside a
-# free-text test description rather than a clean field - computing the
-# real row count via Evidently for both runs and applying our own two-tier
-# comparison, exactly like PSI, is both simpler and consistent.
-WARN_ROW_DROP = 0.10
-FAIL_ROW_DROP = 0.25
-
-
-def _status_for_row_drop(rate_drop: float) -> str:
-    if rate_drop > FAIL_ROW_DROP:
-        return "fail"
-    if rate_drop > WARN_ROW_DROP:
-        return "warn"
-    return "pass"
+# THE BANDS AND THE BANDING MOVED TO evidently_common (REQ-QAC-108
+# criterion 1, 2026-09-29), so Child Protection's six datasets share
+# them rather than acquire a second convention. They were this
+# collection's own, and the reasoning for the two-tier shape is worth
+# keeping here where it was written: Evidently's RowCount metric does
+# support a built-in Reference-based test (gte(Reference(relative=...))),
+# tried first, but that gives one pass/fail band and buries the actual
+# reference value inside a free-text test description rather than a
+# clean field - computing the real row count for both runs and applying
+# our own two-tier comparison, exactly like PSI, is both simpler and
+# consistent.
 
 
 
@@ -242,7 +235,7 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
             reference_count = _row_count_of(_current_frame(reference_run_id))[0]
         rate_drop = ((reference_count - current_count) / reference_count
                      if reference_count else 0.0)
-        volume_status = _status_for_row_drop(rate_drop)
+        volume_status = status_for_row_drop(rate_drop)
     results.append({
         "agency_id": AGENCY_ID,
         "collection_id": COLLECTION_ID,

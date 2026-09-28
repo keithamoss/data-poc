@@ -51,6 +51,48 @@ def status_for_psi(psi: float) -> str:
     return "pass"
 
 
+# HOW BOTH COLLECTIONS JUDGE VOLUME (REQ-QAC-108 criterion 1). These
+# were Birth Registrations' own constants; they moved here so Child
+# Protection's six datasets could share them rather than acquire a
+# second convention - which is the criterion's own reason for existing,
+# in its own words, "so that both collections judge volume the same
+# way". Keith's call on the numbers, 2026-09-28: mirror the bands
+# Birth Registrations already had rather than invent a second set.
+#
+# A DROP ONLY, NOT ANY CHANGE. "Some reduction in a daily refresh is
+# fine" (Keith), so only a genuinely large fall trips this - and growth
+# never does, because a supply arriving bigger than the last one is the
+# ordinary state of a table that is accumulating.
+WARN_ROW_DROP = 0.10
+FAIL_ROW_DROP = 0.25
+
+
+def status_for_row_drop(rate_drop: float) -> str:
+    """The band a proportional drop falls in.
+
+    `rate_drop` is (reference - current) / reference, so it is POSITIVE
+    when the supply shrank and negative when it grew.
+    """
+    if rate_drop > FAIL_ROW_DROP:
+        return "fail"
+    if rate_drop > WARN_ROW_DROP:
+        return "warn"
+    return "pass"
+
+
+def recorded_row_counts(agency: str, collection: str, run_id: str) -> dict | None:
+    """One run's recorded per-table row counts, or None.
+
+    The plural counterpart to recorded_row_count(): Child Protection's
+    dataset_stats records `row_counts` per table, where Birth
+    Registrations, being one table, records a single `row_count`.
+    """
+    stats = recorded_stats(agency, collection, run_id)
+    if not stats:
+        return None
+    return stats.get("row_counts") or None
+
+
 def compute_psi(current_df, reference_df, column: str) -> tuple[float | None, dict]:
     """Returns (psi_value, raw_snapshot) - the raw Evidently snapshot dict
     is the real native tool output, committed as-is to qa_results/ by each

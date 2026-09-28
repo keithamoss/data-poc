@@ -89,7 +89,13 @@ SUPPLY_LEVEL_META = (
     "supply-level",
     "Checks on the supply as a whole rather than on any one column - whether it "
     "arrived the right size, and whether it is current.")
-_SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "row_count[all]", "datacontract:row_count"}
+# `evidently:row_count_growth` joined these 2026-09-29 (REQ-QAC-108
+# criterion 1). "Did this supply arrive the right size" is the same
+# question the three absolute row-count checks ask; this one asks it
+# RELATIVE to the last promoted supply, which is the only version of it
+# that keeps working on a table whose size legitimately changes.
+_SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "row_count[all]", "datacontract:row_count",
+                              "evidently:row_count_growth"}
 
 TABLE_META = {
     "cp_clients": "One row per child with a Child Protection casework history, per quarterly snapshot extract.",

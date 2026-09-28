@@ -15,6 +15,7 @@ from them.
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -87,9 +88,21 @@ class TestFiledIsNotFilled:
     """
 
     def test_filing_a_supply_does_not_fill_its_slot(self, filings):
-        filing.record(_assignment(slot="2026-Q1"))
-        assert filing.filings_of("cp-clients")[0]["slot"] == "2026-Q1"
-        assert filing.filled_slots("cp-clients") == frozenset(), (
+        """A DATASET ID NOBODY ELSE USES, and that is load-bearing
+        rather than tidy. `filled_slots()` reads the DECISION LOG, which
+        is append-only by a real database trigger - so the `filings`
+        fixture cannot truncate it the way it truncates the filings, and
+        a promotion another module on the same xdist worker wrote for
+        `cp-clients` is still there when this runs. It failed exactly
+        that way on 2026-09-29, when adding test files moved which
+        module shared this worker; the assertion was right and the
+        subject was shared.
+        """
+        mine = f"cp-filed-not-filled-{uuid.uuid4().hex[:8]}"
+        filing.record(_assignment(supply_id=f"{mine}@2026", slot="2026-Q1",
+                                   dataset_id=mine))
+        assert filing.filings_of(mine)[0]["slot"] == "2026-Q1"
+        assert filing.filled_slots(mine) == frozenset(), (
             "only a PROMOTION fills a slot - an arrival does not, a staged supply does "
             "not, and a rejected one certainly does not")
 
