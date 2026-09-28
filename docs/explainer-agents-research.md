@@ -315,6 +315,59 @@ re-checked in the sub-agents docs.
 
 How these were applied, decision by decision, is in `plans/explainers.md` #3.
 
+## 7. Stochasticity and lessons from RAG (researched 2026-09-29)
+
+Primary sources:
+- Anthropic's Messages API reference, and its "increase output
+  consistency" and "reduce hallucinations" pages;
+- the "Demystifying evals" and "Contextual Retrieval" posts;
+- the RAGAS docs, read from their own source repo.
+
+The papers on self-consistency voting and judge reliability are
+snippet-only (arXiv and ACL Anthology are blocked here).
+
+**Stochasticity.**
+- **There is no temperature lever.** Models released after Claude Opus
+  4.6 reject any temperature other than 1.0 (verified in the API
+  reference), and even 0.0 was never fully deterministic. Subagent
+  frontmatter has no temperature field, and unknown fields are ignored
+  silently.
+- **Consistency therefore comes from structure:**
+  - precise output formats and examples;
+  - a fixed source set;
+  - prompt chaining;
+  - models pinned by full id, since aliases move;
+  - most of all, never regenerating an approved artifact.
+- **Anthropic's anti-hallucination advice:** extract quotes first,
+  retract any claim with no supporting quote, and treat disagreement
+  between repeated runs as a warning sign.
+- **Score consistency with pass^k** (every run passes), not pass@k (any
+  run passes). At 75% per run, pass^3 is 42%. LLM judges need
+  calibrating against people and an "Unknown" option.
+
+**What RAG teaches.**
+- **RAGAS "faithfulness"** splits a page into claims and measures the
+  share its sources support. That is our fact-checker.
+- **"Answer relevancy"** maps to the critic's reader questions.
+- **"Context recall" shows the gap.** A page can be fully faithful to
+  the sources it cites while missing, or contradicting, one it never
+  cited. So the SOURCE SET needs its own check.
+- **Prompted citations aren't guaranteed valid.** The API's Citations
+  feature is, but subagents can't use it. A script that checks each
+  quote appears verbatim in its cited source gives the same guarantee.
+- **Retrieval:**
+  - below ~200k tokens, load everything rather than retrieve;
+  - use exact-match lookup for identifiers;
+  - a one-line context note in front of each source chunk cuts failed
+    retrievals substantially;
+  - put the sources first and the question last in the prompt.
+- **Here:** `requirements.yaml` is ~300k tokens, too big to load whole,
+  but one concept's cited set is 20-40k. Each requirement's
+  `implemented_by` and `decisions:` already map a requirement to its
+  code, so sources can be walked rather than grepped.
+
+How these were applied is in `plans/explainers.md` #3, round 13.
+
 ## Network notes
 
 - **`github.com` refuses its web pages and API here, but `git clone`

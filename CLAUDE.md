@@ -1682,6 +1682,10 @@ Rough layout:
       snippet-only without it. Google's ADK docs were read
       legitimately from their own source repo (`google/adk-docs`)
       instead.
+    - **`aclanthology.org`** (2026-09-29, the RAG research for
+      `plans/explainers.md` #3) - the usual non-arXiv home of NLP papers
+      (citation evaluation, "Lost in the Middle"). Worth allow-listing
+      alongside arXiv.
     - **`github.com` HTML and `api.github.com`** returned a plain HTTP
       403 rather than a tunnel failure, so that is probably GitHub
       itself (rate limiting, or no auth on the API) rather than this

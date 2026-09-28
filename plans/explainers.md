@@ -500,3 +500,137 @@ building starts, and the entry comes out when it lands.
       requirements, then signing them off with Keith.
 
    Nothing gets built before that sign-off.
+
+   **Raised by Keith after round 12 (2026-09-29), still open:**
+   - **Brainstorm the topics, concepts and group-page structure
+     FIRST**, before the writing preferences, the cast or the
+     requirements. His sequencing.
+   - **"How will we handle stochasticity?"** The same brief can produce
+     a different page, diagram or set of critic findings on every run.
+   - **"Is there anything we can learn from RAG?"** The writer and
+     fact-checker are effectively doing retrieval-augmented generation
+     over this repo's own sources.
+
+   **Stochasticity and RAG research (2026-09-29).** Mostly primary:
+   Anthropic's API reference and prompting guides, "Demystifying
+   evals", the Contextual Retrieval post, and RAGAS's own docs source.
+   - **There is no temperature to turn down.** Checked in the Messages
+     API reference: models released after Claude Opus 4.6 reject any
+     temperature other than 1.0, and even 0.0 was never fully
+     deterministic. Subagent frontmatter has no temperature field
+     either, and unknown fields are silently ignored. So consistency
+     has to come from STRUCTURE:
+     - precise output formats and examples;
+     - a fixed set of sources;
+     - prompt chaining;
+     - models pinned by full id rather than an alias like `opus`,
+       which moves;
+     - above all, freezing a signed-off page so it is never
+       regenerated, only edited.
+   - **Anthropic's anti-hallucination advice maps straight onto the
+     fact-checker:** extract quotes first, retract any claim with no
+     supporting quote, and treat disagreement between repeated runs as
+     a warning sign.
+   - **pass^k, not pass@k, for consistency.** At 75% per run, all three
+     runs passing is only 42%. LLM judges need calibrating against
+     people and an "Unknown" way out.
+   - **The gap RAG exposes: context recall.** The fact-checker (RAGAS's
+     "faithfulness") only checks a page against the sources the page
+     itself cites. A page can be 100% faithful and still miss, or
+     contradict, a requirement it never cited. Nothing in the current
+     design checks the SOURCE SET.
+   - **Prompted citations aren't guaranteed valid.** The API's
+     Citations feature is, but subagents can't use it. The equivalent
+     is a script that checks every quoted passage appears verbatim in
+     the source it cites.
+   - **Size.** `requirements.yaml` is 1.2 MB, about 300k tokens, too
+     big to load whole. One concept's cited set, perhaps 20-40k tokens,
+     fits easily. So the problem is choosing sources, not fitting them.
+     Each requirement's `implemented_by` and `decisions:` already form
+     a walkable map from requirement to code.
+
+   **Round 13 - stochasticity and RAG (2026-09-29):**
+   - **Source recall: a per-group source index.** Each group gets a
+     `sources.yaml`, which Keith reviews once. It lists every requirement
+     and config file relevant to the group, with one line of context
+     each. The writer starts from it. A script flags any glossary term
+     on a page whose defining requirement is not cited, and the
+     staleness gate fingerprints the index too. This closes the
+     "faithful but incomplete" gap.
+   - **The fact-checker runs twice per round, and the results are
+     combined.** Any claim that either run marks contradicted or not
+     found is shown to Keith. Claims the two runs disagree on are
+     flagged "unstable", which is Anthropic's own hallucination-warning
+     signal. A deterministic script also checks that every quoted
+     passage appears verbatim in the source it cites.
+   - **A fourth verdict: "sources disagree".** When a requirement and
+     the code say different things, the page does not pick a side. The
+     finding always goes to Keith, because it may be a real bug in the
+     code or a stale requirement rather than an explainer problem.
+   - **Variation as a feature, confined to the brief.** The writer's
+     brief offers 2-3 candidate analogies or story angles, and Keith
+     picks one or asks for another at his brief checkpoint. Everything
+     after that runs once, and the signed page is frozen: only edited,
+     never regenerated.
+
+4. **[todo, 2026-09-29]** **[Docs & process]** The concept map: which
+   groups and concepts the explainers cover, in what order, and what a
+   group page holds.
+
+   Drafted by the main session from `plans/supply-model.md`'s "Concept
+   inventory" and the 108 requirements, then shaped with Keith. It
+   becomes the source the glossary seed and every `/explain` run
+   start from, and moves into the real glossary and group pages as
+   they are written.
+
+   **Groups, as a numbered learning path** (Keith's call: read in this
+   order, but anyone can jump in anywhere):
+   1. **The shape of the data asset**: data asset; agency, collection,
+      dataset and column; environments; same code, separate deployment
+      per asset.
+   2. **The calendar** (Keith's first topic): delivery calendar,
+      schedule, period, slot, due time and grace, claim window, a
+      dataset that joins a calendar or never has one, and a schedule
+      that runs out.
+   3. **What arrives** (his second): delivery (one physical drop),
+      supply (one table's version), receipt, recognising files by
+      pattern, two files for one dataset being held, a hand-filed
+      supply, and early / on time / late / overdue.
+   4. **Filing a supply** (his third): staging, slot assignment (the
+      claim rule), held for a human, promotion, rejection, demotion,
+      un-decide, re-file, resupply (an arrival into a filled slot), the
+      mixed-period delivery, and the decision log.
+   5. **Filling the gaps** (his "patch in via a view"): a period
+      standing in on the last good one, inherit and un-inherit (an
+      annual dataset on a quarterly asset), and why neither reads as an
+      ordinary green.
+   6. **Judging quality**: check and `check_id`; check scopes (column,
+      dataset, supply, cross-table, file); red/amber/green and the
+      worst-of rollup; red-for-unrun; amber accept/reject; retiring a
+      check; what drift is measured against.
+   7. **Looking back in time**: as-of viewing, "as at T" answered from
+      filing events, snapshots, and the activity feed.
+
+   **A known trap to guard against: "delivery" changed meaning.** It
+   used to mean the logical obligation, which is now a SLOT, and that
+   old sense survives in the generator code (`plans/supply-model.md`,
+   "The collision"). It is exactly what the glossary exists for, and a
+   good early test for the fact-checker.
+
+   **Keith's calls (2026-09-29):**
+   - **Designed-but-unbuilt concepts ARE included, clearly badged**
+     "designed, not built yet". Much of groups 4 and 5 is signed off
+     but not built. Every such page is revisited as the build lands.
+   - **A group page holds all four of:**
+     1. a big-picture story walking the whole group end to end with
+        the cast;
+     2. one overview diagram whose nodes link to the concept pages;
+     3. concept cards in reading order (a glossary one-liner plus a
+        link);
+     4. "read first" prerequisites.
+   - **The concept map lives here** until it moves into the real
+     glossary and group pages.
+
+   **Still open:** Keith's own review of the list above (what's
+   missing or misplaced, and whether anything on it isn't really a
+   concept), asked as an open question.
