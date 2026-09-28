@@ -81,10 +81,22 @@ anywhere leaves a coherent result.
 
 **The sprints, in dependency order:**
 
-- **Sprint 0 - unblocked now** (~20 criteria). `REQ-DASH-094` (the page
-  says which environment built it) and `REQ-PIPE-105` (every arriving
-  file its own arrival; already `in_progress`, and the one needing
-  answer 3). `REQ-DASH-094` names `REQ-PIPE-093` as a dependency, which
+- **Sprint 0 - unblocked now.** `REQ-DASH-094` (the page says which
+  environment built it) - **BUILT 2026-09-28 night**.
+
+  **`REQ-PIPE-105` MOVED OUT OF SPRINT 0, to after Sprint A** (found
+  2026-09-28 night on starting it, and it is a sequencing discovery
+  rather than a design fork). Its criteria 5, 6, 7, 8 and 13 all turn
+  on PROMOTION, and there is no promote operation yet: `decision_log.
+  promoted_into`, `decision_log.promoted_supply` and `period_schema.
+  promoted_in` all READ promotion state, while the act of promoting is
+  `REQ-PIPE-075`'s, which is Sprint A. Criterion 12 is already
+  partly done - `qa_tools/cp/completion_tracker.py` no longer exists.
+  Building it first would mean writing against a mechanism Sprint A
+  creates, so it waits. Worth noting the dependency list did not catch
+  this: `105` declares `REQ-PIPE-035` and `036`, both built, and the
+  real blocker is somewhere else - the same shape as `REQ-DASH-056`'s
+  own note. `REQ-DASH-094` names `REQ-PIPE-093` as a dependency, which
   is unsigned - but the mechanism it actually needs (the build
   recording its environment) shipped with `REQ-PIPE-092`, so it is
   buildable.
