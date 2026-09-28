@@ -20954,6 +20954,13 @@ requirements:
         THE SYSTEM SHALL report the check as having no reference, and
         SHALL NOT report it as passing.
       - >
+        THE SYSTEM SHALL skip, when looking back for that reference, any
+        period whose table is a VIEW ONTO AN EARLIER SUPPLY rather than
+        a supply promoted into that period - whether INHERITED because
+        the dataset owed nothing that period, or CARRIED FORWARD by a
+        person - and SHALL keep looking back until it reaches a period
+        into which a supply was actually promoted.
+      - >
         THE SYSTEM SHALL let both the drift and volume checks reach a
         RED verdict, so that a supply failing either is ineligible for
         automatic promotion under REQ-PIPE-075 criterion 3.
@@ -20967,7 +20974,7 @@ requirements:
         Thresholds are configuration, not literals in a tool script, so
         that a dataset whose volume legitimately swings can be widened
         without a code change.
-    dependencies: [REQ-PIPE-075, REQ-PIPE-079]
+    dependencies: [REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-098]
     decisions:
       - >
         THE REFERENCE IS THE LAST PERIOD THAT ACTUALLY PROMOTED ONE
