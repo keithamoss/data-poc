@@ -1334,6 +1334,25 @@ Rough layout:
   carelessness, it is that a label read true and nobody asked it to
   prove itself.
 
+- **Never change an explainer without Keith's approval - including
+  when a build changes the concept it explains.** His own standing
+  instruction, 2026-09-29: "any changes to the documentation explainers
+  have to go through me, just in case there are changes that happen as
+  part of building stuff." It covers everything under `docs/explainers/`
+  (concept pages, group pages, the glossary, each group's
+  `sources.yaml`) - see `plans/explainers.md`.
+
+  **The case this exists for is the ordinary one, not the careless
+  one.** A session building a feature changes a requirement or config
+  that an explainer cites, notices the page is now slightly wrong, and
+  "helpfully" fixes the prose in the same commit. Don't. Leave the page
+  alone, say in the report to Keith which explainer the change affects
+  and how, and let the explainers' own route handle it (the staleness
+  gate flags it, the fact-checker proposes a minimal edit, Keith
+  approves and re-signs). A red staleness gate caused by your change is
+  the system working, not something to silence by editing the page or
+  refreshing its fingerprints yourself.
+
 - **Never change an authoring standard without Keith's explicit
   approval - propose the exact wording, get a yes, then edit.** His own
   standing instruction, 2026-09-20. It covers two files:

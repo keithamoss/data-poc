@@ -31,9 +31,9 @@ survives context compaction. Tick items off here as they land.
    Report any design decision that should change.
 2. [done] **Naming session.** One canonical word per naming hazard
    (#4's concept sweep lists them); the others become glossary aliases.
-3. [todo] **Triage the 33 missed concepts** (#4's sweep, one by one).
+3. [done: all 33 included] **Triage the 33 missed concepts** (#4's sweep, one by one).
    Keith says what he does NOT want included.
-4. [todo] **Tiering** for the concepts that survive triage: own page,
+4. [in progress] **Tiering** for the concepts that survive triage: own page,
    section, or glossary entry only.
 5. [todo] **The cast draft**: 4-5 characters for Keith to react to
    (#3, round 12).
@@ -1120,3 +1120,28 @@ survives context compaction. Tick items off here as they land.
    - waiting on a person, and blocked (a neighbour);
    - period - cycle;
    - In place on - as of (already settled in REQ-PIPE-081).
+
+   **Triage of the 33 missed concepts (2026-09-29): ALL INCLUDED.**
+   Keith's answer, read for intent ("...and default" read as "include
+   all by default", a likely dictation artefact): none are excluded.
+   The main session had flagged three for him to consider:
+   - #6, where a supply physically lives (it leans towards pipeline
+     internals);
+   - #29, a check's plain-English fields (closer to on-screen help);
+   - #31, recorded QA history (its storage half belongs in the
+     pipeline docs).
+
+   He did not exclude them either.
+
+   **A standing rule, from the same answer.** Any change to an
+   explainer goes through Keith, including when a build changes the
+   concept it explains, "just in case there are changes that happen as
+   part of building stuff". It was written into CLAUDE.md, because it
+   binds every future session, not only this one. Its effect on the
+   design: a building session never edits `docs/explainers/` or
+   refreshes fingerprints. It reports which explainer is affected, and
+   the staleness-gate route (fact-checker proposes, Keith approves and
+   re-signs) is the ONLY way an explainer changes. The write-restriction
+   hook and the post-run diff check are how the agents are held to
+   this; a CI check that `docs/explainers/` changes only in commits
+   carrying Keith's sign-off could be added in the requirements.
