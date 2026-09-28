@@ -15748,7 +15748,7 @@ requirements:
       whose data came from an earlier period to say so right next to its
       status, so that I cannot look at it and think this quarter's data
       arrived and was fine.
-    moscow: should
+    moscow: must
     status: not_started
     source: >
       Keith, 2026-09-24, in his own words: "no one could look at it and
@@ -15766,7 +15766,9 @@ requirements:
         vocabulary.
       - >
         THE SYSTEM SHALL state, on drill-down, which period the data
-        actually came from, who decided it and why.
+        actually came from, who decided it, and the reason they gave -
+        DISPLAYING that reason as written rather than summarising it or
+        replacing it with a generic phrase.
       - >
         THE SYSTEM SHALL distinguish the qualifier by label as well as
         by appearance, and SHALL NOT rely on colour alone.
@@ -15777,6 +15779,31 @@ requirements:
           sees what was recorded, never a fresh derivation from the extract - is
           unchanged, and is what stops the published page disagreeing with the
           run it claims to report.
+      - >
+        THE SYSTEM SHALL render the qualifier at WARNING level, on the
+        dataset's own page and on its card in the agency view.
+      - >
+        THE SYSTEM SHALL carry, on the qualifier itself, a tooltip
+        naming the period the data came from - and SHALL name that
+        period, or failing that its date, in the qualifier's own label
+        where the layout allows it, so a reader learns where the data
+        came from at a glance rather than only on hover.
+      - >
+        THE SYSTEM SHALL NOT present a substituted period's check
+        results as belonging to the period being viewed, and SHALL take
+        a reader drilling into them to the period that earned them.
+      - >
+        WHEN a reader arrives at a period by drilling through a
+        substitution, THE SYSTEM SHALL make plain that they have left
+        the period they were looking at and SHALL offer a way back to
+        it - and SHALL NOT show that framing to a reader who navigated
+        to the same period directly.
+      - >
+        THE SYSTEM SHALL carry that arrival context in the URL, so a
+        refreshed or shared link presents the same framing, and SHALL
+        drop it on the reader's next navigation - it belongs to ONE
+        page and SHALL NOT travel onto any page the reader goes to
+        next.
       - >
         THE SYSTEM SHALL render with zero console errors in a real
         browser.
@@ -15804,6 +15831,37 @@ requirements:
     dependencies: [REQ-PIPE-084, REQ-DASH-041, REQ-DASH-070]
     decisions:
       - >
+        WARNING LEVEL HERE, INFORMATION LEVEL FOR INHERITANCE (Keith,
+        2026-09-28, criterion 6). A substitution is a person deciding a
+        supply that WAS owed will never come, which is worth a reader's
+        attention; an inheritance is a dataset behaving exactly as
+        agreed. Recorded on both requirements so neither leaves the
+        level to whoever builds it. Note this lands directly on
+        non-functional 3's worry about a third annotation competing for
+        one Tier 2 row - warning styling makes the crowding question
+        sharper rather than softer, and it is still the dashboard UX
+        pass's to answer.
+      - >
+        THE QUALIFIER CARRIES A TOOLTIP NAMING THE PERIOD, and names
+        the period or its date in the label itself where the layout
+        allows (Keith, 2026-09-28, criterion 7). A reader should learn
+        WHERE the data came from at a glance rather than by drilling
+        in, with hover as the fallback rather than the answer. He
+        raised the room question himself, which is why the criterion
+        makes the label conditional on layout and the tooltip
+        unconditional.
+      - >
+        RAISED TO `must` from `should` (Keith, 2026-09-28), matching
+        REQ-PIPE-084 - raised the same day - and REQ-DASH-100, which is
+        this requirement's exact counterpart for inheritance and was
+        already `must`.
+      - >
+        THE REASON IS DISPLAYED AS WRITTEN (criterion 3, Keith,
+        2026-09-28), on the same terms as REQ-DASH-100 criterion 4. The
+        difference between them is WHOSE reason: the schedule's for an
+        inheritance, the OPERATOR's for a substitution, recorded by
+        REQ-PIPE-084 criterion 5.
+      - >
         Decided this is a QUALIFIER on an existing status, not a new
         status, following the vocabulary the model already uses
         elsewhere and the explicit prohibition REQ-DASH-041 established
@@ -15828,12 +15886,28 @@ requirements:
         a dataset that does not participate in this period at all, whose
         most recent supply is simply still current.
       - >
-        THE SUBSTITUTED PERIOD SHOWS THE ORIGINAL RUN'S RESULTS,
-        ATTRIBUTED (Keith, 2026-09-26, closing his own question and
-        deciding it on REQ-PIPE-084 at the same time). So this is a
-        QUALIFIER ON AN EXISTING ROW rather than a distinct row shape,
-        and the row must say which run the verdict came from - the
-        results are real, they were simply earned in another period.
+        REVERSED 2026-09-28 (Keith): A SUBSTITUTED PERIOD DOES NOT SHOW
+        THE ORIGINAL RUN'S RESULTS INLINE. It shows the dataset's
+        ordinary row with its real status and the `substituted`
+        qualifier, and drilling into the verdicts TRAVELS to the period
+        that earned them, framed as somewhere the reader has gone.
+        Criteria 9 to 11 are that pattern, matching REQ-DASH-100
+        criteria 8 to 10 clause for clause - he asked for the two
+        dispositions to be treated the same way, and this is the half
+        that had not caught up.
+
+        WHAT SURVIVES from the version below: this is still a QUALIFIER
+        ON AN EXISTING ROW rather than a distinct row shape, and the
+        results are still real, simply earned in another period. What
+        changed is only where a reader meets them.
+
+        SUPERSEDED - THE SUBSTITUTED PERIOD SHOWS THE ORIGINAL RUN'S
+        RESULTS, ATTRIBUTED (Keith, 2026-09-26, closing his own
+        question and deciding it on REQ-PIPE-084 at the same time). So
+        this is a QUALIFIER ON AN EXISTING ROW rather than a distinct
+        row shape, and the row must say which run the verdict came from
+        - the results are real, they were simply earned in another
+        period.
   - id: REQ-PIPE-086
     title: The terminal runs the whole supply lifecycle, using the automated path's own logic
     date_written: "2026-09-26"
@@ -19325,6 +19399,16 @@ requirements:
         page and SHALL NOT travel onto any page the reader goes to
         next.
       - >
+        THE SYSTEM SHALL render the qualifier at INFORMATION level, and
+        SHALL NOT render it at warning level - which is reserved for a
+        substitution, where a supply that WAS owed never came.
+      - >
+        THE SYSTEM SHALL carry, on the qualifier itself, a tooltip
+        naming the period the data came from - and SHALL name that
+        period, or failing that its date, in the qualifier's own label
+        where the layout allows it, so a reader learns where the data
+        came from at a glance rather than only on hover.
+      - >
         THE SYSTEM SHALL render with zero console errors in a real
         browser.
     non_functional_requirements:
@@ -19344,6 +19428,21 @@ requirements:
     dependencies: [REQ-PIPE-098, REQ-DASH-085]
     open_questions: []
     decisions:
+      - >
+        INFORMATION LEVEL HERE, WARNING LEVEL FOR SUBSTITUTION (Keith,
+        2026-09-28, naming both halves). The earlier decision below
+        recorded only that warning styling was substitution's; this
+        states what an inheritance actually gets, so the requirement
+        does not leave the level to whoever builds it.
+      - >
+        THE QUALIFIER CARRIES A TOOLTIP NAMING THE PERIOD, and names
+        the period or its date in the label itself where the layout
+        allows (Keith, 2026-09-28). His reasoning: a reader should
+        learn WHERE the data came from at a glance rather than by
+        drilling in, and hover is the fallback rather than the answer -
+        which matters more here than for substitution, since
+        non-functional 1 expects this to be the common case at ~30
+        datasets.
       - >
         THE OPEN QUESTION IS CLOSED by Keith's own answer on
         REQ-PIPE-098, 2026-09-28. An inherited row shows the dataset's
