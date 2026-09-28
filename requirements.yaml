@@ -19262,6 +19262,9 @@ requirements:
       data arriving fine nor as something missing.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-28"
     source: >
       Keith, plans/running-thoughts.md #45 (2026-09-26) - the display
       half of the "inherited" item, and the reason the word was
@@ -19281,7 +19284,9 @@ requirements:
       - >
         THE SYSTEM SHALL state, on drill-down, which period the data
         came from and the schedule's own stated reason for the dataset
-        not participating in this one.
+        not participating in this one - DISPLAYING that reason as
+        written rather than summarising it or replacing it with a
+        generic phrase.
       - >
         THE SYSTEM SHALL NOT report an inherited period as awaiting a
         supply, as overdue, or as missing a table.
@@ -19306,8 +19311,9 @@ requirements:
       - >
         THE SYSTEM SHALL carry that arrival context in the URL, so a
         refreshed or shared link presents the same framing, and SHALL
-        drop it from the URL on the reader's next navigation - it
-        describes one arrival, not a state the page is in.
+        drop it on the reader's next navigation - it belongs to ONE
+        page and SHALL NOT travel onto any page the reader goes to
+        next.
       - >
         THE SYSTEM SHALL render with zero console errors in a real
         browser.
@@ -19326,14 +19332,38 @@ requirements:
         Renders from what the build recorded, with no live data access
         of its own.
     dependencies: [REQ-PIPE-098, REQ-DASH-085]
-    open_questions:
-      - >
-        Whether an inherited row carries the earlier run's verdicts
-        attributed, or shows no verdicts at all alongside a plain
-        statement that nothing was owed. This follows whatever
-        question set E settles on REQ-PIPE-098, and it changes what
-        this row actually shows.
+    open_questions: []
     decisions:
+      - >
+        THE OPEN QUESTION IS CLOSED by Keith's own answer on
+        REQ-PIPE-098, 2026-09-28. An inherited row shows the dataset's
+        ordinary card with its real status and an `inherited` badge;
+        the earlier run's verdicts are NOT rendered as this period's,
+        and drilling in travels to the period that earned them.
+        Criteria 8 to 10 are that answer.
+      - >
+        WARNING-LEVEL STYLING IS SUBSTITUTION'S ONLY (Keith,
+        2026-09-28), and the asymmetry is deliberate rather than an
+        omission here. A SUBSTITUTION is a person deciding a supply
+        that was owed will never come - REQ-PIPE-084 non-functional 2
+        puts it at warning level on both the dataset page and its
+        agency card. An INHERITANCE is a dataset behaving exactly as
+        agreed, and non-functional 1 warns it will be the COMMON case
+        at ~30 datasets with several annual ones - so warning styling
+        here would be precisely the noise this requirement exists to
+        avoid. Recorded because one requirement now names a level and
+        the other does not, and a silence reads as an oversight later.
+      - >
+        THE REASON IS DISPLAYED AS WRITTEN (criterion 4, Keith,
+        2026-09-28), not summarised and not replaced by a generic
+        phrase - the schedule's own sentence is the answer to "why is
+        there no fresh file?", and schedule.not_expected_periods()
+        already makes it mandatory for exactly that purpose. HE ASKED
+        THE SAME OF SUBSTITUTION, where the reason is the OPERATOR's
+        rather than the schedule's (REQ-PIPE-084 criterion 5 records
+        it). That half belongs to REQ-DASH-085, which is unsigned and
+        not yet read back - flagged here so it is not lost between two
+        requirements.
       - >
         DRILLING THROUGH AN INHERITED VIEW LEAVES THE PERIOD, AND THE
         PAGE HAS TO SAY SO (Keith, 2026-09-28, answering REQ-PIPE-098's
