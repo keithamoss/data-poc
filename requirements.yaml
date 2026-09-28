@@ -15631,7 +15631,7 @@ requirements:
       place a person writes a change or records a decision by a route
       that is neither the CLI nor the TUI.
     moscow: must
-    status: not_started
+    status: in_progress
     source: >
       plans/supply-model.md delivery sprint 25, Keith 2026-09-24, who
       flagged "WHAT DETECTS LATENESS, and what acts on it" as an
@@ -15807,6 +15807,64 @@ requirements:
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-GHUB-027, REQ-PIPE-098]
     open_questions: []
     decisions:
+      - >
+        STARTED 2026-09-29, AND THIS RECORDS EXACTLY HOW FAR.
+        `in_progress` rather than `built` because the register's gate
+        forbids evidence on anything not built, and a status that
+        overclaims is worse than one that cannot carry the detail.
+
+        DONE - criteria 3, 6, 7, 8 and 9, which together are the SLOT
+        STATE: `qa_tools/common/slot_state.py` answers where one
+        expected supply has got to, from the schedule, the filings and
+        the decision log, touching no row of the supply itself. It is
+        DERIVED rather than recorded, which is criterion 4's
+        reconcile-rather-than-react in its data form - a stored state
+        would be wrong from the moment the next decision landed. The
+        stable key is the dataset and the period and nothing else
+        (criterion 3), because a key carrying anything that changes
+        between runs opens a second ticket instead of finding the first.
+        16 tests in tests/test_slot_state.py.
+
+        NOT DONE - the RECONCILER itself, which is every other
+        criterion: finding or opening one ticket per slot, comparing
+        against what it last said, posting only on change, reopening one
+        a person closed, and the policy that decides which slots get a
+        ticket at all.
+
+      - >
+        THE ORDER OF THE STATE RULES IS THE DESIGN, and it is worth
+        stating because the obvious implementation gets it backwards. A
+        DECISION outranks a FILING, and a filing outranks the CLOCK: a
+        slot with a promoted supply is not overdue however late it was,
+        and a slot with a supply awaiting a decision is waiting for a
+        PERSON rather than for a supplier.
+
+        Asking the clock first is how a queue tells somebody to chase a
+        file that is sitting in front of them, which is the single
+        fastest way to make a team stop reading it.
+
+      - >
+        A TENSION BETWEEN CRITERIA 6 AND 7, for Keith rather than for me
+        to settle. Criterion 6 says the ticket reflects "arrived and its
+        QA VERDICT"; criterion 7 says the state is derived "from the
+        schedule, the filings and the decision log ALONE, and SHALL NOT
+        read supply rows or any schema holding them".
+
+        A verdict is in none of those three. It is in `qa.check_result`,
+        which is RECORDED QA METADATA rather than supply rows - so it
+        satisfies criterion 7's prohibition and not its word "alone".
+        REQ-DOCS-101 made exactly this distinction elsewhere, sharpening
+        "no live data access" into "recorded results, never the
+        extract", and the same reading here would resolve it.
+
+        SO slot_state.py DELIBERATELY DOES NOT COMPUTE THE VERDICT. It
+        computes the state from the three named sources, exactly as
+        written, and leaves the verdict to the reconciler to compose
+        from the recorded results - which is also where
+        `drift_reference.run_for()` already knows how to find the run
+        that checked a given supply. Flagged rather than quietly
+        deciding, because reading a fourth source on my own reading of
+        "alone" is the kind of thing the sign-off gate exists to stop.
       - >
         REFRAMED FROM A DETECTOR INTO A RECONCILER (Keith, 2026-09-28,
         and it changes what the requirement IS rather than how it is
