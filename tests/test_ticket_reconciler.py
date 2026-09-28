@@ -25,6 +25,7 @@ class FakeTickets:
     def __init__(self, *, raises_on=None):
         self.tickets: dict[str, tr.Ticket] = {}
         self.threads: dict[str, list[str]] = {}
+        self.bodies: dict[str, str] = {}
         self.raises_on = raises_on or set()
         self.opened: list[str] = []
 
@@ -41,12 +42,17 @@ class FakeTickets:
         ticket = tr.Ticket(key=key, number=len(self.tickets) + 1)
         self.tickets[key] = ticket
         self.threads[key] = [body]
+        self.bodies[key] = body
         self.opened.append(title)
         return ticket
 
     def comment(self, ticket, body):
         self._check(ticket.key)
         self.threads[ticket.key].append(body)
+
+    def set_body(self, ticket, body):
+        self._check(ticket.key)
+        self.bodies[ticket.key] = body
 
     def reopen(self, ticket):
         self._check(ticket.key)
@@ -371,3 +377,56 @@ class TestTheReportDoesNotFloodTheTerminal:
     def test_a_quiet_pass_says_nothing_at_all(self, capsys):
         tr.report(tr.Outcome(unchanged=("cp-carers/2026-Q3",)))
         assert capsys.readouterr().out == ""
+
+
+class TestTheTicketsOwnBodySaysWhereItIsNow:
+    """REQ-GHUB-109 criterion 3, and the failure it closes: a thread
+    quiet for a month says nothing at the top, so a reader has to scroll
+    to the bottom and then work out whether the last comment is still
+    true."""
+
+    def test_the_body_is_rewritten_on_every_change(self):
+        svc = FakeTickets()
+        tr.reconcile(svc, [a_slot(slot_state.OVERDUE)], policy=tr.ALL)
+        tr.reconcile(svc, [a_slot(slot_state.REJECTED)], policy=tr.ALL)
+        assert slot_state.REJECTED in svc.bodies["cp-carers/2026-Q3"]
+        assert slot_state.OVERDUE not in svc.bodies["cp-carers/2026-Q3"]
+
+    def test_the_body_carries_no_marker(self):
+        """The marker is how a COMMENT is known to be this reconciler's.
+        In the body it would be noise - nothing else writes the body of
+        a ticket this scheme opened."""
+        svc = FakeTickets()
+        tr.reconcile(svc, [a_slot()], policy=tr.ALL)
+        tr.reconcile(svc, [a_slot(slot_state.REJECTED)], policy=tr.ALL)
+        assert not svc.bodies["cp-carers/2026-Q3"].startswith(tr.MARKER)
+
+    def test_the_history_is_kept_beside_it(self):
+        """Criterion 6: every comment already posted stays. The body is
+        WHERE IT IS NOW and the thread is WHAT HAPPENED."""
+        svc = FakeTickets()
+        tr.reconcile(svc, [a_slot(slot_state.OVERDUE)], policy=tr.ALL)
+        tr.reconcile(svc, [a_slot(slot_state.REJECTED)], policy=tr.ALL)
+        thread = svc.threads["cp-carers/2026-Q3"]
+        assert len(thread) == 2
+        assert slot_state.OVERDUE in thread[0]
+
+    def test_an_unchanged_state_rewrites_nothing(self):
+        svc = FakeTickets()
+        slot = a_slot()
+        tr.reconcile(svc, [slot], policy=tr.ALL)
+        svc.bodies["cp-carers/2026-Q3"] = "SENTINEL"
+        tr.reconcile(svc, [slot], policy=tr.ALL)
+        assert svc.bodies["cp-carers/2026-Q3"] == "SENTINEL"
+
+    def test_the_body_goes_first(self):
+        """If the pass dies between the two, the body is the half worth
+        having: it is the one a reader sees without scrolling."""
+        import ast
+        import inspect
+
+        tree = ast.parse(inspect.getsource(tr.reconcile))
+        calls = [n.func.attr for n in ast.walk(tree)
+                  if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                  and n.func.attr in ("set_body", "comment")]
+        assert calls == ["set_body", "comment"], calls

@@ -67,6 +67,7 @@ class TicketService(Protocol):
     def find(self, key: str) -> "Ticket | None": ...
     def open(self, key: str, title: str, body: str) -> "Ticket": ...
     def comment(self, ticket: "Ticket", body: str) -> None: ...
+    def set_body(self, ticket: "Ticket", body: str) -> None: ...
     def reopen(self, ticket: "Ticket") -> None: ...
     def comments(self, ticket: "Ticket") -> list[str]: ...
 
@@ -225,6 +226,13 @@ def reconcile(service: TicketService, states, *, policy: str | None = None,
                 # and a person closing one is not a reason to break it.
                 service.reopen(ticket)
                 reopened.append(state.key)
+            # THE BODY FIRST, THEN THE COMMENT (REQ-GHUB-109 criterion
+            # 3). The body is WHERE IT IS NOW, rewritten in place, so a
+            # thread quiet for a month still says where the supply has
+            # got to without anybody scrolling; the comment is WHAT
+            # CHANGED, which is what a notification is for. One slot's
+            # state in one place, and the history beside it.
+            service.set_body(ticket, body_for(state))
             service.comment(ticket, _own_comment(state))
             updated.append(state.key)
         except Exception as exc:  # noqa: BLE001 - see the docstring

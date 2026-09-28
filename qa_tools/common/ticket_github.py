@@ -148,6 +148,22 @@ class GitHubTickets:
         _gh(["issue", "comment", str(ticket.number), "--repo", self._repo,
              "--body", body])
 
+    def set_body(self, ticket: Ticket, body: str) -> None:
+        """Rewrite the ticket's body in place (REQ-GHUB-109 criterion 3).
+
+        THE BODY, NOT A PINNED COMMENT. GitHub has no pinned comment,
+        and the body is the one part of a thread a reader sees without
+        scrolling - which is the whole requirement: a thread quiet for a
+        month still has to say where the supply has got to.
+
+        IT REPLACES ONLY WHAT THIS SCHEME WROTE, because this scheme
+        opened the ticket and nothing else writes its body. A ticket
+        from before the scheme is never found by `find()` at all, so it
+        can never reach here (criterion 19).
+        """
+        _gh(["issue", "edit", str(ticket.number), "--repo", self._repo,
+             "--body", body])
+
     def reopen(self, ticket: Ticket) -> None:
         _gh(["issue", "reopen", str(ticket.number), "--repo", self._repo])
         ticket.closed = False

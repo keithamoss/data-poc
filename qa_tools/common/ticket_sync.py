@@ -266,23 +266,64 @@ def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict, peop
             return f"{scope.id}: opened #{issue_number} ({status})"
         return f"{scope.id}: {status}, no open ticket - nothing to do"
 
-    # REQ-GHUB-027: every run's comment carries the list as it stands at
-    # that run, and posts it even when it is word-for-word what the last
-    # comment said. Keith's own call, with the repetition stated: the
-    # thread is then a real record of the failure set shrinking, and a
-    # reader never has to scroll up to find the most recent one.
+    # THE POST-EVERY-RUN RULE IS RETIRED (REQ-GHUB-109 criterion 2).
+    # REQ-GHUB-027 criterion 7 used to post a comment even when it was
+    # word-for-word what the last one said - Keith's own call at the
+    # time, with the repetition stated, so the thread was a record of
+    # the failure set shrinking and a reader never had to scroll up.
+    #
+    # WHAT CHANGED THE ANSWER is that the SAME THREAD now also carries
+    # the per-slot reconciler's comments, which post only on a change.
+    # Two rules on one thread means a reader cannot tell a repeat from a
+    # new fact, which is worse than either rule alone. So this one
+    # follows the other: say something, or say nothing.
     if status == "red":
-        comment(owner, repo, existing,
-                f"Still **red** as of this run - {scope.name} continues to fail its own checks."
+        body = (f"Still **red** as of this run - {scope.name} continues to fail "
+                f"its own checks." + _check_section(scope, status, dataset))
+    else:
+        body = (f"Resolved to **{status}** as of this run. This ticket does NOT "
+                f"auto-close - close it once you've confirmed the fix, or leave "
+                f"it open if follow-up is still needed."
                 + _check_section(scope, status, dataset))
-        return f"{scope.id}: #{existing} still red, commented"
 
-    comment(owner, repo, existing,
-            f"Resolved to **{status}** as of this run. This ticket does NOT "
-            f"auto-close - close it once you've confirmed the fix, or leave "
-            f"it open if follow-up is still needed."
-            + _check_section(scope, status, dataset))
+    if _already_said(owner, repo, existing, body):
+        # CRITERION 4's reasoning, and the reason this asks the THREAD
+        # rather than remembering: a process that lost its memory,
+        # restarted, or ran from a second place would otherwise post a
+        # duplicate, and there are now two callers of this module.
+        return f"{scope.id}: #{existing} unchanged ({status}), nothing posted"
+
+    comment(owner, repo, existing, body)
+    if status == "red":
+        return f"{scope.id}: #{existing} still red, commented"
     return f"{scope.id}: #{existing} resolved to {status}, commented (not closed)"
+
+
+def _already_said(owner: str, repo: str, issue_number: int, body: str) -> bool:
+    """Whether this exact comment is already the last thing on the thread.
+
+    THE LAST ONE, not any of them. A state that went red, then green,
+    then red again has genuinely changed twice and the thread should say
+    so both times - comparing against the whole history would swallow
+    the second one.
+
+    FAILS OPEN, deliberately. If the thread cannot be read, the old
+    behaviour returns: post. A missed comment is invisible; a repeated
+    one is merely noise, and this is not the failure to optimise for.
+    """
+    try:
+        out = _run_gh(["issue", "view", str(issue_number), "--repo",
+                       f"{owner}/{repo}", "--json", "comments"])
+        comments = (json.loads(out or "{}").get("comments") or [])
+    except (subprocess.CalledProcessError, FileNotFoundError,
+            json.JSONDecodeError, TypeError, AttributeError):
+        # NARROW ON PURPOSE. A bare `except Exception` here swallowed an
+        # AssertionError from a test's own fake - which meant every test
+        # silently took the fail-open path and proved nothing about the
+        # new rule. Same shape as promotion.status_of()'s own note: a
+        # broad except around a lookup turns a bug into a wrong answer.
+        return False
+    return bool(comments) and (comments[-1].get("body") or "").strip() == body.strip()
 
 
 def sync_all(owner: str, repo: str, people_config: dict | None = None) -> list[str]:

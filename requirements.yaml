@@ -2853,6 +2853,25 @@ requirements:
         pre-fix builder first.
     decisions:
       - >
+        CRITERION 7 IS RETIRED, 2026-09-29, by REQ-GHUB-109 criterion 2
+        - which is a signed requirement instructing an amendment to this
+        one, and is recorded in both as Keith's standing answer 3
+        requires.
+
+        It said a comment is posted on every run even when word-for-word
+        what the last one said, and the repetition was the point: the
+        thread became a record of the failure set shrinking, and a
+        reader never had to scroll up. WHAT CHANGED THE ANSWER is that
+        the same thread now also carries REQ-PIPE-083's per-slot
+        reconciler, which posts only on a change. Two rules on one
+        thread means a reader cannot tell a repeat from a new fact.
+
+        `ticket_sync.sync_dataset()` now reads the thread and stays
+        quiet where nothing has changed, failing OPEN where the thread
+        cannot be read. What criterion 7 was really for is supplied
+        better by REQ-GHUB-109 criterion 3: the ticket's own body always
+        says where the supply has got to, with no scrolling at all.
+      - >
         SUPERSEDED BY A SEPARATE REQUIREMENT, NOT AMENDED HERE (Keith,
         2026-09-28). This session first rewrote criterion 7 in place -
         from "post even when identical" to "post only on change" - and
@@ -23233,7 +23252,59 @@ requirements:
       by: Keith
       date: "2026-09-28"
     moscow: must
-    status: not_started
+    status: built
+    implemented_by:
+      - qa_tools/common/ticket_reconciler.py::reconcile
+      - qa_tools/common/ticket_reconciler.py::fingerprint
+      - qa_tools/common/ticket_reconciler.py::body_for
+      - qa_tools/common/ticket_github.py::GitHubTickets
+      - qa_tools/common/ticket_sync.py::sync_dataset
+    linked_tests:
+      - tests/test_ticket_reconciler.py::TestRunningItTwiceOverAnUnchangedWorldChangesNothing
+      - tests/test_ticket_reconciler.py::TestItSpeaksOnlyToItsOwnComments
+      - tests/test_ticket_reconciler.py::TestTheTicketsOwnBodySaysWhereItIsNow
+      - tests/test_ticket_github.py::TestEveryReadIsFencedByThisSchemesOwnLabel
+      - tests/test_ticket_sync.py::test_an_unchanged_red_ticket_gets_no_second_identical_comment
+      - tests/test_ticket_sync.py::test_a_CHANGED_state_still_posts
+      - tests/test_ticket_sync.py::test_it_compares_against_the_LAST_comment_only
+    evidence:
+      - >
+        Built 2026-09-29, alongside REQ-PIPE-083 whose reconciler is
+        where most of it lives. Criteria 1, 4 and 5 fall out of that
+        design: a comment is posted only where the state's FINGERPRINT
+        has changed, the fingerprint is read back off the thread rather
+        than remembered, and a pass that reads the thread gives the same
+        answer however often it runs.
+
+      - >
+        CRITERION 3 IS THE TICKET'S OWN BODY, rewritten in place, and it
+        closes a failure the comment rule alone leaves open: a thread
+        quiet for a month says nothing at the top, so a reader has to
+        scroll to the bottom and then work out whether the last comment
+        is still true. The body is WHERE IT IS NOW; the thread is WHAT
+        HAPPENED. The body is written BEFORE the comment, so a pass that
+        dies between the two leaves the half worth having.
+
+      - >
+        CRITERION 2's RETIREMENT IS A REAL CHANGE TO REQ-GHUB-027's OWN
+        CODE. `ticket_sync.sync_dataset()` now reads the thread and
+        posts nothing where the last comment is word-for-word what it
+        would say. It FAILS OPEN where the thread cannot be read - a
+        missed comment is invisible and a repeated one is merely noise,
+        and that is not the failure to optimise for. A test asserts the
+        module's own source no longer describes the retired rule as
+        current, which is criterion 2's second half held against the
+        code rather than remembered.
+
+      - >
+        A BARE `except Exception` WAS CAUGHT AND NARROWED while writing
+        that, and it is worth recording because it was the same shape
+        this project hit twelve hours earlier in promotion.status_of().
+        The broad except swallowed an AssertionError from the test
+        suite's own `gh` fake, which meant every existing test silently
+        took the fail-open path and proved nothing about the new rule.
+        Narrowed to the four errors that genuinely mean "the thread
+        could not be read", and the fake taught to answer `issue view`.
     source: >
       Keith, 2026-09-28, while reframing REQ-PIPE-083 into a
       reconciler. REQ-GHUB-027 criterion 7 posts a comment on every run
@@ -23304,6 +23375,29 @@ requirements:
         explicitly allows, on a schedule AND after a QA run.
     dependencies: [REQ-GHUB-027, REQ-PIPE-083]
     decisions:
+      - >
+        WHAT CHANGED THE ANSWER ON REQ-GHUB-027 CRITERION 7, because it
+        was Keith's own call at the time and made sense then. That rule
+        posted a comment even when identical, with the repetition
+        stated: the thread was a record of the failure set shrinking,
+        and a reader never had to scroll up to find the most recent one.
+
+        The SAME THREAD now also carries the per-slot reconciler's
+        comments, which post only on a change. Two rules on one thread
+        means a reader cannot tell a repeat from a new fact, which is
+        worse than either rule alone - so this one follows the other:
+        say something, or say nothing. And criterion 3 supplies what the
+        repetition was really for, better: the ticket's own body always
+        says where the supply has got to, without anybody scrolling at
+        all.
+
+      - >
+        HISTORY IS NEVER REWRITTEN (criterion 6). Nothing edits or
+        deletes a comment, and the retirement applies from here rather
+        than retroactively - a thread that carries repeats from the old
+        rule keeps them. Making a thread look as though the new rule
+        always applied would be editing the record to flatter the
+        design, which is the opposite of what a ticket is for.
       - >
         A REFUSAL IS EXEMPT FROM POST-ON-CHANGE (Keith, 2026-09-28,
         carried over from REQ-PIPE-083's own refusal rule). Two
