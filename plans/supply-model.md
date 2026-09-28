@@ -202,7 +202,7 @@ requirement to `built`.
 
 **WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
 fresh session can pick up from a file rather than from the commit log.**
-Last updated 02:30 Perth, 29 commits in.
+Last updated 02:50 Perth, 33 commits in.
 
 **BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
 `REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
@@ -212,9 +212,10 @@ cleared), **`REQ-PIPE-084`** (substitution), **`REQ-PIPE-098`**
 
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
 `REQ-PIPE-079` (decision layer done, wiring not), `REQ-PIPE-105`
-(criteria 7 and 8 done), `REQ-QAC-108` (the reference rule done, the
-check authoring not), `REQ-DASH-085` and `REQ-DASH-100` (the qualifier
-done, the drill-through not).
+(criteria 7 and 8 done), `REQ-QAC-108` (the reference rule and the
+supply-to-run mapping done, the wiring not), `REQ-DASH-085` and
+`REQ-DASH-100` (the qualifier done, the drill-through not),
+`REQ-PIPE-083` (the slot state done, the reconciler not).
 
 **THE FIVE THINGS THAT ARE KEITH'S, not mine, all recorded in the
 requirements' own `decisions:` and repeated here because this is the
@@ -241,14 +242,21 @@ file a fresh session reads:**
    and says so; whether to remove it is his call. The obvious place to
    get the time back is WITHIN a run, whose four tools are independent
    reads evaluated one after another.
-4. **`REQ-QAC-108`'s second half needs a mapping nothing records.**
-   Both orchestrators pass `manifest[0]["run_id"]` as the drift
-   reference - the fixed run criterion 4 forbids - and replacing it
-   needs the RUN that checked the reference period's supply.
-   `qa.tables_read` cannot answer that, because several runs read the
-   same supply by design. The option that is probably right is also the
-   reason not to build the others: after `REQ-PIPE-079`'s wiring a run
-   is per PERIOD, and the question needs no mapping at all.
+4. **~~`REQ-QAC-108`'s second half needs a mapping nothing
+   records.~~ WITHDRAWN at 02:38 - it was recorded all along.** The
+   arrival key is on both sides: a supply is
+   `cp-carers@202608010100000000` and its table is
+   `cp_carers__202608010100000000`. `drift_reference.run_for()` asks
+   the question of the right column. What is left is not a fork but a
+   coupled change: the wiring and criterion 5 have to land together,
+   because computing the reference per period means the FIRST period
+   legitimately has none and `status_for_psi()` returns "pass" for
+   exactly that case today. The full analysis, including what a fifth
+   tool status costs, is in that requirement's decisions.
+
+   **The lesson, kept because it will recur:** a fork written up at
+   midnight turned out to be a column nobody had looked at. Before
+   writing "nothing records this", grep the schema.
 5. **Birth Registrations' page now carries seventeen separate "missing
    supply" items, one per skipped day.** Each correct; whether
    seventeen of them should aggregate the way held supplies do is a
@@ -265,6 +273,16 @@ the operator routes (`REQ-GHUB-082`, `REQ-PIPE-099`) are where
 substitution does. This is written down rather than left implicit
 because the night's own worst hour went on three defects in code that
 had never executed (`plans/post-build-review.md` #63).
+
+**A SIXTH thing for Keith, added 02:45:** `REQ-PIPE-083` criteria 6 and
+7 contradict each other on a literal reading. Criterion 6 wants the
+ticket to show a slot's QA VERDICT; criterion 7 says the state comes
+from the schedule, the filings and the decision log ALONE. A verdict is
+in `qa.check_result`, which is recorded metadata rather than supply
+rows - so it satisfies 7's prohibition and not its word "alone".
+`REQ-DOCS-101` sharpened exactly this phrasing elsewhere. `slot_state.py`
+computes the state from the three named sources and leaves the verdict
+to the reconciler, flagged rather than decided.
 
 **Two lessons from the night, both in `plans/post-build-review.md`:**
 #63, that a guard making a path unreachable also makes it untested, and
