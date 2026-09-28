@@ -21244,7 +21244,17 @@ requirements:
         third value refused outright and a test proving the instant never
         follows a file's mtime.
 
-        NOT DONE: criteria 1, 2 and 5 to 8 - the arrival UNIT itself,
+        ALSO DONE, 2026-09-28 overnight: criterion 7 -
+        `promotion.newest_promoted()` orders by PROMOTION time out of the
+        decision log, deliberately disagreeing with
+        `period_schema.newest()`, which orders by the arrival key parsed
+        out of a physical name. Criterion 8 - a contested logical table is
+        recorded in `Resolution.ambiguous` AND falls through to the
+        period's promoted version, with `period_schema`'s new
+        `contested_own_checks()` and `should_promote(contested=True)`
+        keeping the table's own checks and its promotion out of it.
+
+        NOT DONE: criteria 1, 2, 5 and 6 - the arrival UNIT itself,
         which is still the delivery folder rather than the file, and the
         overlay reading the version staged for the period. Criteria 9 to
         11, the amendments to REQ-PIPE-035 and REQ-PIPE-036 and what they
@@ -21258,6 +21268,49 @@ requirements:
         11 split the carry-forward clause out of criterion 10. Worth saying rather than silently fixing: a stale
         criterion reference in a decision is the kind of thing a later
         reader trusts without re-checking.
+      - >
+        CRITERION 8 OVERRULED A DOCUMENTED SAFEGUARD, and the safeguard
+        was half right, which is why this is worth recording rather than
+        just doing. `period_schema.create_overlay_views()` refused to fall
+        through from a contested staged name to the period's promoted
+        version, and gave a real reason: reading the promoted table would
+        QA the delivery against data it did not contain, which reads green
+        and means nothing. A committed test asserted exactly that.
+
+        That reasoning is true of the contested table's OWN checks and
+        false of every check that merely READS it. A referential-integrity
+        check filed against cp_placements that reads cp_clients is making
+        a claim about the period's clients, so reading the period's
+        clients is the ordinary answer rather than a fallback -
+        REQ-PIPE-079 criteria 12 and 13 draw that line explicitly, and
+        this criterion says the same thing for the arrival case.
+
+        SO THE SAFEGUARD MOVED RATHER THAN GOING: the view resolves, the
+        contest is still recorded in `Resolution.ambiguous`, and
+        `contested_own_checks()` is what stops the table's own checks
+        running while `should_promote(contested=True)` stops it being
+        promoted. REJECTED: keeping the flat refusal, which would have
+        left every cross-table check in the period unrunnable for want of
+        a table the period genuinely holds - loud in a way that teaches
+        people to ignore red. The old test is rewritten rather than
+        deleted, to the half of it that did not change, and says in its
+        own docstring which half was superseded and by what.
+
+        A CONFLICT THIS EXPOSED, FOR KEITH RATHER THAN FOR ME TO SETTLE:
+        REQ-PIPE-079 criterion 10 says a run shall overlay only the tables
+        of the delivery under test and shall draw in no staged supply
+        belonging to another delivery. This requirement's criterion 5 says
+        the opposite - read the one version staged for the PERIOD - and
+        criterion 9's own reasoning is why: "the staged delivery's own
+        tables" names a unit that stops existing once every file is its
+        own arrival. Criterion 9 instructs amending REQ-PIPE-035 and
+        REQ-PIPE-036 by name and does not mention REQ-PIPE-079, so the
+        amendment there is a consequence nobody wrote down. Both are
+        signed; this one is signed later and is explicitly about this
+        unit. Flagged rather than edited, because amending a signed
+        criterion on my own reading is the thing the sign-off gate exists
+        to prevent.
+
       - >
         CRITERION 6 NARROWED 2026-09-28, SAME DAY IT WAS WRITTEN, because
         the first version made a legitimate resupply UNCHECKABLE. It held

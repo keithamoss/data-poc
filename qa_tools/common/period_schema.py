@@ -51,6 +51,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping, Sequence
 
+from qa_tools.common import check_id as check_id_mod
+from qa_tools.common import hierarchy
 from qa_tools.common import supply_db
 
 #: A period schema carries this prefix so it is distinguishable from
@@ -276,12 +278,25 @@ def create_overlay_views(conn, run_id: str, period_name: str,
     and every other table the check needs is read as that period
     currently stands.
 
-    AMBIGUITY IN STAGING IS STILL ABSENCE, and does NOT fall through to
-    the promoted version. Two files claiming one logical name mean
-    nobody has said which is the candidate, so the honest answer is
-    that the table is unreadable for this run - falling back to the
-    promoted table would silently QA the delivery against data it did
-    not contain, which reads green and means nothing.
+    AMBIGUITY IN STAGING OFFERS NOTHING, AND THE PERIOD STILL ANSWERS
+    (REQ-PIPE-105 criterion 8, REQ-PIPE-079 criteria 11-13). Two files
+    claiming one logical name mean nobody has said which is the
+    candidate, so neither is ever chosen between, for any purpose - but
+    the view still resolves to the period's PROMOTED version, because a
+    contested table is in exactly the position of a table the delivery
+    did not bring at all.
+
+    THIS USED TO BE A FLAT REFUSAL, and the reason given for it was
+    real: falling back to the promoted table would QA the delivery
+    against data it did not contain, which reads green and means
+    nothing. That is true of the contested table's OWN checks and false
+    of every check that merely READS it - a referential-integrity check
+    filed against placements reading carers is making a claim about the
+    period's carers, and reading them is the ordinary answer. So the
+    safeguard is kept where it belongs rather than across the board:
+    `ambiguous` still records the contest, and contested_own_checks()
+    is what stops the table's own checks running. A caller that
+    resolves the view and skips that gate has the false green back.
 
     "STAGING" IS THIS RUN'S OWN STAGING SCHEMA, not the shared
     constant (REQ-PIPE-103). A trial stages into a schema of its own
@@ -306,8 +321,11 @@ def create_overlay_views(conn, run_id: str, period_name: str,
     for logical in sorted(set(staged) | set(promoted)):
         candidates = sorted(staged.get(logical) or ())
         if len(candidates) > 1:
+            # Recorded, then treated as though staging brought nothing:
+            # the fall-through below is the whole of criterion 12, and
+            # the record is the whole of criterion 13.
             res.ambiguous[logical] = candidates
-            continue
+            candidates = []
         if candidates:
             physical, source_schema, origin = (
                 candidates[0], supply_db.staging_schema_for(run_id), FROM_STAGING)
@@ -445,6 +463,44 @@ def check_readiness(depends_on: Sequence[str], resolution: PeriodResolution, *,
         return Unrunnable(status=NODATA, reason=NO_PRIOR_PERIOD)
     return Unrunnable(status=RED, reason=MISSING_REFERENCE_PERIOD,
                        names=(reference_period,))
+
+
+def contested_own_checks(contested: Iterable[str],
+                         check_ids: Iterable[str]) -> frozenset[str]:
+    """The checks that must not run because their OWN table is contested.
+
+    REQ-PIPE-079 criterion 13, and the safeguard that makes criterion
+    12's fall-through safe rather than a false green.
+
+    THE SPLIT THIS DRAWS is between a check filed AGAINST a table and a
+    check that merely READS it. Two files claim `cp_clients`, so nobody
+    has said which one the supply is - and running cp_clients' own
+    uniqueness check against the version already promoted last quarter
+    would report on data the supplier did not send, in the green
+    direction, while appearing to have checked their file. A
+    referential-integrity check filed against cp_placements that reads
+    cp_clients is in no such position: it is making a claim about the
+    period's clients, and the period's clients are exactly what it
+    reads (criterion 12).
+
+    A DATASET MAPS TO ONE LOGICAL TABLE BY CONSTRUCTION under the
+    supply model (plans/supply-model.md Thread F), which is what lets
+    "this check's own table" be answered from the check_id's own
+    dataset segment rather than from a second declaration that could
+    disagree with it.
+
+    LOUD ON A NAME NOTHING CLAIMS, rather than skipping it. Failing to
+    suppress is the dangerous direction here, so a logical table no
+    dataset owns raises hierarchy.UnknownDatasetError instead of
+    quietly resolving to "not one of ours, let it run".
+    """
+    datasets = {hierarchy.dataset_for_table(table).dataset_id
+                for table in contested}
+    if not datasets:
+        return frozenset()
+    return frozenset(
+        cid for cid in check_ids
+        if check_id_mod.parse(cid).dataset in datasets)
 
 
 def reference_view(conn, run_id: str, logical: str, reference_period: str,

@@ -139,7 +139,8 @@ def should_promote(*, status: str,
                    slot_filled: bool,
                    held_without_slot: bool,
                    has_active_checks: bool,
-                   decided_by_a_person: bool = False) -> tuple[bool, str | None]:
+                   decided_by_a_person: bool = False,
+                   contested: bool = False) -> tuple[bool, str | None]:
     """Whether automation may promote this supply, and why not if not.
 
     The reason is not decoration: "not promoted" with no explanation is
@@ -151,8 +152,17 @@ def should_promote(*, status: str,
     verdict is the thing to fix, where a filled slot is merely the reason
     today's attempt stopped.
     """
+    if contested:
+        # REQ-PIPE-079 criterion 13, and REQ-PIPE-105 criterion 6.
+        # Ahead of everything, and "whatever the period holds" is the
+        # criterion's own phrase: where several files claim one dataset
+        # nobody has said which file IS the supply, so there is no
+        # supply here to ask any of the later questions about.
+        return False, ("several files claim this dataset and nothing says "
+                       "which one is the supply, so a person decides before "
+                       "anything is promoted")
     if held_without_slot:
-        # Criterion 5. First, because a supply with no confident slot has
+        # Criterion 5. Then, because a supply with no confident slot has
         # no slot to be filled or empty, so every later question is moot.
         return False, ("no slot could be confidently claimed for this supply, "
                        "so it is neither promoted nor arrival-classified")
