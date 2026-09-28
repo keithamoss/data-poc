@@ -202,7 +202,7 @@ requirement to `built`.
 
 **WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
 fresh session can pick up from a file rather than from the commit log.**
-Last updated 02:50 Perth, 33 commits in.
+Last updated 03:10 Perth, 36 commits in.
 
 **BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
 `REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
@@ -215,7 +215,9 @@ cleared), **`REQ-PIPE-084`** (substitution), **`REQ-PIPE-098`**
 (criteria 7 and 8 done), `REQ-QAC-108` (the reference rule and the
 supply-to-run mapping done, the wiring not), `REQ-DASH-085` and
 `REQ-DASH-100` (the qualifier done, the drill-through not),
-`REQ-PIPE-083` (the slot state done, the reconciler not).
+`REQ-PIPE-083` (the slot state AND the reconciler's logic done; the real
+GitHub client and the call sites not - criterion 19 needs a client that
+does not exist, and this container has no `gh`).
 
 **THE FIVE THINGS THAT ARE KEITH'S, not mine, all recorded in the
 requirements' own `decisions:` and repeated here because this is the
