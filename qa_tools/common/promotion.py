@@ -234,3 +234,58 @@ def promote_each(conn: supply_db.SupplyConnection,
         if did:
             promoted.append(dataset_id)
     return promoted, failures
+
+
+def status_of(dataset_id: str, results: Sequence[dict], *,
+              reads: dict[str, list[str]]) -> str | None:
+    """This dataset's status, from EVERY check that contributes to it
+    (criterion 2).
+
+    `reads` is check_id -> the logical tables that check declares it
+    reads, which is what tables_read.declared_by_check_id() returns and
+    what the dashboard already uses. Reusing it rather than deriving a
+    second answer is deliberate: two implementations of "which checks
+    touch this dataset" would drift, and the drift would show as a
+    supply promoting itself past a red check.
+
+    THREE SOURCES, and the middle one is what a naive version misses:
+      - the dataset's own results, whatever their scope;
+      - a CROSS-TABLE check filed under another dataset that declares it
+        reads one of this dataset's tables - a referential check between
+        placements and carers belongs to both, and is filed under
+        whichever it happened to be declared on;
+      - anything else recorded against this dataset.
+
+    RETURNS None WHERE NOTHING CONTRIBUTED, never "green". A dataset with
+    no contributing check has no verdict to gate on, and calling that
+    green is criterion 12's check-free table arriving by another road.
+    """
+    from qa_tools.common import dataset_status, hierarchy
+
+    try:
+        own_tables = {hierarchy.dataset(dataset_id).table}
+    except hierarchy.UnknownDatasetError:
+        # A dataset the tree does not know. Its id is the best name for
+        # its table there is - the same fallback tables_read._own_table
+        # makes, and for the same reason: being slightly over-inclusive
+        # beats raising inside a promotion gate.
+        #
+        # NARROW ON PURPOSE. This was `except Exception` for about a
+        # minute, and it silently swallowed an AttributeError from
+        # getting the field name wrong - the fallback then made every
+        # cross-table check look like it read nothing. A bare except
+        # around a lookup turns a bug into a wrong answer.
+        own_tables = {dataset_id}
+
+    contributing = []
+    for record in results:
+        if record.get("dataset_id") == dataset_id:
+            contributing.append(record["status"])
+            continue
+        declared = reads.get(record.get("check_id") or "")
+        if declared and own_tables.intersection(declared):
+            contributing.append(record["status"])
+
+    if not contributing:
+        return None
+    return dataset_status.worst_of(contributing)
