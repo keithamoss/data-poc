@@ -181,3 +181,56 @@ def may_arrival_classify(*, held_without_slot: bool) -> bool:
     without a slot would be inventing the thing being measured against.
     """
     return not held_without_slot
+
+
+def promote_each(conn: supply_db.SupplyConnection,
+                 work: Sequence[dict], *,
+                 agency_id: str,
+                 collection_id: str,
+                 period: str,
+                 actor: str,
+                 actor_kind: str,
+                 effective_at: str,
+                 reason: str | None = None) -> tuple[list[str], dict[str, str]]:
+    """Promote several datasets' supplies, ONE DECISION EACH.
+
+    Returns (dataset ids promoted, {dataset id: why it failed}).
+
+    TWO CRITERIA MEET HERE and they pull the same way. Criterion 11 says
+    one dataset's failure must not stop the others - at ~30 datasets on a
+    quarterly asset, a run that abandons twenty-nine promotions because
+    the thirtieth had a bad table is a run somebody turns off. Criterion
+    14 says no operation promotes several supplies on ONE decision, so
+    this is a loop over promote() rather than a bulk write: each supply
+    gets its own entry, its own reason and its own transaction, and the
+    log can answer "why was THIS one promoted" a year later.
+
+    A FAILURE LEAVES NOTHING HALF DONE, because each promote() is its own
+    transaction - see this module's docstring. The failure is REPORTED
+    rather than raised, because the caller's job is to finish the run and
+    then tell somebody, not to stop.
+    """
+    promoted: list[str] = []
+    failures: dict[str, str] = {}
+    for item in work:
+        dataset_id = item["dataset_id"]
+        try:
+            did = promote(conn, agency_id=agency_id, collection_id=collection_id,
+                          dataset_id=dataset_id, supply=item["supply"],
+                          period=item.get("period", period),
+                          physical_tables=item["physical_tables"],
+                          actor=actor, actor_kind=actor_kind,
+                          effective_at=effective_at,
+                          reason=item.get("reason", reason),
+                          supply_is_red=item.get("supply_is_red", False))
+        except Exception as exc:
+            # DELIBERATELY BROAD. Anything one dataset's promotion can
+            # raise - a missing table, a refused decision, a lock timeout
+            # - is a reason to carry on with the other twenty-nine and
+            # report this one. Narrowing it would mean a new failure mode
+            # silently becoming fatal to the whole run.
+            failures[dataset_id] = f"{type(exc).__name__}: {exc}"
+            continue
+        if did:
+            promoted.append(dataset_id)
+    return promoted, failures
