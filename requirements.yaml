@@ -18619,14 +18619,43 @@ requirements:
         production confirmation, and recording the environment on every
         QA run - and because it is unsigned.
       - >
-        STILL GENUINELY UNREAD, and both bear on the version this
-        requirement anchors - moved here from REQ-PIPE-087 on
-        2026-09-27, since that one provides the engine and this one
-        declares its version: Aurora 16.8's own extension allowlist,
-        and Aurora's major-version support timeline (how long 16
-        remains available), which is the counter-argument for 17.7.
-        docs.aws.amazon.com is reachable, so this is unread rather
-        than unreachable.
+        ANSWERED 2026-09-28 against AWS's own release calendar rather
+        than recalled - docs.aws.amazon.com/AmazonRDS/latest/
+        AuroraPostgreSQLReleaseNotes/aurorapostgresql-release-calendar,
+        fetched with curl. Worth knowing for the next session: the HTML
+        page is JavaScript-rendered and returns a stub, while the `.md`
+        variant of the same path returns the real tables.
+
+        THE EXTENSION ALLOWLIST DOES NOT CONSTRAIN THIS PROJECT, for a
+        simpler reason than the question assumed: this repository
+        issues NO `CREATE EXTENSION` at all - a grep over every .py and
+        .sql returns zero. Aurora PostgreSQL 16 does list the usual
+        suspects (pg_trgm, pgcrypto, uuid-ossp, pg_stat_statements,
+        postgis, pg_cron, hstore, tablefunc), so one is likely there if
+        ever wanted. Stated plainly because this repo DOES have a live
+        extension problem and it is a different one - DUCKDB's, for
+        reading an arriving file format - which Aurora has no bearing
+        on.
+
+        THE TIMELINE FAVOURS 17 BY EXACTLY ONE YEAR, which is the whole
+        of the counter-argument. Aurora PostgreSQL 16 reaches end of
+        standard support on 28 FEBRUARY 2029 (RDS Extended Support
+        pricing then runs from 1 March 2029, year-3 from 1 March 2031,
+        ending 28 February 2032; community EOL is 9 November 2028).
+        Aurora PostgreSQL 17 reaches end of standard support on 28
+        FEBRUARY 2030. Both have an LTS minor, which is what matters
+        for pinning: 16.8 (LTS), released 20 February 2025, supported
+        to 28 February 2029; 17.7 (LTS), released 13 November 2025,
+        supported to 28 February 2030.
+
+        SO THE ANCHOR HOLDS. Two years and five months of standard
+        support from today is well beyond this PoC's horizon, and the
+        fact that decided it is unchanged: Ubuntu 24.04 ships only
+        postgresql-16, so anchoring on 17.7 would leave a cloud session
+        permanently a major behind. One thing worth knowing for later -
+        Aurora PostgreSQL 18 exists (18.3 and higher, released 11 June
+        2026), so this is a two-major-old anchor rather than a
+        one-major-old one.
       - >
         HOW THE ENVIRONMENT IS STATED, and what production's extra
         friction actually is - relayed as question set D. A mandatory
