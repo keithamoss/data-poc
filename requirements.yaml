@@ -14609,13 +14609,13 @@ requirements:
     acceptance_criteria:
       - >
         THE SYSTEM SHALL accept promote, reject, demote, re-file,
-        substitute, inherit and un-inherit as structured filing
-        decisions raised on the GitHub ticket for the SLOT they concern
-        - one dataset in one period, per REQ-PIPE-083 - so that the
-        period a decision applies to comes from the ticket's own
+        substitute, de-substitute, inherit and un-inherit as structured
+        filing decisions raised on the GitHub ticket for the SLOT they
+        concern - one dataset in one period, per REQ-PIPE-083 - so that
+        the period a decision applies to comes from the ticket's own
         identity rather than from anything stated in the body. Every
         criterion below that says "a filing decision" SHALL mean any one
-        of those seven.
+        of those eight.
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
@@ -14656,6 +14656,11 @@ requirements:
       - >
         THE SYSTEM SHALL NOT add a control to the dashboard for any of
         these operations.
+      - >
+        WHERE the asset's ticket policy has opened no ticket for a slot
+        - a period quietly awaiting a supply that is not yet late - THE
+        SYSTEM SHALL offer that period's decisions from the terminal,
+        and SHALL NOT open a ticket merely to carry one.
       - >
         THE SYSTEM SHALL expose every filing decision through one
         implementation, with each route as an adapter onto it.
@@ -14717,6 +14722,13 @@ requirements:
         the one implementation, and SHALL NOT let either route permit
         something the other would refuse.
       - >
+        WHERE a decision is refused because another period's disposition
+        blocks it, THE SYSTEM SHALL name the decision that would UNBLOCK
+        it - de-substitute for a period standing on this supply,
+        un-inherit for one that inherited it - alongside the blocking
+        period itself, on whichever route raised it, so that a person is
+        told the remedy rather than left to work it out.
+      - >
         WHEN a decision would change nothing because the log already
         records that outcome, THE SYSTEM SHALL say so and SHALL NOT
         treat it as a refusal or append a duplicate entry.
@@ -14740,17 +14752,17 @@ requirements:
         reachability and the ticket is updated by whatever already has
         it.
       - >
-        THE SYSTEM SHALL reach substitute, inherit and un-inherit per
-        period and dataset rather than from the supply queue, because
-        none of them answers "what do I do with this arriving supply"
-        - each is a decision about how a period is filled when a
-        supply for it never arrives.
+        THE SYSTEM SHALL reach substitute, de-substitute, inherit and
+        un-inherit per period and dataset rather than from the supply
+        queue, because none of them answers "what do I do with this
+        arriving supply" - each is a decision about how a period is
+        filled when a supply for it never arrives.
       - >
-        THE SYSTEM SHALL record substitute, inherit and un-inherit in
-        the decision log on the same terms as every other filing
-        decision - actor, reason, allowlist, refusal, GitHub parity -
-        so that the un-inherit an operator performs to unblock a
-        refused demotion is as accountable as the demotion itself.
+        THE SYSTEM SHALL record substitute, de-substitute, inherit and
+        un-inherit in the decision log on the same terms as every other
+        filing decision - actor, reason, allowlist, refusal, GitHub
+        parity - so that the un-inherit an operator performs to unblock
+        a refused demotion is as accountable as the demotion itself.
       - >
         WHERE a period schema is created automatically by an arriving
         supply, THE SYSTEM SHALL perform the inheritance the cadence
@@ -14924,6 +14936,48 @@ requirements:
         disambiguated by context, which is exactly the collision
         plans/supply-model.md's concept inventory warns about for the
         word "delivery".
+      - >
+        DE-SUBSTITUTE WAS MISSING FROM THE LIST, AND IT IS EIGHT
+        OPERATIONS NOT SEVEN (Keith, 2026-09-28, reading the criteria
+        back). REQ-PIPE-084 made de-substitute a first-class operator
+        action - "for one dataset and one period at a time, which
+        removes that period's indirection... leaves the slot unfilled,
+        and is recorded with the operator and a reason" - and its own
+        criterion says it is accepted "from the same operator routes as
+        every other filing decision". This requirement IS those routes,
+        and it never listed it. A real gap rather than a wording
+        preference: nothing here would have offered it on either route.
+      - >
+        A REFUSAL NAMES THE REMEDY, NOT ONLY THE BLOCKER (Keith,
+        2026-09-28). REQ-PIPE-084 already refuses a demote, reject or
+        re-file while a later period stands on the supply, and names
+        every period that blocks it. Keith asked for the next step: say
+        which DECISION would clear the way - de-substitute that period,
+        or un-inherit it - so a person is told what to do rather than
+        left to infer it from a list of blocking periods. Cheap here,
+        and the alternative is somebody guessing at a remedy they are
+        one keystroke away from getting wrong.
+      - >
+        EARLY SUBSTITUTION IS TERMINAL-ONLY, AND THAT IS ACCEPTED
+        (Keith, 2026-09-28: "let's just let them use the TUI in that
+        case or the CLI"). Raised as a gap on the read-back: substitute
+        and inherit are decisions about a period where nothing has
+        arrived and nothing is yet wrong, so under REQ-PIPE-083's
+        `needs-action` default that slot has no ticket, and an operator
+        wanting to substitute EARLY has nothing to raise it on.
+        REJECTED letting a GitHub-raised decision open the ticket it
+        needs, which would put a second creator of tickets beside the
+        reconciler - exactly what REQ-PIPE-083 criterion 2 was
+        strengthened to prevent. The terminal covers the case, and it is
+        the rarer one.
+      - >
+        NO DASHBOARD CONTROL, RE-CONFIRMED (Keith, 2026-09-28). The
+        criterion was written 2026-09-26, before he framed tickets as
+        the management surface and the dashboard as the read surface,
+        so it was put to him again rather than inherited: "reconfirming
+        that should be never controlled by the dashboard. That remains
+        the case." It is a hard never, and it is now load-bearing for a
+        distinction stated later than the criterion itself.
       - >
         THE TICKET A DECISION IS RAISED ON IS A SLOT'S, NOT A DATASET'S
         (2026-09-28, following REQ-PIPE-083's reframe). This requirement
