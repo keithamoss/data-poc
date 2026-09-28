@@ -202,7 +202,7 @@ requirement to `built`.
 
 **WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
 fresh session can pick up from a file rather than from the commit log.**
-Last updated 06:32 Perth, 48 commits in.
+Last updated 06:50 Perth, 49 commits in.
 
 **BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
 `REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
@@ -306,7 +306,19 @@ The phasing it wants, so a fresh session does not have to re-derive it:
    owning its warehouse change. Criterion 25 was already done - see
    `decision_log.UNBLOCKED_BY`.
 3. **The TUI adapter** (2, 12, 15, 16, 17, 18, 19, 28, 31).
-4. **The GitHub adapter** (1, 4, 5, 7, 23, 30).
+4. ~~**The GitHub adapter**~~ (1, 4, 5, 7, 23, 30) - **DONE.**
+   `qa_tools/common/filing_from_github.py`. A line beginning with a
+   slash is addressed to the machine and every other line is addressed
+   to people, which is what makes "ignore the prose AROUND a known
+   command" decidable; the prose IS the reason; the period comes from
+   the ticket's own label and never from the body; a refusal is posted
+   directly rather than through REQ-PIPE-083's pass.
+
+   PHASE 3 IS THE ONE LEFT, and it was left on purpose: criterion 15
+   renames the existing "Promote" wording across a prompt, a success
+   panel, a function name AND the committed demo recording, which is a
+   judgement about what a reader sees rather than a mechanical change.
+   Nothing else blocks it.
 
 ONE THING TO CHECK BEFORE BUILDING criterion 1's `refile`: it is the
 only one of the eight with no effect written yet. `filing.refile()`
