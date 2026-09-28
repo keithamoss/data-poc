@@ -20915,8 +20915,8 @@ requirements:
 
   - id: REQ-QAC-108
     title: >
-      A supply unlike the previous period's accepted one is flagged, and
-      the reference is never whatever happened to arrive
+      Drift and volume are measured against the last supply actually
+      PROMOTED, never against a view or an arrival nobody promoted
     date_written: "2026-09-28"
     moscow: must
     status: not_started
@@ -20935,9 +20935,9 @@ requirements:
       watching.
     acceptance_criteria:
       - >
-        THE SYSTEM SHALL apply a relative volume check to Child
-        Protection's datasets, with a warn band and a fail band, so that
-        both collections judge volume the same way.
+        THE SYSTEM SHALL apply a relative volume check to EACH of Child
+        Protection's six datasets, with a warn band and a fail band, so
+        that both collections judge volume the same way.
       - >
         THE SYSTEM SHALL take the reference for every drift and volume
         check from the MOST RECENT EARLIER PERIOD IN WHICH A SUPPLY FOR
@@ -20971,9 +20971,16 @@ requirements:
         in a build path. CLAUDE.md's standing rule: a build may read
         recorded QA results, never actual data, and never anything else.
       - >
-        Thresholds are configuration, not literals in a tool script, so
-        that a dataset whose volume legitimately swings can be widened
-        without a code change.
+        Thresholds belong to the CHECK, per dataset, not to the tool
+        script - so a dataset whose volume legitimately swings can be
+        widened without touching a shared constant. Soda's already are,
+        in the checks YAML beside each check's own check_id and
+        category. Evidently's are not: WARN_ROW_DROP/FAIL_ROW_DROP in
+        run_evidently_bdm.py and WARN_THRESHOLD/FAIL_THRESHOLD in
+        evidently_common.py are one pair of numbers for every dataset.
+        They move to the per-check entry in each collection's
+        evidently_check_lifecycle.py, which already carries that
+        check's category, introduced_date and prose.
     dependencies: [REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-098]
     decisions:
       - >
@@ -21058,3 +21065,10 @@ requirements:
         thresholds"). Mirroring Birth Registrations' existing bands
         keeps one convention across both collections rather than
         inventing a second.
+      - >
+        "ACCEPTED" WAS STRUCK FROM THE TITLE (Keith, 2026-09-28) and the
+        reason is this requirement's whole subject rather than a style
+        note: acceptance reads as though it might include a
+        carry-forward or an inherited view, which are exactly the two
+        things criterion 6 excludes. The title says PROMOTED because
+        nothing else in this domain means only what was promoted.
