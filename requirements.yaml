@@ -15248,6 +15248,11 @@ requirements:
         narrowed invocation SHALL be the same pass over fewer slots,
         never a second code path.
       - >
+        THE SYSTEM SHALL NOT adopt, re-key, migrate, close or delete any
+        ticket opened before this scheme. A pre-existing ticket is left
+        exactly as it is, and clearing it away is a one-off act by a
+        person rather than anything the reconciler does.
+      - >
         THE SYSTEM SHALL scope a failure for one slot to that slot, and
         SHALL NOT stop reconciliation for any other.
       - >
@@ -15351,6 +15356,31 @@ requirements:
         all is that everybody on the team sees the same queue rather
         than each person going and looking. Recorded because it changes
         what `needs-action` has to cover, not just how the story reads.
+      - >
+        NO MIGRATION - THE EXISTING TICKETS MAY SIMPLY BE CLEARED AWAY
+        (Keith, 2026-09-28, unprompted: "happy to say that we just close
+        and delete any existing tickets if that makes it easier. I don't
+        think we need to migrate anything"). Same call he made for the
+        QA history on REQ-PIPE-089 criterion 25, and for the same
+        reason: what is being thrown away is regenerable or expendable,
+        and a migration path is code that runs once and is maintained
+        forever.
+
+        WORTH KNOWING: no migration was ever mechanically required.
+        Today's tickets are per DATASET; criterion 3 keys a ticket by
+        dataset AND period, so the reconciler will not find them, will
+        not touch them, and will open its own. The permission therefore
+        buys tidiness rather than correctness - without it the old
+        tickets sit open forever beside the new ones, which is
+        confusing rather than broken.
+
+        RECOMMENDED CLOSING RATHER THAN DELETING, and Keith allowed
+        either. Deleting a GitHub issue is permanent, needs repository
+        admin, and breaks every link to it; closing leaves the record
+        readable and is reversible. Either way it is a person doing it
+        once, not a build step - which is what the criterion above
+        makes explicit, so nobody later writes a migration this decision
+        says is not wanted.
       - >
         A CLI OR TUI OPERATION RE-RUNS THE SAME PASS RATHER THAN POSTING
         FOR ITSELF (Keith, 2026-09-28, his own answer to his own
@@ -21975,8 +22005,11 @@ requirements:
         reader sees.
       - >
         THE SYSTEM SHALL keep every comment already posted under the
-        retired rule, and SHALL NOT edit or delete history to make the
-        thread look as though the new rule always applied.
+        retired rule on any thread it goes on using, and SHALL NOT edit
+        or delete history to make the thread look as though the new rule
+        always applied. A ticket predating the per-slot scheme cleared
+        away wholesale by a PERSON is a different act, and REQ-PIPE-083
+        permits it.
     non_functional_requirements:
       - >
         THE COST KEITH'S ORIGINAL DECISION WAS BUYING, and it has to be
