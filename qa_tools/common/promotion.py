@@ -110,3 +110,74 @@ def filled_slots(conn: supply_db.SupplyConnection, dataset_id: str) -> frozenset
     return frozenset(
         slot for (slot,) in rows
         if decision_log.promoted_into(conn, dataset_id, slot) is not None)
+
+
+# ---------------------------------------------------------------------------
+# The automatic gate (criteria 1-5 and 12).
+#
+# A PURE FUNCTION over facts the caller already has, deliberately. Whether
+# a supply should promote and what its verdict was are different
+# questions, and decision_log.Decision already makes the same split for
+# `supply_is_red`. A gate that went browsing for its own inputs could not
+# be asked a hypothetical, which is most of what its tests do.
+# ---------------------------------------------------------------------------
+
+#: Statuses that promote themselves into an empty slot (criterion 1).
+#: Amber is included on purpose: an amber supply is usable data with
+#: something worth knowing about it, and holding every one of them for a
+#: person is how a queue becomes noise nobody reads.
+PROMOTES_ITSELF = frozenset({"green", "amber"})
+
+
+def should_promote(*, status: str,
+                   slot_filled: bool,
+                   held_without_slot: bool,
+                   has_active_checks: bool,
+                   decided_by_a_person: bool = False) -> tuple[bool, str | None]:
+    """Whether automation may promote this supply, and why not if not.
+
+    The reason is not decoration: "not promoted" with no explanation is
+    the state an operator has to escalate, and this string is what the
+    ticket and the terminal both end up showing.
+
+    THE ORDER OF THE REFUSALS IS DELIBERATE. Several can be true at once,
+    and the one reported should be the one worth acting on first - a red
+    verdict is the thing to fix, where a filled slot is merely the reason
+    today's attempt stopped.
+    """
+    if held_without_slot:
+        # Criterion 5. First, because a supply with no confident slot has
+        # no slot to be filled or empty, so every later question is moot.
+        return False, ("no slot could be confidently claimed for this supply, "
+                       "so it is neither promoted nor arrival-classified")
+    if decided_by_a_person:
+        # REQ-PIPE-076 criterion 7. Ahead of the verdict, because a person
+        # having decided outranks whatever the checks now say.
+        return False, ("a person has already decided about this supply, and "
+                       "automation defers to them permanently")
+    if status not in PROMOTES_ITSELF:
+        # Criterion 3.
+        return False, (f"this supply's status is {status} rather than green or "
+                       "amber, so it waits for a person")
+    if not has_active_checks:
+        # Criterion 12, and the dangerous direction: a table nobody wrote
+        # a check for computes as green by having no failures, and would
+        # otherwise promote itself on the strength of nothing having been
+        # asked of it.
+        return False, ("this table has no ACTIVE checks, so nothing was "
+                       "asked of it and green means only that")
+    if slot_filled:
+        # Criterion 4, whatever the status.
+        return False, ("this supply's slot is already filled by a promoted "
+                       "supply, so a person decides what happens to it")
+    return True, None
+
+
+def may_arrival_classify(*, held_without_slot: bool) -> bool:
+    """Criterion 5's second half.
+
+    A supply with no confident slot is not arrival-classified either -
+    early, on time and late are all claims ABOUT A SLOT, so making one
+    without a slot would be inventing the thing being measured against.
+    """
+    return not held_without_slot
