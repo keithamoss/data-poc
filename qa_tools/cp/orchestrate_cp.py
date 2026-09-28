@@ -35,6 +35,7 @@ from qa_tools.common import filing
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common import promotion
+from qa_tools.common import ticket_reconciler
 from qa_tools.common import trial
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -326,6 +327,22 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, run_by, reference_run_id,
         sequential=sequential, before_each=_file, after_each=_promote)
+
+    # THE TICKETS CATCH UP WITH THE SLOTS (REQ-PIPE-083 criteria 13 and
+    # 16). After promotion rather than beside it, because a ticket that
+    # says something the decision log does not is worse than a ticket
+    # that is a minute behind - and it reconciles EVERY slot this
+    # collection is responsible for rather than the ones this run
+    # touched, because a slot nobody delivered for is exactly the one
+    # that needs a ticket and a pass scoped to arrivals can never see
+    # it.
+    #
+    # SILENT WHERE NOTHING IS CONFIGURED. A run on somebody's laptop has
+    # no GITHUB_REPOSITORY and no `gh`, which is not a broken run - it
+    # is a run with no ticketing, the ordinary state of this repository
+    # for most of its life.
+    ticket_reconciler.report(
+        ticket_reconciler.after_runs(cp_common.COLLECTION_ID))
 
     # NOTHING TO SWEEP HERE ANY MORE (Keith, 2026-09-27). Each run
     # discards its own view and dbt schemas as it finishes - see

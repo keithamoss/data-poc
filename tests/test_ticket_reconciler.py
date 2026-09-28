@@ -285,3 +285,89 @@ class TestWhatTheTicketSays:
         body = tr.body_for(a_slot(slot_state.SUBSTITUTED,
                                    reason="the supplier confirmed none is coming"))
         assert "the supplier confirmed none is coming" in body
+
+
+class TestTheReconcilerIsInvokedAfterEveryRun:
+    """Criteria 13 and 16, asserted on the AST rather than the source
+    text - a comment mentioning the reconciler is not a call to it, and
+    this project has been caught by exactly that before
+    (tests/test_filing_before_checks.py's own header)."""
+
+    @staticmethod
+    def _calls(module_name, func_name):
+        import ast
+        import inspect
+
+        module = __import__(module_name, fromlist=[func_name])
+        source = inspect.getsource(getattr(module, func_name))
+        tree = ast.parse(source.lstrip() if source.startswith(" ") else source)
+        out = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            parts, target = [], node.func
+            while isinstance(target, ast.Attribute):
+                parts.append(target.attr)
+                target = target.value
+            if isinstance(target, ast.Name):
+                parts.append(target.id)
+            out.append((".".join(reversed(parts)), node.lineno))
+        return out
+
+    @pytest.mark.parametrize("module,func", [
+        ("qa_tools.cp.orchestrate_cp", "run_pipeline_cp"),
+        ("qa_tools.bdm.orchestrate_bdm", "run_pipeline"),
+    ])
+    def test_it_is_called(self, module, func):
+        names = [n for n, _ in self._calls(module, func)]
+        assert "ticket_reconciler.after_runs" in names, names
+
+    @pytest.mark.parametrize("module,func", [
+        ("qa_tools.cp.orchestrate_cp", "run_pipeline_cp"),
+        ("qa_tools.bdm.orchestrate_bdm", "run_pipeline"),
+    ])
+    def test_it_is_called_AFTER_the_runs(self, module, func):
+        """Criterion 16: only after the change is durably recorded, so a
+        ticket can never say something the decision log does not."""
+        calls = dict(self._calls(module, func))
+        assert calls["ticket_reconciler.after_runs"] > \
+            calls["parallel_orchestrate.run_manifest"]
+
+
+class TestNoTicketingConfiguredIsNotABrokenRun:
+    """A pipeline run on somebody's laptop has no GITHUB_REPOSITORY and
+    no `gh`. That is a run with no ticketing, which is the ordinary
+    state of this repository for most of its life."""
+
+    def test_it_returns_a_quiet_outcome_rather_than_raising(self, monkeypatch):
+        monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+        out = tr.after_runs("child-protection")
+        assert out.quiet is True and out.failed == {}
+
+    def test_no_service_means_no_connection_is_opened(self, monkeypatch):
+        """Cheap, and it matters: a laptop run should not need a
+        database reachable to decide it has no ticketing."""
+        monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+        monkeypatch.setattr(tr, "service_from_env", lambda: None)
+        assert tr.after_runs("child-protection").quiet is True
+
+
+class TestTheReportDoesNotFloodTheTerminal:
+    """Thirty-five copies of "the service is unreachable" buries the one
+    line that matters and trains somebody to scroll past the end of a
+    pipeline run."""
+
+    def test_identical_failures_collapse_to_one_line(self, capsys):
+        same = "TicketServiceUnavailable: gh is not installed here"
+        tr.report(tr.Outcome(failed={f"cp-{i}/2026-Q3": same for i in range(35)}))
+        out = capsys.readouterr().out
+        assert out.count("gh is not installed here") == 1
+        assert "35 slot(s)" in out
+
+    def test_a_failure_of_its_own_still_names_its_slot(self, capsys):
+        tr.report(tr.Outcome(failed={"cp-carers/2026-Q3": "something odd"}))
+        assert "cp-carers/2026-Q3" in capsys.readouterr().out
+
+    def test_a_quiet_pass_says_nothing_at_all(self, capsys):
+        tr.report(tr.Outcome(unchanged=("cp-carers/2026-Q3",)))
+        assert capsys.readouterr().out == ""

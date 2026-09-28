@@ -15808,6 +15808,65 @@ requirements:
     open_questions: []
     decisions:
       - >
+        `gh` IS NOT INSTALLED IN THIS CONTAINER, AND THAT IS WHAT MAKES
+        CRITERION 17 OBSERVABLE. "Where the ticketing service cannot be
+        reached, THE SYSTEM SHALL NOT fail the operation that prompted
+        the reconciliation" is a claim about a real absence, and there
+        is a real absence here to make it against rather than a mocked
+        one. A full pipeline run reconciles nothing, records a failure
+        per slot, prints ONE line about it and finishes normally.
+
+        THE ONE LINE IS NOT COSMETIC. The commonest failure by far is
+        the whole service being unreachable, which fails every slot with
+        the same sentence - and this deployment has 120 slots. Printing
+        it 120 times buries whatever else the run said and trains
+        somebody to scroll past the end of a pipeline run, so identical
+        failures collapse and a genuinely per-slot one still gets its
+        own line.
+
+      - >
+        NO `GITHUB_REPOSITORY` MEANS NO TICKETING, NOT A BROKEN RUN.
+        `service_from_env()` returns None rather than raising, because a
+        pipeline run on somebody's laptop with no ticketing configured
+        is the ordinary state of this repository for most of its life.
+        Criterion 13 asks for the reconciler to be INVOKED after every
+        QA run; it does not ask every deployment to have a ticket
+        service.
+
+      - >
+        A HELD SUPPLY HAS NO SLOT AND SO HAS NO TICKET, and that is
+        worth recording because criterion 6 lists `held` among the
+        states to reflect. REQ-PIPE-059 refuses to choose between two
+        files for one dataset, so a held supply was never filed to a
+        period - there is no slot for a ticket to be about.
+        `slot_state.SlotState` can still carry the state, because an
+        operator route may well know which slot a person is holding it
+        against; what cannot happen is the reconciler DISCOVERING one.
+        They surface through REQ-PIPE-064's own aggregation instead,
+        which counts them together for the reason a ticket each would
+        fail at thirty datasets.
+
+      - >
+        TWO RECONCILERS RACING AGREE AFTERWARDS RATHER THAN BEING
+        PREVENTED. Criterion 2 says at most one ticket per slot "however
+        many reconcilers are running at the same moment", and neither of
+        two simultaneous passes can be stopped from finding nothing and
+        creating. So the rule is that they agree on WHICH is the ticket:
+        `find()` takes the LOWEST issue number, which is the older one,
+        which is the one anybody may already have commented on.
+
+        REJECTED: a lock. It would have to be held across a network
+        call to GitHub, which is the one place a lock cannot be relied
+        on to be released.
+
+      - >
+        THE SLOT KEY LIVES IN A LABEL, NOT THE TITLE. A title is
+        something a person edits, and a ticket that stops being findable
+        because somebody tidied its wording is a second ticket for the
+        same slot on the next pass - criterion 2's whole risk arriving
+        through the most ordinary act there is.
+
+      - >
         THE SERVICE IS A PROTOCOL OF FIVE METHODS, and the reconciler
         knows nothing else about ticketing. That is what lets the whole
         of criteria 2 to 22 be driven in a test without a network, and
@@ -15872,14 +15931,25 @@ requirements:
         `ticket_policy` - `needs-action` by default. 37 tests in
         tests/test_ticket_reconciler.py.
 
-        NOT DONE - THE SERVICE AND THE CALLERS. Criterion 19 (never
-        touch a ticket from before this scheme) belongs to the real
-        GitHub client, which does not exist: `ticket_sync.py` is
-        REQ-GHUB-027's per-DATASET scheme and shells out to `gh`, which
-        this container does not have. Criterion 1's "when a period
-        opens" and criterion 13's "after every QA run" are call sites.
-        Criteria 14, 15 and 16 are the operator routes, REQ-GHUB-082's
-        and REQ-PIPE-099's.
+        AND THEN THE SERVICE AND THE WIRING, the same night: criteria
+        13, 16, 19 and the remainder of 2.
+        `qa_tools/common/ticket_github.py` is a second ticket scheme
+        beside `ticket_sync.py` rather than a replacement - that one is
+        REQ-GHUB-027's per-DATASET ticket, this one is per SLOT - and
+        the two coexist because every read here is FENCED BY THIS
+        SCHEME'S OWN LABEL. That is criterion 19 in its enforceable
+        form: a query that can only ever SEE this scheme's tickets
+        cannot adopt, re-key, close or delete another one, however the
+        code around it changes. Both orchestrators call
+        `ticket_reconciler.after_runs()` AFTER promotion, which is
+        criterion 16. 21 tests in tests/test_ticket_github.py and 12
+        more in tests/test_ticket_reconciler.py.
+
+        NOT DONE - criterion 1's "when a period opens", which wants a
+        call site in `period_schema.open_period()` and is a small
+        change somebody should make with the rest of this in front of
+        them; and criteria 14 and 15, the operator routes, which are
+        REQ-GHUB-082's and REQ-PIPE-099's.
 
       - >
         THE ORDER OF THE STATE RULES IS THE DESIGN, and it is worth

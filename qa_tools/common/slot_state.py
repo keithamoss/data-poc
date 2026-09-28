@@ -202,3 +202,52 @@ def _reason(conn, dataset_id: str, slot: str) -> str:
         "ORDER BY effective_at DESC, id DESC LIMIT 1",
         [dataset_id, slot, slot]).fetchall()
     return (rows[0][0] or "") if rows else ""
+
+
+def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
+               now: datetime | None = None) -> list[SlotState]:
+    """Every slot this collection is responsible for, and where each has
+    got to (REQ-PIPE-083 criterion 13).
+
+    EVERY SLOT, NOT ONLY THE ONES A RUN TOUCHED. The criterion says so,
+    and the reason is the state that nothing touches: a slot nobody
+    delivered for is exactly the one that needs a ticket, and a pass
+    scoped to what just arrived can never see it. It is also what makes
+    the three triggers give one answer (criterion 22) - a pass that
+    looked at what a run touched would depend on which run called it.
+
+    BOUNDED AT TODAY. A daily calendar generates periods without end, so
+    there is no "every slot" without a bound - and a slot in the future
+    cannot need anything, because nothing is late until it is due.
+
+    A HELD SUPPLY HAS NO SLOT AND SO HAS NO TICKET, which is worth
+    saying rather than leaving as an omission: REQ-PIPE-059 refuses to
+    choose between two files for one dataset, so a held supply was never
+    filed to a period, so there is no slot for a ticket to be about.
+    They surface through REQ-PIPE-064's own aggregation instead, which
+    counts them together for the reason a ticket each would fail at
+    thirty datasets.
+    """
+    from qa_tools.common import asset_time, filing, hierarchy
+    from qa_tools.common import slots as slots_mod
+
+    now = now or asset_time.now()
+    out: list[SlotState] = []
+    for entry in hierarchy.datasets_in_collection(collection_id):
+        try:
+            dataset_slots = slots_mod.slots_for_dataset(entry.dataset_id,
+                                                         until=now.date())
+        except (ValueError, KeyError, FileNotFoundError) as exc:
+            # The blast-radius rule this batch applies everywhere: one
+            # dataset whose schedule cannot be built must not cost the
+            # other twenty-nine their tickets.
+            print(f"note: {entry.dataset_id} has no slots to reconcile "
+                  f"({type(exc).__name__}: {exc}).")
+            continue
+        filings = {f["slot"]: f for f in filing.filings_of(entry.dataset_id)
+                    if f.get("slot")}
+        ever = bool(filing.filings_of(entry.dataset_id))
+        for slot in dataset_slots:
+            out.append(state_of(conn, dataset_id=entry.dataset_id, slot=slot,
+                                 now=now, filings=filings, ever_delivered=ever))
+    return out

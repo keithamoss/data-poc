@@ -240,3 +240,83 @@ def _title(state: slot_state.SlotState) -> str:
 
     return (f"{state.dataset_id}: supply for "
             f"{display_time.format_period(state.period)}")
+
+
+def report(outcome: Outcome) -> None:
+    """Say what the pass did, in the terminal, without flooding it.
+
+    IDENTICAL FAILURES COLLAPSE TO ONE LINE, and that is not cosmetic.
+    The commonest failure by far is the whole service being unreachable,
+    which fails every slot with the same sentence - thirty-five copies
+    of it would bury the one line that matters and train somebody to
+    scroll past the end of a pipeline run. A failure that is genuinely
+    per-slot still gets its own line, because then the slot is the
+    information.
+    """
+    if outcome.opened:
+        print(f"tickets: opened {len(outcome.opened)} "
+              f"({', '.join(sorted(outcome.opened)[:3])}"
+              f"{', ...' if len(outcome.opened) > 3 else ''})")
+    if outcome.reopened:
+        print(f"tickets: reopened {len(outcome.reopened)} "
+              f"({', '.join(sorted(outcome.reopened))})")
+    if outcome.updated:
+        print(f"tickets: updated {len(outcome.updated)}")
+    if not outcome.failed:
+        return
+
+    by_message: dict[str, list[str]] = {}
+    for key, message in outcome.failed.items():
+        by_message.setdefault(message, []).append(key)
+    for message, keys in sorted(by_message.items()):
+        if len(keys) == 1:
+            print(f"tickets: {keys[0]} could not be reconciled - {message}")
+        else:
+            print(f"tickets: {len(keys)} slot(s) could not be reconciled - "
+                  f"{message}")
+
+
+def service_from_env():
+    """The real ticketing service this deployment talks to, or None.
+
+    None RATHER THAN A RAISE where `GITHUB_REPOSITORY` is not set,
+    because a pipeline run on somebody's laptop is not a broken run - it
+    is a run with no ticketing configured, which is the ordinary state
+    of this repository for most of its life. Criterion 13 asks for the
+    reconciler to be INVOKED after every QA run; it does not ask for
+    every deployment to have a ticket service.
+    """
+    import os
+
+    from qa_tools.common.ticket_github import GitHubTickets
+
+    slug = os.environ.get("GITHUB_REPOSITORY") or ""
+    if "/" not in slug:
+        return None
+    owner, repo = slug.split("/", 1)
+    return GitHubTickets(owner, repo)
+
+
+def after_runs(collection_id: str, *, conn=None) -> Outcome:
+    """Reconcile every slot this collection is responsible for.
+
+    THE ONE ENTRY POINT the orchestrators, a schedule and an operator
+    command all use, which is criteria 13, 18 and 22 in one function: a
+    narrowed pass is this same pass over fewer slots, and the answer
+    does not depend on who called.
+
+    AFTER THE CHANGE IS DURABLY RECORDED (criterion 16), which is the
+    caller's responsibility and is why this is called after promotion
+    rather than beside it. A ticket that says something the decision log
+    does not is worse than a ticket that is a minute behind.
+    """
+    from qa_tools.common import slot_state, supply_db
+
+    service = service_from_env()
+    if service is None:
+        return Outcome()
+    if conn is None:
+        with supply_db.connect(read_only=True,
+                                label="mothman:reconcile-tickets") as opened:
+            return after_runs(collection_id, conn=opened)
+    return reconcile(service, slot_state.states_for(conn, collection_id))
