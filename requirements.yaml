@@ -18647,7 +18647,10 @@ requirements:
       - >
         THE SYSTEM SHALL create a period's schema either on the first
         promotion into it or on an explicit instruction to open it,
-        and SHALL NOT require an arrival before a period can exist.
+        and SHALL NOT require an arrival before a period can exist -
+        using the SAME creation mechanism for both, so that a period
+        opened by instruction is indistinguishable from one created by
+        a first promotion.
       - >
         THE SYSTEM SHALL determine non-participation from the schedule
         alone, and SHALL NOT infer it from the absence of a supply.
@@ -18663,8 +18666,14 @@ requirements:
         decision log with the rule as the actor.
       - >
         IF a dataset does not participate and has no earlier promoted
-        supply to stand on, THEN THE SYSTEM SHALL create no view,
-        SHALL say why, and SHALL NOT fabricate an empty table.
+        supply to stand on, THEN THE SYSTEM SHALL create no view and
+        SHALL NOT fabricate an empty table.
+      - >
+        WHEN inheritance is refused for want of an earlier supply, THE
+        SYSTEM SHALL record that refusal in the decision log with the
+        rule as the actor, and SHALL surface it at WARNING prominence
+        where a person will see it - so that an attempt which could not
+        complete is visible rather than silent.
       - >
         THE SYSTEM SHALL attribute an inherited period's check results
         to the run that earned them, and SHALL NOT re-run QA to
@@ -18687,12 +18696,25 @@ requirements:
         notice", which is the continuous sweep this design explicitly
         rejects.
       - >
-        NOTHING DOWNSTREAM CONSUMES THE CONFIG THIS RESTS ON TODAY.
-        `delivery_months:` already subsets a calendar (cp-case-workers
-        is [February, August]) and not_expected_periods() already
-        requires a reason per such period, and the only reader of
-        either in the whole repository is one test assertion. So this
-        is a real gap with real evidence rather than a refinement.
+        THIS RESTS ON CONFIG THAT IS BEING RESHAPED, and the shape it
+        lands on is the one to build against: a dataset declares
+        `participates: {slots: [...], reason: ...}` in the asset's own
+        calendar file, plus a `not_expected:` list for one-off
+        exceptions carrying their own per-period reason. Criterion 6's
+        "the reason the schedule states" resolves to the per-period
+        reason where one exists and to the standing participation
+        reason otherwise - because a twice-yearly dataset's reason is a
+        property of the AGREEMENT, true of every skipped period, while
+        "no Q1 file, ERP migration" is an exception to it.
+
+        WHAT IS THERE TODAY IS THE EVIDENCE THAT THIS IS A REAL GAP
+        rather than a refinement: `delivery_months: [February, August]`
+        is really on cp-case-workers and nothing but one test assertion
+        reads it, while not_expected_periods() is fully implemented WITH
+        its mandatory reason and appears in no contract at all. Somebody
+        has already written down that Case Workers skips two quarters,
+        the system does nothing with it, and the half that carries a
+        reason has never been used.
       - >
         SCALE: a period's birth creates up to one object and one log
         entry per dataset - up to 30 on the quarterly asset, and
@@ -18714,16 +18736,43 @@ requirements:
         11's refusal load-bearing and REQ-PIPE-099's un-inherit
         necessary.
     dependencies: [REQ-PIPE-087, REQ-PIPE-084, REQ-PIPE-049]
-    open_questions:
-      - >
-        WHETHER AN INHERITED PERIOD SHOWS THE EARLIER RUN'S RESULTS
-        ATTRIBUTED, or shows no results at all with a plain statement
-        that nothing was owed. Criterion 10 assumes the first,
-        following REQ-PIPE-084's own decision that a substituted
-        period references the original run's results rather than
-        re-running. Relayed as question set E, because it is the fork
-        most likely to change REQ-DASH-100.
+    open_questions: []
     decisions:
+      - >
+        THE OPEN QUESTION IS CLOSED, AND THE ANSWER IS NEITHER OPTION
+        THAT WAS DRAFTED (Keith, 2026-09-28). It asked whether an
+        inherited period shows the earlier run's results attributed, or
+        no results with a statement that nothing was owed. His answer:
+        the dataset appears with its ordinary card and its real status,
+        carrying an `inherited` badge - and drilling in does NOT render
+        those checks as though they belonged to the period being
+        viewed. It takes the reader to the period that earned them,
+        made plain. So criterion 11 stands unchanged - results are
+        attributed, never re-run - and what his answer adds is a
+        DISPLAY rule, which lands on REQ-DASH-100 rather than here.
+      - >
+        THE REASON HAS SOMEWHERE TO LIVE ONLY AFTER THE CALENDAR MOVE
+        (Keith, 2026-09-28, asking where in configuration it is stored
+        - the answer today being nowhere). `delivery_months:` carries
+        no reason field and `not_expected:` is in no contract, so
+        criterion 6 currently has nothing to read. The calendar
+        requirement drafted next gives it two homes, standing and
+        one-off, and non-functional 2 records which resolves first.
+      - >
+        BOTH TRIGGERS USE ONE MECHANISM (criterion 4, Keith,
+        2026-09-28). A period opened by a person from the CLI or TUI
+        and one created by a first promotion must be indistinguishable
+        afterwards - it is a different way to ask, never a different
+        thing done. Stated because "open a period" is the path a human
+        invokes, which is exactly the one that drifts.
+      - >
+        A REFUSED INHERITANCE IS A WARNING, NOT A SILENCE (criterion
+        10, Keith, 2026-09-28). The original criterion said "SHALL say
+        why", too vague to build: it is now a decision-log entry with
+        the rule as actor, surfaced at warning prominence. His
+        reasoning is that a person should be able to see the system
+        TRIED something and could not - which a missing view on its own
+        never tells anybody.
       - >
         CREATION IS AUTOMATIC ONLY AT THE MOMENT A PERIOD SCHEMA IS
         BORN, and only where the schedule says the dataset does not
@@ -18986,6 +19035,21 @@ requirements:
         automatic structural state and a person's decision in the same
         terms.
       - >
+        THE SYSTEM SHALL NOT present an inherited period's check results
+        as belonging to the period being viewed, and SHALL take a reader
+        drilling into them to the period that earned them.
+      - >
+        WHEN a reader arrives at a period by drilling through an
+        inherited view, THE SYSTEM SHALL make plain that they have left
+        the period they were looking at and SHALL offer a way back to
+        it - and SHALL NOT show that framing to a reader who navigated
+        to the same period directly.
+      - >
+        THE SYSTEM SHALL carry that arrival context in the URL, so a
+        refreshed or shared link presents the same framing, and SHALL
+        drop it from the URL on the reader's next navigation - it
+        describes one arrival, not a state the page is in.
+      - >
         THE SYSTEM SHALL render with zero console errors in a real
         browser.
     non_functional_requirements:
@@ -19011,6 +19075,29 @@ requirements:
         question set E settles on REQ-PIPE-098, and it changes what
         this row actually shows.
     decisions:
+      - >
+        DRILLING THROUGH AN INHERITED VIEW LEAVES THE PERIOD, AND THE
+        PAGE HAS TO SAY SO (Keith, 2026-09-28, answering REQ-PIPE-098's
+        open question). An inherited period shows the dataset's ordinary
+        card and real status with an `inherited` badge; its checks are
+        NOT rendered as this period's. Drilling in goes to the period
+        that earned them, framed as a place the reader has travelled to.
+      - >
+        THE FRAMING IS ABOUT THE ARRIVAL, NOT THE PERIOD, which is what
+        makes it real work rather than a banner. Browse to 2026-Q1
+        directly and it is simply 2026-Q1. So the route carries where
+        the reader came from - a URL parameter, since ephemeral
+        in-memory state would lose the framing on a refresh or a shared
+        link and leave the page quietly misleading. It is dropped on the
+        next navigation: it describes one arrival, not a mode.
+      - >
+        REJECTED opening the earlier period in a NEW TAB, which Keith
+        raised and then accepted the argument against. It breaks
+        back-navigation, the affordance people actually reach for inside
+        an SPA, and docs/hci-ux-psychology.md treats a violated
+        expectation as noise rather than signal. A full-width banner
+        plus a prominent way back does the same job and leaves the
+        browser behaving as people expect.
       - >
         THE WORD `inherited` WAS DELIBERATELY RESERVED FOR THIS and
         not spent on REQ-PIPE-084/REQ-DASH-085 (Keith, 2026-09-26). He
