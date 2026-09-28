@@ -202,7 +202,7 @@ requirement to `built`.
 
 **WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
 fresh session can pick up from a file rather than from the commit log.**
-Last updated 06:20 Perth, 45 commits in.
+Last updated 06:25 Perth, 46 commits in.
 
 **BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
 `REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
@@ -218,12 +218,15 @@ results are on the page, drills through to the period that earned them,
 frames the arrival, and carries that framing in the URL for exactly one
 page).
 
+**`built` WITH CRITERIA DEFERRED, each naming its owner in
+`unmet_criteria`:** **`REQ-PIPE-099`** (inherit and un-inherit as
+accountable operator decisions, and the un-inheritance that frees a
+blocked withdrawal - criteria 7, 8 and 11 wait on `REQ-GHUB-082`'s
+routes and `REQ-PIPE-079`'s re-run).
+
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
 `REQ-PIPE-079` (decision layer done, wiring not), `REQ-PIPE-105`
-(criteria 7 and 8 done), `REQ-PIPE-099` (the inherit and un-inherit
-OPERATIONS are built and accountable; what is unbuilt is the operator
-ROUTES that reach them, which are REQ-GHUB-082's, and the cross-table
-re-evaluation, which needs REQ-PIPE-079's unbuilt re-run),
+(criteria 7 and 8 done),
 `REQ-PIPE-083` (everything but criteria 14 and 15, the OPERATOR ROUTES -
 the slot state, the reconciler, a real GitHub ticket service fenced by
 its own label, and both orchestrators calling it after promotion. `gh`
@@ -276,6 +279,37 @@ file a fresh session reads:**
    seventeen of them should aggregate the way held supplies do is a
    judgement about who reads the page. Logged in
    `plans/road-testing.md`.
+
+**WHAT IS LEFT, AND IT IS ONE BIG THING.** `REQ-GHUB-082` - "an
+operator records a filing decision from GitHub or from the terminal,
+and both write the same entry" - is signed, has no open questions, and
+carries THIRTY-FOUR criteria. It is the blocker on `REQ-PIPE-083`'s
+last two, on `REQ-PIPE-099`'s criteria 7 and 8, and on substitution
+ever having a real instance in this deployment. It was deliberately not
+started at 06:20 Perth rather than started and left half-done: it
+touches the TUI, a GitHub comment parser, an allowlist, refusals on two
+routes and a rename of the existing "Promote" wording, and the honest
+shape is three commits rather than one.
+
+The phasing it wants, so a fresh session does not have to re-derive it:
+1. **The one implementation** (criterion 13), which every other
+   criterion hangs off: the eight operations behind one call, the
+   actor resolved against `contract/people.yaml` and refused if absent
+   (criteria 6, 14, 27), a reason required (10), judgement at append
+   time from the one place (20, 21, 24), a no-op reported as a no-op
+   rather than a refusal (26), and `ticket_reconciler` called after
+   (8). Criterion 25 is already done - see `decision_log.UNBLOCKED_BY`.
+   Criterion 29 needs `placeholder: true` on the three fictional
+   people in `contract/people.yaml` and a gate that a real person has
+   a `github:`.
+2. **The TUI adapter** (2, 12, 15, 16, 17, 18, 19, 28, 31).
+3. **The GitHub adapter** (1, 4, 5, 7, 23, 30).
+
+ONE THING TO CHECK BEFORE BUILDING criterion 1's `refile`: it is the
+only one of the eight with no effect written yet. `filing.refile()`
+moves the FILING RECORD and writes no decision-log entry, and what
+should happen to a PROMOTED supply's tables when it is re-filed is
+`REQ-PIPE-079`'s wiring rather than something to invent here.
 
 **THREE FEATURES NOW EXIST THAT NOTHING IN THIS DEPLOYMENT EXERCISES**,
 and that is the single biggest thing to fix next. Inheritance never
