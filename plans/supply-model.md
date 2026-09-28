@@ -3414,6 +3414,60 @@ need a person, so a human waiting on it is the correct output of the
 gate rather than a defect in it. The error was treating "something is
 waiting for a human" as a failure mode when it is the purpose.
 
+**TIME-BASED JUDGEMENTS BELONG TO THE PERIOD SCHEMA, AND ARE MADE ON
+PROMOTION TIME (Keith, 2026-09-28).** His own words: "there should
+never be an arrival-time-based decision made against anything in
+staging - that only applies in the period schema, and when it's in a
+period schema it should be based on promotion time, not arrival time."
+
+Settled in the same breath, and consistent with everything above:
+green and amber auto-promote, an auto-promotion never enters a FILLED
+slot, red never auto-promotes - and a person may promote, demote,
+reject or re-file a supply of ANY status.
+
+WHAT THIS GENERALISES. The 059-wins answer earlier the same day
+refused to let "newest by receipt instant" pick between two staged
+versions of one table. That was decided case by case; this is the
+principle underneath it. Arrival time is a fact ABOUT a supply, not a
+basis for choosing between supplies, and staging is exactly where
+nothing has been chosen yet.
+
+WHY IT IS ALSO A FIX RATHER THAN ONLY A CONSTRAINT. Today a supply can
+arrive on time, be red, never be promoted, and still leave the slot
+reading as met on time. `REQ-PIPE-075` criterion 6 already says a slot
+is filled ONLY by a recorded promotion - so classifying punctuality on
+arrival contradicts a rule this same sprint states. Promotion time is
+simply when the slot was actually filled, and "late" then means the
+honest thing: when the data became available.
+
+WHAT IT COSTS, and it has to be paid rather than absorbed. Promotion
+time conflates two accountabilities - the supplier's punctuality and
+our own processing latency. A supplier who delivered at 13:55 against
+a 14:00 deadline, whose red supply a person accepts three days later,
+is not late; the slot is. So the receipt instant stays recorded and
+stays SHOWN, labelled as the supplier's fact, beside the slot's own
+verdict. Losing that distinction would make an agency look late for
+our delay, which at ~30 datasets across agencies is not a cosmetic
+problem.
+
+WHAT IT CHANGES IN WORK ALREADY DONE. `REQ-PIPE-067` is built and
+recomputes an arrival verdict against the slot a supply is FILED to -
+and filing happens in staging, before QA. `REQ-PIPE-080` criterion 1
+records the classification against the filed slot on the same basis.
+Both move to promotion. Criterion 6 of 080 already half-anticipates
+it ("a supply with no filing presents as unfiled rather than as a
+punctuality verdict"); this extends that from unfiled to unpromoted.
+
+TWO THINGS STILL OPEN, both put to Keith 2026-09-28:
+- ASSIGNMENT is arrival-time-based and happens in staging, which the
+  rule forbids as literally stated. `REQ-PIPE-075` decision 3 calls
+  assignment a DERIVATION with no human in it, and QA must run
+  against a filed period (`REQ-PIPE-079`), so moving it to promotion
+  would leave QA nothing to check against. Read as: assignment keeps
+  using arrival time; the VERDICT does not. Needs confirming.
+- Whether the arrival instant is shown beside the verdict, as the
+  paragraph above argues it must be.
+
 **Operators drive promotion PRIMARILY FROM GITHUB, with the TUI as a
 second route** (Keith, 2026-09-26, correcting this paragraph's own
 earlier framing). It read as though the TUI were the main way an
