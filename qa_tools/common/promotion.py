@@ -340,3 +340,45 @@ def checks_reading(table: str, *, reads: dict[str, list[str]]) -> set[str]:
     answers this question the same way.
     """
     return {check_id for check_id, tables in reads.items() if table in tables}
+
+
+def newest_promoted(conn: supply_db.SupplyConnection,
+                    dataset_id: str, period: str) -> str | None:
+    """The supply most recently PROMOTED into this period, or None.
+
+    REQ-PIPE-105 criterion 7, and it deliberately disagrees with
+    period_schema.newest(), which orders by the ARRIVAL key parsed out
+    of a physical table name. That is the right answer to a different
+    question.
+
+    ARRIVAL ORDER AND PROMOTION ORDER COME APART the moment a person is
+    involved. A supply that arrived on Tuesday and was held for a
+    decision until Friday is NEWER, as the period sees it, than one that
+    arrived on Wednesday and promoted itself immediately - because the
+    period holds what was decided into it, in the order it was decided.
+    Ordering by arrival would silently prefer the Wednesday file, a
+    version nobody chose, over the one somebody looked at and promoted.
+
+    ONLY PROMOTED SUPPLIES ARE CANDIDATES. A staged one has not been
+    chosen by anybody, and criteria 6 and 8 say an ambiguous staged
+    table is ABSENT rather than a contender.
+
+    Ordered by (effective_at, id) for the same reason
+    decision_log.promoted_into does: two decisions can share an instant,
+    and `id` is the only total order there is.
+    """
+    rows = conn.execute(
+        f"SELECT action, supply FROM {decision_log.TABLE} "
+        "WHERE dataset_id = ? AND (to_slot = ? OR from_slot = ?) "
+        "ORDER BY effective_at DESC, id DESC LIMIT 1",
+        [dataset_id, period, period]).fetchall()
+    if not rows:
+        return None
+    action, supply = rows[0]
+    # The last decision touching this slot decides what it holds - a
+    # promote or a re-file INTO it fills it, anything else empties it.
+    # Reusing that rule rather than restating it is why this asks the
+    # log rather than the catalogue.
+    if action in (decision_log.PROMOTE, decision_log.REFILE):
+        return supply
+    return None
