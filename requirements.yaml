@@ -15410,6 +15410,15 @@ requirements:
         THE SYSTEM SHALL point a substitution only at a physical
         PROMOTED table, and SHALL NEVER point it at a period that is
         itself substituted or inherited.
+      - >
+        THE SYSTEM SHALL offer substitute and de-substitute outside the
+        queue of supplies awaiting a decision, which is shaped for
+        supplies and has no entry for a period with no view.
+      - >
+        IF a period is one the schedule says the dataset does NOT
+        participate in, THEN THE SYSTEM SHALL refuse to substitute it,
+        and SHALL say that nothing is owed for that period - which is
+        what INHERITANCE is for.
     non_functional_requirements:
       - >
         This is for DOWNSTREAM CONSUMERS rather than for reporting
@@ -15451,6 +15460,17 @@ requirements:
         February is real work for one person on one afternoon.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-035]
     decisions:
+      - >
+        TWO CRITERIA BACKPORTED FROM REQ-PIPE-099 by the mirror-check
+        Keith asked for, 2026-09-28. Substitute and de-substitute sit
+        OUTSIDE the awaiting-decision queue, for the reason
+        REQ-PIPE-099 non-functional 1 already gives: that queue is
+        shaped for supplies awaiting a decision and has no entry for a
+        period with no view. And substitution is REFUSED for a period
+        the dataset does NOT participate in - the converse of
+        REQ-PIPE-099 criterion 9, and without it the two dispositions
+        overlap in exactly the place REQ-PIPE-098 criterion 12 says
+        they never should.
       - >
         A SUBSTITUTION STANDS ON ANY PROMOTED SUPPLY, NOT ONLY A GREEN
         ONE (Keith, 2026-09-28, criteria 1 and 7, reversing this
@@ -15768,6 +15788,9 @@ requirements:
         vocabulary, and SHALL NOT introduce a new value into the status
         vocabulary.
       - >
+        THE SYSTEM SHALL use the word substituted for that qualifier,
+        distinctly from inherited.
+      - >
         THE SYSTEM SHALL state, on drill-down, which period the data
         actually came from, who decided it, and the reason they gave -
         DISPLAYING that reason as written rather than summarising it or
@@ -15838,6 +15861,32 @@ requirements:
         touching the template.
     dependencies: [REQ-PIPE-084, REQ-DASH-041, REQ-DASH-070]
     decisions:
+      - >
+        A SUBSTITUTED PERIOD STILL SHOWS AWAITING, OVERDUE OR MISSING
+        (Keith, 2026-09-28), REJECTING the symmetry with REQ-DASH-100
+        criterion 5 that a mirror-check proposed. His reasoning
+        inverts it: a substitution is a REACTION to a supply being
+        overdue or missing, so the period is still overdue - somebody
+        decided what to show in the meantime, which does not make the
+        supply arrive. That is particular to substitutions and is
+        exactly what separates them from inheritance, where nothing was
+        owed and there is nothing to be late.
+      - >
+        THE WORD `substituted` IS NOW A CRITERION, not only a decision.
+        REQ-DASH-100 criterion 2 named `inherited` while this
+        requirement left its own word to decision 4 - so one half of a
+        deliberately-paired vocabulary was a requirement and the other
+        was a note. Found by the mirror-check Keith asked for,
+        2026-09-28.
+      - >
+        FROM THE MIRROR-CHECK (Keith, 2026-09-28): substitute and
+        de-substitute sit OUTSIDE the awaiting-decision queue, which
+        REQ-PIPE-099 criterion 7 had said for inherit and un-inherit
+        and this requirement's action half had not. And substitution is
+        REFUSED for a period the dataset does not participate in - the
+        converse of REQ-PIPE-099 criterion 9, without which the two
+        dispositions overlap exactly where REQ-PIPE-098 criterion 12
+        says they never should. Both land on REQ-PIPE-084.
       - >
         THE TOOLTIP NAMES THE ACTOR TOO (criterion 7, Keith,
         2026-09-28). "Where did this come from" and "who decided it"
@@ -18957,6 +19006,17 @@ requirements:
         THE SYSTEM SHALL point an inherited view only at a physical
         PROMOTED table, and SHALL NEVER point it at a period that is
         itself inherited or substituted.
+      - >
+        THE SYSTEM SHALL implement that inheritance as a DATABASE VIEW
+        in the period's own schema, and SHALL NOT copy the data.
+      - >
+        THE SYSTEM SHALL make the inherited view visible to anything
+        querying the period by the table's logical name.
+      - >
+        IF a supply for that dataset arrives into a period that has
+        been inherited, THEN THE SYSTEM SHALL hold it for a person,
+        SHALL NOT replace the view automatically, and SHALL NOT discard
+        it.
     non_functional_requirements:
       - >
         CORRECTNESS DEPENDS ON THE RECORDED-BIRTH EVENT, and today
@@ -19010,6 +19070,19 @@ requirements:
     dependencies: [REQ-PIPE-087, REQ-PIPE-084, REQ-PIPE-049]
     open_questions: []
     decisions:
+      - >
+        THREE CRITERIA BACKPORTED FROM REQ-PIPE-084 by the mirror-check
+        Keith asked for, 2026-09-28, each of which substitution stated
+        and inheritance only implied. The view SHALL NOT COPY the data,
+        which is the whole point of the mechanism. It is VISIBLE TO
+        ANYTHING QUERYING BY THE LOGICAL NAME, which is the
+        downstream-consumer promise this requirement's story makes and
+        had no criterion behind. And a supply ARRIVING INTO AN
+        INHERITED PERIOD is held for a person rather than silently
+        replacing the view - REQ-PIPE-099's decisions had recorded that
+        as falling out of REQ-PIPE-075 criterion 4, which is true and
+        left one disposition explicit while the other relied on a
+        reader knowing.
       - >
         CRITERION 1 NOW NAMES THE ACT (Keith, 2026-09-28, after this
         requirement was signed). It defined the mechanism - create a
