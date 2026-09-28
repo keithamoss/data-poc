@@ -15945,10 +15945,23 @@ requirements:
         criterion 16. 21 tests in tests/test_ticket_github.py and 12
         more in tests/test_ticket_reconciler.py.
 
-        NOT DONE - criterion 1's "when a period opens", which wants a
-        call site in `period_schema.open_period()` and is a small
-        change somebody should make with the rest of this in front of
-        them; and criteria 14 and 15, the operator routes, which are
+        CRITERION 1 IS MET FOR THE PATH THAT EXISTS, and the other path
+        has nothing to call it from. A period opens either on a first
+        promotion or on an explicit instruction (REQ-PIPE-098 criterion
+        4). On the first, the run's own post-promotion pass reconciles
+        EVERY slot the collection has, including the new period's, so
+        the ticket exists by the end of that run. On the second there is
+        nothing to hook: `mothman` has no command that opens a period.
+
+        REJECTED: calling the reconciler from
+        `period_schema.open_period()`. It runs BEFORE the promotion's
+        transaction - that is deliberate, because inheritance writes
+        decisions of its own and a nested transaction is the kind of
+        thing that works until it does not - so a ticket written there
+        would be criterion 16's forbidden case exactly: a ticket saying
+        something the decision log does not yet.
+
+        NOT DONE - criteria 14 and 15, the operator routes, which are
         REQ-GHUB-082's and REQ-PIPE-099's.
 
       - >
