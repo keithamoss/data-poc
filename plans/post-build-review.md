@@ -3718,3 +3718,54 @@ twice. It deliberately did not re-find the `TypeError`.
     one. "Fails" is the answer that rule anticipates and is the SAFE
     one - somebody sees it. "Skips" is the dangerous one, because the
     suite stays green and the coverage quietly leaves.
+
+63. **[done, 2026-09-28]** **[Pipeline & publishing, Dashboard UI]**
+    **Three defects that had been unreachable, all reached on the same
+    night by the same change.** Not found by a critic - found by
+    promotion starting to work, which turned on a code path nothing had
+    ever executed.
+
+    `outstanding._from_closed_slots()` reports REQ-PIPE-063's slot
+    closed by monotonic filling. It returns early for a dataset with no
+    FILLED slots, and only a promotion fills one, so while promotion did
+    not exist the rest of the function was dead. Its own docstring said
+    so - "structurally empty today". Behind that guard sat two real
+    faults:
+
+    - it asked `slots_for_dataset(dataset_id)` with no `until`, which a
+      DAILY calendar refuses because it generates periods without end.
+      This is what actually broke: 153 errors in
+      `tests/test_dashboard_e2e.py`, every one of them a fixture error
+      naming a subprocess rather than a calendar.
+    - `closed_by_monotonic_filling()` returns a set of slot NAMES and
+      the loop read `slot.name` off each. That one would not have shown
+      as a crash in the survey - it needed a slot to actually be closed,
+      which is one step further in again.
+
+    **The third was visible rather than fatal, and is the one worth
+    remembering.** With the function working, the Birth Registrations
+    dataset page rendered **seventeen raw ISO dates** - "Birth
+    Registrations has no supply for 2026-08-27" - which is exactly what
+    REQ-DASH-071's display standard exists to prevent. Nothing was wrong
+    with that requirement's work: a period NAME is an identifier, a
+    DAILY calendar names its periods by the day, and no period name had
+    ever reached a reader as prose before. Fixed with
+    `display_time.format_period()` and `format_periods_in()`, the second
+    because a filing's `ambiguity` sentence is composed once and STORED,
+    so formatting at composition time would leave every earlier filing
+    showing raw dates forever.
+
+    Verified in a real browser against the rebuilt dashboard: 37 raw
+    dates before, zero after. All three carry failing-first tests
+    (`tests/test_outstanding.py`'s own
+    `TestADatasetOnAnEndlessCalendarDoesNotTakeTheSurveyDown`, and four
+    in `tests/test_display_time.py`), confirmed failing against the
+    unfixed module by reverting just that file.
+
+    **The standing lesson, and it is not "test more".** A guard that
+    makes a code path unreachable also makes it untested, and the path
+    runs for the first time on the day the guard stops holding - which
+    is the day somebody is shipping the feature that removes the guard,
+    with the least attention to spare. Worth asking, of any "this is
+    structurally empty today" comment: what runs the first time it is
+    not?

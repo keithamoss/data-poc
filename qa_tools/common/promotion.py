@@ -110,6 +110,12 @@ def filled_slots(conn: supply_db.SupplyConnection, dataset_id: str) -> frozenset
     Each slot is resolved through decision_log.promoted_into(), so a
     slot later emptied by a reject, a demote or a re-file OUT stops
     being filled without this having to know those rules itself.
+
+    AND SO A SUBSTITUTED SLOT COUNTS TOO (REQ-PIPE-084 criterion 4),
+    which arrived later and needed no change here - that is the
+    delegation paying for itself. The period answers, so nothing should
+    treat it as owed, and an arrival for it is a supply landing on a
+    filled slot rather than the one that was missing.
     """
     rows = conn.execute(
         f"SELECT DISTINCT to_slot FROM {decision_log.TABLE} "

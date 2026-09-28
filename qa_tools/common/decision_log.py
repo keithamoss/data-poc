@@ -68,7 +68,26 @@ PROMOTE = "promote"
 REJECT = "reject"
 DEMOTE = "demote"
 REFILE = "refile"
-ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE)
+
+#: The two SUBSTITUTION decisions (REQ-PIPE-084). They are filing
+#: decisions like the four above and live in the same log, because the
+#: question they answer is the same one - what does this period resolve
+#: to, and who said so - and a second log would be a second answer.
+#:
+#: WHAT MAKES THEM DIFFERENT IN SHAPE: a substitution acts on a period
+#: rather than on a supply's position. `to_slot` is the period being
+#: substituted, `supply` is the PROMOTED physical table it will resolve
+#: to, and `stands_on` is the period that table lives in. A
+#: de-substitution names only `from_slot`, the period whose indirection
+#: is being removed, which is what leaves it unfilled.
+SUBSTITUTE = "substitute"
+DE_SUBSTITUTE = "de-substitute"
+
+ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE)
+
+#: The decisions that move a supply, and so are the ones criterion 11
+#: refuses while a later period stands on it.
+MOVES_A_SUPPLY = (REJECT, DEMOTE, REFILE)
 
 #: What kind of thing decided (REQ-PIPE-074 criteria 3 and 4).
 PERSON = "person"
@@ -106,6 +125,10 @@ class Decision:
     from_slot: str | None = None
     to_slot: str | None = None
     reason: str | None = None
+    #: The period a SUBSTITUTION stands on (REQ-PIPE-084 criterion 5).
+    #: Never `from_slot`, which means the period a supply is moving out
+    #: of - see the column's own comment in qa_store.py.
+    stands_on: str | None = None
     #: Whether the supply's own QA verdict was red. Carried on the
     #: decision rather than looked up here, because this module may not
     #: go browsing: the caller has the verdict in hand, and REQ-PIPE-074
@@ -149,6 +172,18 @@ def _check_shape(decision: Decision) -> None:
         raise DecisionRefused(
             "a re-file names both slots: the one the supply is in and the one it "
             "is moving to. One entry, not a demotion followed by a promotion.")
+    if decision.action == SUBSTITUTE and not (decision.to_slot and decision.stands_on):
+        raise DecisionRefused(
+            "a substitution names the period being substituted and the period it "
+            "stands on. Without the second, nothing can say later what it "
+            "depended on.")
+    if decision.action == DE_SUBSTITUTE and not decision.from_slot:
+        raise DecisionRefused(
+            "a de-substitution names the period whose indirection is being "
+            "removed, as the slot it empties.")
+    if decision.action != SUBSTITUTE and decision.stands_on:
+        raise DecisionRefused(
+            f"only a substitution stands on a period; {decision.action!r} does not")
 
 
 def promoted_into(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
@@ -181,12 +216,59 @@ def promoted_into(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
         "ORDER BY effective_at DESC, id DESC LIMIT 1", params).fetchall()
     if not rows:
         return None
-    action, supply, from_slot, to_slot = rows[0]
-    if action in (PROMOTE,) and to_slot == slot:
-        return supply
-    if action == REFILE and to_slot == slot:
-        return supply
-    return None
+    action, supply, _from_slot, to_slot = rows[0]
+    if to_slot != slot:
+        return None
+    # A SUBSTITUTED SLOT COUNTS AS FILLED (REQ-PIPE-084 criterion 4).
+    # That is the point of it: the period answers, so nothing should
+    # treat it as owed, and the next arrival for it is a supply landing
+    # on a filled slot rather than the one that was missing.
+    return supply if action in (PROMOTE, REFILE, SUBSTITUTE) else None
+
+
+def latest_for_slot(conn: supply_db.SupplyConnection, dataset_id: str,
+                     slot: str) -> tuple[str, str, str | None] | None:
+    """`(action, supply, stands_on)` of the last decision on this slot.
+
+    promoted_into() answers "what does this period resolve to" and
+    deliberately flattens a substitution into the supply it stands on,
+    which is what every reader of a period wants. This answers the
+    narrower question a DECISION has to ask: HOW does it resolve, so
+    that substituting into a period that already holds a real promoted
+    supply can be refused with the right words (criterion 15).
+    """
+    rows = conn.execute(
+        f"SELECT action, supply, stands_on FROM {TABLE} "
+        "WHERE dataset_id = ? AND (to_slot = ? OR from_slot = ?) "
+        "ORDER BY effective_at DESC, id DESC LIMIT 1",
+        [dataset_id, slot, slot]).fetchall()
+    return (rows[0][0], rows[0][1], rows[0][2]) if rows else None
+
+
+def periods_standing_on(conn: supply_db.SupplyConnection, dataset_id: str,
+                         supply: str) -> tuple[str, ...]:
+    """Every period that CURRENTLY resolves to this supply by substitution.
+
+    REQ-PIPE-084 criterion 11's question, and the reason it is asked of
+    the log rather than of the catalogue: a view in a period schema
+    tells you a view exists, not whether somebody has since removed the
+    indirection and left the object behind.
+
+    CURRENTLY, not ever. A period that was substituted onto this supply
+    and has since been de-substituted does not block anything, and
+    counting it would make a supply permanently undeletable on the
+    strength of a decision somebody already reversed.
+    """
+    rows = conn.execute(
+        f"SELECT DISTINCT to_slot FROM {TABLE} "
+        "WHERE dataset_id = ? AND supply = ? AND action = ? AND to_slot IS NOT NULL",
+        [dataset_id, supply, SUBSTITUTE]).fetchall()
+    standing = []
+    for (slot,) in rows:
+        latest = latest_for_slot(conn, dataset_id, slot)
+        if latest and latest[0] == SUBSTITUTE and latest[1] == supply:
+            standing.append(slot)
+    return tuple(sorted(standing))
 
 
 def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
@@ -227,6 +309,25 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
             f"{needs_reason} needs a reason. Somebody will ask why a year from "
             "now, and this log is where they will look.")
 
+    # A SUPPLY SOMETHING STANDS ON DOES NOT MOVE (REQ-PIPE-084 criterion
+    # 11). Judged here rather than in substitution.py because it
+    # constrains decisions substitution.py does not own: the person
+    # demoting a supply is not thinking about a later period that was
+    # substituted onto it six months ago, and nothing else would stop
+    # them leaving that period resolving to a table no longer there.
+    #
+    # NAMES EVERY BLOCKING PERIOD, which the criterion asks for and is
+    # also the only useful answer: told about one, an operator
+    # de-substitutes it and hits the next.
+    if decision.action in MOVES_A_SUPPLY:
+        standing = periods_standing_on(conn, decision.dataset_id, decision.supply)
+        if standing:
+            raise DecisionRefused(
+                f"{decision.supply!r} cannot be {decision.action}d while "
+                f"{len(standing)} later period(s) stand on it: "
+                f"{', '.join(standing)}. De-substitute each of them first, or "
+                f"point it somewhere else.")
+
 
 def _lock(conn: supply_db.SupplyConnection, decision: Decision) -> None:
     """Serialise decisions competing for the same slot (criterion 4).
@@ -249,12 +350,13 @@ def _lock(conn: supply_db.SupplyConnection, decision: Decision) -> None:
 def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
     rows = conn.execute(
         f"INSERT INTO {TABLE} (agency_id, collection_id, dataset_id, action, supply, "
-        "from_slot, to_slot, actor, actor_kind, reason, effective_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "from_slot, to_slot, actor, actor_kind, reason, effective_at, stands_on) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         [decision.agency_id, decision.collection_id, decision.dataset_id,
          decision.action, decision.supply, decision.from_slot, decision.to_slot,
          decision.actor.strip(), decision.actor_kind,
-         (decision.reason or "").strip() or None, decision.effective_at]).fetchall()
+         (decision.reason or "").strip() or None, decision.effective_at,
+         decision.stands_on]).fetchall()
     return int(rows[0][0])
 
 

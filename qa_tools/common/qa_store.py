@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -462,7 +462,8 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".decision (
     collection_id  text NOT NULL,
     dataset_id     text NOT NULL,
     action         text NOT NULL
-        CHECK (action IN ('promote', 'reject', 'demote', 'refile')),
+        CHECK (action IN ('promote', 'reject', 'demote', 'refile',
+                          'substitute', 'de-substitute')),
     -- The supply acted on, by the identity the rest of the system uses
     -- for one: a physical staged table name. Not a run id - a run is a
     -- check over a supply, and the same supply can be checked twice.
@@ -500,8 +501,48 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".decision (
     -- does itself and are not for a decision taken earlier and recorded
     -- after the fact, which is the case an audit asks about.
     effective_at   timestamptz NOT NULL,
-    recorded_at    timestamptz NOT NULL DEFAULT now()
+    recorded_at    timestamptz NOT NULL DEFAULT now(),
+    -- THE PERIOD A SUBSTITUTION STANDS ON (REQ-PIPE-084 criterion 5),
+    -- and it is a column rather than a reuse of `from_slot` because the
+    -- two mean opposite things. `from_slot` is the period a supply is
+    -- moving OUT OF, and promoted_into() reads it that way - recording
+    -- the period stood on there would empty it, which is the one thing
+    -- a substitution must never do to the period it depends on.
+    --
+    -- IN THE LOG RATHER THAN DERIVED from which schema holds the table.
+    -- The criterion asks for the period pointed at to be RECORDED, and
+    -- this table's whole claim is that it answers from itself: a
+    -- reconstruction from the catalogue would go wrong the moment a
+    -- supply moved, which is exactly when somebody reads it.
+    stands_on      text,
+    CHECK (action <> 'substitute' OR (stands_on IS NOT NULL AND to_slot IS NOT NULL)),
+    CHECK (action <> 'de-substitute' OR from_slot IS NOT NULL)
 );
+
+-- See the load_outcome note above on why an added column needs this as
+-- well as its place in the CREATE TABLE.
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS stands_on text;
+
+-- AND THE CONSTRAINTS, which ADD COLUMN does not bring with it. Named
+-- explicitly so they can be replaced rather than accumulated: an
+-- anonymous CHECK gets a generated name and a second run adds a second
+-- one.
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_action_known;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
+    CHECK (action IN ('promote', 'reject', 'demote', 'refile',
+                      'substitute', 'de-substitute'));
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_substitute_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_substitute_shape
+    CHECK (action <> 'substitute' OR (stands_on IS NOT NULL AND to_slot IS NOT NULL));
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_de_substitute_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_de_substitute_shape
+    CHECK (action <> 'de-substitute' OR from_slot IS NOT NULL);
+
+--   criterion 11's question, asked of every demote, reject and re-file:
+--   does any period stand on this supply?
+CREATE INDEX IF NOT EXISTS decision_stands_on
+    ON "{SCHEMA}".decision (dataset_id, supply, effective_at)
+    WHERE stands_on IS NOT NULL;
 
 --   one dataset's decisions, in the order they took effect, at a cost
 --   that does not grow with any other dataset's history (criterion 11).

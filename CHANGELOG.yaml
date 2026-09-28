@@ -144,8 +144,23 @@ releases:
               The date box now stops at the earliest and latest periods it
               has. If an old link carries a date outside them, the page says
               so, names the range it covers and offers one click back.
+      - category: Fixed
+        items:
+          - headline: Daily periods are named in words again
+            components: ["Dashboard UI"]
+            description: >
+              Items about a daily feed's missing days named the day as a bare
+              code. They now name it in words, the way every other date on the
+              page is written.
       - category: New
         items:
+          - headline: A period nobody supplied can stand on an earlier one
+            components: ["Pipeline & publishing"]
+            description: >
+              When a supplier confirms a quarter's extract is not coming, you
+              can point that period at an earlier one you choose, with your
+              reason on the record. Queries answer instead of returning an
+              empty table.
           - headline: Good supplies now file themselves away
             components: ["Pipeline & publishing"]
             description: >

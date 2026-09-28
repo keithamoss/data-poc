@@ -973,7 +973,17 @@ Rough layout:
     CP check results), and **re-measured the same evening at 266
     seconds on 163 staged tables** once QA results had moved into the
     database - 12% more time for 8% more tables, which is noise at this
-    resolution rather than a cost of the move. Worth starting early
+    resolution rather than a cost of the move.
+
+    **RE-MEASURED 2026-09-28 NIGHT AT 889 SECONDS (14m49s), and that
+    figure is the one to plan around now.** It is not a regression to
+    hunt: the pipeline stopped running arrivals in parallel that night,
+    because each arrival's filing depends on what the one before it
+    promoted (see `mothman pipeline run` above). The same run promoted
+    84 supplies and left 67 staged tables rather than 189 - promotion
+    MOVES a supply out of staging into its period's schema, so staging
+    now holds only what nobody has decided on, which is the point of it.
+    Worth starting early
     rather than discovering it is needed. It is a no-op when the database already
     holds staged tables; `--force` rebuilds anyway, and the pipeline is
     seeded so the content is the same either way. IT USED TO LEAVE ~900

@@ -2001,7 +2001,7 @@ comparisons against the expected-supply sequence.
     (sprint 12) and the as-of work (sprint 19), and nothing depends on
     it.
 
-25. **[todo, 2026-09-24]** **[Pipeline & publishing]** **CARRY-FORWARD:
+25. **[in-progress, 2026-09-28]** **[Pipeline & publishing]** **CARRY-FORWARD:
     a period whose supply never arrives, and a human decides to point it
     at the previous period.** Keith, 2026-09-24. A genuinely new
     concept, adjacent to promotion and rejection (sprint 11) rather than

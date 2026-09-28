@@ -15973,7 +15973,60 @@ requirements:
       that the substitution was somebody's decision rather than a silent
       default.
     moscow: must
-    status: not_started
+    status: built
+    implemented_by:
+      - qa_tools/common/substitution.py::substitute
+      - qa_tools/common/substitution.py::de_substitute
+      - qa_tools/common/substitution.py::substituted
+      - qa_tools/common/substitution.py::SubstitutionRefused
+      - qa_tools/common/substitution.py::Substitution
+      - qa_tools/common/decision_log.py::SUBSTITUTE
+      - qa_tools/common/decision_log.py::DE_SUBSTITUTE
+      - qa_tools/common/decision_log.py::periods_standing_on
+      - qa_tools/common/decision_log.py::latest_for_slot
+      - qa_tools/common/decision_log.py::promoted_into
+      - qa_tools/common/qa_store.py::SCHEMA_VERSION
+    linked_tests:
+      - tests/test_substitution.py::TestAPeriodStandsOnAnEarlierRealSupply
+      - tests/test_substitution.py::TestItIsAViewAndNotACopy
+      - tests/test_substitution.py::TestTheDecisionIsRecorded
+      - tests/test_substitution.py::TestItRefusesWhereThereIsNothingSoundToStandOn
+      - tests/test_substitution.py::TestDeSubstituting
+      - tests/test_substitution.py::TestASupplySomethingStandsOnCannotMove
+      - tests/test_substitution.py::TestOnePeriodsDecisionLeavesOthersAlone
+    evidence:
+      - >
+        Built 2026-09-28, overnight. `qa_tools/common/substitution.py`,
+        two new actions in the decision log, and one schema change -
+        `qa.decision` gains a `stands_on` column, schema version 7 -> 8.
+        26 tests in tests/test_substitution.py, plus the decision log's
+        own 45, all passing.
+
+      - >
+        THE VIEW IS PROVEN TO BE A VIEW, not asserted (criterion 2). A
+        test inserts a row into the supply AFTER the substitution is
+        made and reads it back through the substituted period. A copy
+        would still return the original row, which is exactly the drift
+        a copy introduces and the reason the criterion names the
+        mechanism rather than the effect.
+
+      - >
+        CRITERION 11 IS ENFORCED BY THE DECISION LOG, not by this
+        module, and that placement is the finding rather than a detail.
+        The person demoting a supply is not thinking about a period
+        substituted onto it six months ago, so a guard living where
+        substitutions are MADE would never run. It lives where every
+        decision passes instead, and refuses a demote, reject or re-file
+        naming every period that blocks it.
+
+      - >
+        A SUBSTITUTED SLOT COUNTS AS FILLED (criterion 4) WITH NO CHANGE
+        TO promotion.filled_slots(), because that function already
+        delegated each slot to decision_log.promoted_into() rather than
+        knowing the rules itself. Teaching one function about the new
+        action was enough. That is the earlier delegation paying for
+        itself, and worth recording as evidence that the split was the
+        right one.
     signed_off:
       by: Keith
       date: "2026-09-28"
@@ -16096,6 +16149,42 @@ requirements:
         that supply can be withdrawn. Four quarters standing on one
         February is real work for one person on one afternoon.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-035]
+    unmet_criteria:
+      - criterion: >
+          Criteria 6 and 14 - re-evaluating every CROSS-TABLE check that
+          reads the dataset when a period's view is created or removed,
+          without re-running the dataset's own table-level and
+          column-level checks.
+        why: >
+          reevaluation.plan() decides WHICH checks a change sets off and
+          is built and tested; what is missing is the thing that runs
+          them. A check is evaluated today against a run's own view
+          schema assembled from staging, not against the period, so
+          there is no period-scoped evaluation to re-trigger. That is
+          REQ-PIPE-079's wiring, which is its own unfinished half.
+        owner: >
+          REQ-PIPE-079, whose decision layer is built and whose wiring
+          is not.
+        blocked_by:
+          requirements: [REQ-PIPE-079]
+      - criterion: >
+          Criterion 9's "offer as an operator action", criterion 10's
+          same-routes-as-every-other-decision, criterion 13's
+          confirmation ON EVERY ROUTE, and criterion 17's placement
+          outside the queue of supplies awaiting a decision. The
+          OPERATIONS are built, tested and refuse correctly; what is
+          absent is any route a person can reach them by.
+        why: >
+          Nothing lets a person take any filing decision yet - not
+          promote, not reject, not substitute. The routes are
+          REQ-GHUB-082's operator operations and REQ-PIPE-099's
+          terminal, both signed and unbuilt. de_substitute() already
+          takes `confirmed` as a required argument rather than
+          prompting, precisely so that every route has to obtain it.
+        owner: >
+          Delivery sprint 12's operator routes.
+        blocked_by:
+          requirements: [REQ-GHUB-082, REQ-PIPE-099]
     decisions:
       - >
         TWO CRITERIA BACKPORTED FROM REQ-PIPE-099 by the mirror-check
