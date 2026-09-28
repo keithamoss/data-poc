@@ -38,6 +38,7 @@ from datetime import date
 from . import bdm_common
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
+from qa_tools.common import filing
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common import trial
 from qa_tools.common.git_identity import get_run_by
@@ -391,24 +392,11 @@ def run_pipeline(sequential: bool = False) -> dict:
     # regenerations, evidently silently compared against a stale leftover
     # file from a previous anchor date instead of failing loudly - see
     # plans/qa-pipeline.md for the regression test this got.
-    # WHERE EACH SUPPLY BELONGS IS NOT RECORDED YET, DELIBERATELY
-    # (REQ-PIPE-062, Keith 2026-09-25). The assignment rule is built
-    # and tested - qa_tools/common/assignment.py - and calling
-    # filing.file_arrivals() here is all that is needed to turn it on.
-    # It is off because ONLY A PROMOTION FILLS A SLOT and promotion
-    # does not exist until batch 4, so today every supply that is not
-    # on time for its own current slot files against the oldest slot
-    # in the calendar: measured on a real run, 102 of 108 supplies
-    # landed on 2023-Q1. A filing is WRITE-ONCE by criterion 10, so
-    # recording those would bake a known artefact of a missing
-    # dependency into permanent history, where it later reads as data.
-    # Turn this on in the sprint that lands promotion, not before.
-    #
-    # WHERE IT WILL LAND IS NOW SETTLED (REQ-PIPE-104, 2026-09-28): the
-    # database, in `qa.filing`. That was the reason to build the
-    # destination before flipping this switch rather than with it -
-    # otherwise turning recording on would start committing state to the
-    # repository again, which is the thing Keith settled against.
+    # WHERE EACH SUPPLY BELONGS IS NOW RECORDED (REQ-PIPE-075 criterion
+    # 7, 2026-09-28) - see the file_arrivals() call below, and
+    # orchestrate_cp.py's identical one. Filings land in the database,
+    # in `qa.filing` (REQ-PIPE-104), which is why that destination was
+    # built before this switch was flipped rather than with it.
 
     # BEFORE ANY REAL TOOL RUNS (REQ-PIPE-057 criterion 19). Run ids
     # are positional, so a change in what recognition returns renames
@@ -417,6 +405,11 @@ def run_pipeline(sequential: bool = False) -> dict:
     run_id_guard.check(AGENCY_ID, COLLECTION_ID, found_arrivals)
     reference_entry = manifest[0]
     run_timestamp = asset_time.now().isoformat()
+
+    # BEFORE ANY CHECK RUNS OVER IT (REQ-PIPE-075 criterion 7) - see
+    # orchestrate_cp.py's identical call for the verification that
+    # preceded turning this on.
+    filing.file_arrivals(found_arrivals)
     # Fails loudly here, before any real tool runs, if git identity isn't
     # configured (Keith's call, 2026-09-16) - see git_identity.py's own
     # docstring for why this can't fall back to "unknown".

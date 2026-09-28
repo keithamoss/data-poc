@@ -30,6 +30,7 @@ import sys
 
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
+from qa_tools.common import filing
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common import trial
@@ -266,28 +267,34 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # are positional, so a change in what recognition returns renames
     # committed history - a failure that would otherwise be found when
     # CI went red on paths nothing in this file mentions.
-    # WHERE EACH SUPPLY BELONGS IS NOT RECORDED YET, DELIBERATELY
-    # (REQ-PIPE-062, Keith 2026-09-25). The assignment rule is built
-    # and tested - qa_tools/common/assignment.py - and calling
-    # filing.file_arrivals() here is all that is needed to turn it on.
-    # It is off because ONLY A PROMOTION FILLS A SLOT and promotion
-    # does not exist until batch 4, so today every supply that is not
-    # on time for its own current slot files against the oldest slot
-    # in the calendar: measured on a real run, 102 of 108 supplies
-    # landed on 2023-Q1. A filing is WRITE-ONCE by criterion 10, so
-    # recording those would bake a known artefact of a missing
-    # dependency into permanent history, where it later reads as data.
-    # Turn this on in the sprint that lands promotion, not before.
-    #
-    # WHERE IT WILL LAND IS NOW SETTLED (REQ-PIPE-104, 2026-09-28): the
-    # database, in `qa.filing`. That was the reason to build the
-    # destination before flipping this switch rather than with it -
-    # otherwise turning recording on would start committing state to the
-    # repository again, which is the thing Keith settled against.
+    # WHERE EACH SUPPLY BELONGS IS NOW RECORDED (REQ-PIPE-075 criterion
+    # 7, 2026-09-28) - see the file_arrivals() call below. This comment
+    # used to say it was deliberately off, because ONLY A PROMOTION
+    # FILLS A SLOT and promotion did not exist, so every supply not on
+    # time for its own slot filed against the oldest one in the
+    # calendar. Filings land in the database, in `qa.filing`
+    # (REQ-PIPE-104) - which is why that destination was built before
+    # this switch was flipped rather than with it.
 
     run_id_guard.check(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, found_arrivals)
     reference_run_id = manifest[0]["run_id"]
     run_timestamp = asset_time.now().isoformat()
+
+    # WHERE EACH SUPPLY BELONGS, RECORDED BEFORE ANY CHECK RUNS OVER IT
+    # (REQ-PIPE-075 criterion 7). This is the switch the long comment
+    # above said to turn on "in the sprint that lands promotion, not
+    # before", and this is that sprint: filing.filled_slots() now reads
+    # the decision log instead of returning an empty set, so the
+    # assignment rule can finally see which slots a promotion has taken.
+    #
+    # VERIFIED BEFORE FLIPPING IT, on a scratch database, because a
+    # filing is WRITE-ONCE and the artefact that kept this off was real:
+    # with every slot unfilled, 102 of 108 supplies landed on 2023-Q1.
+    # Replaying the same corpus with promotion in place, they spread
+    # across consecutive slots per dataset - 2023-Q1, Q2, Q3, Q4,
+    # 2024-Q1 - and the heaviest slot holds 15 of 108 rather than 102.
+    filing.file_arrivals(found_arrivals)
+
     # Fails loudly here, before any real tool runs - see orchestrate_bdm.py's
     # identical comment and git_identity.py's own docstring.
     run_by = get_run_by()
