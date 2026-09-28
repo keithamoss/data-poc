@@ -19998,7 +19998,7 @@ requirements:
     status: in_progress
     signed_off:
       by: Keith
-      date: "2026-09-27"
+      date: "2026-09-28"
     source: >
       Keith, 2026-09-27, scoping who writes a receipt - a question
       that arose from REQ-PIPE-104's in-flight observations and turned
@@ -20051,13 +20051,23 @@ requirements:
         rather than one of the contested versions.
       - >
         THE SYSTEM SHALL amend REQ-PIPE-035 criterion 3 in the same
-        change, since "the staged delivery's own tables" names a unit
-        that no longer exists once every file is its own arrival.
+        change, so that what is overlaid on a period's promoted state
+        is THE TABLES STAGED FOR THAT PERIOD - one version of each,
+        with a contested table absent per criteria 6 and 8 - rather
+        than "the staged delivery's own tables", which names a unit
+        that stops existing once every file is its own arrival.
       - >
         THE SYSTEM SHALL amend REQ-PIPE-036 criteria 1, 2 and 7 in the
-        same change, so that no requirement still describes one QA run
-        per delivery or forbids one per table, and SHALL carry forward
-        what those clauses were protecting.
+        same change: criterion 1 to run QA once per ARRIVAL rather than
+        once per delivery; criterion 2, which forbids a QA run per
+        table, to be STRUCK, since a run per file is now the rule; and
+        criterion 7's later-arriving table to read as the ordinary case
+        rather than as an exception.
+      - >
+        THE SYSTEM SHALL carry forward what REQ-PIPE-036 criterion 2
+        was protecting - that one supply is never QA'd twice over for
+        the same reason - and SHALL NOT let striking it license a
+        re-run per table of a delivery already evaluated.
       - >
         THE SYSTEM SHALL retire qa_tools/cp/completion_tracker.py and
         every document recommending a supplier-written completion
@@ -20085,7 +20095,7 @@ requirements:
 
         What remains is real but much smaller: during the minutes a
         delivery is landing, a viewer can see a cross-table check red
-        for a table that has not arrived yet. Criterion 12 is what
+        for a table that has not arrived yet. Criterion 13 is what
         keeps that legible rather than merely loud - a dashboard red
         for reasons about our own timing rather than about the data
         is how people learn to ignore red.
@@ -20105,13 +20115,7 @@ requirements:
         genuinely not resupplied this period, which is the correct
         comparison in that case.
     dependencies: [REQ-PIPE-035, REQ-PIPE-036]
-    open_questions:
-      - >
-        CRITERIA 5 TO 8 WERE REWRITTEN 2026-09-28 and are NOT covered by
-        the 2026-09-27 signature above, which was given against the
-        newest-wins wording those criteria replace. Keith asked to see
-        the whole requirement again before re-signing. Nothing in the
-        rewritten scope is to be built until he has.
+    open_questions: []
     decisions:
       - >
         BUILT IN STAGES, and this records where it got to on 2026-09-28 so
@@ -20120,7 +20124,7 @@ requirements:
         not built, and a status that overclaims is worse than one that
         cannot carry the detail.
 
-        DONE: criterion 11 - `qa_tools/cp/completion_tracker.py` and its
+        DONE: criterion 12 - `qa_tools/cp/completion_tracker.py` and its
         tests are deleted, the CP ingest handler checks every table
         arrival instead of waiting for a marker, the DynamoDB table and
         its IAM grant are out of the CDK stack, and
@@ -20134,16 +20138,37 @@ requirements:
 
         NOT DONE: criteria 1, 2 and 5 to 8 - the arrival UNIT itself,
         which is still the delivery folder rather than the file, and the
-        overlay reading the version staged for the period. Criteria 9 and
-        10, the amendments to REQ-PIPE-035 and REQ-PIPE-036, go with that
-        change rather than ahead of it. Criterion 12's legible red for a
-        table nothing has promoted is unbuilt.
+        overlay reading the version staged for the period. Criteria 9 to
+        11, the amendments to REQ-PIPE-035 and REQ-PIPE-036 and what they
+        must carry forward, go with that change rather than ahead of it.
+        Criterion 13's legible red for a table nothing has promoted is
+        unbuilt.
 
-        THE NUMBERS IN THIS PARAGRAPH WERE RESTATED 2026-09-28 when
-        criteria 6 to 8 were inserted and everything after them shifted
-        by two. Worth saying rather than silently fixing: a stale
+        THE NUMBERS IN THIS PARAGRAPH WERE RESTATED TWICE ON
+        2026-09-28 - once when criteria 6 to 8 were inserted and
+        everything after them shifted by two, and again when criterion
+        11 split the carry-forward clause out of criterion 10. Worth saying rather than silently fixing: a stale
         criterion reference in a decision is the kind of thing a later
         reader trusts without re-checking.
+      - >
+        SIGNED TWICE, and the second signature is the one that counts.
+        Keith signed the 2026-09-27 draft, whose criteria 5 and 6 said
+        newest-wins. He settled the opposite on 2026-09-28, criteria 5
+        to 11 were rewritten for it, and he re-signed the whole
+        requirement after a full read-back the same day. The
+        signed_off date is the second one, deliberately: a signature
+        against wording that no longer exists is worse than no
+        signature, because it reads as approval of what is there now.
+      - >
+        CRITERIA 9 TO 11 SAY WHAT THE AMENDMENTS MUST SAY (Keith,
+        2026-09-28, at that read-back), not merely that amendments are
+        due. They previously read "amend REQ-PIPE-035 criterion 3" and
+        "amend REQ-PIPE-036 criteria 1, 2 and 7" with no statement of
+        the new wording, which leaves the substance to whoever builds
+        it - months later, without this conversation. Criterion 11 is
+        the half most easily lost: striking REQ-PIPE-036 criterion 2
+        removes a guard against redundant runs, and the guard has to
+        survive its clause.
       - >
         SETTLED 2026-09-28 (Keith), resolving the tension recorded
         after this paragraph, and note the ANSWER IS NOT THE ONE THIS
