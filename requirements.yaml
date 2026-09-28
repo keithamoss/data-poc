@@ -12654,7 +12654,47 @@ requirements:
       why we accepted a supply into Q3, the answer is a lookup rather
       than an archaeology exercise across two mechanisms.
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_decision_log.py
+      - tests/test_cli_supply.py::TestReadingTheDecisionLog
+      - tests/test_promotion.py
+    implemented_by:
+      - qa_tools/common/decision_log.py::apply_decision
+      - qa_tools/common/decision_log.py::Decision
+      - qa_tools/common/decision_log.py::record_automatic
+      - qa_tools/common/decision_log.py::promoted_into
+      - qa_tools/common/decision_log.py::promoted_supply
+      - qa_tools/common/decision_log.py::decisions_for
+      - qa_tools/common/qa_store.py::ensure_schema
+      - cli/supply.py::decisions_command
+    evidence:
+      - >
+        BUILT BY REQ-PIPE-091 RATHER THAN BY A CHANGE OF ITS OWN, and
+        marked here on 2026-09-28 on Keith's own instruction, given as
+        the first of four standing answers for the overnight run. This
+        requirement asked for the append-only decision log; REQ-PIPE-091
+        built it as a table in the `qa` metadata schema and shipped on
+        2026-09-28. No new code was written for this entry.
+      - >
+        VERIFIED CRITERION BY CRITERION rather than stamped. Every live
+        criterion has real coverage in tests/test_decision_log.py, and
+        the ones easiest to assume are the ones that were checked: the
+        reason rules (criteria 6 and 7) are
+        TestItIsJudgedAgainstTheLogInsideTheTransaction, which names
+        them in its own docstring and holds both directions - a routine
+        promotion needs no reason, a rejection without one is refused;
+        the one-entry re-file (criterion 9) is covered in
+        TestEveryFactIsRecorded; append-only (criterion 8) is
+        TestNothingCanChangeAnEntry; and the dashboard-build access rule
+        (criterion 13) is TestAReaderWithNoWriteAccess.
+      - >
+        A CORRECTION TO HOW THIS WAS PUT TO KEITH. The question he
+        answered described criteria 11 and 14 as still needing to be
+        superseded by the configuration-not-state rule. They had
+        ALREADY been superseded - by him, on 2026-09-27, inside
+        REQ-PIPE-091's own change, and the register said so. His answer
+        stands and the outcome is unchanged; the framing was stale.
     source: >
       Keith, plans/supply-model.md Thread G plus Thread B's
       staging/promotion thread, given to delivery-scoper as batch 4
