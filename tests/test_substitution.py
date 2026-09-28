@@ -46,20 +46,39 @@ def periods():
     return (f"2099-A{tag}", f"2099-B{tag}", f"2099-C{tag}")
 
 
-def _promote_into(conn, dataset_id, period, *, status_red=False):
-    """A real promoted table in that period, by the ordinary route."""
+def _promote_into(conn, dataset_id, period, *, status_red=False, logical="carers"):
+    """A real promoted table in that period, by the ordinary route.
+
+    THE SUPPLY ID AND THE TABLE NAME ARE DELIBERATELY DIFFERENT here,
+    and the first version of this helper made them the same string.
+    That is precisely what hid a real defect: substitute() was using the
+    supply ID as a table name, every assertion held because the two
+    coincided, and the first substitution anybody made in the real
+    system - where a supply is `cp-carers@2026...` and its table is
+    `cp_carers__2026...` - would have failed.
+
+    Returns the supply ID, which is what a decision names.
+    """
     from qa_tools.common import promotion
 
-    physical = f"tbl__{uuid.uuid4().hex[:10]}"
+    arrival = uuid.uuid4().hex[:10]
+    physical = f"{logical}__{arrival}"
+    supply = f"{dataset_id}@{arrival}"
     conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
     conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
     conn.execute(f'INSERT INTO "{supply_db.STAGING_SCHEMA}"."{physical}" VALUES (7)')
     promotion.promote(
         conn, agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset_id,
-        supply=physical, period=period, physical_tables=[physical],
+        supply=supply, period=period, physical_tables=[physical],
         actor="tester", actor_kind=dl.PERSON, effective_at=WHEN,
         reason="a reason" if status_red else None, supply_is_red=status_red)
-    return physical
+    return supply
+
+
+def _physical_of(conn, period, logical="carers"):
+    """The table a promoted supply actually landed in."""
+    from qa_tools.common import period_schema as ps_mod
+    return (ps_mod.promoted_in(conn, period, [logical])[logical] or [None])[0]
 
 
 def _substitute(conn, dataset_id, *, period, stands_on, supply, logical="carers",
@@ -124,7 +143,8 @@ class TestItIsAViewAndNotACopy:
         _substitute(conn, dataset, period=second, stands_on=first, supply=supply)
 
         source = period_schema.period_schema(first)
-        conn.execute(f'INSERT INTO "{source}"."{supply}" VALUES (8)')
+        physical = _physical_of(conn, first)
+        conn.execute(f'INSERT INTO "{source}"."{physical}" VALUES (8)')
         schema = period_schema.period_schema(second)
         rows = conn.execute(f'SELECT id FROM "{schema}"."carers" ORDER BY id').fetchall()
         assert [r[0] for r in rows] == [7, 8], \
@@ -272,8 +292,12 @@ class TestASupplySomethingStandsOnCannotMove:
         first, second, third = periods
         supply = _promote_into(conn, dataset, first)
         _substitute(conn, dataset, period=second, stands_on=first, supply=supply)
-        _substitute(conn, dataset, period=third, stands_on=first, supply=supply,
-                    logical="placements")
+        # THE SAME LOGICAL TABLE, into a DIFFERENT period. A dataset
+        # maps to exactly one logical table by construction, so
+        # substituting a second name for it would be incoherent - and
+        # two periods are two schemas, so there is no view-name clash
+        # to avoid.
+        _substitute(conn, dataset, period=third, stands_on=first, supply=supply)
         return first, supply
 
     @pytest.mark.parametrize("action", [dl.DEMOTE, dl.REJECT, dl.REFILE])
@@ -305,10 +329,10 @@ class TestASupplySomethingStandsOnCannotMove:
         """CURRENTLY standing on, not ever. Counting a period somebody
         already de-substituted would make the supply permanently stuck."""
         first, supply = self._two_standing(conn, dataset, periods)
-        for period, logical in ((periods[1], "carers"), (periods[2], "placements")):
+        for period in (periods[1], periods[2]):
             substitution.de_substitute(
                 conn, agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
-                logical_table=logical, period=period, actor="Keith",
+                logical_table="carers", period=period, actor="Keith",
                 reason="no longer needed", effective_at=WHEN, confirmed=True)
         assert dl.periods_standing_on(conn, dataset, supply) == ()
 
@@ -329,8 +353,12 @@ class TestOnePeriodsDecisionLeavesOthersAlone:
         first, second, third = periods
         supply = _promote_into(conn, dataset, first)
         _substitute(conn, dataset, period=second, stands_on=first, supply=supply)
-        _substitute(conn, dataset, period=third, stands_on=first, supply=supply,
-                    logical="placements")
+        # THE SAME LOGICAL TABLE, into a DIFFERENT period. A dataset
+        # maps to exactly one logical table by construction, so
+        # substituting a second name for it would be incoherent - and
+        # two periods are two schemas, so there is no view-name clash
+        # to avoid.
+        _substitute(conn, dataset, period=third, stands_on=first, supply=supply)
         substitution.de_substitute(
             conn, agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
             logical_table="carers", period=second, actor="Keith",

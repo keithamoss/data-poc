@@ -16537,7 +16537,7 @@ requirements:
       status, so that I cannot look at it and think this quarter's data
       arrived and was fine.
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-28"
@@ -16629,6 +16629,47 @@ requirements:
         touching the template.
     dependencies: [REQ-PIPE-084, REQ-DASH-041, REQ-DASH-070]
     decisions:
+      - >
+        THE QUALIFIER IS BUILT; THE DRILL-THROUGH IS NOT, and this
+        records the line on 2026-09-29. `in_progress` rather than
+        `built` because the register's gate forbids evidence on anything
+        not built, and a status that overclaims is worse than one that
+        cannot carry the detail.
+
+        DONE - criteria 1, 2, 3, 5, 7, 8 and 12.
+        `promotion_state.standing_in()` reads the newest period holding
+        somebody else's supply out of the decision log, and the
+        template's `standingInMarker()` renders it beside the status
+        pill - a QUALIFIER rather than a sixth status value, in the same
+        shape `unagreedMarker()` already uses, so no rollup on the page
+        has to decide where a new status sorts. The period the data came
+        from is in the LABEL and not only in the tooltip, because hover
+        is not available to every reader or every device and "where did
+        this come from" is the question the qualifier exists to answer.
+        `standingInDetail()` gives criterion 4's drill-down, showing the
+        reason AS WRITTEN and escaping it, since a reason is free text a
+        person typed rather than committed repo content.
+
+        NOT DONE - criteria 9, 10 and 11: a reader drilling into a
+        substituted period's check results should land on the period
+        that EARNED them, told they have left the one they were looking
+        at, with a way back, and with that framing carried in the URL
+        and dropped on their next navigation. That is real SPA
+        navigation work rather than a render, and it wants a clear head.
+
+      - >
+        NOTHING IN THIS DEPLOYMENT IS SUBSTITUTED, so the qualifier
+        renders nowhere on the real page, and the tests state the state
+        rather than reading it. A substitution needs a person's
+        decision and no operator route exists yet (REQ-GHUB-082,
+        REQ-PIPE-099). Writing one into the real decision log to make a
+        screenshot would be fabricating an operator decision in an
+        append-only record, which is not a thing to do unattended.
+
+        FLAGGED RATHER THAN LEFT IMPLICIT, on the same grounds as
+        REQ-PIPE-098's own note: this project spent a night on what
+        unreachable code costs (plans/post-build-review.md #63), and a
+        rule nothing exercises is a rule nobody has seen work.
       - >
         A SUBSTITUTED PERIOD STILL SHOWS AWAITING, OVERDUE OR MISSING
         (Keith, 2026-09-28), REJECTING the symmetry with REQ-DASH-100
@@ -20413,7 +20454,7 @@ requirements:
       it is standing on, so that I neither read it as this quarter's
       data arriving fine nor as something missing.
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-28"
@@ -20498,6 +20539,33 @@ requirements:
     dependencies: [REQ-PIPE-098, REQ-DASH-085]
     open_questions: []
     decisions:
+      - >
+        BUILT ALONGSIDE REQ-DASH-085 AND SHARING ITS MACHINERY, on
+        2026-09-29, and the split is the same: the QUALIFIER is done and
+        the DRILL-THROUGH is not.
+
+        DONE - criteria 1, 2, 3, 4, 5, 6, 7, 11, 12 and 13. The word is
+        `inherited`, distinctly from `substituted`; the level is
+        INFORMATION where a substitution is WARNING, which is the pairing
+        both requirements insist on and not a styling choice - a dataset
+        behaving exactly as agreed does not deserve the same attention
+        as a supplier who failed. The tooltip says it was inherited
+        automatically and names NOBODY, because naming the rule as
+        though it were a person would put a decision on somebody who
+        never made one. Criterion 5 falls out of REQ-PIPE-098's own
+        design rather than needing anything here: an inherited period is
+        not a filled slot, so nothing reports it as awaiting a supply.
+
+        NOT DONE - criteria 8, 9 and 10, the drill-through and its
+        URL-carried framing. Same as REQ-DASH-085's, and the two should
+        be built together because they are one piece of navigation.
+
+      - >
+        NOTHING IN THIS DEPLOYMENT IS INHERITED EITHER, for the reason
+        REQ-PIPE-098 records: no dataset declares a `not_expected`
+        period, and declaring one is a domain claim about a supplier's
+        obligations rather than a test fixture. So this renders nowhere
+        on the real page until REQ-GEN-044 gives it an instance.
       - >
         THE TOOLTIP SAYS IT WAS AUTOMATIC (criterion 7, extending
         Keith's 2026-09-28 ask on REQ-DASH-085 that the tooltip name

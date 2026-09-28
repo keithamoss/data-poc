@@ -50,6 +50,58 @@ WHY_NOT = {
 }
 
 
+#: How a period comes to hold data that is not its own (REQ-DASH-085
+#: and REQ-DASH-100). Two words, deliberately different ones, because
+#: they mean opposite things about whether anybody failed: a
+#: SUBSTITUTED period was owed a supply that never came and a person
+#: decided what to stand on; an INHERITED one was owed nothing at all.
+SUBSTITUTED = "substituted"
+INHERITED = "inherited"
+
+#: What level each reads at, and the pairing is the requirement rather
+#: than a styling choice. A substitution is a WARNING - a supply that
+#: was owed is missing, and somebody made a judgement call about it. An
+#: inheritance is INFORMATION - the dataset is behaving exactly as
+#: agreed. Rendering both the same would tell a reader that a
+#: quarterly dataset skipping a quarter it never owed is as worth their
+#: attention as a supplier who failed to deliver.
+STANDING_IN_LEVEL = {SUBSTITUTED: "warning", INHERITED: "information"}
+
+
+@dataclass(frozen=True)
+class StandingIn:
+    """A period holding an earlier period's supply, and how it got there.
+
+    THE REASON IS CARRIED AS WRITTEN. Both requirements say so in as
+    many words - "DISPLAYING that reason as written rather than
+    summarising it or replacing it with a generic phrase" - because the
+    reason is the only part a person actually authored, and a generic
+    phrase in its place is the page claiming somebody explained
+    themselves when nobody did.
+    """
+
+    kind: str
+    period: str
+    stands_on: str
+    supply: str
+    decided_by: str | None = None
+    reason: str = ""
+
+    @property
+    def level(self) -> str:
+        return STANDING_IN_LEVEL[self.kind]
+
+    @property
+    def by_a_person(self) -> bool:
+        return self.kind == SUBSTITUTED
+
+    def as_record(self) -> dict:
+        return {"kind": self.kind, "level": self.level, "period": self.period,
+                "standsOn": self.stands_on, "supply": self.supply,
+                "decidedBy": self.decided_by, "reason": self.reason,
+                "byAPerson": self.by_a_person}
+
+
 @dataclass(frozen=True)
 class State:
     """One dataset's arrived-versus-promoted state."""
@@ -62,6 +114,9 @@ class State:
     arrived_supply: str | None = None
     arrived_period: str | None = None
     why_not: str | None = None
+    #: The newest period this dataset has that holds somebody else's
+    #: supply, if any (REQ-DASH-085 and REQ-DASH-100).
+    standing_in: StandingIn | None = None
 
     @property
     def differs(self) -> bool:
@@ -85,6 +140,7 @@ class State:
                           "period": self.arrived_period}),
             "whyNot": self.why_not,
             "explanation": self.explanation,
+            "standingIn": self.standing_in.as_record() if self.standing_in else None,
         }
 
 
@@ -113,6 +169,47 @@ def _why_not(conn, dataset_id: str, supply: str, period: str | None) -> str:
         return SUPERSEDED
     return (RETURNED_BY_A_PERSON if rejection.decided_by_a_person(conn, dataset_id, supply)
             else AWAITING_DECISION)
+
+
+def standing_in(conn: supply_db.SupplyConnection, dataset_id: str) -> StandingIn | None:
+    """The newest period of this dataset's that holds somebody else's
+    supply, or None.
+
+    NEWEST RATHER THAN ALL OF THEM, because the qualifier answers "is
+    what I am looking at this period's own data", and what a reader is
+    looking at is the current state. A dataset with a substitution three
+    years back and a real supply since is not standing in on anything
+    now, and saying it is would be a permanent warning about something
+    already resolved.
+
+    FROM THE LOG rather than from the period schemas, for the reason
+    substitution.substituted() gives: a view in a schema says an object
+    exists, never what put it there or whether the indirection has since
+    been removed.
+    """
+    rows = conn.execute(
+        f"SELECT action, to_slot, stands_on, supply, actor, reason, actor_kind "
+        f"FROM {decision_log.TABLE} "
+        "WHERE dataset_id = ? AND action IN (?, ?) AND to_slot IS NOT NULL "
+        "ORDER BY effective_at DESC, id DESC",
+        [dataset_id, decision_log.SUBSTITUTE, decision_log.INHERIT]).fetchall()
+    for action, slot, stands_on, supply, actor, reason, actor_kind in rows:
+        latest = decision_log.latest_for_slot(conn, dataset_id, slot)
+        if not latest or latest[0] != action:
+            # Something has happened to that period since - a real
+            # supply promoted into it, or the indirection removed. Not
+            # standing in any more.
+            continue
+        kind = SUBSTITUTED if action == decision_log.SUBSTITUTE else INHERITED
+        return StandingIn(
+            kind=kind, period=slot, stands_on=stands_on, supply=supply,
+            # WHO DECIDED IT, and None where nobody did. An inheritance
+            # is the rule acting on a schedule, and naming the rule as
+            # though it were a person would put a decision on somebody
+            # who never made one (REQ-DASH-100 criterion 12).
+            decided_by=actor if actor_kind == decision_log.PERSON else None,
+            reason=reason or "")
+    return None
 
 
 def state_for(dataset_id: str, conn: supply_db.SupplyConnection | None = None) -> State:
@@ -147,10 +244,12 @@ def state_for(dataset_id: str, conn: supply_db.SupplyConnection | None = None) -
         # re-file OUT. The period holds nothing, so neither does this.
         promoted_period, promoted_supply = None, None
 
+    standing = standing_in(conn, dataset_id)
+
     filings = filing.filings_of(dataset_id)
     if not filings:
         return State(dataset_id=dataset_id, promoted_supply=promoted_supply,
-                      promoted_period=promoted_period)
+                      promoted_period=promoted_period, standing_in=standing)
 
     latest = filings[-1]
     arrived_supply = latest.get("supply_id")
@@ -158,11 +257,11 @@ def state_for(dataset_id: str, conn: supply_db.SupplyConnection | None = None) -
     state = State(
         dataset_id=dataset_id, promoted_supply=promoted_supply,
         promoted_period=promoted_period, arrived_supply=arrived_supply,
-        arrived_period=arrived_period)
+        arrived_period=arrived_period, standing_in=standing)
     if not state.differs:
         return state
     return State(
         dataset_id=dataset_id, promoted_supply=promoted_supply,
         promoted_period=promoted_period, arrived_supply=arrived_supply,
-        arrived_period=arrived_period,
+        arrived_period=arrived_period, standing_in=standing,
         why_not=_why_not(conn, dataset_id, arrived_supply, arrived_period))

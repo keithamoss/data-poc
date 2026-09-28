@@ -62,7 +62,7 @@ def _table_for(supply_id):
     warehouse can call a table, because dbt and Soda write the name into
     their own SQL unquoted. promote() takes both, and conflating them in
     a test is how the first version of this file failed."""
-    return "t_" + supply_id.replace("-", "_").replace("@", "__")
+    return "carers__" + supply_id.split("@")[-1].replace("-", "_")
 
 
 def _promote(conn, dataset_id, supply, period):
@@ -204,3 +204,101 @@ class TestItReadsRecordsAndNeverSupplyRows:
         source = inspect.getsource(promotion_state)
         named = [s for s in self.FORBIDDEN if s in source]
         assert not named, f"promotion_state.py names {named}"
+
+
+class TestAPeriodStandingInOnAnEarlierOne:
+    """REQ-DASH-085 and REQ-DASH-100's data side.
+
+    The two are identical in SQL - a view in a period's schema pointing
+    at an earlier promoted table - and mean opposite things about
+    whether anybody failed. Keeping them apart is the whole point.
+    """
+
+    def _substitute(self, conn, dataset, period, stands_on, supply):
+        from qa_tools.common import substitution
+        substitution.substitute(
+            conn, agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
+            logical_table="carers", period=period, stands_on=stands_on,
+            supply=supply, actor="Keith",
+            reason="the supplier confirmed no extract is coming", effective_at=WHEN)
+
+    def test_a_period_holding_its_own_supply_stands_in_on_nothing(
+            self, conn, dataset, periods):
+        first, _ = periods
+        _file(dataset, f"{dataset}@1", first)
+        _promote(conn, dataset, f"{dataset}@1", first)
+        assert promotion_state.state_for(dataset, conn).standing_in is None
+
+    def test_a_substitution_reads_as_SUBSTITUTED_at_warning(
+            self, conn, dataset, periods):
+        first, second = periods
+        _file(dataset, f"{dataset}@1", first)
+        _promote(conn, dataset, f"{dataset}@1", first)
+        self._substitute(conn, dataset, second, first, f"{dataset}@1")
+        st = promotion_state.state_for(dataset, conn).standing_in
+        assert st.kind == promotion_state.SUBSTITUTED
+        assert st.level == "warning"
+        assert st.by_a_person is True
+        assert st.decided_by == "Keith"
+        assert "no extract is coming" in st.reason
+
+    def test_an_inheritance_reads_as_INHERITED_at_information(
+            self, conn, dataset, periods):
+        from qa_tools.common import inheritance
+        first, second = periods
+        _file(dataset, f"{dataset}@1", first)
+        _promote(conn, dataset, f"{dataset}@1", first)
+        entry = type("E", (), {"agency_id": AGENCY, "collection_id": COLLECTION,
+                                "dataset_id": dataset})()
+        inheritance._record(conn, entry, action=dl.INHERIT, supply=f"{dataset}@1",
+                             period=second, stands_on=first,
+                             reason="supplied annually, no quarterly file is due",
+                             effective_at=WHEN)
+        st = promotion_state.state_for(dataset, conn).standing_in
+        assert st.kind == promotion_state.INHERITED
+        assert st.level == "information"
+        assert st.by_a_person is False
+
+    def test_an_inheritance_names_nobody_as_its_decider(self, conn, dataset,
+                                                         periods):
+        """The rule is not a person, and recording it as one would put a
+        decision on somebody who never made it."""
+        from qa_tools.common import inheritance
+        first, second = periods
+        _file(dataset, f"{dataset}@1", first)
+        _promote(conn, dataset, f"{dataset}@1", first)
+        entry = type("E", (), {"agency_id": AGENCY, "collection_id": COLLECTION,
+                                "dataset_id": dataset})()
+        inheritance._record(conn, entry, action=dl.INHERIT, supply=f"{dataset}@1",
+                             period=second, stands_on=first, reason="not due",
+                             effective_at=WHEN)
+        assert promotion_state.state_for(dataset, conn).standing_in.decided_by is None
+
+    def test_a_removed_substitution_stops_standing_in(self, conn, dataset, periods):
+        from qa_tools.common import substitution
+        first, second = periods
+        _file(dataset, f"{dataset}@1", first)
+        _promote(conn, dataset, f"{dataset}@1", first)
+        self._substitute(conn, dataset, second, first, f"{dataset}@1")
+        substitution.de_substitute(
+            conn, agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
+            logical_table="carers", period=second, actor="Keith",
+            reason="the real extract arrived", effective_at=WHEN, confirmed=True)
+        assert promotion_state.state_for(dataset, conn).standing_in is None
+
+    def test_the_two_levels_are_distinct(self):
+        """Criterion 7 of one and 11 of the other, asserted as one
+        claim: a reader must be able to tell a person's decision about a
+        missing supply from a dataset behaving as agreed."""
+        levels = promotion_state.STANDING_IN_LEVEL
+        assert levels[promotion_state.SUBSTITUTED] != levels[promotion_state.INHERITED]
+
+    def test_the_record_carries_everything_the_page_needs(self, conn, dataset,
+                                                           periods):
+        first, second = periods
+        _file(dataset, f"{dataset}@1", first)
+        _promote(conn, dataset, f"{dataset}@1", first)
+        self._substitute(conn, dataset, second, first, f"{dataset}@1")
+        record = promotion_state.state_for(dataset, conn).as_record()["standingIn"]
+        assert set(record) == {"kind", "level", "period", "standsOn", "supply",
+                                "decidedBy", "reason", "byAPerson"}

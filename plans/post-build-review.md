@@ -3769,3 +3769,45 @@ twice. It deliberately did not re-find the `TypeError`.
     with the least attention to spare. Worth asking, of any "this is
     structurally empty today" comment: what runs the first time it is
     not?
+
+64. **[done, 2026-09-29]** **[Pipeline & publishing, Testing & dev tooling]**
+    **A test that conflated two identifiers hid a defect that would have
+    broken the first real substitution anybody made.**
+    Found hours after the code shipped, by writing a DIFFERENT test
+    that happened not to conflate them.
+
+    A supply has two names. `cp-carers@202605010100000000` is how a
+    filing and a decision name it; `cp_carers__202605010100000000` is
+    what the warehouse can call a table, because dbt and Soda write the
+    name into their own SQL unquoted and PostgreSQL folds an unquoted
+    identifier to lower case. `promote()` takes both - the id for the
+    log, the tables to move.
+
+    `substitution.substitute()` took one `supply` argument and used it
+    for BOTH: it judged the decision against the log, where the value is
+    an id, and then built the view with it as a table name. The two
+    cannot both be right.
+
+    **WHY NOTHING CAUGHT IT, and this is the part worth keeping.**
+    `tests/test_substitution.py`'s own helper promoted with
+    `supply=physical, physical_tables=[physical]` - one string playing
+    both parts. Twenty-six tests passed, including ones that read real
+    rows through the substituted view, because within the test the two
+    names genuinely were the same. The fixture was not lazy; it was
+    UNDER-SPECIFIED, and an under-specified fixture makes a whole class
+    of confusion invisible rather than merely untested.
+
+    Fixed in `substitution.py` by resolving the physical table from the
+    period schema (`period_schema.promoted_in`), which is where the
+    warehouse actually keeps the answer, and refusing loudly where the
+    period holds no such table or several. Three test helpers were
+    rewritten to mint the two names differently, and one of them -
+    `tests/test_drift_reference.py`'s - turned up the same latent
+    conflation in a module written the same night.
+
+    **The standing lesson is about fixtures rather than about
+    identifiers.** Where a system carries two values that are usually
+    derived from each other, a test that makes them EQUAL proves
+    nothing about the code that tells them apart. Mint them differently
+    in the fixture, even when it costs a line - the cost is one line
+    and the saving is the first real user finding it.

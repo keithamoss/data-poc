@@ -234,6 +234,25 @@ button{font:inherit; color:inherit;}
 .pill.unagreed .ico{background:transparent; border:1.5px dashed var(--ink-muted);
   border-radius:50%;}
 
+/* A PERIOD HOLDING AN EARLIER PERIOD'S SUPPLY (REQ-DASH-085 and
+   REQ-DASH-100). Two qualifiers, at two LEVELS, and the pairing is the
+   requirement rather than a style choice: a substitution means a supply
+   that WAS owed never came and somebody made a judgement call, so it
+   reads at warning; an inheritance means nothing was owed at all, so it
+   reads at information. Rendering both alike would tell a reader that a
+   dataset behaving exactly as agreed deserves the same attention as a
+   supplier who failed.
+
+   NEVER BY COLOUR ALONE - both requirements say so. The word is the
+   whole meaning and the colour only reinforces it, the same rule
+   .pill.unagreed and the quiet statuses already follow. */
+.pill.standing-in{background:transparent;}
+.pill.standing-in.substituted{color:var(--warn); border:1px solid var(--warn-fill);}
+.pill.standing-in.substituted .ico{background:var(--warn-fill); border-radius:2px;}
+.pill.standing-in.inherited{color:var(--ink-muted); border:1px solid var(--line-strong);}
+.pill.standing-in.inherited .ico{background:transparent;
+  border:1.5px solid var(--ink-faint); border-radius:2px;}
+
 /* ============ Event severity (REQ-DASH-070) =============================
    A SEPARATE VOCABULARY FROM STATUS, which is criterion 5 rather than
    a style choice. The five pills above are verdicts on somebody's
@@ -3082,6 +3101,81 @@ function unagreedMarker(d){
   return `<span class="pill unagreed sm" title="This dataset is not counted in any \
 collection or asset rollup."><span class="ico"></span>${words}</span>`;
 }
+// ESCAPED, unlike most of this page. The page's long-standing posture
+// is that committed repo content renders into innerHTML unescaped, and
+// a substitution's REASON is not that: it is free text a person typed
+// into a terminal or a ticket, arriving here through the decision log.
+// escHtml() below covers the element body; a title attribute also needs
+// its quotes, which is the whole of the difference.
+function escAttr(s){
+  return escHtml(String(s == null ? "" : s)).replace(/"/g, "&quot;");
+}
+
+// A PERIOD STANDING IN ON AN EARLIER ONE (REQ-DASH-085, REQ-DASH-100).
+//
+// THE FAILURE IS A GREEN THAT MEANS SOMETHING ELSE. A period whose
+// table is a view onto an earlier supply passes every check the earlier
+// supply passed - correctly, because it IS that data - so it reads as
+// an ordinary healthy period, and the one thing a reader needs to know
+// about it is invisible.
+//
+// NOT A NEW STATUS (both requirements' criterion 2 or 3). The verdict
+// is whatever the checks found; this sits BESIDE it, in the same
+// status-plus-qualifier shape `unagreedMarker` already uses. Adding a
+// sixth status value would make every rollup in the page decide where
+// it sorts, which is a large change to say a small thing.
+//
+// THE PERIOD IS IN THE LABEL, not only in the tooltip (criterion 8 of
+// one and 12 of the other). Hover is not available to every reader or
+// every device, and "where did this data come from" is the question
+// the qualifier exists to answer - putting the answer behind a
+// gesture answers it for some people.
+function standingInMarker(d){
+  const st = d && d.promotionState && d.promotionState.standingIn;
+  if(!st) return "";
+  const from = fmtPeriodName(st.standsOn) || st.standsOn;
+  const who = st.byAPerson
+    ? `decided by ${st.decidedBy || "a person"}`
+    : "inherited automatically - no person decided it";
+  const title = `This period's data comes from ${from}. ${who}.`;
+  return `<span class="pill standing-in ${st.kind} sm" title="${escAttr(title)}" data-testid="standing-in"><span class="ico"></span>${st.kind === "substituted" ? "Substituted" : "Inherited"} from ${escHtml(String(from))}</span>`;
+}
+
+// The qualifier's own drill-down: which period the data came from, who
+// decided it, and THE REASON AS WRITTEN. Both requirements insist on
+// that last point in the same words - "rather than summarising it or
+// replacing it with a generic phrase" - because the reason is the only
+// part a person actually authored, and a generic phrase in its place is
+// the page claiming somebody explained themselves when nobody did.
+function standingInDetail(d){
+  const st = d && d.promotionState && d.promotionState.standingIn;
+  if(!st) return "";
+  const from = fmtPeriodName(st.standsOn) || st.standsOn;
+  const here = fmtPeriodName(st.period) || st.period;
+  const who = st.byAPerson
+    ? `<div class="promo-sub">Decided by ${escHtml(String(st.decidedBy || "a person"))}</div>`
+    : `<div class="promo-sub">Applied automatically by the schedule - no person decided it</div>`;
+  return `
+    <div class="promo-split standing-in-detail ${st.kind}" data-testid="standing-in-detail">
+      <div class="promo-head">${st.kind === "substituted"
+        ? "This period stands on an earlier one"
+        : "Nothing was owed for this period"}</div>
+      <div class="promo-row">
+        <div class="promo-cell">
+          <div class="k">Period being viewed</div>
+          <div class="v">${escHtml(String(here))}</div>
+        </div>
+        <div class="promo-cell">
+          <div class="k">Where the data actually came from</div>
+          <div class="v">${escHtml(String(from))}</div>
+          <div class="promo-sub mono">${escHtml(String(st.supply || ""))}</div>
+        </div>
+      </div>
+      ${who}
+      ${st.reason ? `<div class="promo-why">${escHtml(String(st.reason))}</div>` : ""}
+    </div>`;
+}
+
 // WHAT ARRIVED VERSUS WHAT IS PROMOTED (REQ-DASH-056).
 //
 // THE TWO LOOK IDENTICAL ON THIS PAGE WITHOUT IT, and that is the whole
@@ -4244,7 +4338,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${unagreedMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
     ${exhaustedBanner}
     ${ds.noDataAsOf ? `
@@ -4254,6 +4348,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       so the figures below show its full real history, but no column reads red/amber/green as CURRENT status.
     </div>` : ""}
     ${outstandingQueue("dataset", ds.id)}
+    ${standingInDetail(ds)}
     ${promotionSplit(ds)}
     <div class="sla-strip">
       <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${cadenceLabel(ds.sla.cadence)}</div></div>

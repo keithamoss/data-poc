@@ -49,14 +49,18 @@ def calendar(monkeypatch):
 
 
 def _promote(conn, dataset_id, period):
-    physical = f"tbl__{uuid.uuid4().hex[:10]}"
+    """A promoted supply, whose ID and TABLE are different strings - as
+    they are in the real system, and as a test that conflated them
+    hid for an hour on 2026-09-29."""
+    arrival = uuid.uuid4().hex[:10]
+    physical, supply = f"carers__{arrival}", f"{dataset_id}@{arrival}"
     conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
     conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
     promotion.promote(
         conn, agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset_id,
-        supply=physical, period=period, physical_tables=[physical],
+        supply=supply, period=period, physical_tables=[physical],
         actor="tester", actor_kind=dl.PERSON, effective_at=WHEN)
-    return physical
+    return supply
 
 
 class TestItIsTheMostRecentEARLIERPromotedPeriod:

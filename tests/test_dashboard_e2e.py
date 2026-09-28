@@ -3129,3 +3129,108 @@ class TestArrivedVersusPromoted:
         prose = [ln for ln in panel.inner_text().splitlines() if "@" not in ln]
         raw = [ln for ln in prose if re.search(r"\b\d{4}-\d{2}-\d{2}\b", ln)]
         assert not raw, f"{dataset_id} shows a raw period code: {raw}"
+
+
+class TestAPeriodStandingInOnAnEarlierOne:
+    """REQ-DASH-085 and REQ-DASH-100, in a real browser.
+
+    NO DATASET IN THIS DEPLOYMENT IS SUBSTITUTED OR INHERITED, and that
+    is stated rather than worked around: a substitution needs a person's
+    decision and no operator route exists yet, and inheritance needs a
+    dataset the schedule says is not due, which no configuration
+    declares. Writing either into the real decision log to make a test
+    pass would be fabricating an operator decision in an append-only
+    record.
+
+    So these set the state ON THE PAGE and re-render. What that proves
+    is the render layer - that the qualifier reaches the status line,
+    that the detail panel says what it must, and that a real browser
+    reports no errors doing it. What it cannot prove is the chain from a
+    real decision, which waits on REQ-GEN-044 giving inheritance a real
+    instance and on the operator routes giving substitution one.
+    """
+
+    SUBSTITUTED = {
+        "kind": "substituted", "level": "warning", "period": "2026-Q3",
+        "standsOn": "2026-Q2", "supply": "cp-carers@202605010100000000",
+        "decidedBy": "Keith", "byAPerson": True,
+        "reason": "the supplier confirmed no extract will be sent this quarter",
+    }
+    INHERITED = {
+        "kind": "inherited", "level": "information", "period": "2026-Q3",
+        "standsOn": "2026-Q1", "supply": "cp-carers@202602010100000000",
+        "decidedBy": None, "byAPerson": False,
+        "reason": "carers are supplied annually, so no quarterly file is due",
+    }
+
+    def _with_state(self, page, html, standing_in):
+        _goto(page, html, state={"tier": "dataset",
+                                  "agencyId": "child-protection-family-support",
+                                  "collectionId": "child-protection",
+                                  "datasetId": "cp-carers"})
+        page.evaluate(
+            """(st) => {
+                 const ds = DATA.agencies.flatMap(a=>a.collections)
+                   .flatMap(c=>c.datasets).find(d=>d.id === "cp-carers");
+                 ds.promotionState = Object.assign({}, ds.promotionState,
+                                                    {standingIn: st});
+                 render();
+               }""", standing_in)
+
+    @pytest.mark.parametrize("kind,word", [("SUBSTITUTED", "Substituted"),
+                                            ("INHERITED", "Inherited")])
+    def test_the_qualifier_appears_beside_the_status(
+            self, clean_page, built_dashboard_html, kind, word):
+        self._with_state(clean_page, built_dashboard_html, getattr(self, kind))
+        marker = clean_page.locator('[data-testid="standing-in"]')
+        assert marker.count() >= 1
+        assert word in marker.first.inner_text()
+
+    @pytest.mark.parametrize("kind", ["SUBSTITUTED", "INHERITED"])
+    def test_it_names_the_period_the_data_came_from_in_the_label(
+            self, clean_page, built_dashboard_html, kind):
+        state = getattr(self, kind)
+        self._with_state(clean_page, built_dashboard_html, state)
+        text = clean_page.locator('[data-testid="standing-in"]').first.inner_text()
+        assert state["standsOn"] in text
+
+    @pytest.mark.parametrize("kind", ["SUBSTITUTED", "INHERITED"])
+    def test_the_drill_down_shows_the_reason_as_written(
+            self, clean_page, built_dashboard_html, kind):
+        state = getattr(self, kind)
+        self._with_state(clean_page, built_dashboard_html, state)
+        detail = clean_page.locator('[data-testid="standing-in-detail"]')
+        assert detail.count() == 1
+        assert state["reason"] in detail.inner_text()
+
+    def test_a_substitution_names_who_decided_it(self, clean_page,
+                                                  built_dashboard_html):
+        self._with_state(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        assert "Keith" in clean_page.locator(
+            '[data-testid="standing-in-detail"]').inner_text()
+
+    def test_an_inheritance_names_nobody(self, clean_page, built_dashboard_html):
+        """Naming the rule as though it were a person would put a
+        decision on somebody who never made one."""
+        self._with_state(clean_page, built_dashboard_html, self.INHERITED)
+        text = clean_page.locator('[data-testid="standing-in-detail"]').inner_text()
+        assert "no person decided it" in text
+        assert "Decided by" not in text
+
+    def test_the_two_are_told_apart_by_more_than_colour(
+            self, clean_page, built_dashboard_html):
+        self._with_state(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        one = clean_page.locator('[data-testid="standing-in"]').first.inner_text()
+        self._with_state(clean_page, built_dashboard_html, self.INHERITED)
+        two = clean_page.locator('[data-testid="standing-in"]').first.inner_text()
+        assert one != two, "the label carries the whole meaning, never the colour"
+
+    @pytest.mark.parametrize("kind", ["SUBSTITUTED", "INHERITED"])
+    def test_it_renders_with_zero_console_errors(
+            self, clean_page, built_dashboard_html, kind):
+        errors = []
+        clean_page.on("console",
+                       lambda m: errors.append(m.text) if m.type == "error" else None)
+        self._with_state(clean_page, built_dashboard_html, getattr(self, kind))
+        assert clean_page.locator('[data-testid="standing-in"]').count() >= 1
+        assert errors == []

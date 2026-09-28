@@ -62,13 +62,47 @@ class Substitution:
                 f"{self.supply}")
 
 
+def _physical_in(conn, *, period: str, logical: str) -> str:
+    """The PHYSICAL table this logical name resolves to in that period.
+
+    A SUPPLY ID IS NOT A TABLE NAME, and this function exists because
+    the first version of this module assumed it was.
+    `cp-carers@202605010100000000` is how a filing and a decision name a
+    supply; `cp_carers__202605010100000000` is what the warehouse can
+    call a table, because dbt and Soda write the name into their own SQL
+    unquoted. The decision log records the first and the period schema
+    holds the second, so building a view needs both - the id to judge
+    the decision against the log, the table to point the view at.
+
+    The two coincided in the tests that first covered this module, which
+    is exactly why nothing caught it: a helper promoted with
+    `supply=physical, physical_tables=[physical]`, so every assertion
+    held and the real system, where they differ, would have failed on
+    the first substitution anybody made.
+    """
+    found = period_schema.promoted_in(conn, period, [logical]).get(logical) or []
+    if not found:
+        raise SubstitutionRefused(
+            f"{period} holds no table called {logical!r}, so there is nothing to "
+            f"point at. The decision log says a supply was promoted into it - if "
+            f"that is still true, the table has been moved or dropped since.")
+    if len(found) > 1:
+        # REQ-PIPE-068's rule, applied here: several versions with no
+        # basis to choose between them is absence, not a coin toss.
+        raise SubstitutionRefused(
+            f"{period} holds {len(found)} versions of {logical!r} "
+            f"({', '.join(sorted(found))}) and nothing says which is the supply, "
+            f"so nothing can stand on it.")
+    return found[0]
+
+
 def _view_sql(conn, *, period: str, logical: str, stands_on: str,
-              supply: str) -> None:
+              physical: str) -> None:
     schema = period_schema.ensure_period_schema(conn, period)
     source = period_schema.period_schema(stands_on)
     conn.execute(
         f'CREATE OR REPLACE VIEW "{schema}"."{supply_db._ident(logical, "table name")}" '
-        f'AS SELECT * FROM "{source}"."{supply_db._ident(supply, "table name")}"')
+        f'AS SELECT * FROM "{source}"."{supply_db._ident(physical, "table name")}"')
 
 
 def substituted(conn: supply_db.SupplyConnection, dataset_id: str,
@@ -176,9 +210,13 @@ def substitute(conn: supply_db.SupplyConnection, *,
         actor_kind=decision_log.PERSON, effective_at=effective_at,
         to_slot=period, stands_on=stands_on, reason=reason)
 
+    # RESOLVED BEFORE THE TRANSACTION OPENS, so a period whose table has
+    # gone missing is a refusal rather than a rolled-back decision.
+    physical = _physical_in(conn, period=stands_on, logical=logical_table)
+
     with decision_log.apply_decision(conn, decision):
         _view_sql(conn, period=period, logical=logical_table,
-                  stands_on=stands_on, supply=supply)
+                  stands_on=stands_on, physical=physical)
     return Substitution(period=period, stands_on=stands_on, supply=supply)
 
 
