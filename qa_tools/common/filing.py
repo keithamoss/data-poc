@@ -105,7 +105,7 @@ def filings_of(dataset_id: str) -> list[dict]:
 
 
 def filled_slots(dataset_id: str) -> frozenset[str]:
-    """Slots a supply has been PROMOTED into - so, nothing yet.
+    """Slots a supply has been PROMOTED into (REQ-PIPE-075 criterion 6).
 
     NOT the slots supplies have been FILED against, and the difference
     is the whole reason this function exists rather than callers
@@ -116,8 +116,17 @@ def filled_slots(dataset_id: str) -> frozenset[str]:
     Returning filings here would be the single easiest way to
     reintroduce the forward cascade, because the rejected supply in
     that worked example IS filed against Monday.
+
+    THIS RETURNED AN EMPTY SET UNTIL 2026-09-28, with a docstring
+    saying "so, nothing yet" - a deliberate stub, because promotion did
+    not exist to fill anything. It does now, and the answer comes from
+    the DECISION LOG rather than from the warehouse catalogue: a table
+    somebody put in a period schema is not a promotion.
     """
-    return frozenset()
+    from qa_tools.common import promotion
+
+    with _connect("mothman:filing-filled-slots") as conn:
+        return promotion.filled_slots(conn, dataset_id)
 
 
 def file_arrivals(found_arrivals) -> list[Assignment]:

@@ -258,3 +258,27 @@ class TestAPersonPromotesOneSupplyAtATime:
             actor="keith", actor_kind=dl.PERSON, effective_at=WHEN,
             reason="checked by hand")
         assert dl.decisions_for(conn, one)[0]["reason"] == "checked by hand"
+
+
+class TestFilingSeesPromotedSlots:
+    """Criterion 6, wired through to the caller that actually needs it.
+
+    filing.filled_slots() has been a stub returning nothing since it was
+    written, with a docstring saying "so, nothing yet" - because only a
+    promotion fills a slot and promotion did not exist. It does now, and
+    until this is wired the assignment rule believes every slot is
+    unfilled, which is how 102 of 108 supplies once landed on 2023-Q1.
+    """
+
+    def test_it_reports_a_promoted_slot(self, conn, dataset, period):
+        from qa_tools.common import filing
+        physical = a_staged_table(conn, "clients")
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                          dataset_id=dataset, supply=physical, period=period,
+                          physical_tables=[physical], actor="promotion-gate",
+                          actor_kind=dl.RULE, effective_at=WHEN)
+        assert period in filing.filled_slots(dataset)
+
+    def test_and_still_reports_nothing_for_a_dataset_with_no_promotion(self, dataset):
+        from qa_tools.common import filing
+        assert filing.filled_slots(dataset) == frozenset()
