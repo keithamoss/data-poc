@@ -94,16 +94,51 @@ anywhere leaves a coherent result.
 - **Sprint B - dispositions** (42). `REQ-PIPE-084` substitution, `098`
   inheritance, `REQ-QAC-108` drift and volume reference. Order fixed by
   answer 2.
-- **Sprint C - tickets** (28). `REQ-PIPE-083` reconciler, `REQ-GHUB-109`
+- **Sprint C - the dashboard trio** (30). `REQ-DASH-056` (what arrived
+  versus what is promoted), `REQ-DASH-085` (a substituted period never
+  reads as ordinary), `REQ-DASH-100` (an inherited one never does
+  either).
+- **Sprint D - tickets** (28). `REQ-PIPE-083` reconciler, `REQ-GHUB-109`
   post-on-change. Note `109` amends `REQ-GHUB-027`'s built behaviour,
   which answer 3 authorises.
-- **Sprint D - operator routes and dashboard** (76). `REQ-GHUB-082`,
-  `REQ-PIPE-099`, `REQ-DASH-085`, `100`, `056`. Largest and last;
-  unlikely to be reached in one night.
+- **Sprint E - operator routes** (46). `REQ-GHUB-082` and
+  `REQ-PIPE-099`. Last, and the least suited to unattended work.
+
+**WHY THE DASHBOARD TRIO MOVED AHEAD OF THE TICKETS, 2026-09-28, after
+Keith asked why the last sprints were being written off.** The first cut
+of this plan had all five dashboard-and-operator requirements in one
+final sprint, which made 76 criteria sit behind the ticket work. Checked
+against the register rather than assumed, and it was wrong:
+`REQ-DASH-056` has NO unmet dependency at all (it needs Sprint A's
+promotion state in practice, nothing more), `085` waits only on `084`,
+and `100` waits only on `098` and `085`. **None of the three needs the
+ticket work.** Moving them ahead makes 30 criteria reachable that the
+first ordering had stranded.
+
+What actually limits the night, so it is not mistaken for difficulty:
+- **Chain depth.** `A -> B -> 083 -> 109 -> 082 -> 099` is six serial
+  links, and nothing in a later one can start until the one before is
+  green. That is scheduling, not hardness.
+- **Verification is a fixed tax per requirement.** `mothman check` is
+  ~300s (this file's own measured log, 2026-09-28; pytest is 257s of it
+  and ~85% of that is the real-browser e2e module, which
+  `--dist loadfile` pins to a single worker). Sixteen requirements
+  flipping to `built` is ~80 minutes of gate runs before any code is
+  written, and Sprints C and E ADD e2e tests, lengthening every run
+  after them.
+- **One criterion is genuinely unsuited to unattended work.**
+  `REQ-GHUB-082` criterion 13 requires RE-RECORDING the committed demo
+  cast (`dashboard/demos/qa_wizard.cast`) via
+  `scripts/dev/record_cast.py`, driving a live TUI. If Sprint E is
+  reached, build everything else and leave that criterion for Keith -
+  which means `082` does NOT flip to `built` that night, and says so.
 
 **Realistic expectation, stated in advance rather than reported at
-6am:** Sprint 0 and A should land solidly, B is plausible, C and D
-probably not.
+6am:** Sprint 0 and A should land solidly, B is plausible, C is
+reachable if B goes well, D and E probably not. This is an estimate
+from volume and shape rather than a measurement, and the first version
+of it was wrong about the ordering, so treat it as a guide rather than
+a commitment.
 
 **Standing rules for the run**, all of them this project's existing
 ones rather than new: a real failing test first for every defect;
