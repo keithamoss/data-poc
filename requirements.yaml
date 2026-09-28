@@ -22611,7 +22611,7 @@ requirements:
       PROMOTED, never against a view or an arrival nobody promoted
     date_written: "2026-09-28"
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-28"
@@ -22678,6 +22678,69 @@ requirements:
         check's category, introduced_date and prose.
     dependencies: [REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-098]
     decisions:
+      - >
+        BUILT IN TWO HALVES, and this records which is which on
+        2026-09-29. `in_progress` rather than `built` because the
+        register's gate forbids evidence on anything not built, and a
+        status that overclaims is worse than one that cannot carry the
+        detail.
+
+        THE REFERENCE RULE IS DONE - criteria 2, 3, 5 and 6, plus the
+        first half of 4. `qa_tools/common/drift_reference.py`'s
+        reference_for() walks back from the current period, however many
+        periods it takes, and returns the first one a supply was really
+        PROMOTED into. It skips a period holding only a VIEW, whether
+        substituted or inherited, which is the subtlest of the wrong
+        answers: measuring against a view compares a supply with ITSELF
+        one hop away, so the distributions are identical, the drift is
+        zero, and the check goes green having asked nothing. It refuses
+        the current period's own supply, so a resupply is never measured
+        against the file it is correcting. And where there is no earlier
+        promoted supply it RAISES rather than returning None - criterion
+        5 forbids reporting the check as passing, and a caller that
+        forgets to handle a None writes a green result where one that
+        forgets to handle an exception writes nothing at all.
+
+        NOT DONE - criteria 1 and 7, and the second half of 4.
+
+      - >
+        A FORK THAT STOPPED THE SECOND HALF, for Keith rather than for
+        me to settle unattended. Criterion 4 forbids taking the
+        reference from "a fixed run chosen once", and both orchestrators
+        do exactly that today: `reference_run_id = manifest[0]["run_id"]`
+        - a stale constant computed fresh, measuring every supply
+        against the beginning of history. Replacing it needs the RUN
+        that checked the reference period's supply, and NOTHING RECORDS
+        THAT MAPPING.
+
+        `qa.tables_read` says which physical tables a run READ, and a
+        supply is read by several runs - REQ-PIPE-068's borrow_views
+        lets a later run read an earlier one's tables, by design. So
+        "the run that checked this supply" cannot be answered from the
+        records as they stand. The options, none of them obviously
+        right: take the EARLIEST run that read it (a heuristic that is
+        usually the staging run and sometimes not); record the
+        relationship explicitly when a supply is staged; or wait for
+        REQ-PIPE-079's wiring, after which a run is per PERIOD and the
+        question becomes "the run for that period", which needs no
+        mapping at all. The third is probably correct and is also the
+        reason not to build one of the first two now.
+
+      - >
+        CRITERION 1 IS CHECK AUTHORING, AND IT NEEDS THE REFERENCE
+        WIRED FIRST. It asks for a RELATIVE volume check on each of
+        Child Protection's six datasets. Both collections have only
+        ABSOLUTE row-count bands today - BDM's is `warn when < 500, fail
+        when < 100 or > 20000` and CP's six are the same shape - so
+        "judge volume the same way" means adding something neither has
+        rather than porting one to the other. A relative check compares
+        against the reference period's table, which is the wiring above.
+
+        Written down rather than attempted, because a check authored
+        against a reference that does not resolve yet is a check that
+        reports nothing while looking present - and this project has
+        just spent a night on what unreachable code costs
+        (plans/post-build-review.md #63).
       - >
         THE REFERENCE IS THE LAST PERIOD THAT ACTUALLY PROMOTED ONE
         (Keith, 2026-09-28), arrived at in two corrections of his. The
