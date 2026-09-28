@@ -21843,6 +21843,28 @@ requirements:
     open_questions: []
     decisions:
       - >
+        AN OBSERVATION FOR KEITH, noticed 2026-09-28 and deliberately
+        not acted on. `qa_tools/cp/build_cp_warehouses.py`'s
+        `_build_run_views()` uses `period_schema.newest()` to choose
+        between several STAGED versions of a SAMPLE table - and criteria
+        6 and 8 say several staged versions should be HELD rather than
+        chosen between.
+
+        IT MAY WELL BE RIGHT AS IT IS. That code path is about sample
+        data, which REQ-PIPE-106 deliberately scopes differently: sample
+        data has no arrival that matters and sits in its own schema
+        until a person discards it, so "the newest version is what a
+        check developed against it should read" is a defensible
+        different rule rather than the same rule broken. The function's
+        own docstring says as much.
+
+        LEFT ALONE because it belongs to another requirement, it is a
+        warehouse-building path rather than a QA read, and changing it
+        unattended on a reading of two criteria written about something
+        else is exactly the move the sign-off gate exists to prevent.
+        Recorded here rather than in a check-in message, which nobody
+        reads twice.
+      - >
         BUILT IN STAGES, and this records where it got to on 2026-09-28 so
         nobody has to infer it from the code. `in_progress` rather than
         `built` because the register's gate forbids evidence on anything
