@@ -13443,7 +13443,48 @@ requirements:
       automatic run, so that staging is a work list rather than a
       graveyard and nothing I decided gets undone behind me.
     moscow: must
-    status: not_started
+    status: built
+    implemented_by:
+      - qa_tools/common/rejection.py::reject
+      - qa_tools/common/rejection.py::demote
+      - qa_tools/common/rejection.py::decided_by_a_person
+      - qa_tools/common/rejection.py::staged_state
+      - qa_tools/common/rejection.py::NotAPersonsDecision
+      - qa_tools/common/promotion.py::should_promote
+    linked_tests:
+      - tests/test_rejection.py::TestRejectingMovesItOutOfTheQueue
+      - tests/test_rejection.py::TestOnlyAPersonRejects
+      - tests/test_rejection.py::TestTheBarOnAutomaticPromotion
+      - tests/test_rejection.py::TestRejectingAPromotedSupplyTakesOneDecision
+      - tests/test_rejection.py::TestDemoteReturnsItToTheQueue
+      - tests/test_rejection.py::TestTellingAnUndecidedSupplyFromAReturnedOne
+      - tests/test_rejection.py::TestARedSupplyNobodyDecidedOnStaysPut
+      - tests/test_rejection.py::TestAReversalKeepsBothEntries
+      - tests/test_promotion_gate.py::TestAutomationDefersToAPersonPermanently
+    evidence:
+      - >
+        Built 2026-09-28. `qa_tools/common/rejection.py`, and the bar on
+        automatic promotion is honoured by REQ-PIPE-075's own gate rather
+        than by a second implementation of the same idea -
+        should_promote() asks decided_by_a_person() and refuses ahead of
+        the verdict, because a person having decided outranks whatever
+        the checks now say.
+
+      - >
+        THE REFUSAL IS ENFORCED BY A TYPE, not by a comment. reject() and
+        demote() raise NotAPersonsDecision when handed a rule actor, so
+        criterion 3's "SHALL NOT reject by any automatic rule" cannot be
+        broken by a caller passing the wrong actor_kind - which is the
+        only way it could be broken at all, since no automatic rule calls
+        either function.
+
+      - >
+        A REJECTION AND ITS EFFECT ARE ONE DECISION (criterion 4).
+        Rejecting a supply that is currently promoted empties its slot
+        and moves it to the rejected schema in a single entry. The person
+        is not made to demote it first, which would put two entries in
+        the log for one act and leave a window where the slot was empty
+        and the supply still promoted.
     source: >
       Keith, plans/supply-model.md Thread B (rejected is a decision
       state, the four-version scenario, no SUPERSEDED state) and Thread
@@ -13515,6 +13556,24 @@ requirements:
         queue an operator can work and one they stop trusting. This is a
         presentation consequence as much as a data one, and REQ-DASH-070's aggregated element is where it lands.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075]
+    unmet_criteria:
+      - criterion: >
+          Criterion 5's proviso - "SUBJECT TO REQ-PIPE-084 criterion 11,
+          which refuses the demotion outright while any later period
+          stands on that supply". The demotion itself is built and
+          tested; what is absent is the refusal, because nothing yet
+          makes a later period stand on a supply.
+        why: >
+          A later period stands on a supply through INHERITANCE, which is
+          REQ-PIPE-098, and through SUBSTITUTION, which is REQ-PIPE-084.
+          Neither is built, so there is no state for the refusal to read
+          and a check written now would be guarding a condition that
+          cannot arise - which is worse than an absent guard, because it
+          reads as covered.
+        owner: >
+          REQ-PIPE-084, which owns the criterion this defers to.
+        blocked_by:
+          requirements: [REQ-PIPE-084, REQ-PIPE-098]
     decisions:
       - >
         POINTER ADDED 2026-09-28 (Keith's approval to touch this signed
@@ -13900,7 +13959,7 @@ requirements:
       that actually belong together rather than whatever happens to be
       sitting in staging.
     moscow: must
-    status: not_started
+    status: in_progress
     source: >
       The wiring REQ-PIPE-035, REQ-PIPE-036 and REQ-QAC-037 each
       deferred to the promotion sprint - ten unmet acceptance criteria
@@ -14004,6 +14063,54 @@ requirements:
         the diagnostic, per CLAUDE.md's standing practice.
     dependencies: [REQ-PIPE-075, REQ-PIPE-035, REQ-PIPE-036, REQ-QAC-037]
     decisions:
+      - >
+        BUILT IN TWO HALVES, and this records which is which on
+        2026-09-28 so nobody has to infer it from the code.
+        `in_progress` rather than `built` because the register's gate
+        forbids evidence on anything not built, and a status that
+        overclaims is worse than one that cannot carry the detail.
+
+        THE DECISION LAYER IS DONE - every rule about what a check may
+        read and what it should say when it cannot. Criteria 4, 5, 14,
+        15 and 16: `period_schema.check_readiness()` and `_why_missing()`
+        tell four reasons a table is absent apart, most specific first,
+        because "overdue" sends somebody to chase a supplier who has
+        already sent it while "staged awaiting a decision" sends them to
+        decide. Criteria 6 and 7: `reevaluation.plan()` and `mark()`.
+        Criteria 11, 12 and 13: a contested table offers nothing of its
+        own, a check that merely READS it resolves against the period's
+        promoted version, and the table's own checks do not run and it
+        is not promoted.
+
+        THE WIRING IS NOT - criteria 1, 2, 3, 8 and 9.
+        `create_overlay_views()`, `fan_out()` and `reference_view()` are
+        built and tested and NOTHING CALLS ANY OF THEM. The orchestrators
+        still assemble a run's schema with
+        `supply_db.create_run_views()` plus `borrow_views()` - this
+        run's own staged tables, with the ones it did not carry BORROWED
+        FROM AN EARLIER RUN rather than read from the period's promoted
+        state. Swapping the one for the other is the whole of the
+        remaining work, and it is a real piece of work rather than a
+        repoint: it changes what every Child Protection cross-table
+        check reads.
+
+      - >
+        CRITERION 10 NOW CONTRADICTS REQ-PIPE-105 CRITERION 5, AND THAT
+        IS FOR KEITH RATHER THAN FOR ME TO SETTLE. This one says a run
+        shall overlay only the tables of THE DELIVERY UNDER TEST and
+        shall draw in no staged supply belonging to another delivery.
+        REQ-PIPE-105 criterion 5 says the opposite - read the one version
+        staged for the PERIOD - and its criterion 9 gives the reasoning:
+        "the staged delivery's own tables" names a unit that stops
+        existing once every file is its own arrival.
+
+        Both are signed. This one on 2026-09-26, that one on 2026-09-28,
+        and the later one is explicitly about this unit - but its
+        criterion 9 instructs amending REQ-PIPE-035 and REQ-PIPE-036 BY
+        NAME and does not mention this requirement, so the amendment here
+        is a consequence nobody wrote down. Flagged rather than edited,
+        because amending a signed criterion on my own reading is what the
+        sign-off gate exists to prevent.
       - >
         Decided a mixed-period delivery FANS OUT, one QA run per period,
         rather than composing tables from different periods into one

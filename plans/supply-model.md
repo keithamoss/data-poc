@@ -200,6 +200,52 @@ A `CHANGELOG.yaml` entry for anything release-note-worthy, and the
 superseded `plans/*.md` prose deleted in the commit that flips a
 requirement to `built`.
 
+**WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
+fresh session can pick up from a file rather than from the commit log.**
+
+Sprint 0 landed (`REQ-DASH-094`) and so did the `REQ-PIPE-074`
+reconciliation. Of Sprint A, **`REQ-PIPE-075` IS BUILT** - the spine
+existed by early evening and nothing called it; what the night added is
+the assembly and the wiring, plus the two defects that only showed once
+the real pipeline ran. `REQ-PIPE-076` and `REQ-PIPE-079` are
+substantially built and still `not_started` in the register, which is
+the next thing to reconcile rather than the next thing to build.
+
+**Three findings from the night that are Keith's rather than mine**,
+all recorded in the requirements' own `decisions:` and repeated here
+because this is the file a fresh session reads:
+
+1. **`REQ-PIPE-075` criterion 9 is met by something stronger than it
+   asks for.** It wants the log entry written only AFTER the tables are
+   durably in the period schema; what was built puts entry and move in
+   ONE TRANSACTION. The purpose - an interrupted promotion repeated
+   rather than skipped - is fully met, the letter is not, because
+   inside one transaction there is no "after". Proposal: reword the
+   criterion to require atomicity outright.
+2. **`REQ-PIPE-079` criterion 10 and `REQ-PIPE-105` criterion 5 now
+   contradict each other**, over whether a run overlays the DELIVERY's
+   tables or the PERIOD's. Both are signed; `105` is signed later and
+   is explicitly about that unit, and its criterion 9 instructs
+   amending `REQ-PIPE-035` and `036` by name without mentioning `079`.
+   Flagged rather than edited.
+3. **The pipeline lost its cross-arrival parallelism, and it cost
+   2.4x.** Child Protection's 18 arrivals: 2m35s parallel, 6m14s in
+   receipt order, so a full bootstrap is nearer ten minutes than four.
+   It is not optional - filing every arrival up front put all 108
+   supplies in 2023-Q1 and promoted six, where one at a time they
+   spread across all fifteen quarters and 67 promote. `--sequential`
+   now changes nothing and says so in its own help text; whether to
+   remove the flag is Keith's call. The obvious place to get the time
+   back is WITHIN a run, whose four tools are independent reads
+   evaluated one after another.
+
+**Nothing has been deleted from this file yet, and that is deliberate
+rather than an oversight.** The standing rule is that a design thread
+is deleted WHOLE once its last dependent batch is built. Thread B's
+staging-and-promotion prose feeds `075`, `076`, `079`, `084` and `098`,
+and the last two are unbuilt, so it stays. Sprint 11's own entry is
+part of the sprint list the `sprints` gate reads, not prose.
+
 **Priority: REQ-PIPE-093 is queued, Keith 2026-09-28 evening, his own
 words: "let's not forget PIPE-093 either. We'll tackle it next or after
 the scoper comes back."** It is `not_started`, UNSIGNED, and has FIVE
