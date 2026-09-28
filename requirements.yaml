@@ -15217,7 +15217,10 @@ requirements:
         THE SYSTEM SHALL distinguish its OWN comments on a ticket from
         comments written by people, SHALL determine what it last said
         from its own comments alone, and SHALL NOT treat a person's
-        comment as a state to reconcile or as a reason to post.
+        comment as a state to reconcile or as a reason to post. A
+        person's comment MAY be read as a filing decision by the
+        decision intake, which is a different reader and REQ-GHUB-082's
+        concern, never the reconciler's.
       - >
         WHEN a person has CLOSED a ticket and the slot's state
         afterwards changes, THE SYSTEM SHALL REOPEN that same ticket and
@@ -15235,6 +15238,11 @@ requirements:
         - through the CLI, the TUI or any other route - THE SYSTEM SHALL
         reconcile through the SAME pass, and SHALL NOT post an update of
         that operation's own devising.
+      - >
+        WHERE such an operation is REFUSED, nothing about the slot has
+        changed, so THE SYSTEM SHALL reply to the person on the route
+        that raised it rather than through the pass - which would
+        correctly say nothing, and leave them hearing nothing back.
       - >
         THE SYSTEM SHALL reconcile only AFTER the change is durably
         recorded, so that a ticket can never say something the decision
@@ -15261,8 +15269,10 @@ requirements:
       - >
         THE SYSTEM SHALL read its ticket policy from DATA-ASSET-LEVEL
         configuration, offering at least `all` - a ticket for every slot
-        - and `needs-action` - a ticket only for a slot that is amber,
-        red, overdue or late - and SHALL default to `needs-action`.
+        - and `needs-action` - a ticket for a slot that is amber, red,
+        overdue, late, held, or awaiting a person's decision because
+        automatic promotion did not apply - and SHALL default to
+        `needs-action`.
       - >
         THE SYSTEM SHALL produce the same result whether the reconciler
         is invoked on a schedule or after a QA run, and SHALL NOT depend
@@ -15359,6 +15369,31 @@ requirements:
         all is that everybody on the team sees the same queue rather
         than each person going and looking. Recorded because it changes
         what `needs-action` has to cover, not just how the story reads.
+      - >
+        THE THREAD HAS TWO READERS, AND ONLY ONE OF THEM IS THIS
+        REQUIREMENT (Keith, 2026-09-28). The RECONCILER ignores what
+        people write entirely and reads state from the decision log; the
+        DECISION INTAKE reads a person's comment as a command and writes
+        to that log, which the reconciler then sees. Written down
+        because a builder given only one of the two requirements will
+        otherwise merge them, and get either a swallowed command or a
+        feedback loop where the tool answers itself.
+
+        KEITH'S OWN REFINEMENT, to be carried into REQ-GHUB-082 as a
+        criterion when it is worked: a comment containing no known
+        command is ignored outright, and the prose AROUND a known
+        command is ignored too. So a person may reply in their own words
+        and still be understood, and may chat on the thread without the
+        tool reading it as an instruction.
+      - >
+        A REFUSAL IS THE ONE THING AN OPERATION SAYS FOR ITSELF (Keith,
+        2026-09-28). Everything else a CLI or TUI operation has to say
+        goes through the pass, but a refused decision appends nothing to
+        the log, so no slot state changed, so the reconciler would
+        correctly say nothing - and the person would hear nothing back.
+        REJECTED routing refusals through the reconciler for tidiness:
+        it would make them invisible, which is the opposite of what a
+        refusal is for.
       - >
         NO MIGRATION - THE EXISTING TICKETS MAY SIMPLY BE CLEARED AWAY
         (Keith, 2026-09-28, unprompted: "happy to say that we just close
