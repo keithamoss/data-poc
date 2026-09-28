@@ -6873,6 +6873,39 @@ requirements:
         leave.
 
       - >
+        CRITERIA 8 TO 11 HAVE AN OWNER NOW, AND IT IS NOT THIS
+        REQUIREMENT. Repointed 2026-09-29 at Keith's own ask, because
+        the decision below says the fork is his and unowned, and that
+        stopped being true the evening it was written. REQ-PIPE-110
+        makes `contract/calendar.yaml` the one place a delivery
+        agreement lives and DELETES `slaProperties` outright, so the
+        due time leaves the ODCS contract; REQ-PIPE-113's criterion 14
+        exists for this requirement by name - "give REQ-GEN-044's
+        generated history somewhere effective-dated to state a due
+        time, so that its criteria 8 to 11 can be built". The
+        underlying question - whether the due time is a versioned
+        property of the CALENDAR or of the DATASET'S PARTICIPATION -
+        Keith answered 2026-09-29: the participation, sited within the
+        calendar file. So nothing here waits on a decision any more; it
+        waits on 110 and 113 being signed and built, and both are
+        `not_started` and unsigned.
+      - >
+        THE ANALYSIS BELOW IS LEFT AS IT WAS, because only its
+        conclusion about ownership went stale. The shape it describes -
+        a calendar version carries the claim window and the dates and
+        NOT the due time, so there is nowhere to put an effective-dated
+        one - is exactly the gap REQ-PIPE-110 was scoped to close.
+      - >
+        AND THE WAY IT WENT STALE IS THIS REQUIREMENT'S OWN RECORDED
+        LESSON HAPPENING AGAIN, in the other direction. It already says
+        "an NFR referring to another requirement BY NAME is a
+        cross-reference nothing validates... when a decision on one
+        requirement changes, every other requirement naming it has to
+        be re-read by hand". Here a NEW requirement took ownership of
+        an OLD one's fork, and nothing told the old one. Keith caught
+        it by remembering the calendar move when a summary said the
+        fork was unowned.
+      - >
         CRITERIA 8 TO 11 NEED A DECISION FROM KEITH BEFORE THEY CAN BE
         BUILT, and it is a real fork rather than an implementation
         detail. Criterion 8 asks for the differing schedule
@@ -24162,10 +24195,13 @@ requirements:
       - "CARRIED FORWARD and specifically at risk in this move: per-dataset expected times are a definite need (Keith, 2026-09-22). The case that decided it is worth restating because a single file invites re-flattening - three slots in one period, births due 09:00, cp_clients due 09:00, cp_placements due 17:00; births arriving at 16:00 reads ON TIME with the deadline on the period and LATE with it on the slot, and the wrong one is a FALSE GREEN."
       - "Decided the Child Protection override is about HOW EARLY a supply may arrive, not about its expected time (Keith corrected this explicitly, 2026-09-28). It widens the claim window; it does not move the deadline. Recorded here because a single file makes the two look like the same kind of setting."
       - "Rejected moving the asset's timezone into this file, which a first reading of `one place a delivery agreement lives` suggests. The zone is asset-wide - the dashboard's asset clock, REQ-DASH-071's timestamps, arrival classification - so putting a general fact inside one consumer's file would misplace it. See REQ-PIPE-112, which is where the zone's own versioning lands."
+      - "ANSWERED 2026-09-29 (Keith): a dataset's expected time is a VERSIONED PROPERTY OF THAT DATASET'S PARTICIPATION, sited within the calendar file. His own words: `the expected time is a versioned property of the dataset's participation within the calendar`. So it is the second of the two options - the due time travels with the dataset rather than with the shared calendar version - and the cost accepted with it is the one the question named: two versioning axes to reason about when asking what was in force on a date."
+      - "WHY THAT WAY ROUND, restated so it is not re-litigated: the rejected option put the due time inside the calendar VERSION, which means one dataset moving its deadline by an hour authors a new version of a calendar that thirty datasets share. At two datasets that reads fine; at thirty it makes every dataset's history carry version boundaries that had nothing to do with it, and it makes a routine per-dataset change look like an asset-wide event."
+      - "WHAT THIS DOES NOT ANSWER, flagged rather than inferred: the first open question below - where participation lives, and whether `participates` replaces today's `delivery_months` and `not_expected` - is still open. This answer presumes participation is expressed in the calendar file, because that is what it is a property OF, but it says nothing about which keys express it. Reading more into it than that is how a decision acquires clauses nobody agreed."
+      - "IT UNBLOCKS REQ-PIPE-113, which is what makes it worth having early: that requirement's criterion 14 exists to give REQ-GEN-044's generated history somewhere effective-dated to state a due time, so REQ-GEN-044 criteria 8 to 11 wait on 113 and 113 waited on this."
       - "Recorded because the move is the risky part rather than the file: pipeline/cadence.py's _sla_properties_to_dict already had a real defect of exactly this shape, keying on `property` alone and discarding `element:`, so Child Protection's single expectedTime block silently governed all six datasets. That was found by reading the parser rather than the config, and the same discipline applies here - reading the new file and inferring what the code does with it is not verification."
     open_questions:
       - "WHERE PARTICIPATION LIVES, and whether `participates: {slots, reason}` REPLACES today's `delivery_months` and `not_expected`. Thread C's newest subsection names `participates` per dataset without saying whether it supersedes the two keys that already do this job in contract/data-asset.yaml's hierarchy, or sits beside them, or whether participation moves into calendar.yaml at all. This changes what gets built: `delivery_months` carries its own reasoned naming decision (it names when a supply ARRIVES, not the period it covers) and replacing it with a slot list would retire that decision rather than restate it."
-      - "WHETHER A DATASET'S EXPECTED TIME IS A VERSIONED PROPERTY OF THE CALENDAR, or a property of the dataset's participation with its own effective dating. If it sits inside a calendar version, then one dataset moving its due time by an hour authors a new version of a calendar that thirty datasets share - readable, but heavy. If it sits on the dataset with its own versioning, there are two versioning axes to reason about when asking what was in force. REQ-PIPE-113 cannot be built without this answer."
       - "WHETHER slaProperties GOES ENTIRELY or only its five schedule properties. `frequency` is an ODCS-standard property that says something a human reader of the contract wants (this feed is daily), and deleting it removes that statement from the contract even though nothing computes with it."
   - id: REQ-PIPE-111
     title: A calendar's history cannot be edited, and there is no way round it

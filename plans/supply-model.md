@@ -4586,11 +4586,22 @@ which the newer subsection deletes. Mark the older one superseded when
 the batch lands. The thread warns about exactly this failure twice and
 has now committed it again.
 
-**Still needing Keith before the batch can be signed** - four that would
+**ONE OF THOSE IS NOW ANSWERED, 2026-09-29 morning.** Keith, in his own
+words: "the expected time is a versioned property of the dataset's
+participation within the calendar." So `expected_time` sits on the
+dataset's PARTICIPATION entry, versioned there, inside the calendar
+file - not on the calendar version itself, and not effective-dated on
+the dataset in its own contract. The reason that way round is recorded
+on `REQ-PIPE-110`: putting it on the calendar version means one
+dataset shifting its hour authors a version that thirty datasets
+share, and every one of them then reads as having changed. It does NOT
+settle where participation itself lives, which is the separate open
+question below.
+
+**Still needing Keith before the batch can be signed** - three that would
 change what gets built (where participation lives and whether
-`participates` replaces `delivery_months`/`not_expected`; whether
-`expected_time` is versioned on the calendar or effective-dated on the
-dataset; what happens to `REQ-PIPE-050`'s existing guard, now answered
+`participates` replaces `delivery_months`/`not_expected`;
+what happens to `REQ-PIPE-050`'s existing guard, now answered
 in principle but not in the register; whether `slaProperties:` goes
 entirely or only its schedule properties) and four non-functional (one
 file at ~30 datasets; what the gate does when it cannot compare - a
