@@ -20074,8 +20074,8 @@ requirements:
         ARRIVING, and then resolve. This was presented to Keith as
         "every CP cross-table check red until promotion exists", and
         that was WRONG - it assumed a run reads only its own
-        arrival's table plus promoted state. Reading the newest
-        supply staged for the period instead (criterion 5) means the
+        arrival's table plus promoted state. Reading the version
+        staged for the period instead (criterion 5) means the
         run triggered by the last file of a six-file delivery sees
         all six, so the final evaluation resolves normally even with
         nothing promoted at all. REQ-QAC-037 criterion 4 already
@@ -20085,7 +20085,7 @@ requirements:
 
         What remains is real but much smaller: during the minutes a
         delivery is landing, a viewer can see a cross-table check red
-        for a table that has not arrived yet. Criterion 8 is what
+        for a table that has not arrived yet. Criterion 12 is what
         keeps that legible rather than merely loud - a dashboard red
         for reasons about our own timing rather than about the data
         is how people learn to ignore red.
@@ -20099,8 +20099,8 @@ requirements:
       - >
         A REFERENTIAL CHECK STILL ASKS WHETHER THE SUPPLY IS
         COHERENT, which is worth stating because an earlier draft of
-        this requirement said it did not. Reading the newest staged
-        supply for the period keeps new-against-new where both have
+        this requirement said it did not. Reading the version staged
+        for the period keeps new-against-new where both have
         arrived; it becomes new-against-promoted only for a table
         genuinely not resupplied this period, which is the correct
         comparison in that case.
@@ -20120,7 +20120,7 @@ requirements:
         not built, and a status that overclaims is worse than one that
         cannot carry the detail.
 
-        DONE: criterion 9 - `qa_tools/cp/completion_tracker.py` and its
+        DONE: criterion 11 - `qa_tools/cp/completion_tracker.py` and its
         tests are deleted, the CP ingest handler checks every table
         arrival instead of waiting for a marker, the DynamoDB table and
         its IAM grant are out of the CDK stack, and
@@ -20132,12 +20132,18 @@ requirements:
         third value refused outright and a test proving the instant never
         follows a file's mtime.
 
-        NOT DONE: criteria 1, 2, 5 and 6 - the arrival UNIT itself, which
-        is still the delivery folder rather than the file, and the overlay
-        reading the newest supply staged for the period. Criteria 7 and 8,
-        the amendments to REQ-PIPE-035 and REQ-PIPE-036, go with that
-        change rather than ahead of it. Criterion 10's legible red for a
+        NOT DONE: criteria 1, 2 and 5 to 8 - the arrival UNIT itself,
+        which is still the delivery folder rather than the file, and the
+        overlay reading the version staged for the period. Criteria 9 and
+        10, the amendments to REQ-PIPE-035 and REQ-PIPE-036, go with that
+        change rather than ahead of it. Criterion 12's legible red for a
         table nothing has promoted is unbuilt.
+
+        THE NUMBERS IN THIS PARAGRAPH WERE RESTATED 2026-09-28 when
+        criteria 6 to 8 were inserted and everything after them shifted
+        by two. Worth saying rather than silently fixing: a stale
+        criterion reference in a decision is the kind of thing a later
+        reader trusts without re-checking.
       - >
         SETTLED 2026-09-28 (Keith), resolving the tension recorded
         after this paragraph, and note the ANSWER IS NOT THE ONE THIS
@@ -20291,6 +20297,13 @@ requirements:
         generator. Also rejected: both, behind a flag, since the fast
         path is the one everybody would run.
       - >
+        PARTLY REFINED 2026-09-28 - the "newest" half of this became
+        "the ONE staged version, and a hold where there are several",
+        for the reasons in the settled decision above. What survives
+        unchanged, and is why this is kept rather than struck, is
+        that a run reads the whole PERIOD rather than only its own
+        arrival.
+
         AN ARRIVAL'S RUN READS THE NEWEST SUPPLY STAGED FOR THE
         PERIOD, NOT ONLY ITS OWN TABLE - Keith's own challenge,
         2026-09-27, to a claim made here that was an overstatement
@@ -20327,6 +20340,10 @@ requirements:
         all of it, so the final evaluation resolves with nothing
         promoted at all, and the reds are transient.
       - >
+        OVERTAKEN BY EVENTS - parts of this requirement were built on
+        2026-09-28, as decision 1 records. Kept because the reasoning
+        still governs everything NOT built, which is most of it.
+
         NOTHING IS BUILT BY THIS REQUIREMENT YET (Keith, 2026-09-27:
         "write the requirement, build nothing yet"). The whole AWS
         ingest path has never run against real AWS and cannot be
@@ -20920,6 +20937,9 @@ requirements:
     date_written: "2026-09-28"
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-28"
     source: >
       Keith, 2026-09-28, in conversation about what actually stops a
       wrong file auto-promoting. Two findings behind it: Birth
