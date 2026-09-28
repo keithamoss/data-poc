@@ -3842,3 +3842,47 @@ twice. It deliberately did not re-find the `TypeError`.
     anyway. A repair of the page the reader is already on keeps the
     arrival framing, because they have not gone anywhere.
     Reproduced first, in `tests-js/navigation.test.js`.
+
+66. **[done, 2026-09-29]** **[Pipeline & publishing, Testing & dev tooling]**
+    **The same supply-id-as-table-name conflation as #64, in the module
+    written the same night, found the same way.**
+    Found by a test in a DIFFERENT module that happened to mint the two
+    names differently.
+
+    `inheritance.inherit_into()` - the RULE's own pass, which runs at
+    every period's birth in the real pipeline - took the supply id
+    straight out of the decision log and built
+    `CREATE VIEW ... AS SELECT * FROM "<period>"."<supply id>"`. A
+    supply has two names: `cp-carers@202605010100000000` is how a filing
+    and a decision name it, and `cp_carers__202605010100000000` is what
+    the warehouse can call a table. The first is not an identifier
+    PostgreSQL will take unquoted, which is why supply_db refuses it.
+
+    **WHY #64's FIX DID NOT REACH IT.** #64 was fixed on 2026-09-29 by
+    adding `substitution._physical_in()`, which resolves the physical
+    table from the period schema, and the write-up said the same
+    conflation had turned up in a third module the same night. It did
+    not say to go and look at the fourth. Substitution and inheritance
+    are deliberately kept apart - they mean opposite things - and that
+    separation is exactly what let one be fixed while the other was
+    not.
+
+    **WHY NOTHING CAUGHT IT, and it is #64's lesson word for word.**
+    `tests/test_inheritance.py`'s own `_promote_into()` promoted with
+    `supply=physical, physical_tables=[physical]` - one string playing
+    both parts - so every one of the module's thirty-five tests passed
+    and the real system, where the two differ, would have failed at the
+    first period birth after a real promotion.
+
+    Fixed with an `inheritance._physical_in()` of its own, and the rule's
+    pass now records a missing table as a REFUSAL rather than raising,
+    on criterion 10's own terms: one dataset's problem must not stop the
+    rest of the period being born. Three tests pin it at the path that
+    actually runs.
+
+    **The standing lesson is about the SWEEP, not the identifiers.**
+    When a fixture-shaped defect is found, the fix is not done until
+    every module that could hold the same one has been looked at. #64
+    named a third module and stopped; the fourth cost a second night's
+    finding. `grep` for the shape - here, a period schema and a name
+    from the decision log in one f-string - not for the module.

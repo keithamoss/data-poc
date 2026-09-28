@@ -15678,6 +15678,54 @@ requirements:
         decision-log entry, and what should happen to a PROMOTED
         supply's tables when it is re-filed is REQ-PIPE-079's wiring
         rather than something to invent in an adapter.
+      - >
+        PHASE 2 IS BUILT, 2026-09-29 - criterion 13, the ONE
+        IMPLEMENTATION, plus 3, 10, 20, 21, 24, 26 and the parts of 8, 9
+        and 28 that are not a route's. `filing_decisions.apply()` takes
+        a `Request` and returns an `Outcome`; what an adapter does is
+        deliberately small - identify the person, read the operation and
+        its arguments, call it, render what comes back.
+      - >
+        THE JUDGEMENT IS DELIBERATELY NOT IN IT (criterion 20). It stays
+        in `decision_log._judge()`, inside the transaction that appends
+        the entry, because whether a slot is already filled is a fact
+        about other rows and an operator shown the state a moment ago
+        may be wrong by now. This module refuses only what it can answer
+        without the log - an unknown actor, a missing reason, an
+        operation nobody offers - and a test drives the same refusal
+        both through `apply` and straight at the operation, requiring
+        the identical sentence from each.
+      - >
+        A NO-OP IS NOT A REFUSAL (criterion 26), and the reason is about
+        people rather than correctness: an operator arriving at a state
+        that already holds happens constantly when two of them look at
+        the same ticket, and reporting it as a failure teaches them to
+        ignore failures. `Outcome.changed` is False, the message says
+        what already holds, and nothing is appended. `reconcile_after()`
+        runs only where something changed - a ticket that says something
+        new, or says nothing, which is REQ-GHUB-109's rule applied here.
+      - >
+        SEVEN OF THE EIGHT WORK; REFILE REFUSES LOUDLY, naming why and
+        naming REQ-PIPE-079. It is the only operation with no module
+        owning its warehouse change: `filing.refile()` moves the FILING
+        RECORD and writes no decision-log entry, and what happens to a
+        PROMOTED supply's tables on a re-file belongs to that
+        requirement's wiring. Inventing it in this dispatcher would put
+        the answer in the one place nobody would look for it - so it
+        says so rather than doing something plausible.
+      - >
+        A REAL DEFECT FOUND WHILE BUILDING, in code that has been
+        running: `inheritance.inherit_into()` - the RULE's own pass, at
+        every period's birth - used a supply ID as a table name. It is
+        the same conflation post-build-review #64 fixed in
+        substitution.py the same night, in the module that was
+        deliberately kept separate from it, and it survived for the same
+        reason: every test of it promoted with `supply=physical`, so the
+        two names were one string. Found by a test HERE that minted them
+        differently. Written up as #66, fixed at the path that actually
+        runs, and the rule's pass now records a missing table as a
+        refusal rather than raising - one dataset's problem must not
+        stop the rest of the period being born.
 
   - id: REQ-PIPE-083
     title: >

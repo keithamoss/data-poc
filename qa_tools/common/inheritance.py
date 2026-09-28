@@ -141,6 +141,41 @@ def _most_recent_promoted(conn, dataset_id: str,
     return best
 
 
+def _physical_in(conn, *, period: str, logical: str) -> str:
+    """The PHYSICAL table this logical name resolves to in that period.
+
+    A SUPPLY ID IS NOT A TABLE NAME, and this module assumed it was
+    until 2026-09-29. `cp-carers@202605010100000000` is how a filing and
+    a decision name a supply; `cp_carers__202605010100000000` is what
+    the warehouse can call a table, because dbt and Soda write the name
+    into their own SQL unquoted. The log records the first and the
+    period schema holds the second, so building a view needs both - the
+    id to record what this period stands on, the table to point at.
+
+    THE SAME DEFECT substitution._physical_in() was written for, in a
+    module written the same night and never joined up. It hid here for
+    the same reason: every test of the rule's own pass promoted with
+    `supply=physical, physical_tables=[physical]`, so the two names were
+    one string and every assertion held. Found by a test in a different
+    module that minted them differently
+    (plans/post-build-review.md #66).
+    """
+    found = period_schema.promoted_in(conn, period, [logical]).get(logical) or []
+    if not found:
+        raise InheritanceRefused(
+            f"{period} holds no table called {logical!r}, so there is nothing "
+            f"to stand on. The decision log says a supply was promoted into it "
+            f"- if that is still true, the table has been moved or dropped.")
+    if len(found) > 1:
+        # REQ-PIPE-068's rule: several versions with no basis to choose
+        # between them is absence, not a coin toss.
+        raise InheritanceRefused(
+            f"{period} holds {len(found)} versions of {logical!r} "
+            f"({', '.join(sorted(found))}) and nothing says which is the "
+            f"supply, so nothing can inherit from it.")
+    return found[0]
+
+
 def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
                  effective_at: str) -> Outcome:
     """Fill this newly-opened period for every dataset that owes it
@@ -180,11 +215,24 @@ def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
             continue
 
         stands_on, supply = source
+        try:
+            physical = _physical_in(conn, period=stands_on, logical=entry.table)
+        except InheritanceRefused as exc:
+            # THE LOG SAYS A SUPPLY IS THERE AND THE SCHEMA DOES NOT.
+            # Recorded as a refusal rather than raised, on criterion
+            # 10's own terms and for the same reason the no-source case
+            # is: one dataset's problem must not stop the rest of the
+            # period being born.
+            outcome.refused.append(Refused(
+                dataset_id=entry.dataset_id, period=period_name, reason=str(exc)))
+            _record(conn, entry, action=decision_log.INHERIT_REFUSED, supply="",
+                    period=period_name, stands_on=None, reason=str(exc),
+                    effective_at=effective_at)
+            continue
         conn.execute(
             f'CREATE OR REPLACE VIEW "{schema}".'
             f'"{supply_db._ident(entry.table, "table name")}" AS SELECT * FROM '
-            f'"{period_schema.period_schema(stands_on)}".'
-            f'"{supply_db._ident(supply, "table name")}"')
+            f'"{period_schema.period_schema(stands_on)}"."{physical}"')
         outcome.inherited.append(Inherited(
             dataset_id=entry.dataset_id, period=period_name, stands_on=stands_on,
             supply=supply, reason=reason))
@@ -315,6 +363,10 @@ def inherit_one(conn: supply_db.SupplyConnection, *, dataset_id: str,
             f"would be a lie with a schema on it.")
 
     stands_on, supply = source
+    # RESOLVED BEFORE THE TRANSACTION OPENS, so a period whose table has
+    # gone missing is a refusal rather than a rolled-back decision - the
+    # same ordering substitution.substitute() uses.
+    physical = _physical_in(conn, period=stands_on, logical=entry.table)
     schema = period_schema.period_schema(period)
     decision = decision_log.Decision(
         agency_id=entry.agency_id, collection_id=entry.collection_id,
@@ -325,8 +377,7 @@ def inherit_one(conn: supply_db.SupplyConnection, *, dataset_id: str,
         conn.execute(
             f'CREATE OR REPLACE VIEW "{schema}".'
             f'"{supply_db._ident(entry.table, "table name")}" AS SELECT * FROM '
-            f'"{period_schema.period_schema(stands_on)}".'
-            f'"{supply_db._ident(supply, "table name")}"')
+            f'"{period_schema.period_schema(stands_on)}"."{physical}"')
     return Inherited(dataset_id=dataset_id, period=period, stands_on=stands_on,
                       supply=supply, reason=schedule_reason or reason)
 

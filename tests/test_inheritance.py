@@ -609,3 +609,94 @@ class TestUnInheritingIsWhatFreesABlockedWithdrawal:
                 actor="Keith", effective_at=WHEN, reason="wrong file", from_slot=first)
         assert dl.DE_SUBSTITUTE in str(exc.value)
         assert dl.UN_INHERIT not in str(exc.value)
+
+
+class TestASupplyIdIsNotATableName:
+    """plans/post-build-review.md #66 - the SAME defect
+    substitution._physical_in() was written for, in a module written the
+    same night and never joined up.
+
+    A supply has two names. `cp-carers@202605010100000000` is how a
+    filing and a decision name it; `cp_carers__202605010100000000` is
+    what the warehouse can call a table, because dbt and Soda write the
+    name into their own SQL unquoted and PostgreSQL folds an unquoted
+    identifier to lower case.
+
+    `inherit_into()` - the RULE's own pass, which runs at every period's
+    birth in the real pipeline - took the supply id straight out of the
+    decision log and built `FROM "<period>"."<supply id>"`. Every test
+    of it passed because `_promote_into()` above promotes with
+    `supply=physical, physical_tables=[physical]`: one string playing
+    both parts, so the two names genuinely were the same. The fixture
+    was not lazy, it was UNDER-SPECIFIED, which makes a whole class of
+    confusion invisible rather than merely untested.
+
+    Found by a test in a DIFFERENT module that happened to mint them
+    differently. These pin it here, at the path that actually runs.
+    """
+
+    def _promote_with_distinct_names(self, conn, dataset, period):
+        arrival = uuid.uuid4().hex[:10]
+        physical = f"{dataset.table}__{arrival}"
+        supply = f"{dataset.dataset_id}@{arrival}"
+        assert supply != physical, "the fixture must not conflate the two"
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
+        conn.execute(
+            f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
+        conn.execute(f'INSERT INTO "{supply_db.STAGING_SCHEMA}"."{physical}" VALUES (11)')
+        promotion.promote(
+            conn, agency_id=dataset.agency_id, collection_id=dataset.collection_id,
+            dataset_id=dataset.dataset_id, supply=supply, period=period,
+            physical_tables=[physical], actor="tester", actor_kind=dl.PERSON,
+            effective_at=WHEN)
+        return supply, physical
+
+    def test_the_rules_own_pass_inherits_a_supply_whose_names_differ(
+            self, conn, annual, periods, owes_nothing):
+        first, second = periods
+        supply, _physical = self._promote_with_distinct_names(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+
+        outcome = inheritance.inherit_into(conn, second, effective_at=WHEN)
+
+        assert not outcome.refused, [r.reason for r in outcome.refused]
+        assert [i.dataset_id for i in outcome.inherited] == [annual.dataset_id]
+        assert outcome.inherited[0].supply == supply, (
+            "the log records the supply ID, whatever the table is called")
+        schema = period_schema.period_schema(second)
+        rows = conn.execute(f'SELECT id FROM "{schema}"."{annual.table}"').fetchall()
+        assert [r[0] for r in rows] == [11], "the view resolves to the real rows"
+
+    def test_an_operators_inheritance_does_the_same(
+            self, conn, annual, periods, owes_nothing):
+        first, second = periods
+        supply, _ = self._promote_with_distinct_names(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+
+        got = inheritance.inherit_one(
+            conn, dataset_id=annual.dataset_id, period=second, actor="Keith",
+            reason="putting it back", effective_at=WHEN)
+
+        assert got.supply == supply
+        schema = period_schema.period_schema(second)
+        rows = conn.execute(f'SELECT id FROM "{schema}"."{annual.table}"').fetchall()
+        assert [r[0] for r in rows] == [11]
+
+    def test_a_period_whose_table_has_gone_is_REFUSED_not_crashed(
+            self, conn, annual, periods, owes_nothing):
+        """The log says a supply was promoted into that period and the
+        schema does not have it - somebody moved or dropped it since.
+        Recorded as a refusal on criterion 10's own terms, so one
+        dataset's problem does not stop the rest of the period being
+        born."""
+        first, second = periods
+        _supply, physical = self._promote_with_distinct_names(conn, annual, first)
+        conn.execute(
+            f'DROP TABLE "{period_schema.period_schema(first)}"."{physical}"')
+        period_schema.ensure_period_schema(conn, second)
+
+        outcome = inheritance.inherit_into(conn, second, effective_at=WHEN)
+
+        assert not outcome.inherited
+        assert len(outcome.refused) == 1
+        assert "no table called" in outcome.refused[0].reason
