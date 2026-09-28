@@ -202,49 +202,81 @@ requirement to `built`.
 
 **WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
 fresh session can pick up from a file rather than from the commit log.**
+Last updated 02:30 Perth, 29 commits in.
 
-Sprint 0 landed (`REQ-DASH-094`) and so did the `REQ-PIPE-074`
-reconciliation. Of Sprint A, **`REQ-PIPE-075` IS BUILT** - the spine
-existed by early evening and nothing called it; what the night added is
-the assembly and the wiring, plus the two defects that only showed once
-the real pipeline ran. `REQ-PIPE-076` and `REQ-PIPE-079` are
-substantially built and still `not_started` in the register, which is
-the next thing to reconcile rather than the next thing to build.
+**BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
+`REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
+into both orchestrators), **`REQ-PIPE-076`** (rejection; its deferral
+cleared), **`REQ-PIPE-084`** (substitution), **`REQ-PIPE-098`**
+(inheritance), **`REQ-DASH-056`** (arrived versus promoted).
 
-**Three findings from the night that are Keith's rather than mine**,
-all recorded in the requirements' own `decisions:` and repeated here
-because this is the file a fresh session reads:
+**PART-BUILT, `in_progress`, each with a decision saying which half:**
+`REQ-PIPE-079` (decision layer done, wiring not), `REQ-PIPE-105`
+(criteria 7 and 8 done), `REQ-QAC-108` (the reference rule done, the
+check authoring not), `REQ-DASH-085` and `REQ-DASH-100` (the qualifier
+done, the drill-through not).
+
+**THE FIVE THINGS THAT ARE KEITH'S, not mine, all recorded in the
+requirements' own `decisions:` and repeated here because this is the
+file a fresh session reads:**
 
 1. **`REQ-PIPE-075` criterion 9 is met by something stronger than it
    asks for.** It wants the log entry written only AFTER the tables are
    durably in the period schema; what was built puts entry and move in
    ONE TRANSACTION. The purpose - an interrupted promotion repeated
-   rather than skipped - is fully met, the letter is not, because
-   inside one transaction there is no "after". Proposal: reword the
-   criterion to require atomicity outright.
-2. **`REQ-PIPE-079` criterion 10 and `REQ-PIPE-105` criterion 5 now
+   rather than skipped - is fully met; the letter is not, because inside
+   one transaction there is no "after". Proposal: reword it to require
+   atomicity outright.
+2. **`REQ-PIPE-079` criterion 10 and `REQ-PIPE-105` criterion 5
    contradict each other**, over whether a run overlays the DELIVERY's
-   tables or the PERIOD's. Both are signed; `105` is signed later and
-   is explicitly about that unit, and its criterion 9 instructs
-   amending `REQ-PIPE-035` and `036` by name without mentioning `079`.
-   Flagged rather than edited.
+   tables or the PERIOD's. Both signed; `105` is later and explicitly
+   about that unit, and its criterion 9 names `035` and `036` as the
+   ones to amend without mentioning `079`. Flagged rather than edited.
 3. **The pipeline lost its cross-arrival parallelism, and it cost
    2.4x.** Child Protection's 18 arrivals: 2m35s parallel, 6m14s in
-   receipt order, so a full bootstrap is nearer ten minutes than four.
-   It is not optional - filing every arrival up front put all 108
-   supplies in 2023-Q1 and promoted six, where one at a time they
-   spread across all fifteen quarters and 67 promote. `--sequential`
-   now changes nothing and says so in its own help text; whether to
-   remove the flag is Keith's call. The obvious place to get the time
-   back is WITHIN a run, whose four tools are independent reads
-   evaluated one after another.
+   receipt order; a full bootstrap is 14m49s where it was ~4m. Not
+   optional - filing every arrival up front put all 108 supplies in
+   2023-Q1 and promoted six, where one at a time they spread across all
+   fifteen quarters and 67 promote. `--sequential` now changes nothing
+   and says so; whether to remove it is his call. The obvious place to
+   get the time back is WITHIN a run, whose four tools are independent
+   reads evaluated one after another.
+4. **`REQ-QAC-108`'s second half needs a mapping nothing records.**
+   Both orchestrators pass `manifest[0]["run_id"]` as the drift
+   reference - the fixed run criterion 4 forbids - and replacing it
+   needs the RUN that checked the reference period's supply.
+   `qa.tables_read` cannot answer that, because several runs read the
+   same supply by design. The option that is probably right is also the
+   reason not to build the others: after `REQ-PIPE-079`'s wiring a run
+   is per PERIOD, and the question needs no mapping at all.
+5. **Birth Registrations' page now carries seventeen separate "missing
+   supply" items, one per skipped day.** Each correct; whether
+   seventeen of them should aggregate the way held supplies do is a
+   judgement about who reads the page. Logged in
+   `plans/road-testing.md`.
 
-**Nothing has been deleted from this file yet, and that is deliberate
-rather than an oversight.** The standing rule is that a design thread
-is deleted WHOLE once its last dependent batch is built. Thread B's
-staging-and-promotion prose feeds `075`, `076`, `079`, `084` and `098`,
-and the last two are unbuilt, so it stays. Sprint 11's own entry is
-part of the sprint list the `sprints` gate reads, not prose.
+**THREE FEATURES NOW EXIST THAT NOTHING IN THIS DEPLOYMENT EXERCISES**,
+and that is the single biggest thing to fix next. Inheritance never
+fires, because no dataset declares a `not_expected` period.
+Substitution never fires, because it needs a person and no operator
+route exists. Both dashboard qualifiers therefore render nowhere on the
+real page. `REQ-GEN-044` is where inheritance gets a real instance and
+the operator routes (`REQ-GHUB-082`, `REQ-PIPE-099`) are where
+substitution does. This is written down rather than left implicit
+because the night's own worst hour went on three defects in code that
+had never executed (`plans/post-build-review.md` #63).
+
+**Two lessons from the night, both in `plans/post-build-review.md`:**
+#63, that a guard making a path unreachable also makes it untested, and
+the path runs for the first time on the day the guard stops holding.
+#64, that a fixture giving two values the SAME string proves nothing
+about the code that tells them apart - which hid a defect that would
+have broken the first real substitution anybody made.
+
+**Nothing has been deleted from this file yet, and that is deliberate.**
+A design thread is deleted WHOLE once its last dependent batch is built.
+Thread B's staging-and-promotion prose still feeds the unbuilt half of
+`REQ-QAC-108` and the operator routes, so it stays.
 
 **Priority: REQ-PIPE-093 is queued, Keith 2026-09-28 evening, his own
 words: "let's not forget PIPE-093 either. We'll tackle it next or after
