@@ -202,7 +202,7 @@ requirement to `built`.
 
 **WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
 fresh session can pick up from a file rather than from the commit log.**
-Last updated 06:25 Perth, 46 commits in.
+Last updated 06:40 Perth, 47 commits in.
 
 **BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
 `REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
@@ -292,18 +292,20 @@ routes and a rename of the existing "Promote" wording, and the honest
 shape is three commits rather than one.
 
 The phasing it wants, so a fresh session does not have to re-derive it:
-1. **The one implementation** (criterion 13), which every other
-   criterion hangs off: the eight operations behind one call, the
-   actor resolved against `contract/people.yaml` and refused if absent
-   (criteria 6, 14, 27), a reason required (10), judgement at append
-   time from the one place (20, 21, 24), a no-op reported as a no-op
-   rather than a refusal (26), and `ticket_reconciler` called after
-   (8). Criterion 25 is already done - see `decision_log.UNBLOCKED_BY`.
-   Criterion 29 needs `placeholder: true` on the three fictional
-   people in `contract/people.yaml` and a gate that a real person has
-   a `github:`.
-2. **The TUI adapter** (2, 12, 15, 16, 17, 18, 19, 28, 31).
-3. **The GitHub adapter** (1, 4, 5, 7, 23, 30).
+1. ~~**Who may act**~~ - **DONE 06:40 Perth.** Criteria 14, 27, 29 and
+   the lookup half of 6: `people.person_by_email()`/`person_by_github()`
+   resolve an actor against `contract/people.yaml` and RAISE rather
+   than return None, `placeholder: true` marks the three fictional
+   entries, and a thirteenth `mothman check` gate requires a `github:`
+   from everybody who is not one.
+2. **The one implementation** (criterion 13), which every other
+   criterion hangs off: the eight operations behind one call, a reason
+   required (10), judgement at append time from the one place (20, 21,
+   24), a no-op reported as a no-op rather than a refusal (26), and
+   `ticket_reconciler` called after (8). Criterion 25 is already done -
+   see `decision_log.UNBLOCKED_BY`.
+3. **The TUI adapter** (2, 12, 15, 16, 17, 18, 19, 28, 31).
+4. **The GitHub adapter** (1, 4, 5, 7, 23, 30).
 
 ONE THING TO CHECK BEFORE BUILDING criterion 1's `refile`: it is the
 only one of the eight with no effect written yet. `filing.refile()`

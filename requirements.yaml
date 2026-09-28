@@ -14971,7 +14971,7 @@ requirements:
       a decision is a comment rather than a deployment and neither
       route can do something the other cannot.
     moscow: must
-    status: not_started
+    status: in_progress
     source: >
       Keith, 2026-09-26, batch 4 scoping input (a), correcting Thread
       B's own earlier framing: "GitHub is the primary operator surface,
@@ -15628,6 +15628,57 @@ requirements:
         until somebody attends to it; and never creating a schema
         automatically, which means refusing or holding a supply for an
         un-initialised period.
+      - >
+        STARTED 2026-09-29, AND THE FIRST THING BUILT IS WHO MAY ACT -
+        criteria 14, 27 and 29, plus the half of 6 that is a lookup.
+        `people.person_by_email()` and `person_by_github()` resolve an
+        actor against contract/people.yaml and RAISE rather than
+        returning None, because every caller's response to "nobody
+        matches" is identical and a None somebody forgets to check
+        becomes a decision recorded against an empty actor. An
+        unattributable filing decision is worse than no decision: saying
+        who is what the log is for.
+      - >
+        THE PLACEHOLDER MARKER IS LOAD-BEARING IN BOTH DIRECTIONS
+        (criterion 29). Three of the four people in this repo's own file
+        are Monty Python-named stand-ins for colleagues not yet named
+        (Keith, 2026-09-19); they exist so the dashboard's "Owned by"
+        badge reads as a name rather than a gap, and they must be able
+        to do nothing. Without `placeholder: true` the new gate would
+        fail on the file as committed, and both obvious ways out - drop
+        the requirement, or give the placeholders usernames - end with a
+        fictional person assigned to a real ticket. So the gate requires
+        a username from everybody who is NOT one, and refuses a
+        placeholder that has one.
+      - >
+        THE GITHUB MATCH IS CASE-INSENSITIVE, because GitHub's own
+        usernames are, and a decision refused over the capitalisation
+        somebody typed into a config file years ago is a refusal nobody
+        can act on. An EMPTY username matches nobody rather than falling
+        through to the first person without one - which is every
+        placeholder.
+      - >
+        THE ACTOR RECORDED IS THE EMAIL, not the display name. Names get
+        edited and two people share one; the email is the key this file
+        already references a person by AND the identity
+        git_identity.get_run_by() stamps onto every QA run, so the
+        terminal route needs no second notion of who is at the keyboard.
+      - >
+        NOT DONE - everything else, and the phasing is written up in
+        plans/supply-model.md rather than here because a fresh session
+        reads that file first. In short: (1) the one implementation
+        behind all eight operations, which every other criterion hangs
+        off; (2) the TUI adapter; (3) the GitHub adapter. Criterion 25
+        is ALREADY done, early, by REQ-PIPE-099's own work - see
+        decision_log.UNBLOCKED_BY.
+      - >
+        ONE THING TO CHECK BEFORE BUILDING criterion 1's `refile`: it is
+        the only one of the eight operations with no effect written yet.
+        `filing.refile()` moves the FILING RECORD and writes no
+        decision-log entry, and what should happen to a PROMOTED
+        supply's tables when it is re-filed is REQ-PIPE-079's wiring
+        rather than something to invent in an adapter.
+
   - id: REQ-PIPE-083
     title: >
       Every slot has a ticket that is reconciled to its current state,

@@ -98,6 +98,12 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "a sprint's written status matches what its criteria say", True),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
      "CHANGELOG.yaml's schema and component tags", False),
+    # REQ-GHUB-082 criterion 29. A person without a `github:` is shown
+    # on the dashboard, assigned nothing, and discovers they cannot
+    # raise a filing decision at the moment they try to raise one -
+    # which will be the moment something is wrong.
+    ("people", ["uv", "run", "python3", "-m", "qa_tools.common.validate_people"],
+     "everybody who is not a placeholder can actually act", False),
     # REQ-DOCS-101 criterion 7. A sweep fixed fifteen signed requirements
     # and three documents that still said the dashboard is built from
     # committed files; what a sweep cannot do is stay fixed, because the

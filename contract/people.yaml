@@ -34,6 +34,15 @@
 #     name: Keith Amoss          # a real display name.
 #     nickname: Keith            # optional - shown in the dashboard's own "Owned by" badge
 #                                 # instead of the full name when set.
+#     placeholder: true          # OPTIONAL, default false. A stand-in for a colleague not
+#                                 # yet named for real (REQ-GHUB-082 criterion 29). A
+#                                 # placeholder is SHOWN - the dashboard's "Owned by" badge
+#                                 # reads better with a name than with a gap - and can do
+#                                 # nothing: it raises no filing decision and is assigned no
+#                                 # GitHub ticket. `mothman check`'s people gate requires a
+#                                 # `github:` on everybody who is NOT one, so a real person
+#                                 # added without a username fails the build rather than
+#                                 # silently being unable to act.
 #     github: keithamoss         # a real GitHub username - required for real ticket
 #                                 # assignment (`gh issue create --assignee`), optional
 #                                 # otherwise (a person can be listed/shown without ever
@@ -67,14 +76,17 @@ people:
     name: Brian Cohen
     nickname: Brian
     roles: [qa]
+    placeholder: true
   - email: reg@example.com
     name: Reg
     nickname: Reg
     roles: [peer_review]
+    placeholder: true
   - email: arthur.pendragon@example.com
     name: Arthur, King of the Britons
     nickname: Arthur
     roles: [manager]
+    placeholder: true
 
 assignments:
   - agency: registry-services
