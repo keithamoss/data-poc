@@ -3886,3 +3886,44 @@ twice. It deliberately did not re-find the `TypeError`.
     named a third module and stopped; the fourth cost a second night's
     finding. `grep` for the shape - here, a period schema and a name
     from the decision log in one f-string - not for the module.
+
+67. **[done, 2026-09-29]** **[Pipeline & publishing]**
+    **A route was built whose entry point does not exist, and only an
+    audit for callers found it.**
+    Found by grepping for callers of the two modules shipped in the
+    preceding two commits, not by anything failing.
+
+    `qa_tools/common/filing_from_github.py` reads a filing decision out
+    of a ticket comment and raises it. Nothing reads ticket comments.
+    The workflow that would - `.github/workflows/ticket-sync.yml` - is
+    disabled and cannot run at all: it needs the recorded QA results,
+    those are rows in a PostgreSQL database since REQ-PIPE-089, and a
+    GitHub runner has no route to one. Its replacement inverts the
+    integration's direction, which is `plans/running-thoughts.md` #53
+    and is not scoped.
+
+    So REQ-GHUB-082's criterion 1 - "accept ... filing decisions raised
+    on the GitHub ticket" - is met as far as an entry point allows, and
+    that is now what the requirement says. It said "criterion 1" flatly
+    for about twenty minutes, which is the part worth correcting: a
+    criterion is not met because the code that would satisfy it exists
+    somewhere unreachable.
+
+    `filing_decisions.py`, shipped the commit before, has the same
+    property and it is fine: its caller is the TUI adapter, which is
+    the one phase of that requirement deliberately left for a session
+    with Keith awake. The difference is that its caller is SCOPED and
+    the GitHub one is not.
+
+    **The standing lesson is a question, and it costs one grep.** After
+    building a module, ask what calls it - in production, not in its
+    tests. This project has now paid three times for code that had
+    never executed outside a test: #63's guard that made a path
+    unreachable, #64/#66's fixture that made two names one string, and
+    this. The first two were found by accident weeks later; this one
+    was found the same hour, by asking.
+
+    Nothing was changed in the code. What changed is that the
+    requirement and this file now say where the gap is, so whoever
+    scopes #53 knows the adapter is already there and needs only a
+    caller.

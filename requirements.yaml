@@ -15727,8 +15727,30 @@ requirements:
         refusal rather than raising - one dataset's problem must not
         stop the rest of the period being born.
       - >
-        PHASE 4, THE GITHUB ADAPTER, IS BUILT 2026-09-29 - criteria 1,
-        4, 5, 7, 23 and 30. `filing_from_github.read()` turns a comment
+        CRITERION 1 IS HALF MET, AND THE HALF THAT IS MISSING IS THE
+        ENTRY POINT. Found 2026-09-29 by auditing for callers rather
+        than by anything failing: `filing_from_github.handle()` is
+        reached only by its own tests, because NOTHING READS TICKET
+        COMMENTS. The workflow that would - `ticket-sync.yml` - is
+        disabled and cannot run at all (REQ-PIPE-089): it needs the
+        recorded results, they are rows in a database, and a GitHub
+        runner has no route to one. Its replacement inverts the
+        integration's direction - something inside the secure
+        environment posting OUT rather than a workflow reaching in -
+        which is plans/running-thoughts.md #53 and is not scoped.
+        So a person cannot yet raise a decision on a ticket. What is
+        built is everything that happens once a comment is in hand.
+      - >
+        RECORDED RATHER THAN QUIETLY LEFT, because this project has
+        paid twice for code that had never executed outside a test
+        (plans/post-build-review.md #63 and #67). The parsing, the
+        actor resolution, the refusal and the reason extraction are all
+        real and covered; the thing that would hand them a comment is
+        not. Anybody wiring #53 should know the adapter is already
+        here and needs only a caller.
+      - >
+        PHASE 4, THE GITHUB ADAPTER, IS BUILT 2026-09-29 - criteria 4,
+        5, 7, 23, 30, and criterion 1 as far as an entry point allows. `filing_from_github.read()` turns a comment
         into a `filing_decisions.Request`; `handle()` raises it and says
         no on the thread it was raised on. Nothing about what a decision
         MEANS is here, because there is one implementation of that.

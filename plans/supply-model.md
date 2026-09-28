@@ -202,7 +202,7 @@ requirement to `built`.
 
 **WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
 fresh session can pick up from a file rather than from the commit log.**
-Last updated 06:50 Perth, 49 commits in.
+Last updated 07:10 Perth, 50 commits in.
 
 **BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
 `REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
@@ -306,13 +306,25 @@ The phasing it wants, so a fresh session does not have to re-derive it:
    owning its warehouse change. Criterion 25 was already done - see
    `decision_log.UNBLOCKED_BY`.
 3. **The TUI adapter** (2, 12, 15, 16, 17, 18, 19, 28, 31).
-4. ~~**The GitHub adapter**~~ (1, 4, 5, 7, 23, 30) - **DONE.**
+4. ~~**The GitHub adapter**~~ (4, 5, 7, 23, 30, and 1 as far as an
+   entry point allows) - **DONE, WITH A GAP WORTH KNOWING.**
    `qa_tools/common/filing_from_github.py`. A line beginning with a
    slash is addressed to the machine and every other line is addressed
    to people, which is what makes "ignore the prose AROUND a known
    command" decidable; the prose IS the reason; the period comes from
    the ticket's own label and never from the body; a refusal is posted
    directly rather than through REQ-PIPE-083's pass.
+
+   **NOTHING READS TICKET COMMENTS**, so a person cannot yet raise a
+   decision that way. `ticket-sync.yml` is disabled and cannot run
+   (REQ-PIPE-089: it needs the recorded results and a runner has no
+   route to the database), and its replacement inverts the
+   integration's direction - `plans/running-thoughts.md` #53, not
+   scoped. Everything that happens once a comment is IN HAND is built
+   and covered; what is missing is the thing that hands one over.
+   Written up as `plans/post-build-review.md` #67, because this
+   project has now paid three times for code that never executed
+   outside a test.
 
    PHASE 3 IS THE ONE LEFT, and it was left on purpose: criterion 15
    renames the existing "Promote" wording across a prompt, a success
