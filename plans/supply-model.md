@@ -1710,7 +1710,7 @@ comparisons against the expected-supply sequence.
    (the verdict follows the filing). Both signed 2026-09-23 and BUILT
    2026-09-25.
 
-11. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Promotion and
+11. **[in-progress, 2026-09-28]** **[Pipeline & publishing]** **Promotion and
     rejection.** Auto on green/amber into an EMPTY slot; red never;
     landing in a filled slot never (Thread B). Plus the **mixed-period
     delivery gate** - a delivery whose tables land in different PERIODS

@@ -13019,7 +13019,90 @@ requirements:
       person, so that automation handles the ordinary case and the queue
       I actually look at contains only the decisions that need me.
     moscow: must
-    status: not_started
+    status: built
+    implemented_by:
+      - qa_tools/common/promotion.py::promote
+      - qa_tools/common/promotion.py::promote_each
+      - qa_tools/common/promotion.py::should_promote
+      - qa_tools/common/promotion.py::status_of
+      - qa_tools/common/promotion.py::filled_slots
+      - qa_tools/common/promotion.py::after_run
+      - qa_tools/common/promotion.py::after_runs
+      - qa_tools/common/promotion.py::report
+      - qa_tools/common/promotion.py::may_arrival_classify
+      - qa_tools/common/promotion.py::UnreadableVerdictError
+      - qa_tools/common/filing.py::supplies_of
+      - qa_tools/common/filing.py::filled_slots
+      - qa_tools/common/parallel_orchestrate.py::run_manifest
+      - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
+      - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
+    linked_tests:
+      - tests/test_promotion.py::TestPromotionMovesRatherThanCopies
+      - tests/test_promotion_step.py::TestAGreenSupplyPromotesItself
+      - tests/test_promotion_step.py::TestTheStatusComesFromEveryContributingCheck
+      - tests/test_promotion_step.py::TestNothingAskedIsNotGreen
+      - tests/test_promotion_step.py::TestARefusalIsNotAFailure
+      - tests/test_promotion_step.py::TestOneOddDatasetDoesNotTakeTheRestDown
+      - tests/test_promotion_step.py::TestRunningTheStepTwiceIsSafe
+      - tests/test_promotion_step.py::TestAFilledSlotStopsTheSecondSupply
+      - tests/test_promotion_gate.py::TestGreenOrAmberPromotesItself
+      - tests/test_promotion_gate.py::TestRedWaitsForAPerson
+      - tests/test_promotion_gate.py::TestAFilledSlotIsNeverOverwritten
+      - tests/test_promotion_gate.py::TestASupplyWithNoConfidentSlotIsLeftAlone
+      - tests/test_promotion_gate.py::TestACheckFreeTableCannotPromoteItself
+      - tests/test_promotion_gate.py::TestTheReasonsAreOrderedSoTheMostUsefulOneWins
+      - tests/test_promotion_status.py::TestItFoldsTheDatasetsOwnChecks
+      - tests/test_promotion_status.py::TestItFoldsCrossTableChecksItParticipatesIn
+      - tests/test_promotion_status.py::TestAbsenceIsNotGreen
+      - tests/test_promotion_status.py::TestAVerdictThisGateCannotReadStopsIt
+      - tests/test_promotion_after_run.py::TestTheRunItselfDoesNotPromote
+      - tests/test_promotion_after_run.py::TestRunningItTwiceIsSafe
+      - tests/test_filing_before_checks.py::TestTheFilingCallComesBeforeTheToolRuns
+      - tests/test_filing_before_checks.py::TestFilingIsInterleavedRatherThanDoneUpFront
+      - tests/test_parallel_orchestrate.py::TestArrivalsThatDependOnEachOther
+    evidence:
+      - >
+        Built 2026-09-28, overnight. The spine had existed since earlier
+        that day and NOTHING CALLED IT - promotion.promote() had no call
+        site anywhere in the repository, so a slot could only ever be
+        filled by a test. What landed is the assembly: after_run() asks
+        the gate about each supply an arrival carried and promotes the
+        ones that qualify, after_runs() is its batch counterpart, and
+        both orchestrators call it once each arrival's checks are done.
+        2501 tests pass (mothman check, 6m10s, twelve gates).
+
+      - >
+        VERIFIED BY RUNNING THE REAL PIPELINE against a scratch
+        PostgreSQL rather than by reading the code, and that is how the
+        ordering defect below was found rather than shipped. A full
+        Child Protection run promoted six supplies, refused the rest
+        naming red verdicts and filled slots, and wrote one decision
+        each.
+
+      - >
+        A REAL ORDERING DEFECT, found that way and fixed in the same
+        sprint. Both orchestrators filed every arrival before any of
+        them was checked, and a supply is filed to the oldest slot no
+        PROMOTION has filled - so no slot was ever filled while the
+        filings were being made. From an empty database all 108 Child
+        Protection supplies filed to 2023-Q1 and six promoted.
+        Interleaved (file, check, promote, next) the same corpus
+        spreads across all fifteen quarters, the heaviest holding 15,
+        and 67 promote. Four AST tests pin it, confirmed failing
+        against the previous commit first.
+
+      - >
+        TWO DEFECTS IN THIS REQUIREMENT'S OWN GATE, found by writing
+        tests against the shapes qa.check_result actually holds rather
+        than the shapes the gate wished for. status_of() fed a
+        recorded result's raw tool verdict (pass/warn/fail) into a
+        rollup that orders only green/amber/red, so every real result
+        would have raised; its own tests were written in the second
+        vocabulary, which is why they passed and proved nothing. And
+        the gate reported "status is None rather than green or amber"
+        for a check-free table, because the status refusal sat ahead of
+        the has_active_checks one and status_of() returns None in
+        exactly that case. Both confirmed failing first.
     source: >
       Keith, plans/supply-model.md delivery sprint 11 and Thread B's QA-gates-promotion decision (settled 2026-09-21). Scoped by delivery-scoper, batch 4, 2026-09-26.
     signed_off:
@@ -13138,8 +13221,86 @@ requirements:
         CLAUDE.md's shape-change rule was written after a status change
         was verified in reports/*.json and rendered a 14-violation check
         GREEN two transforms downstream.
+    unmet_criteria:
+      - criterion: >
+          Criterion 14, in part, and criterion 17 entirely - what happens
+          when a PERSON promotes a supply. The half of 14 this owns is
+          met: no operation anywhere promotes several supplies on one
+          decision, and promote_each() is a loop over promote() rather
+          than a bulk write precisely so each gets its own entry, reason
+          and transaction. What is absent is the operator route itself,
+          so "a decision of its own for each supply a person promotes"
+          has nothing to be true of yet, and 17's re-run of QA against a
+          different period has nothing to trigger it.
+        why: >
+          promotion.needs_requalification() is built and tested - the
+          DECISION of whether a promotion needs QA running again, and
+          criterion 16's "do not re-run where the period is the same" is
+          met through it. What is missing is the caller: nothing lets a
+          person promote a supply at all, which is REQ-GHUB-082's
+          operator operations and REQ-PIPE-099's terminal route. Wiring
+          a re-run to a caller that does not exist would be writing
+          against an imagined interface.
+        owner: >
+          Delivery sprint 12's operator routes - REQ-GHUB-082 and
+          REQ-PIPE-099, both signed and unbuilt as of 2026-09-28.
+        blocked_by:
+          requirements: [REQ-GHUB-082, REQ-PIPE-099]
     dependencies: [REQ-PIPE-074, REQ-PIPE-062, REQ-PIPE-035, REQ-PIPE-064]
     decisions:
+      - >
+        CRITERION 9 IS MET BY SOMETHING STRONGER THAN IT ASKS FOR, AND
+        KEITH SHOULD CONFIRM THE WORDING. It asks for the decision-log
+        entry to be written "only after that supply's tables are durably
+        present in the period schema, so that an interrupted promotion is
+        repeated rather than skipped". What was built puts the entry and
+        the table move in ONE TRANSACTION, through
+        decision_log.apply_decision().
+
+        The criterion's stated PURPOSE is fully met and then some: an
+        interruption rolls both back, so the slot is still unfilled, the
+        supply is still staged, and the next run promotes it again -
+        repeated, never skipped. Ordering-after would leave the window
+        the criterion is worried about only mostly closed; atomicity
+        closes it.
+
+        The LETTER is not followed, because within one transaction there
+        is no "after" to speak of. REJECTED: writing it the ordered way,
+        which would be weaker for no gain, and would also contradict
+        decision_log.record_automatic()'s own rule that anything touching
+        the warehouse uses the context manager. Flagged rather than
+        quietly counted, because a criterion marked met on a reading
+        nobody agreed is exactly what the sign-off gate exists to stop.
+        The proposal for Keith is to reword criterion 9 to require
+        atomicity outright.
+
+      - >
+        THE GATE'S REFUSALS ARE ORDERED, AND THE ORDER IS A DESIGN
+        DECISION rather than an implementation detail. Several can be
+        true at once and only one is reported, because the string is what
+        the ticket and the terminal both show. Contested first (nobody
+        has said which file IS the supply, so there is nothing to ask the
+        later questions about), then no confident slot, then a person
+        having already decided, then no ACTIVE checks, then the verdict,
+        then a filled slot.
+
+        THE LAST TWO MOVED on 2026-09-28: the verdict used to be asked
+        first, and status_of() returns None in exactly the case criterion
+        12 is about, so a check-free table was refused with "its status
+        is None rather than green or amber" - which sends an operator
+        looking for a failing check that does not exist. If nothing was
+        asked, there is no answer to report.
+
+      - >
+        A REFUSAL AND A FAILURE ARE KEPT APART, in AfterRun and in what
+        is printed. Both stop a promotion and they mean opposite things:
+        a refusal is the gate working and the supply waits for a PERSON;
+        a failure is something broken and it waits for a RETRY.
+        REJECTED: one list of "not promoted", which would bury the queue
+        of things needing a decision inside a list of things needing a
+        fix - and that queue is the whole point of the story this
+        requirement carries.
+
       - >
         PROMOTION MOVES, IT DOES NOT COPY (criterion 15; Keith,
         2026-09-28). The settled storage model already said tables can
