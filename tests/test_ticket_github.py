@@ -72,6 +72,60 @@ class TestAnAbsentServiceRefusesCleanly:
         assert out.opened == ()
 
 
+class TestEveryWayTheServiceCanBeAbsentSaysTheSameThing:
+    """Criterion 17's MESSAGE, on the path this container cannot reach.
+
+    `gh` is missing here, so every test above takes the FileNotFoundError
+    branch. A GitHub Actions runner HAS gh and has no token for it, so it
+    takes the CalledProcessError branch instead - and that one used to
+    say only "`gh issue list` failed: <stderr>", with none of the "the
+    change still stands" that the whole message exists to carry. Found by
+    CI going red on the test above, 2026-09-29, in an environment this
+    one cannot reproduce by accident.
+
+    Both branches are driven here explicitly rather than relying on
+    whichever one the host happens to take, because a test that passes
+    for a reason about the machine is a test that stops covering the
+    other reason.
+    """
+
+    def test_a_missing_gh_says_the_change_still_stands(self, monkeypatch):
+        def missing(*a, **k):
+            raise FileNotFoundError("gh")
+
+        monkeypatch.setattr(tg.subprocess, "run", missing)
+        with pytest.raises(tg.TicketServiceUnavailable) as exc:
+            tg._gh(["issue", "list"])
+        assert "durable record" in str(exc.value)
+
+    def test_an_unauthenticated_gh_says_it_too(self, monkeypatch):
+        """The real CI message: gh is installed, GH_TOKEN is unset, and
+        it exits non-zero telling you so."""
+        def refused(*a, **k):
+            raise tg.subprocess.CalledProcessError(
+                4, ["gh"], output="",
+                stderr="gh: To use GitHub CLI in a GitHub Actions workflow, "
+                        "set the GH_TOKEN environment variable.")
+
+        monkeypatch.setattr(tg.subprocess, "run", refused)
+        with pytest.raises(tg.TicketServiceUnavailable) as exc:
+            tg._gh(["issue", "list"])
+        assert "durable record" in str(exc.value)
+
+    def test_and_still_says_what_actually_went_wrong(self, monkeypatch):
+        """The reassurance must not replace the diagnosis. Somebody
+        reading a pipeline run needs to know it was the token."""
+        def refused(*a, **k):
+            raise tg.subprocess.CalledProcessError(
+                4, ["gh"], output="", stderr="set the GH_TOKEN environment variable")
+
+        monkeypatch.setattr(tg.subprocess, "run", refused)
+        with pytest.raises(tg.TicketServiceUnavailable) as exc:
+            tg._gh(["issue", "list"])
+        assert "GH_TOKEN" in str(exc.value)
+        assert "issue list" in str(exc.value)
+
+
 class TestEveryReadIsFencedByThisSchemesOwnLabel:
     """Criterion 19, in its enforceable form. A query that can only ever
     SEE this scheme's tickets cannot adopt, re-key, close or delete

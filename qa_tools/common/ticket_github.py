@@ -64,19 +64,44 @@ def slot_label(key: str) -> str:
     return f"{SLOT_LABEL_PREFIX}{key}"
 
 
+#: What criterion 17 is actually FOR, said once so that every way the
+#: service can be absent says it. The reconciler already carries on -
+#: that is the behaviour - and this is the sentence the person reading
+#: a pipeline run needs, because "ticket service failed" with nothing
+#: after it reads like something was lost.
+STILL_STANDS = ("The change stands on its durable record and the next pass "
+                "will bring the ticket up to date.")
+
+
 def _gh(args: list[str]) -> str:
+    """One `gh` invocation, or a refusal that says nothing was lost.
+
+    TWO WAYS TO BE ABSENT, AND THEY USED TO SAY DIFFERENT THINGS. A
+    missing binary got the reassurance; a binary that ran and exited
+    non-zero got a bare "`gh issue list` failed: <stderr>". The second
+    is the commoner case in the environments this is really for - an
+    unauthenticated CLI, an expired token, a network that cannot reach
+    github.com - and it is the case where somebody is most likely to
+    read the message as "the promotion did not happen".
+
+    Found by CI, 2026-09-29, on a runner that HAS gh and no `GH_TOKEN`:
+    a container without gh at all can only ever take the first branch,
+    so nothing here could see the second one was thinner.
+    """
     try:
         result = subprocess.run(["gh", *args], capture_output=True, text=True,
                                  check=True)
     except FileNotFoundError as exc:
         raise TicketServiceUnavailable(
-            "`gh` is not installed here, so no ticket can be read or written. "
-            "The change stands on its durable record and the next pass will "
-            "bring the ticket up to date.") from exc
+            f"`gh` is not installed here, so no ticket can be read or "
+            f"written. {STILL_STANDS}") from exc
     except subprocess.CalledProcessError as exc:
+        # THE DIAGNOSIS SURVIVES THE REASSURANCE. Somebody has to be
+        # able to tell an expired token from an unreachable host, so
+        # gh's own stderr stays and the sentence follows it.
         raise TicketServiceUnavailable(
             f"`gh {' '.join(args[:2])}` failed: "
-            f"{(exc.stderr or '').strip() or exc}") from exc
+            f"{(exc.stderr or '').strip() or exc} {STILL_STANDS}") from exc
     return result.stdout
 
 

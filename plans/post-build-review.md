@@ -3927,3 +3927,58 @@ twice. It deliberately did not re-find the `TypeError`.
     requirement and this file now say where the gap is, so whoever
     scopes #53 knows the adapter is already there and needs only a
     caller.
+
+68. **[done, 2026-09-29]** **[GitHub workflow & people]**
+    **The commoner way the ticket service is absent got the thinner
+    message, and CI had been red on it for a run of commits nobody
+    checked.**
+
+    `ticket_github._gh()` raises `TicketServiceUnavailable` two ways. A
+    MISSING BINARY got the sentence criterion 17 is actually for - "The
+    change stands on its durable record and the next pass will bring
+    the ticket up to date." A binary that RAN AND EXITED NON-ZERO got
+    `` `gh issue list` failed: <stderr>`` and nothing else.
+
+    The second is the commoner case in the environments this is really
+    for: an unauthenticated CLI, an expired token, a network that
+    cannot reach github.com. It is also the case where a person reading
+    a pipeline run is most likely to conclude the promotion did not
+    happen. The behaviour was always right - the reconciler records a
+    failure per slot and carries on either way - but the message is the
+    only part of criterion 17 a human ever meets.
+
+    **This container cannot see it, and that is why it survived.** `gh`
+    is not installed here, so every test of an absent service takes the
+    first branch. A GitHub Actions runner HAS `gh` and no `GH_TOKEN`,
+    so it takes the second. Both branches are now driven explicitly
+    with a monkeypatched `subprocess.run`, because a test that passes
+    for a reason about the machine is a test that stops covering the
+    other reason.
+
+    **The worse half of this is the process failure, not the message.**
+    `tests/test_ticket_github.py::TestAnAbsentServiceRefusesCleanly::
+    test_it_says_the_change_still_stands` had been failing in CI since
+    that module landed, across a long run of commits - several of whose
+    own messages reported a green local `mothman check` and said
+    nothing about CI. CLAUDE.md has a standing rule for exactly this
+    ("a passing local `uv run pytest` is NOT evidence CI is green"),
+    amended to "don't block on it, but check at the next natural
+    pause". The pauses happened; the check did not.
+
+    **The standing lesson, and it is narrower than "check CI".** The
+    amendment that says not to block is the one that made this easy to
+    drop, because "the next natural pause" has no edge. An overnight
+    run has no pauses a person would notice. So: check the real run
+    BEFORE starting the next requirement, not at a pause - that is a
+    boundary something actually happens at. One `actions_list` call
+    against the branch answers it, and a red one found at the next
+    commit costs a commit rather than nine.
+
+    A second, cheaper lesson while reading those logs: the MCP tool's
+    `get_job_logs` returns a TAIL, and a job with a PostgreSQL service
+    container ends with hundreds of lines of "there is no transaction
+    in progress" from the container's own log. A short tail shows none
+    of pytest's output and reads as though the log is empty. Ask for
+    thousands of lines and grep for `short test summary`. That is
+    already in CLAUDE.md's blocked-host note; it is repeated here
+    because it cost time again.
