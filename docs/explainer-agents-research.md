@@ -440,9 +440,9 @@ He chose **traits, not text**: the writer gets the list below, never the
 exemplars' prose. Everything here is paraphrase. The list is DRAFT: its
 wording goes to Keith with the house standard, like the rest of it.
 
-One trait conflicts with a recorded decision and must be settled before
-the standard is written: trait 11 allows "a light turn of phrase in a
-heading", and style round 2 said no puns in headings.
+Trait 11 ("a light turn of phrase in a heading") looked like it
+conflicted with style round 2's "no puns in headings". Keith settled it
+2026-09-29: a gentle turn of phrase is fine, and puns stay out.
 
 ### The twelve traits
 

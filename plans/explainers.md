@@ -722,6 +722,10 @@ survives context compaction. Tick items off here as they land.
      groups and tiering become a committed config file, so the 32
      tiering decisions survive when this plans file is deleted.
 
+   **Headings, refined (Keith, 2026-09-29):** a gentle turn of phrase
+   in a heading is fine; puns are still out. This refines style round
+   2's "no puns in headings", prompted by exemplar trait 11.
+
    **Next:** the scoper revises the drafts against sets 1-3, then
    `delivery-architect` reviews them, then sign-off one by one. The
    drafts sit in `plans/explainers-slice1-draft.yaml` until they move
