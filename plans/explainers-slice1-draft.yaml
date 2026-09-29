@@ -390,6 +390,9 @@
   story: "As Keith, about to publish a page an agent wrote, I want a mechanical check that the page carries no script, no outside links, no malformed diagram, no false claim of sign-off, no edit since Keith signed it and no badge that disagrees with the register, so that a bad or injected output cannot reach GitHub on the strength of a model's judgement."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 1 (his worry about prompt injection), docs/explainer-agents-research.md section 5 mitigations 4 and 5, Keith's calls on the live research (accTitle and accDescr), slice 1 answers Q4, Q5 and Q9, and sets 4, 5 and 6, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL provide `mothman docs validate`, which checks every file under docs/explainers/ except docs/explainers/_work/."
@@ -459,6 +462,9 @@
   story: "As Keith deciding whether to trust the docs-* agents, I want a few pages with known defects, a clean page and an injection attempt that every agent is run against before real use, so that I know they catch real problems without inventing false ones."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 3 round 3 (evals), the architecture research, the paper check, item 4's 'delivery changed meaning' trap, and slice 1 answers Q10 and Q11, and set 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL hold the eval set in .claude/skills/explain/evals/, outside docs/explainers/, so that no eval page can be published or mistaken for a real explainer."
@@ -514,6 +520,9 @@
   story: "As Keith, letting agents write into a public repository for the first time, I want each docs-* agent limited to the tools, reads and folders its job needs, so that a confused or manipulated agent cannot reach beyond them or act on text it reads."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 1 (prompt injection), item 3 round 2's architecture research and round 10, docs/explainer-agents-research.md sections 5 and 6, slice 1 answers Q1, Q4 and Q8, and sets 4 and 5, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL give docs-writer and docs-illustrator only the Read, Grep, Glob, Write and Edit tools."
@@ -926,6 +935,9 @@
   story: "As Keith, triaging an agent-written page, I want every rule a machine can check - sentence length, banned words, punctuation and the rest - rejected before any reviewer sees the page, so that the critic's findings and my time go on what only a reader can judge."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, slice 1 answers Q5 (the validator enforces the mechanical style rules), set 4 (the other mechanical rules too) and set 5 (no requirement ids or code in a page body), 2026-09-29, with definitions from the delivery-architect review. Split out of REQ-DOCS-122 by delivery-scoper in its third revision of explainers slice 1, 2026-09-29."
   acceptance_criteria:
     - "THE SYSTEM SHALL enforce the rules below in `mothman docs validate` (REQ-DOCS-122), each under its own stable rule id."
