@@ -33,6 +33,7 @@ from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
 from qa_tools.common import decision_log
 from qa_tools.common import drift_reference
 from qa_tools.common import filing
+from qa_tools.common import held_blast_radius
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common import promotion
@@ -179,8 +180,31 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     conn = supply_db.connect(read_only=True)
     conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
     stats = dataset_stats.compute_dataset_stats(conn, entry)
-    tables_read = supply_db.resolution_for(conn, run_id).as_record()
+    resolution = supply_db.resolution_for(conn, run_id)
+    tables_read = resolution.as_record()
     conn.close()
+
+    # WHAT A HELD TABLE COST THE CHECKS THAT READ IT (REQ-PIPE-078
+    # criterion 10). Criterion 9 withheld its view, so those checks did
+    # not run - and a check that silently does not appear is
+    # indistinguishable from one that passed, to the dashboard, to the
+    # promotion gate and to the tickets alike. These say red and name
+    # the held table, which is the difference between somebody looking
+    # for a broken check and somebody looking for the supply nobody has
+    # placed.
+    #
+    # ITS OWN PSEUDO-TOOL, and deliberately NOT in EXPECTED_TOOLS: a
+    # run with nothing held writes nothing here, and a completeness
+    # rule that demanded it would make every clean run incomplete.
+    blast = held_blast_radius.results_for(
+        held=resolution.held, reads=promotion._declared_reads(),
+        run_id=run_id, run_timestamp=run_timestamp)
+    if blast:
+        print(held_blast_radius.describe(blast))
+        write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id,
+                         run_timestamp, held_blast_radius.TOOL,
+                         {"held": resolution.held}, verified=blast)
+        results.extend(blast)
     # run_by stamped only on this write - see orchestrate_bdm.py's
     # identical comment.
     write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dataset_stats", stats,

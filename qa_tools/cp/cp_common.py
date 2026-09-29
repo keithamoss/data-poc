@@ -54,6 +54,23 @@ TABLE_PK = {
 # sits under in contract/child-protection-contract.yaml (the child table in
 # each rule's join, not the parent), and the table dbt's singular tests are
 # associated with for the same reason (see dbt_project/tests/*.sql).
+#: Which LOGICAL TABLES each singular business-rule test reads
+#: (REQ-PIPE-078 criterion 9). Stated rather than parsed out of the
+#: SQL, for the same reason run_dbt_cp.py selects an explicit node list
+#: rather than a graph selector: a derivation that silently gets it
+#: wrong drops a test nobody notices is missing.
+#:
+#: NEEDED BECAUSE A CROSS-TABLE TEST DIES WITH EITHER SIDE. These three
+#: are singular tests precisely because they span two tables, so one
+#: whose home table is readable and whose partner is held errors out
+#: exactly as the missing model did - and an errored node takes the
+#: whole run down.
+BUSINESS_RULE_READS = {
+    "escalation_completeness": ("cp_investigations", "cp_notifications"),
+    "closed_case_investigation_hygiene": ("cp_clients", "cp_investigations"),
+    "placement_carer_approval": ("cp_carers", "cp_placements"),
+}
+
 BUSINESS_RULE_HOME_TABLE = {
     "escalation_completeness": "cp_notifications",
     "closed_case_investigation_hygiene": "cp_investigations",

@@ -68,7 +68,8 @@ from . import bdm_common
 from qa_tools.common import supply_db
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
-    ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
+    ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, parse_threshold, run_dbt,
+    test_nodes,
     failing_sample_keys_direct, failing_sample_keys_via_values,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
@@ -246,6 +247,16 @@ def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
     return "pass"
 
 
+def _unreadable_in(run_id: str) -> frozenset[str]:
+    """The logical tables this run has no view for - see
+    run_dbt_cp.py's identical helper."""
+    conn = supply_db.connect(read_only=True, label="mothman:dbt-readable")
+    try:
+        return frozenset(supply_db.resolution_for(conn, run_id).unreadable)
+    finally:
+        conn.close()
+
+
 def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     # No scratch database any more (REQ-PIPE-087): dbt writes its
     # staging models and its --store-failures audit tables into its own
@@ -272,9 +283,28 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     # uniqueness for free - the same property the retired
     # data/duckdb_runs/ layout used to give it.
     target_path = str(supply_db.dbt_target_path(run_id))
+
+    # ONLY WHAT THIS RUN CAN ACTUALLY READ (REQ-PIPE-078 criterion 9) -
+    # see run_dbt_cp.py's identical block and dbt_common's
+    # exclude_unreadable for the defect this closes.
+    #
+    # BIRTH REGISTRATIONS IS ITS COLLECTION'S ONLY MODEL, so a hold
+    # here leaves nothing to build at all rather than five other
+    # datasets to get on with. That is the case NothingLeftToBuild
+    # exists for: an empty --select would build the whole project,
+    # which would run Child Protection's models against this run's
+    # schema.
+    try:
+        exclude = exclude_unreadable(models=["stg_birth_registrations"],
+                                      unreadable=_unreadable_in(run_id))
+    except NothingLeftToBuild as exc:
+        print(f"note: {run_id}: {exc}")
+        return []
+
     run_dbt("build", ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
             PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
-            run_schema=supply_db.run_schema(run_id), run_id=run_id)
+            run_schema=supply_db.run_schema(run_id), run_id=run_id,
+            exclude=exclude)
 
     with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)

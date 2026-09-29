@@ -28,7 +28,7 @@ from __future__ import annotations
 import os
 
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
-from qa_tools.common import arrivals, asset_time, load_log, sample_data, supply_db, trial
+from qa_tools.common import arrivals, asset_time, load_log, sample_data, supply_db, supply_holds, trial
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
@@ -154,9 +154,13 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
         # other order skips one that never loaded.
         load_log.record_load(delivery_name, DATASET_ID, physical, load_log.LOADED,
                          asset_time.now().isoformat(), row_count=rows, trial=trial_scope)
+        # A HELD SUPPLY GETS NO VIEW (REQ-PIPE-078 criterion 9) - see
+        # build_cp_warehouses.py's identical call for why this extends
+        # the ambiguity rule rather than adding a second mechanism.
         res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
             conn, staging, [TABLE], arrival=key,
-            loaded=load_log.loaded_tables(trial_scope)), source_schema=staging)
+            loaded=load_log.loaded_tables(trial_scope)), source_schema=staging,
+            held=supply_holds.held_tables(conn))
         # Recorded at staging time, which is the only moment this is an
         # observed fact rather than a re-derivation.
         supply_db.record_resolution(conn, res)

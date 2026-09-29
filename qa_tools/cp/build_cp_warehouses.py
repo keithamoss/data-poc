@@ -23,7 +23,7 @@ from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
 from qa_tools.common import load_log
 from qa_tools.common import supply_db
-from qa_tools.common import period_schema, sample_data, trial
+from qa_tools.common import period_schema, sample_data, supply_holds, trial
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -67,9 +67,15 @@ def _build_run_views(conn, run_id: str, key: str, trial_scope) -> supply_db.Reso
     """
     sample_tables, agreed_tables = _sample_and_agreed_tables()
     staging = supply_db.staging_schema_for(run_id)
+    # A HELD SUPPLY GETS NO VIEW (REQ-PIPE-078 criterion 9). The
+    # ambiguity rule already withholds one where two files claim a
+    # dataset; this extends the same refusal to a supply the assignment
+    # rule could not place, which resolves to exactly one table and
+    # would otherwise be checked against no period at all.
     res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
         conn, staging, agreed_tables, arrival=key,
-        loaded=load_log.loaded_tables(trial_scope)), source_schema=staging)
+        loaded=load_log.loaded_tables(trial_scope)), source_schema=staging,
+        held=supply_holds.held_tables(conn))
     if not sample_tables:
         return res
     # THE LOAD-RECORD GATE STILL APPLIES (REQ-PIPE-060 criterion 7).

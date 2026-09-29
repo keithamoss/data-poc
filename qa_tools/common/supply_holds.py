@@ -391,3 +391,29 @@ def resolve_for_supply(conn, *, dataset_id: str, supply: str,
                     decision_id=decision_id):
             resolved.append(held.supply_id)
     return tuple(resolved)
+
+
+def held_tables(conn) -> frozenset[str]:
+    """The LOGICAL TABLE NAMES a run must not build a view for.
+
+    The translation from dataset id to table name lives here rather
+    than at each call site, because there are two warehouse builders
+    and a third would make three copies of the same lookup - and the
+    one that gets it wrong builds a view for a held supply, which is
+    criterion 9 failing silently in the direction that produces a
+    verdict rather than an error.
+
+    A DATASET THE TREE NO LONGER KNOWS IS SKIPPED rather than raising.
+    A hold outlives the schedule it was raised under, and a run that
+    cannot start because a retired dataset is still held is a worse
+    failure than a view nothing reads.
+    """
+    from qa_tools.common import hierarchy
+
+    tables = set()
+    for dataset_id in held_datasets(conn):
+        try:
+            tables.add(hierarchy.dataset(dataset_id).table)
+        except Exception:
+            continue
+    return frozenset(tables)

@@ -60,3 +60,72 @@ def test_relationships_and_business_rule_tests_resolve_a_real_table(_dbt_cp):
     assert relationships, "no relationships (FK) test results found - fixture/test drifted from the real schema.yml"
     assert business_rules, "no business-rule singular test results found"
     assert all(r["dataset_id"] for r in relationships + business_rules)
+
+
+class TestAnUnreadableTableDoesNotTakeTheRunDown:
+    """REQ-PIPE-078 criteria 9 and 10, and a REAL LATENT DEFECT they
+    uncovered in already-shipped code.
+
+    A held supply gets no view in the run schema - that is how "a held
+    supply is not checked" has been enforced since REQ-PIPE-059, by
+    construction rather than by remembering. But dbt is asked to build
+    a FIXED list of six models, so the model over the missing view
+    errors, and an errored node takes the whole run down through
+    `_run_step`. Every one of the other five datasets loses its QA for
+    one dataset nobody could place - the opposite of what REQ-PIPE-059
+    criterion 7, `holds.py` and `supply_holds.py` all promise.
+
+    It was never caught because no hold has ever occurred in the
+    corpus, so the path had never run. Written up as
+    plans/post-build-review.md #72.
+
+    IT BUILDS ITS OWN RUN RATHER THAN EDITING THE SHARED ONE, and the
+    first version did the opposite at real cost: it dropped
+    `cp_clients` from `_REF_RUN_ID`'s schema and put it back in a
+    `finally`. That run's schema and recorded resolution are shared
+    with every other integration module on the same worker, so
+    `test_run_soda_cp.py` and `test_orchestrate_single_run.py` went red
+    against a view that existed either side of them. Staging is shared
+    and immutable here, so a run of one's own costs nothing and cannot
+    reach anybody else - and it exercises the REAL `create_run_views`
+    held path rather than a hand-made imitation of it.
+    """
+
+    def test_the_other_five_tables_are_still_checked(self, _dbt_cp, supply_dsn):
+        import uuid
+
+        from qa_tools.common import load_log, supply_db
+        from qa_tools.cp import cp_common
+
+        mine = f"cp_held_{uuid.uuid4().hex[:8]}"
+        staging = supply_db.staging_schema_for(_REF_RUN_ID)
+        arrival = supply_db.resolution_for(
+            supply_db.connect(read_only=True), _REF_RUN_ID)
+        key = next((supply_db.split_staged(p)[1]
+                     for p in arrival.resolved.values()
+                     if supply_db.split_staged(p)), None)
+        assert key, "test precondition - the reference run must have staged tables"
+
+        with supply_db.connect(label="test-held-dbt") as conn:
+            res = supply_db.create_run_views(
+                conn, mine,
+                supply_db.candidates_in(conn, staging, cp_common.TABLES,
+                                         arrival=key,
+                                         loaded=load_log.loaded_tables(None)),
+                source_schema=staging, held=["cp_clients"])
+            supply_db.record_resolution(conn, res)
+        assert "cp_clients" in res.held, "the held table must not have resolved"
+
+        try:
+            results = run_dbt_cp.evaluate_dbt_cp(mine, "2026-01-01T09:00:00Z")
+
+            assert results, "one unreadable table must not cost the other five their QA"
+            seen = {r["dataset_id"] for r in results}
+            assert len(seen) > 1, f"expected several tables still checked, got {seen}"
+            assert "cp-clients" not in seen, \
+                "nothing may be recorded against the table that could not be read"
+        finally:
+            with supply_db.connect(label="test-held-dbt") as conn:
+                conn.execute(
+                    f'DROP SCHEMA IF EXISTS "{supply_db.run_schema(mine)}" CASCADE')
+                conn.execute(f'DROP SCHEMA IF EXISTS "dbt_{mine}" CASCADE')

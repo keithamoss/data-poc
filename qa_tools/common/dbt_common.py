@@ -44,7 +44,8 @@ def parse_threshold(spec: str | None) -> float | None:
 
 def run_dbt(command: str, select: list[str], target_path: str,
             profiles_dir: str, project_dir: str, root: str,
-            run_schema: str | None = None, run_id: str | None = None) -> None:
+            run_schema: str | None = None, run_id: str | None = None,
+            exclude: list[str] | None = None) -> None:
     """Run dbt against the one PostgreSQL database.
 
     `db_path` IS GONE from this signature (REQ-PIPE-087). It used to name
@@ -65,6 +66,17 @@ def run_dbt(command: str, select: list[str], target_path: str,
     `run_schema` is unchanged and still load-bearing: it is the view
     schema this run's sources resolve through, so a bare table name in a
     model or a checks file means exactly one arrival's rows.
+
+    `exclude` IS DBT'S OWN GRAPH SELECTOR, and it has to be, which is
+    the one place this module departs from its explicit-node-list rule
+    (REQ-PIPE-078 criterion 9). Dropping an unreadable model from
+    `--select` is not enough: `dbt build` runs every test that DEPENDS
+    on a selected node, so a relationships test declared on a readable
+    model still runs and still errors on the table it references. Only
+    `stg_x+` - the node and everything downstream of it - takes the
+    dependents with it, and dbt is the only thing that knows what they
+    are. Excluding by hand would mean this project maintaining its own
+    copy of the DAG.
     """
     env = dict(os.environ)
     # PARSED WITH psycopg's OWN conninfo PARSER, not a regex. dbt-postgres
@@ -113,7 +125,8 @@ def run_dbt(command: str, select: list[str], target_path: str,
         # warehouse - the source failing_sample_keys_* below query for
         # per-row samples (see plans/qa-pipeline.md #15).
         ["dbt", command, "--profiles-dir", profiles_dir, "--project-dir", project_dir, "--quiet",
-         "--target-path", target_path, "--select", *select, "--store-failures"],
+         "--target-path", target_path, "--select", *select,
+         *(("--exclude", *exclude) if exclude else ()), "--store-failures"],
         env=env, cwd=root, check=False, capture_output=True, text=True,
     )
     _refuse_a_build_that_did_not_run(completed, target_path)
@@ -198,3 +211,61 @@ def failing_sample_keys_via_values(conn, relation_name: str, value_column: str,
     except Exception:
         return []
     return [str(r[0]) for r in rows if r[0] is not None]
+
+
+#: The prefix every staging model's name carries over its table's.
+MODEL_PREFIX = "stg_"
+
+
+class NothingLeftToBuild(Exception):
+    """Every model this run would build reads a table it cannot read.
+
+    ITS OWN EXCEPTION RATHER THAN AN EMPTY SELECT LIST, because `dbt
+    build` with no `--select` builds the WHOLE PROJECT - so the failure
+    mode of getting this wrong is not "nothing runs", it is "every
+    other collection's models run against this run's schema". A caller
+    catches this and records no dbt results for the run.
+    """
+
+
+def exclude_unreadable(*, models, unreadable):
+    """`--exclude` arguments for the tables this run cannot read, or
+    raise where that would leave nothing.
+
+    WHY THIS EXISTS, and it is a real defect rather than a refinement
+    (found 2026-09-30 building REQ-PIPE-078 criteria 9 and 10). A held
+    supply gets no view, which is how "a held supply is not checked"
+    has been enforced by construction since REQ-PIPE-059. But dbt was
+    asked to build a FIXED list of models, so the model over the
+    missing view ERRORED - and an errored node is not a failing test,
+    it takes the whole run down through the orchestrator's `_run_step`.
+    One dataset nobody could place cost the other five their QA, which
+    is the exact opposite of what REQ-PIPE-059 criterion 7 promises.
+
+    It had never been caught because no hold had ever occurred in the
+    corpus, so the path had never run.
+
+    `stg_x+` RATHER THAN A FILTERED SELECT LIST, and the first attempt
+    at this got it wrong in a way worth recording: dropping the model
+    from `--select` left four nodes still erroring, because `dbt build`
+    runs every test DEPENDING on a selected node. Three were
+    relationships tests declared on readable models that reference the
+    unreadable one, and the fourth was a cross-table singular test. The
+    `+` suffix is what takes the dependents with it, and dbt is the
+    only thing that knows what they are.
+    """
+    withheld = frozenset(unreadable)
+    if not withheld:
+        return []
+    remaining = [m for m in models if _table_of_model(m) not in withheld]
+    if not remaining:
+        raise NothingLeftToBuild(
+            f"every model this run would build reads a table it cannot read "
+            f"({', '.join(sorted(withheld))}), so there is nothing for dbt to "
+            f"do. Recording no dbt results rather than letting an empty "
+            f"--select build the whole project.")
+    return [f"{MODEL_PREFIX}{table}+" for table in sorted(withheld)]
+
+
+def _table_of_model(model: str) -> str:
+    return model[len(MODEL_PREFIX):] if model.startswith(MODEL_PREFIX) else model

@@ -72,7 +72,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Collection, Mapping, Sequence
 
 from qa_tools.common.asset_time import arrival_key
 
@@ -860,21 +860,38 @@ def ensure_schemas(conn) -> None:
 class Resolution:
     """What one run can actually read, and what it cannot.
 
-    `absent` and `ambiguous` are kept apart on purpose. Both mean the
-    same thing to a check - the table is not there - and they mean
-    completely different things to whoever has to fix it: nothing
-    arrived, versus several things arrived and nobody has said which
-    one counts.
+    `absent`, `ambiguous` and `held` are kept apart on purpose. All
+    three mean the same thing to a check - the table is not there - and
+    they mean completely different things to whoever has to fix it:
+    nothing arrived; several things arrived and nobody has said which
+    one counts; or one thing arrived and nobody has said which period
+    it is for.
+
+    HELD IS THE THIRD REASON, NOT A KIND OF ABSENCE (REQ-PIPE-078
+    criteria 9 and 10). It is the one where the table is sitting right
+    there, single and readable, and is deliberately not read - so a
+    reader told only "absent" would go looking for a delivery that did
+    in fact arrive. Criterion 10 requires the reason to be NAMED, and a
+    reason cannot be named by a field that does not distinguish it.
     """
     run_id: str
     schema: str
     resolved: dict[str, str] = field(default_factory=dict)
     ambiguous: dict[str, list[str]] = field(default_factory=dict)
     absent: list[str] = field(default_factory=list)
+    #: logical table -> the physical table being withheld. Recorded
+    #: rather than dropped, because "which supply is the one nobody has
+    #: placed" is exactly what resolving the hold needs.
+    held: dict[str, str] = field(default_factory=dict)
 
     @property
     def readable(self) -> list[str]:
         return sorted(self.resolved)
+
+    @property
+    def unreadable(self) -> list[str]:
+        """Every logical name a check cannot read, for any reason."""
+        return sorted(set(self.absent) | set(self.ambiguous) | set(self.held))
 
     def as_record(self) -> dict:
         """The committed form (criterion 5): which physical version of
@@ -885,7 +902,8 @@ class Resolution:
         return {"run_id": self.run_id, "schema": self.schema,
                 "resolved": dict(sorted(self.resolved.items())),
                 "ambiguous": {k: sorted(v) for k, v in sorted(self.ambiguous.items())},
-                "absent": sorted(self.absent)}
+                "absent": sorted(self.absent),
+                "held": dict(sorted(self.held.items()))}
 
 
 def split_staged(physical: str) -> tuple[str, str, str] | None:
@@ -967,22 +985,47 @@ def candidates_in(conn, schema: str, logical_names: Sequence[str],
 
 
 def create_run_views(conn, run_id: str, candidates: Mapping[str, Sequence[str]],
-                     source_schema: str = STAGING_SCHEMA) -> Resolution:
+                     source_schema: str = STAGING_SCHEMA,
+                     held: Collection[str] = ()) -> Resolution:
     """Build the run's view schema and report what it holds.
 
     A logical name becomes a view only where exactly one candidate
     physical table claims it (criterion 4). Zero candidates is absence;
     two or more with no basis to choose is ALSO absence (criterion 3),
     recorded separately so the reason survives.
+
+    `held` IS A THIRD REFUSAL, AND IT IS THE SAME MECHANISM AS THE
+    SECOND (REQ-PIPE-078 criterion 9). A supply two files both claim is
+    already unreadable here, because the ambiguity rule declines to
+    choose - which is how "a held supply is not checked" has been
+    enforced by construction rather than by remembering. A supply the
+    ASSIGNMENT rule could not place resolves to exactly one table, so
+    without this it gets a view and is checked, which is the same
+    requirement failing for the other kind of hold. Withholding the
+    view puts both on the terms criterion 3 asks for.
+
+    NOT CHECKING IT IS THE POINT, and the reasoning is the
+    requirement's own: the single-table checks could run without a
+    period, but drift and previous-period comparison cannot, so a
+    partial verdict has to be thrown away once the slot is known - or
+    worse, a GREEN one sits in history against no period at all.
     """
     schema = run_schema(run_id)
     conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
     conn.execute(f'CREATE SCHEMA "{schema}"')
 
+    withheld = frozenset(held)
     res = Resolution(run_id=run_id, schema=schema)
     for logical in sorted(candidates):
         physical = sorted(candidates[logical])
-        if len(physical) == 1:
+        if logical in withheld and physical:
+            # BEFORE THE RESOLVED BRANCH, because a held table is
+            # precisely one that WOULD resolve. Recording which
+            # physical table is being withheld rather than only that
+            # something is: resolving the hold means somebody looking
+            # at that supply.
+            res.held[logical] = physical[0] if len(physical) == 1 else ""
+        elif len(physical) == 1:
             conn.execute(
                 f'CREATE VIEW "{schema}"."{_ident(logical, "table name")}" AS '
                 f'SELECT * FROM "{source_schema}"."{physical[0]}"')
@@ -1320,7 +1363,8 @@ def record_resolution(conn, res: Resolution) -> None:
         f'DELETE FROM "{schema}"."{_RESOLUTIONS}" WHERE run_id = ?', [res.run_id])
     rows = ([(res.run_id, k, v, "resolved") for k, v in res.resolved.items()]
             + [(res.run_id, k, p, "ambiguous") for k, ps in res.ambiguous.items() for p in ps]
-            + [(res.run_id, k, None, "absent") for k in res.absent])
+            + [(res.run_id, k, None, "absent") for k in res.absent]
+            + [(res.run_id, k, v or None, "held") for k, v in res.held.items()])
     for row in rows:
         conn.execute(
             f'INSERT INTO "{schema}"."{_RESOLUTIONS}" VALUES (?, ?, ?, ?)', list(row))
@@ -1348,6 +1392,8 @@ def resolution_for(conn, run_id: str) -> Resolution:
             res.resolved[logical] = physical
         elif state == "ambiguous":
             res.ambiguous.setdefault(logical, []).append(physical)
+        elif state == "held":
+            res.held[logical] = physical or ""
         else:
             res.absent.append(logical)
     return res

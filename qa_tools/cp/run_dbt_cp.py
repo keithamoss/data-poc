@@ -55,7 +55,8 @@ from qa_tools.common import supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
-    ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
+    ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, parse_threshold, run_dbt,
+    test_nodes,
     failing_sample_keys_direct, failing_sample_keys_via_values,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
@@ -218,6 +219,20 @@ def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
     return "pass"
 
 
+def _unreadable_in(run_id: str) -> frozenset[str]:
+    """The logical tables this run has no view for.
+
+    ASKED OF THE RECORDED RESOLUTION rather than of the schema, because
+    the resolution says WHY - and a run that cannot connect should fail
+    on its own terms rather than here, which is why nothing is caught.
+    """
+    conn = supply_db.connect(read_only=True, label="mothman:dbt-readable")
+    try:
+        return frozenset(supply_db.resolution_for(conn, run_id).unreadable)
+    finally:
+        conn.close()
+
+
 def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # No scratch database any more (REQ-PIPE-087) - see the BDM
     # counterpart and qa_tools/common/supply_db.py. dbt writes into its
@@ -236,9 +251,23 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # DBT_PROJECT_DIR/target/, for real parallel-test safety
     # (plans/running-thoughts.md #12).
     target_path = str(supply_db.dbt_target_path(run_id))
+
+    # ONLY WHAT THIS RUN CAN ACTUALLY READ (REQ-PIPE-078 criterion 9,
+    # and the latent defect it uncovered - see dbt_common's
+    # buildable_nodes for the full account). A table with no view in
+    # the run schema - held, ambiguous or absent - makes its model
+    # ERROR rather than fail, and an errored node takes every other
+    # dataset's QA down with it.
+    try:
+        exclude = exclude_unreadable(models=CP_MODELS,
+                                      unreadable=_unreadable_in(run_id))
+    except NothingLeftToBuild as exc:
+        print(f"note: {run_id}: {exc}")
+        return []
+
     run_dbt("build", CP_MODELS + CP_SINGULAR_TESTS, target_path, PROFILES_DIR,
             DBT_PROJECT_DIR, ROOT, run_schema=supply_db.run_schema(run_id),
-            run_id=run_id)
+            run_id=run_id, exclude=exclude)
 
     with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)

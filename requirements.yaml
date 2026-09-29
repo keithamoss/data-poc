@@ -14125,22 +14125,63 @@ requirements:
       - >
         WHERE THE WORK STOPPED, 2026-09-30, recorded here rather than in
         `unmet_criteria` because that field is for a BUILT requirement
-        and this one is not - criteria 9 and 10 are this requirement's
-        own next piece, not another sprint's. Criteria 1-8 are built and
-        tested; 5 was already built by the promotion work
-        (`should_promote`'s `held_without_slot` branch and
-        `may_arrival_classify`) and was verified rather than assumed.
-        What remains is one mechanism serving both: no check runs over a
-        DELIVERY-LEVEL hold already, because no view resolves a logical
-        name two files both claim, but an ASSIGNMENT-RULE hold resolves
-        to exactly one table, so a view is built and the checks run.
-        Making `create_run_views` record a held dataset as absent fixes
-        criterion 9 and gives criterion 10 its mechanism for free - a
-        cross-table check reading it goes red, and the resolution record
-        says why. Measured before starting rather than assumed: the
-        corpus holds ZERO holds of either kind, so the change moves no
-        recorded verdict today and does not pre-empt REQ-PIPE-079's
-        pending risk call.
+        and this one is not. Criteria 1-8 are built and tested; 5 was
+        already built by the promotion work (`should_promote`'s
+        `held_without_slot` branch and `may_arrival_classify`) and was
+        verified rather than assumed.
+      - >
+        CRITERION 9 IS PART BUILT, AND THE ESTIMATE THAT PRECEDED IT WAS
+        WRONG - recorded as a correction rather than quietly replaced,
+        because the wrong version was told to Keith and written here
+        first. It said criteria 9 and 10 were "one mechanism serving
+        both": withhold the held table's view, and the cross-table
+        checks reading it go red for free. Withholding the view is
+        right and is built (`supply_db.create_run_views`, which now
+        keeps `held` as a THIRD reason a table is unreadable, distinct
+        from absent and ambiguous). What the estimate missed is what
+        happens next.
+      - >
+        EVERY TOOL IS POINTED AT A FIXED SET OF THINGS TO CHECK, so an
+        unreadable table does not make a tool skip - it makes it ERROR,
+        and an errored node raises through the orchestrator and
+        abandons the whole run. Five healthy Child Protection datasets
+        would have lost their QA for one held supply, which is the
+        opposite of what REQ-PIPE-059 criterion 7 promises. Found by
+        running the path against a real arrival for the first time, and
+        NOT specific to this requirement's new kind of hold: the
+        delivery-level hold shipped weeks ago leaves a byte-identically
+        empty run schema and crashes by the same route. Written up in
+        full as plans/post-build-review.md #72.
+      - >
+        FIXED FOR dbt IN BOTH COLLECTIONS, failing test first
+        (`TestAnUnreadableTableDoesNotTakeTheRunDown`, confirmed red
+        against the pre-fix code). `--exclude stg_<table>+`, where the
+        `+` is the fix rather than a detail: dropping the model from
+        `--select` left four nodes still erroring, because `dbt build`
+        runs every test DEPENDING on a selected node - three
+        relationships tests declared on readable models that reference
+        the unreadable one, plus a cross-table singular test. Rejected
+        maintaining this project's own copy of the DAG to name them;
+        dbt is the only thing that knows what is downstream.
+      - >
+        THE OTHER THREE TOOLS ARE UNFIXED and are the same bug: the
+        same probe, re-run with dbt fixed, dies one tool later on Soda
+        Core. datacontract-cli and Evidently are unexamined and have no
+        reason to differ. With Keith, 2026-09-30: whether to finish all
+        four inside this requirement or scope the tool-blindness as its
+        own - the recommendation, since it is cross-cutting, predates
+        this requirement, and is bigger than the criterion that found
+        it. Criterion 10's producer (`held_blast_radius`) is built and
+        unit-tested but cannot yet be exercised end to end, because the
+        run does not survive long enough to reach it.
+      - >
+        MEASURED BEFORE STARTING, and it is what makes all of the above
+        safe to leave part-built: the corpus holds ZERO holds of either
+        kind - no filing with branch 'held', no delivery with a held
+        entry - so none of this moves a recorded verdict today, and it
+        does not pre-empt REQ-PIPE-079's pending risk call. Nothing is
+        worse in the meantime either: the same hold crashed at dbt
+        before this change and crashes at Soda after it.
 
   - id: REQ-PIPE-079
     title: QA runs against the period a supply is filed to, not against staging alone

@@ -4160,3 +4160,75 @@ twice. It deliberately did not re-find the `TypeError`.
     static check on "does this module mention X" will accuse the code
     written to handle X properly, and each false positive is pressure to
     satisfy the checker rather than the requirement.
+
+72. **[in-progress, 2026-09-30]** **[Pipeline & publishing]** **A held
+    supply would have taken the whole collection's run down, which is
+    the exact opposite of what three separate places promise. Found by
+    running the path for the first time, while building REQ-PIPE-078
+    criteria 9 and 10.**
+
+    **THE PROMISE.** REQ-PIPE-059 criterion 7, `holds.py`'s own
+    docstring and `supply_holds.py`'s "every other dataset in the
+    delivery is processed normally" all say the same thing: one dataset
+    nobody could place must not cost the others their QA. It is this
+    area's standing blast-radius rule, stated in the requirement and
+    twice in the code.
+
+    **WHAT ACTUALLY HAPPENS.** A held supply gets no view in the run's
+    schema - that is how "a held supply is not checked" has been
+    enforced by construction rather than by remembering, and it is
+    correct as far as it goes. But every tool is then pointed at a
+    FIXED set of things to check. dbt is asked to build six named
+    models, so the model over the missing view does not fail, it
+    ERRORS - and an errored node is not a test result, it raises
+    through the orchestrator's `_run_step` and abandons the run.
+    Measured against a real Child Protection arrival with `cp-clients`
+    held, on a scratch database:
+
+        dbt could not run 1 node(s): model.birth_registrations.stg_cp_clients
+          relation "qa_trial_...z.cp_clients" does not exist
+
+    Five healthy datasets lost their QA for one held supply.
+
+    **WHY IT WAS NEVER SEEN.** The corpus holds ZERO holds of either
+    kind - no filing with `branch='held'`, no delivery with a `held`
+    entry - so the path had never run. `tests/test_holds.py`'s own
+    `TestBothFilesAreStagedAndNeitherIsReadable` covers the VIEW layer
+    and stops there, which is exactly the shape CLAUDE.md's own
+    shape-change lesson warns about: a green data layer says nothing
+    about the layer that consumes it.
+
+    **IT IS NOT SPECIFIC TO THE NEW KIND OF HOLD.** Verified rather
+    than assumed: building the run views with an ambiguous candidate
+    set - REQ-PIPE-059's own delivery-level hold - leaves the run
+    schema byte-identically empty. The same crash, by the same route,
+    in code shipped weeks ago.
+
+    **FIXED FOR dbt, both collections**, with the failing test first
+    (`tests/test_run_dbt_cp.py::TestAnUnreadableTableDoesNotTakeTheRunDown`,
+    confirmed red against the pre-fix code). `--exclude stg_<table>+`,
+    and the `+` is the whole fix: dropping the model from `--select`
+    left FOUR nodes still erroring, because `dbt build` runs every test
+    DEPENDING on a selected node - three relationships tests declared
+    on readable models that reference the unreadable one, plus a
+    cross-table singular test. Only the downstream selector takes the
+    dependents with it, and dbt is the only thing that knows what they
+    are. This is the one place `run_dbt` uses a graph selector rather
+    than an explicit node list, and its docstring says why.
+
+    **THE OTHER THREE TOOLS ARE THE SAME BUG AND ARE NOT FIXED.** The
+    same probe, re-run with dbt fixed, dies one tool later:
+
+        Soda Core failed - UndefinedTable: relation "cp_clients" does not exist
+
+    datacontract-cli and Evidently are unexamined and have no reason to
+    differ. Each is pointed at its own fixed set - Soda at a whole
+    checks YAML - so each needs its own way of being told what not to
+    read, across two collections.
+
+    **WITH KEITH, 2026-09-30**: whether to finish all four tools inside
+    REQ-PIPE-078, or to scope the tool-blindness as its own requirement
+    - the recommendation - since the defect is cross-cutting, predates
+    078, and is bigger than the criterion that found it. Nothing is
+    worse in the meantime: the same hold crashed at dbt before this
+    change and crashes at Soda after it, and the corpus has no holds.
