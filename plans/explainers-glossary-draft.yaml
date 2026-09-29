@@ -36,7 +36,7 @@ entries:
     idea: false
 
   - term: one-off extraction
-    definition: "A data asset gathered once, at one point in time, for a single project. It has no supply calendar, because nothing further is owed."
+    definition: "A data asset gathered once, at one point in time, for a single purpose. It has no supply calendar, because nothing further is owed."
     aliases: []
     forms: [one-off extractions]
     defined_by: [REQ-PIPE-106]
@@ -45,7 +45,7 @@ entries:
     idea: false
 
   - term: sample data collection
-    definition: "A collection of practice or test data that behaves like real supplies but never holds real data."
+    definition: "Sample or test data, supplied as one table, which is a sample dataset, or as several tables, which is a sample data collection. It never holds real data."
     aliases: [sample dataset, sample]
     forms: [samples]
     defined_by: []
@@ -54,7 +54,7 @@ entries:
     idea: true
 
   - term: in development
-    definition: "A dataset we expect to receive regularly, but whose supply calendar has not been agreed yet. Its checks run and show real results, which never count towards any agreed status."
+    definition: "A dataset, or a whole data collection, that we expect to receive regularly, but whose supply calendar has not been agreed yet. Its checks run and show real results, which never count towards any agreed status."
     aliases: [pre-agreement, not yet agreed]
     forms: [in-development]
     defined_by: [REQ-PIPE-106]
