@@ -44,7 +44,7 @@ survives context compaction. Tick items off here as they land.
    user-facing track. At the time of writing, only #9 (actor, reasons
    and the people list) and #6's physical detail had been sent to the
    pipeline docs.
-4. [next] **Tiering** for the concepts that survive triage: own page,
+4. [done: 32 concept pages, see THE PAGE LIST in #3] **Tiering** for the concepts that survive triage: own page,
    section, or glossary entry only.
 5. [todo] **The cast draft**: 4-5 characters for Keith to react to
    (#3, round 12).
@@ -1651,3 +1651,80 @@ survives context compaction. Tick items off here as they land.
    - **"What's this?" links sit BESIDE a status or term, never on it,
      with plain wording.** There is no humour in any dashboard UI text;
      humour stays in the explainer bodies only.
+   - Originals, round 2 (group 2):
+     - periods and slots: ONE OWN PAGE (not-expected periods a section
+       in it).
+     - claim windows: OWN PAGE, with due time and grace, "windows never
+       overlap", supplies for the following period, and OVERDUE as its
+       sections.
+     - a schedule that runs out: SECTION in the supply calendar page,
+       with runway.
+
+     So group 2 has four pages: the delivery agreement, the supply
+     calendar (own page, implied by the sections placed in it), periods
+     and slots, and claim windows.
+   - Originals, round 3 (group 3):
+     - deliveries, arrivals and supplies: ONE OWN PAGE, with receipt
+       and a hand-filed supply (plus #25 trial's line) as sections.
+     - how a file is recognised: OWN PAGE, with two files for one
+       dataset held as a section.
+     - early, on time and late: OWN PAGE (#20 a section in it).
+
+     Group 3 pages: deliveries, arrivals and supplies; how a file is
+     recognised; when a file can't be placed or read (#16); early, on
+     time and late.
+   - Originals, round 4 (group 4):
+     - how a supply is filed (staging plus the claim rule): OWN PAGE,
+       with #17-19 as its sections.
+     - changing your mind about a supply (reject, demote to staging or
+       to rejected, re-file): ONE OWN PAGE.
+     - resupply: OWN PAGE, with the mixed-period delivery as a section;
+       "held for a human" becomes a section in group 6.
+     - the decision log: OWN PAGE. Amber acknowledge/reject is a
+       SECTION of #10's seven-decisions overview.
+
+     Group 4 pages: how a supply is filed; the promotion gate (#7);
+     arrived versus promoted (#5); the seven filing decisions (#10);
+     changing your mind about a supply; resupply; the decision log.
+   - Originals, round 5 (groups 5-7):
+     - substitute: OWN PAGE.
+     - inherit and un-inherit: OWN PAGE (distinct from substitute,
+       because nobody decides it).
+     - what needs a person and where to see it (holds, the asset's
+       single count, where decisions are taken): ONE OWN PAGE in group
+       6, beside tickets (#28).
+     - red, amber and green, and how they roll up: ONE OWN PAGE in
+       group 7, with red-for-unrun and #13 as sections.
+   - Originals, round 6 (groups 7-9):
+     - anomalies aggregated: SECTION in #3's "not a quality verdict"
+       page. Freshness capping: PARKED until it has a requirement.
+     - the checks by level: ONE OWN PAGE PER LEVEL (column, dataset,
+       cross-table, file; file checks badged not built).
+     - drift and volume: OWN PAGE. `check_id`: GLOSSARY line only, with
+       the rest going to the pipeline docs alongside #30.
+     - snapshots: SECTION of #32's page. The activity feed: GLOSSARY
+       line.
+
+   **THE PAGE LIST - tiering complete (2026-09-29).** 32 concept pages
+   plus a group page per group (the overview is group 0's page), plus
+   the glossary. Sections and glossary-only entries are as recorded in
+   the rounds above.
+
+   | Group | Concept pages |
+   |---|---|
+   | 0 Overview | (the group page itself: the problem, one supply's journey, a tour) |
+   | 1 The shape of the asset | the data asset and its hierarchy; one tool, several shapes (environments and one-off extraction as sections); the data contract; in development |
+   | 2 The calendar | the delivery agreement; the supply calendar (runway, and a schedule that runs out, as sections); periods and slots; claim windows (due time, grace, overdue, no overlap, following period) |
+   | 3 What arrives | deliveries, arrivals and supplies (receipt, hand-filed, trial); how a file is recognised; when a file can't be placed or read; early, on time and late |
+   | 4 Filing a supply | how a supply is filed (unfiled, ambiguity, closed unfilled); the promotion gate (places, a person wins); arrived versus promoted (three moments, newest promoted wins); the seven filing decisions (amber acknowledge/reject); changing your mind about a supply; resupply (mixed-period delivery); the decision log |
+   | 5 Filling the gaps | substitute; inherit and un-inherit |
+   | 6 When a person is needed | tickets; what needs a person and where to see it (holds) |
+   | 7 How status works | red, amber and green, and how they roll up (red-for-unrun, why a check couldn't run); statuses that aren't verdicts (qualifiers, event severity, no data, anomalies) |
+   | 8 The checks | (the group page carries the check scopes) what a check is (plain-English fields); column checks; dataset checks; cross-table checks (dependencies); file checks; drift and volume (comparison point) |
+   | 9 Looking back | "In place on" versus what the page said then (history is permanent; snapshots) |
+
+   **Not on the list:** freshness capping (parked); the built resupply
+   chain (not explained, per triage #27); and, sent to the pipeline
+   docs, who can decide (#9), changing or retiring a check (#30),
+   environment setup, the storage halves of #6 and #31, and the
+   `check_id` detail.
