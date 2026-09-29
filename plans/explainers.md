@@ -726,6 +726,48 @@ survives context compaction. Tick items off here as they land.
    in a heading is fine; puns are still out. This refines style round
    2's "no puns in headings", prompted by exemplar trait 11.
 
+   **Slice 1 answers, set 4 (Keith, 2026-09-29), from the scoper's
+   revision pass:**
+   - **The critic does NOT preload the house-standard skill.** Its own
+     prompt carries persona, severity and judgement rules; the
+     validator owns the mechanical rules. This SUPERSEDES round 2's
+     "all four agents preload the skill", to keep round 7's cold read.
+   - **The critic IS given the glossary**, because a real reader can
+     open the glossary panel. It catches pages that fail to explain,
+     not terms the glossary covers.
+   - **The validator enforces the other mechanical rules too:**
+     negative contractions, "midnight", paragraphs over five
+     sentences, headings ending in "?", dashes in dates or ranges.
+     Word count stays with the critic (500 to 800 is a target).
+   - **"First use":** a page title may name its own concept; a term
+     used in the "In short" box is defined in the box itself.
+   - **A validator or recall-check rejection goes straight back to the
+     writer**, without Keith, and does not count as a revision loop.
+   - **Mixed-state badges:** the page badge follows its least-built
+     source, and a section whose state differs carries its own badge.
+   - **Badge drift is caught by the validator in slice 1**, accepting
+     that a build session can turn CI red on a page it may not edit
+     (the fix comes to Keith) - the same trade as slice 2's gate.
+   - **Cast on early pages:** name and role on first mention on every
+     page, matching "redefine terms on every page".
+   - **Trait 7, "real" examples:** real period names, due dates and
+     dataset and table names from committed configuration only; any
+     example rows are invented and obviously synthetic.
+   - **Traits against the fixed page parts: reconciled.** "In short"
+     stays first and the body opens on the story moment; trait 12's
+     recap and pointer sit just before the sources, which stay last;
+     trait 6's takeaway line is the caption and still feeds
+     accTitle/accDescr.
+   - **Trait 11 wording** follows style rounds 1 and 5 plus today's
+     refinement: wry asides in body text, a gentle turn of phrase (not
+     a pun) allowed in a heading, nothing playful in definitions.
+   - **REQ-DOCS-120 is "should"**, up from "could".
+
+   **Still to take to Keith with wording:** CLAUDE.md's explainer
+   rule covers "everything under `docs/explainers/`", which now
+   includes the agents' gitignored working folder - the rule probably
+   wants to exclude it.
+
    **Next:** the scoper revises the drafts against sets 1-3, then
    `delivery-architect` reviews them, then sign-off one by one. The
    drafts sit in `plans/explainers-slice1-draft.yaml` until they move
