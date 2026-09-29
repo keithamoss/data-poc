@@ -50,7 +50,7 @@ survives context compaction. Tick items off here as they land.
    (#3, round 12).
 6. [todo] **Keith names external writing exemplars** (#3, style round
    4).
-7. [todo] **Requirements via `delivery-scoper`**, drafting from items
+7. [in progress: slice 1 with the scoper] **Requirements via `delivery-scoper`**, drafting from items
    1-4, then Keith's sign-off. Nothing is built before this.
 8. [done: moot, GOV.UK is the baseline, and its numbers rule applies] Confirm the Style Manual's rule on numbers once
    `www.stylemanual.gov.au` is reachable (#3, style round 4).
@@ -1763,3 +1763,23 @@ survives context compaction. Tick items off here as they land.
 
    The cast's exact wording is part of the house standard, so Keith
    approves it word for word when the standard is written.
+
+   **Requirements route (Keith, 2026-09-29).** He was asked whether the
+   `delivery-scoper` was needed, given that fifteen rounds of questions
+   had already done the stress-testing. The main session recommended a
+   hand-draft plus architect and UX review. Keith chose **"scoper
+   anyway"**, the full pipeline: scoper, then architect and dashboard
+   UX, then his sign-off. The scoper gets items 1-4 of this file as its
+   SOURCE, per CLAUDE.md's carry-decisions-at-drafting-time rule.
+
+   **Two slices:**
+   - **Slice 1:** the house standard, a glossary seed, the four agents,
+     `/explain`, the evals, and a first explainer as markdown
+     (reviewable on GitHub).
+   - **Slice 2:** the dashboard tab, the explainers-only preview
+     command, "What's this?" links, and the staleness gate.
+
+   **A consequence of slicing, accepted with the choice:** until slice
+   2 exists, the critic reviews the page as GitHub renders it, not in
+   the dashboard tab. This temporarily softens round 7's "rendered from
+   day one".
