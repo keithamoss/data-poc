@@ -31,9 +31,20 @@ survives context compaction. Tick items off here as they land.
    Report any design decision that should change.
 2. [done] **Naming session.** One canonical word per naming hazard
    (#4's concept sweep lists them); the others become glossary aliases.
-3. [done: all 33 included] **Triage the 33 missed concepts** (#4's sweep, one by one).
+3. [done: 29 in, 2 to pipeline docs, 2 split] **Triage the 33 missed concepts** (#4's sweep, one by one).
    Keith says what he does NOT want included.
-4. [in progress] **Tiering** for the concepts that survive triage: own page,
+3b. [next] **Sweep the split between the
+   two documentation tracks.** Keith, 2026-09-29: "it sounds like we're
+   talking about user-facing documentation, whatever we call that. And
+   we're also talking about pipeline documentation... I feel like we're
+   putting a lot into the user-facing documentation right now and not
+   much in the pipeline docs, but I could be wrong." Check the shape of
+   both tracks: what belongs in each, whether the concept map is
+   over-weighted towards the user-facing side, and a name for the
+   user-facing track. At the time of writing, only #9 (actor, reasons
+   and the people list) and #6's physical detail had been sent to the
+   pipeline docs.
+4. [todo, after the triage] **Tiering** for the concepts that survive triage: own page,
    section, or glossary entry only.
 5. [todo] **The cast draft**: 4-5 characters for Keith to react to
    (#3, round 12).
@@ -1107,7 +1118,8 @@ survives context compaction. Tick items off here as they land.
    - inherit - (distinct from substitute);
    - carry forward - RETIRED;
    - resupply (arrival into a filled slot) - the built status chain is
-     explained separately;
+     NOT explained (overridden in triage round 7: explain the new
+     model only);
    - supply calendar - delivery calendar;
    - in development - pre-agreement, calendar-less, not yet agreed;
    - sample - reserved for the practice-data asset shape;
@@ -1145,3 +1157,69 @@ survives context compaction. Tick items off here as they land.
    hook and the post-run diff check are how the agents are held to
    this; a CI check that `docs/explainers/` changes only in commits
    carrying Keith's sign-off could be added in the requirements.
+
+   **Triage reopened (2026-09-29).** Keith asked to walk through all 33
+   one by one with the question tool, giving his triage per concept,
+   with the main session's recommendation on each; tiering comes after.
+   The "all included" reading above is a default, not his triage. The
+   tiering proposal already shown to him (10 own pages, 20 sections, 2
+   glossary-only, check scopes carried by group 8's page) is on hold
+   until then.
+
+   **Triage walk-through (2026-09-29), recorded round by round.** The
+   options per concept were include / leave out / park / pipeline docs,
+   each with a main-session recommendation:
+   - Round 1: #1 data contract, #2 check and warn/fail thresholds, #3
+     statuses that aren't verdicts, #4 qualifiers - all INCLUDE, as
+     recommended.
+   - Round 1 re-asked after a session restart; same answers.
+   - Round 2: #5 arrived vs promoted, #7 automatic promotion gate, #8
+     automation defers to a person - INCLUDE. #6 where a supply lives -
+     INCLUDE LIGHTLY: explained as places a supply moves between, not
+     as schemas; the physical detail goes to the pipeline docs.
+   - Round 3: #9 actor, reasons and the people list - PIPELINE DOCS
+     (Keith's call, against the main session's "include"
+     recommendation). #10 the seven filing decisions, #11 check scopes,
+     #12 check dependencies and comparisons - INCLUDE.
+   - Round 4: #13 why a check couldn't run, #14 load failure, #15 event
+     severity, #16 what recognition can't place - INCLUDE.
+   - Round 5: #17 unfiled supply, #18 assignment under ambiguity, #19
+     a slot closed unfilled, #20 an arrival verdict follows its filing
+     - INCLUDE.
+   - Round 6: #21 three moments, #22 calendar detail (all six parts),
+     #23 in development and graduating - INCLUDE. #24 one-off
+     extraction - INCLUDE LIGHTLY: a short, badged section in group 1's
+     "the shape varies", with no detail until requirements exist.
+   - Round 7: #25 a trial - INCLUDE BRIEFLY (a glossary entry plus a
+     line in the hand-filed supply section). #26 "no data" as of a date
+     and #28 QA and overdue tickets - INCLUDE. #27 the built resupply
+     chain - NOT explained: "explain the new model instead" (Keith's
+     own answer). Resupply is explained only as the model's arrival
+     into a filled slot. This overrides the naming-session note that
+     the built chain would be explained separately; the glossary canon
+     above has been corrected.
+   - Round 8: #29 a check's plain-English fields - INCLUDE BRIEFLY (a
+     glossary entry plus a line in "what a check is"). #30 changing or
+     retiring a check - PIPELINE DOCS (Keith's call, against the main
+     session's "include"). #31 recorded QA history - SPLIT: the idea
+     ("history is permanent and never rewritten") in the explainers,
+     the storage in the pipeline docs. #32 "In place on" versus what
+     the page said then - INCLUDE.
+   - Round 9: #33 newest promoted wins - INCLUDE.
+
+   **Triage result: 29 included, 2 to the pipeline docs, 2 split.**
+   - To the pipeline docs: #9 (who can decide) and #30 (changing or
+     retiring a check).
+   - Split between the two tracks: #6 (where a supply lives) and #31
+     (recorded QA history).
+   - Included only briefly: #25 (a trial) and #29 (a check's
+     plain-English fields).
+   - Included, but explaining only the new model: #27, the built
+     resupply chain.
+
+   **The line between the two tracks, confirmed by Keith (2026-09-29):
+   how the system is OPERATED AND MAINTAINED belongs in the pipeline
+   docs** (permissions, configuration changes, check upkeep). The
+   explainers cover what things MEAN to a reader. It came from the two
+   concepts he sent to the pipeline docs against the recommendation,
+   and it is the starting rule for the split sweep (queue item 3b).
