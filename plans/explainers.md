@@ -883,6 +883,18 @@ survives context compaction. Tick items off here as they land.
    diagrams still does. Rejected: hashing everything, which would force
    a re-sign every time a cited requirement is built.
 
+   **House standard wording review, in chunks (Keith, 2026-09-29
+   evening).** Chunks 1-3 approved, with these changes: "quick" and
+   "simple" come off the banned list; Marcus is renamed **The
+   Squirrel**; build state is one block under the title plus markers
+   under not-built headings; `review_by` is the due date of the next
+   quarterly period's supply after sign-off; and the sources list LINKS
+   its sources by relative path (reversing the architect's plain-text
+   rule, which had been adopted without asking Keith). **SLICE 2 MUST
+   rewrite sources-list links to GitHub URLs** in the dashboard tab,
+   where nothing outside docs/explainers/ exists - add this to slice
+   2's scope when it is scoped.
+
    **Still to take to Keith with wording:** CLAUDE.md's explainer
    rule covers "everything under `docs/explainers/`", which now
    includes the agents' gitignored working folder - the rule probably

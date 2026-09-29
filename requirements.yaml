@@ -24657,7 +24657,7 @@ requirements:
       - "THE HOUSE STANDARD SHALL require the body after the 'In short' box to open on a story moment."
       - "THE HOUSE STANDARD SHALL require the 'why it's this way' section to hold two to four bullets drawn from the cited requirements' decisions, saying what was chosen, what was rejected, and why."
       - "THE HOUSE STANDARD SHALL require the recap and its one pointer to sit immediately before the 'where this comes from' list."
-      - "THE HOUSE STANDARD SHALL require the 'where this comes from' list to be the last section of the page, to name every requirement id and config or code file the page rests on, and to name each file as plain text rather than as a link."
+      - "THE HOUSE STANDARD SHALL require the 'where this comes from' list to be the last section of the page, to name every requirement id and config or code file the page rests on, and to link each by a relative path to the committed file it names, a requirement id linking to requirements.yaml."
       - "THE HOUSE STANDARD SHALL NOT allow requirement ids, file names or code identifiers in the body of a page outside that list."
       - "THE HOUSE STANDARD SHALL require links a reader needs, to the glossary or a related page, to appear inline where they are relevant, and SHALL NOT allow them to appear only in the closing list."
       - "THE HOUSE STANDARD SHALL set a page's length at about 500 to 800 words excluding diagrams, and SHALL direct deeper detail to another page by link."
@@ -24670,7 +24670,7 @@ requirements:
       - "WHERE a section's state is anything other than built, THE HOUSE STANDARD SHALL require a heading marker naming that state on the line directly under the section's heading, for a reader who lands mid-page from a link."
       - "WHERE a page or section is 'proposed', THE HOUSE STANDARD SHALL require the build-state text itself to say that the design is not yet agreed and may change, so that the sentence changes with the state and never counts as a change to the page's prose."
       - "THE HOUSE STANDARD SHALL require the build-state block and every heading marker to be plain markdown text that reads the same on GitHub and in the dashboard."
-      - "THE HOUSE STANDARD SHALL define the front matter every page carries - the page's why-question, a summary of 160 characters or fewer, its group, its cited sources, the sources of each section where sections differ in build state (section_sources), its build state, its status as draft or signed off, and, once signed, who signed it off and when, a hash of the page as signed (REQ-DOCS-122), a last-reviewed date and a review-by date."
+      - "THE HOUSE STANDARD SHALL define the front matter every page carries - the page's why-question, a summary of 160 characters or fewer, its group, its cited sources, the sources of each section where sections differ in build state (section_sources), its build state, its status as draft or signed off, and, once signed, who signed it off and when, a hash of the page as signed (REQ-DOCS-122), a last-reviewed date and a review-by date, the review-by date being the due date of the next quarterly period's supply after sign-off."
     non_functional_requirements:
       - "Answer-first is not decoration. GDS found concept pages are the type readers skip most, and slice 2's 'What's this?' links will land a confused reader straight onto one - the first sentence has to carry the answer on its own. The rule that it does lives in the reader-judgement skill (REQ-DOCS-131), because the critic is the one who judges it."
       - "The citable-source rule is what makes slice 2's staleness gate workable at all: plans/*.md and CLAUDE.md churn daily, and a page fingerprinting them would fail the gate constantly. Slice 1 has no gate, but a page written against the wrong rule now would need rewriting then."
@@ -24682,6 +24682,7 @@ requirements:
       - REQ-DOCS-115
       - REQ-DOCS-131
     decisions:
+      - "Decided the sources list LINKS each source by a relative path to the committed file it names, a requirement id to requirements.yaml (Keith, 2026-09-29, while approving the house standard). This REVERSES the delivery-architect's plain-text rule, which had been adopted without asking him as engineering detail and cost the engineer reader a click-through. The architect's worry - a link that works on GitHub and breaks in slice 2's dashboard tab, where nothing outside docs/explainers/ exists - becomes slice 2's job: its renderer rewrites these relative links to GitHub URLs. The body still links only inside docs/explainers/, and the ban on any scheme:// text stays. Rejected: plain text, and linking requirements to a generated page."
       - "Decided build state is shown as ONE BLOCK UNDER THE TITLE plus a marker under each not-built heading (Keith, 2026-09-29, amended after sign-off, while approving the house standard's wording). Read literally, 'the page badge follows its least-built source and a section that differs carries its own' put a 'built' badge on every more-built section of a mostly built page. Keith's answer was to show the whole picture at the top - one line where every section shares a state, a list by state with section headings where they differ - and to mark each not-built section at its heading for a reader arriving mid-page. Section states come from a front-matter section_sources map, because requirement ids are banned from the page body. The 'proposed' sentence is part of the build-state text itself, so it changes with the state rather than counting as a prose edit. Rejected: the literal per-section badges, flipping the page badge to the page's majority state, and page badge only."
       - "Decided unsigned requirements ARE citable, under a separate 'proposed' badge (Keith, slice 1 Q3). Rejected: the scoper's recommendation that only signed requirements be citable, which would have kept every page resting on REQ-PIPE-110 to 113 out of the explainers until they were signed."
       - "Decided the status mapping (Keith, set 5): in_progress reads 'designed, not built yet', and a built requirement with unmet_criteria gets its own 'partly built' badge. That makes four states, not Q3's three."
@@ -24946,7 +24947,7 @@ requirements:
       - "IF a file contains an image, THEN THE SYSTEM SHALL reject it."
       - "IF a file contains a javascript: or data: link or an external URL, THEN THE SYSTEM SHALL reject it."
       - "THE SYSTEM SHALL treat as an external URL any text of the form scheme:// and any protocol-relative //, anywhere in the file, so that a postgresql:// string is rejected too."
-      - "IF a link's target is anything other than a relative path to an existing file inside docs/explainers/, outside _work/, with or without an anchor, THEN THE SYSTEM SHALL reject it."
+      - "IF a link in a page's body targets anything other than a relative path to an existing file inside docs/explainers/, outside _work/, with or without an anchor, or a link in the 'where this comes from' list targets anything other than a relative path to an existing committed file in the repository outside data/, reports/ and docs/explainers/_work/, THEN THE SYSTEM SHALL reject it."
       - "IF a file under docs/explainers/, the house standard's SKILL.md, the reader-judgement skill's SKILL.md, the /explain skill's SKILL.md or a docs-* agent definition contains a zero-width or bidirectional-control character, THEN THE SYSTEM SHALL reject it."
       - "IF a page has no 'In short' alert block, or has any other GitHub alert block, THEN THE SYSTEM SHALL reject it."
       - "IF a Mermaid block contains a click directive or any directive that touches securityLevel, THEN THE SYSTEM SHALL reject it."
@@ -24982,6 +24983,7 @@ requirements:
       - REQ-DOCS-116
       - REQ-DOCS-118
     decisions:
+      - "Decided the link rule has two scopes (Keith, 2026-09-29): the body links only inside docs/explainers/, while the 'where this comes from' list may link to any committed repository file outside data/, reports/ and _work/. The scheme:// ban is unchanged, so every such link is relative."
       - "Decided the page hash leaves out the whole build state - the front-matter field, the block under the title and every heading marker - after Keith replaced per-section badges with a top block plus heading markers (2026-09-29). The validator derives each section's state through the front matter's section_sources, since the body may not name requirements."
       - "Decided the command group is `mothman docs` (Keith, set 5, over the recommended `mothman explainers`), matching the docs-* team and the future 'Running Mothman' pipeline docs. Its slice-1 subcommands - validate, glossary, quote-check, guard-write, guard-read, snapshot and verify-changes - share one parser module (delivery-architect, adopted). Slice 2 adds sign-off and the preview command."
       - "Decided the validator refuses a page that claims sign-off without a sign-off record in its front matter (Keith, Q9). The full staleness gate stays in slice 2."
@@ -25427,7 +25429,7 @@ requirements:
       - "THE SYSTEM SHALL produce the page through a full /explain run (REQ-DOCS-129), including both of Keith's checkpoints."
       - "[PROCESS] THE SYSTEM SHALL include group 2's source index, reviewed by Keith, and every glossary entry the page uses."
       - "WHEN the page is committed, THE SYSTEM SHALL have it pass `mothman docs validate`, including the recall check."
-      - "THE SYSTEM SHALL link only by relative path to files inside docs/explainers/, and SHALL name repository files in the 'where this comes from' list as plain text."
+      - "THE SYSTEM SHALL link in the body only by relative path to files inside docs/explainers/, and SHALL link each source in the 'where this comes from' list by relative path to the committed file it names."
       - "[PROCESS] THE SYSTEM SHALL carry Keith's sign-off, a last-reviewed date and a review-by date in the page's front matter."
       - "[PROCESS] WHEN the page is viewed on GitHub, THE SYSTEM SHALL render its diagrams, and Keith SHALL confirm that he has seen them rendered there."
       - "THE SYSTEM SHALL carry the build state REQ-DOCS-116 gives the page's cited requirements, badged if it is anything other than built."
@@ -25435,7 +25437,7 @@ requirements:
       - "THE SYSTEM SHALL NOT embed the page in the dashboard, which is explainers slice 2."
     non_functional_requirements:
       - "PUBLIC the moment it is pushed: the repository is public, so whatever is committed - including a draft before sign-off - is published. The sensitivity rule (REQ-DOCS-117) and the validator have to have passed before the first push, not after."
-      - "Relative links only, and only within docs/explainers/, so that every link still resolves once slice 2 embeds the pages in the dashboard tab, where nothing outside that folder exists. Files outside it are named as plain text in the sources list, never linked - a link that works on GitHub and breaks in the tab is a slice-2 defect created here."
+      - "Links stay relative: body links point only inside docs/explainers/, and the sources list links to committed repository files. Both resolve on GitHub today. Slice 2 embeds the pages in the dashboard tab, where nothing outside docs/explainers/ exists, so its renderer must rewrite sources-list links to GitHub URLs (Keith, 2026-09-29) - a link that works on GitHub and breaks in the tab would be a slice-2 defect."
       - "Readable with nothing but a browser on GitHub - no build step, no mothman command, no database."
       - "It is written before the overview page, so it cannot lean on the overview to introduce the cast or the red, amber and green primer. REQ-DOCS-117 (Keith, set 4) therefore requires it to introduce each cast member it uses by name and role on first mention."
       - "EVIDENCE: a dated summary of the /explain run that produced the page, plus Keith's sign-off record in the page itself."
@@ -25450,6 +25452,7 @@ requirements:
       - REQ-DOCS-129
       - REQ-DOCS-132
     decisions:
+      - "Decided the sources list links to repository files by relative path (Keith, 2026-09-29), reversing the plain-text rule adopted from the delivery-architect review; slice 2's renderer rewrites those links to GitHub URLs so they still resolve in the dashboard tab. Recorded in full on REQ-DOCS-116."
       - "Decided the first page is PERIODS AND SLOTS, not claim windows (Keith, slice 1 Q2). Every source it rests on is built and signed (REQ-PIPE-049 to 053 and REQ-PIPE-063), and its natural diagrams can be hand-drawn. Rejected: claim windows, which rests on REQ-PIPE-110 to 113 (unsigned, unbuilt) and is naturally a timeline, which has no hand-drawn look. This supersedes round 10's 'delivery calendars and claim windows' as the first real explainer."
       - "Decided links stay inside docs/explainers/ and repository files are named as plain text (delivery-architect, adopted)."
       - "Decided the folder stays docs/explainers/, with 'Understanding Mothman' as a display title only (Keith, Q8)."
