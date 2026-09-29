@@ -496,14 +496,14 @@ class Validator:
     def idea_terms(self) -> list[str]:
         if self._idea_terms is None:
             terms: list[str] = []
-            g = self.repo / EXPLAINERS / "glossary.yaml"
-            if g.exists():
-                doc = yaml.load(g.read_text(), Loader=_Loader) or {}
-                entries = doc.get("entries", doc) if isinstance(doc, dict) else doc
-                for e in entries or []:
-                    if isinstance(e, dict) and e.get("idea"):
-                        terms.append(str(e.get("term", "")))
-                        terms.extend(str(a) for a in e.get("aliases") or [])
+            if (self.repo / EXPLAINERS / "glossary.yaml").exists():
+                from qa_tools.common import explainers
+                try:
+                    for e in explainers.load_glossary(self.repo).entries:
+                        if e.idea:
+                            terms += [e.term, *e.aliases]
+                except Exception:  # noqa: BLE001 - reported by check_glossary
+                    pass
             self._idea_terms = [t for t in terms if t]
         return self._idea_terms
 
@@ -522,6 +522,7 @@ class Validator:
                 if rel == WORK or WORK in rel.parents:
                     continue
                 self.check_file(rel)
+        self.check_glossary()
         for extra in (HOUSE_STANDARD, READER_JUDGEMENT, EXPLAIN_SKILL):
             if (self.repo / extra).exists():
                 self.check_hidden(extra)
@@ -530,6 +531,38 @@ class Validator:
                 self.check_hidden(a.relative_to(self.repo))
         self.run_mermaid()
         return sorted(self.findings, key=lambda f: (f.path, f.line, f.rule))
+
+    def check_glossary(self) -> None:
+        """REQ-DOCS-119: the strict schema, the alias and idea rules, and
+        that the committed glossary.md is what the generator would write.
+        These are configuration checks rather than rules of the house
+        standard, so they report under their own names, outside the V-
+        rule set the standard marks."""
+        from qa_tools.common import explainers
+
+        path = str(EXPLAINERS / "glossary.yaml")
+        if not (self.repo / EXPLAINERS / "glossary.yaml").exists():
+            return
+        try:
+            glossary = explainers.load_glossary(self.repo)
+        except explainers.ValidationError as exc:
+            for err in exc.errors():
+                where = ".".join(str(x) for x in err["loc"])
+                self.add(path, 1, "glossary-schema", f"{where}: {err['msg']}")
+            return
+        except yaml.YAMLError as exc:
+            self.add(path, 1, "glossary-schema", f"glossary.yaml does not parse: {exc}")
+            return
+        for problem in explainers.glossary_problems(glossary, set(self.req_states)):
+            self.add(path, 1, "glossary", problem)
+        if not explainers.glossary_is_current(self.repo):
+            self.add(str(EXPLAINERS / "glossary.md"), 1, "glossary-stale",
+                     "glossary.md is out of date - run 'mothman docs glossary' and commit the result")
+        md = self.repo / EXPLAINERS / "glossary.md"
+        if md.exists():
+            page = Page(str(EXPLAINERS / "glossary.md"), md.read_text())
+            for m in page.mermaid:
+                self.check_mermaid(page, m)
 
     def check_hidden(self, rel: Path) -> None:
         for n, line in enumerate((self.repo / rel).read_text().split("\n"), 1):

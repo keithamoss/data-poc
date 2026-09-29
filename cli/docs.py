@@ -96,3 +96,21 @@ def validate_command(list_rules: bool, hash_page: Path | None) -> None:
         print(validate_explainers.page_hash(hash_page.read_text()))
         return
     raise SystemExit(validate_explainers.main())
+
+
+@docs_group.command("glossary")
+@click.option("--check", is_flag=True,
+              help="Fail if the committed glossary.md is not what this would write.")
+def glossary_command(check: bool) -> None:
+    """Write docs/explainers/glossary.md from glossary.yaml and
+    requirements.yaml (REQ-DOCS-119). Never edit glossary.md by hand."""
+    from qa_tools.common import explainers
+
+    if check:
+        if not explainers.glossary_is_current():
+            console.print("glossary.md is out of date - run 'mothman docs glossary' and commit it.")
+            raise SystemExit(1)
+        console.print("glossary.md is current.")
+        return
+    out = explainers.write_glossary_md()
+    console.print(f"Wrote {out.relative_to(explainers.REPO_ROOT)}.")
