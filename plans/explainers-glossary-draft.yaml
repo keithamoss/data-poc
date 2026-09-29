@@ -26,7 +26,7 @@ entries:
     draft: false
     idea: false
 
-  - term: scheduled asset
+  - term: scheduled data asset
     definition: "A data asset whose supplies are owed on a supply calendar. This is the shape every data asset in Mothman has today."
     aliases: []
     forms: [scheduled assets]
@@ -36,7 +36,7 @@ entries:
     idea: false
 
   - term: one-off extraction
-    definition: "A data asset made of supplies for a single project, with no supply calendar at all."
+    definition: "A data asset gathered once, at one point in time, for a single project. It has no supply calendar, because nothing further is owed."
     aliases: []
     forms: [one-off extractions]
     defined_by: [REQ-PIPE-106]
@@ -44,9 +44,9 @@ entries:
     draft: true
     idea: false
 
-  - term: sample
-    definition: "A data asset of practice or test data, which is never real data."
-    aliases: []
+  - term: sample data collection
+    definition: "A collection of practice or test data that behaves like real supplies but never holds real data."
+    aliases: [sample dataset, sample]
     forms: [samples]
     defined_by: []
     page: null
@@ -54,8 +54,8 @@ entries:
     idea: true
 
   - term: in development
-    definition: "Said of a dataset that exists before its supply calendar is agreed. Its checks run and show real results, which never count towards any agreed status."
-    aliases: [pre-agreement, calendar-less, not yet agreed]
+    definition: "A dataset we expect to receive regularly, but whose supply calendar has not been agreed yet. Its checks run and show real results, which never count towards any agreed status."
+    aliases: [pre-agreement, not yet agreed]
     forms: [in-development]
     defined_by: [REQ-PIPE-106]
     page: null
@@ -74,7 +74,7 @@ entries:
     idea: false
 
   - term: supply calendar
-    definition: "The list of periods, and the date each period's supply is due, inside a delivery agreement. Each dataset follows exactly one."
+    definition: "The list of periods, and the date each period's supply is due, inside a delivery agreement. The time of day comes from each dataset. Each dataset follows exactly one."
     aliases: [delivery calendar, schedule]
     forms: [supply calendars, delivery calendars, schedules]
     defined_by: [REQ-PIPE-049, REQ-PIPE-051]
@@ -93,7 +93,7 @@ entries:
     idea: false
 
   - term: cadence rule
-    definition: "A supply calendar stated as a rule, such as every day, rather than as a list of dates. Its periods are named by their own dates."
+    definition: "A supply calendar stated as a rule, such as every day, rather than as a list of dates. Each period is named after its own date, such as 29 September 2026."
     aliases: []
     forms: [cadence rules]
     defined_by: [REQ-PIPE-049, REQ-PIPE-051]
@@ -111,7 +111,7 @@ entries:
     idea: false
 
   - term: delivery month
-    definition: "One of the months in which a supply calendar's authored dates fall. A dataset can name the ones it takes part in, or name none to take part in all."
+    definition: "One of the months in which a supply calendar's authored dates fall. A dataset can take part in only some of them, such as one month a year. A dataset that names none takes part in every month."
     aliases: []
     forms: [delivery months]
     defined_by: [REQ-PIPE-049]
@@ -120,7 +120,7 @@ entries:
     idea: false
 
   - term: period
-    definition: "One named step in a supply calendar, carrying a name and a date, that each supply is filed to. A period never moves once it exists."
+    definition: "One named point in a supply calendar, carrying a name and a date, that each supply is filed to. A period never moves once it exists."
     aliases: [cycle]
     forms: [periods, cycles]
     defined_by: [REQ-PIPE-051, REQ-PIPE-049]
