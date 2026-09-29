@@ -382,8 +382,18 @@ is blocked here:
 - `tech-docs-template`;
 - `gds-way`.
 
-Snippet-only: the Australian Style Manual points, and a "reading age 9"
-claim that appears nowhere in the current guidance source.
+After Keith allow-listed the GOV.UK hosts the same day, the gaps were
+re-checked live:
+- **"Writing API reference documentation" was read in full** through
+  GOV.UK's content API. It confirms: generate the reference from code
+  comments, then tidy it by hand. It lists what a reference covers
+  (resources, endpoints and methods, parameters with types and
+  constraints, example requests and responses, error codes) and says
+  all reference material should be published together.
+- **The "reading age 9" claim is in neither the live guidance nor its
+  source**, so treat it as folklore.
+- **Still snippet-only:** the Australian Style Manual points
+  (`www.stylemanual.gov.au` is still blocked).
 
 **Rules that bear on the explainers:**
 - Page titles and headings should not be questions ("they're hard to

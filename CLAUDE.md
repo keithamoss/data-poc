@@ -1739,16 +1739,21 @@ Rough layout:
       from `arxiv.org`, so this blocks only programmatic search. Google's
       ADK docs were read legitimately from their own source repo
       (`google/adk-docs`) instead.
-    - **`guidance.publishing.service.gov.uk`** (the MOST useful - where
-      GOV.UK's writing guidance now lives), **`docs.publishing.service.gov.uk`**,
+    - ~~**`www.gov.uk`**, **`*.publishing.service.gov.uk`**,
+      **`gds-way.digital.cabinet-office.gov.uk`**,
       **`design-system.service.gov.uk`**, **`alphagov.github.io`**,
-      **`technology.blog.gov.uk`**, **`gds.blog.gov.uk`**, plus
-      `www.gov.uk` and `gds-way.digital.cabinet-office.gov.uk` again
-      (2026-09-29, the GOV.UK writing research for
-      `plans/explainers.md` #3). Worked around legitimately: the same
-      guidance is published as source in public `alphagov` GitHub repos
+      **`technology.blog.gov.uk`**, **`gds.blog.gov.uk`**~~ -
+      ALLOW-LISTED by Keith 2026-09-29, the same day they were first
+      hit (the GOV.UK writing research for `plans/explainers.md` #3).
+      Re-verified with a real `curl`: all 200, except
+      `alphagov.github.io`'s bare root, which is a genuine 404 from
+      GitHub Pages (no index page), not a proxy block. Before that the
+      guidance was read from its public `alphagov` source repos
       (`govuk-content-publishing-guidance`, `govuk-developer-docs`,
-      `tech-docs-template`, `gds-way`), readable via `git clone`.
+      `tech-docs-template`, `gds-way`), which remain a good route.
+      **Tip:** GOV.UK's content API (`www.gov.uk/api/content/<path>`)
+      returns a page's body as clean JSON, which is far easier to read
+      than the rendered HTML.
     - ~~**`arxiv.org`**, **`aclanthology.org`**~~ - ALLOW-LISTED by
       Keith 2026-09-29 and re-verified with a real `curl` (both 200).
       Both were first hit that day researching the explainer agents
