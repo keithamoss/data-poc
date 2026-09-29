@@ -2071,7 +2071,7 @@ survives context compaction. Tick items off here as they land.
       a combination of problems she has not seen and the rules cover
       only half of it. Explains promotion, rejection, holds and
       substitutes, often by telling Sam what she saw last time.
-   4. **Marcus, the team manager**, now matching REQ-DOCS-127's manager
+   4. **The Squirrel (was Marcus; renamed by Keith the same evening), the team manager**, now matching REQ-DOCS-127's manager
       persona: knows data really well, not a software engineer. Tested
       by balancing software engineering and data issues against keeping
       a clear view of what is going on in the data asset (Keith's
