@@ -622,3 +622,44 @@ def cp_duckdb_dir(supply_dsn, cp_raw_dir):
                deliveries_dir=Path(cp_raw_dir) / "deliveries",
                receipts_dir=Path(cp_raw_dir) / "receipts")
     return supply_dsn
+
+
+# ---------------------------------------------------------------------------
+# WHICH TESTS NEED A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27).
+#
+# CI used to be one job: set up, spend nine minutes on `mothman pipeline
+# bootstrap`, then run all 2,890 tests. Only a handful of them need what
+# that bootstrap produces - the deployment's own recorded QA history, and
+# the `reports/*.json` built from it - and the rest were waiting nine
+# minutes for something they never read.
+#
+# So the suite is split, and the split is DERIVED rather than listed in
+# the workflow. A path list in YAML goes stale the moment somebody adds a
+# module, and going stale here means a test silently running in the job
+# that cannot satisfy it - which is the SKIP-rather-than-fail failure
+# `.github/workflows/test.yml`'s own bootstrap comment records having hit
+# before: ten tests quietly skipping in CI while passing locally.
+# ---------------------------------------------------------------------------
+
+#: The fixture that hands a test the DEPLOYMENT'S database rather than its
+#: own worker's. Anything requesting it needs the bootstrap by definition,
+#: so the marker is applied from the fixture rather than by hand.
+DEPLOYMENT_FIXTURE = "deployment_history"
+
+#: The marker both halves of CI select on.
+NEEDS_DEPLOYMENT = "needs_deployment"
+
+
+def pytest_collection_modifyitems(items):
+    """Mark every test that needs a bootstrapped deployment.
+
+    TWO WAYS TO NEED ONE, and only the first can be detected: a test that
+    requests `deployment_history` says so in its signature, and a test
+    that reads a built `reports/*.json` says so nowhere at all. The second
+    kind carries a module-level `pytestmark` instead, and
+    tests/test_publish.py asserts that every module reading those files
+    has one - which is what stops the two drifting apart.
+    """
+    for item in items:
+        if DEPLOYMENT_FIXTURE in getattr(item, "fixturenames", ()):
+            item.add_marker(getattr(pytest.mark, NEEDS_DEPLOYMENT))

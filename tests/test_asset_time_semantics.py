@@ -66,6 +66,14 @@ import pytest
 
 from pipeline import cadence
 
+# NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
+# reads `reports/*.json`, which is built from the deployment's recorded
+# QA history - so it belongs in the CI job that bootstraps one. Nothing
+# in a signature says so, which is why the mark is here rather than
+# derived; tests/test_publish.py asserts it is not forgotten.
+pytestmark = pytest.mark.needs_deployment
+
+
 def _instant_as_written_before_048(value) -> datetime | None:
     """One stored arrival as an instant, under the pre-048 reading.
 

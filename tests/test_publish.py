@@ -357,3 +357,78 @@ class TestTheWorkflowCarriesEveryVariableThePipelineNeeds:
                              self.WORKFLOW.read_text()).group(1)
         by_id = {e.id: e for e in environments.all_environments()}
         assert by_id[claimed].publishes is False
+
+
+class TestNeitherHalfOfCIQuietlyStopsCovering:
+    """The split CI depends on, asserted here rather than trusted
+    (plans/tooling.md #27).
+
+    CI runs `-m "not needs_deployment"` in one job and `-m
+    needs_deployment` in another, and the marker is what decides. Two
+    ways that goes wrong, and only one of them is loud: a test in the
+    WRONG half either fails outright (fine, somebody fixes it) or
+    SKIPS - which is the failure `.github/workflows/test.yml`'s own
+    bootstrap comment records having hit before, ten tests quietly
+    skipping in CI while passing locally.
+
+    So this checks the marker covers what it has to, mechanically. The
+    fixture half needs no checking - conftest derives it - and the half
+    that needs it is the five modules reading `reports/` files, where
+    nothing in a signature says so.
+    """
+
+    WORKFLOW = ROOT / "tests"
+
+    def _modules_reading_reports(self) -> set[str]:
+        """Test modules that name a built `reports/` file."""
+        import re
+
+        found = set()
+        for path in sorted((ROOT / "tests").glob("test_*.py")):
+            text = path.read_text()
+            # A real path, not the word in prose: `reports/<name>.json`,
+            # however it is spelled around the quotes.
+            if re.search(r'["\']reports["\']\s*/|reports/\w+\.json', text):
+                found.add(path.name)
+        return found
+
+    def test_every_module_reading_reports_carries_the_marker(self):
+        # THREE WAYS TO BE COVERED, and the first is invisible in the
+        # source of the test itself: conftest marks anything requesting
+        # `deployment_history`. So this looks for any of them rather
+        # than for the module-level spelling alone - a check that
+        # insisted on one would report a module that is already fine,
+        # and a guard that cries wolf is one somebody disables.
+        covered = ("pytestmark = pytest.mark.needs_deployment",
+                   "@pytest.mark.needs_deployment",
+                   "deployment_history")
+        missing = {
+            name for name in self._modules_reading_reports()
+            if not any(mark in (ROOT / "tests" / name).read_text()
+                       for mark in covered)
+        }
+        assert missing == set(), (
+            f"{sorted(missing)} read a built reports/ file but would run in "
+            f"CI's fast half, which never builds one - where they would skip "
+            f"rather than fail. Add "
+            f"`pytestmark = pytest.mark.needs_deployment`.")
+
+    def test_the_marker_is_registered(self):
+        """An unregistered marker makes a typo in `-m` select nothing,
+        silently - a green job that ran no tests at all."""
+        text = (ROOT / "pyproject.toml").read_text()
+        assert "needs_deployment:" in text
+
+    def test_both_halves_are_named_in_the_workflow(self):
+        text = (ROOT / ".github" / "workflows" / "test.yml").read_text()
+        assert '-m "not needs_deployment"' in text
+        assert "-m needs_deployment" in text
+
+    def test_the_coverage_gate_still_runs_over_both(self):
+        """Splitting the suite splits the measurement, so `fail_under`
+        has to be enforced on the combination - not on either half,
+        where it would be meaningless."""
+        text = (ROOT / ".github" / "workflows" / "test.yml").read_text()
+        assert "coverage combine" in text
+        assert text.count("--cov-fail-under=0") == 2, (
+            "each half must defer the threshold to the combine")

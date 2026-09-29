@@ -2995,4 +2995,76 @@ most litter.
 
     **Recommendation given: 2 then 1.** 2 is safe and halves the wait; 1
     is the larger win but the clock question wants answering first.
-    Awaiting Keith's pick.
+    Keith: "go and fix CI."
+
+    ### Option 2 is BUILT (2026-09-29), and my estimate for it was wrong
+
+    **I told Keith the split would take CI from 19m30 to about 10
+    minutes. Measured, it takes it to about 17.** Recorded rather than
+    quietly corrected, because the reasoning error is the reusable part:
+    I assumed the two halves were comparable in cost, so that splitting
+    them would halve the wall clock. They are not. The 270 deployment
+    tests are the EXPENSIVE ones - 178 of them drive a real browser - and
+    they are also the half that carries the nine-minute bootstrap. So the
+    slow job gets both costs and the fast job gets neither.
+
+    Measured locally, each half with coverage on:
+
+    | Half | Tests | Time |
+    |---|---|---|
+    | `-m "not needs_deployment"` | 2,628 | 5m 06s (3m 32s without coverage) |
+    | `-m needs_deployment` | 270 | 5m 47s |
+
+    Projected in CI: the fast job is ~1m setup + ~5m = **~6m**, the slow
+    job ~1m + 8m55 bootstrap + ~6m = **~16m**, and the combine ~1m after
+    both. So ~17m against 19m30 - a real saving of about two and a half
+    minutes, and nothing like the one I promised.
+
+    **WHAT IT IS ACTUALLY WORTH, which is not the wall clock.** A red
+    fast half now reports in about six minutes rather than nineteen, and
+    that is where most failures are - 2,628 of 2,898 tests. And it
+    isolates the bootstrap into one job, which makes caching it a clean
+    single change rather than one tangled with everything else.
+
+    **COVERAGE IS NOT THE MINOR COST this entry guessed it was.** The
+    fast half runs 3m32 without it and 5m06 with - roughly 45% on that
+    half. Worth its own look, since the gate it feeds has exactly one
+    point of headroom (93% measured against a floor of 92).
+
+    **THREE JOBS, NOT TWO, and the third is the cost of splitting.** Each
+    half measures only the lines its own tests reach, so neither can meet
+    `fail_under` alone. `coverage` downloads both, combines and enforces.
+    Rehearsed locally end to end: combined TOTAL 93%, exit 0.
+
+    **THE SPLIT IS DERIVED RATHER THAN LISTED**, which matters more than
+    it looks. A path list in the workflow goes stale the moment somebody
+    adds a module, and going stale means a test running in the job that
+    cannot satisfy it - where it SKIPS rather than fails, which is the
+    silent-green this workflow has already been bitten by once.
+    `tests/conftest.py` marks anything requesting the
+    `deployment_history` fixture; five modules reading `reports/` carry
+    the mark themselves; and `tests/test_publish.py` asserts no module
+    reading those files is missing it.
+
+    **That guard earned its place immediately**: it found
+    `test_scenario_injection.py`, which my own hand enumeration had
+    missed because it spells the path `root / "reports" / name` rather
+    than as a literal my grep matched. It skips when the file is absent,
+    so under the split it would have gone quiet in the fast half.
+
+    **And the split surfaced a real pre-existing test defect**, the same
+    shape as one found the same morning: `test_inheritance.py` asserted
+    on the NEWEST decision-log entry for a dataset, which is routinely
+    the RULE's automatic inheritance rather than the person's. It passed
+    only because of which module happened to share its xdist worker, and
+    removing 270 tests from the run changed that. Fixed to select the
+    entry for the period under test.
+
+    **STILL TO DO: option 1, the cache**, which is where the remaining
+    time actually is - it would take the slow job from ~16m to ~7m. The
+    clock risk is real and now has a cheap answer: key the cache on the
+    config hash AND the asset-clock date, so it is never more than a day
+    stale, which is the same staleness a same-day bootstrap has anyway.
+    The generator produces arrivals relative to when it runs, which is
+    why an unbounded cache would break the daily dataset's current
+    cycle.

@@ -141,6 +141,16 @@ addopts = "-n auto --dist loadfile"
 # for why the old per-directory pythonpath entries (and every script's own
 # sys.path.insert hack) are gone.
 pythonpath = ["."]
+# WHICH HALF OF CI A TEST BELONGS IN (plans/tooling.md #27). `needs_deployment`
+# means "this reads the DEPLOYMENT's recorded QA history, or the reports/*.json
+# built from it" - 269 of 2,894 tests, and the only ones that need
+# `mothman pipeline bootstrap`. tests/conftest.py applies it to anything
+# requesting the `deployment_history` fixture; five modules that read reports/
+# carry it themselves. Registered here so a typo in `-m` is a warning rather
+# than a silently empty selection.
+markers = [
+    "needs_deployment: needs a bootstrapped deployment database (and reports/ built from it)",
+]
 
 [tool.coverage.run]
 # Just the real pipeline source - not tests/ itself, not dbt_project/

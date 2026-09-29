@@ -35,6 +35,14 @@ import pytest
 
 from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats
 
+# NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
+# reads `reports/*.json`, which is built from the deployment's recorded
+# QA history - so it belongs in the CI job that bootstraps one. Nothing
+# in a signature says so, which is why the mark is here rather than
+# derived; tests/test_publish.py asserts it is not forgotten.
+pytestmark = pytest.mark.needs_deployment
+
+
 ROOT = Path(__file__).resolve().parent.parent
 DASHBOARD_HTML = ROOT / "dashboard" / "qa-reporting-dashboard.html"
 TEMPLATE_HTML = ROOT / "dashboard" / "qa-reporting-dashboard.template.html"

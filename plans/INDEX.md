@@ -378,6 +378,7 @@ one when this line suggests it matters.
 - **#26** `done` 2026-09-27 - The suite was FLAKY under the parallel default - different tests failed on each full run, and a green result was...
   - *touches:* `qa_tools/common/soda_common.py`, `tests/test_soda_leaves_the_environment_alone.py`
 - **#27** `todo` 2026-09-29 - CI takes nineteen and a half minutes, and half of it is a bootstrap that could be cached. Keith's own ask this morning,...
+  - *touches:* `tests/conftest.py`, `tests/test_publish.py`
 
 ## plans/performance.md
 

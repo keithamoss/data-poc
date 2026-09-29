@@ -14,6 +14,14 @@ from qa_tools.common import qa_results_reader as reader
 from qa_tools.common import qa_results_writer as writer
 from qa_tools.common import tables_read as tr
 
+# NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
+# reads `reports/*.json`, which is built from the deployment's recorded
+# QA history - so it belongs in the CI job that bootstraps one. Nothing
+# in a signature says so, which is why the mark is here rather than
+# derived; tests/test_publish.py asserts it is not forgotten.
+pytestmark = pytest.mark.needs_deployment
+
+
 AGENCY = "child-protection-family-support"
 COLLECTION = "child-protection"
 

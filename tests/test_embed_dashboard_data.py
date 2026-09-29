@@ -21,6 +21,14 @@ import pytest
 
 from dashboard import embed_dashboard_data as edd
 
+# NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
+# reads `reports/*.json`, which is built from the deployment's recorded
+# QA history - so it belongs in the CI job that bootstraps one. Nothing
+# in a signature says so, which is why the mark is here rather than
+# derived; tests/test_publish.py asserts it is not forgotten.
+pytestmark = pytest.mark.needs_deployment
+
+
 
 @pytest.fixture(autouse=True)
 def _isolate_embed_data_targets(monkeypatch, tmp_path):

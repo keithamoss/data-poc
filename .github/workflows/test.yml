@@ -72,6 +72,34 @@ name: Run test suite
 # subprocess.run(..., check=False, capture_output=True) and nothing
 # surfaces a failed dbt invocation's own stderr.
 
+# 2026-09-29 (plans/tooling.md #27, Keith's own ask - "go and fix CI"):
+# THIS WAS ONE JOB AND IS NOW THREE, because half of a nineteen-minute run
+# was a bootstrap that almost none of the tests read. Measured on run
+# 36503758018: setup 1m04s, `mothman pipeline bootstrap` 8m55s, the
+# dashboard build 8s, the suite 9m18s.
+#
+# Only 269 of 2,894 tests need what that bootstrap produces - the
+# DEPLOYMENT's own recorded QA history, and the `reports/*.json` built
+# from it. The other 2,625 use a database per xdist worker and never look
+# at either, so they were waiting nine minutes for something they do not
+# read. They now run in `test` while `test-deployment` bootstraps beside
+# them, so the wall clock is the longer of the two rather than the sum.
+#
+# THE SPLIT IS DERIVED, NOT LISTED HERE. A path list in YAML goes stale
+# the moment somebody adds a module, and going stale means a test running
+# in the job that cannot satisfy it - which is the skip-rather-than-fail
+# failure the bootstrap step's own comment below records having hit
+# before. `tests/conftest.py` marks anything requesting the
+# `deployment_history` fixture, five modules that read `reports/` carry
+# the mark themselves, and tests/test_publish.py asserts that no module
+# reading those files is missing it.
+#
+# COVERAGE HAS TO BE COMBINED, which is the cost of splitting and the
+# reason for the third job: each half measures only the lines its own
+# tests reach, so neither could meet `fail_under` alone. `coverage`
+# downloads both, combines them and enforces the threshold - seconds of
+# work, and it keeps the gate measuring exactly what it measured before.
+
 # A glob, not a single named branch (plans/publishing-and-history.md #7,
 # fixed 2026-09-19). This used to read `branches:
 # [claude/new-session-en9qen]` - the working branch of whichever session
@@ -202,6 +230,72 @@ jobs:
       - name: Lint YAML (duplicate keys)
         run: uv run yamllint --strict .
 
+      - name: Run the tests that need no deployment
+        # THE FAST HALF - 2,625 of 2,894 tests, each using a database of
+        # its own per xdist worker. No bootstrap, so this starts the
+        # moment setup finishes and reports the common failure in about
+        # three and a half minutes rather than nineteen.
+        #
+        # `--cov` writes a PARTIAL measurement on purpose; the `coverage`
+        # job below combines it with the other half's before anything is
+        # enforced. Enforcing here would fail on every line only the
+        # deployment tests reach.
+        run: |
+          uv run pytest -m "not needs_deployment" \
+            --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard \
+            --cov-report= --cov-fail-under=0
+
+      - name: Keep this half's coverage for the combine
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-fast
+          path: .coverage
+          include-hidden-files: true
+          retention-days: 1
+
+  test-deployment:
+    # THE SLOW HALF, and the only job that pays for a bootstrap. It runs
+    # beside `test` rather than after it, so nineteen minutes of serial
+    # work becomes the longer of two parallel halves.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-not-a-secret
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
+      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      MOTHMAN_ENVIRONMENT: ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Create the warehouse database
+        run: |
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c 'CREATE DATABASE supply'
+
+      - name: Install dbt_utils
+        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
+
+      - name: Install Playwright's Chromium
+        run: uv run playwright install --with-deps chromium
+
       # reports/*.json is gitignored, so a freshly-cloned runner has
       # none - and ten tests across three files guard on it and call
       # pytest.skip when it is absent. They were therefore SILENTLY
@@ -233,8 +327,54 @@ jobs:
           uv run mothman dashboard rebuild-results
           uv run mothman dashboard build-data
 
-      - name: Run test suite
-        run: uv run pytest --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov-report=term-missing
+      - name: Run the tests that need a deployment
+        run: |
+          uv run pytest -m needs_deployment \
+            --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard \
+            --cov-report= --cov-fail-under=0
+
+      - name: Keep this half's coverage for the combine
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-deployment
+          path: .coverage
+          include-hidden-files: true
+          retention-days: 1
+
+  coverage:
+    # THE GATE THE SPLIT WOULD OTHERWISE HAVE BROKEN. Each half measures
+    # only the lines its own tests reach, so `fail_under` has to be
+    # enforced on the two combined - anywhere else and it would either
+    # fail on every push or stop meaning anything.
+    needs: [test, test-deployment]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Collect both halves
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: coverage-parts
+
+      - name: Combine and enforce the threshold
+        # `coverage combine` consumes the files it is given, so they are
+        # named apart first - two files both called `.coverage` in one
+        # directory is one file.
+        run: |
+          find coverage-parts -name .coverage -print0 \
+            | while IFS= read -r -d "" f; do
+                mv "$f" ".coverage.$(basename "$(dirname "$f")")"
+              done
+          uv run coverage combine
+          uv run coverage report --show-missing
 
   js-tests:
     runs-on: ubuntu-latest

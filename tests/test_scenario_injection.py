@@ -260,6 +260,11 @@ class TestNothingSaysScenarioOnTheDashboard:
     SUPPLY carrying one.
     """
 
+    # NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27) - it reads
+    # a built reports/*.json, and skips when there is none. In CI's fast
+    # half there never is, so without this it would skip rather than run.
+    # One test rather than the module: nothing else here reads them.
+    @pytest.mark.needs_deployment
     def test_no_supply_or_dataset_record_carries_a_scenario_id(self):
         import re
         from pathlib import Path

@@ -393,7 +393,17 @@ class TestAnOperatorAsksForOneInheritance:
         assert found is not None and found.stands_on == first
         latest = dl.latest_for_slot(conn, annual.dataset_id, second)
         assert latest[0] == dl.INHERIT
-        entry = dl.decisions_for(conn, annual.dataset_id)[-1]
+        # THE ENTRY FOR THIS PERIOD, NEVER THE LAST ONE FOR THE DATASET.
+        # `_promote_into` above opens the period, and opening one makes
+        # the RULE try to inherit into every later period it can - each
+        # attempt an entry of its own. So the newest entry for this
+        # dataset is routinely the rule's, not the person's, and which
+        # one `[-1]` lands on depends on what else shares this worker.
+        # It passed for a year and failed the moment CI's split changed
+        # the worker's composition, which is what that shape of
+        # assertion always does.
+        entry = [e for e in dl.decisions_for(conn, annual.dataset_id)
+                 if e["to_slot"] == second and e["action"] == dl.INHERIT][-1]
         assert entry["action"] == dl.INHERIT
         assert entry["actor"] == "Keith"
         assert entry["actor_kind"] == dl.PERSON, (
