@@ -207,6 +207,9 @@
   story: "As a reader on GitHub today and on the dashboard later, I want every explainer diagram to argue a point, look the same in both places and carry a description a screen reader can announce, so that the pictures teach rather than decorate."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 1 fourth round, item 3 round 6, Keith's calls on the live GOV.UK research, slice 1 answer Q7, and set 4, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE HOUSE STANDARD SHALL allow the hand-drawn look only on flowchart, state, class and ER diagrams, and SHALL require any other diagram type to use the plain look."
@@ -249,6 +252,9 @@
   story: "As a reader meeting a Mothman term for the first time, I want one glossary that gives each invented term its one canonical spelling, a one-line definition and where it is explained, so that I never have to guess whether two words mean the same thing."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 3 rounds 1, 3 and 4, the naming session (rounds 1 to 3) and its glossary canon, the re-baseline decisions, round 15's placeholder names, slice 1 answers Q2 and Q3, and sets 5 and 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL hold the glossary's one source at docs/explainers/glossary.yaml, under a strict schema that rejects unknown and missing keys."
@@ -299,6 +305,9 @@
   story: "As whoever starts the next /explain run, I want the agreed groups, reading order and page list in one committed file, so that tiering decisions survive plans/explainers.md being deleted and nobody re-derives which concept gets its own page."
   moscow: should
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "delivery-scoper, found by the carry-over check over plans/explainers.md item 4 and THE PAGE LIST in item 3, 2026-09-29. Kept by Keith as a committed config file (slice 1 Q12) and raised to should (set 4), 2026-09-29; schema adopted from the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL hold the explainers' concept map in docs/explainers/concept-map.yaml, under a strict schema that rejects unknown and missing keys."
@@ -337,6 +346,9 @@
   story: "As Keith signing off an explainer, I want each group's relevant requirements and config listed once for me to review, and a check that a page cites the requirement behind every term it uses, so that a page cannot be faithful to its sources and still miss the one that matters."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 3 round 13 (source recall) and the stochasticity and RAG research before it, and set 4, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL hold one source index per group at docs/explainers/<group>/sources.yaml, under a strict schema that rejects unknown and missing keys."
