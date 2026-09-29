@@ -21,9 +21,23 @@ from qa_tools.common import load_log, outstanding
 
 
 @pytest.fixture(autouse=True)
-def _this_workers_database(supply_dsn):
-    """EVERY test here runs against this worker's own database, and that
-    became necessary on 2026-09-28 rather than merely tidy.
+def _a_database_nobody_else_writes_to(private_supply_dsn):
+    """EVERY test here runs against a database OF ITS OWN, and each
+    tightening was forced by a real failure rather than chosen.
+
+    IT WAS `supply_dsn` UNTIL 2026-09-29 - one database per WORKER,
+    which isolates this module from the deployment and from other
+    workers but NOT from the other modules pytest-xdist puts on the same
+    worker. That is enough for a test asserting on rows it wrote itself.
+    It is not enough here, because these tests assert on a GLOBAL total:
+    "the queue is empty" is a claim about everything in the database, so
+    any module sharing the worker can falsify it.
+
+    It held only by luck of file distribution. Splitting CI into two
+    halves moved 270 tests out of the run, `--dist loadfile`
+    redistributed the rest, and nine tests here began reporting 28
+    items where they expected none - a failure this module had already
+    seen the first version of, below.
 
     Two of the queue's producers read the decision log through narrow
     readers that open their own connection - closed slots through
@@ -38,7 +52,7 @@ def _this_workers_database(supply_dsn):
     a test that forgets: it passes on an empty deployment and fails on a
     populated one, which is a flake nobody can reproduce.
     """
-    return supply_dsn
+    return private_supply_dsn
 
 
 def _delivery(conn, name="monday", **overrides):

@@ -213,6 +213,64 @@ def supply_dsn(worker_id):
         os.environ[supply_db.SUPPLY_DSN_ENV] = before
 
 
+@pytest.fixture
+def private_supply_dsn(supply_dsn, request):
+    """A database NO OTHER TEST MODULE can write into.
+
+    `supply_dsn` gives a database per WORKER, which isolates a module
+    from the deployment and from other workers - but not from the other
+    modules pytest-xdist put on the same worker. That is enough for a
+    test asserting on rows it wrote itself, and not enough for one
+    asserting on a GLOBAL total: "the queue is empty" is a claim about
+    everything in the database, so any module sharing the worker can
+    falsify it.
+
+    FOUND THE HARD WAY, 2026-09-29. tests/test_outstanding.py asserts on
+    the whole outstanding queue, and passed for as long as it happened to
+    share a worker with modules that wrote no filings. Splitting CI into
+    two halves moved 270 tests out of the run, `--dist loadfile`
+    redistributed what was left, and nine of its tests began reporting
+    28 items where they expected none. Its own docstring had already
+    recorded the previous version of this - the deployment's 84
+    promotions arriving mid-test - and the fix then was this fixture's
+    weaker cousin.
+
+    PER TEST, not per module, because the decision log is append-only by
+    a database trigger: a TRUNCATE is refused, so a module cannot clean
+    up after itself between its own tests either.
+    """
+    import os
+
+    import psycopg
+
+    from qa_tools.common import supply_db
+
+    admin = os.environ[TEST_DSN_ENV]
+    safe = "".join(c if c.isalnum() else "_" for c in request.node.name)[:40]
+    name = f"mothman_solo_{os.getpid()}_{abs(hash(safe)) % 10**8}"
+    with psycopg.connect(admin, autocommit=True) as conn:
+        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        conn.execute(f'CREATE DATABASE "{name}"')
+
+    info = psycopg.conninfo.conninfo_to_dict(admin)
+    info["dbname"] = name
+    dsn = psycopg.conninfo.make_conninfo(**info)
+
+    before = os.environ.get(supply_db.SUPPLY_DSN_ENV)
+    os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
+    yield dsn
+    if before is None:
+        os.environ.pop(supply_db.SUPPLY_DSN_ENV, None)
+    else:
+        os.environ[supply_db.SUPPLY_DSN_ENV] = before
+    # DROPPED, unlike supply_dsn's, because there is one of these per
+    # test rather than one per worker - left behind they would
+    # accumulate a database per test run, which is the leak this
+    # project's own `drop_orphan_run_schemas` docstring warns about.
+    with psycopg.connect(admin, autocommit=True) as conn:
+        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _no_test_files_a_real_delivery():
     """No test writes a delivery into this repo's own delivery tree.

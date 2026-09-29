@@ -93,6 +93,7 @@ class TestItDoesNotGuessAtProvenance:
         assert run_id_guard.committed_deliveries("ag", "col", tmp_path) == {}
 
 
+@pytest.mark.needs_deployment
 class TestAgainstTheRealCommittedHistory:
     def test_todays_recognition_still_agrees_with_what_is_committed(self):
         """The check that matters: REQ-PIPE-057 changed recognition
@@ -108,5 +109,9 @@ class TestAgainstTheRealCommittedHistory:
                 ("child-protection-family-support", "child-protection", "cp_run_")):
             found = arrivals.arrivals_for(collection, prefix)
             if not found:
+                # Marked `needs_deployment` since 2026-09-29 so this
+                # skip does not fire in CI, where it would mean the
+                # guard quietly stopped guarding. It stays for a
+                # developer's own fresh checkout.
                 pytest.skip("no deliveries on disk - a freshly-cloned checkout")
             run_id_guard.check(agency, collection, found)

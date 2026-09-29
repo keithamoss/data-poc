@@ -4049,3 +4049,69 @@ twice. It deliberately did not re-find the `TypeError`.
     false about the code. Where a failure is ordering-dependent, one
     green proves nothing - the fix has to make the ordering irrelevant,
     which is what selecting by period does and what `[-1]` never could.
+
+
+70. **[done, 2026-09-29]** **[Testing & dev tooling]** **Splitting CI
+    exposed three more tests that only ever passed because something
+    else had run first - and the fast half was silently skipping three
+    more on top.** Found by reproducing the runner's exact condition
+    locally rather than by reading the failures twice.
+
+    **THE REPRODUCTION IS THE REUSABLE PART.** CI's fast half has an
+    EMPTY deployment database, no `data/` and no `reports/`. Recreating
+    all three locally - a scratch database, both trees moved aside -
+    reproduced all ten failures exactly, in 2m44 rather than a
+    nineteen-minute round trip. `CLAUDE.md` already recommends this for
+    the `data/` half; the database half is new and matters more now
+    that the suite's source is one.
+
+    **WHAT IT FOUND, in three groups.**
+
+    - **`test_outstanding.py`, nine tests.** It asserts on a GLOBAL
+      queue total, in a database shared with whatever else
+      `--dist loadfile` put on its worker. Its own docstring already
+      recorded the previous version of this - the deployment's 84
+      promotions arriving mid-test - and the fix then was a database
+      per WORKER, which isolates it from the deployment and from other
+      workers but not from its worker-mates. Removing 270 tests
+      redistributed the rest and nine tests began reporting 28
+      `closed-unfilled-slot` items where they expected none. Now on a
+      database per TEST (`private_supply_dsn`), which nothing else can
+      write into. Per test rather than per module because the decision
+      log is append-only by a database trigger, so a module cannot
+      clean up between its own tests either.
+    - **`test_scenario_map.py`, one test.** It rebuilds `SCENARIOS.md`
+      from `read_placements()`, which reads the GENERATED
+      `data/scenario_placements.json`. It passed in CI only because the
+      single job bootstrapped before running anything. Marked
+      `needs_deployment`.
+    - **Three tests that SKIPPED rather than failed** - `test_run_id_guard.py`
+      and `test_scenario_injection.py`, both on "no deliveries on
+      disk". Green, and proving nothing. This is the exact silent-green
+      the workflow's own bootstrap comment records having hit in 2026-09-18,
+      arriving again by a new route. Both marked; the skips stay as the
+      guard for a developer's own fresh checkout, where they are
+      correct.
+
+    **THE FAST HALF NOW REPORTS 2,622 PASSED AND ZERO SKIPPED** under
+    the runner's real condition, which is the number worth checking
+    rather than the pass count: a skip there is coverage that has gone
+    quiet.
+
+    **AND THE GUARD WAS TOO NARROW**, which is worth admitting rather
+    than just widening. `tests/test_publish.py` checked for modules
+    reading `reports/` and nothing else, so it missed
+    `scenario_placements.json`. It now checks a LIST OF KNOWN
+    ARTEFACTS, and says in its own docstring that it is not a general
+    proof - nothing static can tell whether a path is read from the
+    real tree or a redirected one. CI running the fast half against an
+    empty deployment is the real check; the guard is the cheap one that
+    catches the known shapes before a push.
+
+    **The standing lesson, which is not "test in CI conditions".** It
+    is that every one of these had been passing for a reason unrelated
+    to what it asserts - a bootstrap that ran first, a worker-mate that
+    wrote nothing, a tree that happened to be there. None of that is
+    visible from reading the test. What made them findable in one
+    afternoon rather than one at a time was reproducing the condition
+    that removes all three supports at once.

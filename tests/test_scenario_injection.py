@@ -285,6 +285,7 @@ class TestNothingSaysScenarioOnTheDashboard:
                 f"scenario must not be marked as one in what the dashboard renders")
 
 
+@pytest.mark.needs_deployment
 class TestTheChildProtectionScenariosAreReallyThere:
     """REQ-GEN-044 criterion 1, against the real generated delivery tree.
 
@@ -293,6 +294,14 @@ class TestTheChildProtectionScenariosAreReallyThere:
     all, and a test asserting a gitignored path exists is green locally
     and red on the runner every time - this repo has already shipped
     that mistake twice.
+
+    AND MARKED `needs_deployment` SINCE 2026-09-29, which is what makes
+    that skip stop happening in CI rather than merely be survivable.
+    The old single job bootstrapped before running anything, so `data/`
+    was there and these ran; the fast half of the split never
+    bootstraps, so without the mark they would quietly skip - green, and
+    proving nothing. The skip stays as the guard for a developer's own
+    fresh checkout.
     """
 
     @staticmethod

@@ -379,16 +379,29 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
 
     WORKFLOW = ROOT / "tests"
 
+    #: The GENERATED artefacts a test can only read where something has
+    #: bootstrapped first. `reports/` was the whole list until
+    #: 2026-09-29, when CI found `data/scenario_placements.json` the
+    #: expensive way - a test rebuilding SCENARIOS.md from it had been
+    #: passing only because the single job bootstrapped before running
+    #: anything.
+    #:
+    #: A LIST OF KNOWN ARTEFACTS, not a general proof, and worth being
+    #: honest about: nothing here can tell in general whether a path is
+    #: read from the real tree or a redirected one. CI running the fast
+    #: half against an empty deployment is the real check; this is the
+    #: cheap one that catches the known shapes before a push.
+    GENERATED = (r'["\']reports["\']\s*/', r"reports/\w+\.json",
+                 r"scenario_placements")
+
     def _modules_reading_reports(self) -> set[str]:
-        """Test modules that name a built `reports/` file."""
+        """Test modules that name a generated artefact."""
         import re
 
         found = set()
         for path in sorted((ROOT / "tests").glob("test_*.py")):
             text = path.read_text()
-            # A real path, not the word in prose: `reports/<name>.json`,
-            # however it is spelled around the quotes.
-            if re.search(r'["\']reports["\']\s*/|reports/\w+\.json', text):
+            if any(re.search(pattern, text) for pattern in self.GENERATED):
                 found.add(path.name)
         return found
 

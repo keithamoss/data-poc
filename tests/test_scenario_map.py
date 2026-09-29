@@ -186,6 +186,16 @@ class TestTheCommittedMap:
     """Criterion 4: committed markdown, so anything reading it reads a
     committed file and never touches data/."""
 
+    # NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). It rebuilds
+    # the map from `read_placements()`, which reads the GENERATED
+    # data/scenario_placements.json - gitignored, and written by
+    # `mothman pipeline bootstrap`. Without it the rebuild has no
+    # placements and every comparison against the committed file fails.
+    # It passed in CI until 2026-09-29 only because the single job
+    # bootstrapped before running anything; in the split it has to say
+    # which half it belongs to. The sibling tests here read source
+    # rather than placements, so they stay in the fast half.
+    @pytest.mark.needs_deployment
     def test_the_committed_map_is_not_stale(self):
         """The same shape plans/INDEX.md's own gate has. A generated
         file that can drift from its source is one that will."""
