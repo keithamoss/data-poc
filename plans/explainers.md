@@ -50,7 +50,7 @@ survives context compaction. Tick items off here as they land.
    (#3, round 12).
 6. [in progress: named, 12 traits drafted, wording to Keith with the house standard] **Keith names external writing exemplars** (#3, style round
    4).
-7. [in progress: slice 1 drafted as REQ-DOCS-115 to 130, all 12 questions answered; scoper revision, then architect review and sign-off] **Requirements via `delivery-scoper`**, drafting from items
+7. [in progress: 18 drafts, REQ-DOCS-115 to 132, all questions answered (sets 1-6); last answers to fold in, then sign-off one by one] **Requirements via `delivery-scoper`**, drafting from items
    1-4, then Keith's sign-off. Nothing is built before this.
 8. [done: moot, GOV.UK is the baseline, and its numbers rule applies] Confirm the Style Manual's rule on numbers once
    `www.stylemanual.gov.au` is reachable (#3, style round 4).
@@ -839,6 +839,43 @@ survives context compaction. Tick items off here as they land.
      recommended `mothman explainers`), matching the docs-* team and
      the future "Running Mothman" pipeline docs. This RENAMES slice 2's
      planned `mothman explainers sign-off` to `mothman docs sign-off`.
+
+   **Final scoper pass (2026-09-29): 18 drafts, REQ-DOCS-115 to 132.**
+   Two new requirements split out: REQ-DOCS-131, the reader-judgement
+   skill (its own file, consumers and approval gate), and REQ-DOCS-132,
+   the mechanical prose rules (split from 122, which would otherwise
+   hold ~40 criteria changing for two different reasons). A
+   `[PROCESS]` prefix marks criteria proven by a dated sign-off record
+   rather than a test (16 of them). Carry-over re-check: every slice-1
+   decision in items 1-4 is carried; the slice-2 decisions are not, by
+   design, so THIS ITEM STAYS until slice 2 is built.
+
+   **Keith's set 6 answers:**
+   - **Signed pages carry a hash.** The sign-off record stores a hash
+     of the page and the validator rejects a mismatch, so an edit lands
+     only with a fresh sign-off. Rejected: a CI rule on commits that
+     touch `docs/explainers/` (coarser), and review alone.
+   - **CLAUDE.md's explainer rule will EXCLUDE `docs/explainers/_work/`**
+     - nothing there is published or committed. Exact wording to Keith
+     before the edit.
+   - **Reader-judgement skill content as drafted:** answer first, each
+     page stands alone (terms and cast), the sensitivity rule, the
+     diagram tests, pattern-shaped tics. Traits 9 and 10 stay in the
+     house standard.
+   - **A FIFTH BADGE: "an idea, not designed yet"** - Keith's choice
+     over the recommendation (glossary entry only, section waits). A
+     concept with no requirement at all (e.g. one-off project
+     extractions) may get one sentence under this badge, which the
+     fact-checker exempts from citation. The five states, least built
+     first: idea, proposed, designed not built yet, partly built,
+     built.
+   - **Page titles may carry a gentle turn of phrase**, same rule as
+     headings, never a pun - Keith's choice over plain titles.
+   - **Brief cap: 500 words**, excluding its source list.
+   - **Eval targets confirmed:** the critic gets jargon, the decorative
+     diagram and the sensitivity breach; the fact-checker gets the
+     wrong fact and the naming trap; the clean page targets both; the
+     injection page targets all four.
 
    **Still to take to Keith with wording:** CLAUDE.md's explainer
    rule covers "everything under `docs/explainers/`", which now
