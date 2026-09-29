@@ -53,6 +53,13 @@ on:
       - "requirements.yaml"
       - "plans/**"
       - ".github/workflows/validate-config.yml"
+      # The explainers gate (REQ-DOCS-122) reads pages, the two skill
+      # files and the docs-* agents, and parses Mermaid with the pinned
+      # package, so each of those can turn it red.
+      - "docs/**"
+      - ".claude/**"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
 permissions:
@@ -78,6 +85,18 @@ jobs:
 
       - name: Sync dependencies
         run: uv sync --dev
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Gate - explainer validation (REQ-DOCS-122, REQ-DOCS-132)
+        run: uv run mothman docs validate
 
       - name: Gate - hierarchy validation (REQ-QAC-039)
         run: uv run mothman dashboard validate-hierarchy

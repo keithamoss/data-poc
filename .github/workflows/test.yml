@@ -179,6 +179,19 @@ jobs:
       - name: Sync dependencies
         run: uv sync --dev
 
+      # tests/test_validate_explainers.py drives the real Mermaid parse
+      # (qa_tools/common/mermaid_parse.mjs), which needs Node and the
+      # pinned mermaid package - the validator fails rather than skips
+      # without them, so this job needs them too (REQ-DOCS-122).
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Node dependencies
+        run: npm ci
+
       # The service container creates `postgres` and nothing else, so the
       # warehouse the DSN above names has to be made. A step rather than a
       # second POSTGRES_DB, because the image takes only one.

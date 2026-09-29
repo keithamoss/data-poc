@@ -24934,7 +24934,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith, about to publish a page an agent wrote, I want a mechanical check that the page carries no script, no outside links, no malformed diagram, no false claim of sign-off, no edit since Keith signed it and no badge that disagrees with the register, so that a bad or injected output cannot reach GitHub on the strength of a model's judgement."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -25504,7 +25504,22 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith, triaging an agent-written page, I want every rule a machine can check - sentence length, banned words, punctuation and the rest - rejected before any reviewer sees the page, so that the critic's findings and my time go on what only a reader can judge."
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - "tests/test_validate_explainers.py::test_each_rule_catches_its_own_breakage"
+      - "tests/test_validate_explainers.py::test_a_long_sentence_and_a_long_paragraph"
+      - "tests/test_validate_explainers.py::test_an_exempted_phrase_passes"
+      - "tests/test_validate_explainers.py::test_a_period_name_is_not_a_range"
+      - "tests/test_validate_explainers.py::test_no_banned_word_is_copied_into_the_code"
+      - "tests/test_validate_explainers.py::test_the_rule_ids_match_the_house_standard_both_ways"
+      - "tests/test_validate_explainers.py::test_the_good_page_passes_with_zero_findings"
+    implemented_by:
+      - "qa_tools/common/validate_explainers.py::Validator"
+      - "qa_tools/common/validate_explainers.py::load_house_rules"
+      - "qa_tools/common/validate_explainers.py::RULES"
+      - "cli/docs.py::validate_command"
+    evidence:
+      - "Built 2026-09-29. Every rule in this requirement is enforced by `mothman docs validate` under its own rule id, read from the house standard's `yaml house-rules` block for the banned lists and exemptions: tests/test_validate_explainers.py breaks a known-good page in one way per rule and asserts that rule fires (44 passed), proves an exempted phrase and a period name pass, and fails if any banned word appears as a literal in the validator's code."
     signed_off:
       by: Keith
       date: "2026-09-29"

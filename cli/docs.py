@@ -77,3 +77,22 @@ def verify_changes_command(agent: str, snapshot: Path) -> None:
             console.print(f"  {path}")
         raise SystemExit(1)
     console.print(f"{len(report.changed)} changed, all inside {agent}'s scope.")
+
+
+@docs_group.command("validate")
+@click.option("--list-rules", is_flag=True, help="Print every rule id and what it checks.")
+@click.option("--print-hash", "hash_page", type=click.Path(path_type=Path, exists=True),
+              help="Print the sign-off hash of one page, for its sign-off record.")
+def validate_command(list_rules: bool, hash_page: Path | None) -> None:
+    """Check every explainer page against the house standard's
+    machine-checkable rules (REQ-DOCS-122, REQ-DOCS-132)."""
+    from qa_tools.common import validate_explainers
+
+    if list_rules:
+        for rule, what in validate_explainers.RULES.items():
+            print(f"{rule}  {what}")
+        return
+    if hash_page is not None:
+        print(validate_explainers.page_hash(hash_page.read_text()))
+        return
+    raise SystemExit(validate_explainers.main())

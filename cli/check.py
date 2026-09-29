@@ -113,6 +113,10 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # the real risk rather than the effort.
     ("premise", ["uv", "run", "python3", "-m", "qa_tools.common.validate_premise"],
      "nothing still says CI builds the dashboard from committed files", False),
+    # REQ-DOCS-122. Every explainer page against the house standard's
+    # machine-checkable rules, before any reviewer reads it.
+    ("explainers", ["uv", "run", "mothman", "docs", "validate"],
+     "explainer pages meet the house standard's checkable rules", False),
     ("npm test", ["npm", "test", "--silent"],
      "the dashboard template's own inline JS", False),
     ("pytest", ["uv", "run", "pytest"],
