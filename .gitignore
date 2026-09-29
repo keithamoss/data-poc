@@ -62,3 +62,10 @@ _site/
 
 # A developer's own environment - holds a DSN, and this repo is public.
 .env
+
+# The docs-* explainer agents' working folder - briefs, review reports,
+# diagram notes and A/B versions for each /explain run (REQ-DOCS-129).
+# Ignored HERE, at the root, never by a .gitignore inside
+# docs/explainers/: the writer agent may write anything under that
+# folder, so a nested ignore file would be one it could edit.
+docs/explainers/_work/

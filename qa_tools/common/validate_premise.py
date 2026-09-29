@@ -120,7 +120,12 @@ NEGATION_MARKERS = (
 SKIP_SUFFIXES = (".pyc", ".gz", ".woff2", ".cast", ".png", ".jpg", ".ico")
 SKIP_DIRS = (".git", ".venv", "node_modules", "data", "reports", "_site",
              "dbt_project/target", "dbt_project/dbt_packages", ".playwright-mcp",
-             "__pycache__", ".pytest_cache", "dashboard/snapshots")
+             "__pycache__", ".pytest_cache", "dashboard/snapshots",
+             # The explainer agents' gitignored working folder: its
+             # review reports quote a draft's prose on purpose, so a
+             # finding about an old sentence would fail this gate
+             # locally for text nobody committed (REQ-DOCS-129).
+             "docs/explainers/_work")
 
 #: Build outputs, which carry whatever the template said and are
 #: gitignored. Scanning one means a stale local build fails the gate for a

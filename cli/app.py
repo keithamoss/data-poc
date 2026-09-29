@@ -18,7 +18,7 @@ from qa_tools.common.local_env import load_local_env
 
 load_local_env()
 
-from . import (bdm, check, common, cp, dashboard, debug, env, filing_tui, github,
+from . import (bdm, check, common, cp, dashboard, debug, docs, env, filing_tui, github,
                pipeline, plans, population, scenarios, schedule, supply)
 from .banner import print_banner
 
@@ -134,6 +134,7 @@ cli.add_command(dashboard.dashboard_group)
 cli.add_command(env.env_group)
 cli.add_command(github.github_group)
 cli.add_command(debug.debug_group)
+cli.add_command(docs.docs_group)
 cli.add_command(pipeline.pipeline_group)
 cli.add_command(plans.plans_group)
 cli.add_command(schedule.schedule_group)

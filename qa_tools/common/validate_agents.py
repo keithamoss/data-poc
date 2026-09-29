@@ -63,10 +63,23 @@ AGENTS_DIR = Path(__file__).resolve().parent.parent.parent / ".claude" / "agents
 # outside this set is a typo, and a typo here fails silently - the file
 # still parses, the agent still loads, and whatever that key was meant
 # to configure simply never applies.
+#
+# hooks, maxTurns, disallowedTools and omitClaudeMd joined the set
+# 2026-09-29 for the docs-* explainer agents (REQ-DOCS-124), each
+# checked against the supported-frontmatter table on Claude Code's own
+# sub-agents page (code.claude.com/docs/en/sub-agents) rather than
+# remembered: a key added here on memory would be exactly the silent
+# typo this set exists to catch.
 KNOWN_KEYS = frozenset({
     "name", "description", "tools", "model",
     "permissionMode", "mcpServers", "skills", "isolation",
+    "hooks", "maxTurns", "disallowedTools", "omitClaudeMd",
 })
+
+# The docs-* agents pin a FULL model id (REQ-DOCS-124 criterion 16), so
+# a page's quality does not shift underneath a signed page when an
+# alias moves to a newer model. An alias such as `opus` is refused.
+MODEL_ALIASES = frozenset({"opus", "sonnet", "haiku", "fable", "inherit"})
 
 # Claude Code warns above ~15,000 tokens of combined description. Four
 # characters per token is the same rough estimate CLAUDE.md's own
@@ -126,6 +139,12 @@ def validate_file(path: Path) -> tuple[list[str], int]:
 
     for key in sorted(set(front) - KNOWN_KEYS):
         errors.append(f"{path.name}: unknown key {key!r} - it would be silently ignored")
+
+    if path.stem.startswith("docs-"):
+        model = str(front.get("model") or "")
+        if not model or model in MODEL_ALIASES:
+            errors.append(f"{path.name}: a docs-* agent pins a full model id such as "
+                          f"'claude-opus-5-5', not {model or 'nothing'!r} (REQ-DOCS-124)")
 
     return (errors, len(str(front.get("description") or "")))
 
