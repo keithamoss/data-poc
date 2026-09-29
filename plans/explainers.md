@@ -33,7 +33,7 @@ survives context compaction. Tick items off here as they land.
    (#4's concept sweep lists them); the others become glossary aliases.
 3. [done: 29 in, 2 to pipeline docs, 2 split] **Triage the 33 missed concepts** (#4's sweep, one by one).
    Keith says what he does NOT want included.
-3b. [next] **Sweep the split between the
+3b. [done] **Sweep the split between the
    two documentation tracks.** Keith, 2026-09-29: "it sounds like we're
    talking about user-facing documentation, whatever we call that. And
    we're also talking about pipeline documentation... I feel like we're
@@ -44,7 +44,7 @@ survives context compaction. Tick items off here as they land.
    user-facing track. At the time of writing, only #9 (actor, reasons
    and the people list) and #6's physical detail had been sent to the
    pipeline docs.
-4. [todo, after the triage] **Tiering** for the concepts that survive triage: own page,
+4. [next] **Tiering** for the concepts that survive triage: own page,
    section, or glossary entry only.
 5. [todo] **The cast draft**: 4-5 characters for Keith to react to
    (#3, round 12).
@@ -213,6 +213,40 @@ survives context compaction. Tick items off here as they land.
    separate technical pipeline documentation that we work on
    together." Not scoped yet: audience, home, and whether item 1's
    agent team writes it or it is written by hand.
+
+   **Shape, from the two-track sweep (2026-09-29; see item 3).** Working
+   name "Running Mothman". Readers: engineers and operators. The content
+   is Diátaxis how-to, reference and technical explanation, first
+   inventory:
+   - **How-to (mostly for operators):**
+     - record a filing decision;
+     - deal with a held supply;
+     - deal with a load failure;
+     - add, change or retire a check (triage #30);
+     - add a dataset and its contract;
+     - extend a supply calendar before it runs out;
+     - hand-file or trial a file;
+     - set up an environment;
+     - run QA;
+     - build and publish the dashboard.
+   - **Reference:**
+     - the `mothman` commands;
+     - each config file (`data-asset.yaml`, the contracts,
+       `people.yaml`, `environments.yaml`);
+     - who can decide, and required reasons (triage #9);
+     - the schemas and storage (triage #6 and #31, storage halves);
+     - the CI gates.
+   - **Technical explanation (for engineers):**
+     - CI never touches data;
+     - the repository holds configuration, not state;
+     - why PostgreSQL;
+     - the per-run views;
+     - the `delivery-*` agent pipeline.
+
+   The same agent team writes it later (item 3, round 12: design for
+   it, build explainers first). Its own house standard will need
+   how-to and reference rules, not just the explanation rules settled
+   so far.
 
 3. **[in-progress, 2026-09-29]** **[Docs & process]** Designing the
    three agents: rounds of questions with Keith, big picture first,
@@ -1223,3 +1257,31 @@ survives context compaction. Tick items off here as they land.
    explainers cover what things MEAN to a reader. It came from the two
    concepts he sent to the pipeline docs against the recommendation,
    and it is the starting rule for the split sweep (queue item 3b).
+
+   **The two-track sweep (queue item 3b, 2026-09-29).** Keith suspected
+   the explainers were over-weighted and the pipeline docs thin. The
+   finding: the imbalance was an artefact of what had been inventoried
+   so far. Only CONCEPTS had been sorted, and concepts are naturally
+   explanation-shaped. The pipeline docs' content is mostly how-to and
+   reference, which had not been listed yet. Once listed (see item 2),
+   it is larger than the explainers. Keith's calls:
+   - **The tracks split by Diátaxis type.** The explainers are
+     explanation: what things mean, for the user. The pipeline docs are
+     how-to guides, reference, and technical explanation of how the
+     system is built and run. His "operated and maintained" line falls
+     out of this.
+   - **A concept with two halves is split and cross-linked.** The
+     explainer covers what it means and why, and a pipeline how-to
+     covers the steps. Each links to the other, and neither repeats the
+     other. Examples: the decision log and the seven decisions; calendar
+     versions and runway; file patterns; the "when a person is needed"
+     group; `check_id`.
+   - **The pipeline docs' readers are engineers AND operators.** The
+     how-tos are written for the people who operate it day to day
+     (making filing decisions, clearing holds); the reference and
+     technical explanation are for engineers.
+   - **The explainers track is called "Understanding Mothman".** The
+     option he picked paired it with **"Running Mothman"** for the
+     pipeline docs. That pairing is treated as intended, but is
+     unconfirmed. Still open: whether `docs/explainers/` is renamed to
+     match.
