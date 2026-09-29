@@ -807,6 +807,27 @@ Rough layout:
   check` 6m25s, of which pytest is 300s and `npm test` ~40s (440
   tests). Measured against a `supply` database rebuilt from empty.
 
+  -> **~311s/2887 tests (2026-09-29, REQ-GHUB-082's TUI adapter)**. Up
+  ~11s on 163 more tests since the entry above - no new hot spot. Full
+  `mothman check` 6m42s, of which pytest is 311s and `npm test` ~52s
+  (440 tests). NOT A CLEAN RUN, and said so rather than rounded off:
+  one test failed, a new one of this session's own asserting on the
+  NEWEST decision-log entry for a dataset when a promotion also writes
+  an `inherit-refused` for each later period it cannot carry into. It
+  passed alone and failed beside another module on the same worker.
+  Fixed, and the figure above is still the honest cost of the tree that
+  produced it.
+
+  A FIGURE FOR CI, WHICH IS NOT THE SAME NUMBER AND IS WORTH KNOWING
+  BEFORE WAITING ON ONE. On `ubuntu-latest`, 2026-09-29: setup ~1m,
+  **`mothman pipeline bootstrap` 8m55s**, the dashboard build 8s, and
+  the suite itself **9m18s** - about 19 minutes end to end, against
+  6m42s locally. The bootstrap is the difference and it is structural
+  rather than slow hardware: since REQ-PIPE-089 the suite's source is a
+  database, so a runner has to generate the whole QA history before it
+  can run at all, and since 2026-09-28 it does that one arrival at a
+  time. Budget twenty minutes for a CI answer, not seven.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
