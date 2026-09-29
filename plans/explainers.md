@@ -763,6 +763,83 @@ survives context compaction. Tick items off here as they land.
      a pun) allowed in a heading, nothing playful in definitions.
    - **REQ-DOCS-120 is "should"**, up from "could".
 
+   **delivery-architect review of slice 1 (2026-09-29), and Keith's
+   set 5 answers.** Verified by the main session rather than taken on
+   the architect's word:
+   - `qa_tools/common/validate_agents.py`'s `KNOWN_KEYS` lacks `hooks`,
+     `maxTurns`, `disallowedTools`, `omitClaudeMd`, so the `agents`
+     gate would reject every docs-* file. Claude Code's own sub-agent
+     docs (code.claude.com/docs/en/sub-agents, read 2026-09-29) confirm
+     all four as real keys. REQ-DOCS-124 extends the set, citing that
+     page.
+   - The same docs: an agent whose `tools` resolve to nothing REFUSES
+     TO LAUNCH, so a zero-tool critic is impossible. The critic gets
+     `tools: Read` plus a PreToolUse hook denying every Read/Grep/Glob,
+     and the main session passes everything in the prompt (page,
+     glossary, reader questions, its judgement skill). Proven by an
+     eval step that asks it to read CLAUDE.md. No per-run allowlist
+     file (it would sit where the writer can write).
+   - `validate-config.yml` has no Node and its `paths:` omit
+     `docs/**`, `.claude/**`, `package*.json`: it needs
+     `actions/setup-node`, `npm ci`, and those paths.
+   - Mermaid spike: `mermaid@11.17.2` (GitHub's version) parses
+     headlessly in Node under jsdom - flowchart and state passed, a
+     broken block returned its line, 1.2s total. So "parses" is
+     buildable: one batched `.mjs` script called from the validator,
+     failing loudly (never skipping) if Node is missing.
+
+   Adopted from the architect without a question (security and
+   engineering detail, not product decisions):
+   - Read-deny hooks on `.env*`, `data/`, `reports/` and the eval
+     directory for every docs-* agent; the URL rule rejects ANY
+     `scheme://` and protocol-relative `//` (so `postgresql://` trips).
+   - The write hook fails closed, resolves real paths, matches
+     `Write|Edit|MultiEdit|NotebookEdit`, and is scoped per agent (the
+     writer: pages, glossary, `_work/`; the illustrator: pages and
+     `_work/`; nobody else writes).
+   - The post-run check is a before/after stat walk of the whole repo
+     including `.venv` and `node_modules` (a `.pth` there is code
+     execution), not `git status --ignored`, which collapses ignored
+     directories to one line.
+   - The validator covers every file under `docs/explainers/` except
+     `_work/`, allows only `.md`/`.yaml`, rejects images and HTML
+     comments, allows GitHub alert syntax for the "In short" box, and
+     checks zero-width/bidi characters in YAML and SKILL.md too.
+   - `_work/` is ignored from the ROOT `.gitignore`, never a nested
+     one the writer could edit; `/explain` stages explicit paths,
+     never `git add -A`.
+   - Rules as data: each validator rule has a stable id, marked inline
+     in the standard; `--list-rules` prints them and a test holds the
+     two in step. Banned lists, seed and exemptions live in one fenced
+     YAML block in SKILL.md that the validator reads.
+   - Names: `.claude/skills/docs-house-style/SKILL.md`,
+     `.claude/skills/explain/SKILL.md` (`disable-model-invocation:
+     true`), evals under `.claude/skills/explain/evals/`, working
+     folder `docs/explainers/_work/<date>-<slug>/`, one parser module,
+     full model ids pinned for docs-* agents.
+   - Quote checks match parsed, whitespace-normalised requirement
+     field values, not raw YAML text; the fact-checker's report is a
+     fenced YAML table the main session saves.
+
+   **Keith's set 5 answers:**
+   - **Glossary: `glossary.yaml` is the source**, with a readable
+     `glossary.md` generated from it and gated against going stale
+     (the CHANGELOG.yaml precedent). Badges are derived from
+     `requirements.yaml`, never hand-written.
+   - **The standard splits into TWO skills**: a small reader-judgement
+     skill (judgement rules only - no cast, glossary or examples) that
+     the critic preloads alone, and the house standard the other three
+     preload with it. Still one copy of every rule. Rejected: a named
+     exception copying rules into the critic's prompt.
+   - **Badges:** `in_progress` reads "designed, not built yet"; a
+     `built` requirement with `unmet_criteria` gets its own "partly
+     built" badge. The validator also rejects requirement ids and code
+     in a page body.
+   - **The command group is `mothman docs`** (Keith's choice over the
+     recommended `mothman explainers`), matching the docs-* team and
+     the future "Running Mothman" pipeline docs. This RENAMES slice 2's
+     planned `mothman explainers sign-off` to `mothman docs sign-off`.
+
    **Still to take to Keith with wording:** CLAUDE.md's explainer
    rule covers "everything under `docs/explainers/`", which now
    includes the agents' gitignored working folder - the rule probably

@@ -473,7 +473,7 @@ one when this line suggests it matters.
 - **#1** `investigate` 2026-09-28 - A technical-writing subagent team that explains this project's own invented concepts plainly, with hand-drawn-style...
 - **#2** `todo` 2026-09-28 - Separate technical pipeline documentation, as its own track apart from the concept explainers in item 1.
 - **#3** `in-progress` 2026-09-29 - Designing the three agents: rounds of questions with Keith, big picture first, then each agent in turn, until the...
-  - *touches:* `contract/data-asset.yaml`
+  - *touches:* `contract/data-asset.yaml`, `qa_tools/common/validate_agents.py`
 - **#4** `todo` 2026-09-29 - The concept map: which groups and concepts the explainers cover, in what order, and what a group page holds.
   - *touches:* `qa_tools/common/check_lifecycle.py`, `contract/data-asset.yaml`, `contract/people.yaml`
 
