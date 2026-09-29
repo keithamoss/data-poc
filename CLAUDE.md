@@ -826,7 +826,49 @@ Rough layout:
   rather than slow hardware: since REQ-PIPE-089 the suite's source is a
   database, so a runner has to generate the whole QA history before it
   can run at all, and since 2026-09-28 it does that one arrival at a
-  time. Budget twenty minutes for a CI answer, not seven.
+  time.
+
+  **CI RUNS IN TWO HALVES SINCE 2026-09-29** (plans/tooling.md #27), so
+  the figure above is the OLD one and what to budget now is different.
+  Measured on run 36573107713:
+
+  | Job | Wall clock |
+  |---|---|
+  | `test` - the 2,622 tests needing no deployment | **6m 40s** |
+  | `test-deployment` - bootstrap 8m32 + 277 tests 4m49 | **14m 34s** |
+  | `js-tests` | 43s |
+  | `coverage` - combines both halves, enforces `fail_under` | 19s |
+  | **run total** (the two halves are parallel) | **15m 03s** |
+
+  So a RED IN THE COMMON CASE reports in about SEVEN minutes rather
+  than nineteen - 2,622 of 2,898 tests are in the fast half. The whole
+  run is 15 minutes, not the ~10 an earlier estimate in #27 claimed;
+  that estimate was wrong because the two halves are not comparable in
+  cost, and the correction is recorded there rather than quietly fixed.
+
+  **WHICH HALF A TEST IS IN IS DERIVED, NOT LISTED.** `tests/conftest.py`
+  marks anything requesting the `deployment_history` fixture
+  `needs_deployment`; modules reading a generated artefact carry the
+  mark themselves. A test in the WRONG half does not fail loudly - it
+  SKIPS, which is a green that proves nothing. **So the number to watch
+  on the fast half is the SKIP COUNT, and it should be zero.**
+
+  **AND THE WAY TO DEBUG A CI-ONLY FAILURE IS TO REPRODUCE ITS
+  CONDITION, which is now three things rather than one.** The fast half
+  has an EMPTY deployment database, no `data/` and no `reports/`.
+  Recreating all three locally - a scratch database, both trees moved
+  aside - reproduced ten CI-only failures exactly, in under three
+  minutes rather than a fifteen-minute round trip:
+
+  ```
+  sudo -u postgres psql -c 'CREATE DATABASE ci_probe OWNER "user"'
+  mv data /tmp/data_aside; mv reports /tmp/reports_aside
+  MOTHMAN_SUPPLY_DSN=postgresql://user:password@localhost:5432/ci_probe \
+    uv run pytest -m "not needs_deployment" -q -rs
+  ```
+
+  Restore both trees afterwards, and mind that a test run RECREATES
+  `data/`, so a bare `mv /tmp/data_aside data` nests it.
 
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real

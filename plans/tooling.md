@@ -3060,6 +3060,22 @@ most litter.
     removing 270 tests from the run changed that. Fixed to select the
     entry for the period under test.
 
+    ### Measured in CI, 2026-09-29 (run 36573107713) - all four jobs green
+
+    | Job | Wall clock |
+    |---|---|
+    | `test` (2,622 tests, no deployment) | **6m 40s** |
+    | `test-deployment` (bootstrap 8m32 + 277 tests 4m49) | **14m 34s** |
+    | `js-tests` | 43s |
+    | `coverage` (combine + `fail_under`) | 19s |
+    | **run total** | **15m 03s** |
+
+    So **19m31 -> 15m03**, and a red in the common case reports in about
+    seven minutes rather than nineteen. Better than the ~17m this entry
+    revised to, and still not the ~10m first claimed. The `coverage` job
+    genuinely ran and enforced, which was the piece most likely to be
+    wrong.
+
     **STILL TO DO: option 1, the cache**, which is where the remaining
     time actually is - it would take the slow job from ~16m to ~7m. The
     clock risk is real and now has a cheap answer: key the cache on the
