@@ -1772,6 +1772,19 @@ Rough layout:
       cover the apex, but the site lives on `www`. Consequence: Style
       Manual rules stay snippet-level (`plans/explainers.md` queue item
       8), unless Keith checks a page himself in a browser.
+    - **`www.ncsc.gov.uk`**, **`insidegovuk.blog.gov.uk`**,
+      **`userresearch.blog.gov.uk`**, **`designnotes.blog.gov.uk`**,
+      **`accessibility.blog.gov.uk`**, **`service-manual.ons.gov.uk`**,
+      **`analysisfunction.civilservice.gov.uk`**,
+      **`design.tax.service.gov.uk`**, **`design.education.gov.uk`**,
+      **`service-manual.nhs.uk`** (2026-09-29, the second GOV.UK
+      writing pass for `plans/explainers.md` #3) - all proxy 403s. The
+      ONS service manual would have answered how UK statistics
+      publishers write about quarters; the other blogs hold more GDS
+      writing practice. Separately, `technology.blog.gov.uk`'s own
+      firewall served a bot challenge on its search page (the site's
+      refusal, not the proxy's), which was not worked around; its tag
+      pages worked.
     - ~~**`arxiv.org`**, **`aclanthology.org`**~~ - ALLOW-LISTED by
       Keith 2026-09-29 and re-verified with a real `curl` (both 200).
       Both were first hit that day researching the explainer agents

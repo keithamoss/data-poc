@@ -474,7 +474,7 @@ one when this line suggests it matters.
 - **#3** `in-progress` 2026-09-29 - Designing the three agents: rounds of questions with Keith, big picture first, then each agent in turn, until the...
   - *touches:* `contract/data-asset.yaml`
 - **#4** `todo` 2026-09-29 - The concept map: which groups and concepts the explainers cover, in what order, and what a group page holds.
-  - *touches:* `qa_tools/common/check_lifecycle.py`
+  - *touches:* `qa_tools/common/check_lifecycle.py`, `contract/data-asset.yaml`
 
 ## plans/post-build-review.md
 

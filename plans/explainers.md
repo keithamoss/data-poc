@@ -1490,3 +1490,164 @@ survives context compaction. Tick items off here as they land.
      dates, use the months" (e.g. "Jan to Mar 2013"). But Mothman's
      quarterly PERIOD is a real domain concept with its own name (e.g.
      `2026-Q3`). This is to be asked, not assumed.
+
+   **Tiering walk-through (2026-09-29), recorded round by round.** The
+   tiers are an own page, a section inside another page, or a glossary
+   entry only.
+   - **Quarters (the GOV.UK conflict): term plus months on first
+     use.** Keep "period" and names like `2026-Q3` (they are what the
+     dashboard shows), but prose always says which months on first
+     use: "the 2026-Q3 period (July to September 2026)".
+   - Round 1:
+     - #1 data contract: OWN PAGE (group 1).
+     - #2 what a check is, warn versus fail: OWN PAGE (opens group 8).
+     - #3 statuses that aren't verdicts: OWN PAGE (group 7), absorbing
+       #4 qualifiers, #15 event severity and #26 "no data as of" as
+       its sections.
+   - Round 2:
+     - #5 arrived versus promoted: OWN PAGE (group 4), absorbing #21
+       (three moments) and #33 (newest promoted wins).
+     - #7 the automatic promotion gate: OWN PAGE (group 4, "how a
+       supply goes live"), absorbing #6 (where a supply lives, lightly)
+       and #8 (automation defers to a person).
+     - #10 the seven filing decisions: OWN PAGE as group 4's hub, with
+       all seven in one table linking to where each is explained.
+     - #11 check scopes: carried by group 8's GROUP PAGE, with one
+       concept page per level.
+   - Round 3:
+     - #12 check dependencies and comparisons: SECTIONS, with
+       dependencies in the cross-table checks page and the comparison
+       point in the drift and volume page (group 8).
+     - #13 why a check couldn't run: SECTION in group 7's
+       red/amber/green page.
+     - #16 what recognition can't place: OWN PAGE (group 3, "when a
+       file can't be placed or read"), absorbing #14 load failure.
+     - #17 unfiled, #18 filed under ambiguity, #19 a slot closed
+       unfilled: SECTIONS in group 4's slot-assignment page.
+   - Round 4:
+     - #20 an arrival verdict follows its filing: SECTION in group 3's
+       arrival-timing page.
+     - #22 calendar detail plus REQ-PIPE-110 to 113: SECTIONS across
+       group 2, AND the **delivery agreement gets its OWN PAGE**
+       (Keith's pick over sections only), as the new top-level idea
+       the supply calendar sits inside.
+     - #23 in development and graduating: OWN PAGE (group 1).
+     - #24 one-off extraction: SECTION in "the shape varies", short
+       and badged, growing into a page once it has requirements.
+   - Round 5:
+     - #25 a trial and #29 a check's plain-English fields: GLOSSARY
+       plus a line each (in the hand-filed supply section and in "what
+       a check is").
+     - #28 tickets (the new one-per-slot model): OWN PAGE (group 6).
+     - #32 "In place on" versus what the page said then: OWN PAGE
+       (group 9), with #31 recorded QA history as a SECTION in it.
+
+   **Result for the 33: 11 own pages:**
+   - #1 data contract;
+   - #2 what a check is;
+   - #3 statuses that aren't verdicts;
+   - #5 arrived versus promoted;
+   - #7 the promotion gate;
+   - #10 the seven filing decisions;
+   - #16 when a file can't be placed or read;
+   - #23 in development;
+   - #28 tickets;
+   - #32 In place on;
+   - the delivery agreement.
+
+   The rest are sections or glossary entries, as recorded above; #11
+   is carried by group 8's group page. **Keith then asked for the
+   ORIGINAL map concepts to be tiered the same way, one by one.**
+   - Originals, round 1:
+     - the data asset and its hierarchy: ONE OWN PAGE for both.
+     - the shape varies (scheduled asset, one-off extraction, sample;
+       same code, separate deployment): ONE OWN PAGE.
+     - environments, and which environment a dashboard shows: SECTION
+       in the shapes page (setup goes to the pipeline docs).
+     - schedule: FOLDED into the supply calendar ("schedule" becomes a
+       glossary alias). Readers get delivery agreement, then supply
+       calendar, then periods and slots.
+
+   **CORRECTION, found by the live GOV.UK research and verified in
+   `contract/data-asset.yaml` (2026-09-29).** The quarters question
+   above was asked with a WRONG example. Mothman's quarterly periods
+   are NOT calendar quarters: they are authored dates anchored on 1
+   February, May, August and November ("deliberately NOT calendar
+   quarters"; Child Protection's real agreed cadence). So "2026-Q3" is
+   a named PERIOD whose supply is due on 1 August 2026, not "July to
+   September 2026". A WA reader could also read "Q3" as a
+   financial-year quarter. Keith's "term plus months on first use"
+   answer was given against the wrong example, so it is re-asked below
+   rather than applied.
+
+   **Live GOV.UK / GDS research (2026-09-29, second pass, after Keith
+   allow-listed the hosts).** It read the GDS Way, the Design System,
+   the Service Manual, "Documenting APIs", and 10 GDS blog posts
+   (2013-2021). New findings:
+   - **Diagram accessibility.** Mermaid exposes an accessible title and
+     description only via `accTitle` / `accDescr` in the diagram
+     source (GDS Way, "Diagrams as code"). A visible caption counts
+     only if it is a `<figcaption>` inside a `<figure>`. Round 5's
+     "the caption doubles as the accessible description" needs one of
+     those to actually be true.
+   - **Don't organise documentation by user type** ("Documenting
+     APIs", 2022). Our split by PURPOSE (Understanding / Running) is
+     fine, but navigation should not say "for engineers" or "for
+     operators".
+   - **The writing guidance now lives at
+     `guidance.publishing.service.gov.uk`** ("Writing to GOV.UK
+     standards"), so citations should point there.
+   - **For the explainers:**
+     - no heading may use a term before the page has explained it;
+     - redefine terms on every page, not only in the glossary;
+     - the "In short" box matches the Design System's lead paragraph;
+     - page summaries of 160 characters or fewer.
+   - **For the dashboard's "What's this?" links:** status tags must
+     not be clickable, because users mistook them for buttons. So the
+     link goes NEXT TO a status, not on it. UI copy "aims to be
+     boring", with no humour.
+   - **For Running Mothman:**
+     - code blocks with no `$` prompt, no line numbers, pasteable;
+     - pages in the order: what it does, Get started, tasks,
+       reference, support;
+     - link to dbt, Soda and Evidently's own documentation rather than
+       paraphrasing it;
+     - terminal error messages say what happened and how to fix it
+       (no "invalid", "please" or "sorry");
+     - every page carries a last-reviewed date, a review-by date and
+       an owner, with a reminder bot, because GDS found content cannot
+       be tested like code.
+   - **A time-based review would complement the fingerprint staleness
+     gate.** It catches a world that changed while no cited file did.
+   - **Release notes (GDS):** verb headings, "You can now...", no
+     "We've fixed...". This touches the `CHANGELOG.yaml` header, which
+     needs Keith's approval of exact wording, so it is only flagged.
+
+   **New blocked hosts:** `www.ncsc.gov.uk`, `insidegovuk.blog.gov.uk`,
+   `userresearch.blog.gov.uk`, `designnotes.blog.gov.uk`,
+   `accessibility.blog.gov.uk`, `service-manual.ons.gov.uk`,
+   `analysisfunction.civilservice.gov.uk`, `design.tax.service.gov.uk`,
+   `design.education.gov.uk`, `service-manual.nhs.uk`.
+   `technology.blog.gov.uk`'s search page served a bot challenge,
+   which was not worked around.
+
+   **Keith's calls on the live research (2026-09-29):**
+   - **Quarters, re-asked with the correct example: the name plus its
+     due date on first use** - "the 2026-Q3 period (supply due 1 August
+     2026)" on first use on each page, then just "2026-Q3". The name
+     is treated as a defined term, like GOV.UK treats "tax year". This
+     REPLACES the earlier "term plus months" answer, which rested on
+     the wrong example.
+   - **Diagram accessibility: `accTitle` / `accDescr` generated from
+     the caption.** The illustrator writes the caption once, and the
+     validator checks that every Mermaid block also carries it as
+     `accTitle` / `accDescr`. This works identically on GitHub and in
+     the dashboard.
+   - **Time-based review ALONGSIDE the fingerprint gate.** Every page
+     carries a last-reviewed date and a review-by date (say six
+     months). Fingerprints catch "a cited source changed"; the review
+     date catches "the world changed but no cited file did". The
+     staleness badge shows both.
+   - **"What's this?" links sit BESIDE a status or term, never on it,
+     with plain wording.** There is no humour in any dashboard UI text;
+     humour stays in the explainer bodies only.
