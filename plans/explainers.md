@@ -52,7 +52,7 @@ survives context compaction. Tick items off here as they land.
    4).
 7. [todo] **Requirements via `delivery-scoper`**, drafting from items
    1-4, then Keith's sign-off. Nothing is built before this.
-8. [todo] Confirm the Style Manual's rule on numbers once
+8. [done: moot, GOV.UK is the baseline, and its numbers rule applies] Confirm the Style Manual's rule on numbers once
    `www.stylemanual.gov.au` is reachable (#3, style round 4).
 9. [todo, NOT explainer work] Renames the naming session implies in
    code and requirements, flagged rather than done. Each needs its own
@@ -1464,3 +1464,29 @@ survives context compaction. Tick items off here as they land.
      skimmer who reads nothing else still leaves with it. Concept pages
      are also reached from the dashboard's "What's this?" links, where
      readers are actually confused.
+
+   **Baseline switched from the Australian Style Manual to GOV.UK
+   (Keith, 2026-09-29): "Fine, ignore the style manual. GovUK is a bit
+   better anyway - in my opinion."** The Style Manual cannot be read
+   from here anyway (its own host refuses scripted clients; see
+   CLAUDE.md). What changes, checked against GOV.UK's A to Z source:
+   - **The house baseline** is now GOV.UK's guidance plus Keith's own
+     preferences, not "a mix of the Style Manual and Keith's own".
+   - **Numbers (queue item 8): resolved by GOV.UK.** Write "one" in
+     words unless it is a step or list point; everything else in
+     numerals, including 2 to 9. Item 8 is closed, and the Style Manual
+     is no longer needed.
+   - **Dates** are unchanged ("4 June 2017" style; "to" in ranges,
+     already adopted).
+   - **Dashes:** GOV.UK has no rule for a break in a sentence, so the
+     spaced en dash ( – ) stands as Keith's own preference. It was
+     never GOV.UK's.
+   - **Oxford comma:** still Keith's own "always". GOV.UK has no rule,
+     and its examples omit it.
+   - **Spelling:** Australian spelling stays (it differs from GOV.UK's
+     UK spelling almost nowhere), but it is now Keith's preference
+     rather than a Style Manual rule.
+   - **A NEW CONFLICT for Keith:** GOV.UK says "do not use quarter for
+     dates, use the months" (e.g. "Jan to Mar 2013"). But Mothman's
+     quarterly PERIOD is a real domain concept with its own name (e.g.
+     `2026-Q3`). This is to be asked, not assumed.
