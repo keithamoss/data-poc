@@ -578,6 +578,9 @@
   story: "As Keith scoping a new explainer, I want a writer agent that reads the sources itself, gives me a short brief to approve and then drafts the page to the house standard, so that the page rests on a specialist's reading and I steer it before any prose exists."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 3 rounds 1, 2, 3, 5, 7, 10 and 13, the paper check, slice 1 answers Q3 and Q4, and sets 4, 5 and 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "WHEN a topic has been scoped with Keith, THE SYSTEM SHALL have docs-writer draft a brief of at most 500 words, not counting its list of sources."
@@ -632,6 +635,9 @@
   story: "As a reader of an explainer, I want its diagrams and stories made by an agent that has read the prose first, so that each picture answers a question the text raises - and as Keith, I want proof on a real topic that a separate illustrator beats the writer drawing its own."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 1 second and fourth rounds, item 3 rounds 2, 3 and 6, slice 1 answer Q11, and set 4, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "WHEN docs-writer has drafted a page with marked slots, THE SYSTEM SHALL have docs-illustrator read the whole draft and fill each slot."
@@ -690,7 +696,7 @@
     - "THE SYSTEM SHALL NOT have docs-critic report a breach of any rule on the validator's rule-id list."
     - "IF a page breaches the sensitivity rule (REQ-DOCS-117, REQ-DOCS-131), THEN THE SYSTEM SHALL have docs-critic report it as a blocker."
     - "THE SYSTEM SHALL NOT let docs-critic edit any file."
-    - "WHEN the eval set (REQ-DOCS-123) is run, THE SYSTEM SHALL run docs-critic's evals on both Opus and Sonnet 5, SHALL keep the model that catches the planted defects without inventing findings on the clean page, and SHALL record a dated summary of the outcome in this requirement's evidence and the choice in its decisions."
+    - "WHEN the eval set (REQ-DOCS-123) is run, THE SYSTEM SHALL run docs-critic's evals on both Opus and Sonnet 5.5, SHALL keep the model that catches the planted defects without inventing findings on the clean page, and SHALL record a dated summary of the outcome in this requirement's evidence and the choice in its decisions."
   non_functional_requirements:
     - "COLDNESS is the whole value. A reader who knows the answer cannot tell whether the page taught it, which is why accuracy went to a separate fact-checker. Anything handed to the critic beyond the page is a leak of context the real reader will not have - so each extra input has a reason: the glossary because a real reader can open the glossary panel, the reader questions because they are the test, the rule-id list only to say what NOT to report."
     - "The HCI excerpt is written into the agent file once, rather than supplied per run, so every run of the critic judges UX against the same text and the critic never needs to read the repository for it."
@@ -717,7 +723,7 @@
     - "Decided reader questions come from both places (round 7): the brief's 5 to 8, tweaked by Keith, plus whatever else the critic wondered."
     - "Decided findings are severity-ranked and all shown (round 7) - blocker, should fix, polish - each quoting exact text and suggesting a change, with no confidence filter."
     - "Decided a quick manager pass on the 'In short' box (round 11)."
-    - "Decided critic model is TESTED, Opus against Sonnet 5 (round 3), rather than assumed; the paper check kept the test but changed the reason."
+    - "Decided critic model is TESTED, Opus against Sonnet 5.5 (round 3), rather than assumed; the paper check kept the test but changed the reason."
     - "Decided the rendered page from day one (round 7), through a real browser - softened first by the slicing (the 'two slices' entry) to GitHub's render, then by Q1 to the markdown source until slice 2."
     - "Decided the critic never gets memory, because memory silently grants Read, Write and Edit (round 2 research)."
   open_questions: []
@@ -728,6 +734,9 @@
   story: "As Keith, about to put an explainer in front of managers, I want every factual claim on it checked against the requirements and files it cites, with the problems at the top, so that a wrong or unsupported sentence is found by a table rather than by a reader."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 3 rounds 7, 8, 10 and 13, the paper check's corrections, slice 1 answers Q3, Q4 and Q11, and sets 5 and 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "WHEN docs-fact-checker reviews a page, THE SYSTEM SHALL have it return every factual claim on the page, each with a verdict of supported, contradicted, not found in the sources, or sources disagree."
@@ -785,6 +794,9 @@
   story: "As Keith commissioning an explainer, I want one command that walks the main session through scoping, brief, writing, illustrating, checking, review, triage and sign-off in a fixed order, so that no step - and especially neither of my checkpoints - can be skipped or reordered by accident."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 3 rounds 1, 2, 8, 9 and 13, CLAUDE.md's standing rule 'Never change an explainer without Keith's approval', slice 1 answers Q1, Q4, Q5 and Q9, and sets 4, 5 and 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL provide an /explain project skill at .claude/skills/explain/SKILL.md, marked disable-model-invocation true, that runs in the main session."
@@ -854,6 +866,9 @@
   story: "As a new engineer joining the team, I want the first real explainer readable on GitHub, so that I can learn one Mothman concept properly today - and as Keith, I want it to prove the whole team end to end before any dashboard work is built on it."
   moscow: must
   status: not_started
+  signed_off:
+    by: Keith
+    date: "2026-09-29"
   source: "Keith, plans/explainers.md item 1 third round (first three topics), item 3 round 10 (build order), the 'two slices' entry, slice 1 answers Q1, Q2, Q4 and Q8, and set 4, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL publish the 'periods and slots' concept page from group 2, the calendar, as markdown under docs/explainers/<group>/."
