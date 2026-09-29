@@ -2081,8 +2081,9 @@ survives context compaction. Tick items off here as they land.
       she needs to know which version of the data she holds, which
       period it belongs to, and whether any of it was substituted.
 
-   Plus the Mothman. Still content, not wording: Keith approves the
-   exact text when the house standard is written.
+   Plus the Mothman. **Keith approved this cast's content the same
+   evening.** The exact text is still his to approve word for word
+   when the house standard is written.
 
    **Requirements route (Keith, 2026-09-29).** He was asked whether the
    `delivery-scoper` was needed, given that fifteen rounds of questions
