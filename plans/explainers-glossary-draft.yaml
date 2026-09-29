@@ -1,0 +1,501 @@
+# DRAFT, NOT APPROVED. The explainer glossary seed (REQ-DOCS-119), awaiting Keith's
+# entry-by-entry approval. Kept here only so it survives the container; it moves to
+# docs/explainers/glossary.yaml once approved, and this file is deleted in that commit.
+# DRAFT glossary seed for docs/explainers/glossary.yaml (REQ-DOCS-119).
+# Every entry is for Keith's word-by-word approval. See GLOSSARY-NOTES.md.
+
+entries:
+
+  # ---------------------------------------------------------------- group 1, the shape of the asset
+
+  - term: data asset
+    definition: "All the data one team looks after, from every agency that supplies it, arranged as agencies, collections, and datasets."
+    aliases: [asset]
+    forms: [data assets, assets]
+    defined_by: [REQ-QAC-039, REQ-DASH-003]
+    page: null
+    draft: false
+    idea: false
+
+  - term: dataset
+    definition: "One table that an agency supplies, with its own contract, its own checks, and its own slot in each period it takes part in."
+    aliases: []
+    forms: [datasets]
+    defined_by: [REQ-QAC-039, REQ-PIPE-052]
+    page: null
+    draft: false
+    idea: false
+
+  - term: scheduled asset
+    definition: "A data asset whose supplies are owed on a supply calendar. This is the shape every data asset in Mothman has today."
+    aliases: []
+    forms: [scheduled assets]
+    defined_by: [REQ-PIPE-049, REQ-PIPE-052]
+    page: null
+    draft: true
+    idea: false
+
+  - term: one-off extraction
+    definition: "A data asset made of supplies for a single project, with no supply calendar at all."
+    aliases: []
+    forms: [one-off extractions]
+    defined_by: []
+    page: null
+    draft: true
+    idea: true
+
+  - term: sample
+    definition: "A data asset of practice or test data, which is never real data."
+    aliases: []
+    forms: [samples]
+    defined_by: []
+    page: null
+    draft: true
+    idea: true
+
+  - term: in development
+    definition: "Said of a dataset that exists before its supply calendar is agreed. Its checks run and show real results, which never count towards any agreed status."
+    aliases: [pre-agreement, calendar-less, not yet agreed]
+    forms: [in-development]
+    defined_by: [REQ-PIPE-106]
+    page: null
+    draft: false
+    idea: false
+
+  # ---------------------------------------------------------------- group 2, the calendar
+
+  - term: delivery agreement
+    definition: "What we agreed with a supplier about when each dataset is due, written down in one place, with the supply calendar inside it."
+    aliases: []
+    forms: [delivery agreements]
+    defined_by: [REQ-PIPE-110]
+    page: null
+    draft: false
+    idea: false
+
+  - term: supply calendar
+    definition: "The list of periods, and the date each period's supply is due, inside a delivery agreement. Each dataset follows exactly one."
+    aliases: [delivery calendar, schedule]
+    forms: [supply calendars, delivery calendars, schedules]
+    defined_by: [REQ-PIPE-049, REQ-PIPE-051]
+    page: null
+    draft: false
+    idea: false
+    part_of: delivery agreement
+
+  - term: authored dates
+    definition: "A supply calendar written out as a list of dates, each carrying its period's name. The other kind is a cadence rule."
+    aliases: []
+    forms: [authored date]
+    defined_by: [REQ-PIPE-049, REQ-PIPE-051]
+    page: null
+    draft: false
+    idea: false
+
+  - term: cadence rule
+    definition: "A supply calendar stated as a rule, such as every day, rather than as a list of dates. Its periods are named by their own dates."
+    aliases: []
+    forms: [cadence rules]
+    defined_by: [REQ-PIPE-049, REQ-PIPE-051]
+    page: null
+    draft: false
+    idea: false
+
+  - term: calendar version
+    definition: "One dated edition of a supply calendar. Each period is judged against the version in force on its own date, so a later edition never changes an earlier period."
+    aliases: []
+    forms: [calendar versions]
+    defined_by: [REQ-PIPE-049, REQ-PIPE-051]
+    page: null
+    draft: false
+    idea: false
+
+  - term: delivery month
+    definition: "One of the months in which a supply calendar's authored dates fall. A dataset can name the ones it takes part in, or name none to take part in all."
+    aliases: []
+    forms: [delivery months]
+    defined_by: [REQ-PIPE-049]
+    page: null
+    draft: false
+    idea: false
+
+  - term: period
+    definition: "One named step in a supply calendar, carrying a name and a date, that each supply is filed to. A period never moves once it exists."
+    aliases: [cycle]
+    forms: [periods, cycles]
+    defined_by: [REQ-PIPE-051, REQ-PIPE-049]
+    page: 2-calendar/periods-and-slots.md
+    draft: false
+    idea: false
+
+  - term: not-expected period
+    definition: "A period in which a dataset owes no supply, declared beforehand with a reason. It still shows, and it has no slot."
+    aliases: []
+    forms: [not-expected periods, not expected]
+    defined_by: [REQ-PIPE-049, REQ-PIPE-052]
+    page: 2-calendar/periods-and-slots.md
+    draft: false
+    idea: false
+
+  - term: slot
+    definition: "One dataset's expected supply for one period, with its own due time, grace allowance, and claim window. Each dataset has its own run of slots."
+    aliases: []
+    forms: [slots]
+    defined_by: [REQ-PIPE-052]
+    page: 2-calendar/periods-and-slots.md
+    draft: false
+    idea: false
+
+  - term: due time
+    definition: "The moment a slot's supply is expected: its period's date at its dataset's expected time of day, in the data asset's time zone."
+    aliases: [due instant]
+    forms: [due times]
+    defined_by: [REQ-PIPE-052, REQ-PIPE-048]
+    page: null
+    draft: false
+    idea: false
+
+  - term: grace allowance
+    definition: "Extra time after a slot's due time during which an arriving supply still counts as on time."
+    aliases: [grace]
+    forms: [grace allowances]
+    defined_by: [REQ-PIPE-052, REQ-PIPE-049]
+    page: null
+    draft: false
+    idea: false
+
+  - term: claim window
+    definition: "The stretch of time in which a supply can be filed to a slot. It opens a set time before the slot's due time and never closes."
+    aliases: []
+    forms: [claim windows]
+    defined_by: [REQ-PIPE-052, REQ-PIPE-049]
+    page: null
+    draft: false
+    idea: false
+
+  - term: filled
+    definition: "Said of a slot once a supply has been promoted into it. An arrival, or a supply still in staging, never fills a slot."
+    aliases: []
+    forms: [fill, fills, filling, unfilled]
+    defined_by: [REQ-PIPE-062, REQ-PIPE-075]
+    page: null
+    draft: false
+    idea: false
+
+  - term: closed unfilled
+    definition: "Said of a slot that can no longer be claimed, because a later slot for the same dataset is filled. It stays on record as an unmet obligation."
+    aliases: []
+    forms: []
+    defined_by: [REQ-PIPE-063, REQ-DASH-070]
+    page: null
+    draft: false
+    idea: false
+
+  - term: overdue
+    definition: "Said of a slot whose due time has passed with nothing filed to it. It is about what did not arrive, never about what the data says."
+    aliases: []
+    forms: []
+    defined_by: [REQ-PIPE-052]
+    page: null
+    draft: false
+    idea: false
+
+  - term: runway
+    definition: "How many future slots a dataset's authored dates still cover. When few remain, Mothman warns, counting slots rather than months."
+    aliases: []
+    forms: []
+    defined_by: [REQ-PIPE-053]
+    page: null
+    draft: false
+    idea: false
+
+  - term: schedule ended
+    definition: "The status of a dataset whose authored dates have run out, so no slot covers the date being viewed. It is not a quality verdict."
+    aliases: [exhausted schedule]
+    forms: []
+    defined_by: [REQ-PIPE-053]
+    page: null
+    draft: false
+    idea: false
+
+  # ---------------------------------------------------------------- group 3, what arrives
+
+  - term: delivery
+    definition: "One drop from a supplier, which may hold several files. It never means the obligation to supply, which is a slot."
+    aliases: []
+    forms: [deliveries]
+    defined_by: [REQ-GEN-042]
+    page: null
+    draft: false
+    idea: false
+
+  - term: deliver
+    definition: "What a supplier does when it sends us a delivery of one or more files."
+    aliases: []
+    forms: [delivers, delivered, delivering]
+    defined_by: [REQ-GEN-042]
+    page: null
+    draft: false
+    idea: false
+
+  - term: arrival
+    definition: "One file we received, with its receipt time, which is the moment our own storage took it."
+    aliases: []
+    forms: [arrivals]
+    defined_by: [REQ-PIPE-105, REQ-PIPE-034]
+    page: null
+    draft: false
+    idea: false
+
+  - term: supply
+    definition: "One version of one dataset's table, which is filed to a slot and judged by checks."
+    aliases: []
+    forms: [supplies]
+    defined_by: [REQ-PIPE-034, REQ-PIPE-062]
+    page: null
+    draft: false
+    idea: false
+
+  - term: early
+    definition: "Said of a supply that arrived before the due time of the slot it was filed to. Only ever about arrivals."
+    aliases: []
+    forms: []
+    defined_by: [REQ-PIPE-066]
+    page: null
+    draft: false
+    idea: false
+
+  - term: on time
+    definition: "Said of a supply that arrived at or after its slot's due time, but within its grace allowance. Only ever about arrivals."
+    aliases: []
+    forms: []
+    defined_by: [REQ-PIPE-066]
+    page: null
+    draft: false
+    idea: false
+
+  - term: late
+    definition: "Said of a supply that arrived after its slot's due time and grace allowance had both passed. Only ever about arrivals."
+    aliases: []
+    forms: []
+    defined_by: [REQ-PIPE-066]
+    page: null
+    draft: false
+    idea: false
+
+  - term: QA run
+    definition: "One pass of Mothman's checks over newly arrived data, set off by the data arriving rather than by a clock."
+    aliases: []
+    forms: [QA runs]
+    defined_by: [REQ-PIPE-036]
+    page: null
+    draft: false
+    idea: false
+
+  - term: trial
+    definition: "A check of a supply someone received by hand, run without keeping it. Nothing from a trial is recorded."
+    aliases: [trial run]
+    forms: [trials]
+    defined_by: [REQ-PIPE-103]
+    page: null
+    draft: false
+    idea: false
+
+  # ---------------------------------------------------------------- group 4, filing a supply
+
+  - term: staging
+    definition: "Where every arriving supply waits, checked but not yet decided on, until it is promoted or rejected."
+    aliases: []
+    forms: []
+    defined_by: [REQ-PIPE-060, REQ-PIPE-076]
+    page: null
+    draft: false
+    idea: false
+
+  - term: filing decision
+    definition: "A recorded choice about where a supply belongs or what a period stands on, made by a person or by a rule."
+    aliases: []
+    forms: [filing decisions]
+    defined_by: [REQ-GHUB-082, REQ-PIPE-074]
+    page: null
+    draft: false
+    idea: false
+
+  - term: promote
+    definition: "To move a supply out of staging into its period, which fills its slot. A green or amber supply promotes itself into an empty slot."
+    aliases: []
+    forms: [promotes, promoted, promoting, promotion]
+    defined_by: [REQ-PIPE-075, REQ-PIPE-062]
+    page: null
+    draft: false
+    idea: false
+
+  - term: reject
+    definition: "A person's decision that a supply will not be used. Any supply can be rejected, but never by an automatic rule."
+    aliases: []
+    forms: [rejects, rejected, rejecting, rejection]
+    defined_by: [REQ-PIPE-076]
+    page: null
+    draft: false
+    idea: false
+
+  - term: demote
+    definition: "A person's decision to take a promoted supply out of its period, always with a destination: demote to staging, or demote to rejected."
+    aliases: [un-decide]
+    forms: [demotes, demoted, demoting, demotion]
+    defined_by: [REQ-PIPE-076, REQ-GHUB-082]
+    page: null
+    draft: false
+    idea: false
+
+  - term: re-file
+    definition: "A person's decision to move a supply to a different slot from the one the rule chose."
+    aliases: []
+    forms: [re-files, re-filed, re-filing]
+    defined_by: [REQ-GHUB-082]
+    page: null
+    draft: false
+    idea: false
+
+  - term: acknowledge
+    definition: "A person's note that they have seen an amber supply and are content with it. It changes nothing about where the supply is filed."
+    aliases: [accept]
+    forms: [acknowledges, acknowledged, acknowledging]
+    defined_by: [REQ-QAC-017]
+    page: null
+    draft: false
+    idea: false
+
+  - term: resupply
+    definition: "A supply that arrives for a slot already filled. It never promotes itself, so a person decides what happens to it."
+    aliases: []
+    forms: [resupplies, resupplied]
+    defined_by: [REQ-PIPE-062, REQ-PIPE-065]
+    page: null
+    draft: false
+    idea: false
+
+  # ---------------------------------------------------------------- group 5, filling the gaps
+
+  - term: substitute
+    definition: "A person's decision that a period nobody supplied will stand on an earlier period's promoted supply. The period then shows as substituted."
+    aliases: [standing in, last good one, stand on, carry forward]
+    forms: [substitutes, substituted, substituting, substitution, stands on, standing on, stood on, carried forward, carrying forward]
+    defined_by: [REQ-PIPE-084, REQ-DASH-085]
+    page: null
+    draft: false
+    idea: false
+
+  - term: inherit
+    definition: "When a dataset owes nothing in a period, the period stands on that dataset's most recent promoted supply instead. Nobody has to decide it."
+    aliases: []
+    forms: [inherits, inherited, inheriting, inheritance]
+    defined_by: [REQ-PIPE-098, REQ-PIPE-099, REQ-DASH-100]
+    page: null
+    draft: false
+    idea: false
+
+  - term: un-inherit
+    definition: "A person's decision to remove what a period inherited, so the period no longer stands on that earlier supply."
+    aliases: []
+    forms: [un-inherits, un-inherited, un-inheriting]
+    defined_by: [REQ-PIPE-099]
+    page: null
+    draft: false
+    idea: false
+
+  # ---------------------------------------------------------------- group 6, when a person is needed
+
+  - term: ticket
+    definition: "The one GitHub issue for a slot, kept up to date with where that slot's supply has got to."
+    aliases: [issue]
+    forms: [tickets, issues]
+    defined_by: [REQ-PIPE-083, REQ-GHUB-109]
+    page: null
+    draft: false
+    idea: false
+
+  - term: waiting on a person
+    definition: "Said of a supply that cannot go any further until someone makes a filing decision about it."
+    aliases: []
+    forms: []
+    defined_by: [REQ-DASH-070, REQ-PIPE-076]
+    page: null
+    draft: false
+    idea: false
+
+  - term: blocked
+    definition: "Said of a healthy table whose check cannot run, because a neighbouring table it reads is missing or held. It never means waiting on a person."
+    aliases: []
+    forms: []
+    defined_by: [REQ-PIPE-079]
+    page: null
+    draft: false
+    idea: false
+
+  # ---------------------------------------------------------------- group 7, how status works
+
+  - term: no data
+    definition: "Said of a dataset with nothing to judge on the date being viewed. Mothman says so in words, never with a misleading blank."
+    aliases: [stale]
+    forms: []
+    defined_by: [REQ-PIPE-007, REQ-DASH-041]
+    page: null
+    draft: false
+    idea: false
+
+  - term: freshness
+    definition: "A cap on a dataset's headline status when its newest expected supply is overdue, even though every check passed."
+    aliases: []
+    forms: []
+    defined_by: []
+    page: null
+    draft: false
+    idea: true
+
+  # ---------------------------------------------------------------- group 8, the checks
+
+  - term: recency
+    definition: "The category of check that asks whether the data itself is recent enough. It is never about when a supply arrived."
+    aliases: [timeliness]
+    forms: []
+    defined_by: [REQ-QAC-024, REQ-QAC-001]
+    page: null
+    draft: false
+    idea: false
+
+  # ---------------------------------------------------------------- group 9, looking back
+
+  - term: In place on
+    definition: "The date you choose to see which supply was promoted into each slot on that date."
+    aliases: [as of]
+    forms: []
+    defined_by: [REQ-PIPE-081]
+    page: null
+    draft: false
+    idea: false
+
+diagram: |-
+  ```mermaid
+  ---
+  config:
+    look: handDrawn
+    handDrawnSeed: 42
+    theme: neutral
+  ---
+  flowchart TB
+    accTitle: One delivery can hold several arrivals, and each arrival carries one supply.
+    accDescr: One delivery can hold several arrivals, and each arrival carries one supply.
+    subgraph D["A delivery: one drop from a supplier"]
+      subgraph A1["An arrival: one file we received"]
+        S1["A supply: one version of one table"]
+      end
+      subgraph A2["An arrival: one file we received"]
+        S2["A supply: one version of one table"]
+      end
+    end
+    classDef supply fill:#E1EFDD,stroke:#036819,color:#1B2420
+    class S1,S2 supply
+  ```
+
+  *One delivery can hold several arrivals, and each arrival carries one supply.*

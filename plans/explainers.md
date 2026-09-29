@@ -905,6 +905,28 @@ survives context compaction. Tick items off here as they land.
    and the explainer rule now names the concept map and excludes
    `docs/explainers/_work/`.
 
+   **Writing like a person, not like Claude (Keith's question,
+   2026-09-29 night).** Three sources worth keeping: Anthropic's own
+   prompting guide (say what to do rather than what not to do, and a
+   prompt's style leaks into its output); Wikipedia's "Signs of AI
+   writing" field guide (inflated significance, rule of three, and a
+   recurring vocabulary); and the MIT-licensed `avoid-ai-writing` skill
+   (conorbronsdon/avoid-ai-writing), whose idea worth borrowing is a
+   TIERED list - the worst words fail outright, softer ones only when
+   they cluster. Keith asked for three follow-ups, each to come back as
+   exact wording first:
+   1. propose adding Wikipedia's gaps to the banned list: underscore,
+      enhance, intricate, "serves as", "stands as";
+   2. propose a tiered banned list (a standard AND validator change),
+      which would also have let "quick" and "simple" stay as signals;
+   3. write the docs-writer agent's own prompt as positive prose that
+      describes the voice (no standard change).
+
+   **Glossary seed drafted (2026-09-29 night):** 50 entries, in
+   `plans/explainers-glossary-draft.yaml` with notes beside it, until
+   Keith approves them. That file is deleted when the entries move to
+   `docs/explainers/glossary.yaml`.
+
    **Still to take to Keith with wording:** CLAUDE.md's explainer
    rule covers "everything under `docs/explainers/`", which now
    includes the agents' gitignored working folder - the rule probably
