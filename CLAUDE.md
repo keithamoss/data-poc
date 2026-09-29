@@ -1754,6 +1754,24 @@ Rough layout:
       **Tip:** GOV.UK's content API (`www.gov.uk/api/content/<path>`)
       returns a page's body as clean JSON, which is far easier to read
       than the rendered HTML.
+    - **`www.stylemanual.gov.au`** (the Australian Government Style
+      Manual) - allow-listed by Keith as `*.stylemanual.gov.au`
+      2026-09-29, and the proxy now lets it through (CONNECT succeeds,
+      TLS verifies), but **the site itself refuses**: its host,
+      `Server: AkamaiNetStorage`, answers `403 Forbidden` to `curl`,
+      almost certainly bot protection against scripted clients from
+      cloud servers. That is the SITE's policy, not this proxy's, so
+      there is nothing further to allow-list. It was deliberately not
+      worked around (no faked browser user agent): getting round a
+      site's own protection is a different thing from using a
+      legitimate route. A headless-browser attempt was inconclusive,
+      because Chromium fails even on `www.gov.uk` here with
+      `ERR_TOO_MANY_RETRIES` (the sandbox quirk noted under
+      `keithamoss.github.io`). Separately, the bare `stylemanual.gov.au`
+      (no `www`) is still a proxy 403, because a `*.` wildcard does not
+      cover the apex, but the site lives on `www`. Consequence: Style
+      Manual rules stay snippet-level (`plans/explainers.md` queue item
+      8), unless Keith checks a page himself in a browser.
     - ~~**`arxiv.org`**, **`aclanthology.org`**~~ - ALLOW-LISTED by
       Keith 2026-09-29 and re-verified with a real `curl` (both 200).
       Both were first hit that day researching the explainer agents
