@@ -13341,29 +13341,33 @@ requirements:
         GREEN two transforms downstream.
     unmet_criteria:
       - criterion: >
-          Criterion 14, in part, and criterion 17 entirely - what happens
-          when a PERSON promotes a supply. The half of 14 this owns is
-          met: no operation anywhere promotes several supplies on one
-          decision, and promote_each() is a loop over promote() rather
-          than a bulk write precisely so each gets its own entry, reason
-          and transaction. What is absent is the operator route itself,
-          so "a decision of its own for each supply a person promotes"
-          has nothing to be true of yet, and 17's re-run of QA against a
-          different period has nothing to trigger it.
+          Criterion 17 - re-running QA where a person's promotion puts a
+          supply into a period its verdicts were not computed against.
+          RE-POINTED 2026-09-29, not cleared: criterion 14 IS now met
+          and has come off this list, because the operator route exists
+          and promotes one supply per decision, each with its own entry,
+          reason and transaction. 17 is a different half and the route
+          landing did not supply it.
         why: >
-          promotion.needs_requalification() is built and tested - the
-          DECISION of whether a promotion needs QA running again, and
-          criterion 16's "do not re-run where the period is the same" is
-          met through it. What is missing is the caller: nothing lets a
-          person promote a supply at all, which is REQ-GHUB-082's
-          operator operations and REQ-PIPE-099's terminal route. Wiring
-          a re-run to a caller that does not exist would be writing
-          against an imagined interface.
+          promotion.needs_requalification() answers WHETHER a promotion
+          needs QA running again, and it is built, tested and still
+          called by nothing. What the operator route added was a caller
+          for PROMOTE, not an executor for a re-run - `mothman supply
+          decide --operation promote` records the decision and moves the
+          tables, and there is nowhere for it to send "and now run the
+          checks again". That executor is REQ-PIPE-079's unbuilt half,
+          the same one REQ-PIPE-099 criterion 11 and REQ-GHUB-082's
+          re-file both wait on: reevaluation.plan() answers WHICH checks,
+          and nothing executes a plan. Wiring one here would build that
+          same thing a second time, in the place nobody would look for
+          it.
         owner: >
-          Delivery sprint 12's operator routes - REQ-GHUB-082 and
-          REQ-PIPE-099, both signed and unbuilt as of 2026-09-28.
+          REQ-PIPE-079's wiring. It was REQ-GHUB-082 and REQ-PIPE-099
+          until 2026-09-29; both are built now, and re-testing the
+          criterion rather than clearing it is what found that they were
+          never what it actually waited on.
         blocked_by:
-          requirements: [REQ-GHUB-082, REQ-PIPE-099]
+          requirements: [REQ-PIPE-079]
     dependencies: [REQ-PIPE-074, REQ-PIPE-062, REQ-PIPE-035, REQ-PIPE-064]
     decisions:
       - >
@@ -16871,25 +16875,32 @@ requirements:
           is not.
         blocked_by:
           requirements: [REQ-PIPE-079]
-      - criterion: >
-          Criterion 9's "offer as an operator action", criterion 10's
-          same-routes-as-every-other-decision, criterion 13's
-          confirmation ON EVERY ROUTE, and criterion 17's placement
-          outside the queue of supplies awaiting a decision. The
-          OPERATIONS are built, tested and refuse correctly; what is
-          absent is any route a person can reach them by.
-        why: >
-          Nothing lets a person take any filing decision yet - not
-          promote, not reject, not substitute. The routes are
-          REQ-GHUB-082's operator operations and REQ-PIPE-099's
-          terminal, both signed and unbuilt. de_substitute() already
-          takes `confirmed` as a required argument rather than
-          prompting, precisely so that every route has to obtain it.
-        owner: >
-          Delivery sprint 12's operator routes.
-        blocked_by:
-          requirements: [REQ-GHUB-082, REQ-PIPE-099]
     decisions:
+      - >
+        [MET 2026-09-29] CRITERIA 9, 10, 13 AND 17 CAME OFF THE DEFERRED
+        LIST when REQ-GHUB-082's routes landed, re-tested rather than
+        cleared because a blocker shipping is evidence a criterion CAN
+        be met and never that it has been. Each was checked against the
+        real surface: substitute and de-substitute are offered as
+        operator actions (`mothman supply decide --operation
+        substitute`, and the TUI's period door); they are reached from
+        the same one implementation as every other filing decision,
+        which is what criterion 10 asks for and what makes it true
+        rather than promised; the confirmation is obtained on every
+        route, by filing_decisions._confirmation() refusing an
+        unconfirmed de-substitute wherever it came from as well as by
+        the TUI asking; and criterion 17's placement holds by
+        construction, because filing_queue.operations_for() returns the
+        period-scoped operations in a separate tuple that the supply
+        queue never passes on.
+      - >
+        [MET] WHAT THE DEFERRAL GOT RIGHT, worth keeping because it
+        shaped the build: de_substitute() takes `confirmed` as a
+        REQUIRED ARGUMENT rather than prompting, "precisely so that
+        every route has to obtain it". That is why criterion 13 needed
+        no work when the second route arrived - a prompt inside the
+        operation would have been skipped by the first caller that was
+        not a terminal, and the flag form is exactly that caller.
       - >
         TWO CRITERIA BACKPORTED FROM REQ-PIPE-099 by the mirror-check
         Keith asked for, 2026-09-28. Substitute and de-substitute sit
