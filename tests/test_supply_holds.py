@@ -152,14 +152,25 @@ class TestHoldingChangesNothingElse:
         assert other.branch == assignment.ON_TIME and other.slot == "02"
 
 
-class TestItIsADeadEndUntilSprintTwelve:
-    """The requirement says this must be STATED, because a hold nobody
-    can clear is indistinguishable from a bug."""
+class TestItIsNoLongerADeadEnd:
+    """REQ-PIPE-078 is what ended it, and this class is the previous
+    one inverted rather than deleted.
 
-    def test_nothing_here_pretends_to_resolve_a_hold(self):
-        assert not hasattr(supply_holds, "resolve")
-        assert not hasattr(supply_holds, "assign_to_slot")
+    It used to assert that nothing here pretended to resolve a hold and
+    that the module SAID SO - because a hold nobody can clear is
+    indistinguishable from a bug, and the requirement of the day
+    required the honesty rather than the capability. Both are now
+    wrong, and keeping the pair the right way round is what stops a
+    future reader taking the old assertion for a rule.
+    """
 
-    def test_the_module_says_so_in_its_own_docstring(self):
-        assert "sprint 12" in supply_holds.__doc__.lower() or \
-            "SPRINT 12" in supply_holds.__doc__
+    def test_a_hold_can_be_resolved(self):
+        assert hasattr(supply_holds, "resolve")
+        assert hasattr(supply_holds, "resolve_for_supply")
+
+    def test_the_module_no_longer_claims_to_be_a_dead_end(self):
+        assert "sprint 12" not in supply_holds.__doc__.lower()
+
+    def test_it_says_where_a_hold_now_lives(self):
+        """The store is the deliverable, so the module names it."""
+        assert "qa.hold" in supply_holds.__doc__

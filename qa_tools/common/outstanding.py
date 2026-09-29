@@ -259,25 +259,6 @@ def _from_deliveries(conn=None) -> list[Item]:
     for record in _delivery_records(conn):
         delivery = record.get("delivery", "")
         received = record.get("received_at")
-        # HELD SUPPLIES (REQ-PIPE-059). Blocking, and the most
-        # expensive kind here: the supply is staged and deliberately
-        # NOT checked, so its period has no verdict at all until
-        # somebody chooses.
-        for held in record.get("held") or []:
-            dataset_id = held.get("dataset_id")
-            agency, collection = _scope_of(dataset_id)
-            files = list(held.get("files") or [])
-            items.append(Item(
-                kind=HELD_SUPPLY, severity=NEEDS_ACTION, blocking=True,
-                headline=f"{dataset_id or 'a dataset'} has a held supply in {delivery!r}",
-                detail=(f"{len(files)} files in this delivery are all {dataset_id} "
-                         f"({', '.join(files)}), so nothing will choose between them. "
-                         f"The supply is staged and is not checked until somebody does. "
-                         f"Every other dataset in the delivery was processed as usual."),
-                agency_id=agency, collection_id=collection, dataset_id=dataset_id,
-                observed_at=received,
-                responses=("assign one of the files to the slot",
-                            "reject the supply")))
         for entry in record.get("files") or []:
             name = entry.get("filename", "")
             contested = entry.get("contested_by") or []
@@ -312,6 +293,44 @@ def _from_deliveries(conn=None) -> list[Item]:
                     collection_id=collection, observed_at=received,
                     responses=("confirm it is not a supply",
                                 "add or widen an arrival pattern so it is attributed")))
+    return items
+
+
+def _from_holds(conn=None) -> list[Item]:
+    """Supplies nothing could place, from the hold store (REQ-PIPE-078).
+
+    IT USED TO READ `qa.delivery.held`, and that was the defect this
+    requirement exists to fix rather than a tidier source. A delivery
+    record is written once and never rewritten, so a hold read from one
+    could never stop being outstanding: resolving it changed nothing a
+    reader could see, and the queue went on asking for work already
+    done. The store has a resolution, so this reads only what is still
+    open (criterion 2).
+
+    BOTH KINDS ARRIVE HERE ON THE SAME TERMS (criterion 3). The
+    assignment-rule hold had no source at all before - it was a
+    `continue` in the filing pass - so the queue could show one kind of
+    hold and was structurally blind to the other.
+
+    RECORDED OBSERVATIONS ONLY (criterion 4): `qa.hold` is a record
+    somebody's rule made, and nothing here reaches a schema holding
+    supply rows.
+    """
+    from qa_tools.common import supply_holds
+
+    items = []
+    with delivery_log._db(conn) as db:
+        held_supplies = supply_holds.outstanding(db)
+    for held in held_supplies:
+        agency, collection = _scope_of(held.dataset_id)
+        items.append(Item(
+            kind=HELD_SUPPLY, severity=NEEDS_ACTION, blocking=True,
+            headline=f"{held.dataset_id} has a supply nothing could place",
+            detail=(f"{held.describe()} Every other dataset in the same delivery "
+                     f"was processed as usual."),
+            agency_id=agency, collection_id=collection, dataset_id=held.dataset_id,
+            observed_at=held.raised_at.isoformat(),
+            responses=held.responses))
     return items
 
 
@@ -531,6 +550,7 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
     to do today below six things they have already seen.
     """
     items = (_from_deliveries(conn)
+              + _from_holds(conn)
               + _from_loads()
               + _from_filings()
               + _from_closed_slots()

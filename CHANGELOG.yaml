@@ -109,6 +109,33 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-09-30"
+    summary: >
+      A supply nothing could place now waits for you until you deal with
+      it, instead of disappearing when the run that found it ended.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Held supplies stop vanishing
+            components: ["Pipeline & publishing"]
+            description: >
+              When nothing can work out which period a supply belongs to,
+              it now stays on your list until you decide about it. It used
+              to be mentioned once in a run's output and then forgotten.
+          - headline: Both kinds of hold, one list
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply held because two files claim the same dataset and one
+              held because no period fits now appear together, each saying
+              what you can do about it. The second kind was invisible before.
+      - category: Improved
+        items:
+          - headline: A hold knows how it ended
+            components: ["Pipeline & publishing"]
+            description: >
+              Once you promote, reject or re-file a held supply, its entry
+              closes and keeps a pointer to the decision that closed it - so
+              you can see later why it stopped asking for your attention.
   - date: "2026-09-29"
     summary: >
       You can now decide what goes into a period from the terminal, and

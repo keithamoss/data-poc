@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -601,6 +601,68 @@ CREATE INDEX IF NOT EXISTS decision_dataset_order
 CREATE INDEX IF NOT EXISTS decision_slot
     ON "{SCHEMA}".decision (dataset_id, to_slot, effective_at)
     WHERE to_slot IS NOT NULL;
+
+-- A SUPPLY NOTHING COULD PLACE, KEPT UNTIL SOMEBODY PLACES IT
+-- (REQ-PIPE-078). A hold used to live for exactly as long as the run
+-- that raised it: `file_arrivals()` skipped a held dataset with a
+-- `continue` and said nothing, and `supply_holds.py` aggregated the
+-- run's own assignments in memory and threw them away. The state a
+-- person was meant to drain was a message that scrolled past.
+--
+-- MUTABLE, AND SAYING SO IS REQUIRED (NFR 4). The `filing` table above
+-- is write-once because a filing must never be re-derived against a
+-- schedule that has moved on. This one is the opposite discipline on
+-- purpose: a row is RAISED once and RESOLVED once, and the resolution
+-- is an UPDATE. Two records that look alike and are governed by
+-- opposite rules is exactly the pair worth naming rather than leaving
+-- for a reader to infer from the absence of a trigger.
+--
+-- WHY NOT A NULL SLOT IN `filing`. Both kinds of hold have to land on
+-- the same terms (criterion 3), and a delivery-level hold has no
+-- filing to hang off: REQ-PIPE-059 refuses to choose between two files
+-- for one dataset, so nothing was filed and writing a filing row would
+-- be making that choice by another route. The assignment-rule hold
+-- keeps its `filing` row - that row is evidence of what the rule saw,
+-- which is the thing `filing` is for - and the open work item lives
+-- here, where it can be closed.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".hold (
+    dataset_id  text NOT NULL,
+    supply_id   text NOT NULL,
+    -- WHICH RULE DECLINED. The two are resolved differently - a
+    -- delivery-level hold needs somebody to say which FILE is the
+    -- supply, an assignment-rule one needs somebody to say which SLOT
+    -- it fills - so the kind is what a queue turns into an instruction.
+    kind        text NOT NULL CHECK (kind <> ''),
+    -- WHY, as the producing rule saw it: the competing filenames, or
+    -- each slot considered and what made it unavailable. A hold that
+    -- says only "no slot" tells a person nothing they can act on, and
+    -- acting on it is the entire point (REQ-PIPE-064 criterion 4).
+    reason      jsonb NOT NULL DEFAULT '{{}}',
+    -- THE RUN THAT RAISED IT (criterion 1). Not a foreign key to
+    -- `qa.run`: every other table here cascades from a run and a hold
+    -- deliberately does not, for the reason `decision` does not either
+    -- - regenerating QA history must not silently drop the work queue.
+    raised_by   text NOT NULL,
+    delivery    text,
+    raised_at   timestamptz NOT NULL DEFAULT now(),
+    -- WHICH DECISION CLOSED IT (criterion 6). A hold is not cleared by
+    -- a later run passing over it (criterion 2) - only an entry in the
+    -- log ends one, and the row keeps pointing at it afterwards so
+    -- "why is this no longer waiting on me" is answerable.
+    resolved_by bigint REFERENCES "{SCHEMA}".decision (id),
+    resolved_at timestamptz,
+    PRIMARY KEY (dataset_id, supply_id),
+    CONSTRAINT hold_resolution_is_whole
+        CHECK ((resolved_by IS NULL) = (resolved_at IS NULL))
+);
+
+--   COUNTING AND GROUPING WITHOUT READING ONE ROW PER SUPPLY
+--   (criterion 8), which is a scale requirement rather than a
+--   micro-optimisation: at ~30 datasets a queue that loads every held
+--   supply to say how many there are is the same design that turns one
+--   banner into thirty.
+CREATE INDEX IF NOT EXISTS hold_outstanding
+    ON "{SCHEMA}".hold (dataset_id, kind) WHERE resolved_by IS NULL;
 
 -- APPEND-ONLY, ENFORCED BY THE DATABASE (criterion 5).
 --

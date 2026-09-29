@@ -185,7 +185,15 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
             # A HELD supply is not filed: REQ-PIPE-059 refuses to choose
             # between two files for one dataset, and filing one of them
             # would be making that choice by another route.
+            #
+            # IT IS RECORDED, THOUGH (REQ-PIPE-078 criteria 1 and 3),
+            # and that is what this used to get wrong: a bare `continue`
+            # meant the one state in this pass that genuinely needs a
+            # person left no trace at all, while the assignment-rule
+            # hold below got a row. Two holds, two lifetimes, and the
+            # criterion asks for the same terms.
             if dataset_id in arrival.held:
+                _raise_delivery_hold(arrival, dataset_id)
                 continue
             if dataset_id not in slots_by_dataset:
                 try:
@@ -208,8 +216,45 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                 at=arrival.received_at, slots=slots_by_dataset[dataset_id],
                 filled=filled_slots(dataset_id))
             record(decided)
+            # AN ASSIGNMENT-RULE HOLD IS RECORDED TOO (criterion 3). Its
+            # `filing` row above is evidence of what the rule saw and
+            # stays write-once; the open work item is the hold, because
+            # that is the record a decision has to be able to close.
+            if decided.is_held:
+                _raise_assignment_hold(arrival, decided)
             written.append(decided)
     return written
+
+
+def _raise_delivery_hold(arrival, dataset_id: str) -> None:
+    """Record a supply nothing may choose between (REQ-PIPE-059).
+
+    THE SUPPLY ID IS DERIVED THE SAME WAY A FILED ONE IS, deliberately:
+    a held supply has to be nameable before anybody can resolve it, and
+    inventing a second naming scheme for the one case where a person is
+    involved is how the two stop joining up.
+    """
+    from qa_tools.common import supply_holds
+
+    with _connect("mothman:hold-raise") as conn:
+        supply_holds.raise_hold(
+            conn, dataset_id=dataset_id, supply_id=_supply_id_for(arrival, dataset_id),
+            kind=supply_holds.DELIVERY_LEVEL,
+            reason={"files": sorted(arrival.files_by_dataset.get(dataset_id) or ())},
+            raised_by=arrival.run_id, delivery=arrival.delivery_name)
+
+
+def _raise_assignment_hold(arrival, decided: Assignment) -> None:
+    """Record a supply the rule found no slot for (REQ-PIPE-064)."""
+    from qa_tools.common import supply_holds
+
+    with _connect("mothman:hold-raise") as conn:
+        supply_holds.raise_hold(
+            conn, dataset_id=decided.dataset_id, supply_id=decided.supply_id,
+            kind=supply_holds.ASSIGNMENT_RULE,
+            reason={"unavailable": [list(pair) for pair in decided.unavailable],
+                     "considered": list(decided.considered)},
+            raised_by=arrival.run_id, delivery=arrival.delivery_name)
 
 
 def _supply_id_for(arrival, dataset_id: str) -> str:

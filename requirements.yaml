@@ -13952,7 +13952,7 @@ requirements:
       hold is a piece of work I can pick up rather than a message that
       scrolled past in one run output.
     moscow: must
-    status: not_started
+    status: in_progress
     source: >
       REQ-DASH-070's own unmet criterion 1 and supply_holds.py's own
       docstring ("THIS IS A DEAD END UNTIL SPRINT 12"), plus Thread E's
@@ -14072,6 +14072,75 @@ requirements:
         zero: every other dataset in the delivery is processed normally,
         and any cross-table check reading a held table reads RED naming
         it.
+
+      - >
+        Decided a hold is its OWN TABLE (`qa.hold`) rather than a NULL
+        slot in `qa.filing`, which is what the filing DDL's own comment
+        anticipated. Two reasons, and the second settles it. NFR 4 asks
+        the code to say which discipline a record follows, and these are
+        opposites: a filing is write-once because the rule must never
+        re-derive it against a schedule that has moved on, while a hold
+        is mutable because resolving it is the entire point. And a
+        DELIVERY-LEVEL hold has no filing to hang off at all -
+        REQ-PIPE-059 refuses to choose between two files, so writing a
+        filing row would be making that choice by another route. The
+        assignment-rule hold keeps its filing row as evidence of what
+        the rule saw; the open work item lives in the hold table, where
+        a decision can close it.
+      - >
+        Decided the RESOLUTION happens inside
+        `decision_log.apply_decision()` rather than in each caller, and
+        in the same transaction as the entry. It is the one place every
+        decision passes through, so no route can forget - the failure
+        otherwise is a hold outliving the decision that answered it, the
+        first time somebody adds a fifth route, and a queue asking for
+        work already done is how people stop reading the queue. Same
+        transaction, so the log and the hold cannot disagree.
+      - >
+        Decided a hold is matched to a decision on the ARRIVAL KEY,
+        never on the id. A decision names the physical table
+        `cp_clients__202605010100000000` and a hold names the supply
+        `cp-clients@202605010100000000`; matching on equality silently
+        resolves nothing, which is the worst available failure - the
+        decision lands, the hold stays, and nothing reports a problem.
+        Post-build-review #64's own lesson applied a second time.
+      - >
+        Decided the outstanding queue reads the hold store instead of
+        `qa.delivery.held`, and that swap IS the requirement rather than
+        a tidier source. A delivery record is written once and never
+        rewritten, so a hold read from one could never stop being
+        outstanding: resolving it changed nothing a reader could see.
+        Rejected keeping both sources - two answers to "what is held" is
+        how they come to disagree.
+      - >
+        Recorded a real consequence of the `hold.resolved_by` foreign
+        key, found by a failing test rather than predicted: a plain
+        `TRUNCATE qa.decision` is now refused by the KEY before the
+        append-only trigger is reached, so the message changed. Verified
+        all three routes still protect the log - CASCADE and naming both
+        tables both meet the trigger - and rewrote that test to assert
+        the guarantee on every route rather than one wording on one of
+        them.
+
+      - >
+        WHERE THE WORK STOPPED, 2026-09-30, recorded here rather than in
+        `unmet_criteria` because that field is for a BUILT requirement
+        and this one is not - criteria 9 and 10 are this requirement's
+        own next piece, not another sprint's. Criteria 1-8 are built and
+        tested; 5 was already built by the promotion work
+        (`should_promote`'s `held_without_slot` branch and
+        `may_arrival_classify`) and was verified rather than assumed.
+        What remains is one mechanism serving both: no check runs over a
+        DELIVERY-LEVEL hold already, because no view resolves a logical
+        name two files both claim, but an ASSIGNMENT-RULE hold resolves
+        to exactly one table, so a view is built and the checks run.
+        Making `create_run_views` record a held dataset as absent fixes
+        criterion 9 and gives criterion 10 its mechanism for free - a
+        cross-table check reading it goes red, and the resolution record
+        says why. Measured before starting rather than assumed: the
+        corpus holds ZERO holds of either kind, so the change moves no
+        recorded verdict today and does not pre-empt REQ-PIPE-079's
+        pending risk call.
 
   - id: REQ-PIPE-079
     title: QA runs against the period a supply is filed to, not against staging alone

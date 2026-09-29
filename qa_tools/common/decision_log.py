@@ -58,7 +58,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Iterator
 
-from qa_tools.common import qa_store, supply_db
+from qa_tools.common import qa_store, supply_db, supply_holds
 
 TABLE = f'"{qa_store.SCHEMA}".decision'
 
@@ -473,6 +473,19 @@ def apply_decision(conn: supply_db.SupplyConnection,
         _lock(conn, decision)
         _judge(conn, decision)
         entry_id = _insert(conn, decision)
+        # A DECISION ABOUT A HELD SUPPLY ENDS ITS HOLD (REQ-PIPE-078
+        # criterion 6), and it happens HERE because this is the one
+        # place every decision passes through. Doing it in each caller
+        # would mean a hold outliving the decision that answered it the
+        # first time somebody adds a fifth route - and a queue asking
+        # for work already done is how people stop reading the queue.
+        #
+        # IN THE SAME TRANSACTION as the entry, so the two cannot
+        # disagree: a rollback takes both, and there is no window where
+        # the log says resolved and the hold says waiting.
+        supply_holds.resolve_for_supply(
+            conn, dataset_id=decision.dataset_id, supply=decision.supply or "",
+            decision_id=entry_id)
         yield entry_id
 
 

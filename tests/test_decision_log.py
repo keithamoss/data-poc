@@ -233,13 +233,39 @@ class TestNothingCanChangeAnEntry:
                           "WHERE dataset_id = ?", [dataset])
         assert len(dl.decisions_for(conn, dataset)) == 1
 
-    def test_a_truncate_is_refused_by_the_database(self, conn, dataset):
+    @pytest.mark.parametrize("statement", [
+        'TRUNCATE "{s}".decision',
+        'TRUNCATE "{s}".decision CASCADE',
+        'TRUNCATE "{s}".hold, "{s}".decision',
+    ])
+    def test_a_truncate_is_refused_by_the_database(self, conn, dataset, statement):
         """The one that matters most, being the fastest way to lose the
         whole log - and this schema's own fixtures truncate qa.run
-        routinely."""
-        with pytest.raises(psycopg.Error, match="append-only"):
-            conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".decision')
+        routinely.
+
+        THREE FORMS, BECAUSE A SECOND GUARD APPEARED (REQ-PIPE-078).
+        `qa.hold.resolved_by` references this table, so a plain TRUNCATE
+        is now refused by the FOREIGN KEY before the trigger is reached
+        and the message says so instead. That is a stronger position
+        rather than a weaker one, and the way to keep it honest is to
+        assert the GUARANTEE - the log survives - on every route rather
+        than one wording on one of them. The two forms that get past the
+        key still meet the trigger.
+        """
+        with pytest.raises(psycopg.Error):
+            conn.execute(statement.format(s=qa_store.SCHEMA))
         assert len(dl.decisions_for(conn, dataset)) == 1
+
+    def test_the_two_routes_past_the_foreign_key_still_meet_the_trigger(
+            self, conn, dataset):
+        """A grant is bypassed by the owner and an FK is bypassed by
+        naming both tables, which is why the trigger is the guarantee
+        and the key is only the first thing in the way."""
+        for statement in (f'TRUNCATE "{qa_store.SCHEMA}".decision CASCADE',
+                           f'TRUNCATE "{qa_store.SCHEMA}".hold, '
+                           f'"{qa_store.SCHEMA}".decision'):
+            with pytest.raises(psycopg.Error, match="append-only"):
+                conn.execute(statement)
 
     def test_the_refusal_names_what_to_do_instead(self, conn, dataset):
         with pytest.raises(psycopg.Error, match="new entry"):

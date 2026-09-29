@@ -64,8 +64,16 @@ def _delivery(conn, name="monday", **overrides):
     several of these records describe states - a contested file, a
     hold - that would otherwise need a whole recognition set up to
     produce. What changed is only where the hand-built record lands.
+
+    A `held=` ENTRY ALSO RAISES A REAL HOLD (REQ-PIPE-078). The queue
+    stopped reading `qa.delivery.held` when holds got a store of their
+    own, because a delivery record is written once and never rewritten,
+    so a hold read from one could never stop being outstanding. Both
+    are written here because both are what really happens: the
+    recognition records what it saw, and the filing pass raises the
+    work item.
     """
-    from qa_tools.common import qa_store
+    from qa_tools.common import qa_store, supply_holds
 
     record = {"delivery": name, "received_at": "2026-09-01T09:00:00+08:00",
               "collections": ["child-protection"], "files": [], "held": [],
@@ -78,6 +86,13 @@ def _delivery(conn, name="monday", **overrides):
         [record["delivery"], record["received_at"], record["received_at"],
          json.dumps(record["collections"]), json.dumps(record["held"]),
          json.dumps(record["anomalies"])])
+    for entry in record["held"]:
+        supply_holds.raise_hold(
+            conn, dataset_id=entry["dataset_id"],
+            supply_id=f"{entry['dataset_id']}@{record['delivery']}",
+            kind=supply_holds.DELIVERY_LEVEL,
+            reason={"files": list(entry.get("files") or ())},
+            raised_by=f"run-for-{record['delivery']}", delivery=record["delivery"])
     for entry in record["files"]:
         conn.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".delivery_file '
@@ -447,3 +462,52 @@ class TestADatasetOnAnEndlessCalendarDoesNotTakeTheSurveyDown:
         from qa_tools.common import display_time
         assert display_time.format_period(real[0].name) in items[0].headline
         assert real[0].name not in items[0].headline
+
+
+class TestAHoldLeavesTheQueueWhenItIsResolved:
+    """REQ-PIPE-078 criterion 2, and the defect it exists to fix.
+
+    The queue used to read `qa.delivery.held`, a record written once
+    and never rewritten - so resolving a hold changed nothing a reader
+    could see and the queue went on asking for work already done.
+    """
+
+    def test_an_outstanding_hold_is_in_the_queue(self, tmp_path, clean_delivery_log):
+        with clean_delivery_log as conn:
+            _delivery(conn, "monday",
+                       held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
+        found = outstanding.survey(observations_dir=tmp_path)
+        assert [i.kind for i in found.items] == ["held-supply"]
+
+    def test_a_resolved_one_is_not(self, tmp_path, clean_delivery_log):
+        from qa_tools.common import decision_log as dl
+        from qa_tools.common import supply_holds
+
+        with clean_delivery_log as conn:
+            _delivery(conn, "monday",
+                       held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
+            with dl.apply_decision(conn, dl.Decision(
+                    agency_id="child-protection-family-support",
+                    collection_id="child-protection", dataset_id="cp-clients",
+                    action=dl.PROMOTE, supply="cp_clients__20260930060000000000",
+                    actor="keith@example.gov.au", actor_kind=dl.PERSON,
+                    effective_at="2026-09-30T06:00:00+08:00",
+                    to_slot="2026-Q3")) as entry_id:
+                pass
+            assert supply_holds.resolve(conn, dataset_id="cp-clients",
+                                         supply_id="cp-clients@monday",
+                                         decision_id=entry_id) is True
+        found = outstanding.survey(observations_dir=tmp_path)
+        # Only the HOLD is asserted on: promoting into 2026-Q3 closes
+        # the earlier unfilled slots, which is REQ-PIPE-063 working
+        # rather than residue from this test.
+        assert [i.kind for i in found.items if i.kind == "held-supply"] == []
+
+    def test_the_item_says_what_to_do_about_it(self, tmp_path, clean_delivery_log):
+        """NFR 2 - a hold nobody can clear is indistinguishable from a
+        bug, so the record carries the resolution path."""
+        with clean_delivery_log as conn:
+            _delivery(conn, "monday",
+                       held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
+        [item] = outstanding.survey(observations_dir=tmp_path).items
+        assert item.responses and any("file" in r for r in item.responses)

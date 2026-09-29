@@ -533,22 +533,29 @@ def holds_command() -> None:
     datasets a banner each is how people learn to ignore the whole
     class.
     """
-    from qa_tools.common import supply_holds
+    from qa_tools.common import qa_store, supply_db, supply_holds
 
-    # NOTHING IS RECORDED TO READ BACK YET. REQ-PIPE-062's filings are
-    # not written until promotion exists, so there is no committed
-    # store of holds either. This reports honestly rather than
-    # inventing one, and turns into a real read the moment that lands.
-    found = supply_holds.holds_in([])
-    console.print(found.summary())
-    if not found.needs_action:
-        console.print("[dim]Assignment is built but not yet recorded - see REQ-PIPE-062. "
-                       "Holds will appear here once filings are written.[/dim]")
-        return
-    for entry in found.supplies:
-        console.print(f"\n[yellow]{entry.dataset_id}[/yellow] - {entry.supply_id}")
-        for name, why in entry.unavailable:
-            console.print(f"  {name}: [dim]{why}[/dim]")
+    # A REAL READ SINCE REQ-PIPE-078. This used to print the summary of
+    # an empty in-memory aggregation and a line saying so, because
+    # holds lived for one run and there was nothing to read back. They
+    # have a store now, and a hold stays in it until a decision ends it.
+    with supply_db.connect(label="mothman:holds") as conn:
+        qa_store.ensure_schema(conn)
+        counted = supply_holds.tally(conn)
+        console.print(counted.summary())
+        if not counted.needs_action:
+            return
+        # THE TALLY ANSWERS THE HEADLINE AND THE ROWS ANSWER THE WORK.
+        # Counting is a GROUP BY rather than a read of every held supply
+        # (criterion 8); the detail below is fetched only once there is
+        # something to show, which at thirty datasets is the difference
+        # that matters.
+        for held in supply_holds.outstanding(conn):
+            console.print(f"\n[yellow]{held.dataset_id}[/yellow] - {held.supply_id} "
+                           f"[dim]({held.kind})[/dim]")
+            console.print(f"  {held.describe()}")
+            for response in held.responses:
+                console.print(f"  [dim]- {response}[/dim]")
 
 
 @supply_group.command("tidy")
