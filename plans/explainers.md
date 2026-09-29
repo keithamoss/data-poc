@@ -48,7 +48,7 @@ survives context compaction. Tick items off here as they land.
    section, or glossary entry only.
 5. [done] **The cast draft**: 4-5 characters for Keith to react to
    (#3, round 12).
-6. [todo] **Keith names external writing exemplars** (#3, style round
+6. [in progress: named, trait list being drafted] **Keith names external writing exemplars** (#3, style round
    4).
 7. [in progress: slice 1 with the scoper] **Requirements via `delivery-scoper`**, drafting from items
    1-4, then Keith's sign-off. Nothing is built before this.
@@ -1012,7 +1012,21 @@ survives context compaction. Tick items off here as they land.
      - **Anti-model:** the dense, caveat-heavy internal prose of
        `plans/` and `CLAUDE.md` is marked as the thing NOT to sound
        like.
-     - **Still to come:** Keith will name external examples himself.
+     - **External exemplars (Keith, 2026-09-29):** all four offered
+       were picked - Julia Evans (zines and blog), GDS blog posts,
+       Bartosz Ciechanowski's explainers, and Stripe/Monzo
+       engineering docs and blogs. Each pulls a different way (Evans
+       curious and first-person, GDS plain and narrative, Ciechanowski
+       patient and built up one step at a time, Stripe/Monzo tidy and
+       concrete), so the house standard takes TRAITS from each rather
+       than naming one voice to imitate.
+     - **How they are used: traits, not text** (Keith, 2026-09-29,
+       over short quoted extracts or a links-only list). The main
+       session reads them and writes down what makes each work -
+       sentence shape, openings, asides, how a diagram is introduced.
+       The writer gets that list, never pasted text. Why: no
+       copyright question, and no outside text in any agent's prompt,
+       which is one less prompt-injection route.
      - NOT picked as a model: the check explanations from REQ-QAC-024.
 
    **Paper check (2026-09-29).** With arXiv and the ACL Anthology now

@@ -4439,3 +4439,18 @@ Belongs with batch 5's check work.
     every install) and re-run `npm ci` when they differ. The same shape
     probably applies to `uv sync` and `dbt deps`, which the hook also
     treats as present-therefore-current.
+
+59. **[todo, 2026-09-29]** **[GitHub workflow & people]** Reminder:
+    move this repo over to a private repo. Keith, 2026-09-29 morning,
+    asked for it as a reminder later the same day, not as work to do
+    now. (He dictated "move this report over"; read as "this repo".)
+
+    Not new: `plans/dashboard.md` #2 has been parking this since
+    2026-09-18, and records the cost - free-plan GitHub Pages only
+    serves public repos. Much of that cost has since gone: the
+    dashboard stopped being built or deployed from GitHub Actions
+    with REQ-PIPE-089/092, so going private may cost less than #2
+    assumed. Check `plans/dashboard.md` #2 and #4 before moving.
+
+    When: Keith chose to have it folded into the evening "time to stop"
+    nudge rather than a separate timed reminder.

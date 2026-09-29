@@ -1722,6 +1722,12 @@ Rough layout:
       Evans' zines and the Illustrated Children's Guide to Kubernetes,
       the two style references Keith liked. No source repo, so
       snippet-only without allow-listing.
+    - **`ciechanow.ski`**, **`stripe.com`**, **`docs.stripe.com`**,
+      **`monzo.com`** (2026-09-29, re-confirmed alongside `jvns.ca`) -
+      three of the four external writing exemplars Keith named for the
+      explainers (`plans/explainers.md` #3, style round 4). The house
+      standard takes TRAITS from each, so they need reading in full,
+      not from snippets. The fourth, the GDS blogs, is reachable.
     - **`www.stylemanual.gov.au`**, **`www.gov.uk`**,
       **`developers.google.com`** - plain-language writing standards.
       The Australian Government Style Manual is the obvious house
