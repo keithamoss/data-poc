@@ -1722,6 +1722,13 @@ Rough layout:
       Evans' zines and the Illustrated Children's Guide to Kubernetes,
       the two style references Keith liked. No source repo, so
       snippet-only without allow-listing.
+    - **`viewscreen.githubusercontent.com`** (2026-09-29, found by
+      `delivery-scoper` scoping explainers slice 1, re-confirmed with a
+      real `curl: (56) CONNECT tunnel failed, response 403`) - the host
+      GitHub renders Mermaid diagrams from. `github.com` pages load, but
+      their diagrams do not, so an agent reviewing a pushed explainer on
+      GitHub would see it with no diagrams. Whether to allow-list it is
+      `plans/explainers.md` #3's slice-1 question Q1.
     - ~~**`ciechanow.ski`**, **`stripe.com`**, **`docs.stripe.com`**,
       **`monzo.com`**, **`jvns.ca`**~~ - ALLOW-LISTED by Keith
       2026-09-29 and re-verified with a real `curl` (all 200). First hit

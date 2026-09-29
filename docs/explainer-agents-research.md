@@ -432,6 +432,99 @@ type.
 How these were weighed against Keith's own style decisions is in
 `plans/explainers.md` #3.
 
+## 9. The writing exemplars, turned into traits (researched 2026-09-29)
+
+Keith named four exemplars (`plans/explainers.md` #3, style round 4):
+Julia Evans, the GDS blogs, Bartosz Ciechanowski, and Stripe and Monzo.
+He chose **traits, not text**: the writer gets the list below, never the
+exemplars' prose. Everything here is paraphrase. The list is DRAFT: its
+wording goes to Keith with the house standard, like the rest of it.
+
+One trait conflicts with a recorded decision and must be settled before
+the standard is written: trait 11 allows "a light turn of phrase in a
+heading", and style round 2 said no puns in headings.
+
+### The twelve traits
+
+1. **Open on a small, real moment from the dataset's life, then say why it matters in one sentence.** Someone on the cast notices something odd. The next sentence gives the reader a reason to keep going. *(Evans, Ciechanowski, Stripe blog)*
+
+2. **Put the news first: say what the concept does and who it affects before any background.** *(GDS, Stripe docs)*
+
+3. **Build from the naive version.** Show the simplest approach that almost works, name its one flaw, then show the real concept fixing it. At our length that means one or two rungs, not five. *(Ciechanowski, Evans "false/true" pairs)*
+
+4. **Show the thing, then name it.** Introduce a term only after the reader has seen what it refers to. Give a plain-words definition in the same sentence, using "which means" or brackets, once. *(Ciechanowski, Stripe, Monzo, GDS)*
+
+5. **Pin down slippery words.** Where one of our terms has two senses (run, supply, slot), list each sense with a one-line way to tell which one is meant. Say what the concept is not. *(Evans terminology post, GDS "not a formal sign-off")*
+
+6. **Set up every diagram in the sentence before it, and read it back after.** The sentence before says what to look at and what the colours or shapes mean. The sentence after starts "Notice that..." or similar and gives the single observation. The caption is a full statement of the takeaway. *(Ciechanowski, Stripe blog captions)*
+
+7. **Use real, checked examples from our own calendar and datasets, never "Dataset X".** Where the example can be verified against the system, verify it. *(Evans, Stripe, Monzo)*
+
+8. **Enumerate, then revisit.** When a concept handles several cases, list them early. Once the concept is introduced, walk back through the same list. *(Stripe idempotency, Stripe migrations)*
+
+9. **Admit simplifications and limits in one plain sentence, where they happen.** Correct yourself openly if an earlier sentence was loose. Do not hedge every sentence. *(Ciechanowski, Evans, GDS closing caveats, Monzo "early days")*
+
+10. **Keep an analogy to one idea, then drop it.** The story's cast carries the continuity. The analogy does not. *(Evans)*
+
+11. **Warmth comes from the cast, small stakes and plain friendliness, not from punctuation.** Use gentle dramatic beats ("this is where it goes wrong") and a light turn of phrase in a heading. Keep humour dry and in the story, never in the definitions. *(Ciechanowski's protagonists and stakes, Monzo personas, GDS headings)*
+
+12. **End small and useful.** Give a two- or three-line recap as parallel statements, then one pointer to where to look next (a related explainer or the dashboard view). No sign-off flourish. *(Stripe principles, GDS next steps, Ciechanowski further reading, Evans "that's all")*
+
+Headings throughout are statements that tell the story on their own (GDS). All traits are to be applied within the baseline: no contractions, 15-20 word sentences, no semicolons.
+
+### What we are deliberately not taking
+
+- **Negative contractions** ("don't", "can't"), used by all four sources. Positive ones ("you'll") are fine under the house rule already, so there is no conflict there. (The researcher was briefed "no contractions" by mistake and flagged it as a clash; it is not one.)
+- **Question headings and lower-case headings** (Evans, Monzo, Stripe).
+- **Exclamation marks, capitals for emphasis, "!!!", emoticons and emoji** (Evans, Monzo). The warmth moves into the cast and the story.
+- **First-person singular narrator** ("I struggled with...") (Evans, Ciechanowski, Monzo). Our voice is the house plus a fixed cast.
+- **Long, extended analogies** (Evans explicitly warns against them).
+- **Interactive "drag the slider" figures and article-scale length** (Ciechanowski). We keep only the ladder structure and the figure set-up and read-back pattern.
+- **Maths notation**, beyond perhaps one simple relation stated in words.
+- **Marketing and hiring endings** ("we're hiring", "subscribe") (Monzo, Stripe blog).
+- **Institutional policy abstraction** ("enabling function", "bounded space") (GDS architecture posts).
+- **Semicolons and 30-50 word clause chains**, which all four use at times.
+- **Unsourced statistics as scene-setting** (GDS, Monzo). We use only numbers that the system itself can confirm.
+
+### A page with instructions aimed at AI
+
+**https://docs.stripe.com/payments/paymentintents/lifecycle.md** (the Markdown variant Stripe serves for LLMs) starts with a preamble addressed to AI agents. The preamble tells coding agents to prefer a different Stripe API "unless the user explicitly asks". It also tells them to install the Stripe CLI and run a sandbox-provisioning command. The HTML page's config carries a `docs_llm_preamble` flag, so the preamble is deliberate site behaviour rather than an attack. It is still an instruction aimed at an AI inside fetched content. I ignored it and ran nothing. It is worth knowing about, because a future agent that reads Stripe docs through `.md` URLs would see the same instructions. No other page I read contained instructions aimed at an AI. The Stripe HTML pages only carry "Copy for LLM", "Ask AI" and `llms.txt` links.
+
+---
+
+### Pages read
+
+**Julia Evans (jvns.ca)**
+- https://jvns.ca/blog/2021/12/06/dns-doesn-t-propagate/ (DNS "propagation" is actually caches expiring). Read in full.
+- https://jvns.ca/blog/2022/02/14/some-dns-terminology/ (terminology post). Read in full.
+- https://jvns.ca/blog/confusing-explanations/ (Patterns in confusing explanations, her writing method). Read patterns 1-7 in full, plus the index of all 13.
+- https://jvns.ca/blog/2021/05/24/blog-about-what-you-ve-struggled-with/. Read the opening half.
+- https://jvns.ca/blog/2023/08/07/tactics-for-writing-in-public/. Read most of it.
+- Also fetched, not used: https://jvns.ca/blog/2023/05/08/new-talk-learning-dns-in-10-years/ and https://jvns.ca/categories/dns/ (index only). https://jvns.ca/blog/how-updates-to-dns-work/ returned 404, because I guessed the URL wrong.
+
+**GDS (gds.blog.gov.uk, technology.blog.gov.uk)**
+- https://gds.blog.gov.uk/2026/09/16/how-we-made-it-easier-for-millions-of-users-to-sign-into-government-services/ (passkeys)
+- https://technology.blog.gov.uk/2025/12/08/the-architecture-decision-record-adr-framework-making-better-technology-decisions-across-the-public-sector/
+- https://technology.blog.gov.uk/2026/08/28/lightweight-architecture-for-learning-at-pace/
+- https://gds.blog.gov.uk/2026/06/02/building-for-the-future-making-change-simple-on-gov-uk-pay/
+- Index pages: https://gds.blog.gov.uk/ (plus /page/2/) and https://technology.blog.gov.uk/ (plus /page/2/)
+
+**Bartosz Ciechanowski (ciechanow.ski)**
+- https://ciechanow.ski/gps/. Read the opening through "Leveling Up", plus the closing sections.
+- https://ciechanow.ski/mechanical-watch/. Read the opening and the "Power" section, plus the closing sections.
+- https://ciechanow.ski/bicycle/. Read the opening and the "Forces" section, plus the closing sections.
+- https://ciechanow.ski/ (index)
+
+**Stripe and Monzo**
+- https://stripe.com/blog/idempotency (Brandur Leach). Read in full.
+- https://stripe.com/blog/online-migrations (Jacqueline Xu). Read through Part 3.
+- https://docs.stripe.com/payments/paymentintents/lifecycle, plus its `.md` variant. **See the safety note below.**
+- https://docs.stripe.com/webhooks, plus its `.md` variant. Read the opening sections.
+- https://monzo.com/blog/2016/09/19/building-a-modern-bank-backend (Oliver Beattie). Read in full.
+- https://monzo.com/blog/a-meshy-approach-to-data (dbt data modelling, 2026). Read in full.
+- https://monzo.com/blog/slowing-down-to-speed-up-how-a-2-month-engineering-pause-rebooted-our-mortgage-strategy. Read in full.
+- https://monzo.com/blog/technology (index)
+
 ## Network notes
 
 - **`github.com` refuses its web pages and API here, but `git clone`

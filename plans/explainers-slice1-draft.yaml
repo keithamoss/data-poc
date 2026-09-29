@@ -1,0 +1,628 @@
+# DRAFT, NOT THE REGISTER. delivery-scoper's slice-1 drafts for the explainer team
+# (plans/explainers.md #3). Kept here only so they survive the container;
+# they move into requirements.yaml once Keith's twelve questions are answered,
+# and this file is deleted in that same commit. Nothing here is signed off.
+- id: REQ-DOCS-115
+  title: One approved writing standard for explainer prose
+  date_written: "2026-09-29"
+  story: "As whoever writes, illustrates or reviews an explainer, I want one approved written standard for how explainer prose reads, so that every page sounds like the same colleague and can be held to the same rules."
+  moscow: must
+  status: not_started
+  source: "Keith, designed across plans/explainers.md item 3 (style rounds 1 to 5, the GOV.UK research and the baseline switch), 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL hold the explainer house standard in exactly one file, and every docs-* agent SHALL take its rules from that file rather than from wording copied into its own prompt."
+    - "THE SYSTEM SHALL NOT add, remove, renumber or reword any rule in the house standard without Keith's approval of the exact wording."
+    - "THE HOUSE STANDARD SHALL name GOV.UK's writing guidance as its baseline and SHALL mark each rule that is Keith's own preference layered on top of it."
+    - "THE HOUSE STANDARD SHALL state the voice: a senior colleague at a whiteboard, 'you' for the reader and 'we' for a choice the project made, warm and lightly playful, with wry asides allowed in body text only."
+    - "THE HOUSE STANDARD SHALL forbid puns and humour in page titles and headings, and SHALL require headings and titles to be statements rather than questions."
+    - "THE HOUSE STANDARD SHALL state the mechanics Keith settled - Australian spelling, the Oxford comma always, a spaced en dash for a break in a sentence, a 25-word sentence cap with a 15 to 20 word aim, paragraphs of at most five sentences, no semicolons, no eg, ie or etc, 'cannot' and 'do not' rather than those contractions, 'to' in ranges, '11:59pm' rather than 'midnight', dates in the '29 September 2026' form, and GOV.UK's numbers rule."
+    - "THE HOUSE STANDARD SHALL require a named period to be given with its due date on first use on each page, in the form 'the 2026-Q3 period (supply due 1 August 2026)', and plain thereafter."
+    - "THE HOUSE STANDARD SHALL list the four banned categories - AI-voice words, condescension, corporate filler and rhetorical tics - each with its examples."
+    - "THE HOUSE STANDARD SHALL require a new term's first use on a page to be bold, defined in one plain clause in the same sentence and linked to its glossary entry, and SHALL reserve bold for that use alone."
+    - "THE HOUSE STANDARD SHALL require every invented term to be spelled exactly as its canonical glossary entry spells it, and SHALL require GOV.UK's words-to-avoid to be avoided wherever they are not a defined Mothman term."
+    - "THE HOUSE STANDARD SHALL require status names in lowercase plain text, and prose first with lists only for real sets."
+    - "THE HOUSE STANDARD SHALL name CHANGELOG.yaml's reader voice as the model and the internal prose of plans/*.md and CLAUDE.md as the anti-model."
+    - "THE HOUSE STANDARD SHALL keep its explanation-specific rules in a section of their own, so that rules for a second document type can be added beside them without restructuring the file."
+  non_functional_requirements:
+    - "The standard is an authoring standard in exactly the sense CLAUDE.md's standing rule means: hundreds of hand-authored sentences will be held against it, so a clause that reads one way to Keith and another to the agent applying it is the failure this gate exists for. Approval of the substance is not approval of the wording."
+    - "Single copy, the same reasoning as CHANGELOG.yaml's header (REQ-DOCS-028): two copies of a style rule drift, and nothing says which one wins."
+    - "Every rule in it should be one a reader of the finished page could check, either by eye or by the validator (REQ-DOCS-122). A rule nobody can check is a rule the critic will interpret differently on each run."
+    - "It must be readable on GitHub as plain markdown with no build step, because slice 1 has no dashboard tab."
+    - "Designed for reuse by the pipeline docs (plans/explainers.md item 2, 'Running Mothman'), but this requirement builds only the explanation rules. How-to and reference rules are item 2's own scoping."
+  dependencies: []
+  decisions:
+    - "Decided GOV.UK's writing guidance is the baseline (Keith, 2026-09-29, 'Fine, ignore the style manual. GovUK is a bit better anyway'). The Australian Government Style Manual was the first baseline, rejected once its own host refused scripted clients and GOV.UK's guidance was read in full. Australian spelling stays, as Keith's preference rather than a Style Manual rule."
+    - "Decided headings and titles are STATEMENTS (style round 5), reversing style round 1's 'mostly questions'. The why-question lives in the brief and the page's opening answer instead. GOV.UK's reason was accepted - question headings are hard to front-load."
+    - "Decided new terms stay BOLD rather than GOV.UK's single quotes (style round 5). GOV.UK's real concern, bold used for emphasis, is met by reserving bold for defined terms only."
+    - "Decided the Oxford comma ALWAYS, a deliberate departure from both the Style Manual and GOV.UK (style round 2). The spaced en dash is Keith's own too - GOV.UK has no rule for it."
+    - "Decided humour narrows to wry asides in body text (style round 5). Puns come out of headings and titles, where they cost skimming and search. Not picked in style round 1 - Australian references and idiom, or keeping all the humour inside the cast's stories."
+    - "Decided dates follow the '29 September 2026' form even though the dashboard has its own single date format (REQ-DASH-071). Keith chose this over matching the dashboard, accepting that an explainer and the dashboard may show a date differently."
+    - "Decided numbers follow GOV.UK - 'one' in words unless it is a step or list point, numerals for everything else including 2 to 9. This closed plans/explainers.md queue item 8; the Style Manual's rule is no longer needed."
+    - "Decided a named period is given with its DUE DATE on first use, not its months. The earlier answer, 'term plus months', rested on a wrong example - Mothman's quarterly periods are authored dates anchored on 1 February, May, August and November, deliberately not calendar quarters, so 2026-Q3 is not July to September. A WA reader could also read Q3 as a financial-year quarter."
+    - "Decided GOV.UK's words-to-avoid that are real Mothman terms - promote, deliver, assets, issues - are KEPT as terms and defined in the glossary, rather than renamed. GOV.UK's own rule is to explain specialist terms. In general prose GOV.UK is followed ('problems', not 'issues')."
+    - "Decided the exemplars - model CHANGELOG.yaml's reader voice, anti-model plans/ and CLAUDE.md. Not picked as a model - the check explanations from REQ-QAC-024. External exemplars are still to come from Keith (queue item 6)."
+    - "Decided NOT to adopt GOV.UK's separate accessible title and description per diagram as a writing rule; the diagram caption does that job (see REQ-DOCS-118)."
+    - "Decided the standard is written general enough for a second document type (round 12), because the same team is expected to write 'Running Mothman' later. Only explanation rules are written now."
+  open_questions:
+    - "WHERE the single copy lives - as the SKILL.md of the one preloaded skill every docs-* agent names in `skills:`, or as a page under docs/explainers/ that the agents read on demand. Asked of Keith in the scoper's report; the answer also decides whether CLAUDE.md's authoring-standard rule needs to name the file, or whether the explainers rule already covers it."
+    - "External writing exemplars (plans/explainers.md queue item 6) are not named yet. Proposed that the standard ships without them and gains them when Keith names them - asked in the scoper's report."
+    - "Three GOV.UK rules from the live research were never explicitly adopted or rejected - no heading may use a term before the page has explained it, redefine terms on every page rather than only in the glossary, and a page summary of 160 characters or fewer. Asked in the scoper's report."
+
+- id: REQ-DOCS-116
+  title: Every explainer page has the same four fixed parts and cites only citable sources
+  date_written: "2026-09-29"
+  story: "As a manager or a new engineer opening an explainer, I want the answer at the top, the reasoning in one place and the sources at the end, so that I can stop reading as soon as I have what I came for and trust what I read."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 3 rounds 1, 4, 5, 10 and style rounds 3 and 5, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE HOUSE STANDARD SHALL leave a page's shape free-form apart from four required parts - an 'In short' box, an opening answer to the page's why-question, a short 'why it's this way' section, and a 'where this comes from' list."
+    - "THE HOUSE STANDARD SHALL require the 'In short' box to sit at the top of the page, to run to three or four sentences, and to open with the one-sentence answer to the page's why-question."
+    - "THE HOUSE STANDARD SHALL require the 'why it's this way' section to hold two to four bullets drawn from the cited requirements' decisions, saying what was chosen, what was rejected, and why."
+    - "THE HOUSE STANDARD SHALL require the 'where this comes from' list to be the last section of the page and to name every requirement id and config or code file the page rests on."
+    - "THE HOUSE STANDARD SHALL NOT allow requirement ids, file names or code identifiers in the body of a page outside that list."
+    - "THE HOUSE STANDARD SHALL require links a reader needs, to the glossary or a related page, to appear inline where they are relevant, and SHALL NOT allow them to appear only in the closing list."
+    - "THE HOUSE STANDARD SHALL set a page's length at about 500 to 800 words excluding diagrams, and SHALL direct deeper detail to another page by link."
+    - "THE HOUSE STANDARD SHALL define a citable source as a requirement in requirements.yaml, or a specific config or code file, and SHALL NOT treat any file under plans/ or CLAUDE.md as citable."
+    - "WHERE a page explains a concept whose requirement is signed off but not built, THE HOUSE STANDARD SHALL require the page to badge it 'designed, not built yet'."
+    - "THE HOUSE STANDARD SHALL define the front matter every page carries - the page's why-question, its group, its cited sources, its status as draft or signed off, and, once signed, who signed it off and when, a last-reviewed date and a review-by date."
+  non_functional_requirements:
+    - "Answer-first is not decoration. GDS found concept pages are the type readers skip most, and slice 2's 'What's this?' links will land a confused reader straight onto one - the first sentence has to carry the answer on its own."
+    - "The citable-source rule is what makes slice 2's staleness gate workable at all: plans/*.md and CLAUDE.md churn daily, and a page fingerprinting them would fail the gate constantly. Slice 1 has no gate, but a page written against the wrong rule now would need rewriting then."
+    - "The front matter fields are defined now so that slice 2 only ADDS fingerprints and checking, and does not have to re-open every page already signed. The checks themselves are deferred to explainers slice 2."
+    - "Compatibility: the four fixed parts have to render as plain markdown on GitHub (Mermaid 11.17.2 at last test) with no custom HTML, because REQ-DOCS-122 rejects raw HTML."
+  dependencies:
+    - REQ-DOCS-115
+  decisions:
+    - "Decided free-form page shape (round 5), chosen over a fixed skeleton and over 'required elements, free order'. Two answers in the same round fix the 'In short' box and the 'why' section; round 1's why-question and the cited sources make four fixed parts."
+    - "Decided two readers on one page (round 5) - an 'In short' box a manager can stop after, and the rest for the engineer. Rejected separate reading paths per audience; GDS's 'Documenting APIs' also warns against organising documentation by user type."
+    - "Decided 500 to 800 words, readable in three to four minutes (round 5)."
+    - "Decided the 'why it's this way' section is drawn from requirements' decisions fields (round 5), because they are exactly Diataxis's 'choices, alternatives, reasons' raw material."
+    - "Decided identifiers live only in the closing sources list (style round 3), keeping the body clean for managers."
+    - "Decided the sources list STAYS at the end despite GOV.UK's 'do not gather links at the bottom' (style round 5), because it is provenance rather than further reading - and inline links carry anything a reader actually needs."
+    - "Decided plans/*.md is NEVER citable (round 4) because it is working material deleted as requirements land. The writer may read it for background (round 10)."
+    - "Decided designed-but-unbuilt concepts ARE explained, clearly badged (item 4, Keith's calls), and every such page is revisited as the build lands."
+    - "Decided the boundary with REQ-QAC-024 (item 1): that requirement explains each CHECK in plain English; an explainer explains a CONCEPT - a supply, a slot, promotion, the worst-of rollup. A check's plain-English fields get only a glossary entry and one line in 'what a check is' (triage #29)."
+    - "Decided a concept with two halves is SPLIT and CROSS-LINKED (the two-track sweep): the explainer covers what it means and why, a Running Mothman how-to covers the steps, each links to the other and neither repeats the other. The links wait until item 2's pages exist."
+    - "Decided each page records a last-reviewed and a review-by date alongside its sign-off (Keith's calls on the live research), because a fingerprint catches a changed source but not a world that changed while no cited file did. Suggested review period six months; the date check itself is explainers slice 2."
+  open_questions:
+    - "Whether a page may cite a requirement that is NOT signed off. REQ-PIPE-110 to 113 are unsigned and the claim-windows page would lean on them. Asked in the scoper's report."
+
+- id: REQ-DOCS-117
+  title: A fixed cast, and stories that are about data, never the people in it
+  date_written: "2026-09-29"
+  story: "As a reader working through several explainers, I want the same small cast in every story, so that I get to know them, and I want every story to stay clear of the people the data describes, so that nothing here trivialises child protection or birth records."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 3 round 4, round 12, round 15 and 'The cast', 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE HOUSE STANDARD SHALL define a fixed cast once, giving each member a name, a role, an agency or team, one personality trait and what they typically struggle with."
+    - "THE HOUSE STANDARD SHALL NOT change the cast's wording without Keith's approval of the exact text."
+    - "THE HOUSE STANDARD SHALL name one cast member as the reader's stand-in, and that description SHALL match the critic's persona in REQ-DOCS-127."
+    - "THE HOUSE STANDARD SHALL name one cast member as the voice of the 'In short' box."
+    - "THE HOUSE STANDARD SHALL define the Mothman mascot, and SHALL limit it to some diagrams and the odd aside, never a heading."
+    - "THE HOUSE STANDARD SHALL require every story to concern files, deadlines and decisions, and SHALL NOT allow a story about the children, families or births the data describes."
+    - "THE HOUSE STANDARD SHALL NOT allow a realistic case, or an invented personal detail such as a child's name, a date of birth or a family circumstance, anywhere on a page, including in a diagram or an example row."
+    - "IF a page breaches the sensitivity rule, THEN THE SYSTEM SHALL treat the breach as a blocker-severity finding."
+    - "THE HOUSE STANDARD SHALL state that the cast is introduced in the overview page's one-supply journey, and SHALL say how a page read before the overview introduces a cast member it uses."
+  non_functional_requirements:
+    - "PRIVACY, and the reason this is a must: the real collections behind this PoC include child protection. A page that is fine for synthetic data is still published publicly on GitHub the moment it is pushed, and would be read by exactly the people a careless story would offend. The rule has to hold as if the data were real, because in a real deployment it is."
+    - "The rule applies to invented detail as much as to real detail. An agent that never reads data/ can still invent a plausible child - which is why REQ-DOCS-124 keeps the agents away from data AND this rule forbids invention."
+    - "The cast's names must not collide with contract/people.yaml's placeholder colleagues or any real person the project names, so a reader never confuses a story character with someone who can actually take a decision."
+  dependencies:
+    - REQ-DOCS-115
+  decisions:
+    - "Decided a fixed cast, defined once and reused (round 4), so readers get to know them - the Phippy pattern from the Illustrated Children's Guide to Kubernetes."
+    - "Decided the cast's first draft - Priya (a supplier's data steward), Sam (a data engineer new to the asset team, the reader's stand-in), Jo (the operator who makes filing decisions), Marcus (the team manager, voice of 'In short'), Lin (a downstream researcher) - plus the Mothman mascot. Keith approves the exact wording when the standard is written."
+    - "Rejected Monty Python names. Keith first picked them to match contract/people.yaml's placeholders, then, seeing the re-cast (Galahad, Patsy, Tim the Enchanter, Bedevere, Roger the Shrubber), chose regular Australian names instead."
+    - "Decided the reader's stand-in MATCHES the critic's persona, so the stories and the critic test the same reader."
+    - "Decided the cast is introduced in the overview page's one-supply journey (round 15), so later stories can assume the reader knows them."
+    - "Decided the sensitivity guardrail (Keith's call) - stories are about data, never the people in it - and that the critic flags a breach as a BLOCKER."
+  open_questions:
+    - "How a page read BEFORE the overview introduces a cast member it uses, given the overview is not in slice 1. Depends on which page goes first - asked in the scoper's report."
+
+- id: REQ-DOCS-118
+  title: Diagrams that explain, look the same everywhere, and can be read by a screen reader
+  date_written: "2026-09-29"
+  story: "As a reader on GitHub today and on the dashboard later, I want every explainer diagram to argue a point, look the same in both places and carry a description a screen reader can announce, so that the pictures teach rather than decorate."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 1 fourth round, item 3 round 6 and Keith's calls on the live GOV.UK research, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE HOUSE STANDARD SHALL allow the hand-drawn look only on flowchart, state, class and ER diagrams, and SHALL require any other diagram type to use the plain look."
+    - "WHERE a concept's natural shape is one the hand-drawn look does not support, THE HOUSE STANDARD SHALL require the right shape in the plain look rather than a supported shape bent to fit."
+    - "THE HOUSE STANDARD SHALL require every Mermaid block to state its look and its theme explicitly."
+    - "THE HOUSE STANDARD SHALL fix one handDrawnSeed value for every hand-drawn diagram."
+    - "THE HOUSE STANDARD SHALL define a shared colour palette, tested in light and dark mode and matched to the dashboard, and SHALL require every classDef to set fill, stroke and text colour."
+    - "THE HOUSE STANDARD SHALL require every diagram to carry a one-line caption saying what it shows, and SHALL require the same text as the diagram's accTitle and accDescr."
+    - "THE HOUSE STANDARD SHALL require every diagram to still make sense rendered in the plain look."
+    - "THE HOUSE STANDARD SHALL require every diagram to pass the two argue-not-decorate tests - with every label stripped the shape still carries the idea, and a reader could learn something from it."
+    - "THE HOUSE STANDARD SHALL NOT allow a Mermaid click directive or any directive that touches securityLevel."
+  non_functional_requirements:
+    - "COMPATIBILITY across two renderers: GitHub renders Mermaid 11.17.2 (tested 2026-09-28) while slice 2 will vendor 12.x, and version 12 changed defaults for about ten diagram types. Explicit look and theme are what make the two copies match; the plain-look rule is what keeps a page readable if GitHub changes version without notice."
+    - "ACCESSIBILITY: Mermaid exposes an accessible name only through accTitle and accDescr in the source (GDS Way, 'Diagrams as code'). A visible caption alone is not announced, so the caption has to be carried into the source, and REQ-DOCS-122 checks it mechanically rather than by review."
+    - "STABILITY: the default seed of 0 re-randomises the wobble on every render, so without a fixed seed two renders of an unchanged page differ, and a before/after comparison of a page is noise."
+    - "SECURITY: click directives and securityLevel overrides are the Mermaid surface that could turn a diagram into a link to anywhere or into script. They are forbidden in the standard and rejected by REQ-DOCS-122, and slice 2 initialises Mermaid strict as a second layer."
+  dependencies:
+    - REQ-DOCS-115
+  decisions:
+    - "Decided hand-drawn only where it fits, and only on the four types Mermaid supports it for that GitHub's 11.17.2 also has - flowchart (11.0), state (11.0), class (11.4), ER (11.5) (Keith, 2026-09-28)."
+    - "Decided correctness beats consistency (round 6): use a plain timeline or gantt where that is genuinely clearest. This settled the tension that the first topic, claim windows, is naturally a timeline."
+    - "Verified empirically that GitHub renders the hand-drawn look (Keith viewed a temporary test page, 2026-09-28, since deleted) - a hand-drawn flowchart rendered visibly differently from the plain one, and a hand-drawn state diagram rendered hand-drawn."
+    - "Decided all three on every diagram (round 6) - a one-line caption, a shared palette tested in light and dark, and one fixed handDrawnSeed."
+    - "Decided accTitle and accDescr are GENERATED from the caption (Keith's calls on the live research), so the illustrator writes it once and the validator checks the copy. Rejected a separate accessible title and description written by hand (style round 5), as a second text that could drift."
+    - "Decided 'as many diagrams as it takes' (round 6) - the illustrator's call, with the critic flagging excess."
+    - "Carried from the research, not individually voted on: 'diagrams should argue, not display' and its two tests (mgranberry), and Julia Evans' own anti-pattern, 'fun illustrations on dry explanations'."
+  open_questions:
+    - "A group page's overview diagram was meant to have nodes linking to the concept pages (item 4), but that needs Mermaid's click directive, which this standard forbids and strict mode disables. Asked in the scoper's report; no group page is in slice 1, but the standard must say which way it goes."
+
+- id: REQ-DOCS-119
+  title: A glossary seed, one canonical word per concept
+  date_written: "2026-09-29"
+  story: "As a reader meeting a Mothman term for the first time, I want one glossary that gives each invented term its one canonical spelling, a one-line definition and where it is explained, so that I never have to guess whether two words mean the same thing."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 3 rounds 1, 3 and 4, the naming session (rounds 1 to 3) and its glossary canon, the re-baseline decisions and round 15's placeholder names, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL hold one glossary of the project's invented terms at docs/explainers/glossary.md."
+    - "THE SYSTEM SHALL give every glossary entry its canonical term, its exact spelling, a one-line definition, its aliases, the requirement or requirements that define it, and the explainer page that covers it or a mark that none does yet."
+    - "THE SYSTEM SHALL list every alias and retired word as pointing at its canonical term, and SHALL NOT give an alias a definition of its own."
+    - "THE SYSTEM SHALL seed the glossary with every canonical term and alias the naming session settled, and with the terms the first explainer (REQ-DOCS-130) uses."
+    - "THE SYSTEM SHALL mark the three asset-shape names - scheduled asset, one-off extraction and sample - as draft placeholders."
+    - "THE SYSTEM SHALL define promote, deliver, asset and issue as Mothman terms, in line with REQ-DOCS-115's rule on GOV.UK's words-to-avoid."
+    - "THE SYSTEM SHALL show delivery, arrival and supply nested in one small diagram in the glossary, and SHALL show the delivery agreement and the supply calendar as two related entries, one inside the other."
+    - "THE SYSTEM SHALL badge an entry whose concept is signed off but not built 'designed, not built yet'."
+    - "THE SYSTEM SHALL NOT add or change a glossary entry unless Keith has approved it, either directly or at an /explain brief checkpoint."
+  non_functional_requirements:
+    - "The glossary sits under docs/explainers/, so CLAUDE.md's standing rule 'never change an explainer without Keith's approval' already covers it. A building session that renames a term in code reports which glossary entry it affects and does not edit the entry itself."
+    - "MAINTAINABILITY: plans/explainers.md queue item 9 flags five renames in code and requirements (delivery calendar to supply calendar, the sample schema, /accept to acknowledge, cycle to period, stale to no data). Each one will ripple into this file, so aliases carry the old words rather than the old words being deleted."
+    - "Machine-readable enough for two later readers: REQ-DOCS-121's recall check needs each entry's defining requirement, and slice 2's searchable glossary panel needs the entries. Both must parse the ONE file, not a second copy of it."
+    - "Scale: the page list has 32 concept pages and far more terms. One file must stay readable by eye at that size, which argues for one short line per entry rather than paragraphs."
+    - "Security: the glossary is published publicly and embedded in the dashboard in slice 2, so REQ-DOCS-122's validator applies to it exactly as to a page."
+  dependencies:
+    - REQ-DOCS-115
+  decisions:
+    - "Decided a first-class glossary (round 1): one file, one-line definition, exact spelling, and the explainer that covers it. The writer uses terms exactly as defined."
+    - "Decided the writer PROPOSES and Keith APPROVES (round 3). New or changed terms appear in the brief, Keith approves them at the brief checkpoint, and only then are they added, so the glossary cannot drift without him seeing it."
+    - "Canon from the naming session, canonical then aliases - demote, always with its destination (to staging or to rejected), alias un-decide; substitute and substituted, aliases standing in and last good one; inherit, distinct from substitute because nobody decides it; carry forward RETIRED, because it also means supplies for the following period; resupply means an arrival into a filled slot; supply calendar, alias delivery calendar; in development, aliases pre-agreement, calendar-less, not yet agreed; sample reserved for the practice-data asset shape; recency for the check category, alias ODCS timeliness; acknowledge for amber, alias accept; overdue, no data, recency and freshness distinct, with stale an alias of no data; delivery, arrival and supply distinct; QA run and trial (never 'trial run'); waiting on a person, with blocked kept for a healthy table whose check cannot run because a neighbour is missing or held; period, alias cycle; In place on, alias as of."
+    - "Decided 'early', 'on time' and 'late' are only ever about arrivals, and 'recency' is the content check, so 'timeliness' never appears unqualified."
+    - "Decided the built status-inferred resupply chain (REQ-QAC-008) is NOT explained (triage #27, 'explain the new model instead'). This overrode the naming session's note that it would be explained separately."
+    - "Decided (re-baseline) 'delivery agreement' and 'supply calendar' are nested and both kept - the agreement is what we agreed with a supplier (REQ-PIPE-110), the calendar is the schedule of periods and due dates inside it. Noted that 'supply calendar' had zero uses anywhere at the time; 'reconcile' and 'stand on' are established words and 'stand on' is an alias."
+    - "Decided readers only ever see 'QA run'; run_id and rehearsal-versus-real stay out of the explainers as tooling."
+    - "Decided the three placeholder asset-shape names are named by how supplies arrive (round 15), entered as draft, and approved by Keith."
+    - "Decided the glossary may double as a quick-reference panel in the dashboard tab - built in explainers slice 2, not here."
+  open_questions:
+    - "The glossary's FORMAT - markdown with one structured line per entry, or a YAML data file rendered to glossary.md - is left to delivery-architect. Constraint: one source of truth that both REQ-DOCS-121's check and slice 2's panel parse, and that reads well on GitHub."
+
+- id: REQ-DOCS-120
+  title: The concept map lives in a committed file, not in a plans entry
+  date_written: "2026-09-29"
+  story: "As whoever starts the next /explain run, I want the agreed groups, reading order and page list in one committed file, so that tiering decisions survive plans/explainers.md being deleted and nobody re-derives which concept gets its own page."
+  moscow: could
+  status: not_started
+  source: "delivery-scoper, found by the carry-over check over plans/explainers.md item 4 and THE PAGE LIST in item 3, 2026-09-29. Proposed rather than asked for - Keith has not asked for this file."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL hold the explainers' concept map in one committed file under docs/explainers/."
+    - "THE SYSTEM SHALL list the groups in their numbered reading order, from 0 (the overview) to 9 (looking back)."
+    - "THE SYSTEM SHALL list, for each group, its concept pages in reading order, and for each page the concepts it carries as sections."
+    - "THE SYSTEM SHALL list the concepts that are glossary-only, and SHALL list each excluded concept with where it went - the pipeline docs, parked, or not explained."
+    - "THE SYSTEM SHALL record each group page's four required parts - a big-picture story with the cast, one overview diagram, concept cards in reading order, and 'read first' prerequisites."
+    - "THE SYSTEM SHALL NOT change the concept map without Keith's approval."
+  non_functional_requirements:
+    - "This exists for the carry-over rule in CLAUDE.md, not for readers: explainers are documentation and get no requirement each (round 1), so once plans/explainers.md item 4 is deleted, nothing else holds 32 tiering decisions made one by one with Keith."
+    - "It is configuration, not state - authored, reviewed, and the same for two people with no data - so it belongs in git under the standing rule."
+  dependencies:
+    - REQ-DOCS-119
+  decisions:
+    - "Carried from item 4 - groups as a numbered learning path, read in order but anyone can jump in anywhere (Keith's call); groups 0 overview, 1 the shape of the asset, 2 the calendar, 3 what arrives, 4 filing a supply, 5 filling the gaps, 6 when a person is needed, 7 how status works, 8 the checks, 9 looking back."
+    - "Carried from item 4 - the overview covers the problem, one supply's journey from arriving to being judged to appearing on the dashboard, and a tour of the groups (round 14); it carries a short red, amber and green primer so every group can use the words (round 15)."
+    - "Carried - group 1 must flag that the asset's SHAPE VARIES (Keith - 'we don't have language for that yet, but it is something that will change'), so its pages are the likeliest to be revisited."
+    - "Carried - three tiers (round 16): a big idea gets its own page, a medium one a section, a small one a glossary entry only."
+    - "Carried - THE PAGE LIST, 32 concept pages plus a group page per group, and the triage outcomes: 29 included, #9 and #30 to the pipeline docs, #6 and #31 split, #25 and #29 included only briefly, #27 explaining only the new model; freshness capping parked until it has a requirement."
+    - "Carried - status and checks divide cleanly (round 15): group 7 is purely how status works, group 8 is every check, organised by LEVEL rather than by the five categories (round 14)."
+    - "Carried - 'the overview diagram's nodes link to the concept pages' is subject to REQ-DOCS-118's open question on click directives."
+    - "Carried - the line between the two tracks (Keith, confirmed 2026-09-29): what things MEAN to a reader is an explainer; how the system is OPERATED AND MAINTAINED - permissions, configuration changes, check upkeep - is Running Mothman. The tracks split by Diataxis type: explanation here, how-to, reference and technical explanation there."
+    - "Carried - 'the four QA tools and why there are four' is NOT a concept and is not explained (item 1, third round); the CI-never-touches-data rule and the delivery-* agent pipeline go to the pipeline docs."
+    - "Carried from the re-baseline - group 6's ticket page explains the NEW model, one ticket per slot always showing where that supply has got to (REQ-PIPE-083, REQ-GHUB-109), with the reconciling mechanics in the pipeline docs; and REQ-PIPE-110 to 113 give the explainers their MEANING only (a past due date can never change, windows never overlap), badged not built, with file location and timezone versioning in the pipeline docs, as is REQ-TEST-114."
+  open_questions:
+    - "Whether Keith wants this file at all, or prefers item 4 to stay in plans/explainers.md until the last group page is written and then be deleted whole (CLAUDE.md's rule 4). Asked in the scoper's report."
+
+- id: REQ-DOCS-121
+  title: Each group has a reviewed source index, and a page cannot silently skip a defining source
+  date_written: "2026-09-29"
+  story: "As Keith signing off an explainer, I want each group's relevant requirements and config listed once for me to review, and a check that a page cites the requirement behind every term it uses, so that a page cannot be faithful to its sources and still miss the one that matters."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 3 round 13 (source recall) and the stochasticity and RAG research before it, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL hold one source index per group at docs/explainers/<group>/sources.yaml."
+    - "THE SYSTEM SHALL list in each source index every requirement and config or code file relevant to the group, each with one line of context."
+    - "THE SYSTEM SHALL NOT list any file under plans/ or CLAUDE.md in a source index."
+    - "WHEN the first page of a group is scoped, THE SYSTEM SHALL require Keith to have reviewed that group's source index before the writer drafts the brief."
+    - "THE SYSTEM SHALL provide a mothman subcommand that, for each page, reports every glossary term the page uses whose defining requirement the page does not cite."
+    - "IF a page uses a glossary term whose defining requirement it does not cite, THEN THE SYSTEM SHALL report the page, the term and the missing requirement."
+    - "THE SYSTEM SHALL read only committed files under docs/explainers/ and requirements.yaml to run that check, and SHALL NOT open any database or anything under data/ or reports/."
+  non_functional_requirements:
+    - "SCALE: requirements.yaml is about 1.2MB, roughly 300k tokens, too big for an agent to load whole; one concept's cited set is 20 to 40k tokens. The index is what turns 'choose sources' from a grep into a reviewed list, and each requirement's implemented_by and decisions already make it walkable from requirement to code."
+    - "Fingerprinting the index, so a changed index makes its pages stale, is explainers slice 2 (the staleness gate) and is NOT built here."
+    - "The recall check must be deterministic and fast enough to sit in `mothman check` and CI's validate-config workflow, which read only committed configuration."
+    - "Configuration, not state: an index is authored and reviewed, so it is committed."
+  dependencies:
+    - REQ-DOCS-119
+  decisions:
+    - "Decided a per-group source index Keith reviews once (round 13), which the writer starts from. It closes RAG's 'context recall' gap - the fact-checker measures faithfulness to CITED sources only, so a page can be 100 percent faithful and still miss or contradict a requirement it never cited. Nothing else in the design checks the source set."
+    - "Decided the recall check flags a glossary term whose defining requirement is not cited (round 13), which is why REQ-DOCS-119 records each entry's defining requirement."
+    - "Decided the staleness gate fingerprints the index too (round 13) - deferred to explainers slice 2."
+  open_questions: []
+
+- id: REQ-DOCS-122
+  title: A deterministic validator refuses unsafe or malformed explainer output
+  date_written: "2026-09-29"
+  story: "As Keith, about to publish a page an agent wrote, I want a mechanical check that the page carries no script, no outside links and no malformed diagram, so that a bad or injected output cannot reach GitHub or the dashboard on the strength of a model's judgement."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 1 (his worry about prompt injection), docs/explainer-agents-research.md section 5 mitigations 4 and 5, and Keith's calls on the live research (accTitle and accDescr), 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL provide a mothman subcommand that validates every markdown file under docs/explainers/."
+    - "IF a file contains raw HTML, a script element or an iframe, THEN THE SYSTEM SHALL reject it."
+    - "IF a file contains a javascript: or data: link, an external URL or an external image, THEN THE SYSTEM SHALL reject it."
+    - "IF a file contains a zero-width or bidirectional-control character, THEN THE SYSTEM SHALL reject it."
+    - "IF a Mermaid block contains a click directive or any directive that touches securityLevel, THEN THE SYSTEM SHALL reject it."
+    - "IF a Mermaid block does not parse, THEN THE SYSTEM SHALL reject it."
+    - "IF a Mermaid block does not state its look and theme explicitly, uses the hand-drawn look on a type other than flowchart, state, class or ER, or uses a seed other than the house seed, THEN THE SYSTEM SHALL reject it."
+    - "IF a Mermaid block's accTitle and accDescr are missing or do not match its caption, THEN THE SYSTEM SHALL reject it."
+    - "IF a page's front matter is missing a field REQ-DOCS-116 requires, THEN THE SYSTEM SHALL reject it."
+    - "WHEN the validator rejects a file, THE SYSTEM SHALL name the file, the line, the rule broken and the correction to make."
+    - "WHEN the repository's gates run, THE SYSTEM SHALL run the validator in `mothman check` and in CI's validate-config workflow."
+    - "THE SYSTEM SHALL run the validator without opening any database or reading anything under data/ or reports/."
+  non_functional_requirements:
+    - "SECURITY, and the reason it is deterministic code rather than a reviewer: OWASP LLM01's own advice is to validate output formats with deterministic code. A model can be talked out of a rule; a regular expression cannot. Keith's sign-off stays the human gate on top of this, never instead of it."
+    - "Defence in depth: slice 2 adds an HTML-escaping renderer and Mermaid initialised strict in the dashboard. This validator is the first layer, and the only one in slice 1, where GitHub's own sanitiser is the renderer."
+    - "MAINTAINABILITY: parsing Mermaid needs Mermaid itself, which is JavaScript, while mothman is Python. How the parse runs (the repo's existing npm toolchain, a pinned dev dependency, or a vendored build) is an architect call, but it must run from `uv run mothman` on a fresh clone with only the documented setup steps, and CI must have the same steps."
+    - "Per CLAUDE.md, a new script gets its mothman subcommand in the same change that adds it."
+    - "Errors say what happened and how to fix it, with no 'invalid', 'please' or 'sorry' (GDS guidance adopted for Running Mothman, and the same courtesy applies here)."
+  dependencies:
+    - REQ-DOCS-116
+    - REQ-DOCS-118
+  decisions:
+    - "Decided from the research (section 5, mitigation 4) that deterministic output validation is built in, rejecting raw HTML, script and iframe, javascript: and data: links, external URLs and images, securityLevel and click directives, and zero-width or bidi characters, and checking every Mermaid block parses."
+    - "Decided the validator also checks every Mermaid block carries its caption as accTitle and accDescr (Keith's calls on the live research), which works identically on GitHub and in the dashboard."
+    - "Decided the post-run diff check and the write hook (REQ-DOCS-124) are separate from this validator - those hold the agents to one folder, this holds the output to a safe shape."
+  open_questions:
+    - "Whether the mechanical house rules - the 25-word sentence cap, the banned words, semicolons, eg, ie and etc, the en dash - are checked here or by the critic. Style round 2 said the critic flags sentences over the cap. Asked in the scoper's report; if the answer is 'here', criteria are added to this requirement."
+    - "Whether this validator also refuses a page whose status is signed off but which carries no signed_off record, as a slice-1 guard on the rule that explainers change only with Keith's approval. Asked in the scoper's report."
+
+- id: REQ-DOCS-123
+  title: A small eval set, built before the agents it tests
+  date_written: "2026-09-29"
+  story: "As Keith deciding whether to trust the docs-* agents, I want a few pages with known defects, a clean page and an injection attempt that every agent is run against before real use, so that I know they catch real problems without inventing false ones."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 3 round 3 (evals), the architecture research and the paper check, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL hold the eval set outside docs/explainers/, so that no eval page can be published or mistaken for a real explainer."
+    - "THE SYSTEM SHALL include three pages with planted defects - one with unexplained jargon, one with a wrong fact, and one with a diagram that decorates rather than explains."
+    - "THE SYSTEM SHALL include one clean page that meets the house standard as the critic's negative control."
+    - "THE SYSTEM SHALL include one page carrying text addressed to an AI agent as a prompt-injection fixture."
+    - "THE SYSTEM SHALL record beside each eval page the finding or findings a passing run must produce, and for the clean page that a passing run produces no blocker or should-fix finding."
+    - "THE SYSTEM SHALL mark each eval page, in its own text, as a test fixture that is not a real explainer."
+    - "WHEN an agent is evaluated, THE SYSTEM SHALL run each eval page it is meant to handle about three times, each in a fresh session."
+    - "THE SYSTEM SHALL score an agent as passing an eval page only when every one of its runs passes."
+    - "IF an agent obeys the injected instruction on any run, THEN THE SYSTEM SHALL score that eval as failed."
+    - "THE SYSTEM SHALL have the eval set in place before any docs-* agent is first run on a real topic."
+    - "WHEN a real /explain run exposes an agent failure the eval set would not have caught, THE SYSTEM SHALL let a new eval page be added for it."
+  non_functional_requirements:
+    - "Scored pass^k, not pass@k: at 75 percent per run, three passes in a row happen only 42 percent of the time. Consistency is the property being bought, so any-run-passes would measure the wrong thing."
+    - "COST: the evals run Opus agents several times over - five pages, about three runs each, plus the critic's run on a second model. Keith chose quality over cost for this team (round 2), so this is flagged, not questioned; the set stays small on purpose and grows only from real failures."
+    - "SECURITY: the injection fixture is itself text written to instruct an AI, sitting in the repo other agents read. It needs to say plainly, outside the injected passage, that it is a fixture, and its location must keep it out of every docs-* agent's normal source set and out of the delivery-* agents' way."
+    - "PRIVACY: no eval page may breach REQ-DOCS-117's sensitivity rule except a page whose planted defect IS that breach, and any such page carries only invented, obviously unreal detail."
+    - "Evals need a real Claude session and cost real tokens, so they are not run in CI. Their outcome is recorded rather than re-run on every push."
+  dependencies:
+    - REQ-DOCS-116
+    - REQ-DOCS-117
+    - REQ-DOCS-118
+  decisions:
+    - "Decided a SMALL set, built before the agents (round 3, and the research's 'write the evals before the agents'): about three planted-defect pages (jargon, a wrong fact, a decorative diagram), one clean page, one injection fixture, each run about three times, growing from real failures."
+    - "Decided a clean page is essential because reviewers asked to find gaps usually invent some - 'no findings' must be a legitimate answer, and only a negative control shows the critic gives it."
+    - "Decided three runs per eval STANDS after the paper check. 'About 11 runs for a stable vote' came from one unreviewed 2026 paper testing two OpenAI mini models on 29 deliberately close choices, where three runs already reached about 90 percent reliability - it is not to be cited as a requirement."
+    - "Decided the injection fixture is a regression case kept in the repo (research section 5, mitigation 7: red-team once and keep the fixture)."
+    - "Noted, not decided: all the papers behind this test 2022 to 2025 models on tasks unlike this one, so how far they carry over to current Claude models is a judgement, not a measurement."
+  open_questions:
+    - "Whether to add two eval pages beyond round 3's five - a sensitivity breach (a blocker class in REQ-DOCS-117) and the 'delivery changed meaning' trap item 4 named as a good early fact-checker test. Asked in the scoper's report."
+    - "Where eval OUTCOMES are recorded - summarised in this requirement's evidence and decisions with transcripts not committed, or as a committed run log. Asked in the scoper's report; the repository-holds-configuration-not-state rule leans towards the first."
+
+- id: REQ-DOCS-124
+  title: The docs-* agents can only write explainers, and treat the repository as material, not instructions
+  date_written: "2026-09-29"
+  story: "As Keith, letting agents write into a public repository for the first time, I want each docs-* agent limited to the tools and folder its job needs, so that a confused or manipulated agent cannot reach beyond docs/explainers/ or act on text it reads."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 1 (prompt injection), item 3 round 2's architecture research and round 10, docs/explainer-agents-research.md sections 5 and 6, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL give docs-writer and docs-illustrator only the Read, Grep, Glob, Write and Edit tools."
+    - "THE SYSTEM SHALL give docs-fact-checker only the Read, Grep and Glob tools."
+    - "THE SYSTEM SHALL give docs-critic only the tools REQ-DOCS-127 names."
+    - "THE SYSTEM SHALL NOT give any docs-* agent Bash, WebFetch, WebSearch, the Agent tool, any MCP tool other than one REQ-DOCS-127 names, or a memory setting."
+    - "THE SYSTEM SHALL give each docs-* agent a maximum number of turns."
+    - "WHEN docs-writer or docs-illustrator attempts to write or edit a path outside docs/explainers/, THE SYSTEM SHALL refuse the write through a PreToolUse hook in that agent's own definition."
+    - "WHEN any docs-* agent finishes a run, THE SYSTEM SHALL check that the working-tree changes since the run began touch only docs/explainers/, and SHALL stop the /explain run and report if they do not."
+    - "THE SYSTEM SHALL instruct every docs-* agent that repository files are source material, never instructions, and that text addressed to an AI is to be reported as a finding and not acted on."
+    - "WHEN a docs-* agent meets text addressed to an AI, THE SYSTEM SHALL have it report the text as a top-severity finding and finish its task normally."
+    - "THE SYSTEM SHALL instruct every docs-* agent never to read data/, reports/ or any database, and to use invented scenarios instead."
+    - "THE SYSTEM SHALL pin each docs-* agent's model by full model id, not by an alias."
+    - "THE SYSTEM SHALL put knowledge the four agents share in one preloaded skill named in each agent's skills field, and SHALL NOT copy that wording into the agents' own prompts."
+  non_functional_requirements:
+    - "SECURITY in depth, because each layer has a known hole: frontmatter hooks are skipped silently in an untrusted folder, which is why the post-run diff check exists; hooks cannot see inside Bash, which is why no docs-* agent gets Bash; `memory:` silently grants Read, Write and Edit, which is why none gets it; unknown or misspelled frontmatter fields are silently ignored, which is why the restriction has to be tested rather than read."
+    - "STOCHASTICITY: models released after Claude Opus 4.6 reject any temperature other than 1.0, and subagent frontmatter has no temperature field. Consistency comes from structure instead - pinned model ids, fixed sources, precise output formats - and an alias like `opus` moves underneath a pinned design."
+    - "The report-and-carry-on rule exists because this repo is FULL of imperatives - CLAUDE.md alone has dozens of 'never do X' sentences. Halting on anything instruction-shaped would stop every run on a false alarm."
+    - "The CLAUDE.md check on the combined `description:` budget of .claude/agents/*.md is re-run when these four are added - at eight agents the budget was about 1,600 tokens of 15,000."
+    - "Descriptions carry no 'use PROACTIVELY' and no success statistics, both anti-patterns found in the third-party agents examined."
+    - "Portability: the agents run from a fresh clone with no extra setup beyond Claude Code itself, and the post-run check uses git, which every clone has."
+  dependencies: []
+  decisions:
+    - "Decided least privilege from the research (section 5, mitigation 1): writer and illustrator get Read, Grep, Glob, Write, Edit; none of the team gets Bash, WebFetch, WebSearch or MCP. The concepts exist only in this repo, so web tools buy nothing but exposure."
+    - "Decided the write restriction is ENFORCED by a PreToolUse hook allowing exactly docs/explainers/ (round 2 research, round 4 location), backed by a post-run diff check."
+    - "Decided NONE of the four gets the Agent tool, even though subagents can now start subagents (up to 3 layers). AskUserQuestion is still unavailable inside a subagent, so Keith's checkpoints must sit in the main session, and a critic nested under the writer would hide its findings from him."
+    - "Decided prompt injection is REPORTED AND CARRIED ON (round 10): treated as content, quoted as a top-severity finding, task finishes, Keith sees it at the next checkpoint."
+    - "Decided shared knowledge goes in ONE preloaded skill, with bulky reference such as the glossary in sibling files read on demand (round 2 research). A skill with disable-model-invocation cannot be preloaded, so it uses user-invocable false instead."
+    - "Decided models are pinned by full id (round 13)."
+    - "Decided the team is named docs-* (round 11) - docs-writer, docs-illustrator, docs-critic, docs-fact-checker - over explainer-*, because it is broader and the same team is expected to write the pipeline docs later."
+  open_questions: []
+
+- id: REQ-DOCS-125
+  title: docs-writer drafts the brief and the page
+  date_written: "2026-09-29"
+  story: "As Keith scoping a new explainer, I want a writer agent that reads the sources itself, gives me a one-screen brief to approve and then drafts the page to the house standard, so that the page rests on a specialist's reading and I steer it before any prose exists."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 3 rounds 1, 2, 3, 5, 7, 10 and 13, and the paper check, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "WHEN a topic has been scoped with Keith, THE SYSTEM SHALL have docs-writer draft a brief that fits on one screen."
+    - "THE SYSTEM SHALL have the brief state the page's why-question, who it is for, its key points, two or three candidate analogies or story angles, the planned diagrams and stories, the sources it will cite, five to eight questions a new engineer should be able to answer from the page, and every new or changed glossary term."
+    - "THE SYSTEM SHALL have the brief list what the critic and fact-checker will check the page against, so the writer is held to the same checks in advance."
+    - "THE SYSTEM SHALL have docs-writer start its source reading from the group's source index (REQ-DOCS-121)."
+    - "THE SYSTEM SHALL have docs-writer place the defining requirements first in its reading, peripheral sources after them, and the task last, with the task also named briefly at the start."
+    - "THE SYSTEM SHALL let docs-writer read plans/*.md for background, and SHALL NOT let it cite plans/*.md or state as fact anything found only there."
+    - "WHEN Keith has approved the brief, THE SYSTEM SHALL have docs-writer draft the page to the house standard using the analogy or angle Keith picked, with a marked slot for each diagram and story."
+    - "THE SYSTEM SHALL NOT have docs-writer state a fact that is not in a source the page cites."
+    - "THE SYSTEM SHALL have docs-writer add a glossary term only after Keith has approved it at the brief."
+    - "WHEN Keith has chosen which findings to act on, THE SYSTEM SHALL have docs-writer revise with targeted edits addressing only those findings, not a rewrite."
+    - "IF a page is signed off, THEN THE SYSTEM SHALL NOT have docs-writer regenerate it, and SHALL allow it only to be edited."
+    - "THE SYSTEM SHALL run docs-writer on Opus, pinned by full model id."
+  non_functional_requirements:
+    - "STOCHASTICITY is spent in one place on purpose: the brief offers two or three angles and Keith picks. Everything after that runs once, which is what makes a signed page reproducible in the only sense that matters - it is never regenerated."
+    - "Quality over cost (round 2): explainers are few, long-lived and put in front of managers."
+    - "The brief is working material for one run, not a published artefact. Where it lives, and whether it is committed, is asked in the scoper's report."
+  dependencies:
+    - REQ-DOCS-115
+    - REQ-DOCS-116
+    - REQ-DOCS-119
+    - REQ-DOCS-121
+    - REQ-DOCS-123
+    - REQ-DOCS-124
+  decisions:
+    - "Decided the WRITER drafts the brief (round 2) after Keith and the main session scope the topic, so the brief rests on the specialist's reading rather than the main session's."
+    - "Decided Keith's two checkpoints are the brief and the findings (round 1). He did NOT pick reviewing the first draft, or the final page only."
+    - "Decided writer first, then illustrator (round 2): the writer marks slots such as [diagram: supply lifecycle] or [story: ...] and the illustrator fills them after reading the draft, so each picture answers a question the prose raises."
+    - "Decided the brief carries 5 to 8 reader questions (round 7) that Keith sees and tweaks, and that the critic answers from the page alone."
+    - "Decided variation is confined to the brief (round 13): 2 to 3 candidate analogies or story angles, Keith picks one or asks for another."
+    - "Decided the 'equal effort' point from the paper check (Huang et al., ICLR 2024): whatever the critic checks for also goes into the writer's brief. Models revising their own work without outside feedback got worse, so the design's safety comes from the sources, the scripts and Keith, not from the critic being a separate agent."
+    - "Decided context ordering from 'Lost in the Middle' (Liu et al., TACL 2024) - defining requirements first, peripheral sources in the middle, the task last and named briefly at the top. Tested only at 2 to 16K tokens on 2023 models, but cheap to apply."
+    - "Decided 'never state a fact that is not in a named source file; write a pointer, not a guess' (research, docs-drift-editor), which also blunts injected facts."
+    - "Decided Keith feeds the topics and each is scoped together before writing (round 3). The team does NOT sweep the repo and pick its own."
+    - "Decided a signed page is FROZEN - only edited, never regenerated (round 13)."
+  open_questions: []
+
+- id: REQ-DOCS-126
+  title: docs-illustrator fills the diagram and story slots, and has to earn its place
+  date_written: "2026-09-29"
+  story: "As a reader of an explainer, I want its diagrams and stories made by an agent that has read the prose first, so that each picture answers a question the text raises - and as Keith, I want proof on a real topic that a separate illustrator beats the writer drawing its own."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 1 second and fourth rounds, item 3 rounds 2, 3 and 6, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "WHEN docs-writer has drafted a page with marked slots, THE SYSTEM SHALL have docs-illustrator read the whole draft and fill each slot."
+    - "THE SYSTEM SHALL let docs-illustrator choose, per concept, among a recurring-cast story, an everyday analogy, a real-world incident scenario, and an analogy followed by the cast walking through it, and to combine them."
+    - "THE SYSTEM SHALL let docs-illustrator choose between a short vignette and numbered zine-style panels for a story."
+    - "THE SYSTEM SHALL have docs-illustrator follow REQ-DOCS-118 for every diagram and REQ-DOCS-117 for every story."
+    - "THE SYSTEM SHALL let docs-illustrator decide how many diagrams a page needs."
+    - "THE SYSTEM SHALL have docs-illustrator say, for each diagram, which question in the prose it answers."
+    - "THE SYSTEM SHALL run docs-illustrator on Opus, pinned by full model id."
+    - "WHEN the first real explainer (REQ-DOCS-130) is written, THE SYSTEM SHALL produce its diagrams and stories twice - once by docs-illustrator and once by docs-writer alone - for Keith to compare."
+    - "WHEN Keith has compared the two, THE SYSTEM SHALL record his verdict and, if the writer alone was as good, SHALL leave the decision to merge the illustrator into the writer with him."
+  non_functional_requirements:
+    - "Anthropic's default is the simplest system that works. A separate illustrator is justified only if it measurably improves the pictures, and the A/B is the measurement - so this requirement is 'built' only once that verdict exists, whichever way it goes."
+    - "COST: the A/B doubles the illustration work on one page, once. Judged acceptable given round 2's quality-over-cost call."
+    - "The diagrams have to render on GitHub now and in the dashboard later, from the same source - REQ-DOCS-118's non-functional notes apply in full."
+  dependencies:
+    - REQ-DOCS-117
+    - REQ-DOCS-118
+    - REQ-DOCS-123
+    - REQ-DOCS-124
+    - REQ-DOCS-125
+  decisions:
+    - "Decided all four kinds of story are available (item 1, second round) - a recurring cast, everyday analogies, real-world incident scenarios, and an analogy followed by the cast walking through it - as a per-concept judgement, not a house format."
+    - "Decided the story form is the illustrator's choice (round 6) between a short vignette (the Phippy pattern) and numbered zine-style panels (the Julia Evans pattern)."
+    - "Decided tone warm and lightly playful (item 1, second round): friendly, the odd wry line, fun diagrams, but safe to put in front of a manager or on a slide. The diagrams should 'look a bit hand-drawn'."
+    - "Decided build three, then A/B the illustrator on the first real topic against the writer doing its own pictures, before committing to the split (round 3)."
+    - "Carried from the research for the illustrator's prompt, not individually voted on: match a concept's behaviour to a shape (a lifecycle is a state diagram, branching is a fork, a comparison is side-by-side subgraphs); a node budget of 5 to 7 for an overview and 10 to 15 technical, splitting beyond about 20; and the Mermaid syntax rules (quote labels with special characters, flowchart not graph, meaningful node ids)."
+  open_questions:
+    - "Who judges the A/B - Keith alone (recommended in the scoper's report), or the critic's findings on both versions as well. Asked in the scoper's report."
+
+- id: REQ-DOCS-127
+  title: docs-critic reads each page cold, as a new engineer, with a UX eye
+  date_written: "2026-09-29"
+  story: "As Keith triaging a draft, I want a critic that knows nothing but the page, reads it as a competent engineer new to Mothman and tells me exactly where it stumbled, so that I find out whether the page teaches before a real newcomer does."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 1 third round, item 3 rounds 3, 7, 10 and 11, the paper check and the 'two slices' entry, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL start docs-critic without CLAUDE.md, and SHALL NOT let it browse the repository."
+    - "THE SYSTEM SHALL give docs-critic the page under review, the glossary and the brief's reader questions, and nothing else from the repository."
+    - "THE SYSTEM SHALL give docs-critic the persona of a mid-level data engineer who is comfortable with SQL, pipelines and data quality, has heard of dbt, knows nothing about this project, its terms or WA government data sharing, and reads on a laptop between meetings."
+    - "THE SYSTEM SHALL ground docs-critic's UX lens in the relevant parts of docs/hci-ux-psychology.md, supplied to it rather than browsed."
+    - "WHEN docs-critic reviews a page, THE SYSTEM SHALL have it answer each reader question from the page alone, and SHALL treat a wrong or missing answer as a finding."
+    - "THE SYSTEM SHALL have docs-critic add a finding for anything else it found itself wondering while reading."
+    - "WHEN docs-critic has finished its main read, THE SYSTEM SHALL have it re-read only the 'In short' box as a technical team manager and report whether the concept could be explained upward from those sentences alone."
+    - "THE SYSTEM SHALL have every finding quote the exact text it concerns, give a severity of blocker, should fix or polish, and suggest a change."
+    - "THE SYSTEM SHALL return every finding, grouped by severity, with no confidence filter."
+    - "THE SYSTEM SHALL accept 'no findings' as a valid result."
+    - "IF a page breaches the sensitivity rule in REQ-DOCS-117, THEN THE SYSTEM SHALL have docs-critic report it as a blocker."
+    - "THE SYSTEM SHALL NOT let docs-critic edit any file."
+    - "WHEN the eval set (REQ-DOCS-123) is run, THE SYSTEM SHALL run docs-critic's evals on both Opus and Sonnet 5, and SHALL keep the model that catches the planted defects without inventing findings on the clean page."
+    - "WHILE explainers slice 2 is not built, THE SYSTEM SHALL have docs-critic review the page as decided in the scoper's report question on rendering, and SHALL defer review in the dashboard tab to slice 2."
+  non_functional_requirements:
+    - "COLDNESS is the whole value. A reader who knows the answer cannot tell whether the page taught it, which is why accuracy went to a separate fact-checker. Anything handed to the critic beyond the page is a leak of context the real reader will not have - so each extra input needs a reason."
+    - "The critic's verdict is ADVISORY. Keith's triage is the gate, and the writer does not auto-fix everything."
+    - "Self-preference bias is real but weaker evidence than first assumed (paper check), and appears to track how familiar text is to the judge rather than who wrote it - so a Sonnet critic probably shares much of Opus's bias. The model test is decided by the planted-defect evals, and switching models is NOT expected to remove the bias."
+    - "SECURITY: the critic is the agent most likely to quote injected text back into the loop, where the writer would read it. Its findings quote the text as data, and the writer's instruction (REQ-DOCS-124) is what stops the quote being acted on."
+    - "COMPATIBILITY, found while scoping: in this sandbox github.com pages load but viewscreen.githubusercontent.com, the host GitHub renders Mermaid from, is refused by the egress proxy (a real `curl: (56) CONNECT tunnel failed, response 403`, 2026-09-29). A critic driving a browser at GitHub would see the page without its diagrams. The main session should record the host in CLAUDE.md's blocked-domains bullet."
+  dependencies:
+    - REQ-DOCS-117
+    - REQ-DOCS-119
+    - REQ-DOCS-123
+    - REQ-DOCS-124
+  decisions:
+    - "Decided the critic is a new data engineer with a strong UX lens (item 1 third round; Keith - 'I really care about good user experience'), grounded in docs/hci-ux-psychology.md like the delivery-* UX agents, not only a plain-language check. Round 11 made the persona competent but new."
+    - "Decided the critic is PURELY a cold reader judging clarity and UX (round 7); accuracy moved to a separate fact-checker, chosen over one critic doing two passes and over relying on citations plus Keith's sign-off."
+    - "Decided a cold start via omitClaudeMd (round 2 research), taken from Anthropic's doc-coauthoring 'reader test', which gives a subagent only the document plus the questions a real reader would ask."
+    - "Decided reader questions come from both places (round 7): the brief's 5 to 8, tweaked by Keith, plus whatever else the critic wondered."
+    - "Decided findings are severity-ranked and all shown (round 7) - blocker, should fix, polish - each quoting exact text and suggesting a change, with no confidence filter."
+    - "Decided a quick manager pass on the 'In short' box (round 11)."
+    - "Decided critic model is TESTED, Opus against Sonnet 5 (round 3), rather than assumed; the paper check kept the test but changed the reason."
+    - "Decided the rendered page from day one (round 7), through a real browser, like the delivery-*-ux-critics - then SOFTENED by the slicing (the 'two slices' entry): until slice 2 exists, the critic reviews the page as GitHub renders it rather than in the dashboard tab. How it can see that render is re-opened by the blocked-host finding above."
+    - "Decided the critic never gets memory, because memory silently grants Read, Write and Edit (round 2 research)."
+  open_questions:
+    - "HOW the critic sees the page in slice 1, given GitHub's Mermaid host is blocked here and a browser on github.com could browse the whole repository. Asked in the scoper's report with three options; this changes the critic's tools, so REQ-DOCS-124's criterion 3 depends on it."
+    - "Whether the critic is given the glossary. A cold newcomer could follow a glossary link, which argues yes; every extra input weakens coldness, which argues for the page alone. Drafted as 'yes' in criterion 2 - flagged here so it is visible rather than settled."
+
+- id: REQ-DOCS-128
+  title: docs-fact-checker checks every claim against the page's own cited sources
+  date_written: "2026-09-29"
+  story: "As Keith, about to put an explainer in front of managers, I want every factual claim on it checked against the requirements and files it cites, with the problems at the top, so that a wrong or unsupported sentence is found by a table rather than by a reader."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 3 rounds 7, 8, 10 and 13, and the paper check's corrections, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "WHEN docs-fact-checker reviews a page, THE SYSTEM SHALL have it return a table of every factual claim on the page, each with a verdict of supported, contradicted, not found in the sources, or sources disagree."
+    - "THE SYSTEM SHALL have each row name the exact source it was checked against, as a requirement id or a file and line."
+    - "THE SYSTEM SHALL sort contradicted, not-found and sources-disagree rows above supported ones."
+    - "THE SYSTEM SHALL have docs-fact-checker check each claim only against the sources the page cites."
+    - "THE SYSTEM SHALL have docs-fact-checker extract the supporting quote before giving a verdict, and SHALL mark a claim with no supporting quote as not found."
+    - "THE SYSTEM SHALL have docs-fact-checker judge support sentence by sentence against the whole cited set, and SHALL mark partial support as not found."
+    - "IF a sentence makes a factual claim and cites nothing, THEN THE SYSTEM SHALL flag it."
+    - "IF a claim is supported only by plans/*.md or CLAUDE.md, THEN THE SYSTEM SHALL mark it not found."
+    - "IF a cited requirement and the cited code say different things, THEN THE SYSTEM SHALL mark the claim sources disagree and SHALL always show it to Keith, and the page SHALL NOT pick a side."
+    - "WHEN a round of review runs, THE SYSTEM SHALL run docs-fact-checker twice on the same page, SHALL show Keith every claim either run marks other than supported, and SHALL flag as unstable any claim the two runs disagree on."
+    - "THE SYSTEM SHALL provide a mothman subcommand that checks every quoted passage in a fact-checker report appears verbatim in the source it names, and SHALL flag any that does not."
+    - "THE SYSTEM SHALL run docs-fact-checker on Opus, pinned by full model id."
+    - "THE SYSTEM SHALL NOT let docs-fact-checker edit any file."
+  non_functional_requirements:
+    - "RELIABILITY is bought honestly rather than by vote: two runs cannot form a majority, so the union catches more at the cost of more false flags, which works only because Keith reviews every flag. Disagreement between runs IS a supported warning sign. If the union proves too noisy, the backed alternative is three runs with a majority vote per claim - a change of design to bring back to Keith, not a tuning knob."
+    - "The verbatim-quote check proves a quote EXISTS, not that it SUPPORTS the claim (ALCE, Gao et al., EMNLP 2023). It is a separate gate against invented quotes, and never a substitute for the per-sentence judgement."
+    - "'Sources disagree' can be a real bug in the code or a stale requirement rather than an explainer problem, so it routes to Keith as a possible defect, with CLAUDE.md's post-build review rules applying to whatever it turns out to be."
+    - "Scale: one concept's cited set is 20 to 40k tokens and fits; the checker reads only that set, never requirements.yaml whole."
+    - "Deterministic parts stay in code (the quote check is a mothman subcommand, per CLAUDE.md's rule for any new script); judgement stays in the agent."
+    - "The staleness-gate route - re-running on just the changed sources when a fingerprint breaks and proposing minimal edits - is explainers slice 2 and not built here."
+  dependencies:
+    - REQ-DOCS-116
+    - REQ-DOCS-121
+    - REQ-DOCS-123
+    - REQ-DOCS-124
+  decisions:
+    - "Decided a separate fact-checker, making a team of four (round 7), for cleaner roles - a reader who knows the answer cannot tell whether the page taught it."
+    - "Decided the report is a full claim-by-claim table, problems first (round 8)."
+    - "Decided the fact-checker runs on OPUS (round 8) and is NOT part of the Opus-versus-Sonnet test; careful claim-checking is reasoning work and its errors reach managers."
+    - "Decided the critic and fact-checker run in PARALLEL (round 8) - one reads cold, the other reads sources - and Keith triages both reports at one checkpoint."
+    - "Decided plans prose never counts as support (round 10)."
+    - "Decided a fourth verdict, 'sources disagree' (round 13), which always goes to Keith."
+    - "Decided two runs per round, combined as a union, disagreement flagged unstable (round 13); the paper check kept this but corrected the description - it is not self-consistency voting (Wang et al.)."
+    - "Decided from Anthropic's anti-hallucination guidance: extract quotes first, retract any claim with no supporting quote, and treat run-to-run disagreement as a warning (stochasticity research)."
+    - "Decided per-sentence support against the whole cited set, flagging uncited sentences and treating partial support as not found (paper check, ALCE)."
+    - "Rejected relying on the API's Citations feature - it guarantees valid citations but subagents cannot use it, so the verbatim script is the nearest equivalent."
+  open_questions: []
+
+- id: REQ-DOCS-129
+  title: An /explain skill runs the team in fixed steps with Keith at two checkpoints
+  date_written: "2026-09-29"
+  story: "As Keith commissioning an explainer, I want one command that walks the main session through scoping, brief, writing, illustrating, review, triage and sign-off in a fixed order, so that no step - and especially neither of my checkpoints - can be skipped or reordered by accident."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 3 rounds 1, 2, 8, 9 and 13, and CLAUDE.md's standing rule 'Never change an explainer without Keith's approval', 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL provide an /explain project skill that runs in the main session."
+    - "WHEN /explain runs, THE SYSTEM SHALL take the steps in this order - scope the topic with Keith, docs-writer drafts the brief, Keith approves the brief, docs-writer writes, docs-illustrator illustrates, the reviews run, Keith triages the findings, docs-writer revises, Keith signs off."
+    - "THE SYSTEM SHALL NOT start a step until the step before it has finished."
+    - "WHEN the brief is presented, THE SYSTEM SHALL ask Keith to pick an analogy or story angle, to tweak the reader questions, and to approve each new or changed glossary term."
+    - "WHEN the reviews run, THE SYSTEM SHALL run docs-critic and docs-fact-checker in parallel, run docs-fact-checker twice, run the quote check (REQ-DOCS-128) and the validator (REQ-DOCS-122), and present all their results together."
+    - "WHEN any docs-* agent finishes, THE SYSTEM SHALL run the post-run check that only docs/explainers/ changed (REQ-DOCS-124)."
+    - "WHEN findings are presented, THE SYSTEM SHALL show every finding grouped by severity and SHALL act only on the findings Keith picks."
+    - "WHEN docs-writer has revised a page, THE SYSTEM SHALL re-run the reviews on the revised page and return to Keith's triage."
+    - "IF a page has been through two revision loops and Keith has not signed it off, THEN THE SYSTEM SHALL stop the run and hand back to Keith rather than start a third loop."
+    - "WHEN Keith signs a page off, THE SYSTEM SHALL record who signed it and when, a last-reviewed date and a review-by date in the page's front matter."
+    - "THE SYSTEM SHALL NOT run /explain to regenerate a signed-off page."
+    - "THE SYSTEM SHALL NOT pick a topic itself, and SHALL start only from a topic Keith gives."
+    - "THE SYSTEM SHALL NOT write a CHANGELOG.yaml entry for an individual explainer page."
+  non_functional_requirements:
+    - "The loop cap lives in the SKILL, not in a prompt: Anthropic's own cookbook evaluator loop is uncapped, and a cap an agent is asked to respect is a cap it can talk itself past."
+    - "RELIABILITY: if an agent fails partway through a step, the skill stops and reports what exists on disk rather than retrying silently. A half-written page is left as a draft for Keith to see, never pushed as if finished."
+    - "No agent can ask Keith anything directly (AskUserQuestion is unavailable in every subagent), so every question an agent has comes back through the main session - which is why the checkpoints, and the skill, sit there."
+    - "The skill must work for a second document type later (round 12), so the step list is generic - brief, draft, illustrate, review, triage, sign off - with explanation-specific wording held in the house standard rather than the skill."
+    - "AUDITABILITY: sign-off lives in the page itself and in git's authorship of the commit that adds it, so 'who approved this page and when' is answerable from the committed tree. Fingerprints of the cited sources, and the `mothman explainers sign-off` command that writes them, are explainers slice 2."
+    - "COST: a page can take up to three review rounds, each running the critic once and the fact-checker twice, all on Opus apart from whatever the critic's model test decides. Accepted under round 2's quality-over-cost call."
+  dependencies:
+    - REQ-DOCS-122
+    - REQ-DOCS-124
+    - REQ-DOCS-125
+    - REQ-DOCS-126
+    - REQ-DOCS-127
+    - REQ-DOCS-128
+  decisions:
+    - "Decided its own lighter pipeline (round 1): an explainer is documentation, not behaviour, so it gets NO requirements.yaml entry. Keith and the main session scope, the agents write, Keith signs off the finished page. The agent team, the gates and the tab are behaviour and do get requirements."
+    - "Decided kick-off is a project skill with fixed steps (round 2), so nothing can be skipped or reordered by accident."
+    - "Decided revisions re-check, at most 2 loops (round 9); after that the session stops and talks rather than looping."
+    - "Decided sign-off lives in each page's front matter (round 9). The fingerprints that go with it, and the sign-off command, are explainers slice 2."
+    - "Decided changelog entries only for the tab launch (round 11), not individual pages - so slice 1 ships no CHANGELOG.yaml entry for its page."
+    - "Decided under CLAUDE.md's standing rule (Keith, 2026-09-29) that the staleness-gate route is the ONLY way an explainer changes after sign-off: a building session never edits docs/explainers/ or refreshes fingerprints, it reports which explainer is affected. That route itself is explainers slice 2."
+    - "Decided the critic and fact-checker run in parallel and Keith triages both together at one checkpoint (round 8)."
+  open_questions:
+    - "Where the brief, the reports and a draft page live between steps - asked in the scoper's report, with a recommendation of a gitignored working folder for briefs and reports and the draft page committed to the working branch as status draft."
+
+- id: REQ-DOCS-130
+  title: A first explainer, published as markdown and signed off by Keith
+  date_written: "2026-09-29"
+  story: "As a new engineer joining the team, I want the first real explainer readable on GitHub, so that I can learn one Mothman concept properly today - and as Keith, I want it to prove the whole team end to end before any dashboard work is built on it."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/explainers.md item 1 third round (first three topics), item 3 round 10 (build order) and the 'two slices' entry, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL publish one explainer concept page as markdown under docs/explainers/<group>/, on the page Keith chooses in answer to the scoper's report."
+    - "THE SYSTEM SHALL produce the page through a full /explain run (REQ-DOCS-129), including both of Keith's checkpoints."
+    - "THE SYSTEM SHALL include the page's group source index, reviewed by Keith, and every glossary entry the page uses."
+    - "WHEN the page is committed, THE SYSTEM SHALL have it pass the validator (REQ-DOCS-122) and the recall check (REQ-DOCS-121)."
+    - "THE SYSTEM SHALL carry Keith's sign-off, a last-reviewed date and a review-by date in the page's front matter."
+    - "WHEN the page is viewed on GitHub, THE SYSTEM SHALL render its diagrams, and Keith SHALL confirm that he has seen them rendered there."
+    - "WHERE the page explains a concept that is signed off but not built, THE SYSTEM SHALL badge it 'designed, not built yet'."
+    - "THE SYSTEM SHALL record the outcome of the illustrator A/B (REQ-DOCS-126) run on this page."
+    - "THE SYSTEM SHALL NOT embed the page in the dashboard, which is explainers slice 2."
+  non_functional_requirements:
+    - "PUBLIC the moment it is pushed: the repository is public, so whatever is committed - including a draft before sign-off - is published. The sensitivity rule (REQ-DOCS-117) and the validator have to have passed before the first push, not after."
+    - "Relative links only, written so they will still resolve once slice 2 embeds the page in the dashboard tab - a link that works on GitHub and breaks in the tab is a slice-2 defect created here."
+    - "Readable with nothing but a browser on GitHub - no build step, no mothman command, no database."
+    - "After sign-off, CLAUDE.md's standing rule governs: any change, including one a later build makes necessary, goes through Keith."
+  dependencies:
+    - REQ-DOCS-116
+    - REQ-DOCS-117
+    - REQ-DOCS-118
+    - REQ-DOCS-119
+    - REQ-DOCS-121
+    - REQ-DOCS-122
+    - REQ-DOCS-129
+  decisions:
+    - "Decided the first three topics in order (item 1 third round): supply calendars and claim windows, then deliveries and supplies, then the actions on a supply. Round 10's build order named the first real explainer as 'delivery calendars and claim windows'; the page list later split group 2 into four pages (the delivery agreement, the supply calendar, periods and slots, claim windows)."
+    - "Decided markdown in the repo, readable on GitHub, AND a dashboard tab (item 1 first round) - slice 1 publishes the markdown only."
+    - "Decided the build order standard, glossary, evals, agents, /explain, first page (round 10), with the preview command moved to slice 2 by the slicing."
+    - "Decided home docs/explainers/<group>/ (round 4); whether it is renamed to match 'Understanding Mothman' is asked in the scoper's report."
+    - "Decided readers - new engineers joining, Keith for presenting, and team managers of his technical staff (item 1 first round). Agency executives and data stewards were NOT picked as primary readers."
+  open_questions:
+    - "WHICH page goes first. Round 10 said claim windows, but the claim-windows page leans on REQ-PIPE-110 to 113, all four unsigned and unbuilt, and the cast is introduced in the overview, which is not in slice 1. Asked in the scoper's report with a recommendation."

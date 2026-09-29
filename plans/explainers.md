@@ -48,9 +48,9 @@ survives context compaction. Tick items off here as they land.
    section, or glossary entry only.
 5. [done] **The cast draft**: 4-5 characters for Keith to react to
    (#3, round 12).
-6. [in progress: named, trait list being drafted] **Keith names external writing exemplars** (#3, style round
+6. [in progress: named, 12 traits drafted, wording to Keith with the house standard] **Keith names external writing exemplars** (#3, style round
    4).
-7. [in progress: slice 1 with the scoper] **Requirements via `delivery-scoper`**, drafting from items
+7. [in progress: slice 1 drafted as REQ-DOCS-115 to 130, all 12 questions answered; scoper revision, then architect review and sign-off] **Requirements via `delivery-scoper`**, drafting from items
    1-4, then Keith's sign-off. Nothing is built before this.
 8. [done: moot, GOV.UK is the baseline, and its numbers rule applies] Confirm the Style Manual's rule on numbers once
    `www.stylemanual.gov.au` is reachable (#3, style round 4).
@@ -649,6 +649,88 @@ survives context compaction. Tick items off here as they land.
      picks one or asks for another at his brief checkpoint. Everything
      after that runs once, and the signed page is frozen: only edited,
      never regenerated.
+
+   **Slice 1 drafted (delivery-scoper, 2026-09-29).** Sixteen draft
+   requirements, REQ-DOCS-115 to 130: the house standard in four parts
+   (prose, page shape, cast, diagrams), the glossary seed, a proposed
+   committed concept map, per-group source indexes with a recall check,
+   a deterministic validator, the eval set, shared agent guardrails, the
+   four agents, `/explain`, and the first page. All unsigned, not yet in
+   `requirements.yaml` - they wait on twelve questions. Found while
+   scoping: `viewscreen.githubusercontent.com`, GitHub's Mermaid host, is
+   blocked here; a group page's linked overview diagram conflicts with
+   the no-`click` rule; and the claim-windows page would rest on
+   unsigned REQ-PIPE-110 to 113.
+
+   **Slice 1 answers, set 1 (Keith, 2026-09-29):**
+   - **Q1, how the critic sees a page before slice 2:** the markdown
+     source only, Mermaid source included. Keith checks the GitHub
+     render at his triage; the rendered review arrives with slice 2's
+     preview. Rejected: allow-listing viewscreen and driving GitHub with
+     Playwright (a browser on github.com can wander the repo, breaking
+     the cold read), and pulling a local render forward (half of slice
+     2 built early).
+   - **Q2, first page:** periods and slots, not claim windows. Every
+     source is built and signed (REQ-PIPE-049 to 053, 063), and it can
+     be hand-drawn. Claim windows rests on unsigned REQ-PIPE-110 to 113
+     and is naturally a timeline.
+   - **Q3, citing unsigned requirements: YES, with a separate
+     "proposed" badge** - Keith's choice over the scoper's
+     recommendation (only signed requirements citable). So a page
+     carries one of three states: built, "designed, not built yet"
+     (signed, unbuilt), and "proposed" (unsigned).
+   - **Q4, working files:** briefs and reports go in a gitignored
+     working folder under `docs/explainers/`; the page itself is
+     committed as `status: draft` so Keith can view it on GitHub.
+     Nothing that is state is committed.
+
+   **Slice 1 answers, set 2 (Keith, 2026-09-29):**
+   - **Q5, mechanical style rules** (the 25-word cap, banned words,
+     semicolons, eg/ie/etc, the spaced en dash): the deterministic
+     validator enforces them; the critic keeps the judgement calls. This
+     SUPERSEDES style round 2's "the critic flags anything over the
+     cap". Rejected: critic only (a model misses a 26-word sentence
+     sometimes), and both (duplicate noise).
+   - **Q6, three GOV.UK rules never ruled on: all adopted.** No heading
+     uses a term before the page explains it; every page redefines its
+     terms, because readers arrive from links and search rather than in
+     order; every page has a summary of 160 characters or fewer.
+   - **Q7, group-page diagram links:** the diagram has no links, and a
+     list of concept cards beneath it carries them. `securityLevel`
+     stays strict. Rejected: `click` with relative links.
+   - **Q8, where the house standard lives:** it is the SKILL.md of the
+     one skill every agent preloads, so there is one copy.
+     CLAUDE.md's authoring-standard rule gets amended to name it (its
+     wording goes to Keith first, like any standard). The folder stays
+     `docs/explainers/`, with "Understanding Mothman" as a display title
+     only. Rejected: a standalone doc agents read on demand, and
+     renaming the folder now.
+
+   **Slice 1 answers, set 3 (Keith, 2026-09-29):**
+   - **Q9, guarding signed pages in slice 1:** yes. The validator
+     refuses a page that claims sign-off without a sign-off record in
+     its front matter. The full staleness gate stays in slice 2.
+   - **Q10, eval set: seven pages, not five.** Round 3's five (three
+     planted defects, one clean, one prompt injection), plus a
+     sensitivity breach (a blocker class) and the "delivery changed
+     meaning" naming trap.
+   - **Q11, eval records:** summarised in each requirement's
+     `evidence:` and `decisions:`; no transcripts committed, because
+     they are state. Keith alone judges the illustrator A/B. Rejected:
+     the critic also reviewing the A/B, and a committed run log.
+   - **Q12, the concept map: REQ-DOCS-120 stays.** The page list,
+     groups and tiering become a committed config file, so the 32
+     tiering decisions survive when this plans file is deleted.
+
+   **Next:** the scoper revises the drafts against sets 1-3, then
+   `delivery-architect` reviews them, then sign-off one by one. The
+   drafts sit in `plans/explainers-slice1-draft.yaml` until they move
+   into `requirements.yaml`; that file is deleted in the same commit.
+   **Before this plans file is deleted**, per the scoper's carry-over
+   check: queue item 9's renames and the GDS release-note style (which
+   touches `CHANGELOG.yaml`'s header) move to
+   `plans/running-thoughts.md`, since no slice-1 requirement carries
+   them.
 
 4. **[todo, 2026-09-29]** **[Docs & process]** The concept map: which
    groups and concepts the explainers cover, in what order, and what a
