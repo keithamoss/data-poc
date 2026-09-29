@@ -65,6 +65,28 @@ def _stage(conn, dataset, arrival=None):
     return f"{dataset.dataset_id}@{arrival}", physical
 
 
+def _entry_for(conn, dataset_id, period, action=None):
+    """This period's own decision-log entry, newest first match.
+
+    NEVER `decisions_for(...)[-1]`, and this helper exists because that
+    spelling broke CI three times in one day. These tests act on a REAL
+    dataset id - `cp-carers`, because the fixture needs a real table and
+    agency - while minting a period of their own. Every other module
+    touching cp-carers on the same xdist worker writes into the same
+    log, so the NEWEST entry for the dataset is routinely somebody
+    else's: a promotion the rule made, or a reason another test typed.
+
+    It is also not deterministic, which is what made it expensive: which
+    module shares a worker depends on how pytest-xdist distributes
+    files, so the same code went green once and red twice.
+    """
+    matches = [e for e in dl.decisions_for(conn, dataset_id)
+                if period in (e.get("to_slot"), e.get("from_slot"))
+                and (action is None or e["action"] == action)]
+    assert matches, f"no {action or 'decision'} recorded for {dataset_id} {period}"
+    return matches[-1]
+
+
 def _request(dataset, actor, operation, **kw):
     kw.setdefault("reason", "because I looked at it")
     return fd.Request(operation=operation, dataset_id=dataset.dataset_id,
@@ -110,7 +132,7 @@ class TestWhoMayRaiseOne:
         supply, physical = _stage(conn, dataset)
         fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=supply),
                   effective_at=WHEN, conn=conn)
-        entry = dl.decisions_for(conn, dataset.dataset_id)[-1]
+        entry = _entry_for(conn, dataset.dataset_id, first, dl.PROMOTE)
         assert entry["actor"] == REAL_PERSON
         assert entry["actor_kind"] == dl.PERSON, (
             "a person's decision is never recorded as the rule's")
@@ -199,7 +221,7 @@ class TestSevenOfTheEightReallyWork:
                                  supply=supply), effective_at=WHEN, conn=conn)
 
         assert got.changed is True
-        entry = dl.decisions_for(conn, dataset.dataset_id)[-1]
+        entry = _entry_for(conn, dataset.dataset_id, first, dl.REJECT)
         assert entry["action"] == dl.REJECT
         staged = supply_db.candidates_in(
             conn, supply_db.STAGING_SCHEMA, [dataset.table],
@@ -401,7 +423,8 @@ class TestTheFilingRulesAreJudgedWhenTheEntryIsAppended:
 
         assert got.changed is True
         assert dl.promoted_into(conn, dataset.dataset_id, first) == mine
-        assert dl.decisions_for(conn, dataset.dataset_id)[-1]["reason"] == \
+        assert _entry_for(conn, dataset.dataset_id, first,
+                           dl.PROMOTE)["reason"] == \
             "theirs was the wrong extract"
 
 

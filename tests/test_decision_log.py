@@ -541,3 +541,58 @@ class TestAReaderWithNoWriteAccess:
             pass
         everything = dl.all_decisions(conn)
         assert any(e["dataset_id"] == dataset for e in everything)
+
+
+class TestNoTestAssumesTheNewestEntryIsItsOwn:
+    """The defect class that broke CI three times on 2026-09-29, made
+    impossible to reintroduce quietly.
+
+    THE SHAPE: `decisions_for(conn, dataset_id)[-1]`. It reads as "the
+    decision I just recorded" and means "the newest decision anybody
+    recorded for this dataset". Tests act on REAL dataset ids - the
+    fixtures need a real table and agency - while minting periods of
+    their own, so several modules write cp-carers entries into one
+    worker's log. Whose entry is last depends on how pytest-xdist
+    distributed the files, which is why the same code went green once
+    and red twice before anybody looked.
+
+    IT IS THE INDEX THAT IS WRONG, NOT THE READ. `[0]` is safe where a
+    test mints a dataset id nobody else uses, and every current one
+    does; `[-1]` is unsafe even then, because the rule writes
+    `inherit-refused` entries of its own after a promotion. So this
+    forbids the one spelling rather than policing the whole read.
+
+    WHAT TO DO INSTEAD: select by the period or supply under test -
+    tests/test_filing_decisions.py's own `_entry_for()` is the worked
+    example, and it says why in its docstring.
+    """
+
+    def test_no_test_module_takes_the_last_entry_for_a_dataset(self):
+        """READ WITH `ast`, NOT A REGEX. The first version was a regex
+        and matched its own docstring, plus the helper written to
+        replace the spelling - both of which quote it in prose to say
+        not to use it. A guard that fires on its own explanation is one
+        somebody deletes."""
+        import ast
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent
+        offenders = set()
+        for path in sorted(root.glob("test_*.py")):
+            for node in ast.walk(ast.parse(path.read_text())):
+                if not isinstance(node, ast.Subscript):
+                    continue
+                call = node.value
+                if not (isinstance(call, ast.Call)
+                        and isinstance(call.func, ast.Attribute)
+                        and call.func.attr == "decisions_for"):
+                    continue
+                index = node.slice
+                if (isinstance(index, ast.UnaryOp)
+                        and isinstance(index.op, ast.USub)
+                        and getattr(index.operand, "value", None) == 1):
+                    offenders.add(path.name)
+        assert offenders == set(), (
+            f"{sorted(offenders)} assert on the NEWEST decision-log entry for "
+            f"a dataset, which is routinely another module's - see this "
+            f"class's docstring. Select by the period or supply under test.")

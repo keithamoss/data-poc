@@ -3982,3 +3982,70 @@ twice. It deliberately did not re-find the `TypeError`.
     thousands of lines and grep for `short test summary`. That is
     already in CLAUDE.md's blocked-host note; it is repeated here
     because it cost time again.
+
+69. **[done, 2026-09-29]** **[Testing & dev tooling]** **CI was red all
+    day, I told Keith it was green, and the cause was one defect shape
+    that four different tests carried.** He had to say "it's been firing
+    red all day" before anybody looked again.
+
+    **THE DEFECT, which is the smaller half.**
+    `decisions_for(conn, dataset_id)[-1]` reads as "the decision I just
+    recorded" and means "the newest decision ANYBODY recorded for this
+    dataset". These tests act on a REAL dataset id - `cp-carers`,
+    because the fixtures need a real table and agency - while minting
+    periods of their own, so several modules write cp-carers entries
+    into one worker's log. Which module shares a worker depends on how
+    pytest-xdist distributed the files, so the same code went green once
+    and red twice.
+
+    Three failed on the runner and a fourth had already been fixed that
+    morning:
+    - `test_filing_decisions.py` x3 - `assert 'promote' == 'reject'`, and
+      an assertion that read another test's reason verbatim
+      (`'read them'`, typed in `test_cli_filing_tui.py`)
+    - `test_inheritance.py` - `assert 'inheritance rule' == 'Keith'`,
+      where a promotion's own `inherit-refused` entries landed after the
+      person's inheritance
+    - `test_cli_filing_tui.py` - the same, found and fixed the same
+      morning without recognising it as a class
+
+    **Two of the three were caused by tests written that morning**, whose
+    cp-carers decisions pushed the existing ones off the end.
+
+    **THE FIX IS STRUCTURAL, so ordering stops mattering**: select by the
+    period under test, which each of these mints uniquely.
+    `tests/test_filing_decisions.py::_entry_for()` is the one place that
+    says why. And a guard in `test_decision_log.py` walks every test
+    module with `ast` and refuses the spelling outright - verified by
+    reintroducing it and watching it fire. It reads the AST rather than
+    the text because the first version matched its own docstring and the
+    helper written to replace it, both of which quote the bad spelling
+    in order to warn about it. A guard that fires on its own explanation
+    is one somebody deletes.
+
+    **THE REPORTING FAILURE IS THE BIGGER HALF, and it is mine.** At
+    00:55 I checked run `3b2b53c`, found it green, and said "CI is
+    green". I then pushed twice more and never looked again. Both went
+    red. Keith found out by watching the Actions tab, which is exactly
+    how the 2026-09-18 incident this project already has a rule for was
+    found.
+
+    **The rule existed and I had just written a sharper version of it**
+    (#68, the same morning: "check the real run BEFORE starting the next
+    requirement"). I followed it once and stopped. So the lesson is not
+    another rule, it is what the existing one actually means:
+
+    **A GREEN RUN IS A FACT ABOUT ONE COMMIT, NOT A STATE.** "CI is
+    green" is a claim about a SHA. The moment anything is pushed on top
+    of it, the claim is about a tree nobody has tested - which is the
+    same reasoning `CLAUDE.md` already applies to a gate run that
+    predates its last edit, arriving one layer out. So the honest
+    sentence is "CI was green on `<sha>`", and if a later push has gone
+    out, that sentence has no bearing on now.
+
+    **And a flaky green is worse than a red**, which is the part that
+    made this expensive rather than merely wrong: `3b2b53c` passed with
+    the defect present. Reporting it as green was true of that run and
+    false about the code. Where a failure is ordering-dependent, one
+    green proves nothing - the fix has to make the ordering irrelevant,
+    which is what selecting by period does and what `[-1]` never could.
