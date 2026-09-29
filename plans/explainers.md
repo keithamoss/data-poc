@@ -50,7 +50,7 @@ survives context compaction. Tick items off here as they land.
    (#3, round 12).
 6. [in progress: named, 12 traits drafted, wording to Keith with the house standard] **Keith names external writing exemplars** (#3, style round
    4).
-7. [in progress: 18 drafts, REQ-DOCS-115 to 132, all questions answered (sets 1-6); last answers to fold in, then sign-off one by one] **Requirements via `delivery-scoper`**, drafting from items
+7. [done: all 18, REQ-DOCS-115 to 132, signed off and in requirements.yaml] **Requirements via `delivery-scoper`**, drafting from items
    1-4, then Keith's sign-off. Nothing is built before this.
 8. [done: moot, GOV.UK is the baseline, and its numbers rule applies] Confirm the Style Manual's rule on numbers once
    `www.stylemanual.gov.au` is reachable (#3, style round 4).
@@ -888,10 +888,33 @@ survives context compaction. Tick items off here as they land.
    includes the agents' gitignored working folder - the rule probably
    wants to exclude it.
 
-   **Next:** the scoper revises the drafts against sets 1-3, then
-   `delivery-architect` reviews them, then sign-off one by one. The
-   drafts sit in `plans/explainers-slice1-draft.yaml` until they move
-   into `requirements.yaml`; that file is deleted in the same commit.
+   **Slice 1 SIGNED OFF (Keith, 2026-09-29): all 18 requirements,
+   REQ-DOCS-115 to 132, are in `requirements.yaml`** with
+   `signed_off`, status `not_started`. Walked through in build-order
+   clusters (standard, reference data, tooling, agents and first page)
+   after Keith asked for fewer round trips. Changes made at sign-off:
+   the critic eval compares Opus with Sonnet 5.5 (the draft said
+   Sonnet 5), and REQ-DOCS-127 carries two personas in Keith's own
+   words plus a third, returning-reader pass:
+   - the ENGINEER - a government data engineer whose QA today is
+     per-dataset hand-written Python scripts and a hand-compiled Word
+     report, vaguely aware of dbt or Great Expectations, who knows the
+     domain but not this proof of concept, and reads both when new and
+     as a mid-task reminder;
+   - the MANAGER - knows data really well, is not a software engineer,
+     reads "In short" and sometimes "why it's this way" to explain a
+     concept upward; the pass flags oversimplified as well as too
+     technical;
+   - the returning-reader pass - the engineer weeks later, skimming
+     headings and "In short" for two or three operating answers.
+   The cast's reader stand-in (Sam) must match the engineer persona
+   (REQ-DOCS-117), so the cast draft changes to match when the house
+   standard is written. The temporary draft file was deleted in the
+   same commit that moved the requirements into the register.
+
+   **Next:** building slice 1, in dependency order. Nothing is built
+   yet. This item and item 4 stay until slice 2 is built (CLAUDE.md
+   rule 4): the slice-2 decisions live only here.
    **Before this plans file is deleted**, per the scoper's carry-over
    check: queue item 9's renames and the GDS release-note style (which
    touches `CHANGELOG.yaml`'s header) move to
