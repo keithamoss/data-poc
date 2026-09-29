@@ -1739,6 +1739,16 @@ Rough layout:
       from `arxiv.org`, so this blocks only programmatic search. Google's
       ADK docs were read legitimately from their own source repo
       (`google/adk-docs`) instead.
+    - **`guidance.publishing.service.gov.uk`** (the MOST useful - where
+      GOV.UK's writing guidance now lives), **`docs.publishing.service.gov.uk`**,
+      **`design-system.service.gov.uk`**, **`alphagov.github.io`**,
+      **`technology.blog.gov.uk`**, **`gds.blog.gov.uk`**, plus
+      `www.gov.uk` and `gds-way.digital.cabinet-office.gov.uk` again
+      (2026-09-29, the GOV.UK writing research for
+      `plans/explainers.md` #3). Worked around legitimately: the same
+      guidance is published as source in public `alphagov` GitHub repos
+      (`govuk-content-publishing-guidance`, `govuk-developer-docs`,
+      `tech-docs-template`, `gds-way`), readable via `git clone`.
     - ~~**`arxiv.org`**, **`aclanthology.org`**~~ - ALLOW-LISTED by
       Keith 2026-09-29 and re-verified with a real `curl` (both 200).
       Both were first hit that day researching the explainer agents

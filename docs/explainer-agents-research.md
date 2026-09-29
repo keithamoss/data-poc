@@ -372,6 +372,56 @@ snippet-only (arXiv and ACL Anthology are blocked here).
 
 How these were applied is in `plans/explainers.md` #3, round 13.
 
+## 8. GOV.UK and GDS writing guidance (researched 2026-09-29)
+
+Primary: the `alphagov` GitHub repos, since every GOV.UK guidance site
+is blocked here:
+- `govuk-content-publishing-guidance`: the A to Z style guide, the
+  Technical A to Z and the writing guidelines;
+- `govuk-developer-docs`;
+- `tech-docs-template`;
+- `gds-way`.
+
+Snippet-only: the Australian Style Manual points, and a "reading age 9"
+claim that appears nowhere in the current guidance source.
+
+**Rules that bear on the explainers:**
+- Page titles and headings should not be questions ("they're hard to
+  frontload and users want answers, not questions").
+- Tone is incisive rather than friendly ("friendliness can lead to a
+  lack of precision"), and metaphors are discouraged.
+- Front-load everything. Sentences of 25 words at most, and paragraphs
+  of five sentences at most.
+- Use "you". "Cannot" and "do not" rather than contractions, though
+  "you'll" is fine.
+- No semicolons; no eg, ie or etc.
+- "To" rather than a dash in ranges; "11:59pm" rather than "midnight".
+- Mark an unfamiliar term in 'single quotes' on first use. Bold is only
+  for interface labels.
+- Don't gather links at the bottom of a page.
+- "Easy", "simple" and "quick" demoralise readers who find it
+  otherwise.
+- Explain specialist terms rather than avoiding them.
+
+**Rules that bear on the pipeline docs.** GDS technical writing:
+- verb-first task titles, with no "How to";
+- the steps first, then how it works;
+- troubleshooting on the task page itself, not an FAQ;
+- numbered steps, each saying what the command does;
+- `<CAPS_WITH_UNDERSCORES>` placeholders, explained below the example;
+- "must", "should" and "can" for requirement, recommendation and
+  option;
+- code style for commands, paths and keys;
+- reference generated from code;
+- a "Get started" page;
+- a last-reviewed date on every page.
+
+GDS also warns that readers skip concept pages more than any other
+type.
+
+How these were weighed against Keith's own style decisions is in
+`plans/explainers.md` #3.
+
 ## Network notes
 
 - **`github.com` refuses its web pages and API here, but `git clone`

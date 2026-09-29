@@ -1285,3 +1285,134 @@ survives context compaction. Tick items off here as they land.
      pipeline docs. That pairing is treated as intended, but is
      unconfirmed. Still open: whether `docs/explainers/` is renamed to
      match.
+
+   **Re-baseline after the overnight merge (2026-09-29).** Keith: the
+   other session built a lot overnight, "like promotion", so the map was
+   stale. 86 commits were merged in (`e3526d8`). Build status changed
+   for 12 concepts the map relies on:
+   - REQ-DASH-056 arrived versus promoted;
+   - REQ-DASH-085 and REQ-DASH-100 the stand-in qualifiers;
+   - REQ-DASH-094 which environment a dashboard shows;
+   - REQ-GHUB-082 filing decisions from GitHub or the terminal;
+   - REQ-PIPE-074 the decision log;
+   - REQ-PIPE-075 the promotion gate;
+   - REQ-PIPE-076 rejection, demote, and automation deferring to a
+     person;
+   - REQ-PIPE-084 substitute;
+   - REQ-PIPE-098 and REQ-PIPE-099 inherit and un-inherit;
+   - REQ-QAC-108 drift measured against the last promoted period.
+
+   All are now BUILT. REQ-PIPE-079 (why a check couldn't run, QA against
+   the filed period) and REQ-PIPE-083 (tickets) are in progress. The
+   "designed, not built" badge therefore now applies to much less of
+   groups 4-6. Still unbuilt: holds as a recorded state (078), mixed-
+   period deliveries (077), "In place on" (081), file-shape checks
+   (096/097), and the recorded arrival classification (080).
+
+   **New since the triage**, not yet triaged:
+   - **REQ-PIPE-083 re-shaped**: every slot has ONE ticket, reconciled
+     to its current state, never a stream of events. REQ-GHUB-109 (a
+     ticket comment only when something changed) goes with it. This
+     replaces the "an overdue slot raises its own ticket, once" wording
+     triaged as #28.
+   - **REQ-PIPE-110**: `contract/calendar.yaml` as the one place a
+     **delivery agreement** lives (not built).
+   - **REQ-PIPE-111**: a calendar's history cannot be edited (not
+     built).
+   - **REQ-PIPE-112**: the asset's timezone is versioned (not built).
+   - **REQ-PIPE-113**: a slot's due instant comes from the agreement,
+     and overlapping windows are refused (not built).
+   - **REQ-TEST-114**: the terminal says which environment it acts
+     against. This is operating the system, so pipeline docs.
+
+   **Naming clashes with the naming session:**
+   - "Supply calendar" (Keith's pick) has ZERO uses anywhere. The
+     overnight requirements introduced "delivery agreement" (5 uses)
+     and a file called `calendar.yaml`.
+   - "Reconcile" is now established (79 uses in requirements, 48 in
+     code).
+   - "Stand on" / "standing on" is widespread (28 in requirements, 24
+     in code), and was already a listed alias.
+
+   **Re-baseline decisions (Keith, 2026-09-29):**
+   - **"Delivery agreement" and "supply calendar" are nested, both
+     kept.** The delivery agreement is what we agreed with a supplier
+     (REQ-PIPE-110, in `contract/calendar.yaml`). The supply calendar
+     is the schedule of periods and due dates INSIDE it. They are two
+     related glossary entries.
+   - **Tickets: explain the new model.** Group 6's ticket page explains
+     "one ticket per slot, always showing where that supply has got
+     to" (REQ-PIPE-083, REQ-GHUB-109). The reconciling mechanics go to
+     the pipeline docs. This replaces #28's old wording.
+   - **The new calendar requirements (110-113): meaning in, config
+     out.** The explainers get the reader's meaning, badged not built:
+     a past due date can never change, and windows never overlap so a
+     supply belongs to one slot. Where the file lives and how the
+     timezone is versioned go to the pipeline docs, as does
+     REQ-TEST-114.
+   - **Triage decisions stand; the "not built" badge simply drops**
+     from the concepts built overnight. Tiering proceeds on the updated
+     picture.
+
+   **GOV.UK research (2026-09-29, Keith's ask).** Primary sources are
+   the `alphagov` repos on GitHub, because `www.gov.uk` and every
+   `*.service.gov.uk` guidance site are blocked:
+   - `govuk-content-publishing-guidance`, the source of the A to Z,
+     the Technical A to Z and the writing guidelines, read in full;
+   - `govuk-developer-docs`;
+   - `tech-docs-template`;
+   - `gds-way`.
+
+   The main session re-verified two quotes at source: titles and
+   headings "not be questions", and "friendliness can lead to a lack
+   of precision".
+
+   **Conflicts with style rounds 1-4, for Keith (round 5 of style):**
+   - question headings;
+   - puns in headings (GOV.UK's tone is "incisive", with no
+     metaphors);
+   - bold for a new term (GOV.UK marks a term with 'single quotes' and
+     uses bold only for interface labels);
+   - a sources section at the end (GOV.UK says not to gather links at
+     the bottom, though provenance is not "further reading").
+
+   **Clashes with Mothman's own words:** "promote", "deliver", "assets"
+   and "issues" are on GOV.UK's words-to-avoid list. The recommendation
+   is to give each a glossary entry rather than rename it, since
+   GOV.UK's own rule is to explain specialist terms.
+
+   **Agrees with our decisions:**
+   - "you" (and "we" once the team is named);
+   - a 25-word sentence cap;
+   - "29 September 2026" dates;
+   - the banned-word lists, with GOV.UK's reason: "easy", "simple"
+     and "quick" demoralise readers who do not find it so;
+   - splitting documents by type and cross-linking.
+
+   **Numbers:** "one" in words, numerals from 2, which supports round
+   4 (the Style Manual itself is still unconfirmed).
+
+   **New rules GOV.UK would add:**
+   - "cannot" / "do not" rather than contractions (but "you'll" is
+     fine);
+   - paragraphs of five sentences at most;
+   - no semicolons;
+   - no eg / ie / etc;
+   - "to" in ranges rather than a dash;
+   - "11:59pm" rather than "midnight";
+   - accessible titles and descriptions on every diagram.
+
+   **For "Running Mothman", follow GDS closely:**
+   - verb-first task titles with no "How to";
+   - the steps first, and "how it works" lower down;
+   - troubleshooting on the task page, not an FAQ;
+   - numbered steps, each saying what the command does;
+   - `<CAPS_WITH_UNDERSCORES>` placeholders;
+   - "must" / "should" / "can" for requirement / recommendation /
+     option;
+   - reference generated from the code;
+   - a "Get started" page;
+   - a last-reviewed date on every page.
+
+   GDS also warns that concept pages are the type readers skip most,
+   which argues for each explainer's one-sentence answer coming first.
