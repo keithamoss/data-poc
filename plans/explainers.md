@@ -1416,3 +1416,51 @@ survives context compaction. Tick items off here as they land.
 
    GDS also warns that concept pages are the type readers skip most,
    which argues for each explainer's one-sentence answer coming first.
+
+   **Style round 5 - the GOV.UK conflicts (Keith, 2026-09-29):**
+   - **Headings: follow GOV.UK - statements, not questions.** This
+     REVERSES style round 1's "mostly questions". Titles are not
+     questions either. The why-question lives in each page's brief and
+     opening answer, not in its headings.
+   - **Humour narrowed: wry asides stay in body text; puns come OUT of
+     headings and titles**, where they cost skimming and search.
+     Analogies stay, as the explainers' core device.
+   - **New terms stay bold** (not GOV.UK's single quotes). Bold is
+     still reserved for defined terms only, which answers GOV.UK's real
+     concern (no bold for emphasis).
+   - **Added from GOV.UK:**
+     - "cannot" and "do not" rather than contractions ("you'll" is
+       still fine);
+     - paragraphs of five sentences at most;
+     - no semicolons;
+     - no eg / ie / etc;
+     - "to" in ranges, never a dash;
+     - "11:59pm" rather than the ambiguous "midnight", which matters
+       for due times.
+   - **Not added: a separate accessible title and description per
+     diagram.** Round 6's required caption already doubles as each
+     diagram's accessible description.
+   - **The sources list stays at the end, and links also go inline.**
+     The list is provenance, not "further reading". Links a reader
+     actually needs (the glossary, related pages) go inline where they
+     are relevant, never only at the bottom.
+   - **"Running Mothman" adopts GDS technical-writing conventions
+     wholesale** as its house standard:
+     - verb-first task titles;
+     - the steps first;
+     - troubleshooting on the task page;
+     - numbered steps;
+     - `<CAPS>` placeholders;
+     - "must" / "should" / "can";
+     - reference generated from code;
+     - a "Get started" page;
+     - last-reviewed dates.
+   - **GOV.UK's words-to-avoid that are real Mothman terms** (promote,
+     deliver, assets, issues) are kept as terms and each defined in
+     the glossary. In general prose, where they are not the term,
+     GOV.UK is followed (e.g. "problems", not "issues").
+   - **Answer first, always.** The first sentence of every "In short"
+     box is the one-line answer to the page's why-question, so a
+     skimmer who reads nothing else still leaves with it. Concept pages
+     are also reached from the dashboard's "What's this?" links, where
+     readers are actually confused.
