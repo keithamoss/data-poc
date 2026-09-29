@@ -228,15 +228,32 @@ blocked withdrawal - criteria 7 and 8 were met on 2026-09-29 when
 `REQ-GHUB-082`'s TUI route landed and offered both outside the supply
 queue; criterion 11 still waits on `REQ-PIPE-079`'s re-run).
 
+**`REQ-PIPE-083` IS NOW `built` (2026-09-29)** and has moved out of this
+list. It was everything but criteria 14 and 15, the OPERATOR ROUTES; both
+were met when `REQ-GHUB-082`'s routes landed and are now pinned by tests
+rather than assumed. Criterion 1's second path closed with them, which
+nobody foresaw: it had nothing to hook because `mothman` had no command
+that opened a period, and a person's SUBSTITUTE now opens one. A case of
+a requirement being FINISHED by another one's build rather than merely
+unblocked by it. `gh` is still absent here, which is what makes criterion
+17 observable rather than asserted: a full run reconciles nothing, says
+so in one line, and finishes normally.
+
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
 `REQ-PIPE-079` (decision layer done, wiring not), `REQ-PIPE-105`
-(criteria 7 and 8 done),
-`REQ-PIPE-083` (everything but criteria 14 and 15, the OPERATOR ROUTES -
-the slot state, the reconciler, a real GitHub ticket service fenced by
-its own label, and both orchestrators calling it after promotion. `gh`
-is absent here, which is what makes criterion 17 observable rather than
-asserted: a full run reconciles nothing, says so in one line, and
-finishes normally).
+(criteria 3, 4, 7, 8 and 12 done; the arrival UNIT is not).
+
+**AND THE TWO ARE THE SAME SWITCH-OVER, found 2026-09-29 while answering
+Keith's "what do you need from me" on each.** `079` criterion 2 ("evaluate
+each run against that period's schema with that delivery's own staged
+supplies overlaid") and `105` criterion 5 ("the one version of that table
+staged for that period... falling back to the period's promoted state")
+describe the SAME replacement of `supply_db.borrow_views()`, and `105`
+criterion 9 amends `REQ-PIPE-035` criterion 3 for exactly it.
+`period_schema.create_overlay_views()` already implements both and
+NOTHING CALLS IT - nor `fan_out()` nor `reference_view()`, verified by
+grep. So doing one without the other means doing it twice. Worth
+scheduling as one piece.
 
 **THE FIVE THINGS THAT ARE KEITH'S, not mine, all recorded in the
 requirements' own `decisions:` and repeated here because this is the
@@ -2089,13 +2106,21 @@ comparisons against the expected-supply sequence.
     (sprint 12) and the as-of work (sprint 19), and nothing depends on
     it.
 
-25. **[in-progress, 2026-09-28]** **[Pipeline & publishing]** **CARRY-FORWARD:
+25. **[blocked, 2026-09-29]** **[Pipeline & publishing]** **CARRY-FORWARD:
     a period whose supply never arrives, and a human decides to point it
     at the previous period.** Keith, 2026-09-24. A genuinely new
     concept, adjacent to promotion and rejection (sprint 11) rather than
     part of either, and it has no requirement anywhere yet.
 
     **Owns:** `REQ-PIPE-083`, `REQ-PIPE-084`, `REQ-DASH-085`
+
+    **`blocked` SINCE 2026-09-29, at 51 of 52 criteria.** It went there
+    when `REQ-PIPE-083` flipped to `built` and took its last unmet
+    criteria with it - what remains is `REQ-PIPE-084`'s deferral, which
+    waits on `REQ-PIPE-079`'s unbuilt wiring, and a sprint whose every
+    remaining criterion is deferred to another one is `blocked` rather
+    than `in-progress`. The `sprints` gate counted this before I did,
+    which is what it is for.
 
     **NAME COLLISION, FLAGGED FIRST because this file has been bitten
     by exactly this before** (see "The collision: delivery already means

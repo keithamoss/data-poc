@@ -2926,3 +2926,73 @@ standing rule). A real test can assert the directory a run created is
 gone afterwards, which fails against today's code by construction.
 Worth covering all five call sites rather than the one that produced the
 most litter.
+
+27. **[todo, 2026-09-29]** **[Testing & dev tooling]** **CI takes
+    nineteen and a half minutes, and half of it is a bootstrap that
+    could be cached.** Keith's own ask this morning, to be picked up in
+    the next couple of days.
+
+    **Where the time goes, measured on run `36503758018` rather than
+    estimated** - and note the CI figure is not the local one, which is
+    6m42s for the same tree:
+
+    | Step | Time |
+    |---|---|
+    | setup (checkout, `uv sync`, `dbt deps`, playwright, yamllint) | 1m 04s |
+    | `mothman pipeline bootstrap` | **8m 55s** |
+    | dashboard build | 8s |
+    | `pytest`, 2890 tests, with coverage | **9m 18s** |
+    | **total** | **19m 31s** |
+
+    The `js-tests` job is 41s and runs in parallel, so it is never the
+    critical path. The bootstrap exists because `REQ-PIPE-089` made the
+    suite's source a database and a runner's starts empty; it takes nine
+    minutes rather than four because `REQ-PIPE-075` made arrivals run one
+    at a time, each filing to the oldest slot the one before it did not
+    promote.
+
+    **Five options, put to Keith 2026-09-29, roughly best-value first.**
+
+    1. **CACHE THE BOOTSTRAPPED DATABASE.** It is a pure function of
+       committed configuration plus a fixed seed, so `pg_dump` it and
+       key the cache on a hash of `contract/`, `generator/`,
+       `qa_tools/` and `dbt_project/`. Restore is seconds, and most
+       pushes - plans, requirements, the dashboard template, tests -
+       would not invalidate it. **The risk to settle FIRST, because it
+       is the whole difficulty**: recorded results carry real
+       timestamps, and this project has twice been bitten by tests that
+       depend on the asset clock (a daily dataset's current cycle going
+       correctly quiet the moment the Perth date rolls, and an e2e
+       assertion computing "today" off `date.today()`). A cache three
+       days old could fail a test for a reason that is not a
+       regression. Half a day of care, not a one-liner.
+    2. **SPLIT THE JOB SO THE BOOTSTRAP IS OFF THE CRITICAL PATH.** Nine
+       test modules read `reports/` - `test_dashboard_e2e.py` is 178
+       tests of them - and the other ~2,700 use per-worker databases and
+       need no bootstrap at all. Two jobs in parallel: a fast one that
+       starts immediately, a slow one that bootstraps and runs the nine.
+       Wall clock becomes `max(...)` rather than `sum(...)`, so roughly
+       19m -> 10m, with the common failure back in about three minutes.
+       Lower risk than 1 and independent of it; they compose.
+    3. **PARALLELISE INSIDE A RUN.** `CLAUDE.md` already flags this: a
+       run's four tools are independent reads evaluated one after
+       another. Arrivals must stay serial, the tools inside one need
+       not. The only option here that is not CI-specific - it helps a
+       local bootstrap and a real pipeline run too. Touches both
+       orchestrators.
+    4. **PATH FILTERS.** A commit touching only `plans/` or
+       `requirements.yaml` needs neither the bootstrap nor the browser
+       tests, and several of the overnight commits were exactly that.
+       Cheap - and precisely the "it only failed on CI" class this
+       project has been burned by, so the filter would have to be narrow
+       and fail OPEN.
+    5. **A BIGGER RUNNER.** One line, costs money. Arrivals being
+       serial, it helps `pytest` under xdist more than the bootstrap, so
+       perhaps two to three minutes off the second half only.
+
+    Unmeasured and probably minor: coverage runs over the whole suite.
+    Worth timing before assuming it is free.
+
+    **Recommendation given: 2 then 1.** 2 is safe and halves the wait; 1
+    is the larger win but the clock question wants answering first.
+    Awaiting Keith's pick.

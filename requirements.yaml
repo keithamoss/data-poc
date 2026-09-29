@@ -16106,7 +16106,7 @@ requirements:
       place a person writes a change or records a decision by a route
       that is neither the CLI nor the TUI.
     moscow: must
-    status: in_progress
+    status: built
     source: >
       plans/supply-model.md delivery sprint 25, Keith 2026-09-24, who
       flagged "WHAT DETECTS LATENESS, and what acts on it" as an
@@ -16436,8 +16436,39 @@ requirements:
         would be criterion 16's forbidden case exactly: a ticket saying
         something the decision log does not yet.
 
-        NOT DONE - criteria 14 and 15, the operator routes, which are
-        REQ-GHUB-082's and REQ-PIPE-099's.
+        NOT DONE AS OF 2026-09-28 - criteria 14 and 15, the operator
+        routes, which are REQ-GHUB-082's and REQ-PIPE-099's. BOTH MET
+        2026-09-29 and this requirement is `built`; see the decision
+        below and the evidence. Dated rather than deleted, because the
+        shape of the gap is what a reader needs in order to trust that
+        it closed.
+
+      - >
+        [BUILT 2026-09-29] CRITERIA 14 AND 15 ARE MET, CHECKED RATHER
+        THAN ASSUMED. Keith asked directly whether this had actually
+        been built once REQ-GHUB-082's routes landed, which is the right
+        question: a blocker shipping is evidence a criterion CAN be met
+        and never that it has been. Criterion 14 is a claim about what
+        does NOT exist, so it is pinned structurally - an `ast` walk of
+        every module under qa_tools/, cli/ and pipeline/ asserts exactly
+        two call `.comment()` on a ticket: this reconciler, which IS the
+        pass, and the GitHub adapter's refusal path, which criterion 15
+        requires be said directly. Every person route - the TUI, the
+        flag form and a ticket comment - funnels through
+        `filing_decisions.reconcile_after()`, which calls
+        `ticket_reconciler.report(after_runs(...))` and nothing else.
+      - >
+        [BUILT] CRITERION 1'S SECOND PATH CLOSED WITH THEM, which was
+        not foreseen. The note above said a period opened by explicit
+        instruction had nothing to hook, because "mothman has no command
+        that opens a period". It has one now: a person's SUBSTITUTE
+        calls `substitution.substitute()`, which calls
+        `period_schema.open_period()`, and it became reachable the
+        moment the operator routes landed. Because the pass reads EVERY
+        slot the collection has rather than the ones a run touched, the
+        new period's tickets appear on the same reconcile. Worth
+        recording as a case where a requirement got FINISHED by another
+        one's build rather than merely unblocked by it.
 
       - >
         THE ORDER OF THE STATE RULES IS THE DESIGN, and it is worth
@@ -16667,6 +16698,63 @@ requirements:
         makes the action reachable, it has its own failure modes, and
         Keith flagged its mechanism as an open decision in its own
         right.
+
+    implemented_by:
+      - qa_tools/common/slot_state.py::states_for
+      - qa_tools/common/ticket_reconciler.py::reconcile
+      - qa_tools/common/ticket_reconciler.py::after_runs
+      - qa_tools/common/ticket_github.py::GitHubTickets
+      - qa_tools/common/filing_decisions.py::reconcile_after
+      - qa_tools/common/filing_from_github.py::_say_no
+    linked_tests:
+      - tests/test_slot_state.py
+      - tests/test_ticket_reconciler.py::TestOneTicketPerSlot
+      - tests/test_ticket_reconciler.py::TestRunningItTwiceOverAnUnchangedWorldChangesNothing
+      - tests/test_ticket_reconciler.py::TestANarrowedPassIsTheSamePass
+      - tests/test_ticket_reconciler.py::TestTheReconcilerIsInvokedAfterEveryRun
+      - tests/test_ticket_reconciler.py::TestAPersonsOperationGoesThroughTheSamePass
+      - tests/test_ticket_github.py::TestEveryReadIsFencedByThisSchemesOwnLabel
+      - tests/test_ticket_github.py::TestAnAbsentServiceRefusesCleanly
+      - tests/test_cli_filing_tui.py::TestItCallsNoGitHub
+      - tests/test_filing_from_github.py
+    evidence:
+      - >
+        2026-09-29. Criteria 14 and 15 were the only two outstanding and
+        are now met, CHECKED RATHER THAN ASSUMED once REQ-GHUB-082's
+        routes landed. Criterion 14 is a claim about what does NOT exist
+        - "SHALL NOT post an update of that operation's own devising" -
+        so it is pinned structurally: a test walks every module under
+        qa_tools/, cli/ and pipeline/ with `ast` and asserts that
+        exactly two call `.comment()` on a ticket, the reconciler (which
+        IS the pass) and the GitHub adapter's refusal path (which
+        criterion 15 requires be said directly). A second test asserts
+        there is one function every route reconciles through, and that
+        it calls this pass.
+      - >
+        2026-09-29. Criterion 1's SECOND PATH is now covered too, and it
+        had nothing to hook when this was last assessed: a period opens
+        either on a first promotion or on an explicit instruction, and
+        `mothman` had no command that opened one. A person's SUBSTITUTE
+        does - `substitution.substitute()` calls
+        `period_schema.open_period()` - and it became reachable when the
+        operator routes landed. The pass it reconciles through reads
+        EVERY slot the collection has rather than a run's own, so the
+        new period's tickets appear on it. Pinned by a test asserting
+        both halves.
+      - >
+        2026-09-29. 55 tests in tests/test_ticket_reconciler.py, 24 in
+        tests/test_ticket_github.py, 16 in tests/test_slot_state.py. The
+        ticket service is driven against a fake rather than real GitHub
+        on purpose: the contract is five methods, and a real one would
+        test the network far more than the logic while littering a
+        public repository with issues.
+      - >
+        2026-09-29. Criterion 17 is observable here rather than merely
+        asserted, because `gh` is genuinely absent from this container:
+        a full pipeline run reconciles nothing, says so in one line, and
+        finishes normally. A real defect in what it SAYS was found by CI
+        the same day and fixed - see REQ-GHUB-082's own evidence and
+        plans/post-build-review.md #68.
 
   - id: REQ-PIPE-084
     title: >

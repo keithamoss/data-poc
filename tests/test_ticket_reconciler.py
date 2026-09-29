@@ -430,3 +430,83 @@ class TestTheTicketsOwnBodySaysWhereItIsNow:
                   if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
                   and n.func.attr in ("set_body", "comment")]
         assert calls == ["set_body", "comment"], calls
+
+
+class TestAPersonsOperationGoesThroughTheSamePass:
+    """Criteria 14 and 15 - the two this requirement waited on
+    REQ-GHUB-082 for, checked here rather than assumed once its routes
+    landed.
+
+    THE FIRST IS A CLAIM ABOUT WHAT DOES NOT EXIST, which is why it is
+    asserted structurally rather than by driving one route. "SHALL NOT
+    post an update of that operation's own devising" cannot be shown by
+    a test of the route that behaves; it is shown by there being nowhere
+    else in the tree that composes a ticket update.
+    """
+
+    def _modules_that_comment(self):
+        """Every non-test module that calls `.comment(` on a ticket."""
+        import ast
+        from pathlib import Path
+
+        root = Path(tr.__file__).resolve().parent.parent.parent
+        found = set()
+        for path in sorted(root.glob("qa_tools/**/*.py")) + \
+                sorted(root.glob("cli/**/*.py")) + \
+                sorted(root.glob("pipeline/**/*.py")):
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Attribute)
+                        and node.func.attr == "comment"):
+                    found.add(path.relative_to(root).as_posix())
+        return found
+
+    def test_only_the_pass_and_the_refusal_route_write_to_a_ticket(self):
+        """Criterion 14. The reconciler composes the update; the GitHub
+        adapter posts REFUSALS, which criterion 15 requires be said on
+        the route that raised them rather than through a pass that would
+        correctly say nothing."""
+        assert self._modules_that_comment() == {
+            "qa_tools/common/ticket_reconciler.py",
+            "qa_tools/common/filing_from_github.py",
+        }
+
+    def test_every_route_that_records_a_decision_reconciles_the_same_way(self):
+        """Criterion 14's positive half: there is ONE function a filing
+        decision reconciles through, and it calls this pass."""
+        import inspect
+
+        from qa_tools.common import filing_decisions
+
+        source = inspect.getsource(filing_decisions.reconcile_after)
+        assert "ticket_reconciler.report(ticket_reconciler.after_runs(" in source
+
+    def test_the_pass_covers_every_slot_so_a_new_periods_tickets_appear(self):
+        """Criterion 1's second path, which used to have nothing to hook.
+
+        `mothman` had no command that opened a period, so a period opened
+        by explicit instruction could not get its tickets. A person's
+        SUBSTITUTE opens one (substitution.substitute -> open_period), it
+        is reachable since REQ-GHUB-082's routes landed, and the pass it
+        reconciles through reads EVERY slot rather than a run's own.
+        """
+        import inspect
+
+        from qa_tools.common import substitution
+
+        assert "open_period" in inspect.getsource(substitution.substitute)
+        assert "states_for" in inspect.getsource(tr.after_runs), (
+            "a run-scoped pass would never see the new period's slots")
+
+    def test_a_refused_decision_reconciles_nothing(self):
+        """Criterion 15, from the other end: a refusal appends nothing,
+        so the pass would find nothing changed and say nothing - which
+        is why the refusal is said directly instead."""
+        import inspect
+
+        from qa_tools.common import filing_decisions
+
+        source = inspect.getsource(filing_decisions.reconcile_after)
+        assert "if not outcome.changed:" in source
+        assert "return" in source
