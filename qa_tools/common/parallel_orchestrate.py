@@ -36,6 +36,8 @@ def run_manifest(
     *worker_args,
     sequential: bool = False,
     max_workers: int | None = None,
+    before_each: Callable[[dict], None] | None = None,
+    after_each: Callable[[dict, list[dict]], None] | None = None,
 ) -> list[dict]:
     """Runs worker(entry, *worker_args) once per manifest entry, either
     sequentially (in manifest order, today's original behaviour) or in
@@ -44,6 +46,29 @@ def run_manifest(
     order, regardless of completion order, so output stays byte-for-byte
     reproducible for a given manifest - the same "seeded -> diffable"
     property this project relies on everywhere else.
+
+    `before_each`/`after_each` MAKE THE RUNS DEPENDENT ON EACH OTHER, so
+    passing either FORCES SEQUENTIAL EXECUTION whatever `sequential`
+    says - and that is the point of them rather than a limitation.
+    They exist for filing and promotion (REQ-PIPE-075 criteria 1 and 7):
+    a supply is filed to the oldest slot no PROMOTION has filled, so
+    arrival N's filing genuinely depends on arrival N-1's promotion,
+    which depends on arrival N-1's checks. The chain is real.
+
+    MEASURED, because it costs something and the number should not be
+    guessed at: Child Protection's 18 arrivals take 2m35s in parallel
+    and 6m14s in receipt order on this 4-core sandbox, a 2.4x
+    regression. WHAT IT BUYS is not a nicety - run in parallel from an
+    empty database, every one of the 108 supplies files to 2023-Q1,
+    because no slot is ever filled while the filings are being made. In
+    receipt order they spread across all 15 quarters, the heaviest
+    holding 15, and 67 supplies promote where 6 did. A faster wrong
+    answer is not a trade worth having.
+
+    THE OBVIOUS PLACE TO GET THE TIME BACK, for whoever looks next: a
+    single run evaluates its four tools one after another and they are
+    independent reads. Parallelising WITHIN a run does not touch this
+    ordering at all.
 
     A worker exception aborts the whole batch: under ProcessPoolExecutor,
     a still-running worker isn't killed the instant another one raises
@@ -55,8 +80,16 @@ def run_manifest(
     don't silently produce a partial results file" behaviour the old
     sequential loop gave for free, just not instantaneous.
     """
-    if sequential:
-        return [item for entry in manifest for item in worker(entry, *worker_args)]
+    if sequential or before_each or after_each:
+        results: list[dict] = []
+        for entry in manifest:
+            if before_each is not None:
+                before_each(entry)
+            got = worker(entry, *worker_args)
+            results.extend(got)
+            if after_each is not None:
+                after_each(entry, got)
+        return results
 
     ordered_results: list[list[dict] | None] = [None] * len(manifest)
     with ProcessPoolExecutor(max_workers=max_workers or os.cpu_count()) as ex:

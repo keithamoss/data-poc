@@ -109,14 +109,65 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-09-29"
+    summary: >
+      You can now decide what goes into a period from the terminal, and
+      see what every period already resolves to.
+    changes:
+      - category: New
+        items:
+          - headline: Decide a period from the terminal
+            components: ["Testing & dev tooling"]
+            description: >
+              A new Filing decisions menu shows the supplies waiting on
+              somebody, and lets you promote or reject one, or say a
+              period stands on an earlier one. Every choice is recorded
+              with your name and your reason.
+          - headline: Your queue, without running anything first
+            components: ["Testing & dev tooling"]
+            description: >
+              Run mothman supply queue to see what is waiting, and
+              mothman supply slots to see where every period stands.
+              Both read the same live record the tickets do, so the
+              terminal and a ticket can no longer disagree.
+          - headline: The run you just did offers its own next step
+            components: ["Testing & dev tooling"]
+            description: >
+              Finish a check and, if that supply is now waiting on a
+              decision, you are offered it there rather than having to
+              go and find it.
+      - category: Improved
+        items:
+          - headline: Only people we know can file
+            components: ["Testing & dev tooling"]
+            description: >
+              A filing decision is accepted only from somebody named in
+              the project's own people list, and refused with a reason
+              from anybody else. Every decision needs a reason and an
+              explicit yes before it is written.
+          - headline: A fresher demo
+            components: ["Dashboard UI"]
+            description: >
+              The Demo tab's recording was showing a question the tool
+              stopped asking. It has been re-recorded against the real
+              wizard as it is today.
+
   - date: "2026-09-28"
     summary: >
-      Looking at the dashboard as of an earlier date now follows the
-      delivery dates you actually agreed, and tells you which one you are
-      looking at.
+      Supplies that pass their checks now file themselves into the period
+      they were sent for, and looking at an earlier date follows the
+      delivery dates you actually agreed.
     changes:
       - category: Improved
         items:
+          - headline: A dashboard now tells you when it is not the real one
+            components: ["Dashboard UI"]
+            description: >
+              A dashboard built anywhere other than the published
+              environment now says so on the page, in words rather than
+              just a colour, so a screenshot of development results can
+              never be mistaken for production's. One that does not know
+              where it was built says that too, instead of staying quiet.
           - headline: As-of viewing now follows your real delivery dates
             components: ["Dashboard UI"]
             description: >
@@ -136,8 +187,138 @@ releases:
               The date box now stops at the earliest and latest periods it
               has. If an old link carries a date outside them, the page says
               so, names the range it covers and offers one click back.
+      - category: Fixed
+        items:
+          - headline: A repaired link no longer breaks itself
+            components: ["Dashboard UI"]
+            description: >
+              Opening an old link to a column that no longer exists tidies the
+              address so you can share it again. With a date set, that tidy-up
+              used to leave a link nobody could open. It does not now.
+          - headline: Daily periods are named in words again
+            components: ["Dashboard UI"]
+            description: >
+              Items about a daily feed's missing days named the day as a bare
+              code. They now name it in words, the way every other date on the
+              page is written.
       - category: New
         items:
+          - headline: A ticket says something new or says nothing
+            components: ["Pipeline & publishing"]
+            description: >
+              Tickets no longer repeat themselves run after run. Each one's
+              description is kept up to date with where its supply has got to,
+              so a thread quiet for a month still tells you, and comments mark
+              only what actually changed.
+          - headline: Each expected supply can have its own ticket
+            components: ["Pipeline & publishing"]
+            description: >
+              A ticket per expected supply, kept up to date with where that
+              supply has got to, and silent when nothing has changed. By
+              default only supplies that want somebody get one; set
+              ticket_policy to all for every one.
+          - headline: Decide it on the ticket, in your own words
+            components: ["Pipeline & publishing"]
+            description: >
+              A line starting with a slash on a supply's ticket now records the
+              decision, with everything you wrote around it as the reason. A
+              comment with no such line is left alone, and a decision that
+              cannot be taken is answered on the thread.
+          - headline: One set of filing decisions, whoever makes them
+            components: ["Pipeline & publishing"]
+            description: >
+              Promote, reject, demote, substitute and the rest now go through
+              one place, so the terminal and a ticket cannot end up offering
+              different things or disagreeing about what is allowed. Repeating
+              a decision already made says so instead of failing.
+          - headline: Only real people can file a decision
+            components: ["Pipeline & publishing"]
+            description: >
+              Filing decisions are now checked against the people list, so a
+              stand-in entry can be shown on a page without being able to act,
+              and a real colleague added without a GitHub username fails the
+              build instead of finding out later.
+          - headline: You can take an inherited quarter back out
+            components: ["Pipeline & publishing"]
+            description: >
+              A quarter standing on an earlier supply can now be stood up or
+              taken back down one dataset at a time, with your reason on the
+              record - which is what frees a withdrawal those quarters were
+              holding up.
+          - headline: A blocked withdrawal now tells you how to unblock it
+            components: ["Pipeline & publishing"]
+            description: >
+              Refusing to move a supply, the system names each quarter standing
+              on it AND which action clears that one - de-substitute where a
+              person chose it, un-inherit where the schedule did.
+          - headline: Every Child Protection table watches its own size
+            components: ["QA checks & contract"]
+            description: >
+              Each of the six tables now has a check on how much it grew or
+              shrank against the last supply you promoted, with a warn level
+              and a fail level. A table that has doubled over three years is no
+              longer judged against a fixed floor.
+          - headline: Drift is measured against what you actually promoted
+            components: ["QA checks & contract"]
+            description: >
+              Distribution and row-count checks now compare each supply with
+              the last one you promoted, however many periods back that was -
+              never with the start of history, and never with a file somebody
+              rejected.
+          - headline: A check with nothing to compare says so
+            components: ["QA checks & contract"]
+            description: >
+              A dataset's first supply has nothing behind it, so its drift and
+              volume checks now read as having no reference instead of quietly
+              passing. Nothing is promoted on the strength of a comparison that
+              never happened.
+          - headline: Whose results are these, and a way back
+            components: ["Dashboard UI"]
+            description: >
+              A period showing an earlier one's data now says the checks on
+              the page belong to that earlier period, and offers one click
+              through to it. You are told you have left, and given a way
+              back, on a link that survives being shared.
+          - headline: A period standing in on an earlier one says so
+            components: ["Dashboard UI"]
+            description: >
+              Where a period shows data from an earlier one, its status now
+              carries a label naming where the data came from - and saying
+              whether a person decided it or the schedule did, with their
+              reason as written.
+          - headline: You can see what is live, not just what arrived
+            components: ["Dashboard UI"]
+            description: >
+              Where a dataset's newest file is not the one in the warehouse, its
+              page now shows both and says why the new one is not live yet. When
+              they are the same, nothing extra appears.
+          - headline: A dataset that is not due stops reading as missing
+            components: ["Pipeline & publishing"]
+            description: >
+              An annual dataset now fills each quarter it is not due in with
+              the supply that is still current, so a query for this quarter
+              answers instead of finding nothing. Where there is nothing
+              earlier to stand on, the queue says so.
+          - headline: A period nobody supplied can stand on an earlier one
+            components: ["Pipeline & publishing"]
+            description: >
+              When a supplier confirms a quarter's extract is not coming, you
+              can point that period at an earlier one you choose, with your
+              reason on the record. Queries answer instead of returning an
+              empty table.
+          - headline: Good supplies now file themselves away
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply whose checks all pass or warn now moves itself into the
+              period it was sent for. A red one, or one arriving where a supply
+              already sits, waits for you and says which it is.
+          - headline: Deliveries are handled oldest first
+            components: ["Pipeline & publishing"]
+            description: >
+              Each delivery is now checked before the next one starts, so it
+              sees the periods the earlier ones filled. Five years of quarterly
+              extracts land in five years of quarters instead of piling into
+              the first.
           - headline: There is now one record of who decided what happened to a supply
             components: ["Pipeline & publishing"]
             description: >

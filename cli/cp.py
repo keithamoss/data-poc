@@ -33,7 +33,7 @@ from qa_tools.common import supply_db
 from qa_tools.common import trial as trial_mod
 from qa_tools.common.qa_results_reader import list_run_ids
 
-from . import common
+from . import common, filing_tui
 from qa_tools.common import asset_time
 
 AGENCY_ID = cp_common.AGENCY_ID
@@ -207,9 +207,9 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
             f"No manifest entry for run_id={run_id!r} - run generate-synthetic-data first?")
     entry = next(e for e in manifest if e["run_id"] == run_id)
 
-    if reference_run_id is None:
-        reference_run_id = default_reference(manifest)
-    if not has_arrival(reference_run_id):
+    # NO DEFAULT REFERENCE ANY MORE - see cli/bdm.py's run_check() for
+    # the full note (REQ-QAC-108 criterion 4).
+    if reference_run_id is not None and not has_arrival(reference_run_id):
         raise click.ClickException(
             f"Reference run {reference_run_id!r}'s delivery isn't on disk - "
             f"run generate-synthetic-data first?")
@@ -226,7 +226,12 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
     recorded_run_id = run_id if keep else trial_mod.trial_run_id()
     entry = {**entry, "run_id": recorded_run_id}
 
-    _load_delivery(reference_run_id)
+    # ONLY WHERE AN OPERATOR NAMED ONE. A resolved reference's
+    # distribution comes from what that run RECORDED (REQ-QAC-088), so
+    # its rows do not need staging; a run somebody named by hand may
+    # never have been checked here, which is what this load is for.
+    if reference_run_id is not None:
+        _load_delivery(reference_run_id)
     _load_delivery_from_folder(arrival_path(run_id), recorded_run_id)
 
     results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by,
@@ -369,7 +374,13 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
              "received_at": asset_time.isoformat(
                  filed.received_at
                  or asset_time.start_of_day(date.fromisoformat(run_date)))}
-    results = orchestrate_cp.run_single(entry, reference_run_id=other_tables_run_id, run_by=run_by,
+    # THE BORROWED TABLES AND THE DRIFT REFERENCE ARE NOT THE SAME
+    # QUESTION, and they used to share an answer. other_tables_run_id
+    # is which run's other five tables this single-table check stands
+    # beside; the drift reference is which period's supply it is
+    # measured against, which the orchestrator now resolves from the
+    # records (REQ-QAC-108).
+    results = orchestrate_cp.run_single(entry, reference_run_id=None, run_by=run_by,
                                         on_step=on_step)
     return results, filed
 
@@ -445,6 +456,13 @@ def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
                        "nothing was recorded.", style="dim")
     elif interactive:
         common.report_recorded(recorded_run_id, len(results))
+        # AND IF THIS RUN LEFT ITS SUPPLY WAITING ON A PERSON, OFFER THE
+        # DECISION HERE (REQ-GHUB-082 criterion 17), through the same
+        # implementation the standing queue uses. Before the publish
+        # offer, because promoting a supply changes what a publish would
+        # publish - asking the other way round would republish the state
+        # the operator was about to change.
+        filing_tui.offer_after_run(COLLECTION_ID, recorded_run_id)
         # AND THEN, ONLY THEN, THE OFFER (REQ-PIPE-092 criterion 14).
         # After the panel rather than before it: the operator has just
         # been told what was recorded, which is what they need in order

@@ -17,11 +17,14 @@ import os
 import psycopg
 
 from qa_tools.common import hierarchy
-from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
+from qa_tools.common.evidently_common import (
+    ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, NO_REFERENCE, WARN_ROW_DROP, FAIL_ROW_DROP,
+    status_for_psi, status_for_row_drop, compute_psi, recorded_row_counts,
+)
 from qa_tools.common.csv_io import load_null_values_by_column
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
-from .evidently_check_lifecycle import PSI_CHECK_ID
+from .evidently_check_lifecycle import PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_IDS
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
@@ -29,15 +32,15 @@ _NULL_VALUES = load_null_values_by_column(CONTRACT_PATH).get("cp_notifications",
 
 DATASET_ID = hierarchy.dataset_for_table("cp_notifications").dataset_id
 
-# A fallback default only, for calling this function directly with no
-# other context - real callers (orchestrate_cp.py, this file's own
-# __main__ block below) always pass the manifest's actual first run_id
-# instead, since this literal goes stale every time the anchor date rolls
-# forward (generator/anchor_date.py) and data/cp_raw/ isn't cleared
-# between regenerations, so a stale copy can sit there and get silently
-# used instead of raising - see orchestrate_cp.py and
-# plans/qa-pipeline.md for the bug this was found as.
-REFERENCE_RUN_ID = "cp_run_01_2026-07-06"
+# THERE IS NO DEFAULT REFERENCE ANY MORE (REQ-QAC-108 criterion 4,
+# 2026-09-29). This module carried a hardcoded REFERENCE_RUN_ID, and
+# then its callers carried `manifest[0]["run_id"]` to avoid it - which
+# is the same mistake computed fresh: every supply measured against the
+# beginning of history, so drift stops being detectable about a year in.
+# The reference is now the most recent EARLIER period a supply was
+# really promoted into, resolved per supply by
+# drift_reference.reference_run_for_arrival(), and `None` means there is
+# no such period rather than "use a default".
 
 
 _COLUMN = "concern_type"
@@ -108,17 +111,127 @@ def _reference_frame(reference_run_id: str):
     return _current_frame(reference_run_id)
 
 
+def _current_row_counts(run_id: str) -> dict[str, int]:
+    """How many rows this run staged, per table.
+
+    MEASURED HERE RATHER THAN READ FROM dataset_stats, because
+    dataset_stats runs AFTER the tool steps - a check cannot compare
+    against a number that does not exist yet when it runs. The reference
+    side is read from what its own run recorded, which is the asymmetry
+    REQ-QAC-088 established for PSI and this follows: measure the
+    present, read the past.
+    """
+    from qa_tools.common import supply_db
+
+    schema = supply_db.run_schema(run_id)
+    counts: dict[str, int] = {}
+    with supply_db.connect(read_only=True, label="mothman:evidently-cp-volume") as conn:
+        # ASKED OF THE CATALOGUE FIRST, rather than counting each table
+        # and catching the failures. A TABLE THIS RUN DID NOT STAGE IS
+        # NOT A ZERO - single-table mode stages one and borrows the
+        # rest, and a partial resupply is a real shape (REQ-PIPE-068),
+        # so a missing view means "this run has nothing to say about
+        # that table" rather than "it arrived empty", which is the
+        # difference between silence and a red. Catching the error
+        # instead would also leave the transaction aborted, so the
+        # tables after the missing one would fail too.
+        present = {row[0] for row in conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
+            [schema]).fetchall()}
+        conn.execute(f'SET search_path TO "{schema}"')
+        for table in ROW_COUNT_GROWTH_CHECK_IDS:
+            if table in present:
+                counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+    return counts
+
+
+def _volume_results(run_id: str, run_timestamp: str, reference_run_id: str | None) -> list[dict]:
+    """One relative volume check per Child Protection dataset
+    (REQ-QAC-108 criterion 1).
+
+    SIX RATHER THAN ONE. The question is about a TABLE, and a
+    collection-wide count would tell a reader something shrank without
+    saying what. Birth Registrations needed one because it has one
+    table, not because one is the right number.
+
+    THE SAME BANDS AS BIRTH REGISTRATIONS, from evidently_common rather
+    than restated here - criterion 1's own words are "so that both
+    collections judge volume the same way", which two copies of two
+    numbers would stop being true of on the first day somebody tuned
+    one of them.
+    """
+    counts = _current_row_counts(run_id)
+    reference = (None if reference_run_id is None else recorded_row_counts(
+        cp_common.AGENCY_ID, cp_common.COLLECTION_ID, reference_run_id))
+
+    out = []
+    for table, check_id in ROW_COUNT_GROWTH_CHECK_IDS.items():
+        if table not in counts:
+            continue
+        current = counts[table]
+        before = (reference or {}).get(table)
+        if not before:
+            # NO REFERENCE, or a reference that recorded nothing for
+            # this table (criterion 5). Zero counts here too, and
+            # deliberately: dividing by it would be an error, and
+            # calling a supply an infinite drop from nothing is not a
+            # measurement.
+            rate_drop, status = None, NO_REFERENCE
+        else:
+            rate_drop = (before - current) / before
+            status = status_for_row_drop(rate_drop)
+        out.append({
+            "agency_id": cp_common.AGENCY_ID,
+            "collection_id": cp_common.COLLECTION_ID,
+            "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
+            "check_id": check_id,
+            # "(table)" plus a supply-level check name is what puts this
+            # in the dashboard's "Supply-level checks" section - which
+            # is where "did this arrive the right size" belongs, and is
+            # the mechanism REQ-DASH-033 built rather than a lookalike.
+            # Birth Registrations attributes its own to a real column
+            # because its builder has no such section.
+            "column_name": "(table)",
+            "check_name": "evidently:row_count_growth",
+            "dimension": "timeliness",
+            "label": "Row count vs. last promoted supply",
+            "run_id": run_id,
+            "run_timestamp": run_timestamp,
+            "metric_value": None if rate_drop is None else round(rate_drop * 100, 2),
+            "unit": "%",
+            "warn_threshold": round(WARN_ROW_DROP * 100, 2),
+            "fail_threshold": round(FAIL_ROW_DROP * 100, 2),
+            "status": status,
+            "on_fail_action": "flag",
+            "row_count_total": current,
+            "row_count_invalid": None,
+            "engine": ENGINE_TAG,
+            "reference_run_id": reference_run_id,
+        })
+    return out
+
+
 def evaluate_evidently_cp(run_id: str, run_timestamp: str,
-                                reference_run_id: str = REFERENCE_RUN_ID) -> list[dict]:
+                                reference_run_id: str | None = None) -> list[dict]:
     """Reads the warehouse for the current run and the RECORDED
     distribution for the reference (REQ-QAC-088, 2026-09-27) - the BDM
-    counterpart carries the full account."""
-    reference = _reference_frame(reference_run_id)
+    counterpart carries the full account.
+
+    `reference_run_id=None` MEANS THERE IS NOTHING TO MEASURE AGAINST
+    (REQ-QAC-108 criterion 5), which is true of every dataset's first
+    supply and of any supply whose earlier periods hold only views. The
+    check is then reported as having no reference, and specifically NOT
+    as passing - see evidently_common.NO_REFERENCE.
+    """
     current = _current_frame(run_id)
     n_total = len(current)
 
-    psi, psi_snapshot = compute_psi(current, reference, "concern_type")
-    status = status_for_psi(psi, run_id == reference_run_id)
+    if reference_run_id is None:
+        psi, psi_snapshot, status = None, None, NO_REFERENCE
+    else:
+        reference = _reference_frame(reference_run_id)
+        psi, psi_snapshot = compute_psi(current, reference, "concern_type")
+        status = status_for_psi(psi)
 
     results = [{
         "agency_id": cp_common.AGENCY_ID,
@@ -142,6 +255,8 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
         "engine": ENGINE_TAG,
         "reference_run_id": reference_run_id,
     }]
+    results.extend(_volume_results(run_id, run_timestamp, reference_run_id))
+
     # Written under the COLLECTION id, not this module's own table-scoped
     # DATASET_ID - 2026-09-16 fix, Keith's call: qa_results/ output stays
     # dataset(collection)-level for every tool, matching run_dbt_cp.py/
@@ -160,9 +275,12 @@ if __name__ == "__main__":
     from datetime import datetime, timezone
 
     from qa_tools.common import arrivals
-    manifest = [a.as_entry() for a in arrivals.arrivals_for("child-protection", "cp_run_")]
-    reference_run_id = manifest[0]["run_id"]  # not the module-level REFERENCE_RUN_ID default - see orchestrate_cp.py
-    for entry in manifest:
+    from qa_tools.common import drift_reference
+    manifest = [a for a in arrivals.arrivals_for("child-protection", "cp_run_")]
+    for arrival in manifest:
+        entry = arrival.as_entry()
+        reference_run_id = drift_reference.reference_run_for_arrival(
+            DATASET_ID, arrival.received_at)
         res = evaluate_evidently_cp(entry["run_id"], datetime.now(timezone.utc).isoformat(),
                                      reference_run_id=reference_run_id)
         r = res[0]

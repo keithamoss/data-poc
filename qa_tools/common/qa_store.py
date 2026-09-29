@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 10
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -461,8 +461,13 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".decision (
     agency_id      text NOT NULL,
     collection_id  text NOT NULL,
     dataset_id     text NOT NULL,
-    action         text NOT NULL
-        CHECK (action IN ('promote', 'reject', 'demote', 'refile')),
+    -- THE KNOWN ACTIONS ARE CHECKED BY A NAMED CONSTRAINT BELOW, not
+    -- inline. An inline CHECK gets a generated name, which is fine
+    -- until the list grows: `CREATE TABLE IF NOT EXISTS` does nothing
+    -- to an existing table, so an older database keeps the old list and
+    -- refuses the new action while a fresh one accepts it. That
+    -- happened on 2026-09-28 and cost a debugging round.
+    action         text NOT NULL,
     -- The supply acted on, by the identity the rest of the system uses
     -- for one: a physical staged table name. Not a run id - a run is a
     -- check over a supply, and the same supply can be checked twice.
@@ -500,7 +505,90 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".decision (
     -- does itself and are not for a decision taken earlier and recorded
     -- after the fact, which is the case an audit asks about.
     effective_at   timestamptz NOT NULL,
-    recorded_at    timestamptz NOT NULL DEFAULT now()
+    recorded_at    timestamptz NOT NULL DEFAULT now(),
+    -- THE PERIOD A SUBSTITUTION STANDS ON (REQ-PIPE-084 criterion 5),
+    -- and it is a column rather than a reuse of `from_slot` because the
+    -- two mean opposite things. `from_slot` is the period a supply is
+    -- moving OUT OF, and promoted_into() reads it that way - recording
+    -- the period stood on there would empty it, which is the one thing
+    -- a substitution must never do to the period it depends on.
+    --
+    -- IN THE LOG RATHER THAN DERIVED from which schema holds the table.
+    -- The criterion asks for the period pointed at to be RECORDED, and
+    -- this table's whole claim is that it answers from itself: a
+    -- reconstruction from the catalogue would go wrong the moment a
+    -- supply moved, which is exactly when somebody reads it.
+    stands_on      text,
+    CHECK (action <> 'substitute' OR (stands_on IS NOT NULL AND to_slot IS NOT NULL)),
+    CHECK (action <> 'de-substitute' OR from_slot IS NOT NULL)
+);
+
+-- See the load_outcome note above on why an added column needs this as
+-- well as its place in the CREATE TABLE.
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS stands_on text;
+
+-- AND THE CONSTRAINTS, which ADD COLUMN does not bring with it. Named
+-- explicitly so they can be replaced rather than accumulated: an
+-- anonymous CHECK gets a generated name and a second run adds a second
+-- one.
+-- The generated name the inline CHECK used to carry, on every database
+-- created before it moved down here.
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_action_check;
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_action_known;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
+    CHECK (action IN ('promote', 'reject', 'demote', 'refile',
+                      'substitute', 'de-substitute',
+                      'inherit', 'inherit-refused', 'un-inherit'));
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_substitute_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_substitute_shape
+    CHECK (action <> 'substitute' OR (stands_on IS NOT NULL AND to_slot IS NOT NULL));
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_de_substitute_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_de_substitute_shape
+    CHECK (action <> 'de-substitute' OR from_slot IS NOT NULL);
+-- An un-inheritance names the period whose view is being removed, the
+-- same shape a de-substitution has and for the same reason: it leaves
+-- that period unfilled rather than moving anything into it
+-- (REQ-PIPE-099 criterion 3).
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_un_inherit_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_un_inherit_shape
+    CHECK (action <> 'un-inherit' OR from_slot IS NOT NULL);
+
+--   criterion 11's question, asked of every demote, reject and re-file:
+--   does any period stand on this supply?
+CREATE INDEX IF NOT EXISTS decision_stands_on
+    ON "{SCHEMA}".decision (dataset_id, supply, effective_at)
+    WHERE stands_on IS NOT NULL;
+
+-- A REFUSAL HAS NO SUPPLY (REQ-PIPE-098 criterion 10), which is why the
+-- NOT NULL on `supply` had to give way to a CHECK. The criterion asks
+-- for an inheritance that could not complete to be RECORDED rather than
+-- silent, and the thing it could not find is precisely a supply - so
+-- there is nothing honest to put in that column.
+--
+-- NARROW ON PURPOSE. Every other action still requires one, enforced by
+-- the CHECK below rather than by the column, so nothing else gains the
+-- freedom to write a decision about nothing in particular.
+ALTER TABLE "{SCHEMA}".decision ALTER COLUMN supply DROP NOT NULL;
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_supply_present;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_supply_present
+    CHECK (action = 'inherit-refused' OR (supply IS NOT NULL AND supply <> ''));
+
+--   WHEN A PERIOD WAS OPENED (REQ-PIPE-098 criterion 3). "First
+--   created" has to be a FACT rather than an inference from the schema
+--   being present, because inheritance happens once, at that moment,
+--   and an inference cannot tell a period opened a moment ago from one
+--   opened last year whose schema was dropped and rebuilt.
+--
+--   ASSET-LEVEL, not per dataset: a period schema holds every dataset's
+--   tables, so it is opened once and every dataset inherits into it.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".period (
+    name       text PRIMARY KEY,
+    -- WHY IT WAS OPENED, and the two ways are deliberately
+    -- indistinguishable afterwards (criterion 4): a period opened by
+    -- instruction must behave exactly like one created by a first
+    -- promotion, so this is a fact about history rather than a mode.
+    opened_by  text NOT NULL CHECK (opened_by <> ''),
+    opened_at  timestamptz NOT NULL DEFAULT now()
 );
 
 --   one dataset's decisions, in the order they took effect, at a cost

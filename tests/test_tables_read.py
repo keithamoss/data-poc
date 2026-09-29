@@ -288,8 +288,17 @@ class TestAPartialRunIsNotRecordedAsACompleteOne:
         missing = qa_results_reader.missing_tools("a", "b", "run_1")
 
         assert "cp-carers/dbt" in missing
-        assert "cp-carers/evidently" not in missing, (
-            "no Evidently check is defined against cp-carers, so it owes no file")
+        # WHICH TOOLS cp-carers OWES IS DERIVED, not fixed - it gained
+        # Evidently on 2026-09-29 when REQ-QAC-108 gave every Child
+        # Protection dataset a relative volume check. This used to name
+        # Evidently as the tool it did not owe, which made the test read
+        # as being about that pair rather than about the rule.
+        owed = qa_results_reader.expected_tools_for("cp-carers")
+        for tool in qa_results_reader.EXPECTED_TOOLS:
+            if tool in owed:
+                continue
+            assert f"cp-carers/{tool}" not in missing, (
+                f"no {tool} check is defined against cp-carers, so it owes no record")
 
 
 class TestTheFailureNamesTheDatasetAndTheTool:

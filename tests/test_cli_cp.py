@@ -554,7 +554,12 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
     assert borrowed["from_run_id"] == "cp_run_promoted"
     assert borrowed["tables"] == sorted(t for t in cp.TABLES if t != "cp_clients")
 
-    assert captured["reference_run_id"] == "cp_run_promoted"
+    # THE BORROWED TABLES ARE NOT THE DRIFT REFERENCE, and they used to
+    # share an answer (REQ-QAC-108 criterion 4). Which run's other five
+    # tables this check stands beside is a question about the warehouse;
+    # which period's supply it is measured against is a question about
+    # the records, and the orchestrator resolves it.
+    assert captured["reference_run_id"] is None
     assert captured["run_by"] == "test@example.com"
     assert results == [{"status": "pass"}]
     assert filed.delivery_name == "", "a trial filed a delivery"

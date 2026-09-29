@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from qa_tools.common import display_time
 from qa_tools.common.display_time import format_day, format_instant, format_relative
 
 CASES = json.loads((Path(__file__).resolve().parent.parent
@@ -118,3 +119,61 @@ class TestThereIsOnlyOneOfIt:
             "Intl.DateTimeFormat should appear exactly twice - once in "
             "assetTimezoneOrFail() to validate the zone, once in assetParts() "
             f"to read it. Found {len(hits)}: {hits}")
+
+
+class TestAPeriodNameWrittenForAPerson:
+    """format_period(), added 2026-09-28 after the real dashboard showed
+    "Birth Registrations has no supply for 2026-08-27" seventeen times on
+    one page.
+
+    A period NAME is an identifier, which is why it took a promotion
+    landing to notice: it only becomes a problem when it reaches a
+    reader as prose, and nothing put one in prose until the outstanding
+    queue's closed-slot items became reachable.
+    """
+
+    def test_a_quarterly_name_is_already_how_somebody_says_it(self):
+        assert display_time.format_period("2023-Q1") == "2023-Q1"
+
+    def test_a_daily_name_is_a_date_and_is_written_as_one(self):
+        assert display_time.format_period("2026-08-27") == "Thursday, 27 August 2026"
+
+    def test_it_agrees_with_format_day(self):
+        from datetime import date
+        assert display_time.format_period("2026-08-27") == format_day(date(2026, 8, 27))
+
+    def test_a_name_it_does_not_recognise_comes_back_as_it_is(self):
+        """A calendar may name its periods anything its agency agreed,
+        and guessing at a shape nobody declared is how a display
+        standard starts mangling real names."""
+        for name in ("Nov-Jan window", "FY2026", "2026-W35", ""):
+            assert display_time.format_period(name) == name
+
+    def test_it_does_not_reach_for_a_zone(self):
+        """A period name has no instant in it, so there is nothing to
+        localise - and treating it as one would move a period across a
+        day boundary."""
+        assert display_time.format_period(" 2026-01-01 ") == "Thursday, 1 January 2026"
+
+    def test_it_rewrites_every_period_named_in_a_stored_sentence(self):
+        """A filing's `ambiguity` sentence is composed once and stored,
+        so it has to be written for a person at render time - otherwise
+        only filings made after this change would read correctly."""
+        assert display_time.format_periods_in(
+            "filed to 2026-08-31, but 2026-08-27 is also unfilled") == \
+            "filed to Monday, 31 August 2026, but Thursday, 27 August 2026 " \
+            "is also unfilled"
+
+    def test_it_leaves_a_quarterly_name_alone(self):
+        assert display_time.format_periods_in("filed to 2023-Q1") == "filed to 2023-Q1"
+
+    def test_it_never_touches_the_date_half_of_a_timestamp(self):
+        """The trap this was written into on the first attempt:
+        "2026-08-31T09:00:00+08:00" became "Monday, 31 August
+        2026T09:00:00+08:00". An instant is format_instant's to write."""
+        for text in ("at 2026-08-31T09:00:00+08:00", "at 2026-08-31 09:00:00"):
+            assert display_time.format_periods_in(text) == text
+
+    def test_empty_and_none_are_the_empty_string(self):
+        assert display_time.format_periods_in("") == ""
+        assert display_time.format_periods_in(None) == ""

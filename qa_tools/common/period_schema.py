@@ -51,6 +51,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping, Sequence
 
+from qa_tools.common import check_id as check_id_mod
+from qa_tools.common import qa_store
+from qa_tools.common import hierarchy
 from qa_tools.common import supply_db
 
 #: A period schema carries this prefix so it is distinguishable from
@@ -169,6 +172,59 @@ def ensure_period_schema(conn, period_name: str) -> str:
     return schema
 
 
+def opened(conn, period_name: str) -> bool:
+    """Whether this period has been recorded as opened (criterion 3).
+
+    A FACT, NOT AN INFERENCE FROM THE SCHEMA BEING PRESENT, and that is
+    the whole reason the row exists. Inheritance happens once, at the
+    moment a period is born, and "does the schema exist" cannot tell a
+    period opened a second ago from one opened last year whose schema
+    was dropped and rebuilt - the second would inherit all over again,
+    from whatever is current now rather than from what was current then.
+    """
+    rows = conn.execute(
+        f'SELECT 1 FROM "{qa_store.SCHEMA}".period WHERE name = ?',
+        [period_name]).fetchall()
+    return bool(rows)
+
+
+def open_period(conn, period_name: str, *, opened_by: str,
+                effective_at: str | None = None) -> bool:
+    """Bring a period into existence, once, and fill what it owes
+    nothing for. Returns True where THIS call opened it.
+
+    ONE MECHANISM FOR BOTH WAYS IN (REQ-PIPE-098 criterion 4). A period
+    is opened by the first promotion into it or by an explicit
+    instruction, and afterwards the two are indistinguishable - which is
+    what makes "open next quarter early so somebody can look at it"
+    safe rather than a second kind of period.
+
+    NOT INSIDE ANOTHER TRANSACTION. Inheritance writes decision-log
+    entries of its own, so callers open the period BEFORE they begin
+    their own decision. promotion.promote() and substitution.substitute()
+    both do.
+
+    ensure_period_schema() REMAINS THE PLAIN, UNRECORDED CREATE, and the
+    two are not the same thing: that one is idempotent scaffolding a
+    view needs, this one is an event.
+    """
+    from qa_tools.common import asset_time, inheritance
+
+    schema = ensure_period_schema(conn, period_name)
+    if opened(conn, period_name):
+        return False
+    conn.execute(
+        f'INSERT INTO "{qa_store.SCHEMA}".period (name, opened_by) VALUES (?, ?) '
+        "ON CONFLICT (name) DO NOTHING",
+        [period_name, opened_by])
+    if not opened(conn, period_name):
+        # Somebody else won the race. Theirs inherited; ours must not.
+        return False
+    inheritance.inherit_into(conn, period_name,
+                              effective_at=effective_at or asset_time.now().isoformat())
+    return bool(schema)
+
+
 def period_schemas(conn) -> list[str]:
     """Every period schema in the database, by PERIOD NAME."""
     rows = conn.execute(
@@ -276,12 +332,25 @@ def create_overlay_views(conn, run_id: str, period_name: str,
     and every other table the check needs is read as that period
     currently stands.
 
-    AMBIGUITY IN STAGING IS STILL ABSENCE, and does NOT fall through to
-    the promoted version. Two files claiming one logical name mean
-    nobody has said which is the candidate, so the honest answer is
-    that the table is unreadable for this run - falling back to the
-    promoted table would silently QA the delivery against data it did
-    not contain, which reads green and means nothing.
+    AMBIGUITY IN STAGING OFFERS NOTHING, AND THE PERIOD STILL ANSWERS
+    (REQ-PIPE-105 criterion 8, REQ-PIPE-079 criteria 11-13). Two files
+    claiming one logical name mean nobody has said which is the
+    candidate, so neither is ever chosen between, for any purpose - but
+    the view still resolves to the period's PROMOTED version, because a
+    contested table is in exactly the position of a table the delivery
+    did not bring at all.
+
+    THIS USED TO BE A FLAT REFUSAL, and the reason given for it was
+    real: falling back to the promoted table would QA the delivery
+    against data it did not contain, which reads green and means
+    nothing. That is true of the contested table's OWN checks and false
+    of every check that merely READS it - a referential-integrity check
+    filed against placements reading carers is making a claim about the
+    period's carers, and reading them is the ordinary answer. So the
+    safeguard is kept where it belongs rather than across the board:
+    `ambiguous` still records the contest, and contested_own_checks()
+    is what stops the table's own checks running. A caller that
+    resolves the view and skips that gate has the false green back.
 
     "STAGING" IS THIS RUN'S OWN STAGING SCHEMA, not the shared
     constant (REQ-PIPE-103). A trial stages into a schema of its own
@@ -306,8 +375,11 @@ def create_overlay_views(conn, run_id: str, period_name: str,
     for logical in sorted(set(staged) | set(promoted)):
         candidates = sorted(staged.get(logical) or ())
         if len(candidates) > 1:
+            # Recorded, then treated as though staging brought nothing:
+            # the fall-through below is the whole of criterion 12, and
+            # the record is the whole of criterion 13.
             res.ambiguous[logical] = candidates
-            continue
+            candidates = []
         if candidates:
             physical, source_schema, origin = (
                 candidates[0], supply_db.staging_schema_for(run_id), FROM_STAGING)
@@ -343,6 +415,15 @@ MISSING_TABLE = "missing-table"
 MISSING_REFERENCE_PERIOD = "missing-reference-period"
 NO_PRIOR_PERIOD = "no-prior-period"
 
+#: WHY a table a check reads has no promoted supply (REQ-PIPE-079
+#: criteria 14, 15 and 16). All four look identical from inside a
+#: check - the table is not there - and each has a different next
+#: action for whoever reads the result, which is the whole reason they
+#: are told apart rather than collapsed into one red.
+NOT_YET_DUE = "not-yet-due"
+PAST_DUE = "past-due"
+STAGED_AWAITING_DECISION = "staged-awaiting-decision"
+
 
 @dataclass(frozen=True)
 class Unrunnable:
@@ -365,14 +446,47 @@ class Unrunnable:
         if self.reason == MISSING_REFERENCE_PERIOD:
             return (f"could not run - {listed} was owed but has no filled slot, so "
                      f"there is nothing to compare against")
+        if self.reason == NOT_YET_DUE:
+            return (f"{listed} has not been supplied for this period yet and is "
+                     f"not yet overdue")
+        if self.reason == PAST_DUE:
+            return f"could not run - {listed} is overdue for this period"
+        if self.reason == STAGED_AWAITING_DECISION:
+            return (f"could not run - a supply for {listed} is staged awaiting a "
+                     f"decision, so nothing is promoted for this period yet")
         return ("no data - no prior period was ever owed for this dataset, so there "
                  "is nothing to compare against yet")
+
+
+#: Most specific first. Criterion 4 defers to "the more specific cases
+#: in this requirement", and where several are true at once the one
+#: reported should name an action the reader can actually take: a
+#: staged supply means "go and decide", where "overdue" would send them
+#: to chase a supplier who has already sent it.
+_MISSING_PRECEDENCE = (STAGED_AWAITING_DECISION, PAST_DUE, NOT_YET_DUE)
+
+
+def _why_missing(missing: Sequence[str], supply_states: dict[str, str]) -> "Unrunnable":
+    """Which of REQ-PIPE-079's cases explains these absent tables.
+
+    NOT RED FOR A SUPPLY THAT IS NOT DUE YET (criterion 14). Nothing is
+    wrong in that case, and a red that fires when nothing is wrong is
+    how a check earns the reputation that makes people ignore it.
+    """
+    for reason in _MISSING_PRECEDENCE:
+        named = sorted(n for n in missing if supply_states.get(n) == reason)
+        if named:
+            status = NODATA if reason == NOT_YET_DUE else RED
+            return Unrunnable(status=status, reason=reason, names=tuple(named))
+    # Criterion 4's fallback, and every caller that knows no state.
+    return Unrunnable(status=RED, reason=MISSING_TABLE, names=tuple(sorted(missing)))
 
 
 def check_readiness(depends_on: Sequence[str], resolution: PeriodResolution, *,
                      reference_period: str | None = None,
                      reference_filled: bool = False,
-                     any_prior_period_owed: bool = True) -> Unrunnable | None:
+                     any_prior_period_owed: bool = True,
+                     supply_states: dict[str, str] | None = None) -> Unrunnable | None:
     """Whether a check may be evaluated, or why not.
 
     Returns None where the check should run normally.
@@ -391,7 +505,7 @@ def check_readiness(depends_on: Sequence[str], resolution: PeriodResolution, *,
     """
     missing = [name for name in depends_on if name not in resolution.resolution.resolved]
     if missing:
-        return Unrunnable(status=RED, reason=MISSING_TABLE, names=tuple(sorted(missing)))
+        return _why_missing(missing, supply_states or {})
     if reference_period is None:
         return None
     if reference_filled:
@@ -403,6 +517,44 @@ def check_readiness(depends_on: Sequence[str], resolution: PeriodResolution, *,
         return Unrunnable(status=NODATA, reason=NO_PRIOR_PERIOD)
     return Unrunnable(status=RED, reason=MISSING_REFERENCE_PERIOD,
                        names=(reference_period,))
+
+
+def contested_own_checks(contested: Iterable[str],
+                         check_ids: Iterable[str]) -> frozenset[str]:
+    """The checks that must not run because their OWN table is contested.
+
+    REQ-PIPE-079 criterion 13, and the safeguard that makes criterion
+    12's fall-through safe rather than a false green.
+
+    THE SPLIT THIS DRAWS is between a check filed AGAINST a table and a
+    check that merely READS it. Two files claim `cp_clients`, so nobody
+    has said which one the supply is - and running cp_clients' own
+    uniqueness check against the version already promoted last quarter
+    would report on data the supplier did not send, in the green
+    direction, while appearing to have checked their file. A
+    referential-integrity check filed against cp_placements that reads
+    cp_clients is in no such position: it is making a claim about the
+    period's clients, and the period's clients are exactly what it
+    reads (criterion 12).
+
+    A DATASET MAPS TO ONE LOGICAL TABLE BY CONSTRUCTION under the
+    supply model (plans/supply-model.md Thread F), which is what lets
+    "this check's own table" be answered from the check_id's own
+    dataset segment rather than from a second declaration that could
+    disagree with it.
+
+    LOUD ON A NAME NOTHING CLAIMS, rather than skipping it. Failing to
+    suppress is the dangerous direction here, so a logical table no
+    dataset owns raises hierarchy.UnknownDatasetError instead of
+    quietly resolving to "not one of ours, let it run".
+    """
+    datasets = {hierarchy.dataset_for_table(table).dataset_id
+                for table in contested}
+    if not datasets:
+        return frozenset()
+    return frozenset(
+        cid for cid in check_ids
+        if check_id_mod.parse(cid).dataset in datasets)
 
 
 def reference_view(conn, run_id: str, logical: str, reference_period: str,

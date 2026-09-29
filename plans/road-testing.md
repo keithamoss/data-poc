@@ -759,3 +759,29 @@ anything here that turns into real build work becomes a requirement in
     arrival-classification display, so changing what it means is a
     shape change with several consumers - this project's own standing
     rule says enumerate them first. Written down as a sighting.
+
+## Seen on 2026-09-28 night, once promotion started working
+
+**[investigate, 2026-09-28]** **[Dashboard UI]** **Seventeen "missing
+supply" items for ONE daily dataset, on one page.** Birth Registrations'
+dataset page now carries a closed-unfilled-slot item for every day the
+synthetic corpus skipped between its earliest arrival and its newest -
+each individually correct, and seventeen of them in a column.
+
+This is REQ-PIPE-063's rule working exactly as written, so it is a
+SIGHTING rather than a diagnosis. What makes it worth writing down is
+the scale argument this project already applies elsewhere: `supply_holds`
+aggregates precisely because "at two datasets a banner per held supply
+is fine; at the ~30 this is a PoC for it is thirty banners, and a banner
+per dataset is exactly how people learn to ignore a whole class of
+warning". A DAILY dataset multiplies that again - a feed with a quiet
+fortnight produces fourteen items about one fact.
+
+Three things it might be, and it is not obvious which:
+- the items should aggregate, the way holds do - "14 days with no supply
+  between X and Y", one row, expandable;
+- a run of consecutive closed slots is one event (a gap) rather than N;
+- it is right as it is, and a daily feed simply has more to say.
+
+Nothing done. It needs Keith, because "how much is too much" is a
+judgement about who reads the page rather than about the rule.

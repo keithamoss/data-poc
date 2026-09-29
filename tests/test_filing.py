@@ -15,6 +15,7 @@ from them.
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -87,9 +88,21 @@ class TestFiledIsNotFilled:
     """
 
     def test_filing_a_supply_does_not_fill_its_slot(self, filings):
-        filing.record(_assignment(slot="2026-Q1"))
-        assert filing.filings_of("cp-clients")[0]["slot"] == "2026-Q1"
-        assert filing.filled_slots("cp-clients") == frozenset(), (
+        """A DATASET ID NOBODY ELSE USES, and that is load-bearing
+        rather than tidy. `filled_slots()` reads the DECISION LOG, which
+        is append-only by a real database trigger - so the `filings`
+        fixture cannot truncate it the way it truncates the filings, and
+        a promotion another module on the same xdist worker wrote for
+        `cp-clients` is still there when this runs. It failed exactly
+        that way on 2026-09-29, when adding test files moved which
+        module shared this worker; the assertion was right and the
+        subject was shared.
+        """
+        mine = f"cp-filed-not-filled-{uuid.uuid4().hex[:8]}"
+        filing.record(_assignment(supply_id=f"{mine}@2026", slot="2026-Q1",
+                                   dataset_id=mine))
+        assert filing.filings_of(mine)[0]["slot"] == "2026-Q1"
+        assert filing.filled_slots(mine) == frozenset(), (
             "only a PROMOTION fills a slot - an arrival does not, a staged supply does "
             "not, and a rejected one certainly does not")
 
@@ -349,3 +362,53 @@ class TestAFilingIsRecordedInTheDatabase:
         for forbidden in ("FILINGS_DIR", "path_for", "write_text(", "mkdir("):
             assert forbidden not in source, \
                 f"{forbidden} is back in filing.py - a filing is a row, not a file"
+
+
+class TestWhichPeriodAnArrivalWasFiledTo:
+    """period_of() - REQ-QAC-108's bridge from an arrival instant to the
+    period a drift check walks back from.
+
+    IT LIVES IN THIS MODULE ON PURPOSE. The caller has an arrival and
+    needs a period, and the only thing standing between them is the
+    supply id - which is this module's answer. A caller building one
+    itself would be a second naming scheme to keep in step, and the part
+    it would get wrong is the one below.
+    """
+
+    def test_it_finds_the_period_from_the_arrival_instant(self, filings):
+        filing.record(_assignment(supply_id="cp-clients@20260801010000000000",
+                                   slot="2026-Q3"))
+        assert filing.period_of(
+            "cp-clients", "2026-08-01T01:00:00.000000+00:00") == "2026-Q3"
+
+    def test_a_HELD_supply_resolves_to_the_same_filing(self, filings):
+        """A supply whose dataset had more than one matching file
+        carries a `#1` suffix (filing._supply_id_for). Matching on the
+        whole id would miss it; matching on the ARRIVAL KEY does not,
+        and the arrival key is what both sides actually share."""
+        filing.record(_assignment(supply_id="cp-clients@20260801010000000000#1",
+                                   slot="2026-Q3"))
+        assert filing.period_of(
+            "cp-clients", "2026-08-01T01:00:00.000000+00:00") == "2026-Q3"
+
+    def test_an_arrival_with_no_filing_is_None(self, filings):
+        assert filing.period_of("cp-clients", "2026-08-01T01:00:00+00:00") is None
+
+    def test_another_datasets_filing_at_the_same_instant_is_not_ours(self, filings):
+        """Six datasets arrive in one delivery, so the arrival key alone
+        is not an identifier - the dataset is the other half of it."""
+        filing.record(_assignment(supply_id="cp-carers@20260801010000000000",
+                                   slot="2026-Q3", dataset_id="cp-carers"))
+        assert filing.period_of(
+            "cp-clients", "2026-08-01T01:00:00.000000+00:00") is None
+        assert filing.period_of(
+            "cp-carers", "2026-08-01T01:00:00.000000+00:00") == "2026-Q3"
+
+    def test_a_supply_filed_nowhere_reports_no_period(self, filings):
+        """A supply with no confident slot is filed with slot=None
+        (REQ-PIPE-059), which is a real state rather than an absence of
+        a filing - and it still has no period to measure against."""
+        filing.record(_assignment(supply_id="cp-clients@20260801010000000000",
+                                   slot=None, branch=assignment.UNASSIGNABLE))
+        assert filing.period_of(
+            "cp-clients", "2026-08-01T01:00:00.000000+00:00") is None

@@ -3046,3 +3046,315 @@ class TestCrossTableChecks:
             return realColumns(ds).map(c=>c.name);
         }""")
         assert "cp_client_id" not in invented, invented
+
+
+class TestArrivedVersusPromoted:
+    """REQ-DASH-056, in a real browser against the real built page.
+
+    Driven here rather than only in tests-js because the thing being
+    checked is a chain: a decision in the log, through the build, into
+    the embedded data, into a rendered panel. Each link is tested on its
+    own; only this asserts at the layer a person actually sees, which is
+    the lesson plans/qa-pipeline.md item 74 paid for - a green data
+    layer says nothing about a render layer with its own transform.
+    """
+
+    DATASETS = (
+        ("registry-services", "civil-registration", "birth-registrations"),
+        ("child-protection-family-support", "child-protection", "cp-carers"),
+    )
+
+    def _open(self, page, html, agency, collection, dataset_id):
+        _goto(page, html, state={"tier": "dataset", "agencyId": agency,
+                                  "collectionId": collection, "datasetId": dataset_id})
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
+    def test_the_panel_agrees_with_the_data_about_whether_to_show_at_all(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        """Criteria 1 and 3 together, and asserting them as ONE claim is
+        deliberate: "show both" and "stay quiet" are the same rule read
+        from its two sides, and a test for either alone passes on a page
+        that always does that one thing."""
+        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        differs = clean_page.evaluate(
+            """(id) => {
+                 const ds = DATA.agencies.flatMap(a=>a.collections)
+                   .flatMap(c=>c.datasets).find(d=>d.id === id);
+                 return Boolean(ds && ds.promotionState && ds.promotionState.differs);
+               }""", dataset_id)
+        shown = clean_page.locator('[data-testid="promotion-split"]').count()
+        assert shown == (1 if differs else 0), (
+            f"{dataset_id}: promotionState.differs is {differs} and the panel "
+            f"rendered {shown} time(s)")
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
+    def test_where_it_shows_it_names_both_supplies_and_says_why(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        panel = clean_page.locator('[data-testid="promotion-split"]')
+        if panel.count() == 0:
+            pytest.skip(f"{dataset_id}'s latest arrival IS what is promoted")
+        text = panel.inner_text()
+        state = clean_page.evaluate(
+            """(id) => DATA.agencies.flatMap(a=>a.collections)
+                 .flatMap(c=>c.datasets).find(d=>d.id === id).promotionState""",
+            dataset_id)
+        assert state["arrived"]["supply"] in text
+        if state["promoted"]:
+            assert state["promoted"]["supply"] in text
+        # CASE-INSENSITIVELY, because the labels are uppercased by CSS
+        # and inner_text() reports what is rendered. The claim is that
+        # the two are LABELLED rather than left to the reader's guess at
+        # the order (criterion 2) - which letter-case they are in is the
+        # stylesheet's business.
+        lower = text.lower()
+        assert "promoted" in lower and "latest arrival" in lower
+        assert state["explanation"] and state["explanation"] in text
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
+    def test_it_shows_no_raw_period_code(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        """A DAILY calendar names its periods by the day, so the period
+        name is a bare ISO date - the one thing REQ-DASH-071 says a
+        reader never sees. The panel is the newest place one could leak
+        in."""
+        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        panel = clean_page.locator('[data-testid="promotion-split"]')
+        if panel.count() == 0:
+            pytest.skip(f"{dataset_id}'s latest arrival IS what is promoted")
+        # The supply IDENTIFIER legitimately carries digits, so the line
+        # holding it is excluded rather than the whole panel: an
+        # identifier is what somebody quotes in a ticket, not a date
+        # being shown to them.
+        prose = [ln for ln in panel.inner_text().splitlines() if "@" not in ln]
+        raw = [ln for ln in prose if re.search(r"\b\d{4}-\d{2}-\d{2}\b", ln)]
+        assert not raw, f"{dataset_id} shows a raw period code: {raw}"
+
+
+class TestAPeriodStandingInOnAnEarlierOne:
+    """REQ-DASH-085 and REQ-DASH-100, in a real browser.
+
+    NO DATASET IN THIS DEPLOYMENT IS SUBSTITUTED OR INHERITED, and that
+    is stated rather than worked around: a substitution needs a person's
+    decision and no operator route exists yet, and inheritance needs a
+    dataset the schedule says is not due, which no configuration
+    declares. Writing either into the real decision log to make a test
+    pass would be fabricating an operator decision in an append-only
+    record.
+
+    So these set the state ON THE PAGE and re-render. What that proves
+    is the render layer - that the qualifier reaches the status line,
+    that the detail panel says what it must, and that a real browser
+    reports no errors doing it. What it cannot prove is the chain from a
+    real decision, which waits on REQ-GEN-044 giving inheritance a real
+    instance and on the operator routes giving substitution one.
+    """
+
+    SUBSTITUTED = {
+        "kind": "substituted", "level": "warning", "period": "2026-Q3",
+        "standsOn": "2026-Q2", "supply": "cp-carers@202605010100000000",
+        "decidedBy": "Keith", "byAPerson": True,
+        "reason": "the supplier confirmed no extract will be sent this quarter",
+    }
+    INHERITED = {
+        "kind": "inherited", "level": "information", "period": "2026-Q3",
+        "standsOn": "2026-Q1", "supply": "cp-carers@202602010100000000",
+        "decidedBy": None, "byAPerson": False,
+        "reason": "carers are supplied annually, so no quarterly file is due",
+    }
+
+    def _with_state(self, page, html, standing_in):
+        _goto(page, html, state={"tier": "dataset",
+                                  "agencyId": "child-protection-family-support",
+                                  "collectionId": "child-protection",
+                                  "datasetId": "cp-carers"})
+        page.evaluate(
+            """(st) => {
+                 const ds = DATA.agencies.flatMap(a=>a.collections)
+                   .flatMap(c=>c.datasets).find(d=>d.id === "cp-carers");
+                 ds.promotionState = Object.assign({}, ds.promotionState,
+                                                    {standingIn: st});
+                 render();
+               }""", standing_in)
+
+    @pytest.mark.parametrize("kind,word", [("SUBSTITUTED", "Substituted"),
+                                            ("INHERITED", "Inherited")])
+    def test_the_qualifier_appears_beside_the_status(
+            self, clean_page, built_dashboard_html, kind, word):
+        self._with_state(clean_page, built_dashboard_html, getattr(self, kind))
+        marker = clean_page.locator('[data-testid="standing-in"]')
+        assert marker.count() >= 1
+        assert word in marker.first.inner_text()
+
+    @pytest.mark.parametrize("kind", ["SUBSTITUTED", "INHERITED"])
+    def test_it_names_the_period_the_data_came_from_in_the_label(
+            self, clean_page, built_dashboard_html, kind):
+        state = getattr(self, kind)
+        self._with_state(clean_page, built_dashboard_html, state)
+        text = clean_page.locator('[data-testid="standing-in"]').first.inner_text()
+        assert state["standsOn"] in text
+
+    @pytest.mark.parametrize("kind", ["SUBSTITUTED", "INHERITED"])
+    def test_the_drill_down_shows_the_reason_as_written(
+            self, clean_page, built_dashboard_html, kind):
+        state = getattr(self, kind)
+        self._with_state(clean_page, built_dashboard_html, state)
+        detail = clean_page.locator('[data-testid="standing-in-detail"]')
+        assert detail.count() == 1
+        assert state["reason"] in detail.inner_text()
+
+    def test_a_substitution_names_who_decided_it(self, clean_page,
+                                                  built_dashboard_html):
+        self._with_state(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        assert "Keith" in clean_page.locator(
+            '[data-testid="standing-in-detail"]').inner_text()
+
+    def test_an_inheritance_names_nobody(self, clean_page, built_dashboard_html):
+        """Naming the rule as though it were a person would put a
+        decision on somebody who never made one."""
+        self._with_state(clean_page, built_dashboard_html, self.INHERITED)
+        text = clean_page.locator('[data-testid="standing-in-detail"]').inner_text()
+        assert "no person decided it" in text
+        assert "Decided by" not in text
+
+    def test_the_two_are_told_apart_by_more_than_colour(
+            self, clean_page, built_dashboard_html):
+        self._with_state(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        one = clean_page.locator('[data-testid="standing-in"]').first.inner_text()
+        self._with_state(clean_page, built_dashboard_html, self.INHERITED)
+        two = clean_page.locator('[data-testid="standing-in"]').first.inner_text()
+        assert one != two, "the label carries the whole meaning, never the colour"
+
+    @pytest.mark.parametrize("kind", ["SUBSTITUTED", "INHERITED"])
+    def test_it_renders_with_zero_console_errors(
+            self, clean_page, built_dashboard_html, kind):
+        errors = []
+        clean_page.on("console",
+                       lambda m: errors.append(m.text) if m.type == "error" else None)
+        self._with_state(clean_page, built_dashboard_html, getattr(self, kind))
+        assert clean_page.locator('[data-testid="standing-in"]').count() >= 1
+        assert errors == []
+
+
+class TestDrillingThroughToThePeriodThatEarnedTheResults:
+    """REQ-DASH-085 criteria 9-11 and REQ-DASH-100 criteria 8-10.
+
+    THE STATE IS SET ON THE EMBEDDED SOURCE, not on the built DATA tree,
+    and the difference is the whole reason this class exists separately
+    from the one above. Drilling REBUILDS DATA for the new as-of date,
+    so a standing-in record patched onto DATA disappears on the first
+    click - which would make every assertion after it about a page in a
+    state the test never set up. Patching REAL_CP_DATA, which buildData()
+    reads, survives the rebuild exactly as a real record would.
+
+    Still not a real decision, for the reason the class above states:
+    writing one into an append-only log to make a test pass would be
+    fabricating an operator's decision.
+    """
+
+    SUBSTITUTED = {
+        "kind": "substituted", "level": "warning", "period": "2026-Q3",
+        "standsOn": "2026-Q2", "supply": "cp-carers@202605010100000000",
+        "decidedBy": "Keith", "byAPerson": True,
+        "reason": "the supplier confirmed no extract will be sent this quarter",
+    }
+    # The two dates the real quarterly calendar gives those period names.
+    # Written out rather than computed, so a change to the calendar shows
+    # up here as a failing assertion rather than as a test that quietly
+    # agrees with whatever it now says.
+    PERIOD_DATE = "2026-08-01"
+    STANDS_ON_DATE = "2026-05-01"
+    WHERE = {"tier": "dataset", "agencyId": "child-protection-family-support",
+              "collectionId": "child-protection", "datasetId": "cp-carers"}
+
+    def _open(self, page, html, standing_in=None):
+        _goto(page, html, state=self.WHERE)
+        if standing_in is not None:
+            page.evaluate(
+                """(st) => {
+                     const d = REAL_CP_DATA.datasets.find(x => x.id === "cp-carers");
+                     d.promotionState = Object.assign({}, d.promotionState,
+                                                       {standingIn: st});
+                     DATA = buildData(CURRENT_AS_OF);
+                     renderFromState();
+                   }""", standing_in)
+
+    def _params(self, page):
+        return dict(urllib.parse.parse_qsl(
+            urllib.parse.urlparse(page.url).query))
+
+    def test_the_page_says_whose_results_these_are_before_offering_the_drill(
+            self, clean_page, built_dashboard_html):
+        """Criterion 9's first half. A reader who never clicks still
+        reads the checks below as this period's, which is the whole
+        false green - so the sentence is not optional decoration around
+        the link."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        text = " ".join(clean_page.locator(
+            '[data-testid="standing-in-detail"]').inner_text().split())
+        assert "ran against 2026-Q2's supply" in text
+        assert "not 2026-Q3's own results" in text
+
+    def test_drilling_moves_the_as_of_date_and_records_where_from(
+            self, clean_page, built_dashboard_html):
+        """Criterion 9's second half, and criterion 11's first: the
+        framing is in the URL, so a refresh or a shared link says the
+        same thing."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        params = self._params(clean_page)
+        assert params.get("asof") == self.STANDS_ON_DATE
+        assert params.get("from") == "2026-Q3"
+
+    def test_the_reader_is_told_they_have_left_the_period_they_were_on(
+            self, clean_page, built_dashboard_html):
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        notice = clean_page.locator('[data-testid="arrival-notice"]')
+        assert notice.count() == 1
+        assert "You have left 2026-Q3" in notice.inner_text()
+
+    def test_the_way_back_returns_and_takes_the_framing_with_it(
+            self, clean_page, built_dashboard_html):
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        clean_page.locator('[data-testid="arrival-back"]').click()
+        params = self._params(clean_page)
+        assert params.get("asof") == self.PERIOD_DATE
+        assert "from" not in params
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
+
+    def test_a_reader_who_came_here_directly_is_told_nothing(
+            self, clean_page, built_dashboard_html):
+        """The 'only' in criterion 10 is half of it: telling somebody
+        they have left a period they were never on is a false alarm."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
+
+    def test_the_framing_does_not_travel_onto_the_next_page(
+            self, clean_page, built_dashboard_html):
+        """Criterion 11's second half. A banner saying 'you have left
+        2026-Q3' is true of the one page it was followed to and a lie
+        everywhere else - and pushState() with a bare hash keeps the
+        query string, so this does not happen by itself."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        assert self._params(clean_page).get("from") == "2026-Q3"
+        clean_page.locator("#rail .crumb").first.click()
+        clean_page.wait_for_function(
+            "() => !new URLSearchParams(location.search).get('from')")
+        params = self._params(clean_page)
+        assert "from" not in params
+        # The orthogonal query state a navigation has always kept stays.
+        assert params.get("asof") == self.STANDS_ON_DATE
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
+
+    def test_the_whole_drill_reports_no_console_errors(
+            self, clean_page, built_dashboard_html):
+        errors = []
+        clean_page.on("console",
+                       lambda m: errors.append(m.text) if m.type == "error" else None)
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        clean_page.locator('[data-testid="arrival-back"]').click()
+        assert errors == []

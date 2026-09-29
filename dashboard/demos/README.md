@@ -57,12 +57,44 @@ uv run python3 scripts/dev/record_cast.py \
   --step 'key:up'   --step 'pause:0.25' \
   --step 'key:up'   --step 'pause:1.1' \
   --step 'key:enter' \
-  --step 'wait:Promote this run:90' \
+  --step 'wait:Record this check:30' \
+  --step 'pause:2.4' \
+  --step 'key:y' \
+  --step 'wait:Press any key:240' \
   --step 'pause:5.5' \
+  --step 'key:space' \
+  --step 'wait:Publish the dashboard now?:30' \
+  --step 'pause:2.2' \
   --step 'key:n' \
-  --step 'wait:What would you like to do?:15' \
+  --step 'wait:What would you like to do?:30' \
   --step 'pause:1.6'
 ```
+
+Needs a reachable PostgreSQL with `MOTHMAN_SUPPLY_DSN` and
+`MOTHMAN_ENVIRONMENT` set, the same as any other real run - answering
+`y` records this run in that database's QA history, which is the point
+of recording that branch rather than the trial one.
+
+## Why the end of the script changed (2026-09-29)
+
+It used to wait for `Promote this run into the real, permanent
+qa_results/ history?` and answer `n`. That question does not exist any
+more, in two separate steps:
+
+- **REQ-PIPE-089** removed the committed `qa_results/` tree, so there
+  was nothing to copy into and nothing to decline. The decision became
+  "record this check in the dataset's QA history", asked BEFORE the
+  chain runs, because a recorded result is visible as the run completes
+  and asking afterwards would offer a choice already made.
+- **REQ-GHUB-082 criterion 15** then took the word: "promote" means the
+  supply operation in this tool and nothing else, so the recording is
+  the last place it had the other meaning.
+
+So the recording had been showing a prompt a viewer would never see, and
+answering it in a way that skipped the most consequential screen in the
+flow. It now takes the `y` branch instead, which is both current and the
+better demo: the results table, the **Recorded** panel, and the publish
+offer that follows it.
 
 Then re-embed so the built dashboard picks it up:
 
@@ -100,8 +132,9 @@ produces the same rhythm every time.
 
 With that in the `.cast`, playback is honest at `speed: 1` (see the
 player config in `dashboard/qa-reporting-dashboard.template.html`).
-Total runtime is ~48s, about the same as the old recording's effective
-playback at 0.4 — the time is simply spent where a viewer needs it now.
+Total runtime is ~58s as of the 2026-09-29 re-recording (~48s before
+it), the extra time being the Recorded panel and the publish offer the
+old script's `n` skipped past.
 
 ## The chain now shows progress
 

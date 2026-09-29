@@ -26,7 +26,16 @@ def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deploym
 
     summary = output["summary"]
     assert summary["total_checks"] == len(output["results"])
-    assert summary["pass"] + summary["warn"] + summary["fail"] + summary["error"] == summary["total_checks"]
+    # EVERY VERDICT IS COUNTED, and this line is the one that found the
+    # gap. REQ-QAC-108 added a fifth - `nodata`, a drift or volume check
+    # with no reference period - and the summary went on counting four,
+    # so the parts stopped adding up to the whole. Nothing else noticed:
+    # the dashboard reads `results`, not `summary`.
+    counted = sum(summary[k] for k in ("pass", "warn", "fail", "error", "nodata"))
+    assert counted == summary["total_checks"], (
+        f"{summary['total_checks'] - counted} result(s) carry a verdict the "
+        f"summary does not count: "
+        f"{sorted({r['status'] for r in output['results']})}")
     assert summary["engines"] == sorted(summary["engines"])
     assert summary["engines"], "no real engine names found in committed history"
 
@@ -48,7 +57,16 @@ def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployme
 
     summary = output["summary"]
     assert summary["total_checks"] == len(output["results"])
-    assert summary["pass"] + summary["warn"] + summary["fail"] + summary["error"] == summary["total_checks"]
+    # EVERY VERDICT IS COUNTED, and this line is the one that found the
+    # gap. REQ-QAC-108 added a fifth - `nodata`, a drift or volume check
+    # with no reference period - and the summary went on counting four,
+    # so the parts stopped adding up to the whole. Nothing else noticed:
+    # the dashboard reads `results`, not `summary`.
+    counted = sum(summary[k] for k in ("pass", "warn", "fail", "error", "nodata"))
+    assert counted == summary["total_checks"], (
+        f"{summary['total_checks'] - counted} result(s) carry a verdict the "
+        f"summary does not count: "
+        f"{sorted({r['status'] for r in output['results']})}")
 
     # results span more than one of the 6 real CP tables - not silently
     # collapsed onto just one dataset_id by the interleaved-per-run read

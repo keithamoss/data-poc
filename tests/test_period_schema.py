@@ -189,13 +189,20 @@ class TestTheStagedDeliveryIsOverlaid:
             f'CROSS JOIN "{res.resolution.schema}"."carers" c').fetchone()
         assert joined[0] == 2
 
-    def test_an_ambiguous_staged_name_does_NOT_fall_through_to_the_promoted_one(self, conn):
-        """The dangerous fallback, and the reason this test exists.
+    def test_an_ambiguous_staged_name_offers_nothing_of_its_own(self, conn):
+        """Staging offers nothing where two files claim one name - and
+        THAT is what this test still holds.
 
-        Two files claim one logical name, so nobody has said which is
-        the candidate. Reading the PROMOTED table instead would QA the
-        delivery against data it did not contain - which passes, means
-        nothing, and looks exactly like a healthy run.
+        IT USED TO ASSERT MORE THAN THAT, and the extra part was
+        superseded: it required that the view not resolve at all, so
+        that no check could read the table by any route. REQ-PIPE-079
+        criteria 12 and 13 (signed 2026-09-26) and REQ-PIPE-105
+        criterion 8 (signed 2026-09-28) draw a line the flat rule did
+        not - the contested table's OWN checks must not run, and a
+        check that merely READS it resolves against the period's
+        promoted version like any table the delivery did not bring.
+        tests/test_contested_staging.py holds that split; what remains
+        here is the half that did not change.
         """
         _promote(conn, "2026-Q3", "clients__20260801010000", [1, 2, 3])
         _stage(conn, "clients__20260901010000__1", [8])
@@ -208,10 +215,8 @@ class TestTheStagedDeliveryIsOverlaid:
             promoted=ps.promoted_in(conn, "2026-Q3", ["clients"]))
 
         assert "clients" in res.resolution.ambiguous
-        assert "clients" not in res.resolution.resolved
-        assert "clients" not in res.source
-        with pytest.raises(duckdb.Error):
-            conn.execute(f'SELECT * FROM "{res.resolution.schema}"."clients"')
+        assert res.source["clients"] == ps.FROM_PERIOD
+        assert res.resolution.resolved["clients"] == "clients__20260801010000"
 
     def test_a_name_neither_staged_nor_promoted_is_absent(self, conn):
         res = ps.create_overlay_views(

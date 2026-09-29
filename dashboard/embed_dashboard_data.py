@@ -350,7 +350,13 @@ def embed() -> None:
     provenance = {"environment": None, "commit": commit}
     env = environments.current_or_none()
     if env is not None:
-        provenance["environment"] = {"id": env.id, "label": env.label}
+        # `publishes` travels with it (REQ-DASH-094 criterion 3) so the
+        # page can say "not production" without carrying a second copy of
+        # which environment that is. The page must not have to know the
+        # name of the published one - that is configuration, and it
+        # changes per deployment.
+        provenance["environment"] = {"id": env.id, "label": env.label,
+                                     "publishes": bool(env.publishes)}
     html = _replace_const(html, "BUILD_PROVENANCE",
                            json.dumps(provenance, separators=(",", ":")))
     print(f"Re-embedded BUILD_PROVENANCE = {provenance['environment'] or 'unset'}, "

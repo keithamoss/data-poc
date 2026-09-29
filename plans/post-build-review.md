@@ -3718,3 +3718,267 @@ twice. It deliberately did not re-find the `TypeError`.
     one. "Fails" is the answer that rule anticipates and is the SAFE
     one - somebody sees it. "Skips" is the dangerous one, because the
     suite stays green and the coverage quietly leaves.
+
+63. **[done, 2026-09-28]** **[Pipeline & publishing, Dashboard UI]**
+    **Three defects that had been unreachable, all reached on the same
+    night by the same change.** Not found by a critic - found by
+    promotion starting to work, which turned on a code path nothing had
+    ever executed.
+
+    `outstanding._from_closed_slots()` reports REQ-PIPE-063's slot
+    closed by monotonic filling. It returns early for a dataset with no
+    FILLED slots, and only a promotion fills one, so while promotion did
+    not exist the rest of the function was dead. Its own docstring said
+    so - "structurally empty today". Behind that guard sat two real
+    faults:
+
+    - it asked `slots_for_dataset(dataset_id)` with no `until`, which a
+      DAILY calendar refuses because it generates periods without end.
+      This is what actually broke: 153 errors in
+      `tests/test_dashboard_e2e.py`, every one of them a fixture error
+      naming a subprocess rather than a calendar.
+    - `closed_by_monotonic_filling()` returns a set of slot NAMES and
+      the loop read `slot.name` off each. That one would not have shown
+      as a crash in the survey - it needed a slot to actually be closed,
+      which is one step further in again.
+
+    **The third was visible rather than fatal, and is the one worth
+    remembering.** With the function working, the Birth Registrations
+    dataset page rendered **seventeen raw ISO dates** - "Birth
+    Registrations has no supply for 2026-08-27" - which is exactly what
+    REQ-DASH-071's display standard exists to prevent. Nothing was wrong
+    with that requirement's work: a period NAME is an identifier, a
+    DAILY calendar names its periods by the day, and no period name had
+    ever reached a reader as prose before. Fixed with
+    `display_time.format_period()` and `format_periods_in()`, the second
+    because a filing's `ambiguity` sentence is composed once and STORED,
+    so formatting at composition time would leave every earlier filing
+    showing raw dates forever.
+
+    Verified in a real browser against the rebuilt dashboard: 37 raw
+    dates before, zero after. All three carry failing-first tests
+    (`tests/test_outstanding.py`'s own
+    `TestADatasetOnAnEndlessCalendarDoesNotTakeTheSurveyDown`, and four
+    in `tests/test_display_time.py`), confirmed failing against the
+    unfixed module by reverting just that file.
+
+    **The standing lesson, and it is not "test more".** A guard that
+    makes a code path unreachable also makes it untested, and the path
+    runs for the first time on the day the guard stops holding - which
+    is the day somebody is shipping the feature that removes the guard,
+    with the least attention to spare. Worth asking, of any "this is
+    structurally empty today" comment: what runs the first time it is
+    not?
+
+64. **[done, 2026-09-29]** **[Pipeline & publishing, Testing & dev tooling]**
+    **A test that conflated two identifiers hid a defect that would have
+    broken the first real substitution anybody made.**
+    Found hours after the code shipped, by writing a DIFFERENT test
+    that happened not to conflate them.
+
+    A supply has two names. `cp-carers@202605010100000000` is how a
+    filing and a decision name it; `cp_carers__202605010100000000` is
+    what the warehouse can call a table, because dbt and Soda write the
+    name into their own SQL unquoted and PostgreSQL folds an unquoted
+    identifier to lower case. `promote()` takes both - the id for the
+    log, the tables to move.
+
+    `substitution.substitute()` took one `supply` argument and used it
+    for BOTH: it judged the decision against the log, where the value is
+    an id, and then built the view with it as a table name. The two
+    cannot both be right.
+
+    **WHY NOTHING CAUGHT IT, and this is the part worth keeping.**
+    `tests/test_substitution.py`'s own helper promoted with
+    `supply=physical, physical_tables=[physical]` - one string playing
+    both parts. Twenty-six tests passed, including ones that read real
+    rows through the substituted view, because within the test the two
+    names genuinely were the same. The fixture was not lazy; it was
+    UNDER-SPECIFIED, and an under-specified fixture makes a whole class
+    of confusion invisible rather than merely untested.
+
+    Fixed in `substitution.py` by resolving the physical table from the
+    period schema (`period_schema.promoted_in`), which is where the
+    warehouse actually keeps the answer, and refusing loudly where the
+    period holds no such table or several. Three test helpers were
+    rewritten to mint the two names differently, and one of them -
+    `tests/test_drift_reference.py`'s - turned up the same latent
+    conflation in a module written the same night.
+
+    **The standing lesson is about fixtures rather than about
+    identifiers.** Where a system carries two values that are usually
+    derived from each other, a test that makes them EQUAL proves
+    nothing about the code that tells them apart. Mint them differently
+    in the fixture, even when it costs a line - the cost is one line
+    and the saving is the first real user finding it.
+
+65. **[done, 2026-09-29]** **[Dashboard UI]** **Repairing a stale link
+    broke it, whenever an as-of date was set.**
+    Found while building REQ-DASH-085's drill-through, by reading every
+    place this page writes a URL rather than by a critic.
+
+    `forgetStaleSegment()` is the repair for a URL naming a column or a
+    check the dataset no longer has (#11): it renders the dataset page,
+    drops the dead segment from STATE, rewrites the address and puts a
+    notice above the page. It built the new address as
+    `stateToHash(STATE) + location.search`.
+
+    That concatenation puts the query string INSIDE the hash. With an
+    as-of date set, the repaired URL reads
+    `#/.../dataset/birth-registrations?asof=2026-05-01`, so on the next
+    load `pathToState()` takes the dataset id to be
+    `birth-registrations?asof=2026-05-01`, finds nothing, and renders
+    not-found. The repair whose whole purpose was to stop a broken
+    segment being re-shared produced a URL that was broken outright.
+
+    **WHY NOTHING CAUGHT IT.** `location.search` is empty in every
+    existing test of this path, and empty concatenates harmlessly. The
+    bug needed one more thing to be true at the same time - a filter
+    the tests had no reason to set - which is the shape of most things
+    that survive a suite.
+
+    Fixed by building the address with `URL` rather than by
+    concatenation, in the same `navUrl()` the drill-through needed
+    anyway. A repair of the page the reader is already on keeps the
+    arrival framing, because they have not gone anywhere.
+    Reproduced first, in `tests-js/navigation.test.js`.
+
+66. **[done, 2026-09-29]** **[Pipeline & publishing, Testing & dev tooling]**
+    **The same supply-id-as-table-name conflation as #64, in the module
+    written the same night, found the same way.**
+    Found by a test in a DIFFERENT module that happened to mint the two
+    names differently.
+
+    `inheritance.inherit_into()` - the RULE's own pass, which runs at
+    every period's birth in the real pipeline - took the supply id
+    straight out of the decision log and built
+    `CREATE VIEW ... AS SELECT * FROM "<period>"."<supply id>"`. A
+    supply has two names: `cp-carers@202605010100000000` is how a filing
+    and a decision name it, and `cp_carers__202605010100000000` is what
+    the warehouse can call a table. The first is not an identifier
+    PostgreSQL will take unquoted, which is why supply_db refuses it.
+
+    **WHY #64's FIX DID NOT REACH IT.** #64 was fixed on 2026-09-29 by
+    adding `substitution._physical_in()`, which resolves the physical
+    table from the period schema, and the write-up said the same
+    conflation had turned up in a third module the same night. It did
+    not say to go and look at the fourth. Substitution and inheritance
+    are deliberately kept apart - they mean opposite things - and that
+    separation is exactly what let one be fixed while the other was
+    not.
+
+    **WHY NOTHING CAUGHT IT, and it is #64's lesson word for word.**
+    `tests/test_inheritance.py`'s own `_promote_into()` promoted with
+    `supply=physical, physical_tables=[physical]` - one string playing
+    both parts - so every one of the module's thirty-five tests passed
+    and the real system, where the two differ, would have failed at the
+    first period birth after a real promotion.
+
+    Fixed with an `inheritance._physical_in()` of its own, and the rule's
+    pass now records a missing table as a REFUSAL rather than raising,
+    on criterion 10's own terms: one dataset's problem must not stop the
+    rest of the period being born. Three tests pin it at the path that
+    actually runs.
+
+    **The standing lesson is about the SWEEP, not the identifiers.**
+    When a fixture-shaped defect is found, the fix is not done until
+    every module that could hold the same one has been looked at. #64
+    named a third module and stopped; the fourth cost a second night's
+    finding. `grep` for the shape - here, a period schema and a name
+    from the decision log in one f-string - not for the module.
+
+67. **[done, 2026-09-29]** **[Pipeline & publishing]**
+    **A route was built whose entry point does not exist, and only an
+    audit for callers found it.**
+    Found by grepping for callers of the two modules shipped in the
+    preceding two commits, not by anything failing.
+
+    `qa_tools/common/filing_from_github.py` reads a filing decision out
+    of a ticket comment and raises it. Nothing reads ticket comments.
+    The workflow that would - `.github/workflows/ticket-sync.yml` - is
+    disabled and cannot run at all: it needs the recorded QA results,
+    those are rows in a PostgreSQL database since REQ-PIPE-089, and a
+    GitHub runner has no route to one. Its replacement inverts the
+    integration's direction, which is `plans/running-thoughts.md` #53
+    and is not scoped.
+
+    So REQ-GHUB-082's criterion 1 - "accept ... filing decisions raised
+    on the GitHub ticket" - is met as far as an entry point allows, and
+    that is now what the requirement says. It said "criterion 1" flatly
+    for about twenty minutes, which is the part worth correcting: a
+    criterion is not met because the code that would satisfy it exists
+    somewhere unreachable.
+
+    `filing_decisions.py`, shipped the commit before, has the same
+    property and it is fine: its caller is the TUI adapter, which is
+    the one phase of that requirement deliberately left for a session
+    with Keith awake. The difference is that its caller is SCOPED and
+    the GitHub one is not.
+
+    **The standing lesson is a question, and it costs one grep.** After
+    building a module, ask what calls it - in production, not in its
+    tests. This project has now paid three times for code that had
+    never executed outside a test: #63's guard that made a path
+    unreachable, #64/#66's fixture that made two names one string, and
+    this. The first two were found by accident weeks later; this one
+    was found the same hour, by asking.
+
+    Nothing was changed in the code. What changed is that the
+    requirement and this file now say where the gap is, so whoever
+    scopes #53 knows the adapter is already there and needs only a
+    caller.
+
+68. **[done, 2026-09-29]** **[GitHub workflow & people]**
+    **The commoner way the ticket service is absent got the thinner
+    message, and CI had been red on it for a run of commits nobody
+    checked.**
+
+    `ticket_github._gh()` raises `TicketServiceUnavailable` two ways. A
+    MISSING BINARY got the sentence criterion 17 is actually for - "The
+    change stands on its durable record and the next pass will bring
+    the ticket up to date." A binary that RAN AND EXITED NON-ZERO got
+    `` `gh issue list` failed: <stderr>`` and nothing else.
+
+    The second is the commoner case in the environments this is really
+    for: an unauthenticated CLI, an expired token, a network that
+    cannot reach github.com. It is also the case where a person reading
+    a pipeline run is most likely to conclude the promotion did not
+    happen. The behaviour was always right - the reconciler records a
+    failure per slot and carries on either way - but the message is the
+    only part of criterion 17 a human ever meets.
+
+    **This container cannot see it, and that is why it survived.** `gh`
+    is not installed here, so every test of an absent service takes the
+    first branch. A GitHub Actions runner HAS `gh` and no `GH_TOKEN`,
+    so it takes the second. Both branches are now driven explicitly
+    with a monkeypatched `subprocess.run`, because a test that passes
+    for a reason about the machine is a test that stops covering the
+    other reason.
+
+    **The worse half of this is the process failure, not the message.**
+    `tests/test_ticket_github.py::TestAnAbsentServiceRefusesCleanly::
+    test_it_says_the_change_still_stands` had been failing in CI since
+    that module landed, across a long run of commits - several of whose
+    own messages reported a green local `mothman check` and said
+    nothing about CI. CLAUDE.md has a standing rule for exactly this
+    ("a passing local `uv run pytest` is NOT evidence CI is green"),
+    amended to "don't block on it, but check at the next natural
+    pause". The pauses happened; the check did not.
+
+    **The standing lesson, and it is narrower than "check CI".** The
+    amendment that says not to block is the one that made this easy to
+    drop, because "the next natural pause" has no edge. An overnight
+    run has no pauses a person would notice. So: check the real run
+    BEFORE starting the next requirement, not at a pause - that is a
+    boundary something actually happens at. One `actions_list` call
+    against the branch answers it, and a red one found at the next
+    commit costs a commit rather than nine.
+
+    A second, cheaper lesson while reading those logs: the MCP tool's
+    `get_job_logs` returns a TAIL, and a job with a PostgreSQL service
+    container ends with hundreds of lines of "there is no transaction
+    in progress" from the container's own log. A short tail shows none
+    of pytest's output and reads as though the log is empty. Ask for
+    thousands of lines and grep for `short test summary`. That is
+    already in CLAUDE.md's blocked-host note; it is repeated here
+    because it cost time again.

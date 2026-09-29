@@ -166,15 +166,39 @@ class TestReadingItBack:
 
 
 class TestCompletenessIsWhatThisDatasetActuallyOwes:
-    """Keith, 2026-09-26. Evidently defines one check in the whole
-    collection, so a fixed six-tool rule would call five of six
-    datasets permanently incomplete."""
+    """Keith, 2026-09-26. A fixed six-tool rule would call a dataset
+    permanently incomplete for a tool that does not check it, and a
+    completeness signal that is always false says nothing about the
+    thing it exists to catch.
 
-    def test_only_cp_notifications_owes_an_evidently_result(self):
-        assert "evidently" in reader.expected_tools_for("cp-notifications")
-        for dataset in ("cp-clients", "cp-carers", "cp-case-workers",
-                         "cp-investigations", "cp-placements"):
-            assert "evidently" not in reader.expected_tools_for(dataset), dataset
+    THE WORKED EXAMPLE CHANGED SIDES, 2026-09-29, and that is the point
+    rather than a nuisance. Evidently used to define exactly ONE check
+    in the whole collection, on cp-notifications, and these tests said
+    so by name. REQ-QAC-108 gave every Child Protection dataset a
+    relative volume check, so all six owe an Evidently result now - and
+    nothing had to be configured for that to become true, which is
+    exactly what being derived buys. The test below asserts the rule
+    rather than the roster, so the next check to arrive does not break
+    it either.
+    """
+
+    def test_a_dataset_owes_evidently_exactly_when_evidently_checks_it(self):
+        from pipeline.dashboard_check_labels import try_parse
+        from qa_tools.common.validate_check_lifecycle import collect_checks
+
+        checked = {try_parse(c.check_id).dataset
+                    for c in collect_checks(None)
+                    if try_parse(c.check_id) and c.check_id.endswith("_evidently")}
+        assert checked, "no Evidently check is defined anywhere"
+        for dataset in ("cp-notifications", "cp-clients", "cp-carers",
+                         "cp-case-workers", "cp-investigations", "cp-placements"):
+            owes = "evidently" in reader.expected_tools_for(dataset)
+            assert owes == (dataset in checked), dataset
+
+    def test_a_dataset_nothing_checks_owes_nothing_at_all(self):
+        """The half the rule exists for, kept as its own case now that
+        every real Child Protection dataset owes all four tools."""
+        assert reader.expected_tools_for("a-dataset-that-does-not-exist") == ()
 
     def test_every_dataset_owes_the_three_tools_that_do_check_it(self):
         for dataset in ("cp-clients", "cp-carers", "cp-notifications"):
@@ -196,7 +220,19 @@ class TestCompletenessIsWhatThisDatasetActuallyOwes:
         assert "cp-clients/dbt" in reader.missing_tools(AGENCY, COLLECTION, "r1")
 
     def test_a_dataset_is_not_asked_for_a_tool_that_does_not_check_it(self, recorded):
-        assert "cp-clients/evidently" not in reader.missing_tools(AGENCY, COLLECTION, "r1")
+        """IT USED TO NAME cp-clients AND EVIDENTLY, which stopped being
+        an example of this rule on 2026-09-29 when REQ-QAC-108 gave
+        every Child Protection dataset a relative volume check. The rule
+        is unchanged and is asserted against whatever is true now rather
+        than against a pair that happened to be true then.
+        """
+        missing = reader.missing_tools(AGENCY, COLLECTION, "r1")
+        for dataset in ("cp-clients", "cp-carers", "cp-notifications"):
+            for tool in ("dbt", "soda", "datacontract", "evidently"):
+                if tool in reader.expected_tools_for(dataset):
+                    continue
+                assert f"{dataset}/{tool}" not in missing, (
+                    f"{dataset} is reported as missing {tool}, which does not check it")
 
 
 class TestOneAgreedOrdering:
@@ -324,3 +360,51 @@ class TestTheRegenerationCommand:
 
         assert "is_reserved_scope" in inspect.getsource(
             pipeline.regenerate_history_command.callback)
+
+
+class TestTheEvidentlyCheckRegistryAgreesWithTheHierarchy:
+    """REQ-QAC-108 criterion 1's registry is written out rather than
+    derived, and this is the cost of that.
+
+    It WAS derived, from hierarchy.datasets_in_collection(), and that
+    was worse: the lifecycle validator `exec`s that file's source,
+    including at an older git ref, so a hierarchy lookup inside it ran
+    against whatever tree happened to be configured - and several tests
+    install a minimal one in which "child-protection" is not a
+    collection at all. A check registry is configuration and should read
+    the same whatever the process around it is doing.
+
+    So the agreement is asserted here instead, where a test may
+    legitimately read the real tree.
+    """
+
+    def test_every_child_protection_dataset_has_exactly_one(self):
+        from qa_tools.common import hierarchy
+        from qa_tools.cp.evidently_check_lifecycle import ROW_COUNT_GROWTH_CHECK_IDS
+
+        real = {d.table: d.dataset_id
+                for d in hierarchy.datasets_in_collection("child-protection")}
+        assert set(ROW_COUNT_GROWTH_CHECK_IDS) == set(real), (
+            "the registry and the hierarchy disagree about which tables exist")
+        assert len(set(ROW_COUNT_GROWTH_CHECK_IDS.values())) == len(real)
+
+    def test_each_check_id_names_its_own_datasets_id(self):
+        """A check id filed under the wrong dataset renders on the wrong
+        page and folds into the wrong status - silently, because every
+        id is well-formed either way."""
+        from qa_tools.common import hierarchy
+        from qa_tools.cp.evidently_check_lifecycle import ROW_COUNT_GROWTH_CHECK_IDS
+
+        real = {d.table: d.dataset_id
+                for d in hierarchy.datasets_in_collection("child-protection")}
+        for table, check_id in ROW_COUNT_GROWTH_CHECK_IDS.items():
+            assert check_id.split(".")[3] == real[table], (table, check_id)
+
+    def test_every_one_of_them_is_registered_for_its_lifecycle(self):
+        from qa_tools.cp.evidently_check_lifecycle import (
+            CHECK_LIFECYCLE, ROW_COUNT_GROWTH_CHECK_IDS,
+        )
+
+        for check_id in ROW_COUNT_GROWTH_CHECK_IDS.values():
+            assert check_id in CHECK_LIFECYCLE, check_id
+            assert CHECK_LIFECYCLE[check_id]["failure_indicates"]

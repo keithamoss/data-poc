@@ -1,10 +1,16 @@
 """Shared mothman CLI/TUI helpers - plans/tooling.md #1's real design
 requirements, not incidental utilities: the non-TTY guard, confirm-by-
-default writes, and the tmp-dir-first Promote pattern every QA flow uses
-(run the real tools into a throwaway location first, only copy into the
-real, permanent qa_results/ history on explicit confirmation - never a
-second, wasteful re-run of the real tool chain just to change where the
-result lands)."""
+default writes, and the record-or-trial question every QA flow asks
+before it runs anything.
+
+IT USED TO DESCRIBE A TMP-DIR-FIRST "PROMOTE" PATTERN - run the real
+tools into a throwaway directory, and copy the JSON into the committed
+qa_results/ tree only on confirmation. Both halves are gone: there is no
+tree (REQ-PIPE-089) and so nothing to copy, and the question moved to
+BEFORE the chain because a recorded result is visible as the run
+completes, so asking afterwards would offer a choice already made. The
+word "promote" went with it (REQ-GHUB-082 criterion 15) and now means
+the supply operation in this tool and nothing else."""
 from __future__ import annotations
 import os
 import sys
@@ -105,6 +111,21 @@ def path_prompt(message: str, flag_hint: str) -> str | None:
     require_tty(flag_hint)
     answer = questionary.path(message, style=_QMARK_STYLE).ask()
     return answer or None
+
+
+def text_prompt(message: str, flag_hint: str) -> str | None:
+    """A free-text answer, with the same non-TTY guard and the same
+    Back-on-Ctrl-C contract every other prompt here has.
+
+    BLANK READS AS BACK, not as an empty answer. The one thing this is
+    for is a REASON on a filing decision, which REQ-GHUB-082 criterion
+    10 refuses without - so somebody who hits enter on an empty line has
+    not supplied a reason, they have changed their mind, and treating
+    that as "go back" is both truer and kinder than refusing them.
+    """
+    require_tty(flag_hint)
+    answer = questionary.text(message, style=_QMARK_STYLE).ask()
+    return (answer or "").strip() or None
 
 
 def confirm(message: str, *, yes: bool, default: bool = False) -> bool:

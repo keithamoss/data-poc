@@ -19,14 +19,78 @@ WARN_THRESHOLD = 0.10
 FAIL_THRESHOLD = 0.25
 
 
-def status_for_psi(psi: float, is_reference: bool) -> str:
-    if is_reference:
-        return "pass"
+#: What a drift or volume check reports when it has nothing to measure
+#: against (REQ-QAC-108 criterion 5, 2026-09-29). It is the dashboard's
+#: existing quiet word rather than a new one, and the point is entirely
+#: what it is NOT: a check whose reference period does not exist has
+#: measured nothing, and "pass" would say the supply was compared and
+#: found fine.
+#:
+#: It can never win a rollup - dataset_status orders it below green - so
+#: one unmeasurable drift check does not hold up a dataset whose real
+#: checks are green. A dataset whose EVERY contributing check is quiet
+#: rolls up quiet, which promotion.status_of() refuses.
+NO_REFERENCE = "nodata"
+
+
+def status_for_psi(psi: float) -> str:
+    """The band this PSI value falls in.
+
+    `is_reference` WAS REMOVED 2026-09-29 with REQ-QAC-108. It returned
+    "pass" when a run was its own reference, which was reachable only
+    because the reference was a fixed run the batch chose once - the
+    thing criterion 4 forbids. The reference is now always an EARLIER
+    period's supply, so a run can never be its own, and the "no
+    reference at all" case is answered by NO_REFERENCE before this
+    function is reached rather than by a parameter inside it.
+    """
     if psi > FAIL_THRESHOLD:
         return "fail"
     if psi > WARN_THRESHOLD:
         return "warn"
     return "pass"
+
+
+# HOW BOTH COLLECTIONS JUDGE VOLUME (REQ-QAC-108 criterion 1). These
+# were Birth Registrations' own constants; they moved here so Child
+# Protection's six datasets could share them rather than acquire a
+# second convention - which is the criterion's own reason for existing,
+# in its own words, "so that both collections judge volume the same
+# way". Keith's call on the numbers, 2026-09-28: mirror the bands
+# Birth Registrations already had rather than invent a second set.
+#
+# A DROP ONLY, NOT ANY CHANGE. "Some reduction in a daily refresh is
+# fine" (Keith), so only a genuinely large fall trips this - and growth
+# never does, because a supply arriving bigger than the last one is the
+# ordinary state of a table that is accumulating.
+WARN_ROW_DROP = 0.10
+FAIL_ROW_DROP = 0.25
+
+
+def status_for_row_drop(rate_drop: float) -> str:
+    """The band a proportional drop falls in.
+
+    `rate_drop` is (reference - current) / reference, so it is POSITIVE
+    when the supply shrank and negative when it grew.
+    """
+    if rate_drop > FAIL_ROW_DROP:
+        return "fail"
+    if rate_drop > WARN_ROW_DROP:
+        return "warn"
+    return "pass"
+
+
+def recorded_row_counts(agency: str, collection: str, run_id: str) -> dict | None:
+    """One run's recorded per-table row counts, or None.
+
+    The plural counterpart to recorded_row_count(): Child Protection's
+    dataset_stats records `row_counts` per table, where Birth
+    Registrations, being one table, records a single `row_count`.
+    """
+    stats = recorded_stats(agency, collection, run_id)
+    if not stats:
+        return None
+    return stats.get("row_counts") or None
 
 
 def compute_psi(current_df, reference_df, column: str) -> tuple[float | None, dict]:

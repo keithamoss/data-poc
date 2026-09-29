@@ -104,8 +104,34 @@ def filings_of(dataset_id: str) -> list[dict]:
             "ORDER BY recorded_at, supply_id", [dataset_id]).fetchall()]
 
 
+def period_of(dataset_id: str, received_at) -> str | None:
+    """The period this dataset's supply from that arrival was filed to.
+
+    WHY IT LIVES HERE, for the same reason supplies_of() does: the
+    supply id is this module's answer, and a caller deriving one from
+    an arrival instant would be a second naming scheme to keep in step -
+    including the `#1` suffix a held supply carries, which is exactly
+    the part a second derivation gets wrong.
+
+    Matched on the ARRIVAL KEY rather than on the whole id, so the held
+    variant resolves to the same filing as the plain one. None where
+    nothing was filed for this dataset from that arrival, which is a
+    real state: a supply with no confident slot is filed nowhere.
+    """
+    from qa_tools.common import asset_time
+
+    key = asset_time.arrival_key(received_at)
+    for record in filings_of(dataset_id):
+        supply = record.get("supply_id") or ""
+        if "@" not in supply:
+            continue
+        if supply.rsplit("@", 1)[1].split("#", 1)[0] == key:
+            return record.get("slot")
+    return None
+
+
 def filled_slots(dataset_id: str) -> frozenset[str]:
-    """Slots a supply has been PROMOTED into - so, nothing yet.
+    """Slots a supply has been PROMOTED into (REQ-PIPE-075 criterion 6).
 
     NOT the slots supplies have been FILED against, and the difference
     is the whole reason this function exists rather than callers
@@ -116,8 +142,17 @@ def filled_slots(dataset_id: str) -> frozenset[str]:
     Returning filings here would be the single easiest way to
     reintroduce the forward cascade, because the rejected supply in
     that worked example IS filed against Monday.
+
+    THIS RETURNED AN EMPTY SET UNTIL 2026-09-28, with a docstring
+    saying "so, nothing yet" - a deliberate stub, because promotion did
+    not exist to fill anything. It does now, and the answer comes from
+    the DECISION LOG rather than from the warehouse catalogue: a table
+    somebody put in a period schema is not a promotion.
     """
-    return frozenset()
+    from qa_tools.common import promotion
+
+    with _connect("mothman:filing-filled-slots") as conn:
+        return promotion.filled_slots(conn, dataset_id)
 
 
 def file_arrivals(found_arrivals) -> list[Assignment]:
@@ -276,3 +311,58 @@ def classification_of(dataset_id: str, supply_id: str, arrived_at,
     record = filing_for(dataset_id, supply_id)
     slot = slot_by_name(record["slot"]) if record and record.get("slot") else None
     return arrival_classification.classify(arrived_at, slot)
+
+
+def supplies_of(conn, arrival) -> list[dict]:
+    """What this arrival brought, in the shape the promotion step reads.
+
+    One dict per dataset the arrival carried:
+      dataset_id, supply, period (None where nothing could be filed),
+      physical_tables, held, contested.
+
+    WHY IT LIVES HERE rather than in promotion.py: the supply id and the
+    slot are both this module's answers, and a second place deriving
+    either of them would be a second naming scheme to keep in step -
+    the thing _supply_id_for()'s own docstring exists to prevent.
+
+    PHYSICAL TABLES ARE SCOPED TO THIS ARRIVAL (supply_db.candidates_in's
+    own `arrival` argument, and see its docstring for the bug that put it
+    there). Staging accumulates, so the unscoped question has as many
+    answers as there have been runs.
+
+    A DATASET WITH NO STAGED TABLE IS STILL RETURNED, with an empty
+    list, so the step refuses it visibly rather than skipping it in
+    silence. A supply that arrived and staged nothing is a thing
+    somebody should hear about.
+    """
+    from qa_tools.common import asset_time, hierarchy, supply_db
+
+    key = asset_time.arrival_key(arrival.received_at)
+    out: list[dict] = []
+    for dataset_id in sorted(arrival.files_by_dataset):
+        supply_id = _supply_id_for(arrival, dataset_id)
+        try:
+            logical = hierarchy.dataset(dataset_id).table
+        except hierarchy.UnknownDatasetError:
+            # The same fallback promotion.status_of() makes, and for the
+            # same reason: a dataset the tree does not know still has an
+            # id, and raising inside the step would cost the other
+            # twenty-nine their promotions.
+            logical = dataset_id
+        staged = supply_db.candidates_in(
+            conn, supply_db.STAGING_SCHEMA, [logical], arrival=key).get(logical) or []
+        record = filing_for(dataset_id, supply_id)
+        out.append({
+            "dataset_id": dataset_id,
+            "supply": supply_id,
+            "period": (record or {}).get("slot"),
+            "physical_tables": sorted(staged),
+            "held": dataset_id in arrival.held,
+            # SEVERAL STAGED TABLES FOR ONE NAME is REQ-PIPE-059's case
+            # seen from the warehouse rather than from the file listing.
+            # Both are reported because they can disagree - a file that
+            # matched but failed to load leaves one without the other -
+            # and either is a reason not to choose.
+            "contested": len(staged) > 1,
+        })
+    return out

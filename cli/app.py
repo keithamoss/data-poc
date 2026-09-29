@@ -18,8 +18,8 @@ from qa_tools.common.local_env import load_local_env
 
 load_local_env()
 
-from . import (bdm, check, common, cp, dashboard, debug, env, github, pipeline, plans,
-               population, scenarios, schedule, supply)
+from . import (bdm, check, common, cp, dashboard, debug, env, filing_tui, github,
+               pipeline, plans, population, scenarios, schedule, supply)
 from .banner import print_banner
 
 click.rich_click.TEXT_MARKUP = "rich"
@@ -29,6 +29,7 @@ console = Console()
 
 _MAIN_MENU_QA = "Quality Assurance - run the real check chain against a dataset"
 _MAIN_MENU_GENERATE = "Generate synthetic data"
+_MAIN_MENU_DECIDE = "Filing decisions - what goes into a period"
 _MAIN_MENU_BOOTSTRAP = "Set up this environment - generate data and run the checks over it"
 _MAIN_MENU_EXIT = "Exit"
 
@@ -41,8 +42,10 @@ def _main_menu_loop() -> None:
     while True:
         choice = common.select(
             "What would you like to do?",
-            [_MAIN_MENU_QA, _MAIN_MENU_GENERATE, _MAIN_MENU_BOOTSTRAP],
-            flag_hint="mothman bdm qa / mothman bdm generate-synthetic-data / "
+            [_MAIN_MENU_QA, _MAIN_MENU_DECIDE, _MAIN_MENU_GENERATE,
+             _MAIN_MENU_BOOTSTRAP],
+            flag_hint="mothman bdm qa / mothman supply queue / "
+                       "mothman bdm generate-synthetic-data / "
                        "mothman pipeline bootstrap",
         )
         if choice is None:
@@ -51,6 +54,14 @@ def _main_menu_loop() -> None:
         console.print()
         if choice == _MAIN_MENU_QA:
             _qa_menu()
+        elif choice == _MAIN_MENU_DECIDE:
+            # REQ-GHUB-082 criterion 16: reachable without doing a QA
+            # run first. Second on the menu rather than last, because
+            # somebody sitting down to work is at least as likely to be
+            # draining the queue as to be running new checks - and the
+            # old rule that kept it off this menu entirely was reversed
+            # knowingly (see cli/supply.py's own note on why).
+            filing_tui.filing_menu()
         elif choice == _MAIN_MENU_GENERATE:
             _generate_menu()
         elif choice == _MAIN_MENU_BOOTSTRAP:

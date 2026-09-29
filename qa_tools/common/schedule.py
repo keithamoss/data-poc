@@ -858,3 +858,32 @@ def _renamed_for_year(template: str, when: date, year: int) -> str:
         return ""
     offset = year - int(m.group(0))
     return template[:m.start()] + str(int(m.group(0)) + offset) + template[m.end():]
+
+
+def date_of(period_name: str, dataset_id: str) -> date | None:
+    """The date a named period falls on, for this dataset's calendar.
+
+    THE INVERSE OF A NAME, and it is a lookup rather than a parse
+    because a period's name is whatever its calendar's template says -
+    "2023-Q1" carries a quarter and "Nov-Jan window" carries nothing at
+    all. Only a DAILY calendar happens to name its periods by the day,
+    and even there parsing the name would be assuming a template rather
+    than reading one.
+
+    BOUNDED BY A YEAR AHEAD of the asset's today, because a daily
+    calendar generates periods without end and periods_for_calendar()
+    refuses an unbounded ask. A year is comfortably past anything a
+    supply can be promoted into and cheap to generate.
+
+    None where the calendar does not name that period, which is a real
+    answer rather than an error: a period from another calendar, or one
+    whose name changed, is simply not this dataset's.
+    """
+    from qa_tools.common import asset_time
+
+    horizon = asset_time.now().date() + timedelta(days=365)
+    for period in periods_for_calendar(calendar_for_dataset(dataset_id).name,
+                                        until=horizon):
+        if period.name == period_name:
+            return period.date
+    return None

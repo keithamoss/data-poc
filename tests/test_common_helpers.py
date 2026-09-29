@@ -40,11 +40,17 @@ def test_check_id_from_resource_attributes_finds_the_real_attribute():
 
 
 def test_status_for_psi_below_warn_threshold_is_pass():
-    assert status_for_psi(0.01, is_reference=False) == "pass"
+    assert status_for_psi(0.01) == "pass"
 
 
-def test_status_for_psi_reference_run_is_always_pass_regardless_of_value():
-    assert status_for_psi(0.9, is_reference=True) == "pass"
+def test_status_for_psi_bands_a_real_value_rather_than_special_casing_a_run():
+    """`is_reference` WAS REMOVED 2026-09-29 (REQ-QAC-108 criterion 4).
+    It returned "pass" when a run was its own reference, which was only
+    reachable while the reference was a fixed run the batch chose once.
+    A run can never be its own reference now, and "there is no reference
+    at all" is answered by NO_REFERENCE before this function is reached."""
+    assert status_for_psi(0.9) == "fail"
+    assert status_for_psi(0.15) == "warn"
 
 
 def test_failing_sample_keys_direct_returns_empty_on_a_real_query_error():

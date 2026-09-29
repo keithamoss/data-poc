@@ -47,6 +47,324 @@ every other plans file.
 
 ## Next steps
 
+**Priority: THE OVERNIGHT BUILD PLAN, 2026-09-28 (Keith's own ask -
+build the signed-and-unbuilt backlog unattended while he sleeps).**
+Written down before starting so it survives the container. Four
+questions were put to him and answered before any code was written;
+his answers are the standing authority for the run.
+
+**What is signed and unbuilt: 16 requirements, 225 acceptance
+criteria.** Twelve signed on the 27th/28th, plus FOUR signed on the
+26th that everything else rests on - `REQ-PIPE-074`, `075`, `076`,
+`079`. `REQ-DASH-056` has been `not_started` since the 27th for exactly
+this reason; its own note says nothing records promotion state yet.
+This is more than one night. The sprints are ordered so that stopping
+anywhere leaves a coherent result.
+
+**Keith's four answers, 2026-09-28:**
+1. **`REQ-PIPE-074` is BUILT BY `REQ-PIPE-091`**, with criteria 11 and
+   14 recorded as SUPERSEDED by the configuration-not-state rule (they
+   say commit the log to the repository). No new code; a register
+   reconciliation with the reasoning in `decisions:`.
+2. **The `083` -> `098` -> `084` -> `083` cycle breaks at `084`.**
+   Build substitution first, then inheritance, then the ticket
+   reconciler - because `083`'s dependency on `098` is only "have a
+   state to report", satisfied once both dispositions exist.
+3. **Amend a built requirement when a signed one says to**, recording
+   the amendment in BOTH requirements' `decisions:` and naming it in
+   the commit message. This is what `REQ-PIPE-105` criteria 9 and 10
+   require of `REQ-PIPE-035`/`036`, and it follows the `REQ-PIPE-050`
+   precedent set the same evening.
+4. **On an unforeseen design fork: SKIP that requirement and carry on.**
+   Write up the fork with its options, move to the next requirement.
+   Nothing gets built on a guess.
+
+**The sprints, in dependency order:**
+
+- **Sprint 0 - unblocked now.** `REQ-DASH-094` (the page says which
+  environment built it) - **BUILT 2026-09-28 night**.
+
+  **`REQ-PIPE-105` MOVED OUT OF SPRINT 0, to after Sprint A** (found
+  2026-09-28 night on starting it, and it is a sequencing discovery
+  rather than a design fork). Its criteria 5, 6, 7, 8 and 13 all turn
+  on PROMOTION, and there is no promote operation yet: `decision_log.
+  promoted_into`, `decision_log.promoted_supply` and `period_schema.
+  promoted_in` all READ promotion state, while the act of promoting is
+  `REQ-PIPE-075`'s, which is Sprint A. Criterion 12 is already
+  partly done - `qa_tools/cp/completion_tracker.py` no longer exists.
+  Building it first would mean writing against a mechanism Sprint A
+  creates, so it waits. Worth noting the dependency list did not catch
+  this: `105` declares `REQ-PIPE-035` and `036`, both built, and the
+  real blocker is somewhere else - the same shape as `REQ-DASH-056`'s
+  own note. `REQ-DASH-094` names `REQ-PIPE-093` as a dependency, which
+  is unsigned - but the mechanism it actually needs (the build
+  recording its environment) shipped with `REQ-PIPE-092`, so it is
+  buildable.
+- **Sprint A - the spine** (45). `REQ-PIPE-075` promotion, `076`
+  rejection and un-decide, `079` QA against the filed period. Plus the
+  `074` reconciliation from answer 1. Everything below needs this.
+- **Sprint B - dispositions** (42). `REQ-PIPE-084` substitution, `098`
+  inheritance, `REQ-QAC-108` drift and volume reference. Order fixed by
+  answer 2.
+- **Sprint C - the dashboard trio** (30). `REQ-DASH-056` (what arrived
+  versus what is promoted), `REQ-DASH-085` (a substituted period never
+  reads as ordinary), `REQ-DASH-100` (an inherited one never does
+  either).
+- **Sprint D - tickets** (28). `REQ-PIPE-083` reconciler, `REQ-GHUB-109`
+  post-on-change. Note `109` amends `REQ-GHUB-027`'s built behaviour,
+  which answer 3 authorises.
+- **Sprint E - operator routes** (46). `REQ-GHUB-082` and
+  `REQ-PIPE-099`. Last, and the least suited to unattended work.
+
+**WHY THE DASHBOARD TRIO MOVED AHEAD OF THE TICKETS, 2026-09-28, after
+Keith asked why the last sprints were being written off.** The first cut
+of this plan had all five dashboard-and-operator requirements in one
+final sprint, which made 76 criteria sit behind the ticket work. Checked
+against the register rather than assumed, and it was wrong:
+`REQ-DASH-056` has NO unmet dependency at all (it needs Sprint A's
+promotion state in practice, nothing more), `085` waits only on `084`,
+and `100` waits only on `098` and `085`. **None of the three needs the
+ticket work.** Moving them ahead makes 30 criteria reachable that the
+first ordering had stranded.
+
+What actually limits the night, so it is not mistaken for difficulty:
+- **Chain depth.** `A -> B -> 083 -> 109 -> 082 -> 099` is six serial
+  links, and nothing in a later one can start until the one before is
+  green. That is scheduling, not hardness.
+- **Verification is a fixed tax per requirement.** `mothman check` is
+  ~300s (this file's own measured log, 2026-09-28; pytest is 257s of it
+  and ~85% of that is the real-browser e2e module, which
+  `--dist loadfile` pins to a single worker). Sixteen requirements
+  flipping to `built` is ~80 minutes of gate runs before any code is
+  written, and Sprints C and E ADD e2e tests, lengthening every run
+  after them.
+- **One criterion is genuinely unsuited to unattended work.**
+  `REQ-GHUB-082` criterion 15 requires RE-RECORDING the committed demo
+  cast (`dashboard/demos/qa_wizard.cast`) via
+  `scripts/dev/record_cast.py`, driving a live TUI. If Sprint E is
+  reached, build everything else and leave that criterion for Keith -
+  which means `082` does NOT flip to `built` that night, and says so.
+  (That is what happened, and the criterion was done the next morning
+  with him awake. The number was wrong here - 13, not 15 - which cost
+  nothing and is corrected rather than left to mislead.)
+
+**Realistic expectation, stated in advance rather than reported at
+6am:** Sprint 0 and A should land solidly, B is plausible, C is
+reachable if B goes well, D and E probably not. This is an estimate
+from volume and shape rather than a measurement, and the first version
+of it was wrong about the ordering, so treat it as a guide rather than
+a commitment.
+
+**Two more, granted later the same night, and the second one changes
+what is safe to attempt:**
+- **THE DATABASE MAY BE WIPED AND REBUILT.** Keith's own words: "if you
+  get stuck at any point in the night and it would help unblock you,
+  feel free to wipe the database and start again fresh. It's all just
+  synth data and our POC data - so nothing is lost." What that unblocks
+  is bigger than being stuck: a FILING IS WRITE-ONCE, which is why
+  turning on `filing.file_arrivals()` in the orchestrators was being
+  treated as the night's riskiest step - a wrong assignment bakes into
+  permanent history. With permission to wipe, the cost of getting it
+  wrong drops from "permanent" to "one bootstrap, about four minutes".
+  Still verify on a throwaway database first; the wipe is a recovery,
+  not a substitute for looking.
+- **REQ-GEN-044 IS BACK ON THE LIST**, after the rest, "if it opens up
+  any of the stuff we wanted to inject there". It does, and the
+  connection is real: this file's own test scenario register is full of
+  scenarios that turn on promotion - auto-promotes, holds because the
+  slot is filled, promoted-then-resupplied, the cross-table check that
+  only runs once a sibling is promoted. Criterion 1 asks for a real
+  instance of every scenario the register names, and a large share of
+  them could not be generated while promotion did not exist. NOTE the
+  limit: criteria 8-11 need effective-dated SCHEDULE VERSIONS, which is
+  the calendar batch (REQ-PIPE-110..113) and still unsigned - so this
+  can move a long way without finishing.
+
+**Two permissions Keith granted for this run specifically, 2026-09-28
+night, and they do not generalise beyond it:**
+- **Real GitHub issues and comments may be created** in
+  `keithamoss/data-poc` where a requirement needs them. Asked because
+  they are outward-facing artefacts in a PUBLIC repository that he
+  would have to clean up; he said yes. Still prefer a fake client for
+  the bulk of the tests - exercising the real thing once is evidence,
+  a hundred times is litter.
+- **Self-scheduled wake-ups are allowed**, because an unattended run
+  otherwise stops when a turn ends. Each firing reads this plan,
+  continues from the last committed state, and schedules the next.
+
+**Standing rules for the run**, all of them this project's existing
+ones rather than new: a real failing test first for every defect;
+`mothman check` before each commit and never a commit after an edit
+that postdates its gate; never a test skipped, disabled or quarantined
+to reach green; every number in a commit message from a run that
+happened after the last change; and requirements get `linked_tests`,
+`implemented_by`, `evidence` and `decisions` when they flip to `built`.
+A `CHANGELOG.yaml` entry for anything release-note-worthy, and the
+superseded `plans/*.md` prose deleted in the commit that flips a
+requirement to `built`.
+
+**WHERE THE OVERNIGHT RUN ACTUALLY GOT TO, updated as it went so a
+fresh session can pick up from a file rather than from the commit log.**
+Last updated 07:10 Perth, 50 commits in.
+
+**BUILT AND IN THE REGISTER AS `built`:** `REQ-DASH-094`,
+`REQ-PIPE-074` (reconciliation), **`REQ-PIPE-075`** (promotion, wired
+into both orchestrators), **`REQ-PIPE-076`** (rejection; its deferral
+cleared), **`REQ-PIPE-084`** (substitution), **`REQ-PIPE-098`**
+(inheritance), **`REQ-QAC-108`** (drift and volume measured against
+the last PROMOTED earlier period, a fifth verdict where there is none,
+and a relative volume check on each of Child Protection's six
+datasets), **`REQ-DASH-056`** (arrived versus promoted),
+**`REQ-DASH-085`** and **`REQ-DASH-100`** (the qualifier AND the
+drill-through - a period showing an earlier one's data says whose
+results are on the page, drills through to the period that earned them,
+frames the arrival, and carries that framing in the URL for exactly one
+page).
+
+**`built` WITH CRITERIA DEFERRED, each naming its owner in
+`unmet_criteria`:** **`REQ-PIPE-099`** (inherit and un-inherit as
+accountable operator decisions, and the un-inheritance that frees a
+blocked withdrawal - criteria 7 and 8 were met on 2026-09-29 when
+`REQ-GHUB-082`'s TUI route landed and offered both outside the supply
+queue; criterion 11 still waits on `REQ-PIPE-079`'s re-run).
+
+**PART-BUILT, `in_progress`, each with a decision saying which half:**
+`REQ-PIPE-079` (decision layer done, wiring not), `REQ-PIPE-105`
+(criteria 7 and 8 done),
+`REQ-PIPE-083` (everything but criteria 14 and 15, the OPERATOR ROUTES -
+the slot state, the reconciler, a real GitHub ticket service fenced by
+its own label, and both orchestrators calling it after promotion. `gh`
+is absent here, which is what makes criterion 17 observable rather than
+asserted: a full run reconciles nothing, says so in one line, and
+finishes normally).
+
+**THE FIVE THINGS THAT ARE KEITH'S, not mine, all recorded in the
+requirements' own `decisions:` and repeated here because this is the
+file a fresh session reads:**
+
+1. **`REQ-PIPE-075` criterion 9 is met by something stronger than it
+   asks for.** It wants the log entry written only AFTER the tables are
+   durably in the period schema; what was built puts entry and move in
+   ONE TRANSACTION. The purpose - an interrupted promotion repeated
+   rather than skipped - is fully met; the letter is not, because inside
+   one transaction there is no "after". Proposal: reword it to require
+   atomicity outright.
+2. **`REQ-PIPE-079` criterion 10 and `REQ-PIPE-105` criterion 5
+   contradict each other**, over whether a run overlays the DELIVERY's
+   tables or the PERIOD's. Both signed; `105` is later and explicitly
+   about that unit, and its criterion 9 names `035` and `036` as the
+   ones to amend without mentioning `079`. Flagged rather than edited.
+3. **The pipeline lost its cross-arrival parallelism, and it cost
+   2.4x.** Child Protection's 18 arrivals: 2m35s parallel, 6m14s in
+   receipt order; a full bootstrap is 14m49s where it was ~4m. Not
+   optional - filing every arrival up front put all 108 supplies in
+   2023-Q1 and promoted six, where one at a time they spread across all
+   fifteen quarters and 67 promote. `--sequential` now changes nothing
+   and says so; whether to remove it is his call. The obvious place to
+   get the time back is WITHIN a run, whose four tools are independent
+   reads evaluated one after another.
+4. **~~`REQ-QAC-108`'s second half needs a mapping nothing
+   records.~~ WITHDRAWN at 02:38 - it was recorded all along.** The
+   arrival key is on both sides: a supply is
+   `cp-carers@202608010100000000` and its table is
+   `cp_carers__202608010100000000`. `drift_reference.run_for()` asks
+   the question of the right column. What is left is not a fork but a
+   coupled change: the wiring and criterion 5 have to land together,
+   because computing the reference per period means the FIRST period
+   legitimately has none and `status_for_psi()` returns "pass" for
+   exactly that case today. The full analysis, including what a fifth
+   tool status costs, is in that requirement's decisions.
+
+   **The lesson, kept because it will recur:** a fork written up at
+   midnight turned out to be a column nobody had looked at. Before
+   writing "nothing records this", grep the schema.
+5. **Birth Registrations' page now carries seventeen separate "missing
+   supply" items, one per skipped day.** Each correct; whether
+   seventeen of them should aggregate the way held supplies do is a
+   judgement about who reads the page. Logged in
+   `plans/road-testing.md`.
+
+**`REQ-GHUB-082` IS BUILT** (2026-09-29), all four phases - the
+allowlist, the one shared implementation, the GitHub adapter and the
+TUI adapter. Its thirty-four criteria are met bar two, both recorded in
+its own `unmet_criteria` with owners: the GitHub route has no PRODUCTION
+CALLER (nothing reads ticket comments, because `ticket-sync.yml` is
+disabled and its replacement is `plans/running-thoughts.md` #53, not
+scoped), and RE-FILE is offered on both routes while its effect belongs
+to `REQ-PIPE-079`'s unbuilt wiring - both routes refuse it by name
+rather than half-doing it. The design reasoning that used to be written
+out here has moved into that requirement's own `decisions:`, which is
+where it belongs now that it describes something built.
+
+What it unblocked on the way: `REQ-PIPE-083`'s criteria 14 and 15,
+`REQ-PIPE-099`'s criteria 7 and 8, and substitution finally having a
+route a person can reach.
+
+**THREE FEATURES NOW EXIST THAT NOTHING IN THIS DEPLOYMENT EXERCISES**,
+and that is the single biggest thing to fix next. Inheritance never
+fires, because no dataset declares a `not_expected` period.
+Substitution had never fired for want of a person to decide it, and as
+of 2026-09-29 the route exists - `mothman supply decide --operation
+substitute`, or the TUI's period door - so what is missing there is now
+somebody using it rather than anywhere to use it. Both dashboard
+qualifiers still render nowhere on the real page. `REQ-GEN-044` is
+where inheritance gets a real instance. This is written down rather than left implicit
+because the night's own worst hour went on three defects in code that
+had never executed (`plans/post-build-review.md` #63).
+
+**A SIXTH thing for Keith, added 02:45:** `REQ-PIPE-083` criteria 6 and
+7 contradict each other on a literal reading. Criterion 6 wants the
+ticket to show a slot's QA VERDICT; criterion 7 says the state comes
+from the schedule, the filings and the decision log ALONE. A verdict is
+in `qa.check_result`, which is recorded metadata rather than supply
+rows - so it satisfies 7's prohibition and not its word "alone".
+`REQ-DOCS-101` sharpened exactly this phrasing elsewhere. `slot_state.py`
+computes the state from the three named sources and leaves the verdict
+to the reconciler, flagged rather than decided.
+
+**Two lessons from the night, both in `plans/post-build-review.md`:**
+#63, that a guard making a path unreachable also makes it untested, and
+the path runs for the first time on the day the guard stops holding.
+#64, that a fixture giving two values the SAME string proves nothing
+about the code that tells them apart - which hid a defect that would
+have broken the first real substitution anybody made.
+
+**Nothing has been deleted from this file yet, and that is deliberate.**
+A design thread is deleted WHOLE once its last dependent batch is built.
+Thread B's staging-and-promotion prose still feeds the unbuilt half of
+`REQ-QAC-108` and the operator routes, so it stays.
+
+**Priority: REQ-PIPE-093 is queued, Keith 2026-09-28 evening, his own
+words: "let's not forget PIPE-093 either. We'll tackle it next or after
+the scoper comes back."** It is `not_started`, UNSIGNED, and has FIVE
+open questions - so the sign-off gate applies and at least three of the
+five would change what gets built.
+
+What it needs before it can be signed, in the order they can be dealt
+with:
+- **Two of the questions are RESEARCH, not decisions**, and are
+  answerable without Keith: Aurora 16.8's own extension allowlist, and
+  how long Aurora keeps major version 16 available - the counter-
+  argument for targeting 17.7 instead. `docs.aws.amazon.com` is
+  reachable, so these are unread rather than unreachable, and they were
+  moved here from REQ-PIPE-087 on 2026-09-27 because this requirement
+  is the one that declares the version.
+- **Three are genuinely Keith's**: how an environment is STATED (a
+  mandatory flag, a mandatory environment variable, or both with the
+  flag winning); what production's extra friction actually is (typing
+  the name back, a separate explicit flag, or a per-environment setting
+  saying which need confirming); and whether the decision log carries
+  the environment on each entry.
+- **Where the declared PostgreSQL version lives** - `contract/
+  data-asset.yaml`, a committed file of its own, or alongside
+  `.python-version`, which is the precedent it borrows from.
+
+Note before anyone plans the build: part of this requirement is ALREADY
+BUILT under REQ-PIPE-092's follow-on work - see this requirement's own
+first open question, which records exactly which criteria and why it
+still reads `not_started`. REQ-TEST-114 (the terminal saying which
+environment it is acting against) depends on it and is also unsigned.
+
 **Priority: work through in THIS ORDER (Keith, 2026-09-21 night, his own
 words setting the queue): "let's work through the still open items that
 you've got logged... and then we'll do one last stress test using chaos
@@ -1526,7 +1844,7 @@ comparisons against the expected-supply sequence.
    (the verdict follows the filing). Both signed 2026-09-23 and BUILT
    2026-09-25.
 
-11. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Promotion and
+11. **[in-progress, 2026-09-28]** **[Pipeline & publishing]** **Promotion and
     rejection.** Auto on green/amber into an EMPTY slot; red never;
     landing in a filled slot never (Thread B). Plus the **mixed-period
     delivery gate** - a delivery whose tables land in different PERIODS
@@ -1574,7 +1892,7 @@ comparisons against the expected-supply sequence.
     "promotion and rejection" reads like a complete set of outcomes and
     is not.
 
-12. **[todo, 2026-09-21]** **[Pipeline & publishing]** **The decision
+12. **[in-progress, 2026-09-28]** **[Pipeline & publishing]** **The decision
     log, and the GitHub Issues write path.** Append-only; who, when,
     what, which, why; automated decisions recorded the same way with the
     rule as actor; demotion stickiness; **re-filing** (confirmed in
@@ -1771,7 +2089,7 @@ comparisons against the expected-supply sequence.
     (sprint 12) and the as-of work (sprint 19), and nothing depends on
     it.
 
-25. **[todo, 2026-09-24]** **[Pipeline & publishing]** **CARRY-FORWARD:
+25. **[in-progress, 2026-09-28]** **[Pipeline & publishing]** **CARRY-FORWARD:
     a period whose supply never arrives, and a human decides to point it
     at the previous period.** Keith, 2026-09-24. A genuinely new
     concept, adjacent to promotion and rejection (sprint 11) rather than
@@ -2000,7 +2318,7 @@ exist.
     load-time file check gates promotion, "possibly even QA". The second half
     is deliberately tentative and is his to settle when this is built.
 
-28. **[todo, 2026-09-26]** **[Pipeline & publishing]** **"Inherited": a dataset
+28. **[blocked, 2026-09-29]** **[Pipeline & publishing]** **"Inherited": a dataset
     that does not participate in a period at all.** A view created when a
     period schema is born, pointing at the supply that is still current, for
     the datasets the schedule says owe nothing that period - plus inherit and
@@ -3997,6 +4315,263 @@ At 30 datasets the runway warning must **aggregate** ("3 datasets
 have fewer than 2 supplies remaining"); 30 individual banners is
 noise. Same for staleness - the top-level view summarises rather than
 enumerates.
+
+### `contract/calendar.yaml` - one file per asset, and `slaProperties` goes
+
+**Status:** todo (2026-09-28) · **Category:** Pipeline & publishing
+
+Designed with Keith across the morning of 2026-09-28 and written down
+that evening, on noticing it existed in NO file - only in a chat
+session that had already been compacted once. **Nothing here is a
+requirement yet.** The sign-off gate applies: this is the material a
+`delivery-scoper` pass and a read-back should be built from, not a
+licence to start building.
+
+**The problem it solves: the same facts are configured twice.** Today
+an asset's delivery calendars live in `contract/data-asset.yaml` while
+each dataset's cadence, expected time and latency live in that
+dataset's own ODCS contract under `slaProperties:`. The two can
+disagree, nothing checks that they don't, and `slaProperties` cannot
+be versioned - so changing a cadence silently re-judges history.
+
+**The shape agreed:**
+- **One `contract/calendar.yaml` per data asset.** It holds the named
+  calendars (quarterly, daily, ...), each as EFFECTIVE-DATED VERSIONS,
+  the same shape check lifecycle already uses. `slaProperties:` is
+  DELETED from both ODCS contracts rather than left to rot.
+- **A collection may name a calendar, not only a dataset** - Keith's
+  own ask, since a whole collection usually shares one.
+- **`participates: {slots, reason}`** per dataset, so a dataset that
+  is owed nothing in a period says so with a reason a reader can see,
+  rather than being silently absent.
+- **The Child Protection override is about HOW EARLY a supply may
+  arrive**, not about its expected time - Keith corrected this
+  explicitly. It widens the claim window; it does not move the
+  deadline.
+- **The gap invariant, rejected at CONFIG time rather than discovered
+  at runtime:** `claim_window + grace < the gap between consecutive
+  due instants`. Stated concretely: `claim_opens_at(N+1) >
+  late_after(N)`. Without it, a slot's claim window overlaps the
+  previous slot's lateness and an arrival is ambiguous between two
+  slots.
+- **A structured changelog** inside the file - `date`, `author`,
+  `change` per entry - rather than prose comments. Keith asked for
+  this specifically.
+
+**Two decisions Keith added on the evening of 2026-09-28:**
+
+1. **A calendar's HISTORY IS IMMUTABLE, enforced by a validation
+   command wired into the existing pre-commit hook.** Historical
+   entries cannot be changed; the check refuses the commit.
+
+   This is the load-bearing complement to a rejection already recorded
+   two sections above, and the pair only makes sense together. This
+   thread rejected "derive at runtime, freeze the computed `due_at`
+   onto the result", on the grounds that **the dates ARE the supplier
+   agreement and QA judges against the agreement**. But that rejection
+   removes the thing that was protecting history: if a judgement does
+   not carry its own frozen inputs, then editing the agreement
+   retroactively re-judges every past supply against dates nobody
+   agreed at the time. Immutability is what puts that protection back,
+   on the config rather than on the record.
+
+   It also has to be a COMMIT-time gate rather than a runtime one,
+   because by the time anything runs, the damage is already committed
+   and the old values are only recoverable by reading git.
+
+2. **Times are interpreted in the timezone from the data asset's own
+   config.** `contract/data-asset.yaml` already carries `timezone`, so
+   an `expected_time` of `14:00` is wall-clock in the ASSET's zone.
+   Not per-calendar, not per-dataset, and never the timezone of
+   whatever machine happens to be running.
+
+**What "historical" means - SETTLED, Keith 2026-09-28, option B of
+three shown to him.** The rule is **freeze by what the thing
+governs**, and it rests on one observation: ADDING A FUTURE DATE IS
+NOT A CHANGE TO HISTORY. The first draft of this section conflated
+"editing a version" with "changing what a past supply was judged
+against", and they are different things.
+
+- An **entry** is frozen once **its own date** has passed.
+- A **version-level property** (`claim_window`, and anything else that
+  governs a whole version) is frozen once **that version** takes
+  effect, because it already governed periods that have been judged.
+
+The validator rule, in three sentences, compared against `HEAD`: no
+entry whose date has passed may be changed or removed; **no entry with
+a past date may be ADDED either**, since that invents a slot nobody was
+ever owed; everything future-dated is freely editable. That last
+clause is easy to leave out and is the one a naive "existing entries
+cannot change" wording would miss.
+
+What it costs in the case that motivated the choice - Keith's own
+"I don't want adding future days to the quarterly calendar to be that
+annoying". Authoring 2028's four dates is four appended lines plus one
+changelog entry, inside the existing version. A new version stays
+reserved for what deserves one: the supplier changing the agreement,
+or the claim window changing. Note the daily calendar is a `cadence`
+rule rather than a date list, so none of this touches it.
+
+REJECTED, both worth not re-deriving:
+- **(A) Freeze the whole version once `effective_from` has passed.**
+  A version is a complete statement of the agreement, so adding four
+  dates means restating all twenty you did not touch - an unreadable
+  diff, and two copies of the same dates that can silently disagree.
+  Its obvious escape, letting each version state only its DELTA, is
+  worse: "what was in force on 3 May 2025" then needs versions
+  replayed in order, and the file stops being readable by eye.
+- **(C) Freeze by whether anything has been JUDGED against an entry**
+  - a slot existing in the database for that period. Theoretically the
+  most precise rule, and practically the wrong one: a pre-commit hook
+  has to run on a laptop with no database, and a config gate that
+  queries the warehouse to decide whether a config edit is legal
+  inverts this project's own "the repository holds configuration, not
+  state".
+
+**Both remaining forks SETTLED, Keith 2026-09-28.**
+
+**No escape hatch.** There is no flag, no override, no "I know what I
+am doing" path past the gate. A past date that was wrong is exactly
+the case immutability exists for: supplies were judged against it, and
+quietly changing it makes the record disagree with what happened. A
+correction that genuinely needs making is a new version with its own
+`effective_from` and its own changelog entry, which is visible rather
+than silent - and the real history stays in git either way.
+
+**The timezone IS versioned.** Which makes it the same shape as
+everything else here: a wall-clock `expected_time` is interpreted in
+the zone **in force when the supply was due**, exactly as a date is
+read from the calendar version in force then. Without that, changing
+an asset's zone would silently move every past due instant, which is
+the same retroactive re-judgement the calendar rule exists to prevent.
+
+Three consequences, so nobody has to re-derive them:
+- **It stays in `contract/data-asset.yaml`, becoming a versioned list
+  rather than the scalar `timezone: Australia/Perth` there today.** My
+  call rather than Keith's, and easily reversed: the zone is
+  asset-wide, used well beyond the calendars - the dashboard's asset
+  clock, REQ-DASH-071's timestamps, arrival classification - so moving
+  it into `calendar.yaml` would put a general fact inside one
+  consumer's file.
+- **Every reader becomes "as at when".** A due instant asks for the
+  zone in force at its own date; a display clock asks for the current
+  one. That is a real cost of versioning and the reason to write it
+  down: a bare `asset_timezone()` with no instant is the bug this
+  invites.
+- **The immutability rule applies to it too**, on the same freeze-by-
+  what-it-governs line: a timezone version that has taken effect is
+  frozen, because it already governed instants that have been judged.
+
+Worth keeping from the existing comment in `contract/data-asset.yaml`,
+because it is still true and answers a different question: changing
+the zone reinterprets nothing ALREADY STORED, since every recorded
+instant carries its own offset. That covers recorded facts. Versioning
+covers instants COMPUTED from config, which had nothing protecting
+them.
+
+### Where the calendar batch actually stands - read this before picking it up
+
+**Status:** in-progress (2026-09-28) · **Category:** Pipeline & publishing
+
+Written at the end of 2026-09-28 at Keith's own ask, because the next
+session on this will otherwise re-derive an evening's verification.
+
+**The four requirements EXIST and are LANDED, unsigned.**
+`REQ-PIPE-110` (one file for the agreement, 19 criteria), `REQ-PIPE-111`
+(history cannot be edited, 19), `REQ-PIPE-112` (versioned timezone, 12)
+and `REQ-PIPE-113` (due instant and the gap invariant, 14). All four are
+`not_started`, none is signed, and the sign-off gate applies - they are
+PROPOSALS. They came from a real `delivery-scoper` pass against this
+thread read in full, so the provenance rule is satisfied and can be
+stated when the batch is presented.
+
+**They were landed UNREAD in detail, and that is the one caveat.** The
+scoper's analysis was verified (below); its 64 acceptance criteria were
+not read line by line. They went into the register rather than staying
+in a scratchpad because the scratchpad does not survive the container,
+and an unsigned requirement in the register is exactly what the register
+is for. Read them properly before presenting them.
+
+**KEITH'S DECISION, 2026-09-28 evening, and it is the important one: a
+changelog entry must NOT clear the gate.** His words: "a change log
+entry shouldn't clear and offer an escape hatch". Made KNOWINGLY, after
+being told it reverses a decision he took five days earlier.
+
+**Why that matters more than it looks.** `REQ-PIPE-050` is SIGNED and
+BUILT, and its own `[BUILD]` decision says, verbatim: *"A changelog
+entry on the version clears it - this is a say-what-you-did gate, not a
+freeze, which is what Thread E actually asks for."* The gate is real
+code, shipping since 2026-09-23 in
+`qa_tools/common/validate_schedule.py::_retrospective_edit_errors`,
+wired into the same pre-commit hook this batch proposes using. So:
+
+- **The batch is NOT purely additive.** `REQ-PIPE-050`'s criteria and
+  its two `[BUILD]` decisions have to be amended in the SAME change, on
+  the `REQ-DOCS-101` precedent, or the register will carry two
+  contradictory accounts of one gate.
+- **`REQ-PIPE-111` is an amendment, not a new build.** It repoints an
+  existing gate at `calendar.yaml` and removes one clause. Its criteria
+  8 and 9 already say so.
+- **One question is still open on it** and is a fair one: is `git commit
+  --no-verify` accepted as out of scope? "No escape hatch" is a promise
+  about what this tool OFFERS; it cannot stop somebody bypassing the
+  hook, which is what the CI gate catches. Worth confirming that
+  reading rather than assuming it.
+
+**And a correction worth keeping, because it is the reason the reversal
+went unnoticed for a whole evening.** Three options for "what counts as
+historical" were put to Keith that evening as though the field were
+open. It was not: a gate implementing option B minus the escape hatch
+had been running for five days, and nobody checked before offering the
+menu. The real question was always the narrow one he has now answered.
+
+**What was VERIFIED rather than relayed** (2026-09-28, against the real
+code, after the scoper reported):
+
+| Scoper's claim | Verdict |
+|---|---|
+| `slots.py` already computes `due_at`, `late_after`, `claim_opens_at` | Confirmed - `qa_tools/common/slots.py:63-82,128` |
+| A retrospective-edit gate already ships, as a say-what-you-did gate | Confirmed - `validate_schedule.py:778`, wired at `:896` |
+| Comparing against `HEAD` reintroduces a closed hole; use `diff_base()` | Confirmed - `qa_tools/common/diff_base.py:55` |
+| The gap invariant holds today with real margin | Re-measured independently, identical: daily 19:00:00 over 495 slots, the quarterly datasets 74d 16:00 over 20, `cp-case-workers` 166d 16:00 over 10 |
+| Draft validates with 6 errors, all cross-references | Re-run, identical |
+| Carry-over check is complete | Ten claims spot-checked, all held - `const PERIOD_SEQUENCES` is real and embedded, the `element:` default/override comment is real, both rejected runtime-derivation alternatives are on `REQ-PIPE-049`, every "already carried" item appears in `048`-`053` |
+
+So **"today NOTHING computes a due instant" (written in the subsection
+above) is WRONG** and should be read as "nothing in `schedule.py` does".
+`REQ-PIPE-113` is therefore smaller than its brief: re-source and
+version the inputs, and add the invariant.
+
+**Also flagged by the scoper and still outstanding:** this thread now
+holds TWO disagreeing config sketches - the older "Config sketch"
+subsection still shows per-dataset slot properties in `slaProperties:`,
+which the newer subsection deletes. Mark the older one superseded when
+the batch lands. The thread warns about exactly this failure twice and
+has now committed it again.
+
+**ONE OF THOSE IS NOW ANSWERED, 2026-09-29 morning.** Keith, in his own
+words: "the expected time is a versioned property of the dataset's
+participation within the calendar." So `expected_time` sits on the
+dataset's PARTICIPATION entry, versioned there, inside the calendar
+file - not on the calendar version itself, and not effective-dated on
+the dataset in its own contract. The reason that way round is recorded
+on `REQ-PIPE-110`: putting it on the calendar version means one
+dataset shifting its hour authors a version that thirty datasets
+share, and every one of them then reads as having changed. It does NOT
+settle where participation itself lives, which is the separate open
+question below.
+
+**Still needing Keith before the batch can be signed** - three that would
+change what gets built (where participation lives and whether
+`participates` replaces `delivery_months`/`not_expected`;
+what happens to `REQ-PIPE-050`'s existing guard, now answered
+in principle but not in the register; whether `slaProperties:` goes
+entirely or only its schedule properties) and four non-functional (one
+file at ~30 datasets; what the gate does when it cannot compare - a
+shallow clone, a branch's first push; what happens if the move changes
+even one recorded arrival verdict; whether the timezone versioning is
+worth building before a second zone exists). The scoper's full report
+has them written out ready to relay.
 
 ## Thread D - Arrival classification
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing

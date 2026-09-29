@@ -38,6 +38,7 @@ violations green.
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 
 from qa_tools.common import asset_time
@@ -137,3 +138,64 @@ def format_relative(value, now) -> str:
             unit = name if n == 1 else name + "s"
             return f"in {n} {unit}" if delta > 0 else f"{n} {unit} ago"
     return "just now"
+
+
+#: A period NAME that happens to be a date. A daily calendar names its
+#: periods by the day - "2026-08-27" - while a quarterly one names them
+#: "2023-Q1", and only the first is a date a reader should never be
+#: shown raw.
+_ISO_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def format_period(name: str) -> str:
+    """A period's name, written for a person.
+
+    "2023-Q1" is already how somebody says it and comes back unchanged.
+    "2026-08-27" is a DAILY calendar naming its period by the day, and
+    a bare ISO date in prose is exactly what this module exists to stop
+    - so it becomes "Thursday, 27 August 2026".
+
+    WHY A PERIOD NAME NEEDS THIS AT ALL, since a name is an identifier
+    rather than an instant: because it reaches a reader as prose.
+    "Birth Registrations has no supply for 2026-08-27" was on the real
+    dashboard on 2026-09-28, in an item whose whole job is to tell a
+    person what to go and do. The identifier is unchanged in the
+    record; this is the last transform before an eye, same as the rest
+    of this module.
+
+    A NAME THIS DOES NOT RECOGNISE COMES BACK AS IT IS, deliberately. A
+    calendar may name its periods anything its agency agreed, and
+    guessing at a shape nobody declared is how a display standard
+    starts mangling real names.
+    """
+    text = (name or "").strip()
+    if not _ISO_DAY.match(text):
+        return text
+    return format_day(date.fromisoformat(text))
+
+
+#: A bare ISO date sitting inside a longer sentence, and NOT the date
+#: half of a timestamp - the lookahead for `T14:` or ` 14:` is what
+#: keeps this off an instant, which is format_instant's to write and
+#: would otherwise come out as "Monday, 31 August 2026T09:00:00+08:00".
+_ISO_DAY_IN_TEXT = re.compile(r"(?<![\d-])(\d{4}-\d{2}-\d{2})(?![\d-]|[T ]\d{2}:)")
+
+
+def format_periods_in(text: str) -> str:
+    """Every bare ISO date in a sentence, rewritten for a person.
+
+    FOR PROSE THAT WAS COMPOSED AS A RECORD. `assignment.Assignment`
+    writes an `ambiguity` sentence naming the slots it hesitated
+    between, and that sentence is stored - a filing is write-once, so
+    formatting it at composition time would fix only the filings made
+    after the change and leave every earlier one showing raw dates
+    forever.
+
+    So the record keeps the identifiers and this is the last transform
+    before an eye, which is what the rest of this module already is. It
+    is deliberately narrow: only a bare `YYYY-MM-DD` with no digit or
+    hyphen either side, so "2023-Q1" and a timestamp's own date half are
+    both left alone - the second because a timestamp is format_instant's
+    to write, not this function's.
+    """
+    return _ISO_DAY_IN_TEXT.sub(lambda m: format_period(m.group(1)), text or "")

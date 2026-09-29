@@ -60,6 +60,7 @@ about records, and `supply_db.connect` can answer any question at all.
     the delivery record     held supplies, contested and unrecognised
                             files, receipt-time anomalies
     the load record         failed loads
+    the decision log        inheritances that could not complete
     observations/in_flight/ a delivery still being written when we
                             looked
     filings/                an assignment made under ambiguity
@@ -75,7 +76,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from qa_tools.common import delivery_log, filing, hierarchy, in_flight_log, load_log
+from qa_tools.common import (delivery_log, display_time, filing, hierarchy,
+                             in_flight_log, load_log)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -97,6 +99,13 @@ UNRECOGNISED_FILE = "unrecognised-file"
 IN_FLIGHT_DELIVERY = "in-flight-delivery"
 UNCERTAIN_ASSIGNMENT = "uncertain-assignment"
 CLOSED_UNFILLED_SLOT = "closed-unfilled-slot"
+#: An inheritance that could not complete (REQ-PIPE-098 criterion 10).
+#: WARNING rather than needs-action: there is nothing for a person to
+#: DO about it directly - the period genuinely has no earlier supply to
+#: stand on - but it is the reason a table is absent, and the reason is
+#: ours rather than the supplier's, which is exactly what somebody
+#: looking at an empty period needs told.
+INHERITANCE_REFUSED = "inheritance-refused"
 
 
 @dataclass(frozen=True)
@@ -375,14 +384,19 @@ def _from_filings() -> list[Item]:
                 kind=UNCERTAIN_ASSIGNMENT, severity=WARNING, blocking=False,
                 headline=(f"{entry.dataset_name}'s supply "
                            f"{record.get('supply_id', '')} was filed under uncertainty"),
-                detail=(f"It was filed to {record.get('slot')}, but an earlier slot "
+                detail=(f"It was filed to {display_time.format_period(record.get('slot') or '')}, "
+                         f"but an earlier slot "
                          f"was also unfilled, so it may have been for that one instead. "
                          f"The supply is filed and checked - this is a qualifier on "
                          f"which period it counts for, not a fault in the data."),
                 agency_id=entry.agency_id, collection_id=entry.collection_id,
                 dataset_id=entry.dataset_id,
                 responses=("confirm the slot", "re-file it to the earlier slot"),
-                ambiguity=record.get("ambiguity")))
+                # WRITTEN FOR A PERSON at render time, not at
+                # composition time: a filing is write-once, so
+                # formatting the stored sentence when it was made would
+                # leave every earlier filing showing raw dates forever.
+                ambiguity=display_time.format_periods_in(record.get("ambiguity") or "")))
     return items
 
 
@@ -397,26 +411,58 @@ def _from_closed_slots() -> list[Item]:
     would put a permanent failure on a dataset whose data is fine.
 
     NOTHING CLOSES A SLOT UNTIL A LATER ONE IS FILLED, and only a
-    PROMOTION fills one - which does not exist until delivery sprint 11.
-    So this is structurally empty today, and deliberately derived from
-    the same filled-slot question rather than from filings, because
-    reading filings here is the single easiest way to reintroduce the
-    forward cascade.
+    PROMOTION fills one. It is derived from the same filled-slot
+    question rather than from filings, because reading filings here is
+    the single easiest way to reintroduce the forward cascade.
+
+    THIS USED TO SAY "structurally empty today", and it was - promotion
+    did not exist. It does now (REQ-PIPE-075, 2026-09-28), and the first
+    thing this function did on being reached for real was crash: it
+    asked for a dataset's slots with no `until`, which a daily calendar
+    refuses. Worth leaving the note rather than deleting it, because the
+    shape recurs - a guard that makes a path unreachable also makes it
+    untested, and the path runs for the first time on the day the guard
+    stops holding.
     """
     from qa_tools.common import assignment as assignment_mod
+    from qa_tools.common import asset_time
     from qa_tools.common import slots as slots_mod
+
+    # TODAY ON THE ASSET CLOCK, and it is required rather than tidy: a
+    # DAILY calendar generates periods without end, and
+    # schedule.periods_for_dataset() refuses an unbounded ask rather
+    # than looping forever. This asked without one until 2026-09-28 and
+    # nothing noticed, because the early return above meant the call was
+    # unreachable while no slot was ever filled - see this function's
+    # own note below, and the test named for it.
+    #
+    # Today is the right bound rather than an arbitrary one: a slot in
+    # the future cannot be CLOSED, since closure means a later slot was
+    # filled and nothing fills a slot that is not yet due.
+    until = asset_time.now().date()
 
     items = []
     for entry in hierarchy.all_datasets():
         filled = filing.filled_slots(entry.dataset_id)
         if not filled:
             continue
-        dataset_slots = slots_mod.slots_for_dataset(entry.dataset_id)
-        for slot in assignment_mod.closed_by_monotonic_filling(dataset_slots, filled):
+        dataset_slots = slots_mod.slots_for_dataset(entry.dataset_id, until=until)
+        # A SET OF NAMES, not of Slots - closed_by_monotonic_filling()
+        # returns frozenset[str], and this read `slot.name` until
+        # 2026-09-28. Sorted so the queue is stable between runs, which a
+        # frozenset is not.
+        closed = sorted(assignment_mod.closed_by_monotonic_filling(dataset_slots, filled))
+        for slot in closed:
+            # A DAILY calendar names its periods by the day, so the
+            # identifier is a bare ISO date - which is the one thing
+            # REQ-DASH-071 says a reader is never shown. The item keeps
+            # the identifier in `dataset_id`/its own kind; only the prose
+            # is written for a person.
+            shown = display_time.format_period(slot)
             items.append(Item(
                 kind=CLOSED_UNFILLED_SLOT, severity=NEEDS_ACTION, blocking=False,
-                headline=f"{entry.dataset_name} has no supply for {slot.name}",
-                detail=(f"A later slot has been filled, so {slot.name} can no longer "
+                headline=f"{entry.dataset_name} has no supply for {shown}",
+                detail=(f"A later slot has been filled, so {shown} can no longer "
                          f"be claimed by an arriving supply. This is a missing delivery "
                          f"awaiting a decision, not a finding about the data that did "
                          f"arrive."),
@@ -424,6 +470,50 @@ def _from_closed_slots() -> list[Item]:
                 dataset_id=entry.dataset_id,
                 responses=("record the period as not supplied",
                             "re-file a supply to this slot")))
+    return items
+
+
+def _from_inheritance_refusals() -> list[Item]:
+    """REQ-PIPE-098 criterion 10 - an inheritance that could not
+    complete, surfaced rather than silent.
+
+    THE ATTEMPT IS THE POINT. A period a dataset owes nothing for is
+    normally filled by the rule with whatever is still current; where
+    there is nothing earlier to stand on the rule correctly does
+    nothing, and the result is a genuinely absent table with an
+    explanation nobody can see unless it is put here.
+    """
+    from qa_tools.common import display_time, inheritance
+
+    items = []
+    try:
+        # THROUGH THE NARROW READER, never a connection of this module's
+        # own - see this file's own docstring on why that distinction is
+        # load-bearing rather than stylistic.
+        refused = inheritance.refusals()
+    except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
+        print(f"note: could not read inheritance refusals "
+              f"({type(exc).__name__}: {exc}) - the rest of the queue is unaffected.")
+        return items
+
+    for entry in refused:
+        try:
+            dataset = hierarchy.dataset(entry.dataset_id)
+        except hierarchy.UnknownDatasetError:
+            continue
+        shown = display_time.format_period(entry.period)
+        items.append(Item(
+            kind=INHERITANCE_REFUSED, severity=WARNING, blocking=False,
+            headline=f"{dataset.dataset_name} has no table at all for {shown}",
+            detail=(f"Nothing is owed for {shown}, so the period would normally "
+                     f"stand on this dataset's most recent supply - and no "
+                     f"earlier period holds one to stand on. The table is "
+                     f"genuinely absent, for a reason of ours rather than the "
+                     f"supplier's."),
+            agency_id=dataset.agency_id, collection_id=dataset.collection_id,
+            dataset_id=dataset.dataset_id,
+            responses=("file a supply into an earlier period",
+                        "accept that this dataset has no history yet")))
     return items
 
 
@@ -444,5 +534,6 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
               + _from_loads()
               + _from_filings()
               + _from_closed_slots()
+              + _from_inheritance_refusals()
               + _from_in_flight(observations_dir))
     return Outstanding(items=tuple(sorted(items, key=_sort_key)))

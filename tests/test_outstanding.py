@@ -20,6 +20,27 @@ import pytest
 from qa_tools.common import load_log, outstanding
 
 
+@pytest.fixture(autouse=True)
+def _this_workers_database(supply_dsn):
+    """EVERY test here runs against this worker's own database, and that
+    became necessary on 2026-09-28 rather than merely tidy.
+
+    Two of the queue's producers read the decision log through narrow
+    readers that open their own connection - closed slots through
+    filing.filled_slots(), refused inheritances through
+    inheritance.refusals(). Both were structurally EMPTY while nothing
+    was ever promoted, so a test that asked for no database at all got
+    an empty queue for free. The night promotion started working, the
+    real deployment's 84 promotions arrived in the middle of nine tests
+    asserting on totals.
+
+    Requested autouse rather than per-test, because the failure mode is
+    a test that forgets: it passes on an empty deployment and fails on a
+    populated one, which is a flake nobody can reproduce.
+    """
+    return supply_dsn
+
+
 def _delivery(conn, name="monday", **overrides):
     """One delivery record, straight into this worker's database.
 
@@ -339,3 +360,76 @@ class TestTheRecordTheDashboardReads:
                    held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
         record = _survey(tmp_path).as_record()
         assert json.loads(json.dumps(record)) == record
+
+
+class TestADatasetOnAnEndlessCalendarDoesNotTakeTheSurveyDown:
+    """A real crash, found when promotion started working.
+
+    `_from_closed_slots()` asked for a dataset's slots WITHOUT an
+    `until`, and a daily calendar generates periods without end - so
+    `schedule.periods_for_dataset()` refuses rather than looping
+    forever. The refusal is right; the question was wrong.
+
+    IT HID BEHIND AN EMPTY FEATURE. The function returns early when a
+    dataset has no FILLED slots, and only a promotion fills one, so
+    while nothing promoted the bad call was never reached. The
+    function's own docstring said as much - "structurally empty today"
+    - and the day promotion landed it took the whole dashboard build
+    with it: 153 errors in the e2e module, none of which named a
+    calendar.
+
+    The lesson is the shape rather than the line: a guard that makes a
+    code path unreachable also makes it untested, and the path runs for
+    the first time on the day the guard stops holding.
+    """
+
+    def test_the_survey_completes_for_a_daily_dataset_with_a_filled_slot(
+            self, monkeypatch):
+        from qa_tools.common import filing, hierarchy, outstanding as out_mod
+
+        daily = next(d for d in hierarchy.all_datasets()
+                      if d.dataset_id == "birth-registrations")
+        monkeypatch.setattr(out_mod.hierarchy, "all_datasets", lambda: [daily])
+        # A filled slot is what gets past the early return. Its NAME does
+        # not matter - what matters is that the function then asks the
+        # schedule for this dataset's slots.
+        monkeypatch.setattr(filing, "filled_slots", lambda ds: frozenset({"2026-09-01"}))
+
+        items = out_mod._from_closed_slots()
+        assert isinstance(items, list)
+
+    def test_a_closed_slot_produces_an_item_naming_the_period(self, monkeypatch):
+        """The SECOND bug in the same unreachable function, and it would
+        not have shown as a crash in the survey - it raised only once a
+        slot was actually closed.
+
+        closed_by_monotonic_filling() returns a set of slot NAMES;
+        this read `slot.name` off each one. Both faults sat behind the
+        same early return, which is the point of the class this test is
+        in: nothing had ever run these four lines.
+        """
+        from qa_tools.common import filing, hierarchy, outstanding as out_mod
+        from qa_tools.common import slots as slots_mod
+
+        daily = next(d for d in hierarchy.all_datasets()
+                      if d.dataset_id == "birth-registrations")
+        monkeypatch.setattr(out_mod.hierarchy, "all_datasets", lambda: [daily])
+        real = slots_mod.slots_for_dataset(daily.dataset_id,
+                                            until=__import__("datetime").date(2026, 9, 20))
+        assert len(real) > 2, "test precondition - the calendar must give several slots"
+        # Fill the LAST one and nothing before it, which closes every
+        # earlier slot.
+        monkeypatch.setattr(filing, "filled_slots",
+                             lambda ds: frozenset({real[-1].name}))
+
+        items = out_mod._from_closed_slots()
+        assert items, "filling the newest slot closes every earlier one"
+        assert items[0].dataset_id == daily.dataset_id
+        # WRITTEN FOR A PERSON, not as the identifier. A daily calendar
+        # names its periods by the day, so the name is a bare ISO date -
+        # which is the one thing REQ-DASH-071 says a reader never sees,
+        # and which the real dashboard was showing seventeen times on one
+        # page until this was fixed.
+        from qa_tools.common import display_time
+        assert display_time.format_period(real[0].name) in items[0].headline
+        assert real[0].name not in items[0].headline

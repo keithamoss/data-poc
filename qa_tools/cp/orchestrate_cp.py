@@ -30,8 +30,13 @@ import sys
 
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
+from qa_tools.common import decision_log
+from qa_tools.common import drift_reference
+from qa_tools.common import filing
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common import promotion
+from qa_tools.common import ticket_reconciler
 from qa_tools.common import trial
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -102,7 +107,8 @@ def _announce(on_step, label: str) -> None:
     if on_step is not None:
         on_step(label)
 
-def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str,
+def _run_one(entry: dict, run_timestamp: str, run_by: str,
+             reference_run_id: str | None = None,
              on_step: Callable[[str], None] | None = None) -> list[dict]:
     run_id = entry["run_id"]
     print(f"--- {run_id} ---")
@@ -142,7 +148,7 @@ def _discard_this_runs_schemas(run_id: str) -> None:
 
 
 def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
-                    reference_run_id: str,
+                    reference_run_id: str | None,
                     on_step: Callable[[str], None] | None) -> list[dict]:
     # Before any tool writes - see orchestrate_bdm.py's identical block.
     open_run(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, run_by)
@@ -157,6 +163,12 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     _announce(on_step, RUN_STEPS[2])
     results.extend(_run_step(cp_common.COLLECTION_ID, "datacontract-cli", run_id,
         lambda: run_datacontract_cp.evaluate_datacontract_cp(run_id, run_timestamp)))
+    # PER SUPPLY, NOT PER BATCH (REQ-QAC-108 criteria 2 and 4) - see
+    # orchestrate_bdm.py's identical block for the full account, and
+    # why None here means "no reference" rather than "use a default".
+    if reference_run_id is None:
+        reference_run_id = drift_reference.reference_run_for_arrival(
+            run_evidently_cp.DATASET_ID, entry["received_at"])
     _announce(on_step, RUN_STEPS[3])
     results.extend(_run_step(cp_common.COLLECTION_ID, "Evidently", run_id,
         lambda: run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id)))
@@ -192,7 +204,7 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     return results
 
 
-def run_single(entry: dict, reference_run_id: str, run_by: str | None = None,
+def run_single(entry: dict, reference_run_id: str | None = None, run_by: str | None = None,
                on_step: Callable[[str], None] | None = None) -> list[dict]:
     """The single-delivery counterpart to run_pipeline_cp()'s full-manifest
     batch loop - built for the AWS event-driven MVP (plans/running-
@@ -266,33 +278,80 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # are positional, so a change in what recognition returns renames
     # committed history - a failure that would otherwise be found when
     # CI went red on paths nothing in this file mentions.
-    # WHERE EACH SUPPLY BELONGS IS NOT RECORDED YET, DELIBERATELY
-    # (REQ-PIPE-062, Keith 2026-09-25). The assignment rule is built
-    # and tested - qa_tools/common/assignment.py - and calling
-    # filing.file_arrivals() here is all that is needed to turn it on.
-    # It is off because ONLY A PROMOTION FILLS A SLOT and promotion
-    # does not exist until batch 4, so today every supply that is not
-    # on time for its own current slot files against the oldest slot
-    # in the calendar: measured on a real run, 102 of 108 supplies
-    # landed on 2023-Q1. A filing is WRITE-ONCE by criterion 10, so
-    # recording those would bake a known artefact of a missing
-    # dependency into permanent history, where it later reads as data.
-    # Turn this on in the sprint that lands promotion, not before.
-    #
-    # WHERE IT WILL LAND IS NOW SETTLED (REQ-PIPE-104, 2026-09-28): the
-    # database, in `qa.filing`. That was the reason to build the
-    # destination before flipping this switch rather than with it -
-    # otherwise turning recording on would start committing state to the
-    # repository again, which is the thing Keith settled against.
+    # WHERE EACH SUPPLY BELONGS IS NOW RECORDED (REQ-PIPE-075 criterion
+    # 7, 2026-09-28) - see the file_arrivals() call below. This comment
+    # used to say it was deliberately off, because ONLY A PROMOTION
+    # FILLS A SLOT and promotion did not exist, so every supply not on
+    # time for its own slot filed against the oldest one in the
+    # calendar. Filings land in the database, in `qa.filing`
+    # (REQ-PIPE-104) - which is why that destination was built before
+    # this switch was flipped rather than with it.
 
     run_id_guard.check(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, found_arrivals)
-    reference_run_id = manifest[0]["run_id"]
+    # THE BATCH NO LONGER CHOOSES A REFERENCE RUN - see
+    # orchestrate_bdm.py's identical note (REQ-QAC-108 criterion 4).
     run_timestamp = asset_time.now().isoformat()
+
     # Fails loudly here, before any real tool runs - see orchestrate_bdm.py's
     # identical comment and git_identity.py's own docstring.
     run_by = get_run_by()
+
+    # IN RECEIPT ORDER, ONE ARRIVAL AT A TIME - file it, check it,
+    # promote it, then the next. The chain is real rather than
+    # cautious: a supply is filed to the oldest slot no PROMOTION has
+    # filled, so arrival N's filing depends on arrival N-1's promotion,
+    # which depends on arrival N-1's checks.
+    #
+    # THIS COST THE CROSS-ARRIVAL PARALLELISM, and the measurement is in
+    # parallel_orchestrate.run_manifest's own docstring along with what
+    # it buys. Short version: filing every arrival up front put all 108
+    # supplies in 2023-Q1, because nothing was ever filled while the
+    # filings were being made.
+    by_run_id = {a.run_id: a for a in found_arrivals}
+
+    def _file(entry: dict) -> None:
+        # WHERE EACH SUPPLY BELONGS, RECORDED BEFORE ANY CHECK RUNS OVER
+        # IT (REQ-PIPE-075 criterion 7). filing.filled_slots() reads the
+        # decision log, so this sees what the arrivals before it filled.
+        #
+        # VERIFIED BEFORE FLIPPING IT, on a scratch database, because a
+        # filing is WRITE-ONCE and the artefact that kept this off was
+        # real: with every slot unfilled, 102 of 108 supplies landed on
+        # 2023-Q1.
+        filing.file_arrivals([by_run_id[entry["run_id"]]])
+
+    def _promote(entry: dict, got: list[dict]) -> None:
+        # PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13),
+        # and is deliberately not inside it: a promotion that fails must
+        # be retryable without re-running QA, which it is only while the
+        # two are separable. tests/test_promotion_after_run.py asserts
+        # that against _run_one_inner's own AST rather than trusting
+        # this comment.
+        promotion.report(promotion.after_runs(
+            [by_run_id[entry["run_id"]]], got,
+            agency_id=cp_common.AGENCY_ID, collection_id=cp_common.COLLECTION_ID,
+            actor=run_by, actor_kind=decision_log.RULE,
+            effective_at=asset_time.now().isoformat()))
+
     all_results = parallel_orchestrate.run_manifest(
-        manifest, _run_one, run_timestamp, run_by, reference_run_id, sequential=sequential)
+        manifest, _run_one, run_timestamp, run_by, None,
+        sequential=sequential, before_each=_file, after_each=_promote)
+
+    # THE TICKETS CATCH UP WITH THE SLOTS (REQ-PIPE-083 criteria 13 and
+    # 16). After promotion rather than beside it, because a ticket that
+    # says something the decision log does not is worse than a ticket
+    # that is a minute behind - and it reconciles EVERY slot this
+    # collection is responsible for rather than the ones this run
+    # touched, because a slot nobody delivered for is exactly the one
+    # that needs a ticket and a pass scoped to arrivals can never see
+    # it.
+    #
+    # SILENT WHERE NOTHING IS CONFIGURED. A run on somebody's laptop has
+    # no GITHUB_REPOSITORY and no `gh`, which is not a broken run - it
+    # is a run with no ticketing, the ordinary state of this repository
+    # for most of its life.
+    ticket_reconciler.report(
+        ticket_reconciler.after_runs(cp_common.COLLECTION_ID))
 
     # NOTHING TO SWEEP HERE ANY MORE (Keith, 2026-09-27). Each run
     # discards its own view and dbt schemas as it finishes - see
@@ -320,6 +379,13 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")
     n_error = sum(1 for r in all_results if r["status"] == "error")
+    # THE FIFTH VERDICT (REQ-QAC-108 criterion 5, 2026-09-29). A drift
+    # or volume check with no reference period has measured nothing, and
+    # counting it under any of the four above would say it did. Left out
+    # of the summary entirely, the four stopped adding up to
+    # total_checks - which is what the history rebuild's own test
+    # noticed before anybody else did.
+    n_nodata = sum(1 for r in all_results if r["status"] == "nodata")
 
     output = {
         "generated_at": run_timestamp,
@@ -334,6 +400,7 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
             "warn": n_warn,
             "fail": n_fail,
             "error": n_error,
+            "nodata": n_nodata,
             "engines": sorted(set(r["engine"] for r in all_results)),
         },
     }
@@ -343,7 +410,8 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
         json.dump(output, f, indent=2, default=str)
 
     print(f"\n{len(all_results)} real check results ({n_pass} pass / {n_warn} warn / {n_fail} fail"
-          f"{f' / {n_error} error' if n_error else ''}) across {len(manifest)} runs -> {RESULTS_PATH}")
+          f"{f' / {n_error} error' if n_error else ''}"
+          f"{f' / {n_nodata} no reference' if n_nodata else ''}) across {len(manifest)} runs -> {RESULTS_PATH}")
     return output
 
 

@@ -325,8 +325,20 @@ class TestReadingTheDecisionLog:
 
     def test_it_distinguishes_a_rule_from_a_person(self, logged):
         """REQ-PIPE-074 criterion 4 reaching a reader. "Promoted by
-        auto-promotion" and "promoted by Keith" are different facts."""
-        result = _run(["decisions", "--dataset", "cp-carers"])
+        auto-promotion" and "promoted by Keith" are different facts.
+
+        THE LIMIT IS RAISED ON PURPOSE. This command shows the newest
+        `--limit` decisions, and its default is a display choice for a
+        person at a terminal; the claim here is that a rule's entry
+        RENDERS as a rule, not that it lands in the first twenty. Other
+        test modules on this xdist worker write cp-carers decisions into
+        the same database - they have to, because the command validates
+        the dataset against the real hierarchy, so an invented id is
+        refused - and on 2026-09-29 twenty more of them pushed this
+        fixture's one row out of the window. The assertion was right and
+        the window was somebody else's.
+        """
+        result = _run(["decisions", "--dataset", "cp-carers", "--limit", "500"])
         assert result.exit_code == 0, result.output
         assert "rule" in result.output
 
