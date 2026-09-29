@@ -4115,3 +4115,48 @@ twice. It deliberately did not re-find the `TypeError`.
     visible from reading the test. What made them findable in one
     afternoon rather than one at a time was reproducing the condition
     that removes all three supports at once.
+
+
+71. **[done, 2026-09-29]** **[Testing & dev tooling]** **A generator
+    test had been rewriting the real `data/scenario_placements.json` on
+    every run, and the bootstrap was hiding it by overwriting the damage
+    each time.**
+
+    `tests/generator_isolation.py` redirects a generator's outputs to a
+    tmp tree, and its own docstring promises "one obvious place" for the
+    next output somebody adds. A fourth output was added and not added
+    there: both generators call
+    `scenario_injection.write_placements()` at the end of a run, which
+    defaults to the REAL file. So `test_generate_runs.py` rewrote it
+    with Birth Registrations' scenarios alone - while asserting, two
+    lines further down, that the real tree was untouched.
+
+    **IT WAS INVISIBLE BECAUSE SOMETHING ALWAYS REPAIRED IT.** The
+    single CI job bootstrapped before every run, overwriting the partial
+    file with a complete one. Splitting CI removed that, and the fast
+    half started reading whatever a test had last written:
+    `KeyError: 'TS-4'` - a Child Protection scenario missing from a file
+    a Birth Registrations test had truncated.
+
+    **WHY IT HANGS OFF A DIFFERENT MODULE**, which is the reusable part:
+    the other three redirected paths are attributes of the generator
+    being redirected, and this one belongs to `scenario_injection`. A
+    helper that loops over `hasattr(module, name)` cannot see it, so it
+    was skipped silently rather than failing. The redirect now sets it
+    explicitly, and `test_generating_never_touches_the_real_delivery_tree`
+    - the test that should have caught this - now fingerprints the
+    placements file alongside the other three.
+
+    **AND THE GUARD FROM #70 FALSELY ACCUSED THE FIX.** Teaching
+    `test_generate_runs.py` to redirect the path made it mention the
+    path, which is what that guard looks for - so it demanded a
+    `needs_deployment` mark on a module that needs the opposite. The
+    wrong fix was available and tempting: add the mark, quiet the
+    check, and push a fast test into the slow half for no reason. The
+    right one was to teach the guard that REDIRECTING an artefact is a
+    stronger form of covered than any mark.
+
+    Worth keeping as a caution about this kind of guard generally: a
+    static check on "does this module mention X" will accuse the code
+    written to handle X properly, and each false positive is pressure to
+    satisfy the checker rather than the requirement.

@@ -270,9 +270,26 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     # would bring it into existence, which the comparison below catches
     # either way.
 
+    # THE SCENARIO PLACEMENTS ARE A FOURTH OUTPUT, and this test did not
+    # know about them until 2026-09-29. Both generators call
+    # scenario_injection.write_placements() at the end of a run, which
+    # defaults to the real data/scenario_placements.json - so this test
+    # asserted the real tree was untouched while quietly rewriting that
+    # file on every run. It went unnoticed because the bootstrap ran
+    # before every test and overwrote the partial file with a complete
+    # one; CI's fast half does not bootstrap, and a Child Protection
+    # scenario went missing from a file a Birth Registrations test had
+    # truncated.
+    from generator import scenario_injection
+
+    placements_before = (scenario_injection.PLACEMENTS_PATH.read_bytes()
+                          if scenario_injection.PLACEMENTS_PATH.exists() else None)
+
     monkeypatch.setattr(generate_runs, "DELIVERIES_DIR", tmp_path / "deliveries")
     monkeypatch.setattr(generate_runs, "RECEIPTS_DIR", tmp_path / "receipts")
     monkeypatch.setattr(generate_runs, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")
+    monkeypatch.setattr(scenario_injection, "PLACEMENTS_PATH",
+                         tmp_path / "scenario_placements.json")
 
     generate_runs.main()
 
@@ -283,6 +300,10 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
     assert (delivery.BOOKKEEPING_PATH.read_bytes()
             if delivery.BOOKKEEPING_PATH.exists() else None) == book_before
+    assert (scenario_injection.PLACEMENTS_PATH.read_bytes()
+            if scenario_injection.PLACEMENTS_PATH.exists() else None) \
+        == placements_before, (
+            "the real scenario_placements.json was written to by a test run")
 
 
 class TestTheInjectedScenariosAreReallyThere:

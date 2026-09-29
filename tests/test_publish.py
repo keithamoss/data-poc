@@ -406,15 +406,24 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
         return found
 
     def test_every_module_reading_reports_carries_the_marker(self):
-        # THREE WAYS TO BE COVERED, and the first is invisible in the
-        # source of the test itself: conftest marks anything requesting
-        # `deployment_history`. So this looks for any of them rather
-        # than for the module-level spelling alone - a check that
-        # insisted on one would report a module that is already fine,
-        # and a guard that cries wolf is one somebody disables.
+        # FOUR WAYS TO BE COVERED, and only one is visible as a mark.
+        # conftest marks anything requesting `deployment_history`; a
+        # module may carry the mark itself or on one class or test; and
+        # a module that REDIRECTS the artefact away from the real tree
+        # never reads the real one at all, which is a stronger form of
+        # covered than any mark.
+        #
+        # THE LAST ONE WAS ADDED AFTER THIS GUARD FALSELY ACCUSED
+        # test_generate_runs.py, which mentions the placements path
+        # precisely BECAUSE it redirects it. A guard that cries wolf is
+        # one somebody disables - and the wrong fix here would have been
+        # to add a mark it does not need, pushing a fast test into the
+        # slow half to quiet a check.
         covered = ("pytestmark = pytest.mark.needs_deployment",
                    "@pytest.mark.needs_deployment",
-                   "deployment_history")
+                   "deployment_history",
+                   "generator_isolation",
+                   "PLACEMENTS_PATH\",")
         missing = {
             name for name in self._modules_reading_reports()
             if not any(mark in (ROOT / "tests" / name).read_text()
