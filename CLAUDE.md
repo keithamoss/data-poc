@@ -1376,8 +1376,11 @@ Rough layout:
   instruction, 2026-09-29: "any changes to the documentation explainers
   have to go through me, just in case there are changes that happen as
   part of building stuff." It covers everything under `docs/explainers/`
-  (concept pages, group pages, the glossary, each group's
-  `sources.yaml`) - see `plans/explainers.md`.
+  (concept pages, group pages, the glossary, the concept map, each
+  group's `sources.yaml`) except `docs/explainers/_work/`, the
+  gitignored folder where the docs-* agents keep their briefs and
+  review reports. Nothing in `_work/` is published or committed, so it
+  needs no approval - see `plans/explainers.md`.
 
   **The case this exists for is the ordinary one, not the careless
   one.** A session building a feature changes a requirement or config
@@ -1392,10 +1395,15 @@ Rough layout:
 
 - **Never change an authoring standard without Keith's explicit
   approval - propose the exact wording, get a yes, then edit.** His own
-  standing instruction, 2026-09-20. It covers two files:
+  standing instruction, 2026-09-20. It covers four files:
   `docs/check-authoring-rules.md` (how a check's three prose fields are
-  written) and `CHANGELOG.yaml`'s own header (how a release note is
-  written). Adding a rule, removing one, renumbering, or rewriting one
+  written), `CHANGELOG.yaml`'s own header (how a release note is
+  written), `.claude/skills/docs-house-style/SKILL.md` (how an
+  explainer is written, including its cast and its banned-word lists),
+  and `.claude/skills/docs-reader-judgement/SKILL.md` (how a finished
+  explainer is judged). The two skill files also carry rules the
+  explainer validator enforces by rule id, so a change to either can
+  change what `mothman docs validate` rejects. Adding a rule, removing one, renumbering, or rewriting one
   to mean something slightly different are all the same act.
 
   **Approval of the substance is not approval of the wording.** The

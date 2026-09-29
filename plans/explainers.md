@@ -898,11 +898,12 @@ survives context compaction. Tick items off here as they land.
    **Chunk 4 (the reader-judgement skill) approved as drafted, and
    both skill files COMMITTED the same night** at
    `.claude/skills/docs-house-style/SKILL.md` and
-   `.claude/skills/docs-reader-judgement/SKILL.md`. STILL OWED, next
-   session: the two CLAUDE.md amendments REQ-DOCS-115 criterion 5 and
-   REQ-DOCS-129 criterion 23 require (name both SKILL.md files as gated
-   authoring standards; exclude `_work/` from the explainer rule), each
-   in wording Keith approves before the edit.
+   `.claude/skills/docs-reader-judgement/SKILL.md`. The two CLAUDE.md
+   amendments REQ-DOCS-115 criterion 5 and REQ-DOCS-129 criterion 23
+   require were approved word for word and made the same night: the
+   authoring-standard rule now covers four files, both skills included,
+   and the explainer rule now names the concept map and excludes
+   `docs/explainers/_work/`.
 
    **Still to take to Keith with wording:** CLAUDE.md's explainer
    rule covers "everything under `docs/explainers/`", which now
