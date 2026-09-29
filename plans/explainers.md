@@ -877,6 +877,12 @@ survives context compaction. Tick items off here as they land.
      wrong fact and the naming trap; the clean page targets both; the
      injection page targets all four.
 
+   **The page hash excludes build-state badges** (Keith, 2026-09-29):
+   the validator checks badges against `requirements.yaml` anyway, so a
+   badge-only fix needs no fresh sign-off; any change to prose or
+   diagrams still does. Rejected: hashing everything, which would force
+   a re-sign every time a cited requirement is built.
+
    **Still to take to Keith with wording:** CLAUDE.md's explainer
    rule covers "everything under `docs/explainers/`", which now
    includes the agents' gitignored working folder - the rule probably
