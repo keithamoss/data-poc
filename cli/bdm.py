@@ -29,7 +29,7 @@ from qa_tools.common.git_identity import get_run_by
 from qa_tools.common import trial as trial_mod
 from qa_tools.common import hand_filing
 
-from . import common
+from . import common, filing_tui
 from qa_tools.common import asset_time
 
 AGENCY_ID = orchestrate_bdm.AGENCY_ID
@@ -335,6 +335,13 @@ def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
                        "nothing was recorded.", style="dim")
     elif interactive:
         common.report_recorded(recorded_run_id, len(results))
+        # AND IF THIS RUN LEFT ITS SUPPLY WAITING ON A PERSON, OFFER THE
+        # DECISION HERE (REQ-GHUB-082 criterion 17), through the same
+        # implementation the standing queue uses. Before the publish
+        # offer, because promoting a supply changes what a publish would
+        # publish - asking the other way round would republish the state
+        # the operator was about to change.
+        filing_tui.offer_after_run(COLLECTION_ID, recorded_run_id)
         # AND THEN, ONLY THEN, THE OFFER (REQ-PIPE-092 criterion 14).
         # After the panel rather than before it: the operator has just
         # been told what was recorded, which is what they need in order

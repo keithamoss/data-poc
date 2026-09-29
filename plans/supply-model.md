@@ -139,11 +139,14 @@ What actually limits the night, so it is not mistaken for difficulty:
   written, and Sprints C and E ADD e2e tests, lengthening every run
   after them.
 - **One criterion is genuinely unsuited to unattended work.**
-  `REQ-GHUB-082` criterion 13 requires RE-RECORDING the committed demo
+  `REQ-GHUB-082` criterion 15 requires RE-RECORDING the committed demo
   cast (`dashboard/demos/qa_wizard.cast`) via
   `scripts/dev/record_cast.py`, driving a live TUI. If Sprint E is
   reached, build everything else and leave that criterion for Keith -
   which means `082` does NOT flip to `built` that night, and says so.
+  (That is what happened, and the criterion was done the next morning
+  with him awake. The number was wrong here - 13, not 15 - which cost
+  nothing and is corrected rather than left to mislead.)
 
 **Realistic expectation, stated in advance rather than reported at
 6am:** Sprint 0 and A should land solidly, B is plausible, C is
@@ -221,8 +224,9 @@ page).
 **`built` WITH CRITERIA DEFERRED, each naming its owner in
 `unmet_criteria`:** **`REQ-PIPE-099`** (inherit and un-inherit as
 accountable operator decisions, and the un-inheritance that frees a
-blocked withdrawal - criteria 7, 8 and 11 wait on `REQ-GHUB-082`'s
-routes and `REQ-PIPE-079`'s re-run).
+blocked withdrawal - criteria 7 and 8 were met on 2026-09-29 when
+`REQ-GHUB-082`'s TUI route landed and offered both outside the supply
+queue; criterion 11 still waits on `REQ-PIPE-079`'s re-run).
 
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
 `REQ-PIPE-079` (decision layer done, wiring not), `REQ-PIPE-105`
@@ -280,72 +284,31 @@ file a fresh session reads:**
    judgement about who reads the page. Logged in
    `plans/road-testing.md`.
 
-**WHAT IS LEFT, AND IT IS ONE BIG THING.** `REQ-GHUB-082` - "an
-operator records a filing decision from GitHub or from the terminal,
-and both write the same entry" - is signed, has no open questions, and
-carries THIRTY-FOUR criteria. It is the blocker on `REQ-PIPE-083`'s
-last two, on `REQ-PIPE-099`'s criteria 7 and 8, and on substitution
-ever having a real instance in this deployment. It was deliberately not
-started at 06:20 Perth rather than started and left half-done: it
-touches the TUI, a GitHub comment parser, an allowlist, refusals on two
-routes and a rename of the existing "Promote" wording, and the honest
-shape is three commits rather than one.
+**`REQ-GHUB-082` IS BUILT** (2026-09-29), all four phases - the
+allowlist, the one shared implementation, the GitHub adapter and the
+TUI adapter. Its thirty-four criteria are met bar two, both recorded in
+its own `unmet_criteria` with owners: the GitHub route has no PRODUCTION
+CALLER (nothing reads ticket comments, because `ticket-sync.yml` is
+disabled and its replacement is `plans/running-thoughts.md` #53, not
+scoped), and RE-FILE is offered on both routes while its effect belongs
+to `REQ-PIPE-079`'s unbuilt wiring - both routes refuse it by name
+rather than half-doing it. The design reasoning that used to be written
+out here has moved into that requirement's own `decisions:`, which is
+where it belongs now that it describes something built.
 
-The phasing it wants, so a fresh session does not have to re-derive it:
-1. ~~**Who may act**~~ - **DONE.** Criteria 14, 27, 29 and
-   the lookup half of 6: `people.person_by_email()`/`person_by_github()`
-   resolve an actor against `contract/people.yaml` and RAISE rather
-   than return None, `placeholder: true` marks the three fictional
-   entries, and a thirteenth `mothman check` gate requires a `github:`
-   from everybody who is not one.
-2. ~~**The one implementation**~~ (criterion 13) - **DONE.**
-   `qa_tools/common/filing_decisions.py`: `apply(Request) -> Outcome`,
-   with criteria 3, 10, 20, 21, 24, 26 and the non-route parts of 8, 9
-   and 28. SEVEN of the eight operations work; `refile` refuses loudly
-   and names `REQ-PIPE-079`, because it is the only one with no module
-   owning its warehouse change. Criterion 25 was already done - see
-   `decision_log.UNBLOCKED_BY`.
-3. **The TUI adapter** (2, 12, 15, 16, 17, 18, 19, 28, 31).
-4. ~~**The GitHub adapter**~~ (4, 5, 7, 23, 30, and 1 as far as an
-   entry point allows) - **DONE, WITH A GAP WORTH KNOWING.**
-   `qa_tools/common/filing_from_github.py`. A line beginning with a
-   slash is addressed to the machine and every other line is addressed
-   to people, which is what makes "ignore the prose AROUND a known
-   command" decidable; the prose IS the reason; the period comes from
-   the ticket's own label and never from the body; a refusal is posted
-   directly rather than through REQ-PIPE-083's pass.
-
-   **NOTHING READS TICKET COMMENTS**, so a person cannot yet raise a
-   decision that way. `ticket-sync.yml` is disabled and cannot run
-   (REQ-PIPE-089: it needs the recorded results and a runner has no
-   route to the database), and its replacement inverts the
-   integration's direction - `plans/running-thoughts.md` #53, not
-   scoped. Everything that happens once a comment is IN HAND is built
-   and covered; what is missing is the thing that hands one over.
-   Written up as `plans/post-build-review.md` #67, because this
-   project has now paid three times for code that never executed
-   outside a test.
-
-   PHASE 3 IS THE ONE LEFT, and it was left on purpose: criterion 15
-   renames the existing "Promote" wording across a prompt, a success
-   panel, a function name AND the committed demo recording, which is a
-   judgement about what a reader sees rather than a mechanical change.
-   Nothing else blocks it.
-
-ONE THING TO CHECK BEFORE BUILDING criterion 1's `refile`: it is the
-only one of the eight with no effect written yet. `filing.refile()`
-moves the FILING RECORD and writes no decision-log entry, and what
-should happen to a PROMOTED supply's tables when it is re-filed is
-`REQ-PIPE-079`'s wiring rather than something to invent here.
+What it unblocked on the way: `REQ-PIPE-083`'s criteria 14 and 15,
+`REQ-PIPE-099`'s criteria 7 and 8, and substitution finally having a
+route a person can reach.
 
 **THREE FEATURES NOW EXIST THAT NOTHING IN THIS DEPLOYMENT EXERCISES**,
 and that is the single biggest thing to fix next. Inheritance never
 fires, because no dataset declares a `not_expected` period.
-Substitution never fires, because it needs a person and no operator
-route exists. Both dashboard qualifiers therefore render nowhere on the
-real page. `REQ-GEN-044` is where inheritance gets a real instance and
-the operator routes (`REQ-GHUB-082`, `REQ-PIPE-099`) are where
-substitution does. This is written down rather than left implicit
+Substitution had never fired for want of a person to decide it, and as
+of 2026-09-29 the route exists - `mothman supply decide --operation
+substitute`, or the TUI's period door - so what is missing there is now
+somebody using it rather than anywhere to use it. Both dashboard
+qualifiers still render nowhere on the real page. `REQ-GEN-044` is
+where inheritance gets a real instance. This is written down rather than left implicit
 because the night's own worst hour went on three defects in code that
 had never executed (`plans/post-build-review.md` #63).
 

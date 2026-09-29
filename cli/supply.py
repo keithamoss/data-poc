@@ -18,20 +18,29 @@ deliveries is not perfectly precise. It is the word a person reaches
 for, and the alternative was a group called `delivery` that would then
 be the wrong home for everything after sprint 10.
 
-WHAT THIS GROUP WILL NEVER DO, because it will be re-proposed and each
-proposal reads as an obvious convenience (Keith, 2026-09-24): show a
-count of holds, a queue to work through, or a "you have N things
-waiting" line on the bare command. His reason is stronger than the
-convenience it defeats - ANY SUCH COUNT WOULD BE STALE BY CONSTRUCTION,
-because the records live in committed history and a local `mothman`
-reads the operator's own CHECKOUT. A wrong count on the front door is
-worse than no count, and a command that fetched to fix it would stop
-being a local operation. The standing division: the CLI DOES things, the
-DASHBOARD SEES things.
+IT USED TO SAY THIS GROUP WOULD NEVER SHOW A QUEUE, and that has been
+reversed knowingly rather than forgotten (REQ-GHUB-082 criterion 16,
+signed 2026-09-28; REQ-PIPE-057's decisions 22 and 23 amended the same
+day this landed). The old rule was right for the reason it gave: a count
+would be STALE BY CONSTRUCTION, because the records lived in committed
+history and a local `mothman` read the operator's own CHECKOUT, so a
+front-page number was a count as of whenever they last pulled.
 
-So this command reports what recognition makes of the deliveries ON THIS
-MACHINE, right now, which is a question about local state and therefore
-one the CLI can answer honestly.
+THE REASON STOPPED BEING TRUE, which is why the rule went with it.
+REQ-PIPE-089 moved the records into the database, and every `mothman`
+pointed at it reads the same rows as everybody else - so `mothman supply
+queue` is as current as the dashboard, without fetching anything. What
+the old rule protected against was a wrong number presented as a live
+one, and that failure mode no longer has a mechanism.
+
+WHAT SURVIVES OF IT, and is worth keeping: there is still no count on
+the bare command. A queue is something you go and look at, not something
+the front door shouts at you, and at thirty datasets a standing number
+in the banner is the thing people stop seeing.
+
+So this group both DOES things and, now, shows the state those things
+act on - because both questions are answered by the one database rather
+than by a checkout that may be a week old.
 """
 from __future__ import annotations
 
@@ -39,7 +48,7 @@ import rich_click as click
 from rich.console import Console
 from rich.table import Table
 
-from qa_tools.common import arrivals, delivery, hierarchy
+from qa_tools.common import arrivals, delivery, filing_decisions, hierarchy
 
 console = Console()
 
@@ -690,3 +699,113 @@ def grant_publisher_command(role: str, password: str | None) -> None:
     if password is None:
         console.print("No password set - pass --password to set or rotate one.",
                       style="dim")
+
+
+# ---------------------------------------------------------------------------
+# Filing decisions (REQ-GHUB-082). The wizard bodies live in
+# cli/filing_tui.py; these are the flag-invocable forms of the same
+# thing, which is this CLI's standing wizard/flags duality rather than a
+# second implementation - every one of them calls the same
+# qa_tools/common/filing_decisions.apply().
+# ---------------------------------------------------------------------------
+
+@supply_group.command("queue")
+@click.option("--collection", "collection_id", required=True,
+               help="Which collection's queue to show.")
+def queue_command(collection_id: str) -> None:
+    """Supplies waiting on a person (REQ-GHUB-082 criterion 16).
+
+    THE SAME DEFINITION THE TICKET POLICY USES, never a second one -
+    `slot_state.NEEDS_ACTION`, filtered to the states that hold a
+    supply. A terminal and a ticket disagreeing about what is
+    outstanding is the failure this avoids by construction.
+    """
+    from cli import filing_tui
+    from qa_tools.common import filing_queue
+
+    try:
+        with filing_tui.open_log() as conn:
+            waiting = filing_queue.awaiting(conn, collection_id)
+    except filing_queue.LogUnreachable as exc:
+        filing_tui.say_unreachable(exc)
+        raise SystemExit(1) from exc
+    if not waiting:
+        console.print("Nothing is waiting on a person.", style="green")
+        return
+    console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a decision\n")
+    console.print(filing_tui.queue_table(waiting))
+
+
+@supply_group.command("slots")
+@click.option("--collection", "collection_id", required=True,
+               help="Which collection's periods to show.")
+@click.option("--dataset", "dataset_id", default=None,
+               help="Narrow to one dataset.")
+def slots_command(collection_id: str, dataset_id: str | None) -> None:
+    """Where every period stands (REQ-GHUB-082 criterion 18).
+
+    WHAT THE DECISIONS RESOLVE TO, whichever route recorded each of
+    them - which is the difference between this and `mothman supply
+    decisions`: that one lists what happened, this says what is true
+    now.
+    """
+    from cli import filing_tui
+
+    filing_tui.standing_view(collection_id, dataset_id)
+
+
+@supply_group.command("decide")
+@click.option("--operation", required=True,
+               type=click.Choice(list(filing_decisions.OPERATIONS), case_sensitive=False),
+               help="Which filing decision to record.")
+@click.option("--dataset", "dataset_id", required=True, help="The dataset.")
+@click.option("--period", required=True, help="The period the decision is about.")
+@click.option("--supply", default=None,
+               help="The supply being acted on, where the operation acts on one. "
+                    "Taken from the slot when omitted.")
+@click.option("--stands-on", "stands_on", default=None,
+               help="For a substitute: the earlier period this one stands on.")
+@click.option("--to-period", "to_period", default=None,
+               help="For a re-file: the period to move the supply to.")
+@click.option("--reason", default=None,
+               help="Why. Required - a decision nobody can explain is the "
+                    "thing the log exists to prevent.")
+@click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
+def decide_command(operation: str, dataset_id: str, period: str,
+                    supply: str | None, stands_on: str | None,
+                    to_period: str | None, reason: str | None, yes: bool) -> None:
+    """Record one filing decision (REQ-GHUB-082 criteria 2, 3, 28).
+
+    THE FLAG FORM OF THE WIZARD, calling the same implementation the
+    GitHub route calls. The actor is whoever `git config user.email`
+    says, checked against contract/people.yaml - there is no way to
+    state one, on either route.
+
+    IT WRITES THE DECISION LOG AND CALLS NO GITHUB (criterion 30). The
+    slot's ticket is brought up to date by REQ-PIPE-083's own pass, so
+    this needs no `gh` auth and works where that domain is unreachable.
+    """
+    from cli import filing_tui
+    from qa_tools.common import filing_queue
+
+    if supply is None:
+        try:
+            with filing_tui.open_log() as conn:
+                found = [s for s in filing_queue.slots_of(
+                    conn, hierarchy.dataset(dataset_id).collection_id,
+                    dataset_id=dataset_id) if s.period == period]
+        except filing_queue.LogUnreachable as exc:
+            filing_tui.say_unreachable(exc)
+            raise SystemExit(1) from exc
+        supply = found[0].supply if found else None
+
+    outcome = filing_tui.apply_decision(
+        operation=operation.lower(), dataset_id=dataset_id, period=period,
+        supply=supply, stands_on=stands_on, to_period=to_period,
+        reason=reason, yes=yes)
+    # A REFUSAL FAILS AND A NO-OP DOES NOT (criterion 26). Both end with
+    # nothing appended and a panel already saying which, but a script
+    # that treats "already promoted" as an error is a script that stops
+    # on the ordinary case of two people working the same slot.
+    if outcome is None:
+        raise SystemExit(1)

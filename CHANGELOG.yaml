@@ -109,6 +109,49 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-09-29"
+    summary: >
+      You can now decide what goes into a period from the terminal, and
+      see what every period already resolves to.
+    changes:
+      - category: New
+        items:
+          - headline: Decide a period from the terminal
+            components: ["Testing & dev tooling"]
+            description: >
+              A new Filing decisions menu shows the supplies waiting on
+              somebody, and lets you promote or reject one, or say a
+              period stands on an earlier one. Every choice is recorded
+              with your name and your reason.
+          - headline: Your queue, without running anything first
+            components: ["Testing & dev tooling"]
+            description: >
+              Run mothman supply queue to see what is waiting, and
+              mothman supply slots to see where every period stands.
+              Both read the same live record the tickets do, so the
+              terminal and a ticket can no longer disagree.
+          - headline: The run you just did offers its own next step
+            components: ["Testing & dev tooling"]
+            description: >
+              Finish a check and, if that supply is now waiting on a
+              decision, you are offered it there rather than having to
+              go and find it.
+      - category: Improved
+        items:
+          - headline: Only people we know can file
+            components: ["Testing & dev tooling"]
+            description: >
+              A filing decision is accepted only from somebody named in
+              the project's own people list, and refused with a reason
+              from anybody else. Every decision needs a reason and an
+              explicit yes before it is written.
+          - headline: A fresher demo
+            components: ["Dashboard UI"]
+            description: >
+              The Demo tab's recording was showing a question the tool
+              stopped asking. It has been re-recorded against the real
+              wizard as it is today.
+
   - date: "2026-09-28"
     summary: >
       Supplies that pass their checks now file themselves into the period

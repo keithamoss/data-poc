@@ -9752,6 +9752,32 @@ requirements:
         filed here" over REQ-PIPE-062 criterion 9's recorded branch and
         considered slots (its §7). All three are the dashboard's.
       - >
+        [AMENDED 2026-09-29] THE TWO DECISIONS ABOVE ARE REVERSED IN
+        PART, BY REQ-GHUB-082 CRITERION 16, which Keith signed 2026-09-28
+        and which requires a standing queue of supplies awaiting a
+        decision "reachable from the main menu without doing a QA run
+        first". Recorded here as well as there, on the standing rule
+        that a signed requirement instructing a change to a built one is
+        written into both.
+      - >
+        [AMENDED] WHY THE REVERSAL IS SOUND RATHER THAN A CHANGE OF
+        MIND. The rejection rested on a mechanism, not a preference: a
+        count would be STALE BY CONSTRUCTION because the records lived
+        in committed history and a local mothman read the operator's own
+        CHECKOUT. REQ-PIPE-089 moved the records into the database, so
+        every mothman pointed at it reads the same rows as everybody
+        else, and "as of whenever they last pulled" has nothing left to
+        mean. The dashboard's advantage the decision named - current for
+        everyone by construction - is now the terminal's too.
+      - >
+        [AMENDED] WHAT SURVIVES, and is deliberately kept: no count on
+        the bare command, and no "you have N things waiting" line
+        anywhere. A queue is something you go and look at. The third
+        rejected proposal - a CLI lookup for "why was this supply filed
+        here" - is untouched and remains the dashboard's. So of the
+        three, one is now built (the main-menu entry, plus `mothman
+        supply queue`/`slots` as its flag forms), and two stand.
+      - >
         CONSEQUENCE, named rather than discovered: the dashboard becomes
         the ONLY way to see a hold, and it is rebuilt by CI on push - so
         the latency between a hold appearing and a person being able to
@@ -15004,7 +15030,7 @@ requirements:
       a decision is a comment rather than a deployment and neither
       route can do something the other cannot.
     moscow: must
-    status: in_progress
+    status: built
     source: >
       Keith, 2026-09-26, batch 4 scoping input (a), correcting Thread
       B's own earlier framing: "GitHub is the primary operator surface,
@@ -15846,12 +15872,213 @@ requirements:
         reading our own last summary and calling it the truth - and a
         summary a person edited would then decide what happens next.
       - >
-        NOT DONE - phase 3, the TUI adapter (criteria 2, 12, 15, 16, 17,
-        18, 19, 28, 31). Left for a session with Keith awake rather than
-        built unattended, because criterion 15 renames the existing
-        "Promote" wording across a prompt, a success panel, a function
-        name AND the committed demo recording, which is a judgement
-        about what a reader sees rather than a mechanical change.
+        [BUILD 2026-09-29] PHASE 3, THE TUI ADAPTER, IS BUILT, and the
+        shape of it was Keith's own delegation: "happy for you to make a
+        decision on how that looks... just make your best judgment call.
+        And then go ahead and build that." He said he would do a
+        refinement pass over the CLI/TUI later, so what follows is the
+        reasoning behind the shape rather than a claim it is settled.
+      - >
+        [BUILD] THREE DOORS, AND THE SPLIT BETWEEN THE FIRST TWO IS
+        CRITERION 31 RATHER THAN TASTE. "Supplies waiting on a decision"
+        is the standing queue (criterion 16); "Decide about a period -
+        nothing arrived for it" is where the four period-scoped
+        operations live (criterion 31); "Where every period stands" is
+        the read-only view criterion 18 asks for. Somebody working
+        through arrivals is never offered inherit, because inheriting is
+        what you do when there is NO arrival - which is the criterion
+        made structural rather than remembered:
+        filing_queue.operations_for() returns the two sets separately
+        and the queue passes only the first.
+      - >
+        [BUILD] THE QUEUE FILTERS slot_state.NEEDS_ACTION RATHER THAN
+        RESTATING IT, which criterion 16 requires ("never a second
+        one"), and an assert at import time refuses a state that falls
+        in neither half. Two of the six needs-action states - overdue
+        and never-supplied - hold no supply, so they are the period
+        door's business; the other four are the queue's. Splitting the
+        one set by "does this slot hold a supply" is a property of the
+        states rather than a second policy, and a test asserts the
+        partition is exact.
+      - >
+        [BUILD] A RUN'S OWN SUPPLY IS FOUND THROUGH qa.tables_read
+        (criterion 17). A physical table name carries the arrival key,
+        so the join from "this run" back to "this filed supply" is a
+        fact the database already holds - no walk of the delivery tree,
+        and it cannot disagree with what the run actually read. Rejected
+        re-recognising the arrivals on disk, which is the same answer
+        computed a second way and therefore a second way to be wrong.
+        post-build-review #64's lesson is carried explicitly: a supply
+        id is not a table name, and the only safe join is the key they
+        both carry.
+      - >
+        [BUILD] THE QUEUE IS ON THE MAIN MENU, WHICH REVERSES
+        REQ-PIPE-057's DECISIONS 22 AND 23 - amended there in the same
+        change, on the standing rule that a signed requirement
+        instructing a change to a built one is recorded on BOTH. Those
+        decisions rejected a main-menu queue because any count the CLI
+        showed would be STALE BY CONSTRUCTION, the records living in
+        committed history and a local mothman reading the operator's own
+        CHECKOUT. REQ-PIPE-089 moved the records into the database, so
+        every mothman pointed at it reads the same rows as everybody
+        else and the mechanism behind that staleness no longer exists.
+        WHAT SURVIVES of the old rule and is kept: no count on the bare
+        command. A queue is something you go and look at, not something
+        the front door shouts at you, and at thirty datasets a standing
+        number in the banner is what people stop seeing.
+      - >
+        [BUILD] CRITERION 15 IS MET BY A DIFFERENT WORD THAN THE ONE THE
+        CRITERION NAMES, and that is worth stating rather than glossing.
+        The criterion asks for "Save to history"; the prompt is "Record
+        this check of <run> in the dataset's QA history?" and the panel
+        is titled "Recorded". Both arrived with REQ-PIPE-089, which
+        moved the question BEFORE the chain and deleted the qa_results/
+        tree the old wording described - so by the time this criterion
+        was built, the rename had already happened under a different
+        name. Its purpose clause is what was checked: "Promote" in this
+        tool now means the supply operation and nothing else. The
+        function `promote()` no longer exists, the prompt and panel
+        carry no "Promote", and the demo recording was re-recorded
+        (2026-09-29) against the current flow, where the word appeared
+        three times and now appears none. cli/common.py's module
+        docstring, which still described the retired tmp-dir-first
+        Promote pattern as current, was corrected in the same change.
+      - >
+        [BUILD] THE DEMO RE-RECORDING TAKES THE "y" BRANCH, where the
+        old one answered "n". The old script declined a prompt that no
+        longer exists and in doing so skipped the most consequential
+        screen in the flow; the new one records the run, shows the
+        Recorded panel, and declines the publish offer instead. Runtime
+        ~58s against the old ~48s, the difference being the two screens
+        the old ending skipped. dashboard/demos/README.md carries the
+        exact step script, as it is meant to.
+      - >
+        [BUILD] "A RULE DECIDED THIS" IS SAID ONLY WHERE SOMETHING WAS
+        DECIDED. Found while building the standing view: SlotState
+        leaves decided_by None both for an automatic decision and for a
+        slot nobody has touched, so rendering both as "a rule" told a
+        reader that a supply sitting in the queue had already been dealt
+        with. filing_queue.FROM_A_DECISION names the states a decision
+        produces, and everything else reads "-". Criterion 34's
+        distinction, applied one layer out from where it was written.
+      - >
+        [BUILD] CRITERION 31 CONSTRAINS ONE DIRECTION ONLY, and reading
+        it as both cost a door before a test caught it. It says the four
+        period-scoped operations are reached per period and dataset
+        RATHER THAN FROM THE SUPPLY QUEUE; it says nothing against
+        supply-scoped operations being reachable from the period door,
+        and they have to be. A DEMOTE acts on a promoted slot, a
+        promoted slot is not awaiting a decision, so it is never in the
+        queue - offering only the period-scoped four from the period
+        door left demote reachable from no wizard door at all, and only
+        from the flag form. So the queue stays supply-scoped and the
+        period door offers whatever applies to the slot. Found by
+        re-reading the criteria rather than by a failure, and covered by
+        a test that walks both doors and asserts all eight are
+        reachable between them - the failing-test-first rule applied to
+        a gap in navigation, which no test of a list of strings would
+        have shown.
+      - >
+        [BUILD] WHAT IS OFFERED IS NOT WHAT IS PERMITTED, and the two
+        are deliberately allowed to differ. operations_for() decides
+        what is worth putting in front of somebody; the decision log,
+        inside the transaction, decides what is allowed (criteria 20 and
+        21). Offering something the log then refuses costs a clear
+        refusal; hiding something the log would have allowed costs an
+        operator who cannot do their job. So the menu errs towards
+        offering.
+
+    implemented_by:
+      - cli/filing_tui.py::filing_menu
+      - cli/filing_tui.py::apply_decision
+      - cli/filing_tui.py::offer_after_run
+      - cli/filing_tui.py::standing_view
+      - cli/supply.py::decide_command
+      - cli/supply.py::queue_command
+      - cli/supply.py::slots_command
+      - qa_tools/common/filing_queue.py::awaiting
+      - qa_tools/common/filing_queue.py::operations_for
+      - qa_tools/common/filing_queue.py::from_run
+      - qa_tools/common/filing_decisions.py::apply
+      - qa_tools/common/filing_from_github.py::handle
+      - qa_tools/common/people.py::person_by_github
+      - qa_tools/common/validate_people.py::main
+    linked_tests:
+      - tests/test_filing_decisions.py::TestTheEightAreOneList
+      - tests/test_filing_decisions.py::TestSevenOfTheEightReallyWork
+      - tests/test_filing_from_github.py
+      - tests/test_filing_queue.py::TestTheQueueUsesTheTicketPolicysOwnDefinition
+      - tests/test_filing_queue.py::TestWhatASlotOffers
+      - tests/test_filing_queue.py::TestTheOfferAfterARun
+      - tests/test_cli_filing_tui.py::TestEveryOneOfTheEightIsOfferedHere
+      - tests/test_cli_filing_tui.py::TestItConfirmsBeforeItWrites
+      - tests/test_cli_filing_tui.py::TestItNeverShowsACachedAnswer
+      - tests/test_cli_filing_tui.py::TestItCallsNoGitHub
+      - tests/test_cli_filing_tui.py::TestTheCommandReallyWritesTheLog
+      - tests/test_validate_people.py
+    evidence:
+      - >
+        2026-09-29. The TUI adapter, 32 tests. The ones that matter are
+        the three properties only this surface can break: it confirms
+        before it writes (declining appends nothing, and it asks even
+        for a promote), it never shows a cached answer (an unreachable
+        log raises rather than falling back, the standing view prints no
+        periods, the queue offers nothing and the command exits 1), and
+        it calls no GitHub - asserted by parsing this module's own
+        imports rather than grepping its source, which its prose about
+        GitHub would otherwise fail.
+      - >
+        2026-09-29. `mothman supply decide` driven end to end against a
+        real PostgreSQL: a promote from the terminal lands in qa.decision
+        with actor_kind PERSON and the operator's own email, running it
+        twice appends nothing the second time and exits 0, and a real
+        refusal exits 1. The worker's own database throughout - a
+        filing decision is append-only by a database trigger, so a test
+        writing to the live log could not take it back.
+      - >
+        2026-09-29. The allowlist refused a real invocation on this
+        machine: `mothman supply decide --operation promote --dataset
+        cp-carers --period 2023-Q2` came back "'noreply@anthropic.com'
+        is not in contract/people.yaml, so a filing decision raised by
+        them could not be attributed to anybody". Criteria 14 and 22 on
+        the terminal route, from the real command rather than a test.
+      - >
+        2026-09-29. `mothman supply queue --collection child-protection`
+        lists the 16 supplies really awaiting a decision in this
+        environment, and `mothman supply slots --dataset cp-carers` the
+        15 periods and what each resolves to.
+      - >
+        2026-09-29. dashboard/demos/qa_wizard.cast re-recorded against
+        the real TUI in a real pty - 217 events, 58.1s, and zero
+        occurrences of "Promote" where there were three.
+    unmet_criteria:
+      - criterion: >
+          Criterion 1, in the part of it that is an ENTRY POINT rather
+          than a capability - a GitHub comment actually reaching
+          filing_from_github.handle().
+        why: >
+          The adapter is built and tested; nothing in production calls
+          it. ticket-sync.yml is disabled (REQ-PIPE-089) because a
+          workflow cannot reach the database, and its replacement
+          inverts the integration's direction.
+        owner: >
+          plans/running-thoughts.md #53, which is not scoped yet.
+        blocked_by:
+          unowned: true
+      - criterion: >
+          Criterion 2, for RE-FILE specifically - it is offered on both
+          routes and its effect is not built.
+        why: >
+          filing.refile() moves the filing record and writes no
+          decision-log entry; what happens to a PROMOTED supply's tables
+          on a re-file is REQ-PIPE-079's wiring. Both routes refuse it
+          by name, saying so, rather than half-doing it. The other seven
+          work.
+        owner: >
+          REQ-PIPE-079's unbuilt half.
+        blocked_by:
+          requirements:
+            - REQ-PIPE-079
 
   - id: REQ-PIPE-083
     title: >
@@ -20870,27 +21097,6 @@ requirements:
         substituted case and checks the refusal names de-substitute
         instead of un-inherit.
     unmet_criteria:
-      - criterion: >
-          Criterion 7 - offering inherit and un-inherit OUTSIDE the
-          queue of supplies awaiting a decision.
-        why: >
-          It is a statement about a MENU, and there is no operator menu
-          for filing decisions yet. The operations are built and
-          callable; what is missing is where a person reaches them from.
-        owner: >
-          REQ-GHUB-082, which builds both operator routes.
-        blocked_by:
-          requirements: [REQ-GHUB-082]
-      - criterion: >
-          Criterion 8 - offering them from EVERY operator route that
-          offers any other filing decision.
-        why: >
-          "Every route" is REQ-GHUB-082's two, neither of which exists,
-          so there is nothing yet for the two to be at parity about.
-        owner: >
-          REQ-GHUB-082.
-        blocked_by:
-          requirements: [REQ-GHUB-082]
       - criterion: >
           Criterion 11 - re-evaluating every cross-table check that
           reads a dataset whose period view an operator just created or
