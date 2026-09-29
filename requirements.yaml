@@ -24755,3 +24755,147 @@ requirements:
     open_questions:
       - "WHETHER THE INVARIANT IS CHECKED ACROSS A DATASET'S WHOLE HISTORY OR ONLY FORWARD FROM TODAY. Checking everything is the honest reading and makes a past configuration's ambiguity visible; it also means importing a historically ambiguous configuration fails the gate on work nobody can now change, which the freeze rule in REQ-PIPE-111 would then prevent anybody from fixing. Checking forward only avoids that and leaves a real past ambiguity unreported."
       - "WHAT HAPPENS TO A CONFIGURATION ALREADY IN FORCE THAT BREACHES THE INVARIANT, if one is ever found. Rejecting it stops the pipeline for that dataset, which is REQ-PIPE-053's exhausted-schedule shape and is arguably right; refusing only the EDIT that introduces it is gentler and leaves a known ambiguity running. This does not arise for today's two calendars, which is exactly why it is cheap to decide now."
+  - id: REQ-PIPE-115
+    title: A table the run cannot read is red and says so, and never stops the run
+    date_written: "2026-09-30"
+    story: >
+      As a data engineer operating this pipeline, I want a dataset whose
+      table is not there to come out RED and labelled as absent, while
+      every other dataset in the same run is checked as usual, so that a
+      supply nobody could place costs me one red row rather than a whole
+      collection's QA.
+    moscow: must
+    status: not_started
+    source: >
+      NOT SCOPED BY delivery-scoper - hand-drafted 2026-09-30, and said
+      here rather than left to be discovered, because this project's own
+      rule is to flag an unscopered requirement BEFORE presenting it. It
+      should get a scoper pass alongside the research below, before
+      sign-off.
+
+      Split out of REQ-PIPE-078 criteria 9 and 10 at Keith's own ask
+      ("scope this up as its own requirement"), after building those
+      criteria uncovered a defect that predates them and is wider than
+      they are. The defect is written up in full as
+      plans/post-build-review.md #72.
+    signed_off: null
+    acceptance_criteria:
+      - "WHERE a run cannot read a table, THE SYSTEM SHALL still evaluate and record every check that does not read it."
+      - "WHERE a run cannot read a table, THE SYSTEM SHALL record every check that does read it as RED, naming the table and why it could not be read."
+      - "THE SYSTEM SHALL distinguish a table that could not be READ from a check that FAILED, in the recorded result and wherever it is displayed, so that neither is mistaken for the other."
+      - "THE SYSTEM SHALL NOT record a passing result for any check that was not evaluated."
+      - "THE SYSTEM SHALL apply this to all four tools and both collections, and SHALL fail loudly where a tool cannot be made to behave this way rather than silently omitting its checks."
+      - "WHERE a tool's own failure cannot be attributed to a known unreadable table, THE SYSTEM SHALL continue to treat it as a failed run rather than absorbing it."
+      - "THE SYSTEM SHALL reconcile what it withheld against what it reddened, and SHALL refuse the run where the two disagree."
+    non_functional_requirements:
+      - "THE COMMITTED CONFIGURATION IS NEVER REWRITTEN. Keith, 2026-09-30, on being shown the filtering option: he does not want the Soda checks YAML edited. Whatever mechanism is chosen, contract/*.yml and contract/*.yaml are read-only to the pipeline, and anything per-run happens in memory."
+      - "A FALSE GREEN IS THE FAILURE THIS EXISTS TO PREVENT, so every mechanism has to be judged against it first. A check that silently does not appear is indistinguishable from one that passed, to the dashboard, the promotion gate and the tickets alike."
+      - "It must hold at ~30 datasets: one absent table among thirty must not produce thirty banners, and the reds it does produce have to aggregate the way REQ-PIPE-064's holds already do."
+    dependencies:
+      - REQ-PIPE-078
+      - REQ-PIPE-059
+    decisions:
+      - >
+        THE ABORT IS OURS, NOT dbt's - established 2026-09-30 by reading
+        `dbt_common._refuse_a_build_that_did_not_run`, and it corrects
+        the account given earlier the same day. dbt does NOT stop when a
+        model errors: it runs the rest of the DAG and writes
+        `run_results.json` with a per-node status, successes included.
+        Our code then finds any node with `status == "error"` and raises
+        `DbtRunFailed`, discarding every good result in the file. So the
+        healthy datasets' verdicts were computed and thrown away, which
+        is a much cheaper thing to fix than a tool that refuses to run.
+      - >
+        WHICH MAKES KEITH'S REFRAMING THE LIKELY ANSWER (his own,
+        2026-09-30): "I don't want to filter out the checks per se. I
+        just kind of want to say, hey, the entire table is red because
+        there's nothing there." Rather than preventing the tools from
+        seeing the missing table, let them report it and CLASSIFY what
+        comes back - keep the results that are real, turn the
+        table-does-not-exist errors into reds naming the table. It
+        needs no configuration manipulation at all, which is the part
+        he objected to.
+      - >
+        THE COST OF THAT ROUTE, stated so it is weighed rather than
+        discovered: it means matching on a tool's own error text, which
+        is version-sensitive and differs per tool. The mitigation is
+        that we never have to GUESS - the run already records which
+        tables it withheld and why (`Resolution.held`, REQ-PIPE-078), so
+        an error is only absorbed when it names a table we already know
+        is unreadable. Anything else stays a failed run, which is
+        criterion 6.
+      - >
+        THE EXCLUDE ROUTE IS BUILT FOR dbt ALREADY and should probably
+        stay whichever way this goes: `--exclude stg_<table>+`, where
+        the `+` is load-bearing because `dbt build` runs every test
+        DEPENDING on a selected node - three relationships tests
+        declared on readable models plus a cross-table singular test
+        still errored without it. It is graceful for dbt precisely
+        because dbt has a real selector; Soda, datacontract-cli and
+        Evidently have nothing equivalent, which is what made the same
+        approach ugly for them.
+      - >
+        REJECTED, PROVISIONALLY - THE EMPTY-VIEW IDEA (Keith's own,
+        2026-09-30, raised as a creative alternative worth considering:
+        "just having an empty view sitting there, maybe, so there's at
+        least something for it to point to"). It is attractive because
+        it needs no per-tool work at all. It is rejected pending the
+        research below because of what it does to the verdicts: over
+        zero rows a not-null check, a uniqueness check and a
+        referential check ALL PASS vacuously. That is a green table for
+        a supply nobody could place - precisely the false green NFR 2
+        exists to prevent, and worse than the crash because nobody
+        would look. A row-count check would go red, so the outcome is a
+        mostly-green table with one red on it, which reads as a minor
+        problem rather than an absent supply. Recorded rather than
+        dismissed, because a variant might survive - an empty view plus
+        a rule that a zero-row table is red whatever its checks say.
+      - >
+        WHAT A PERSON SEES IS PART OF THIS, and Keith named the
+        consequence himself: an absent table cannot be drilled into,
+        because there are no real column-level results underneath it.
+        So the dashboard needs a red row that is honest about being a
+        dead end, with a qualifier saying the table was not there -
+        rather than a red row that invites a click leading nowhere.
+        Whether that is this requirement's or a REQ-DASH sibling's is
+        open.
+    open_questions:
+      - >
+        RESEARCH FIRST, BEFORE ANY MORE BUILDING - Keith's explicit
+        instruction, 2026-09-30: "it might be worth some research online
+        and a bit of a deep dive before we do any further work". His
+        instinct is that this should be a solved problem: data not
+        arriving is the most ordinary thing that happens to a pipeline,
+        and every mature data-quality tool must have a position on it.
+        The question to answer is what dbt, Soda, datacontract-cli,
+        Evidently and the wider field (Great Expectations, Monte Carlo,
+        the freshness/volume-anomaly vendors) actually DO when an
+        expected table is absent - is it an error, a distinguished
+        "cannot evaluate" state, or a failure? Worth knowing before
+        inventing a fourth answer. NOTE the egress position: docs.soda.io
+        and docs.getdbt.com are reachable, datacontract.com is reachable,
+        and docs.evidentlyai.com is BLOCKED (CLAUDE.md's own list) - so
+        Evidently will need real experiment against the installed
+        package, which this project's own standing lesson says outranks
+        the docs anyway.
+      - >
+        DOES SODA SURVIVE A MISSING TABLE AT ALL? Unverified, and it
+        decides whether the intercept route works there. What actually
+        crashed in the probe was OUR OWN pre-flight `SELECT COUNT(*)`
+        over every CP table, before the scan started - which is a
+        one-line skip whatever else is decided. Whether the Soda scan
+        itself then reports a per-check error and completes, the way
+        dbt does, has not been tested.
+      - >
+        datacontract-cli AND Evidently ARE UNEXAMINED. Evidently is
+        likely the easiest - it reads one named table into a dataframe
+        rather than a whole schema, so the question is only whether the
+        tool is skipped for that run.
+      - >
+        IS THE HELD CASE THE SAME AS THE NEVER-ARRIVED CASE? Keith
+        raised it directly, and the answer shapes the scope: a table
+        with nothing promoted and nothing held is also absent, and the
+        checks blow up identically. If the two are one problem, this
+        requirement covers a great deal more than holds - which is an
+        argument for it existing separately, and possibly for it being
+        more valuable than the requirement that found it.
