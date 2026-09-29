@@ -39,10 +39,10 @@ entries:
     definition: "A data asset made of supplies for a single project, with no supply calendar at all."
     aliases: []
     forms: [one-off extractions]
-    defined_by: []
+    defined_by: [REQ-PIPE-106]
     page: null
     draft: true
-    idea: true
+    idea: false
 
   - term: sample
     definition: "A data asset of practice or test data, which is never real data."
@@ -379,8 +379,8 @@ entries:
 
   - term: substitute
     definition: "A person's decision that a period nobody supplied will stand on an earlier period's promoted supply. The period then shows as substituted."
-    aliases: [standing in, last good one, stand on, carry forward]
-    forms: [substitutes, substituted, substituting, substitution, stands on, standing on, stood on, carried forward, carrying forward]
+    aliases: [standing in, last good one, carry forward]
+    forms: [substitutes, substituted, substituting, substitution, carried forward, carrying forward]
     defined_by: [REQ-PIPE-084, REQ-DASH-085]
     page: null
     draft: false
@@ -391,6 +391,15 @@ entries:
     aliases: []
     forms: [inherits, inherited, inheriting, inheritance]
     defined_by: [REQ-PIPE-098, REQ-PIPE-099, REQ-DASH-100]
+    page: null
+    draft: false
+    idea: false
+
+  - term: de-substitute
+    definition: "A person's decision to undo a substitute, so the period no longer stands on an earlier supply. It always asks for confirmation first."
+    aliases: []
+    forms: [de-substitutes, de-substituted, de-substituting, de-substitution]
+    defined_by: [REQ-PIPE-084, REQ-GHUB-082]
     page: null
     draft: false
     idea: false

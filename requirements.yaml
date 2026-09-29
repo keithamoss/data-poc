@@ -24812,7 +24812,7 @@ requirements:
       - "IF a glossary entry is marked as an idea and names a defining requirement, or names no defining requirement and is not marked as an idea, THEN `mothman docs validate` SHALL reject it."
       - "THE SYSTEM SHALL seed the glossary with every canonical term and alias the naming session settled, and with the terms the first explainer, periods and slots (REQ-DOCS-130), uses."
       - "THE SYSTEM SHALL mark the three asset-shape names - scheduled asset, one-off extraction and sample - as draft placeholders."
-      - "THE SYSTEM SHALL define promote, deliver, asset and issue as Mothman terms, in line with REQ-DOCS-115's rule on GOV.UK's words-to-avoid."
+      - "THE SYSTEM SHALL cover promote, deliver, asset and issue as Mothman terms, in line with REQ-DOCS-115's rule on GOV.UK's words-to-avoid - promote and deliver as entries of their own, and asset and issue as aliases of the entries whose definitions they point to."
       - "THE SYSTEM SHALL show delivery, arrival and supply nested in one small diagram in glossary.md, held in glossary.yaml and held to REQ-DOCS-118 like any explainer diagram, and SHALL show the delivery agreement and the supply calendar as two related entries, one inside the other."
       - "[PROCESS] THE SYSTEM SHALL NOT add or change a glossary entry unless Keith has approved it, either directly or at an /explain brief checkpoint."
     non_functional_requirements:
@@ -24828,6 +24828,7 @@ requirements:
       - REQ-DOCS-116
       - REQ-DOCS-122
     decisions:
+      - "Decided asset and issue are ALIASES - of data asset and of ticket - rather than entries of their own (Keith, 2026-09-29 night), keeping one word per concept. Criterion 11 was amended from 'define' to 'cover', because an alias carries no definition of its own. Rejected: separate entries (two per concept), and making asset and issue the canonical words."
       - "Decided glossary.yaml is the source, with a readable glossary.md generated from it and gated against going stale (Keith, set 5, the CHANGELOG.yaml precedent; the gate has the same shape as `mothman dashboard plans-index --check`). Rejected: markdown with one structured line per entry, which three programs would each have had to parse."
       - "Decided glossary badges are derived from requirements.yaml, never hand-written (Keith, set 5)."
       - "Decided an entry with no defining requirement carries an explicit idea mark and the badge 'an idea, not designed yet' (Keith, set 6), since that badge cannot derive from requirements.yaml. The mark is a glossary change, so Keith approves it like any other, and an entry must either name a defining requirement or carry the mark - there is no unbadged third case."
@@ -24900,8 +24901,8 @@ requirements:
       - "THE SYSTEM SHALL list in each source index every requirement and config or code file relevant to the group, each with one line of context."
       - "[PROCESS] WHEN the first page of a group is scoped, THE SYSTEM SHALL require Keith to have reviewed that group's source index before the writer drafts the brief."
       - "THE SYSTEM SHALL run a recall check as part of `mothman docs validate` (REQ-DOCS-122)."
-      - "IF a page uses a glossary term whose defining requirement the page does not cite, THEN THE SYSTEM SHALL reject the page, naming the page, the line, the term and the missing requirement."
-      - "THE SYSTEM SHALL count a page as using a glossary term when the term, one of its aliases or one of its listed word forms appears in the page's prose, matched case-insensitively at word boundaries."
+      - "IF a page DEFINES a glossary term - its bold first use - without citing that term's defining requirement, THEN THE SYSTEM SHALL reject the page, naming the page, the line, the term and the missing requirement."
+      - "THE SYSTEM SHALL count a page as defining a glossary term when the term, one of its aliases or one of its listed word forms appears in bold in the page's prose, matched case-insensitively at word boundaries. A passing, unbolded mention of another term needs no citation, and links to the glossary instead."
       - "THE SYSTEM SHALL also match the regular inflections of each term and alias - the forms made by adding s, es, d, ed or ing, including after dropping a final e."
       - "THE SYSTEM SHALL apply term matching to the same prose the validator's prose rules cover (REQ-DOCS-132), and SHALL NOT count a match in front matter, Mermaid source or the 'where this comes from' list."
       - "IF a source index or a page's cited sources name a file under plans/ or CLAUDE.md, THEN THE SYSTEM SHALL reject it in the same check."
@@ -24919,6 +24920,7 @@ requirements:
       - REQ-DOCS-119
       - REQ-DOCS-122
     decisions:
+      - "Decided the recall check fires only on terms a page DEFINES - its bold first uses - not on every mention (Keith, 2026-09-29 night). Found while drafting the glossary: under the signed rule, a page saying 'supply' or 'dataset' in passing had to cite those terms' defining requirements, and since many are only partly built, nearly every page would have badged 'partly built' indefinitely. A passing mention links to the glossary instead. Rejected: citing every use, and citing every use while the badge ignored most of them."
       - "Decided a per-group source index Keith reviews once (round 13), which the writer starts from. It closes RAG's 'context recall' gap - the fact-checker measures faithfulness to CITED sources only, so a page can be 100 percent faithful and still miss or contradict a requirement it never cited. Nothing else in the design checks the source set."
       - "Decided the recall check flags a glossary term whose defining requirement is not cited (round 13), which is why REQ-DOCS-119 records each entry's defining requirement."
       - "Decided the recall check, the 'no plans/ or CLAUDE.md citations' check and the 'every listed id and file exists' check run in the same gate, inside `mothman docs validate` (delivery-architect, adopted), so a page has one gate to pass rather than three commands."
@@ -25452,6 +25454,7 @@ requirements:
       - REQ-DOCS-129
       - REQ-DOCS-132
     decisions:
+      - "Recorded 2026-09-29 night: one of this page's own sources, REQ-PIPE-053, is now 'partly built', so the decision above that every source is built no longer holds exactly. The page takes whatever state its cited requirements give it, which may be 'partly built'. The recall change on REQ-DOCS-121 (defined terms only) keeps passing mentions from pulling it further down."
       - "Decided the sources list links to repository files by relative path (Keith, 2026-09-29), reversing the plain-text rule adopted from the delivery-architect review; slice 2's renderer rewrites those links to GitHub URLs so they still resolve in the dashboard tab. Recorded in full on REQ-DOCS-116."
       - "Decided the first page is PERIODS AND SLOTS, not claim windows (Keith, slice 1 Q2). Every source it rests on is built and signed (REQ-PIPE-049 to 053 and REQ-PIPE-063), and its natural diagrams can be hand-drawn. Rejected: claim windows, which rests on REQ-PIPE-110 to 113 (unsigned, unbuilt) and is naturally a timeline, which has no hand-drawn look. This supersedes round 10's 'delivery calendars and claim windows' as the first real explainer."
       - "Decided links stay inside docs/explainers/ and repository files are named as plain text (delivery-architect, adopted)."

@@ -52,7 +52,7 @@ The validator counts sentences and words this way:
 - Aim for sentences of 15 to 20 words. (Keith)
 - Keep every sentence to 25 words or fewer. A heading is exempt, because a heading is not a sentence. Every other prose rule still applies to headings. [V-sentence-length]
 - Keep every paragraph to 5 sentences or fewer. [V-paragraph-length]
-- Write prose first. Use a list only for a real set, such as the 7 filing decisions. (Keith)
+- Write prose first. Use a list only for a real set, such as the 8 filing decisions. (Keith)
 
 ### Dates, times, numbers, and ranges
 

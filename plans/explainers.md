@@ -59,6 +59,8 @@ survives context compaction. Tick items off here as they land.
    scoping:
    - "delivery calendar" to "supply calendar";
    - the `sample` schema, which clashes with the "sample" asset shape;
+   - REQ-PIPE-106's "sample data" and "sample schema" wording (it is
+     built), for the same reason (Keith, 2026-09-29 night);
    - the amber `/accept` command to "acknowledge";
    - "cycle" to "period";
    - "stale" wording to "no data".
@@ -927,6 +929,17 @@ survives context compaction. Tick items off here as they land.
    Keith approves them. That file is deleted when the entries move to
    `docs/explainers/glossary.yaml`.
 
+   **Glossary forks settled (Keith, 2026-09-29 night):** asset and
+   issue stay aliases (REQ-DOCS-119 c11 amended to "cover"); the recall
+   check fires only on terms a page DEFINES, not on passing mentions
+   (REQ-DOCS-121 amended - otherwise almost every page badges "partly
+   built" for good); "stand on" is no longer an alias of anything, just
+   plain wording in the substitute and inherit definitions; one-off
+   extraction cites REQ-PIPE-106 and keeps its draft name, and sample
+   stays an idea; de-substitute gets an entry and the filing decisions
+   are EIGHT, not seven. Acknowledge's wording waits for the
+   entry-by-entry review.
+
    **Still to take to Keith with wording:** CLAUDE.md's explainer
    rule covers "everything under `docs/explainers/`", which now
    includes the agents' gitignored working folder - the rule probably
@@ -1150,10 +1163,12 @@ survives context compaction. Tick items off here as they land.
       permanently" (REQ-PIPE-075/076/077) (NB) [4].
    8. The actor on every decision (person or rule), required reasons,
       and the people allowlist (REQ-PIPE-074, REQ-GHUB-082) (P) [4].
-   9. The seven filing decisions: four about a supply (promote,
-      reject, demote, re-file) and three about a period (substitute,
-      inherit, un-inherit), taken from a ticket or the terminal, never
-      the dashboard (REQ-GHUB-082) (NB) [4].
+   9. The eight filing decisions: four about a supply (promote,
+      reject, demote, re-file) and four about a period (substitute,
+      de-substitute, inherit, un-inherit), taken from a ticket or the
+      terminal, never the dashboard (REQ-GHUB-082) (NB) [4]. Was
+      "seven" until de-substitute joined REQ-GHUB-082 (corrected
+      2026-09-29).
    10. Check scopes, and cross-table verdicts counting against EVERY
        dataset they read (REQ-QAC-037) (B) [6/7].
    11. Check dependencies (`depends_on`) and temporal reference
@@ -2045,7 +2060,7 @@ survives context compaction. Tick items off here as they land.
    | 1 The shape of the asset | the data asset and its hierarchy; one tool, several shapes (environments and one-off extraction as sections); the data contract; in development |
    | 2 The calendar | the delivery agreement; the supply calendar (runway, and a schedule that runs out, as sections); periods and slots; claim windows (due time, grace, overdue, no overlap, following period) |
    | 3 What arrives | deliveries, arrivals and supplies (receipt, hand-filed, trial); how a file is recognised; when a file can't be placed or read; early, on time and late |
-   | 4 Filing a supply | how a supply is filed (unfiled, ambiguity, closed unfilled); the promotion gate (places, a person wins); arrived versus promoted (three moments, newest promoted wins); the seven filing decisions (amber acknowledge/reject); changing your mind about a supply; resupply (mixed-period delivery); the decision log |
+   | 4 Filing a supply | how a supply is filed (unfiled, ambiguity, closed unfilled); the promotion gate (places, a person wins); arrived versus promoted (three moments, newest promoted wins); the eight filing decisions (amber acknowledge/reject); changing your mind about a supply; resupply (mixed-period delivery); the decision log |
    | 5 Filling the gaps | substitute; inherit and un-inherit |
    | 6 When a person is needed | tickets; what needs a person and where to see it (holds) |
    | 7 How status works | red, amber and green, and how they roll up (red-for-unrun, why a check couldn't run); statuses that aren't verdicts (qualifiers, event severity, no data, anomalies) |
