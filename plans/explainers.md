@@ -46,7 +46,7 @@ survives context compaction. Tick items off here as they land.
    pipeline docs.
 4. [done: 32 concept pages, see THE PAGE LIST in #3] **Tiering** for the concepts that survive triage: own page,
    section, or glossary entry only.
-5. [todo] **The cast draft**: 4-5 characters for Keith to react to
+5. [done] **The cast draft**: 4-5 characters for Keith to react to
    (#3, round 12).
 6. [todo] **Keith names external writing exemplars** (#3, style round
    4).
@@ -1728,3 +1728,38 @@ survives context compaction. Tick items off here as they land.
    docs, who can decide (#9), changing or retiring a check (#30),
    environment setup, the storage halves of #6 and #31, and the
    `check_id` detail.
+
+   **The cast (Keith, 2026-09-29).** The main session drafted it and
+   Keith reacted, over two rounds. He first picked Monty Python names,
+   matching the placeholder colleagues in `contract/people.yaml`. Then,
+   seeing the re-cast (Galahad, Patsy, Tim the Enchanter, Bedevere,
+   Roger the Shrubber), he chose "regular Australian names instead". So
+   the cast is the first draft:
+   1. **Priya, a data steward at a supplying agency.** She sends the
+      supplies; organised and proud of her data, occasionally caught
+      out when her own systems change. Explains deliveries, calendars
+      and lateness from the supplier's side.
+   2. **Sam, a data engineer new to the asset team, and THE READER'S
+      STAND-IN.** Curious, always asking "but why?". Sam asks the
+      questions the pages answer, and matches the critic's persona, so
+      the stories and the critic test the same reader.
+   3. **Jo, the operator who makes filing decisions.** Calm, has seen
+      every odd delivery, and never lets a rule overrule her judgement.
+      Explains promotion, rejection, holds and substitutes.
+   4. **Marcus, the team manager.** Wants the one-line answer, then
+      trusts his team. The voice of the "In short" box.
+   5. **Lin, a researcher downstream.** Uses the promoted data and needs
+      to trust it; the "why any of this matters" character.
+
+   Plus **the Mothman**, a small moth mascot used lightly in some
+   diagrams and the odd aside, never in a heading.
+
+   **A sensitivity guardrail (Keith's call): stories are about data,
+   never the people in it.** Stories concern files, deadlines and
+   decisions. They are never about the children, families or births
+   the data describes, never a realistic case, and never invented
+   personal details. The critic flags any breach as a BLOCKER. This
+   matters because the real collections include child protection.
+
+   The cast's exact wording is part of the house standard, so Keith
+   approves it word for word when the standard is written.
