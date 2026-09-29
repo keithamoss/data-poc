@@ -908,8 +908,8 @@ survives context compaction. Tick items off here as they land.
    - the returning-reader pass - the engineer weeks later, skimming
      headings and "In short" for two or three operating answers.
    The cast's reader stand-in (Sam) must match the engineer persona
-   (REQ-DOCS-117), so the cast draft changes to match when the house
-   standard is written. The temporary draft file was deleted in the
+   (REQ-DOCS-117); the cast was revised to match the same evening -
+   see "The cast, revised" below. The temporary draft file was deleted in the
    same commit that moved the requirements into the register.
 
    **Next:** building slice 1, in dependency order. Nothing is built
@@ -2048,6 +2048,41 @@ survives context compaction. Tick items off here as they land.
 
    The cast's exact wording is part of the house standard, so Keith
    approves it word for word when the standard is written.
+
+   **The cast, revised (Keith, 2026-09-29 evening), SUPERSEDING the
+   list above.** Each member now carries "the situation that tests
+   them" - something outside the person - instead of "what they
+   struggle with", because the house standard is public and a written
+   failing ("struggles to unlearn the old ways") could read as a dig
+   at a real colleague. REQ-DOCS-117 was amended after sign-off to say
+   so and to forbid framing any difficulty as a personal shortcoming.
+   1. **Priya, data steward at a supplying agency** (unchanged). Tested
+      when her own agency's systems change and a supply arrives looking
+      different from last time.
+   2. **Sam, data engineer new to the asset team, the reader's
+      stand-in**, now matching REQ-DOCS-127's engineer persona: knows
+      government data, Mothman is new. Tested when a check result or a
+      filing decision disagrees with what the old per-dataset scripts
+      would have said, and Sam has to work out which is right.
+   3. **Leah, senior data engineer** (RECAST from Jo, the operator; name
+      Keith's pick). Been there, done that: has seen the pipeline run
+      across many periods and met every shape of data quality problem;
+      calm, her judgement is the benchmark. Tested when a supply brings
+      a combination of problems she has not seen and the rules cover
+      only half of it. Explains promotion, rejection, holds and
+      substitutes, often by telling Sam what she saw last time.
+   4. **Marcus, the team manager**, now matching REQ-DOCS-127's manager
+      persona: knows data really well, not a software engineer. Tested
+      by balancing software engineering and data issues against keeping
+      a clear view of what is going on in the data asset (Keith's
+      wording). The voice of the "In short" box.
+   5. **Hannah, researcher downstream** (RENAMED from Lin; Keith's
+      pick). Careful, sceptical of numbers she cannot trace. Tested when
+      she needs to know which version of the data she holds, which
+      period it belongs to, and whether any of it was substituted.
+
+   Plus the Mothman. Still content, not wording: Keith approves the
+   exact text when the house standard is written.
 
    **Requirements route (Keith, 2026-09-29).** He was asked whether the
    `delivery-scoper` was needed, given that fifteen rounds of questions
