@@ -895,6 +895,15 @@ survives context compaction. Tick items off here as they land.
    where nothing outside docs/explainers/ exists - add this to slice
    2's scope when it is scoped.
 
+   **Chunk 4 (the reader-judgement skill) approved as drafted, and
+   both skill files COMMITTED the same night** at
+   `.claude/skills/docs-house-style/SKILL.md` and
+   `.claude/skills/docs-reader-judgement/SKILL.md`. STILL OWED, next
+   session: the two CLAUDE.md amendments REQ-DOCS-115 criterion 5 and
+   REQ-DOCS-129 criterion 23 require (name both SKILL.md files as gated
+   authoring standards; exclude `_work/` from the explainer rule), each
+   in wording Keith approves before the edit.
+
    **Still to take to Keith with wording:** CLAUDE.md's explainer
    rule covers "everything under `docs/explainers/`", which now
    includes the agents' gitignored working folder - the rule probably
