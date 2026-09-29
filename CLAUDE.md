@@ -1722,8 +1722,10 @@ Rough layout:
       Evans' zines and the Illustrated Children's Guide to Kubernetes,
       the two style references Keith liked. No source repo, so
       snippet-only without allow-listing.
-    - **`ciechanow.ski`**, **`stripe.com`**, **`docs.stripe.com`**,
-      **`monzo.com`** (2026-09-29, re-confirmed alongside `jvns.ca`) -
+    - ~~**`ciechanow.ski`**, **`stripe.com`**, **`docs.stripe.com`**,
+      **`monzo.com`**, **`jvns.ca`**~~ - ALLOW-LISTED by Keith
+      2026-09-29 and re-verified with a real `curl` (all 200). First hit
+      the same day (`jvns.ca` was blocked earlier, see above) -
       three of the four external writing exemplars Keith named for the
       explainers (`plans/explainers.md` #3, style round 4). The house
       standard takes TRAITS from each, so they need reading in full,
