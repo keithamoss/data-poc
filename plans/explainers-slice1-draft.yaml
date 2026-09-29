@@ -10,6 +10,10 @@
 # the validator requirement small). Their numbers assume nothing else has taken
 # 131 or 132 by the time this is applied.
 #
+# Revision 4, 2026-09-29: a targeted pass applying Keith's set 6 answers only
+# (signed-page hash, the _work/ exclusion, the reader-judgement boundary, the
+# fifth 'idea' badge, turns of phrase in titles, the brief cap, the eval targets).
+#
 # A criterion that begins "[PROCESS]" is a human approval step. Its evidence is a
 # dated sign-off record in the requirement's evidence field (who approved what,
 # and when), not a linked test.
@@ -19,7 +23,7 @@
   story: "As whoever writes, illustrates or fact-checks an explainer, I want one approved written standard for how explainer prose reads, so that every page sounds like the same colleague and can be held to the same rules."
   moscow: must
   status: not_started
-  source: "Keith, designed across plans/explainers.md item 3 (style rounds 1 to 5, the GOV.UK research, the baseline switch and the exemplar traits), 2026-09-28 to 2026-09-29, slice 1 answers Q5, Q6 and Q8, the headings refinement, and sets 4 and 5, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
+  source: "Keith, designed across plans/explainers.md item 3 (style rounds 1 to 5, the GOV.UK research, the baseline switch and the exemplar traits), 2026-09-28 to 2026-09-29, slice 1 answers Q5, Q6 and Q8, the headings refinement, and sets 4, 5 and 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL hold the explainer house standard in exactly one file, .claude/skills/docs-house-style/SKILL.md, and SHALL NOT hold a second copy of any of its rules anywhere else."
     - "THE SYSTEM SHALL have docs-writer, docs-illustrator and docs-fact-checker preload the house standard, and SHALL NOT have docs-critic preload it."
@@ -46,7 +50,7 @@
     - "THE HOUSE STANDARD SHALL word traits 1 and 2 to apply to the body after the 'In short' box, so that the box stays first and the body opens on the story moment."
     - "THE HOUSE STANDARD SHALL word trait 12 so that the recap and its one pointer sit immediately before the 'where this comes from' list, which stays last."
     - "THE HOUSE STANDARD SHALL word trait 6 so that a diagram's caption is its one-line takeaway, in the caption form REQ-DOCS-118 defines, and still supplies the diagram's accTitle and accDescr."
-    - "THE HOUSE STANDARD SHALL word trait 11 as warmth from the cast, small stakes and plain friendliness, with wry asides in body text, a gentle turn of phrase (not a pun) allowed in a section heading, and nothing playful in a definition."
+    - "THE HOUSE STANDARD SHALL word trait 11 as warmth from the cast, small stakes and plain friendliness, with wry asides in body text, a gentle turn of phrase (not a pun) allowed in a section heading or a page title, and nothing playful in a definition."
     - "THE HOUSE STANDARD SHALL state the exemplar traits as paraphrase only, and SHALL NOT quote, excerpt or link any exemplar's text."
     - "THE HOUSE STANDARD SHALL list the exemplar habits deliberately not taken, so that none is adopted by imitation."
     - "THE HOUSE STANDARD SHALL keep its explanation-specific rules in a section of their own, so that rules for a second document type can be added beside them without restructuring the file."
@@ -76,6 +80,7 @@
     - "Decided the traits and the fixed page parts are reconciled (Keith, set 4): 'In short' stays first and the body opens on the story moment; trait 12's recap and pointer sit just before the sources, which stay last; trait 6's takeaway line is the caption and still feeds accTitle and accDescr."
     - "Decided trait 11's wording follows style rounds 1 and 5 plus the headings refinement (Keith, set 4): wry asides in body text, a gentle turn of phrase (not a pun) allowed in a heading, nothing playful in definitions. The draft trait's 'keep humour in the story' is dropped, since style round 1 did not pick it."
     - "Decided headings (Keith, 2026-09-29): a gentle turn of phrase in a heading is fine and puns are still out. This refines style round 5, which took puns out of headings and titles."
+    - "Decided page TITLES follow the same rule as headings - a gentle turn of phrase is allowed, a pun never is (Keith, set 6). Rejected: the scoper's recommendation that titles stay plain because search, the concept cards and slice 2's 'What's this?' links show them."
     - "Decided GOV.UK's writing guidance is the baseline (Keith, 2026-09-29, 'Fine, ignore the style manual. GovUK is a bit better anyway'), cited at guidance.publishing.service.gov.uk where it now lives. The Australian Government Style Manual was the first baseline, rejected once its own host refused scripted clients and GOV.UK's guidance was read in full. Australian spelling stays, as Keith's preference rather than a Style Manual rule."
     - "Decided NO negative contractions at all (style round 5, GOV.UK, and the research's list of habits not taken), while positive ones such as 'you'll' stay allowed. The validator enforces it (set 4)."
     - "Decided headings and titles are STATEMENTS (style round 5), reversing style round 1's 'mostly questions'. The why-question lives in the brief and the page's opening answer instead. GOV.UK's reason was accepted - question headings are hard to front-load."
@@ -90,8 +95,7 @@
     - "Decided NOT to adopt GOV.UK's separate accessible title and description per diagram as a writing rule; the diagram caption does that job (REQ-DOCS-118)."
     - "Decided the pattern-shaped rhetorical tics ('it's not X, it's Y', rule-of-three padding, ending a section on a punchy one-liner) live in the reader-judgement skill (REQ-DOCS-131), because no fixed string catches them and the critic is the agent that has to judge them. Only fixed-phrase tics such as 'here's the thing' stay in this standard's banned lists."
     - "Decided the standard is written general enough for a second document type (round 12), because the same team is expected to write 'Running Mothman' later. Only explanation rules are written now."
-  open_questions:
-    - "Whether a gentle turn of phrase is allowed in a page TITLE as well as in a section heading. Keith's refinement says 'a heading'; style round 5 took puns out of 'headings and titles' because they cost skimming and search. Drafted provisionally as section headings only (criteria 8 and 26). Recommendation - titles stay plain, because a title is what search, the concept cards and slice 2's 'What's this?' links will show."
+  open_questions: []
 
 - id: REQ-DOCS-116
   title: "Every explainer page has the same fixed parts, a short summary and a visible build state, and cites only citable sources"
@@ -99,7 +103,7 @@
   story: "As a manager or a new engineer opening an explainer, I want the answer at the top, the reasoning in one place, the sources at the end and a clear sign of whether the thing described exists yet, so that I can stop reading as soon as I have what I came for and trust what I read."
   moscow: must
   status: not_started
-  source: "Keith, plans/explainers.md item 3 rounds 1, 4, 5, 10 and style rounds 3 and 5, slice 1 answers Q3 and Q6, and sets 4 and 5, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
+  source: "Keith, plans/explainers.md item 3 rounds 1, 4, 5, 10 and style rounds 3 and 5, slice 1 answers Q3 and Q6, and sets 4, 5 and 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE HOUSE STANDARD SHALL leave a page's shape free-form apart from its fixed parts - the page's why-question in the front matter, an 'In short' box, a 'why it's this way' section, a recap with one pointer onward, and a 'where this comes from' list."
     - "THE HOUSE STANDARD SHALL require the 'In short' box to come first after the page title and any page badge, written as a GitHub alert block of three or four sentences."
@@ -111,17 +115,19 @@
     - "THE HOUSE STANDARD SHALL require links a reader needs, to the glossary or a related page, to appear inline where they are relevant, and SHALL NOT allow them to appear only in the closing list."
     - "THE HOUSE STANDARD SHALL set a page's length at about 500 to 800 words excluding diagrams, and SHALL direct deeper detail to another page by link."
     - "THE HOUSE STANDARD SHALL define a citable source as a requirement in requirements.yaml, whether or not it is signed off, or a specific config or code file, and SHALL NOT treat any file under plans/ or CLAUDE.md as citable."
-    - "THE HOUSE STANDARD SHALL define four build states, each derived from requirements.yaml - 'proposed', where the requirement is not signed off; 'designed, not built yet', where it is signed off and its status is not_started or in_progress; 'partly built', where its status is built and it has unmet_criteria; and built, where its status is built with no unmet_criteria."
-    - "THE HOUSE STANDARD SHALL rank the states from least built to most built as 'proposed', 'designed, not built yet', 'partly built', built."
+    - "THE HOUSE STANDARD SHALL define five build states - 'an idea, not designed yet', where the concept has no defining requirement at all and its glossary entry is marked as an idea (REQ-DOCS-119); and four derived from requirements.yaml - 'proposed', where the requirement is not signed off; 'designed, not built yet', where it is signed off and its status is not_started or in_progress; 'partly built', where its status is built and it has unmet_criteria; and built, where its status is built with no unmet_criteria."
+    - "THE HOUSE STANDARD SHALL rank the states from least built to most built as 'an idea, not designed yet', 'proposed', 'designed, not built yet', 'partly built', built."
     - "THE HOUSE STANDARD SHALL give a page the state of its least-built cited requirement, and SHALL require a page badge directly under the title whenever that state is anything other than built."
+    - "THE HOUSE STANDARD SHALL NOT allow a page badge of 'an idea, not designed yet', and SHALL NOT let an idea-badged section change the page's own state."
+    - "WHERE a page mentions a concept whose glossary entry is marked as an idea, THE HOUSE STANDARD SHALL allow it only in a section badged 'an idea, not designed yet' holding exactly one sentence of prose under that badge, and SHALL exempt that one sentence from the citable-source rule."
     - "WHERE a section rests on requirements whose least-built state differs from the page's, THE HOUSE STANDARD SHALL require a section badge naming that state directly under the section's heading."
     - "WHERE a page or section is badged 'proposed', THE HOUSE STANDARD SHALL require one plain sentence saying that the design is not yet agreed and may change."
     - "THE HOUSE STANDARD SHALL require every badge to be plain markdown text that reads the same on GitHub and in the dashboard."
-    - "THE HOUSE STANDARD SHALL define the front matter every page carries - the page's why-question, a summary of 160 characters or fewer, its group, its cited sources, its build state, its status as draft or signed off, and, once signed, who signed it off and when, a last-reviewed date and a review-by date."
+    - "THE HOUSE STANDARD SHALL define the front matter every page carries - the page's why-question, a summary of 160 characters or fewer, its group, its cited sources, its build state, its status as draft or signed off, and, once signed, who signed it off and when, a hash of the page as signed (REQ-DOCS-122), a last-reviewed date and a review-by date."
   non_functional_requirements:
     - "Answer-first is not decoration. GDS found concept pages are the type readers skip most, and slice 2's 'What's this?' links will land a confused reader straight onto one - the first sentence has to carry the answer on its own. The rule that it does lives in the reader-judgement skill (REQ-DOCS-131), because the critic is the one who judges it."
     - "The citable-source rule is what makes slice 2's staleness gate workable at all: plans/*.md and CLAUDE.md churn daily, and a page fingerprinting them would fail the gate constantly. Slice 1 has no gate, but a page written against the wrong rule now would need rewriting then."
-    - "Badges are DERIVED, never judged: every state comes from requirements.yaml's status, signed_off and unmet_criteria, so the validator can check it (REQ-DOCS-122). The cost, accepted by Keith in set 4, is that a building session which signs or builds a cited requirement turns CI red on a page it may not edit, until Keith approves the badge change - the same trade as slice 2's staleness gate."
+    - "Badges are DERIVED, never judged: every state but one comes from requirements.yaml's status, signed_off and unmet_criteria, and 'an idea, not designed yet' comes from the concept's glossary entry, which Keith approves - so the validator can check every badge (REQ-DOCS-122). The cost, accepted by Keith in set 4, is that a building session which signs or builds a cited requirement turns CI red on a page it may not edit, until Keith approves the badge change - the same trade as slice 2's staleness gate."
     - "A 'proposed' page describes a design that sign-off may still change, so it is the page most likely to go wrong silently. Slice 2's fingerprint gate catches the requirement entry changing; in slice 1 nothing does, which is why the page must say plainly that the design may change."
     - "The front matter fields are defined now so that slice 2 only ADDS fingerprints and checking, and does not have to re-open every page already signed. The summary is there for search and for a group page's concept cards later; slice 1 only requires it to exist and fit."
     - "Compatibility: the fixed parts and the badges have to render as plain markdown on GitHub (Mermaid 11.17.2 at last test) with no custom HTML, because the validator rejects raw HTML. GitHub alert syntax renders natively there; slice 2's dashboard renderer has to render the same alert block."
@@ -131,6 +137,8 @@
   decisions:
     - "Decided unsigned requirements ARE citable, under a separate 'proposed' badge (Keith, slice 1 Q3). Rejected: the scoper's recommendation that only signed requirements be citable, which would have kept every page resting on REQ-PIPE-110 to 113 out of the explainers until they were signed."
     - "Decided the status mapping (Keith, set 5): in_progress reads 'designed, not built yet', and a built requirement with unmet_criteria gets its own 'partly built' badge. That makes four states, not Q3's three."
+    - "Decided a FIFTH state, 'an idea, not designed yet' (Keith, set 6), for a concept with no requirement at all, such as one-off project extractions: one sentence under the badge, exempt from citation. Rejected: the scoper's recommendation that such a concept get a draft glossary entry only and its section wait until a requirement exists."
+    - "Decided the idea badge is section-only and does not pull a page's own badge down, so a built page with one idea section still reads as built (scoper's derivation in revision 4, flagged for Keith). The alternative - the idea state ranking into the page badge - would badge group 1's page 'an idea' for the sake of one sentence."
     - "Decided mixed-state pages (Keith, set 4): the page badge follows its least-built source, and a section whose state differs carries its own badge. Rejected: a page-level badge only, which would hide a built page's one unbuilt section."
     - "Decided badge drift is caught by the validator in slice 1 (Keith, set 4), accepting that a build session can turn CI red on a page it may not edit, with the fix coming to Keith."
     - "Decided the page parts and the exemplar traits are reconciled (Keith, set 4): 'In short' first, the body opening on the story moment, trait 12's recap and pointer just before the sources, and the sources last."
@@ -148,8 +156,7 @@
     - "Decided the boundary with REQ-QAC-024 (item 1): that requirement explains each CHECK in plain English; an explainer explains a CONCEPT - a supply, a slot, promotion, the worst-of rollup. A check's plain-English fields get only a glossary entry and one line in 'what a check is' (triage #29)."
     - "Decided a concept with two halves is SPLIT and CROSS-LINKED (the two-track sweep): the explainer covers what it means and why, a Running Mothman how-to covers the steps, each links to the other and neither repeats the other. The links wait until item 2's pages exist."
     - "Decided each page records a last-reviewed and a review-by date alongside its sign-off (Keith's calls on the live research), because a fingerprint catches a changed source but not a world that changed while no cited file did. Suggested review period six months; the date check itself is explainers slice 2."
-  open_questions:
-    - "How a page describes something that has NO requirement yet. The tiering placed 'one-off extraction' as a short, badged section in group 1's 'the shape varies', but a section with nothing to cite breaks the citable-source rule, and none of the four states fits it. Not blocking slice 1 (periods and slots cites only built requirements), but the state model is defined here. Recommendation - such a concept gets a draft glossary entry only, and its section waits until a requirement exists; the alternative is a fifth badge ('an idea, not designed yet') with one sentence exempt from the fact-checker."
+  open_questions: []
 
 - id: REQ-DOCS-117
   title: "A fixed cast, and stories that are about data, never the people in it"
@@ -233,14 +240,16 @@
   story: "As a reader meeting a Mothman term for the first time, I want one glossary that gives each invented term its one canonical spelling, a one-line definition and where it is explained, so that I never have to guess whether two words mean the same thing."
   moscow: must
   status: not_started
-  source: "Keith, plans/explainers.md item 3 rounds 1, 3 and 4, the naming session (rounds 1 to 3) and its glossary canon, the re-baseline decisions, round 15's placeholder names, slice 1 answers Q2 and Q3, and set 5, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
+  source: "Keith, plans/explainers.md item 3 rounds 1, 3 and 4, the naming session (rounds 1 to 3) and its glossary canon, the re-baseline decisions, round 15's placeholder names, slice 1 answers Q2 and Q3, and sets 5 and 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL hold the glossary's one source at docs/explainers/glossary.yaml, under a strict schema that rejects unknown and missing keys."
     - "THE SYSTEM SHALL give every glossary entry its canonical term spelled exactly, a one-line definition, its aliases, any further word forms it should match, the requirement or requirements that define it, the explainer page that covers it or a mark that none does yet, and whether it is a draft."
     - "THE SYSTEM SHALL list every alias and retired word as pointing at its canonical term, and SHALL NOT give an alias a definition of its own."
     - "THE SYSTEM SHALL provide `mothman docs glossary`, which writes docs/explainers/glossary.md from glossary.yaml and requirements.yaml, and SHALL commit the generated file."
     - "IF the committed glossary.md differs from what `mothman docs glossary` would write, THEN `mothman docs glossary --check` SHALL fail, and `mothman docs validate` (REQ-DOCS-122) SHALL run that check."
-    - "THE SYSTEM SHALL derive each entry's badge from its defining requirements in requirements.yaml, using REQ-DOCS-116's four states and its least-built rule, and SHALL NOT let a badge be written by hand."
+    - "THE SYSTEM SHALL derive each entry's badge from its defining requirements in requirements.yaml, using REQ-DOCS-116's derived states and its least-built rule, and SHALL NOT let a badge be written by hand."
+    - "THE SYSTEM SHALL give glossary.yaml an explicit idea field, true only for an entry whose concept has no defining requirement at all, and SHALL render such an entry in glossary.md with the badge 'an idea, not designed yet'."
+    - "IF a glossary entry is marked as an idea and names a defining requirement, or names no defining requirement and is not marked as an idea, THEN `mothman docs validate` SHALL reject it."
     - "THE SYSTEM SHALL seed the glossary with every canonical term and alias the naming session settled, and with the terms the first explainer, periods and slots (REQ-DOCS-130), uses."
     - "THE SYSTEM SHALL mark the three asset-shape names - scheduled asset, one-off extraction and sample - as draft placeholders."
     - "THE SYSTEM SHALL define promote, deliver, asset and issue as Mothman terms, in line with REQ-DOCS-115's rule on GOV.UK's words-to-avoid."
@@ -261,6 +270,7 @@
   decisions:
     - "Decided glossary.yaml is the source, with a readable glossary.md generated from it and gated against going stale (Keith, set 5, the CHANGELOG.yaml precedent; the gate has the same shape as `mothman dashboard plans-index --check`). Rejected: markdown with one structured line per entry, which three programs would each have had to parse."
     - "Decided glossary badges are derived from requirements.yaml, never hand-written (Keith, set 5)."
+    - "Decided an entry with no defining requirement carries an explicit idea mark and the badge 'an idea, not designed yet' (Keith, set 6), since that badge cannot derive from requirements.yaml. The mark is a glossary change, so Keith approves it like any other, and an entry must either name a defining requirement or carry the mark - there is no unbadged third case."
     - "Decided a first-class glossary (round 1): one source, one-line definition, exact spelling, and the explainer that covers it. The writer uses terms exactly as defined."
     - "Decided the writer PROPOSES and Keith APPROVES (round 3). New or changed terms appear in the brief, Keith approves them at the brief checkpoint, and only then are they added, so the glossary cannot drift without him seeing it."
     - "Decided the glossary badges follow the page states, including 'proposed' for an unsigned design (Keith, slice 1 Q3) and 'partly built' (set 5)."
@@ -356,10 +366,10 @@
 - id: REQ-DOCS-122
   title: "A deterministic validator refuses unsafe or malformed explainer output and checks build-state badges"
   date_written: "2026-09-29"
-  story: "As Keith, about to publish a page an agent wrote, I want a mechanical check that the page carries no script, no outside links, no malformed diagram, no false claim of sign-off and no badge that disagrees with the register, so that a bad or injected output cannot reach GitHub on the strength of a model's judgement."
+  story: "As Keith, about to publish a page an agent wrote, I want a mechanical check that the page carries no script, no outside links, no malformed diagram, no false claim of sign-off, no edit since Keith signed it and no badge that disagrees with the register, so that a bad or injected output cannot reach GitHub on the strength of a model's judgement."
   moscow: must
   status: not_started
-  source: "Keith, plans/explainers.md item 1 (his worry about prompt injection), docs/explainer-agents-research.md section 5 mitigations 4 and 5, Keith's calls on the live research (accTitle and accDescr), slice 1 answers Q4, Q5 and Q9, and sets 4 and 5, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
+  source: "Keith, plans/explainers.md item 1 (his worry about prompt injection), docs/explainer-agents-research.md section 5 mitigations 4 and 5, Keith's calls on the live research (accTitle and accDescr), slice 1 answers Q4, Q5 and Q9, and sets 4, 5 and 6, 2026-09-28 to 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL provide `mothman docs validate`, which checks every file under docs/explainers/ except docs/explainers/_work/."
     - "THE SYSTEM SHALL parse explainer pages, the house standard's YAML block, glossary.yaml, concept-map.yaml and every sources.yaml through one parser module shared by every `mothman docs` subcommand."
@@ -378,7 +388,11 @@
     - "IF a Mermaid block has no caption, or its accTitle or accDescr does not equal its caption, THEN THE SYSTEM SHALL reject it, comparing after removing the caption's italic markers and normalising whitespace."
     - "IF a page's front matter is missing a field REQ-DOCS-116 requires, or its summary is longer than 160 characters, THEN THE SYSTEM SHALL reject it."
     - "IF a page's front matter gives its status as signed off and carries no sign-off record naming who signed it and when, THEN THE SYSTEM SHALL reject it."
+    - "THE SYSTEM SHALL compute a page's hash over the whole file except its status field and its sign-off record's own fields, and SHALL print it with `mothman docs validate --print-hash <page>`."
+    - "IF a page's front matter gives its status as signed off and the hash in its sign-off record does not equal the page's current hash, THEN THE SYSTEM SHALL reject it, saying that the page has changed since Keith signed it and needs his fresh sign-off."
     - "IF a page's front-matter build state, its page badge or any section badge disagrees with the state REQ-DOCS-116 derives from the cited requirements' status, signed_off and unmet_criteria in requirements.yaml, THEN THE SYSTEM SHALL reject it."
+    - "IF a page carries a page badge of 'an idea, not designed yet', THEN THE SYSTEM SHALL reject it."
+    - "IF a section badged 'an idea, not designed yet' holds anything other than exactly one sentence of prose, or that sentence uses no term or alias of a glossary entry marked as an idea, THEN THE SYSTEM SHALL reject it."
     - "THE SYSTEM SHALL give every rule a stable id, and SHALL print every rule's id and a one-line description with `mothman docs validate --list-rules`."
     - "THE SYSTEM SHALL include a test that fails when the rule ids `--list-rules` prints and the rule-id markers in the house standard's SKILL.md are not the same set."
     - "WHEN the validator rejects a file, THE SYSTEM SHALL name the file, the line, the rule id and the correction to make."
@@ -387,7 +401,8 @@
     - "THE SYSTEM SHALL run the validator without opening any database or reading anything under data/ or reports/."
   non_functional_requirements:
     - "SECURITY, and the reason it is deterministic code rather than a reviewer: OWASP LLM01's own advice is to validate output formats with deterministic code. A model can be talked out of a rule; a regular expression cannot. Keith's sign-off stays the human gate on top of this, never instead of it."
-    - "The sign-off guard catches a page that CLAIMS sign-off without a record. It cannot tell a record Keith approved from one an agent wrote, since the writer can write under docs/explainers/. The protection is that /explain writes the record only after Keith says yes, and that git records who committed it. Slice 2's staleness gate compares fingerprints of the cited SOURCES, so nothing in either slice yet notices a signed page's own body being edited - see the open question."
+    - "The sign-off guard catches a page that CLAIMS sign-off without a record, and the hash catches a signed page edited afterwards, so an edit lands only with a fresh sign-off. Neither can tell a record Keith approved from one somebody wrote, since the hash is printable by anyone with a shell. The protection is that /explain writes the record only after Keith says yes, that no docs-* agent has a shell, and that git records who committed it. A signed page set back to draft is not hash-checked; that shows as a status change in the diff rather than as a failed gate."
+    - "The idea badge is the one place a sentence needs no citation, so the validator keeps it narrow: a section badge only, exactly one sentence, and only for a concept whose glossary entry carries the idea mark Keith approved. What the validator cannot see is a new requirement that now defines an idea; the concept leaves the idea state when its glossary entry gains that requirement, which is Keith's change to approve."
     - "The working folder is excluded on purpose: a critic's report quotes offending text, including injected text and zero-width characters, as data - validating it would reject every report that did its job."
     - "PORTABILITY: parsing Mermaid needs Mermaid, which is JavaScript. The spike (delivery-architect, 2026-09-29) parsed mermaid@11.17.2 headlessly under jsdom in 1.2s including a broken block that returned its line. The documented `npm ci` step is therefore a hard prerequisite of `uv run mothman docs validate` locally and in CI, and a missing one fails loudly rather than silently passing."
     - "Badge drift trades a red CI for a page a building session may not edit (Keith, set 4). The error must say that the fix is a badge change for Keith to approve, so the session does not try to edit the page itself."
@@ -401,6 +416,9 @@
   decisions:
     - "Decided the command group is `mothman docs` (Keith, set 5, over the recommended `mothman explainers`), matching the docs-* team and the future 'Running Mothman' pipeline docs. Its slice-1 subcommands - validate, glossary, quote-check, guard-write, guard-read, snapshot and verify-changes - share one parser module (delivery-architect, adopted). Slice 2 adds sign-off and the preview command."
     - "Decided the validator refuses a page that claims sign-off without a sign-off record in its front matter (Keith, Q9). The full staleness gate stays in slice 2."
+    - "Decided signed pages carry a hash (Keith, set 6): the sign-off record stores a hash of the page as signed, and the validator rejects a signed page whose hash no longer matches, so any later edit needs Keith's fresh sign-off. Rejected: a CI rule that docs/explainers/ changes only in commits that update a sign-off record, as coarser; and relying on CLAUDE.md's rule and review alone."
+    - "Decided the hash is printed by a flag on the validator, `--print-hash`, rather than a new subcommand, and covers everything but the status field and the sign-off record (scoper's derivation in revision 4, flagged for Keith). A record cannot hash itself, and the status flips from draft at signing."
+    - "Decided how the validator stops the idea badge becoming a loophole for uncited claims (Keith, set 6, mechanism by the scoper): section badges only, one sentence each, and only for a concept whose glossary entry carries the idea mark. The idea state is checked against glossary.yaml, not requirements.yaml, since by definition no requirement exists."
     - "Decided badge drift is checked by the validator in slice 1 (Keith, set 4) against status, signed_off and unmet_criteria (set 5's mapping)."
     - "Decided the gitignored working folder under docs/explainers/ holds briefs and reports and is not validated (Keith, Q4, with the reason above)."
     - "Decided from the research (section 5, mitigation 4) that deterministic output validation is built in, rejecting raw HTML, script and iframe, javascript: and data: links, external URLs and images, securityLevel and click directives, and zero-width or bidi characters, and checking every Mermaid block parses."
@@ -411,8 +429,7 @@
     - "Decided validate-config.yml gets Node and the docs/**, .claude/** and package*.json paths (delivery-architect, verified by the main session - the workflow had no Node step and its paths omitted all three)."
     - "Decided the house-style prose rules this validator enforces are their own requirement (REQ-DOCS-132), split out in this revision to keep this one to safety, structure and wiring."
     - "Decided the post-run change check and the write guard (REQ-DOCS-124) are separate from this validator - those hold the agents to their folders, this holds the output to a safe shape."
-  open_questions:
-    - "Whether slice 1 should notice a SIGNED page's body being edited afterwards. Keith's standing rule forbids a building session editing an explainer, but nothing enforces it: this validator checks only that a sign-off record exists, and slice 2's gate fingerprints the cited sources, not the page. Recommendation - the sign-off record carries a hash of the page as signed, and this validator rejects a signed page whose content no longer matches it, so any later edit needs Keith's re-sign. Alternatives - a CI check that docs/explainers/ changes only in commits that update a sign-off record (item 4 floated this as 'could be added'), or rely on the rule and review."
+  open_questions: []
 
 - id: REQ-DOCS-123
   title: "A small eval set, built before the agents it tests"
@@ -420,7 +437,7 @@
   story: "As Keith deciding whether to trust the docs-* agents, I want a few pages with known defects, a clean page and an injection attempt that every agent is run against before real use, so that I know they catch real problems without inventing false ones."
   moscow: must
   status: not_started
-  source: "Keith, plans/explainers.md item 3 round 3 (evals), the architecture research, the paper check, item 4's 'delivery changed meaning' trap, and slice 1 answers Q10 and Q11, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
+  source: "Keith, plans/explainers.md item 3 round 3 (evals), the architecture research, the paper check, item 4's 'delivery changed meaning' trap, and slice 1 answers Q10 and Q11, and set 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL hold the eval set in .claude/skills/explain/evals/, outside docs/explainers/, so that no eval page can be published or mistaken for a real explainer."
     - "THE SYSTEM SHALL include seven eval pages."
@@ -429,6 +446,7 @@
     - "THE SYSTEM SHALL include one page carrying text addressed to an AI agent as a prompt-injection fixture."
     - "THE SYSTEM SHALL include one page that breaches the sensitivity rule (REQ-DOCS-117), with only invented and obviously unreal detail."
     - "THE SYSTEM SHALL include one page that uses 'delivery' in its old sense, the logical obligation now called a slot, as the naming-trap fixture."
+    - "THE SYSTEM SHALL target the jargon, decorative-diagram and sensitivity-breach pages at docs-critic, the wrong-fact and naming-trap pages at docs-fact-checker, the clean page at both, and the injection page at all four docs-* agents."
     - "THE SYSTEM SHALL hold beside each eval page an expected-findings file in one fixed schema - the agents it targets, each finding a passing run must produce with its minimum severity and the text it must quote, the most severe finding a passing run may produce, and, for the injection fixture, the instruction no run may follow."
     - "IF an expected-findings file does not match that schema, THEN THE SYSTEM SHALL fail a test."
     - "THE SYSTEM SHALL mark each eval page, in its own text, as a test fixture that is not a real explainer."
@@ -454,6 +472,7 @@
     - REQ-DOCS-118
     - REQ-DOCS-131
   decisions:
+    - "Decided which agents each page targets (Keith, set 6, confirming the scoper's proposal): each page's defect is one only its target agent is placed to catch, the clean page tests both reviewers for invented findings, and every agent reads text an injection could hide in."
     - "Decided SEVEN pages (Keith, slice 1 Q10) - round 3's five (three planted defects, one clean, one prompt injection) plus a sensitivity breach, because it is a blocker class, and the 'delivery changed meaning' naming trap that item 4 named as a good early fact-checker test."
     - "Decided eval outcomes are summarised in each evaluated agent's requirement, under evidence (a dated run summary) and decisions, with no transcripts committed because they are state (Keith, Q11). Rejected: a committed run log."
     - "Decided EXACTLY three runs per eval page (delivery-architect, adopted; round 3 said 'about three'), because a scoring rule over an unfixed number of runs is not a rule."
@@ -465,8 +484,7 @@
     - "Decided the injection fixture is a regression case kept in the repo (research section 5, mitigation 7: red-team once and keep the fixture)."
     - "Dropped the previous draft's criterion that a new eval page MAY be added after a real failure: a criterion that permits something nobody forbids tests nothing. Growing the set from real failures stays the intent (round 3)."
     - "Noted, not decided: all the papers behind this test 2022 to 2025 models on tasks unlike this one, so how far they carry over to current Claude models is a judgement, not a measurement."
-  open_questions:
-    - "Which agents each eval page targets - proposed by the scoper and not yet confirmed by Keith: jargon, the decorative diagram and the sensitivity breach target docs-critic; the wrong fact and the naming trap target docs-fact-checker; the clean page targets both; the injection fixture targets all four. Recommendation - confirm as drafted, since each page's defect is one only its target agent is placed to catch."
+  open_questions: []
 
 - id: REQ-DOCS-124
   title: "The docs-* agents can only reach what their job needs, and treat the repository as material, not instructions"
@@ -529,7 +547,7 @@
   story: "As Keith scoping a new explainer, I want a writer agent that reads the sources itself, gives me a short brief to approve and then drafts the page to the house standard, so that the page rests on a specialist's reading and I steer it before any prose exists."
   moscow: must
   status: not_started
-  source: "Keith, plans/explainers.md item 3 rounds 1, 2, 3, 5, 7, 10 and 13, the paper check, slice 1 answers Q3 and Q4, and sets 4 and 5, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
+  source: "Keith, plans/explainers.md item 3 rounds 1, 2, 3, 5, 7, 10 and 13, the paper check, slice 1 answers Q3 and Q4, and sets 4, 5 and 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "WHEN a topic has been scoped with Keith, THE SYSTEM SHALL have docs-writer draft a brief of at most 500 words, not counting its list of sources."
     - "THE SYSTEM SHALL have the brief state the page's why-question, who it is for, its key points, two or three candidate analogies or story angles, the planned diagrams and stories, the sources it will cite, the build state those sources give the page, five to eight questions a new engineer should be able to answer from the page, and every new or changed glossary term."
@@ -540,7 +558,7 @@
     - "THE SYSTEM SHALL have docs-writer place the defining requirements first in its reading, peripheral sources after them, and the task last, with the task also named briefly at the start."
     - "THE SYSTEM SHALL let docs-writer read plans/*.md for background, and SHALL NOT let it cite plans/*.md or state as fact anything found only there."
     - "WHEN Keith has approved the brief, THE SYSTEM SHALL have docs-writer draft the page to the house standard using the analogy or angle Keith picked, with a marked slot for each diagram and story."
-    - "THE SYSTEM SHALL NOT have docs-writer state a fact that is not in a source the page cites."
+    - "THE SYSTEM SHALL NOT have docs-writer state a fact that is not in a source the page cites, except the one sentence under an idea badge (REQ-DOCS-116)."
     - "THE SYSTEM SHALL have docs-writer badge the page and any differing section as REQ-DOCS-116 requires."
     - "THE SYSTEM SHALL have docs-writer add a term to glossary.yaml only after Keith has approved it at the brief."
     - "WHEN Keith has chosen which findings to act on, THE SYSTEM SHALL have docs-writer revise with targeted edits addressing only those findings, not a rewrite."
@@ -561,7 +579,7 @@
     - REQ-DOCS-123
     - REQ-DOCS-124
   decisions:
-    - "Decided a word cap in place of 'fits on one screen' (delivery-architect, adopted), because the old wording could not be checked. The figure itself is still for Keith - see the open question."
+    - "Decided a word cap in place of 'fits on one screen' (delivery-architect, adopted), because the old wording could not be checked. Keith confirmed the figure as 500 words, excluding the brief's source list (set 6)."
     - "Decided the main session writes the critic's and fact-checker's reports into _work (delivery-architect, adopted), because neither agent has a write tool."
     - "Decided briefs live in the gitignored working folder docs/explainers/_work/<date>-<slug>/ and are never committed, because they are state (Keith, slice 1 Q4; path from the delivery-architect review)."
     - "Decided the writer may cite an unsigned requirement, under the 'proposed' badge (Keith, Q3)."
@@ -572,11 +590,10 @@
     - "Decided variation is confined to the brief (round 13): 2 to 3 candidate analogies or story angles, Keith picks one or asks for another."
     - "Decided the 'equal effort' point from the paper check (Huang et al., ICLR 2024): whatever the critic checks for also goes into the writer's brief. Models revising their own work without outside feedback got worse, so the design's safety comes from the sources, the scripts and Keith, not from the critic being a separate agent. Since Q5 the validator's rules go into the brief too, and since set 5 the writer preloads the reader-judgement skill the critic applies."
     - "Decided context ordering from 'Lost in the Middle' (Liu et al., TACL 2024) - defining requirements first, peripheral sources in the middle, the task last and named briefly at the top. Tested only at 2 to 16K tokens on 2023 models, but cheap to apply."
-    - "Decided 'never state a fact that is not in a named source file; write a pointer, not a guess' (research, docs-drift-editor), which also blunts injected facts."
+    - "Decided 'never state a fact that is not in a named source file; write a pointer, not a guess' (research, docs-drift-editor), which also blunts injected facts. The one exception is the single sentence under an idea badge (Keith, set 6; REQ-DOCS-116, bounded by REQ-DOCS-122)."
     - "Decided Keith feeds the topics and each is scoped together before writing (round 3). The team does NOT sweep the repo and pick its own."
     - "Decided a signed page is FROZEN - only edited, never regenerated (round 13)."
-  open_questions:
-    - "The brief's word cap. Drafted provisionally as 500 words, not counting the source list - enough for the ten required items including 5 to 8 reader questions, and about one laptop screen. Recommendation - 500; say if 'one screen' meant something shorter."
+  open_questions: []
 
 - id: REQ-DOCS-126
   title: "docs-illustrator fills the diagram and story slots, and has to earn its place"
@@ -680,7 +697,7 @@
   story: "As Keith, about to put an explainer in front of managers, I want every factual claim on it checked against the requirements and files it cites, with the problems at the top, so that a wrong or unsupported sentence is found by a table rather than by a reader."
   moscow: must
   status: not_started
-  source: "Keith, plans/explainers.md item 3 rounds 7, 8, 10 and 13, the paper check's corrections, slice 1 answers Q3, Q4 and Q11, and set 5, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
+  source: "Keith, plans/explainers.md item 3 rounds 7, 8, 10 and 13, the paper check's corrections, slice 1 answers Q3, Q4 and Q11, and sets 5 and 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "WHEN docs-fact-checker reviews a page, THE SYSTEM SHALL have it return every factual claim on the page, each with a verdict of supported, contradicted, not found in the sources, or sources disagree."
     - "THE SYSTEM SHALL have docs-fact-checker return its report as one fenced YAML table with one row per claim - the claim, the verdict, the source and the supporting quote - and SHALL have the main session save that table into the run's working folder."
@@ -689,7 +706,8 @@
     - "THE SYSTEM SHALL have docs-fact-checker check each claim only against the sources the page cites."
     - "THE SYSTEM SHALL have docs-fact-checker extract the supporting quote before giving a verdict, and SHALL mark a claim with no supporting quote as not found."
     - "THE SYSTEM SHALL have docs-fact-checker judge support sentence by sentence against the whole cited set, and SHALL mark partial support as not found."
-    - "IF a sentence makes a factual claim and cites nothing, THEN THE SYSTEM SHALL flag it."
+    - "IF a sentence makes a factual claim and cites nothing, THEN THE SYSTEM SHALL flag it, unless it is the one sentence under an 'an idea, not designed yet' badge (REQ-DOCS-116)."
+    - "THE SYSTEM SHALL list the sentence under an 'an idea, not designed yet' badge in the report as exempt, with no verdict, so that Keith still sees it."
     - "IF a claim is supported only by plans/*.md or CLAUDE.md, THEN THE SYSTEM SHALL mark it not found."
     - "IF a cited requirement and the cited code say different things, THEN THE SYSTEM SHALL mark the claim sources disagree and SHALL always show it to Keith, and the page SHALL NOT pick a side."
     - "WHEN a round of review runs, THE SYSTEM SHALL run docs-fact-checker twice on the same page, SHALL show Keith every claim either run marks other than supported, and SHALL flag as unstable any claim the two runs disagree on."
@@ -726,6 +744,7 @@
     - "Decided two runs per round, combined as a union, disagreement flagged unstable (round 13); the paper check kept this but corrected the description - it is not self-consistency voting (Wang et al.)."
     - "Decided from Anthropic's anti-hallucination guidance: extract quotes first, retract any claim with no supporting quote, and treat run-to-run disagreement as a warning (stochasticity research)."
     - "Decided per-sentence support against the whole cited set, flagging uncited sentences and treating partial support as not found (paper check, ALCE)."
+    - "Decided the one sentence under an 'an idea, not designed yet' badge is exempt from citation (Keith, set 6), and is listed as exempt rather than dropped from the report (scoper's derivation, flagged for Keith). Rejected: holding such a concept to a glossary entry only until a requirement exists."
     - "Rejected relying on the API's Citations feature - it guarantees valid citations but subagents cannot use it, so the verbatim script is the nearest equivalent."
   open_questions: []
 
@@ -735,7 +754,7 @@
   story: "As Keith commissioning an explainer, I want one command that walks the main session through scoping, brief, writing, illustrating, checking, review, triage and sign-off in a fixed order, so that no step - and especially neither of my checkpoints - can be skipped or reordered by accident."
   moscow: must
   status: not_started
-  source: "Keith, plans/explainers.md item 3 rounds 1, 2, 8, 9 and 13, CLAUDE.md's standing rule 'Never change an explainer without Keith's approval', slice 1 answers Q1, Q4, Q5 and Q9, and sets 4 and 5, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
+  source: "Keith, plans/explainers.md item 3 rounds 1, 2, 8, 9 and 13, CLAUDE.md's standing rule 'Never change an explainer without Keith's approval', slice 1 answers Q1, Q4, Q5 and Q9, and sets 4, 5 and 6, 2026-09-29. Scoped by delivery-scoper as explainers slice 1, 2026-09-29; revised against Keith's answers and the delivery-architect review the same day."
   acceptance_criteria:
     - "THE SYSTEM SHALL provide an /explain project skill at .claude/skills/explain/SKILL.md, marked disable-model-invocation true, that runs in the main session."
     - "WHEN /explain runs, THE SYSTEM SHALL take the steps in this order - scope the topic with Keith, docs-writer drafts the brief, Keith approves the brief, docs-writer writes, docs-illustrator illustrates, the validator and recall check pass, the reviews run, the draft is pushed, Keith triages the findings, docs-writer revises, Keith signs off."
@@ -755,11 +774,11 @@
     - "WHEN findings are presented, THE SYSTEM SHALL show every finding grouped by severity and SHALL act only on the findings Keith picks."
     - "WHEN docs-writer has revised a page, THE SYSTEM SHALL re-run the validator, the recall check and the reviews on the revised page and return to Keith's triage."
     - "IF a page has been through two revision loops - each loop being Keith's triage followed by docs-writer's revision - and Keith has not signed it off, THEN THE SYSTEM SHALL stop the run and hand back to Keith rather than start a third loop."
-    - "[PROCESS] WHEN Keith signs a page off, THE SYSTEM SHALL record who signed it and when, a last-reviewed date and a review-by date in the page's front matter, and SHALL NOT write that record before he has."
+    - "[PROCESS] WHEN Keith signs a page off, THE SYSTEM SHALL record who signed it and when, the page's hash as printed by `mothman docs validate --print-hash` (REQ-DOCS-122), a last-reviewed date and a review-by date in the page's front matter, and SHALL NOT write that record before he has."
     - "THE SYSTEM SHALL NOT run /explain to regenerate a signed-off page."
     - "THE SYSTEM SHALL NOT pick a topic itself, and SHALL start only from a topic Keith gives."
     - "THE SYSTEM SHALL NOT write a CHANGELOG.yaml entry for an individual explainer page."
-    - "[PROCESS] WHEN the working folder is first created, THE SYSTEM SHALL amend CLAUDE.md's explainer rule to say how it treats docs/explainers/_work/, in wording Keith has approved."
+    - "[PROCESS] WHEN the working folder is first created, THE SYSTEM SHALL amend CLAUDE.md's explainer rule to exclude docs/explainers/_work/, in wording Keith has approved before the edit is made."
   non_functional_requirements:
     - "The loop cap lives in the SKILL, not in a prompt: Anthropic's own cookbook evaluator loop is uncapped, and a cap an agent is asked to respect is a cap it can talk itself past. A mechanical rejection is not a loop because it has one right answer and Keith's checkpoints are for judgement (Keith, set 4)."
     - "PUBLIC ON PUSH: the repository is public, so the draft is published the moment it is pushed. That is why the push waits for the validator AND the critic's sensitivity read - REQ-DOCS-130 requires the sensitivity rule to have held before the first push, and in slice 1 only the critic checks it."
@@ -789,13 +808,14 @@
     - "Decided its own lighter pipeline (round 1): an explainer is documentation, not behaviour, so it gets NO requirements.yaml entry. Keith and the main session scope, the agents write, Keith signs off the finished page. The agent team, the gates and the tab are behaviour and do get requirements."
     - "Decided kick-off is a project skill with fixed steps (round 2), so nothing can be skipped or reordered by accident."
     - "Decided revisions re-check, at most 2 loops (round 9); after that the session stops and talks rather than looping."
+    - "Decided the sign-off record carries a hash of the page as signed (Keith, set 6), so an edit after sign-off fails the validator until Keith signs again. Rejected: a CI rule on commits that touch docs/explainers/, and relying on review alone."
+    - "Decided CLAUDE.md's explainer rule EXCLUDES docs/explainers/_work/ (Keith, set 6), since nothing there is published or committed; its exact wording goes to Keith before the edit."
     - "Decided sign-off lives in each page's front matter (round 9). The fingerprints that go with it, and the sign-off command - renamed `mothman docs sign-off` by set 5 - are explainers slice 2."
     - "Decided changelog entries only for the tab launch (round 11), not individual pages - so slice 1 ships no CHANGELOG.yaml entry for its page."
     - "Decided under CLAUDE.md's standing rule (Keith, 2026-09-29) that the staleness-gate route is the ONLY way an explainer changes after sign-off: a building session never edits docs/explainers/ or refreshes fingerprints, it reports which explainer is affected. That route itself is explainers slice 2."
     - "Decided the critic and fact-checker run in parallel and Keith triages both together at one checkpoint (round 8)."
     - "Scoper's derivation, flagged for Keith: the draft is pushed AFTER the reviews rather than straight after writing, because REQ-DOCS-130 requires the sensitivity rule to hold before the first push and only the critic checks it. Keith still sees the GitHub render at his triage, which is when Q1 needs him to."
-  open_questions:
-    - "How CLAUDE.md's explainer rule treats the working folder. The rule covers 'everything under docs/explainers/', which now includes gitignored briefs and reports the agents write on every run - read literally, each one needs Keith's approval. Listed in plans/explainers.md as still to take to Keith with wording. Recommendation - the rule excludes docs/explainers/_work/, since nothing there is published or committed; the exact wording goes to Keith under the last criterion."
+  open_questions: []
 
 - id: REQ-DOCS-130
   title: "A first explainer, periods and slots, published as markdown and signed off by Keith"
@@ -848,7 +868,7 @@
   story: "As Keith, I want the rules a reader judges a page by held in one small skill that the critic and the writers all preload, so that the critic applies exactly the rules the writer wrote to without being handed the cast, glossary or examples that a cold reader would not have."
   moscow: must
   status: not_started
-  source: "Keith, plans/explainers.md item 3, slice 1 answers set 4 (the critic does not preload the house standard) and set 5 (the standard splits into two skills), 2026-09-29. Drafted by delivery-scoper in its third revision of explainers slice 1, 2026-09-29."
+  source: "Keith, plans/explainers.md item 3, slice 1 answers set 4 (the critic does not preload the house standard) and set 5 (the standard splits into two skills) and set 6 (its content as drafted), 2026-09-29. Drafted by delivery-scoper in its third revision of explainers slice 1, 2026-09-29."
   acceptance_criteria:
     - "THE SYSTEM SHALL hold the reader-judgement rules in exactly one file, .claude/skills/docs-reader-judgement/SKILL.md, and SHALL NOT hold a second copy of any of them anywhere else, including the house standard and any agent's prompt."
     - "THE SYSTEM SHALL have docs-critic preload the reader-judgement skill as its only skill, and SHALL have docs-writer, docs-illustrator and docs-fact-checker preload it alongside the house standard."
@@ -870,10 +890,10 @@
   decisions:
     - "Decided the split into two skills (Keith, set 5): a small reader-judgement skill - judgement rules only, no cast, glossary or examples - that the critic preloads alone, and the house standard the other three preload with it. Still one copy of every rule. Rejected: a named exception copying rules into the critic's prompt."
     - "Decided a requirement of its own rather than criteria inside REQ-DOCS-115, REQ-DOCS-124 or REQ-DOCS-127 (scoper's call in this revision): it is a separate file with its own consumers, its own approval gate and a boundary against the house standard that has to be stated once, and folding it into the house standard's requirement would put the two skills' contents in one list where the line between them is easy to lose."
-    - "Decided which rules sit here (scoper's proposal, flagged for Keith): answer-first, the page stands alone for a cold reader (terms and cast), the sensitivity rule, the argue-not-decorate tests and diagram excess, and the pattern-shaped rhetorical tics. The test used - does the critic have to apply this rule itself? - puts everything the validator enforces, and every writing technique only a writer needs, in the house standard."
+    - "Decided which rules sit here (Keith, set 6, approving the scoper's proposal as drafted): answer-first, the page stands alone for a cold reader (terms and cast), the sensitivity rule, the argue-not-decorate tests and diagram excess, and the pattern-shaped rhetorical tics. The test used - does the critic have to apply this rule itself? - puts everything the validator enforces, and every writing technique only a writer needs, in the house standard."
+    - "Decided traits 9 and 10 - admit simplifications in one sentence, and keep an analogy to one idea - stay in the house standard (Keith, set 6). Rejected: moving them here, which the critic could judge from the page alone but which would split the traits list across two files."
     - "Decided the skill is preloadable with user-invocable false, because a skill with disable-model-invocation cannot be preloaded (round 2 research)."
-  open_questions:
-    - "Whether the boundary above is right. Recommendation - approve it as drafted; the alternative worth weighing is also moving traits 9 and 10 (admit simplifications in one sentence; keep an analogy to one idea) here, since the critic could judge both from the page alone - at the cost of the traits list being split across two files."
+  open_questions: []
 
 - id: REQ-DOCS-132
   title: "The validator enforces the house standard's mechanical prose rules"
