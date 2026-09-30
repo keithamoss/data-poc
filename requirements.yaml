@@ -13944,29 +13944,51 @@ requirements:
         because their slots were in different states.
       - >
         MEASURED AGAINST REAL RECORDED HISTORY, which NFR 2 asks for
-        rather than leaving to assumption - and the number changes what
-        this gate should probably do. As specified, it fires on NINE of
-        the sixty deliveries in the corpus: 15%, where the NFR's own
+        rather than leaving to assumption: the gate fires on NINE of
+        the sixty deliveries in the corpus, 15%, against an NFR whose
         bar is "genuinely rare shapes only" because a gate firing on
-        healthy traffic is a gate somebody disables. Seven of those
-        nine are not catch-up drops at all. They are ordinary Child
-        Protection deliveries in which ONE table is a RESUPPLY: five
-        datasets file on time to the current quarter while
-        cp-case-workers files as a resupply of the previous one, so the
-        delivery touches two periods without carrying two periods of
-        new obligation. Excluding resupply-branch filings takes it to
-        two of sixty (3.3%), and both of those are genuine - a table a
-        whole quarter behind, filed by oldest-claimable-unfilled.
+        healthy traffic is a gate somebody disables.
       - >
-        THE CONDITION IS THEREFORE A QUESTION FOR KEITH rather than
-        something settled here, and it is built as SIGNED in the
-        meantime (all filed periods count, criterion 2 as written).
-        Whether a resupply should count toward "spanning" is a change
-        to agreed behaviour, so it is his. Note TS-33a survives either
-        way: August's cp_clients in a November drop files by
-        oldest-claimable-unfilled rather than as a resupply, so
-        excluding resupplies removes the false positives without
-        costing the case the gate exists for.
+        THE CAUSE WAS MISATTRIBUTED FIRST TIME AND IS CORRECTED HERE,
+        because a wrong cause with a right number is exactly what a
+        later reader trusts instead of re-deriving. The first account
+        said seven of the nine were ordinary deliveries carrying a
+        RESUPPLY, and proposed excluding resupply-branch filings. Keith
+        pushed on how the rule could know a supply was for the previous
+        period - it cannot, and does not try: nothing ever reads the
+        file, and `resupply-of-most-recently-filled` is the assignment
+        rule's THIRD BRANCH, the fallback that fires when no claimable
+        unfilled slot exists at all. It means "there was nowhere to put
+        this", not "this looks like last quarter's data".
+      - >
+        THE REAL CAUSE IS PARTIAL PARTICIPATION, and it accounts for
+        NINE of nine rather than seven. `cp-case-workers` carries
+        `delivery_months: [February, August]` in contract/data-asset.yaml
+        - six slots where cp-clients has twelve, and no Q2 or Q4 slot
+        at all. Checked rather than sampled: the dataset in the
+        minority period is cp-case-workers in every one of the nine.
+        The proposed resupply exclusion would have silenced seven and
+        left two firing for the identical reason, which is the shape of
+        a fix that works by accident.
+      - >
+        SO THE CONDITION STANDS AS SIGNED, and the resupply exclusion
+        is DROPPED rather than deferred. Keith, 2026-09-30, settling
+        both halves: a partial-participation dataset would not in
+        reality arrive alongside the quarterly ones, so the 15% is the
+        GENERATOR's fiction (nothing in generator/ reads
+        `delivery_months`) rather than the model's behaviour - and if
+        one ever did arrive off-cycle, "it's worth flagging, that
+        should definitely be a human decision, not auto promotion".
+        Both together mean the gate did the right thing on all nine:
+        they were never false positives, and the real-world rate on an
+        honest corpus is nearer zero. NFR 2's bar is met.
+      - >
+        WHAT IS LEFT IS THE EXPLANATION RATHER THAN THE CONDITION. An
+        off-cycle arrival is withheld for the right reason and told to
+        a person in the wrong words - "filed to more than one period"
+        where "this dataset is not due this quarter" is what they need.
+        Worth a follow-up, and smaller than it looks. The generator
+        half is plans/data-generation.md #11.
     linked_tests:
       - tests/test_mixed_period_gate.py
     implemented_by:
@@ -13984,9 +14006,11 @@ requirements:
         with the other thirteen.
       - >
         The gate's firing rate on the real recorded corpus: 9 of 60
-        deliveries as specified (15%), 2 of 60 (3.3%) if resupplies are
-        excluded. Measured by grouping qa.filing on the arrival key and
-        counting distinct slots, 2026-09-30.
+        deliveries (15%), every one of them caused by cp-case-workers'
+        partial participation rather than by a catch-up drop. Measured
+        by grouping qa.filing on the arrival key and counting distinct
+        slots, then checking which dataset held the minority period in
+        each, 2026-09-30.
       - >
         Schema version 12 adds 'promotion-withheld' to the decision
         table's named action constraint, with its own shape constraint
