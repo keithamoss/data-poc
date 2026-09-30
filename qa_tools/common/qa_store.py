@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -538,7 +538,14 @@ ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_action_known;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
     CHECK (action IN ('promote', 'reject', 'demote', 'refile',
                       'substitute', 'de-substitute',
-                      'inherit', 'inherit-refused', 'un-inherit'));
+                      'inherit', 'inherit-refused', 'un-inherit',
+                      'promotion-withheld'));
+-- A withheld promotion names the period it stood back from, which is
+-- the same shape a promotion has - it is a record ABOUT that slot
+-- rather than a change to it (REQ-PIPE-077 criterion 6).
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_withheld_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_withheld_shape
+    CHECK (action <> 'promotion-withheld' OR to_slot IS NOT NULL);
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_substitute_shape;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_substitute_shape
     CHECK (action <> 'substitute' OR (stands_on IS NOT NULL AND to_slot IS NOT NULL));

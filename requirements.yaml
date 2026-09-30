@@ -13845,7 +13845,7 @@ requirements:
       for comes to me with its QA results in hand, rather than being
       filed automatically and found later.
     moscow: should
-    status: not_started
+    status: built
     source: >
       plans/supply-model.md Thread H second chaos pass #4 and test
       scenarios TS-33a/TS-33b, settled with Keith 2026-09-22. Assigned
@@ -13942,6 +13942,55 @@ requirements:
         delivery is recognised with nothing read from any file - two
         tables land at the same instant and claim different periods
         because their slots were in different states.
+      - >
+        MEASURED AGAINST REAL RECORDED HISTORY, which NFR 2 asks for
+        rather than leaving to assumption - and the number changes what
+        this gate should probably do. As specified, it fires on NINE of
+        the sixty deliveries in the corpus: 15%, where the NFR's own
+        bar is "genuinely rare shapes only" because a gate firing on
+        healthy traffic is a gate somebody disables. Seven of those
+        nine are not catch-up drops at all. They are ordinary Child
+        Protection deliveries in which ONE table is a RESUPPLY: five
+        datasets file on time to the current quarter while
+        cp-case-workers files as a resupply of the previous one, so the
+        delivery touches two periods without carrying two periods of
+        new obligation. Excluding resupply-branch filings takes it to
+        two of sixty (3.3%), and both of those are genuine - a table a
+        whole quarter behind, filed by oldest-claimable-unfilled.
+      - >
+        THE CONDITION IS THEREFORE A QUESTION FOR KEITH rather than
+        something settled here, and it is built as SIGNED in the
+        meantime (all filed periods count, criterion 2 as written).
+        Whether a resupply should count toward "spanning" is a change
+        to agreed behaviour, so it is his. Note TS-33a survives either
+        way: August's cp_clients in a November drop files by
+        oldest-claimable-unfilled rather than as a resupply, so
+        excluding resupplies removes the false positives without
+        costing the case the gate exists for.
+    linked_tests:
+      - tests/test_mixed_period_gate.py
+    implemented_by:
+      - qa_tools/common/promotion.py::spans_periods
+      - qa_tools/common/promotion.py::should_promote
+      - qa_tools/common/promotion.py::_record_withheld
+      - qa_tools/common/promotion.py::withheld
+      - qa_tools/common/decision_log.py::PROMOTION_WITHHELD
+      - qa_tools/common/outstanding.py::_from_withheld_promotions
+    evidence:
+      - >
+        26 tests in tests/test_mixed_period_gate.py, all passing. The
+        negative case (TS-33b) is first in the file on purpose and was
+        confirmed failing against the pre-implementation code along
+        with the other thirteen.
+      - >
+        The gate's firing rate on the real recorded corpus: 9 of 60
+        deliveries as specified (15%), 2 of 60 (3.3%) if resupplies are
+        excluded. Measured by grouping qa.filing on the arrival key and
+        counting distinct slots, 2026-09-30.
+      - >
+        Schema version 12 adds 'promotion-withheld' to the decision
+        table's named action constraint, with its own shape constraint
+        requiring to_slot.
 
   - id: REQ-PIPE-078
     title: A hold is a recorded state that survives the run that raised it

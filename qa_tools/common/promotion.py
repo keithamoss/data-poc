@@ -149,13 +149,37 @@ def filled_slots(conn: supply_db.SupplyConnection, dataset_id: str) -> frozenset
 PROMOTES_ITSELF = frozenset({"green", "amber"})
 
 
+def spans_periods(supplies) -> bool:
+    """Whether one delivery's supplies were filed to more than one
+    PERIOD (REQ-PIPE-077 criteria 1 and 2).
+
+    PERIODS, NOT SLOTS, and the wording is load-bearing rather than
+    pedantic. A slot is one dataset in one period, so Child Protection's
+    ordinary six-table delivery already spans SIX slots - an
+    implementation keyed on slots blocks auto-promotion on every healthy
+    multi-table delivery while passing the positive case, which is
+    exactly why TS-33b exists and why this function takes periods out of
+    the supplies rather than counting them.
+
+    A SUPPLY WITH NO PERIOD IS NOT A PERIOD. A held supply was never
+    filed, so counting `None` would make every delivery carrying one
+    hold look like a catch-up drop - firing this gate on the one shape
+    REQ-PIPE-059 already handles, with a different remedy.
+
+    NO DATA ACCESS, which is NFR 3: a set comparison over filings the
+    caller already has.
+    """
+    return len({s["period"] for s in supplies if s.get("period")}) > 1
+
+
 def should_promote(*, status: str,
                    slot_filled: bool,
                    held_without_slot: bool,
                    has_active_checks: bool,
                    decided_by_a_person: bool = False,
                    contested: bool = False,
-                   inherited: bool = False) -> tuple[bool, str | None]:
+                   inherited: bool = False,
+                   delivery_spans_periods: bool = False) -> tuple[bool, str | None]:
     """Whether automation may promote this supply, and why not if not.
 
     The reason is not decoration: "not promoted" with no explanation is
@@ -204,6 +228,21 @@ def should_promote(*, status: str,
         # Criterion 3.
         return False, (f"this supply's status is {status} rather than green or "
                        "amber, so it waits for a person")
+    if delivery_spans_periods:
+        # REQ-PIPE-077 criterion 1. AFTER the verdict, because the
+        # refusal reported should be the one worth acting on first: a
+        # red supply is a thing to fix, where a delivery's shape is
+        # merely why today's attempt stopped.
+        #
+        # IT WITHHOLDS EVERY SUPPLY IN THE DELIVERY, including the ones
+        # whose own period is unremarkable. The gate's whole premise is
+        # that a drop carrying two periods is a shape the filing rules
+        # were not designed for, so which of its supplies was filed
+        # correctly is exactly the question a person is being asked.
+        return False, ("this delivery's tables were filed to more than one "
+                       "period, which is a shape the filing rules were not "
+                       "designed for, so a person reviews it before anything "
+                       "is promoted")
     if slot_filled:
         # Criterion 4, whatever the status.
         return False, ("this supply's slot is already filled by a promoted "
@@ -537,6 +576,13 @@ def after_run(conn: supply_db.SupplyConnection, *,
     work: list[dict] = []
     refused: dict[str, str] = {}
 
+    # ONCE PER DELIVERY, NOT ONCE PER SUPPLY (REQ-PIPE-077 criteria 1
+    # and 2). It is a fact about the delivery's shape, and asking it
+    # per supply would invite an implementation that compares each
+    # supply's period to its own - which is always equal.
+    spanning = spans_periods(supplies)
+    periods = sorted({s["period"] for s in supplies if s.get("period")})
+
     for item in supplies:
         dataset_id = item["dataset_id"]
         period = item.get("period")
@@ -563,9 +609,15 @@ def after_run(conn: supply_db.SupplyConnection, *,
                        and inheritance.inherited(conn, dataset_id, period) is not None),
             decided_by_a_person=rejection.decided_by_a_person(
                 conn, dataset_id, item["supply"]),
+            delivery_spans_periods=spanning,
         )
         if not ok:
             refused[dataset_id] = why or "refused"
+            if spanning and period:
+                _record_withheld(
+                    conn, agency_id=agency_id, collection_id=collection_id,
+                    dataset_id=dataset_id, supply=item["supply"], period=period,
+                    periods=periods, actor=actor, effective_at=effective_at)
             continue
         work.append({"dataset_id": dataset_id, "supply": item["supply"],
                      "period": period,
@@ -580,6 +632,79 @@ def after_run(conn: supply_db.SupplyConnection, *,
         period="", actor=actor, actor_kind=actor_kind,
         effective_at=effective_at)
     return AfterRun(promoted=tuple(promoted), refused=refused, failed=failed)
+
+
+@dataclass(frozen=True)
+class Withheld:
+    """One supply the mixed-period gate stood back from."""
+
+    dataset_id: str
+    period: str
+    reason: str
+
+
+def withheld(conn=None) -> list[Withheld]:
+    """Every supply the mixed-period gate withheld (REQ-PIPE-077
+    criterion 4).
+
+    A NARROW READER, and opens its own connection when not given one -
+    the same shape as `inheritance.refusals()` and for the reason
+    outstanding.py's own docstring gives: a narrow reader can only
+    answer questions about RECORDS, where `supply_db.connect` can
+    answer any question at all, including ones about supply rows a
+    dashboard build must never ask.
+    """
+    if conn is None:
+        with supply_db.connect(read_only=True,
+                                label="mothman:withheld-promotions") as opened:
+            return withheld(opened)
+    from qa_tools.common import decision_log
+
+    rows = conn.execute(
+        f"SELECT dataset_id, to_slot, reason FROM {decision_log.TABLE} "
+        "WHERE action = ? ORDER BY dataset_id, to_slot",
+        [decision_log.PROMOTION_WITHHELD]).fetchall()
+    return [Withheld(dataset_id=d, period=p, reason=r or "") for d, p, r in rows]
+
+
+def _record_withheld(conn, *, agency_id: str, collection_id: str,
+                      dataset_id: str, supply: str, period: str,
+                      periods: Sequence[str], actor: str,
+                      effective_at: str) -> None:
+    """Record that the mixed-period gate stood back (criterion 6).
+
+    ONE ENTRY PER SUPPLY, because the log is keyed on a dataset and a
+    slot and a delivery is neither - and because "why is this one not
+    promoted" is asked of a supply. Each names every period the
+    delivery touched, so the entry answers the question without the
+    reader having to reassemble the delivery.
+
+    THE RULE IS THE ACTOR, never a person: nobody decided this, a gate
+    fired. `_decider()` in slot_state.py depends on that distinction -
+    naming a person here would put a decision on somebody who never
+    made one.
+
+    IT DOES NOT RAISE. A gate that cannot write its own note must not
+    cost the delivery its QA, which is the blast-radius rule this area
+    applies everywhere - and the refusal itself has already been
+    recorded in `refused`, which is what the terminal and the ticket
+    show.
+    """
+    from qa_tools.common import decision_log
+
+    try:
+        decision_log.record_automatic(conn, decision_log.Decision(
+            agency_id=agency_id, collection_id=collection_id,
+            dataset_id=dataset_id, action=decision_log.PROMOTION_WITHHELD,
+            supply=supply, actor=actor, actor_kind=decision_log.RULE,
+            effective_at=effective_at, to_slot=period,
+            reason=(f"this delivery's tables were filed to "
+                     f"{len(periods)} periods ({', '.join(periods)}), so "
+                     f"automation stood back and a person reviews it")))
+    except Exception as exc:  # noqa: BLE001 - see the docstring
+        print(f"note: could not record the withheld promotion for "
+               f"{dataset_id} ({type(exc).__name__}: {exc}) - the refusal "
+               f"itself still stands and is reported.")
 
 
 def after_runs(found_arrivals, results: Sequence[dict], *,

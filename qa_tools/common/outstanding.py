@@ -106,6 +106,11 @@ CLOSED_UNFILLED_SLOT = "closed-unfilled-slot"
 #: ours rather than the supplier's, which is exactly what somebody
 #: looking at an empty period needs told.
 INHERITANCE_REFUSED = "inheritance-refused"
+#: A delivery the mixed-period gate withheld (REQ-PIPE-077 criterion 4).
+#: NEEDS-ACTION and BLOCKING: the supplies are checked and sitting
+#: there, and only a person can move them - which is the definition of
+#: work in somebody's queue rather than something to know about.
+WITHHELD_PROMOTION = "withheld-promotion"
 
 
 @dataclass(frozen=True)
@@ -536,6 +541,51 @@ def _from_inheritance_refusals() -> list[Item]:
     return items
 
 
+def _from_withheld_promotions() -> list[Item]:
+    """REQ-PIPE-077 criterion 4 - a delivery whose tables landed in more
+    than one period, waiting for somebody to look.
+
+    NAMING THE PERIODS IS THE CRITERION, not a nicety: "this delivery
+    was odd" sends a person to reassemble the delivery themselves,
+    where "August and November" is the whole of what they need to know
+    before deciding.
+
+    ONE ITEM PER SUPPLY, matching the log. They aggregate in the queue's
+    own totals the way every other kind does, so a catch-up drop of six
+    tables is six rows in one queue rather than six banners.
+    """
+    from qa_tools.common import display_time, promotion
+
+    items = []
+    try:
+        stood_back = promotion.withheld()
+    except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
+        print(f"note: could not read withheld promotions "
+              f"({type(exc).__name__}: {exc}) - the rest of the queue is unaffected.")
+        return items
+
+    for entry in stood_back:
+        try:
+            dataset = hierarchy.dataset(entry.dataset_id)
+        except hierarchy.UnknownDatasetError:
+            continue
+        shown = display_time.format_period(entry.period)
+        items.append(Item(
+            kind=WITHHELD_PROMOTION, severity=NEEDS_ACTION, blocking=True,
+            headline=(f"{dataset.dataset_name}'s supply for {shown} is waiting "
+                       f"on a review"),
+            detail=(f"{display_time.format_periods_in(entry.reason)} The supply "
+                     f"is filed and checked - what is waiting is the decision "
+                     f"about whether the delivery was filed the way it should "
+                     f"have been."),
+            agency_id=dataset.agency_id, collection_id=dataset.collection_id,
+            dataset_id=dataset.dataset_id,
+            responses=("promote it if the filing looks right",
+                        "re-file it to the period it belongs to",
+                        "reject it and ask the supplier to resend")))
+    return items
+
+
 def _sort_key(item: Item) -> tuple:
     return (0 if item.blocking else 1,
             SEVERITY_ORDER.index(item.severity) if item.severity in SEVERITY_ORDER else 9,
@@ -555,5 +605,6 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
               + _from_filings()
               + _from_closed_slots()
               + _from_inheritance_refusals()
+              + _from_withheld_promotions()
               + _from_in_flight(observations_dir))
     return Outstanding(items=tuple(sorted(items, key=_sort_key)))

@@ -104,8 +104,19 @@ INHERIT_REFUSED = "inherit-refused"
 #: obstacle that exists to make somebody look.
 UN_INHERIT = "un-inherit"
 
+#: A delivery the mixed-period gate withheld from automatic promotion
+#: (REQ-PIPE-077 criterion 6). ALWAYS A RULE'S, and it is the only
+#: action here that records something NOT happening to a supply - the
+#: same shape as `inherit-refused`, and for the same reason: a refusal
+#: nobody recorded is indistinguishable from a rule that never ran.
+#:
+#: IT IS NOT A REJECTION. Nothing is decided about the supply, and a
+#: person may still promote it (criterion 5). What it records is that
+#: automation stood back and why.
+PROMOTION_WITHHELD = "promotion-withheld"
+
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
-           INHERIT, INHERIT_REFUSED, UN_INHERIT)
+           INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD)
 
 #: The actions a RULE may take. Everything else is a person's, and
 #: rejection.py and substitution.py enforce that by not offering an
@@ -224,6 +235,15 @@ def _check_shape(decision: Decision) -> None:
         raise DecisionRefused(
             "an inheritance names the period being filled and the period it "
             "takes the supply from.")
+    if decision.action == PROMOTION_WITHHELD and not decision.to_slot:
+        raise DecisionRefused(
+            "a withheld promotion names the period the supply was filed to - "
+            "that is the slot automation stood back from.")
+    if decision.action == PROMOTION_WITHHELD and not (decision.reason or "").strip():
+        raise DecisionRefused(
+            "a withheld promotion needs a reason. It is the only record that "
+            "the rule looked and declined, and a refusal with no explanation "
+            "is indistinguishable from a rule that never ran.")
     if decision.action not in (SUBSTITUTE, INHERIT) and decision.stands_on:
         raise DecisionRefused(
             f"only a substitution or an inheritance stands on a period; "
