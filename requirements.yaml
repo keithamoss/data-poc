@@ -13989,6 +13989,51 @@ requirements:
         where "this dataset is not due this quarter" is what they need.
         Worth a follow-up, and smaller than it looks. The generator
         half is plans/data-generation.md #11.
+      - >
+        A SECOND CORRECTION, 2026-09-30, from Keith asking how we could
+        possibly know a supply was a resupply. WE CANNOT, and the
+        system is built not to try: `assignment.py` reads nothing out
+        of the file, on the stated grounds that inferring the filing
+        decision from the data whose correctness is about to be tested
+        is circular, and that a resupply exists precisely because the
+        first attempt was wrong - possibly wrong in its dates.
+        `branch` records WHICH RULE FIRED, never what the file holds.
+      - >
+        AND `resupply-of-most-recently-filled` MEANS SOMETHING NARROWER
+        THAN ITS NAME, which the code makes plain and the docstring
+        does not: branch 3 fires only where `latest.name ==
+        current.name`, so a resupply is always filed to the CURRENT
+        slot. It is "the period I am in is already filled", not "this
+        is older data". Which has a consequence worth stating: for a
+        dataset on the SAME cadence as its siblings, a resupply lands
+        in the same period they do and therefore CANNOT make a delivery
+        span periods at all. Excluding resupplies from the span
+        calculation would have been a no-op for every same-cadence
+        dataset and would only ever have masked the partial-
+        participation case - the one Keith has just said must be
+        flagged. A third independent reason the exclusion was wrong.
+      - >
+        WHICH ALSO RETRACTS "TS-33a SURVIVES EITHER WAY", claimed here
+        earlier and not true as stated. August's cp_clients arriving in
+        a November drop files by `oldest-claimable-unfilled` ONLY where
+        August is still unfilled AND not closed by monotonic filling.
+        Where August is already filled, the rule does not file to
+        August at all: the most recently filled slot is November, which
+        is also current, so it records a resupply of NOVEMBER - the
+        delivery does not span periods and the gate never fires. Where
+        August is unfilled but closed, branch 4 holds it for a human.
+      - >
+        SO THE GATE HAS A BLIND SPOT, and it is a limit of the signed
+        criteria rather than a defect in what was built. The catch-up
+        drop it exists to catch trips it only in the window where the
+        older period is unfilled and still claimable. Once that period
+        has been filled - the commoner case, since a catch-up follows a
+        period somebody has already dealt with - the older table is
+        filed into the current period as a resupply and nothing
+        notices. Recorded rather than fixed: widening it means deciding
+        what evidence could distinguish a catch-up from a resupply
+        without reading the file, and that is Keith's question to
+        settle, not one to answer by inference.
     linked_tests:
       - tests/test_mixed_period_gate.py
     implemented_by:
