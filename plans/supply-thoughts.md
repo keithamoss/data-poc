@@ -26,6 +26,32 @@ A thing here graduates by becoming a requirement, at which point the
 entry is deleted rather than marked done - the standing rule in
 CLAUDE.md, and the reason `decisions:` exists on a requirement.
 
+**THIS FILE IS PARKED UNTIL THE SIGNED SPRINT QUEUE IS CLOSED OUT -
+Keith, 2026-10-01, and it is a sequencing instruction rather than a
+loss of interest.** His words: he does not want to hold up finishing
+the sprints from the other day at the cost of going down this road.
+So nothing here is built, scoped or researched until that queue is
+done, with ONE carve-out he named himself: where a decision recorded
+here genuinely CHANGES one of those requirements, it lands with that
+requirement rather than waiting.
+
+Two such carve-outs exist as of 2026-10-01, both settled by him and
+both listed in #0: `REQ-PIPE-077`'s criterion 1 (only the off-cycle
+supply is withheld) and `REQ-PIPE-079`'s revision (105 takes
+precedence). Neither is optional - leaving them would mean building
+the rest of the queue against a register that records a decision he
+has already reversed.
+
+Worth knowing before picking work off that queue, because it is not
+obvious from the outside: THREE of the six signed-and-unbuilt
+requirements cannot close without opening a door this file or the
+unsigned calendar work owns. `REQ-PIPE-105`'s unbuilt half IS the
+arrival unit, which is the substance of this file; `REQ-PIPE-078`'s
+last two criteria moved to `REQ-PIPE-115`, which is parked pending
+research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
+`REQ-PIPE-110`/`113`, which are unsigned. That leaves
+`REQ-PIPE-080` and `REQ-PIPE-081` as the genuinely clean ones.
+
 ---
 
 0. **[todo, 2026-10-01]** **[Docs & process]** The open threads from
