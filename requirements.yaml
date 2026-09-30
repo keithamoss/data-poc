@@ -22907,7 +22907,42 @@ requirements:
         genuinely not resupplied this period, which is the correct
         comparison in that case.
     dependencies: [REQ-PIPE-035, REQ-PIPE-036]
-    open_questions: []
+    open_questions:
+      - >
+        IS REQ-PIPE-059'S HOLD REACHABLE AT ALL AFTER CRITERION 1?
+        Raised 2026-09-30 by Keith, asking whether six objects
+        trickling into an S3 prefix are treated identically to one zip
+        of the same contents. Criterion 6 holds several files claiming
+        one dataset "within ONE arrival", which requires an arrival to
+        be able to contain more than one file. Criterion 1 says every
+        arriving FILE is its own arrival. `Arrival.held` is computed as
+        the datasets where more than one file matched, so under one
+        file per arrival it can never be non-empty and the
+        delivery-level hold has no producer left. Decision 4
+        anticipated the shape of this - "the hold is only within one
+        arrival" - but not that the case might become unrealisable.
+      - >
+        AND NOTHING IN THIS SYSTEM UNDERSTANDS AN ARCHIVE, which is
+        what would give criterion 6 a case again. Checked 2026-09-30:
+        neither docs/delivery-format.md, contract/data-asset.yaml,
+        delivery.py nor arrival_patterns.py mentions zip, tar or any
+        container, and every arrival pattern matches a bare `.csv`. A
+        zip arriving today matches no dataset and is reported as an
+        unrecognised artefact. So "a zip is one arrival holding several
+        files" is an INFERENCE about how it would work rather than
+        anything designed - recorded because it was stated to Keith as
+        though it were settled, and it is not.
+      - >
+        WHICH LEAVES THE PACKAGING DECIDING THE OUTCOME, and that is
+        the part worth settling before this is built. Two files both
+        claiming cp_clients are HELD when they share an arrival and NOT
+        held when they arrive separately (criterion 6's second
+        sentence): identical bytes, different treatment, decided by
+        whether the transport happened to bundle them. Decision 4
+        argues it well and it is defensible. It is also the kind of
+        rule that surprises an operator - and REQ-PIPE-078's hold store
+        now carries a `delivery-level` kind that would go quiet without
+        anybody noticing.
     decisions:
       - >
         AN OBSERVATION FOR KEITH, noticed 2026-09-28 and deliberately
