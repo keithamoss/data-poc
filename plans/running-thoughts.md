@@ -4454,3 +4454,40 @@ Belongs with batch 5's check work.
 
     When: Keith chose to have it folded into the evening "time to stop"
     nudge rather than a separate timed reminder.
+
+60. **[todo, 2026-09-30]** **[Pipeline & publishing]** Simplify sample
+    data: treat it as a one-off run, never kept in the database. Keith,
+    2026-09-30 evening, during the glossary review, after reading what
+    REQ-PIPE-106 actually built. His words: "we basically treat sample
+    data like we treat a once-off extraction or any other kind of
+    once-off thing... it doesn't persist in the database. There's no
+    sample schema."
+
+    **What he described.**
+    - Sample data arrives before a dataset is agreed, sometimes real,
+      sometimes synthetic, sometimes scrambled. It is used to scaffold
+      the checks, which are only finalised when the first real supply
+      arrives.
+    - Every sample delivery, even several of them, is a one-off run.
+      Its output is an HTML report plus the tools' outputs, kept outside
+      the system (SharePoint or similar) as the historical record.
+    - The live reporting layer for an asset holds only officially
+      accepted data. "Having the actual live reporting layer report on
+      the sample data... really confuses things", above all when real
+      and scrambled samples sit side by side.
+    - He noted the one-off extraction path already has some of this
+      mechanism.
+
+    **What it changes, because it is BUILT behaviour.** REQ-PIPE-106
+    (built) lands a `no_calendar: not-yet-agreed` dataset's data in the
+    `sample` schema (`supply_db.SAMPLE_SCHEMA`) and records its results
+    tagged `in-development` (`qa_store.IN_DEVELOPMENT`), shown on the
+    dashboard as "No delivery schedule agreed yet". This idea retires
+    both. No real dataset uses `no_calendar` today; only
+    `tests/test_no_calendar.py` and `tests/test_sample_data.py` do.
+
+    **Not scoped, not signed off.** A change to agreed behaviour, so it
+    goes through requirements and Keith's sign-off before any code
+    moves. It also settles several glossary terms (sample data, in
+    development, one-off extraction), so the glossary review waits on
+    it for those entries.
