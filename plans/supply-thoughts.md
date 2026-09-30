@@ -36,29 +36,34 @@ CLAUDE.md, and the reason `decisions:` exists on a requirement.
    several of these are decisions only Keith can make and they were
    accumulating in chat.
 
-   **Waiting on Keith, and blocking:**
-   - **`REQ-PIPE-077`: whole delivery, or just the off-cycle supply?**
-     Criterion 1 as signed withholds EVERY supply in a spanning
-     delivery. In the partial-participation case that means five
-     healthy quarterly tables wait on a person because one
-     semi-annual table rode along. His own words were that the
-     off-cycle DATASET needs a human decision; whether that extends to
-     its five siblings is unanswered, and it is a change to a signed
-     criterion either way. Possibly two different conditions wearing
-     one gate.
+   **SETTLED BY KEITH, 2026-10-01 - two of these are now answers
+   rather than questions, and both need the register changed to
+   match:**
+   - **`REQ-PIPE-077`: only the OFF-CYCLE SUPPLY is withheld, never
+     the whole delivery.** His reasoning is the one that dissolves the
+     gate rather than tuning it: once every file is its own arrival,
+     there is no delivery unit to withhold - case-workers' Q1 is
+     assessed on its merits and the other five on theirs. So there is
+     NO hard block on a cross-period delivery; a delivery CAN span
+     periods and the rules already in place handle it, because we know
+     the cadences and we already know what fills, what holds and what
+     is off-cycle. An off-cycle partial-participation arrival is still
+     flagged, still QA'd, and still kept from auto-promotion so a
+     person decides whether it belongs in its own period or is an
+     off-schedule supply for the current one. **This amends criterion
+     1 of a BUILT requirement** and needs doing properly.
+   - **`REQ-PIPE-079` vs `REQ-PIPE-105`: 105 TAKES PRECEDENCE.** A run
+     overlays what is staged for the PERIOD, regardless of the
+     delivery it arrived in. 079 needs revising to say so - either
+     directly, or by the route criterion 9 already uses for
+     `REQ-PIPE-035` and `036`, naming it for amendment with the new
+     wording stated rather than implied.
+
+   **Still waiting on Keith:**
    - **`REQ-PIPE-079` risk call.** Swapping `borrow_views()` for
      `create_overlay_views()` changes what every CP cross-table check
      reads, so recorded verdicts will move. Happy for them to shift,
      or want a before/after comparison first?
-   - **`REQ-PIPE-079` vs `REQ-PIPE-105` criterion 5 - a live
-     contradiction between two SIGNED requirements.** 079 criterion 10
-     says a run overlays only the tables of the delivery under test
-     and draws in no staged supply belonging to another delivery. 105
-     criterion 5 says read the one version staged for the PERIOD. 105
-     is signed later and is explicitly about this unit, but its
-     criterion 9 names `REQ-PIPE-035` and `036` for amendment and NOT
-     079 - so that amendment is a consequence nobody wrote down. These
-     two have to be decided together.
    - **`REQ-PIPE-110`-`113`** remain unsigned, 64 criteria, and
      `REQ-GEN-044` criteria 8-11 wait on them.
 
@@ -128,6 +133,15 @@ CLAUDE.md, and the reason `decisions:` exists on a requirement.
    solved by the supplier's own packaging rather than by us inferring
    anything. It also restores a case for `REQ-PIPE-059`'s hold, which
    may otherwise have no producer once every file is its own arrival.
+
+   **KEITH, 2026-10-01: this is a batch of work rather than a flag** -
+   either one large requirement or a few together, and he wants the
+   ADJUSTMENTS tracked alongside the feature rather than discovered
+   during it. What it touches, from this conversation: arrival
+   patterns (which match a bare `.csv` today), the receipt instant and
+   which object owns it, `Arrival.held` and REQ-PIPE-059's whole case
+   (#10), the bundling RULE that #5 and #7 both want to lean on, and
+   a real security surface he explicitly agreed needs dealing with.
 
    **Questions to settle**: whether the zip or its members get the
    receipt instant; whether a member is an arrival or the zip is;
@@ -235,6 +249,22 @@ CLAUDE.md, and the reason `decisions:` exists on a requirement.
    cosmetic: a dashboard red for reasons about our own timing rather
    than about the data is how people learn to ignore red.
 
+   **AND KEITH RAISED THE STAKE THAT SETTLES IT, 2026-10-01: under
+   full automation a red SENDS EMAILS AND SMS.** A transient red is
+   then not a display blemish, it is a false alarm waking somebody up
+   - and a false alarm is how an alerting channel gets muted, which
+   costs the real alert later. So "let it flicker and label it" drops
+   off the list of acceptable answers.
+
+   **His direction, and it is #7's answer arriving at the same place
+   from a different side**: require any delivery whose tables take
+   part in cross-table checks (#11 is the map) to arrive as ONE
+   arrival - bracketed by markers (#3) or as a zip (#2) - so there is
+   one QA run over a consistent read and no intermediate state exists
+   to alarm on. Where that is not possible, an alert should fire on a
+   SETTLED verdict rather than on every evaluation, which is a
+   different mechanism worth costing separately.
+
 6. **[investigate, 2026-10-01]** **[Pipeline & publishing]** Parquet
    support for uploads - and no, one file cannot hold several tables.
 
@@ -262,3 +292,151 @@ CLAUDE.md, and the reason `decisions:` exists on a requirement.
    for the contract - is a file whose declared types disagree with the
    ODCS contract a failed load, or a check result? Probably the
    latter, and probably a good check to have.
+
+7. **[todo, 2026-10-01]** **[Pipeline & publishing]** THE RACE:
+   promotion physically MOVES a table out of staging while another
+   run may be reading it.
+
+   **Keith's own find, 2026-10-01**, and it is the sharpest consequence
+   of six runs where there was one. Promotion is `ALTER TABLE ... SET
+   SCHEMA` - the table LEAVES staging. So with six files trickling in
+   over ten minutes, each triggering its own run: run 4 resolves
+   `cp_clients` to the staged table, and run 3's promotion moves that
+   same table into the period schema partway through. The view
+   underneath run 4 is now pointing at something that is not there.
+
+   **It is not hypothetical and it is not only about staging.** The
+   same shape covers a period's promoted table being superseded by a
+   later promotion while a cross-table check reads it.
+
+   **HIS PROPOSED RESOLUTION, and he reasoned himself into it in one
+   pass**: require any delivery carrying tables that participate in
+   CROSS-TABLE checks to arrive either bracketed by delivery-start and
+   delivery-end markers (#3) or as a single zip (#2), so the whole set
+   is ONE QA run. He then checked it against himself and it holds - in
+   a single run over all six Child Protection tables, if the first were
+   already promoted, that table resolves to its promoted version and
+   the rest to staging, which is exactly what criterion 5 of
+   `REQ-PIPE-105` already specifies. One run, one consistent read.
+
+   **What still needs deciding rather than assuming.** A single run
+   narrows the window; it does not close it, because a run still holds
+   its resolution across the four tools and a promotion from some other
+   collection's run could still land inside it. The database has real
+   answers here that are worth costing before a policy is written - a
+   repeatable-read transaction for the duration of a run, or an
+   advisory lock per dataset around promote, or resolving views against
+   a snapshot rather than live names. Code may be the cheaper fix than
+   a rule suppliers have to follow.
+
+   Note what makes this tractable at all: a run already records which
+   physical table it read (`Resolution`, REQ-PIPE-068 criterion 5), so
+   "did this run read something that has since moved" is answerable
+   after the fact even before it is preventable.
+
+8. **[todo, 2026-10-01]** **[Pipeline & publishing]** Guardrails when
+   promoting into a slot something else DEPENDS on.
+
+   **Keith, 2026-10-01.** A period can resolve to an earlier period's
+   supply by INHERITANCE (nothing was owed) or by SUBSTITUTION (a
+   person decided). Promoting a new supply into that earlier slot
+   changes what those later periods stand on, and today nothing warns.
+
+   **His MVP**: warn the operator and require them to de-inherit or
+   de-substitute BEFORE the promotion is allowed. **His preferred end
+   state**: warn, let them continue if they choose, and then offer to
+   RE-POINT the inheriting or substituting periods at the newly
+   promoted table.
+
+   Worth knowing before building either: the decision log already
+   refuses to let a supply MOVE while a later period stands on it
+   (`REQ-PIPE-084` criterion 11, judged in `decision_log._judge` for
+   reject, demote and re-file, and it names every blocking period with
+   the right remedy per period). So the machinery for "what stands on
+   this" exists and is tested; what is missing is the same question
+   asked of a PROMOTION rather than a move, and the re-pointing offer.
+
+9. **[todo, 2026-10-01]** **[Testing & dev tooling]** Model the
+   off-cycle partial-participation supply end to end, as a real test
+   case with tests.
+
+   **Keith's own ask, 2026-10-01**: take a partial-participation
+   dataset arriving off schedule and walk the whole thing, so the model
+   is shown to work rather than argued to work. Both operator paths,
+   because they end somewhere different:
+
+   - **Treat it as an off-schedule supply for the CURRENT period**:
+     un-inherit that period, promote the supply into it, done.
+   - **Treat it as a resupply of its own designated period**: promote
+     it there (a supersession, so the log requires a reason), then
+     un-inherit the later period and re-inherit it onto the new table.
+
+   Both belong in `plans/supply-model.md`'s own test scenario register
+   as numbered scenarios, not only as unit tests - that register is
+   what `REQ-GEN-044` generates real history against, and a scenario
+   that exists only as a test never appears on the dashboard where
+   somebody could look at it.
+
+   This is also where #8's guardrail gets exercised for real: the
+   second path promotes into a slot a later period is standing on,
+   which is precisely the case that should warn.
+
+10. **[todo, 2026-10-01]** **[Pipeline & publishing]** Work through
+    `REQ-PIPE-105`'s three open questions here rather than in the
+    register.
+
+    Keith's own call, 2026-10-01 - they are transport questions and
+    this is the transport file. Recorded on the requirement
+    2026-09-30 and repeated here so they are worked rather than
+    filed:
+
+    - **Is `REQ-PIPE-059`'s hold reachable after criterion 1?** The
+      hold is defined "within ONE arrival"; criterion 1 says every
+      arriving FILE is its own arrival; `Arrival.held` is the datasets
+      where more than one file matched, which under one file per
+      arrival can never be non-empty. **Keith, 2026-10-01: he does not
+      follow the question yet and expects it to be puzzle-able.** It
+      probably dissolves the moment #2 lands - a zip restores an
+      arrival that can hold several files, and that is the only shape
+      where "two files, nothing to tell them apart" can occur.
+    - **Nothing understands an archive.** #2.
+    - **The packaging decides the outcome** - two files claiming one
+      dataset are held when bundled and not when separate.
+
+11. **[todo, 2026-10-01]** **[QA checks & contract]** The dependency
+    map: there are TWO classes of cross-table check, not one.
+
+    **Keith asked, 2026-10-01, whether referential integrity is the
+    only kind. It is not** - counted from the real declarations
+    (`tables_read.declared_by_check_id`), 30 checks read a table other
+    than their own:
+
+    - **21 REFERENTIAL INTEGRITY** - 7 foreign keys, each implemented
+      three times (dbt `relationships`, Soda `values in ... must exist
+      in`, and the ODCS contract). "Does this id exist over there."
+    - **9 CROSS-TABLE BUSINESS RULES** - 3 rules, each implemented
+      three times, and these are the second class he remembered. They
+      are claims about the STATE of a row given a row in another
+      table, which is a different thing from existence:
+      - *escalation_completeness* - every notification escalated to an
+        investigation must have that investigation recorded
+        (notifications ← investigations)
+      - *closed_case_investigation_hygiene* - an investigation must not
+        still be open once its client's case has been closed
+        (investigations ← clients)
+      - *placement_carer_approval* - a placement's carer must hold an
+        approved status (placements ← carers)
+
+    **AND A THIRD KIND OF DEPENDENCY THAT IS NOT CROSS-TABLE AT ALL**,
+    worth naming here because it has the same exposure to #7 and gets
+    forgotten: Evidently's drift checks compare a supply against a
+    REFERENCE RUN - another period's data. The dependency runs across
+    TIME rather than across tables, so a promotion that changes what a
+    period resolves to can change a drift verdict without any table in
+    this run moving.
+
+    Why this belongs in a transport file: #7's race, #5's flicker and
+    #2's bundling rule all need to know WHICH tables depend on which,
+    and the answer is a real, queryable declaration rather than a
+    guess. Any rule of the form "tables in a cross-table relationship
+    must arrive together" is defined by this map.
