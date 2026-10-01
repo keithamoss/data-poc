@@ -331,9 +331,41 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
    same table into the period schema partway through. The view
    underneath run 4 is now pointing at something that is not there.
 
-   **It is not hypothetical and it is not only about staging.** The
-   same shape covers a period's promoted table being superseded by a
-   later promotion while a cross-table check reads it.
+   **AND THE EXPERIMENT SAYS IT DOES NOT BREAK - CORRECTED
+   2026-10-01, the same day this item was written.** The paragraph
+   above was reasoned rather than tested, and testing it against a
+   real PostgreSQL changes the conclusion: **a view binds to its table
+   by OID, not by name, so moving the table's schema MOVES THE VIEW
+   WITH IT.** Measured - a view over `stg_probe.cp_clients__2026`
+   returned 2 rows, the table was `ALTER TABLE ... SET SCHEMA`'d into
+   another schema, and the view returned 2 rows still, with
+   `pg_get_viewdef` rewriting itself to name the new schema. The run
+   goes on reading the same physical table; it has simply moved house.
+
+   **WHAT SURVIVES THE CORRECTION, because it is not nothing:**
+   - **Lock contention, not a wrong answer.** `SET SCHEMA` takes an
+     ACCESS EXCLUSIVE lock, so a promotion waits behind a running
+     query and a long QA run can hold one up - a latency and deadlock
+     question rather than a correctness one, and the kind this project
+     already has a diagnostic recipe for (CLAUDE.md's `log_lock_waits`
+     note).
+   - **A provenance wrinkle.** The run records that it read
+     `staging.<table>`, and by the time anybody looks, that table is
+     in a period schema. Same table, same OID, same rows - so "what
+     did this run read" is still answerable, but the schema-qualified
+     name in the record has gone stale.
+   - **The semantic oddity.** Run 4 resolved the table as a STAGED
+     candidate and, by the time its tools executed, that supply had
+     been promoted. The verdict is identical because the rows are, so
+     this is about what the record MEANS rather than whether it is
+     right.
+
+   **SO THE BUNDLING RULE IS NOT NEEDED FOR CORRECTNESS**, which is
+   the part that matters for #2, #3 and #5. It is still wanted for the
+   alerting reason in #5 - transient reds firing emails and SMS - and
+   that argument stands on its own feet without this one. Worth
+   keeping the distinction: a rule suppliers must follow is expensive,
+   and it should be bought for the reason that actually needs it.
 
    **HIS PROPOSED RESOLUTION, and he reasoned himself into it in one
    pass**: require any delivery carrying tables that participate in
