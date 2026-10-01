@@ -282,14 +282,40 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
    costs the real alert later. So "let it flicker and label it" drops
    off the list of acceptable answers.
 
-   **His direction, and it is #7's answer arriving at the same place
-   from a different side**: require any delivery whose tables take
-   part in cross-table checks (#11 is the map) to arrive as ONE
-   arrival - bracketed by markers (#3) or as a zip (#2) - so there is
-   one QA run over a consistent read and no intermediate state exists
-   to alarm on. Where that is not possible, an alert should fire on a
-   SETTLED verdict rather than on every evaluation, which is a
-   different mechanism worth costing separately.
+   **His direction**: require any delivery whose tables take part in
+   cross-table checks (#11 is the map) to arrive as ONE arrival -
+   bracketed by markers (#3) or as a zip (#2) - so there is one QA run
+   and no intermediate state exists to alarm on.
+
+   **DOES BUNDLING SOLVE IT? PARTLY, AND IT IS NOT THE MAIN ANSWER**
+   (Keith asked, 2026-10-01). It closes exactly one cause - the
+   partial arrival - and leaves four standing:
+   - **Nothing promoted yet**, early in a period or for a new dataset.
+     Red regardless of how the files arrived.
+   - **A held or contested table**, red because nobody has decided,
+     which no transport rule touches.
+   - **A supplier who does not comply.** The rule binds the ones who
+     adopt it, and a supplier trickling files is the least likely to.
+   - **A cross-PERIOD dependency**, where a check reads an earlier
+     period through a declared temporal reference.
+
+   **THE REAL ANSWER IS ALREADY BUILT, and it is REQ-PIPE-079's
+   decision layer.** Criteria 14, 15 and 16 exist for precisely this:
+   a table with no promoted supply whose slot is NOT YET DUE is not
+   red at all; one whose slot is PAST DUE is red and says "overdue";
+   one with a supply staged awaiting a decision is red and says so.
+   Three different reds for three different people to act on, and one
+   case that stops being red entirely.
+
+   **So the alerting rule should key on the READINESS REASON rather
+   than on the colour** - which makes most of the false positives
+   disappear with no supplier rule at all, and is available the moment
+   079's wiring lands. Bundling then narrows the residual window
+   rather than carrying the whole load, and a rule suppliers must
+   follow gets bought for a smaller, honest reason.
+
+   Still worth costing separately, and independent of both: alerting
+   on a SETTLED verdict rather than on every evaluation.
 
 6. **[investigate, 2026-10-01]** **[Pipeline & publishing]** Parquet
    support for uploads - and no, one file cannot hold several tables.
@@ -359,6 +385,32 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
      been promoted. The verdict is identical because the rows are, so
      this is about what the record MEANS rather than whether it is
      right.
+
+   **IS THE LOCK CONTENTION SOLVED BY REQ-PIPE-079? NO - AND IT IS
+   NOT LIVE TODAY EITHER** (Keith asked, 2026-10-01). Two separate
+   facts, and both are worth having rather than the reassuring half.
+
+   079 changes WHAT a run reads, never WHEN a promotion happens, so it
+   neither fixes nor worsens this. If anything it enlarges the lock
+   surface slightly - a run now touches the period's promoted tables
+   as well as its own staged candidate - while making more of what it
+   reads STABLE, since a promoted table does not move again unless
+   somebody demotes or re-files it.
+
+   **It cannot happen today, and the reason is structural rather than
+   lucky.** `parallel_orchestrate.run_manifest()` FORCES SEQUENTIAL
+   EXECUTION whenever `before_each`/`after_each` are passed, which is
+   exactly how the orchestrators wire filing and promotion. So within
+   a collection it is strictly file -> run -> promote, one arrival at
+   a time, and a promotion can never overlap a QA run. Across
+   collections the tables are disjoint, so there is nothing to
+   contend for.
+
+   **It becomes live the moment arrivals are processed CONCURRENTLY**,
+   which is this file's own subject: the trickle scenario in #1, and
+   the event-driven AWS MVP where each object's arrival triggers its
+   own handler with nothing serialising them. So it is a real future
+   problem that belongs here, and not a blocker for 079.
 
    **SO THE BUNDLING RULE IS NOT NEEDED FOR CORRECTNESS**, which is
    the part that matters for #2, #3 and #5. It is still wanted for the
