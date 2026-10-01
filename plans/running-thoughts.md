@@ -4524,3 +4524,13 @@ Belongs with batch 5's check work.
     - **In development** stays as an ALIAS of sample data (rejecting
       the recommendation to drop it).
     - **One-off extraction**: "yes, but tweak", tweak not yet given.
+
+    **Second round, Keith 2026-10-01.**
+    - Sample data: DROP the "in development" alias after all (reverses
+      the previous answer). "Provided", not "supplied". And never "a
+      one-off check" in the singular: there may be several rounds - one
+      per new set of sample data for the same dataset, or a basic round
+      followed by more rounds as more advanced checks are added.
+    - One-off extraction: make it broader. Project extractions use this
+      path, but so may any other table or set of tables we want to check
+      once - it is a generic path for tabular data, not a project thing.
