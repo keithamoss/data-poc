@@ -4512,3 +4512,15 @@ Belongs with batch 5's check work.
     Correction to the framing above: "we already have some mechanics" is
     the TRIAL (REQ-PIPE-103, keep=False), not the one-off extraction path
     - one-off extractions are currently KEPT, in the `sample` schema.
+
+    **Glossary terms, Keith 2026-10-01 morning.**
+    - The run that keeps nothing in the database and writes the report
+      is a **one-off check** - chosen over keeping "trial". Implies
+      renaming the trial in code and in REQ-PIPE-103 when this is built.
+    - **Sample data**: close. Say that nothing is kept in the data
+      asset's PERMANENT REPORTING, not that nothing is kept at all - the
+      report and the raw tool outputs ARE kept (SharePoint). And drop
+      "trial" from the wording.
+    - **In development** stays as an ALIAS of sample data (rejecting
+      the recommendation to drop it).
+    - **One-off extraction**: "yes, but tweak", tweak not yet given.
