@@ -4491,3 +4491,24 @@ Belongs with batch 5's check work.
     moves. It also settles several glossary terms (sample data, in
     development, one-off extraction), so the glossary review waits on
     it for those entries.
+
+    **Keith's answers, 2026-10-01 morning (four scoping questions).**
+    1. One-off extractions get the SAME treatment: nothing kept. So the
+       `sample` schema and the `in-development` results tag both go, and
+       the live layer only ever holds accepted data.
+    2. Drop `no_calendar:` entirely - rejecting the recommendation to
+       keep it as a marker. Any configured dataset can be run one-off; a
+       dataset without a calendar simply never has kept supplies.
+       Follow-on to raise when scoping: the dashboard labels "No delivery
+       schedule agreed yet" / "One-off extraction - no delivery schedule"
+       lose their source, and so does `owes_from:`-style graduation.
+    3. A one-off run's record is an HTML report PLUS each tool's raw
+       output (dbt, Soda, datacontract, Evidently) in a folder, for
+       SharePoint. Today's trial prints to the terminal and writes no
+       file, so this is new work (trial.py, REQ-PIPE-103).
+    4. Settle the glossary terms now, so the requirement is written in
+       the final words.
+
+    Correction to the framing above: "we already have some mechanics" is
+    the TRIAL (REQ-PIPE-103, keep=False), not the one-off extraction path
+    - one-off extractions are currently KEPT, in the `sample` schema.
