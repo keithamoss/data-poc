@@ -29,6 +29,8 @@ Only the sources the page cites, in its front matter and its "Where this comes f
 
 A requirement is in `requirements.yaml`. Read the requirement by its id, including its acceptance criteria and decisions.
 
+A requirement's acceptance criteria and evidence say what the system does now. Its other parts, such as its decisions and non-functional requirements, record the reasoning when it was written, and what they say about the system 'today' may since have changed. So when a claim is supported by a requirement's criteria or evidence, a remark in its other parts saying otherwise does not make the claim contradicted or sources disagree.
+
 ## How you check
 
 1. Go through the page sentence by sentence, including captions, the "In short" box, diagram labels and story text. List every factual claim.

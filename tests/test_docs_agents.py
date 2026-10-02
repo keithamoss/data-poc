@@ -194,3 +194,12 @@ def test_the_fact_checker_returns_one_yaml_table_with_the_four_verdicts():
     for verdict in ("supported", "contradicted", "not found", "sources disagree"):
         assert f"**{verdict}**" in text
     assert "```yaml" in text
+
+
+def test_the_fact_checker_lets_criteria_outweigh_a_stale_remark():
+    """REQ-DOCS-128 (Keith, 2026-10-02): a requirement's criteria and
+    evidence say what the system does now; its decisions and NFRs record
+    the reasoning when written, and their 'today' can go stale."""
+    text = " ".join(body("docs-fact-checker").split())
+    assert "acceptance criteria and evidence say what the system does now" in text
+    assert "does not make the claim contradicted or sources disagree" in text

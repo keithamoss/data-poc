@@ -17,7 +17,7 @@ section_sources:
   Periods come from the calendar: [REQ-PIPE-049, REQ-PIPE-051]
   Each dataset gets a slot with its own due time: [REQ-PIPE-052]
   Arriving is not the same as filling a slot: [REQ-PIPE-062, REQ-PIPE-075]
-  No slot in a period means nothing is owed for it: [REQ-PIPE-049, REQ-PIPE-052, REQ-PIPE-098]
+  A table that skips a period owes nothing for it: [REQ-PIPE-049, REQ-PIPE-052, REQ-PIPE-098]
   Why it's this way: [REQ-PIPE-051, REQ-PIPE-052, REQ-PIPE-075]
 status: draft
 ---
@@ -25,7 +25,7 @@ status: draft
 # Periods and slots
 
 Build state, by section:
-- Partly built: "Periods and slots", "Arriving is not the same as filling a slot", "No slot in a period means nothing is owed for it", "Why it's this way".
+- Partly built: "Periods and slots", "Arriving is not the same as filling a slot", "A table that skips a period owes nothing for it", "Why it's this way".
 - Built: "Periods come from the calendar", "Each dataset gets a slot with its own due time".
 
 > [!NOTE]
@@ -86,7 +86,7 @@ A green or amber supply is promoted automatically when its slot is empty. A red 
 
 So an empty slot does not always mean nothing arrived. A supply may be waiting in staging for a decision. Sam finds no carers supply there either, so Sam chases the supplier.
 
-## No slot in a period means nothing is owed for it
+## A table that skips a period owes nothing for it
 
 Build state: partly built.
 
