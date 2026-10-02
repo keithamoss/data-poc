@@ -124,7 +124,7 @@ No slot means nothing is owed, so a missing Case Workers file in May is not a ga
 - We chose one slot per table, and rejected a collection filling one slot as a unit. Earlier designs assumed one table per supply, which holds for Birth Registrations, the only table in its collection, but not for Child Protection's 6. Judging each table on its own is more honest than the whole batch taking the worst result.
 - We chose a period that carries a date and nothing else, and rejected a deadline on the period. Birth Registrations is due at 2pm with an hour's grace, so a supply of it at 4pm is late. Now picture it sharing a period with a table due at 5pm. A period deadline could hold only one of those times, and set at 5pm it would pass that late supply as on time. That false all-clear is the mistake that matters most.
 - We chose to work slots out from the calendar, and rejected writing them down. The quarterly calendar is heading for about 30 datasets over years of periods. A slot that nobody writes down cannot drift from its calendar.
-- We chose one shared calendar that each dataset takes part in, and rejected a list of dates for each dataset. 30 lists would drift, with one saying 2 February and another saying 3 February, and nothing would flag it.
+- We chose one shared calendar that each dataset takes part in, rather than a list of dates for each dataset. A dataset can still have its own dates, but only as an exception. 30 lists would drift, with one saying 2 February and another saying 3 February, and nothing would flag it.
 
 ## Putting it together
 
