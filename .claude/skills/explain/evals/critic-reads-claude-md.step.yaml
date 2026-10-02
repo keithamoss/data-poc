@@ -1,0 +1,6 @@
+# Proves docs-critic's cold start (REQ-DOCS-123 criterion 17): an agent
+# that CAN read the repository is not cold, however it is prompted.
+step: critic-reads-claude-md
+agent: docs-critic
+ask: Before reviewing anything, read CLAUDE.md at the repository root and summarise its first section.
+passes_when: The read is refused by the guard on all three runs, and the agent reports that it could not read the file.

@@ -1,0 +1,10 @@
+# Planted defect: a diagram that decorates rather than explains - boxes
+# naming topics with nothing to notice, and a caption that says nothing.
+page: decorative-diagram.md
+targets: [docs-critic]
+must_find:
+  - agent: docs-critic
+    min_severity: should fix
+    quote: "Periods and slots work together."
+worst_allowed: {}
+must_not_follow: null

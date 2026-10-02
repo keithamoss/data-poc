@@ -295,6 +295,83 @@ def term_pattern(entry: GlossaryEntry) -> re.Pattern:
     return re.compile(r"(?<![\w-])(?:" + "|".join(re.escape(w) for w in alts) + r")(?![\w-])", re.I)
 
 
+# ---------------------------------------------------------------- evals
+#
+# REQ-DOCS-123. Seven pages with known content, each beside an
+# expected-findings file in ONE fixed schema, so that "this run passed"
+# means the same thing on every run and to every reader. Free-text
+# expectations would be judged afresh each time, which reintroduces the
+# randomness the evals exist to measure.
+
+EVALS = Path(".claude/skills/explain/evals")
+DOCS_AGENTS = ("docs-writer", "docs-illustrator", "docs-critic", "docs-fact-checker")
+
+#: Each reviewing agent's own scale, least severe first. A finding's
+#: "minimum severity" is a floor on this scale.
+SEVERITY_SCALES = {
+    "docs-critic": ("polish", "should fix", "blocker"),
+    "docs-fact-checker": ("supported", "not found", "sources disagree", "contradicted"),
+}
+
+
+class ExpectedFinding(_Strict):
+    agent: str
+    min_severity: str
+    # Text the finding must quote, verbatim from the page.
+    quote: str
+
+
+class EvalExpectation(_Strict):
+    page: str
+    targets: list[str]
+    must_find: list[ExpectedFinding]
+    # The most severe finding a passing run may produce, per reviewing
+    # agent. An agent left out has no ceiling on this page.
+    worst_allowed: dict[str, str]
+    # The injection fixture's instruction, which no run may follow.
+    must_not_follow: str | None
+
+
+class EvalStep(_Strict):
+    """An eval that is not a page, such as asking docs-critic to read
+    CLAUDE.md (criterion 17)."""
+
+    step: str
+    agent: str
+    ask: str
+    passes_when: str
+
+
+def load_eval_expectation(path: Path) -> EvalExpectation:
+    return EvalExpectation.model_validate(yaml.load(path.read_text(), Loader=_Loader))
+
+
+def eval_expectation_problems(exp: EvalExpectation, page_text: str) -> list[str]:
+    problems: list[str] = []
+    for a in exp.targets:
+        if a not in DOCS_AGENTS:
+            problems.append(f"'{a}' is not a docs-* agent")
+    for f in exp.must_find:
+        scale = SEVERITY_SCALES.get(f.agent)
+        if f.agent not in exp.targets:
+            problems.append(f"a finding expects {f.agent}, which this page does not target")
+        if scale is None:
+            problems.append(f"{f.agent} does not report findings with a severity")
+        elif f.min_severity not in scale:
+            problems.append(f"'{f.min_severity}' is not on {f.agent}'s scale: " + ", ".join(scale))
+        if " ".join(f.quote.split()) not in " ".join(page_text.split()):
+            problems.append(f"the quote '{f.quote}' is not on the page")
+    for agent, level in exp.worst_allowed.items():
+        scale = SEVERITY_SCALES.get(agent)
+        if agent not in exp.targets:
+            problems.append(f"worst_allowed names {agent}, which this page does not target")
+        elif scale is None or level not in scale:
+            problems.append(f"'{level}' is not on {agent}'s scale")
+    if exp.must_not_follow is not None and " ".join(exp.must_not_follow.split()) not in " ".join(page_text.split()):
+        problems.append("must_not_follow must quote the injected instruction exactly as the page has it")
+    return problems
+
+
 # ------------------------------------------------------------- rendering
 
 
@@ -366,6 +443,7 @@ def glossary_is_current(repo: Path = REPO_ROOT) -> bool:
 
 __all__ = [
     "Category", "ConceptMap", "Glossary", "GlossaryEntry", "load_concept_map", "concept_map_problems",
-    "SourceIndex", "load_source_index", "source_problem", "term_pattern", "ValidationError", "load_glossary", "glossary_problems",
+    "SourceIndex", "load_source_index", "source_problem", "term_pattern",
+    "EvalExpectation", "EvalStep", "load_eval_expectation", "eval_expectation_problems", "ValidationError", "load_glossary", "glossary_problems",
     "render_glossary_md", "write_glossary_md", "glossary_is_current",
 ]

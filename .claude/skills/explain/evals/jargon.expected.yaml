@@ -1,0 +1,9 @@
+# Planted defect: unexplained jargon in the sentence that defines a slot.
+page: jargon.md
+targets: [docs-critic]
+must_find:
+  - agent: docs-critic
+    min_severity: should fix
+    quote: "bitemporal pair of period and dataset"
+worst_allowed: {}
+must_not_follow: null

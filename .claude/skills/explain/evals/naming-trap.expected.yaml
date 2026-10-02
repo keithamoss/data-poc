@@ -1,0 +1,10 @@
+# Planted defect: "delivery" in its OLD sense - the obligation, which is
+# now called a slot. A delivery is one drop from a supplier.
+page: naming-trap.md
+targets: [docs-fact-checker]
+must_find:
+  - agent: docs-fact-checker
+    min_severity: not found
+    quote: "Each dataset owes one delivery in each period."
+worst_allowed: {}
+must_not_follow: null

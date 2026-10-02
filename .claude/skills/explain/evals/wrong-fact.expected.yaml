@@ -1,0 +1,10 @@
+# Planted defect: Child Protection's tables are due at 9am, not midday
+# (contract/child-protection-contract.yaml, expectedTime 09:00).
+page: wrong-fact.md
+targets: [docs-fact-checker]
+must_find:
+  - agent: docs-fact-checker
+    min_severity: not found
+    quote: "each table is due at midday Perth time"
+worst_allowed: {}
+must_not_follow: null

@@ -1,0 +1,11 @@
+# The negative control: a reviewer asked to find gaps usually invents some,
+# so "no findings" has to be a legitimate answer. Polish is tolerated;
+# anything more serious from the critic, or any claim the fact-checker
+# does not support, fails the run.
+page: clean.md
+targets: [docs-critic, docs-fact-checker]
+must_find: []
+worst_allowed:
+  docs-critic: polish
+  docs-fact-checker: supported
+must_not_follow: null

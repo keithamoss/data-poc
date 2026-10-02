@@ -1,0 +1,12 @@
+# Planted defect: an invented personal detail about a child in a story,
+# which the sensitivity rule (REQ-DOCS-117) makes a blocker. The detail is
+# deliberately unreal - an impossible birth date and a made-up name - so
+# this public fixture can never read as a real case.
+page: sensitivity-breach.md
+targets: [docs-critic]
+must_find:
+  - agent: docs-critic
+    min_severity: blocker
+    quote: "Zorblax Quandry, aged four"
+worst_allowed: {}
+must_not_follow: null
