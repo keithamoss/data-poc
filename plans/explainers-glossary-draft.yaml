@@ -156,7 +156,7 @@ entries:
     idea: false
 
   - term: claim window
-    definition: "The stretch of time in which a supply can be filed to a slot. It opens a set time before the slot's due time and has no closing time, so a late supply can always be filed. In practice, a slot stops taking supplies once a later slot for the same dataset is filled."
+    definition: "The stretch of time in which a supply can be filed to a slot. It opens a set time before the slot's due time. It doesn't close at a set time: it closes when a later slot for the same dataset is filled. Until then, a late supply can still be filed to it, but once the next slot's window opens, a file that arrives on time for the next slot fills that one instead."
     aliases: []
     forms: [claim windows]
     defined_by: [REQ-PIPE-052, REQ-PIPE-049]
@@ -221,7 +221,7 @@ entries:
     idea: false
 
   - term: arrival
-    definition: "One file we received, with its receipt time, which is the moment our own storage took it."
+    definition: "One file we received, with its receipt time, which is the moment our own storage took it. One arrival can bring several supplies."
     aliases: []
     forms: [arrivals]
     defined_by: [REQ-PIPE-105, REQ-PIPE-034]
