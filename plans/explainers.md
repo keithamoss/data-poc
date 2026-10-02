@@ -924,6 +924,14 @@ survives context compaction. Tick items off here as they land.
    3. write the docs-writer agent's own prompt as positive prose that
       describes the voice (no standard change).
 
+   **All three DONE (Keith approved the exact wording, 2026-10-02).**
+   intricate, "serves as" and "stands as" are banned; a new watch list
+   (crucial, robust, landscape, underscore, enhance, quick, simple)
+   fails only when two or more gather in one unit, under
+   V-banned-cluster (REQ-DOCS-132 criterion 16); and docs-writer's
+   voice paragraph is recorded verbatim in REQ-DOCS-125's decisions for
+   when the agent is written.
+
    **Glossary approved and moved (2026-10-02):** Keith reviewed all 50
    entries in four chunks (2026-09-30 to 2026-10-02) and they now live
    in `docs/explainers/glossary.yaml`, filed under five ordered

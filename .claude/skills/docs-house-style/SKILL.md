@@ -69,6 +69,7 @@ The validator counts sentences and words this way:
 ### Words
 
 - Never use a word or phrase on the banned lists in the house rules block below. The lists have 4 categories: AI-voice words, condescension, corporate filler, and fixed-phrase rhetorical tics. (Keith) [V-banned-phrase]
+- Some words are fine once but read as AI writing when they gather. They are on the watch list in the house rules block below. Never use 2 or more of them in one paragraph, list item, or heading. (Keith) [V-banned-cluster]
 - The validator matches each banned entry as a whole word or phrase, in any letter case. A match inside a phrase on the exemption list passes.
 - Only Keith adds an exemption, as a change to this standard. A page never carries an override of its own.
 - Rhetorical tics that take a pattern rather than a fixed phrase are for a reader to judge. The reader-judgement skill holds them.
@@ -165,13 +166,10 @@ banned:
     - delves
     - delving
     - tapestry
-    - crucial
     - leverage
     - leveraging
     - seamless
     - seamlessly
-    - robust
-    - landscape
     - "it's worth noting"
     - "it is worth noting"
     - pivotal
@@ -183,6 +181,9 @@ banned:
     - "a testament to"
     - "in today's"
     - "at its core"
+    - intricate
+    - "serves as"
+    - "stands as"
   condescension:
     - just
     - simply
@@ -220,6 +221,21 @@ banned:
     - "at the end of the day"
     - "the bottom line"
     - "spoiler alert"
+
+# Fine alone. Two or more matches in one paragraph, list item, or heading fail.
+watch:
+  - crucial
+  - robust
+  - landscape
+  - underscore
+  - underscores
+  - underscored
+  - enhance
+  - enhances
+  - enhanced
+  - enhancing
+  - quick
+  - simple
 
 # A banned match that falls wholly inside one of these phrases passes.
 exemptions:
@@ -450,6 +466,7 @@ Every rule id this standard marks, one per line. `mothman docs validate --list-r
 V-sentence-length
 V-paragraph-length
 V-banned-phrase
+V-banned-cluster
 V-semicolon
 V-latin-abbreviation
 V-negative-contraction

@@ -24642,6 +24642,7 @@ requirements:
       - "Decided NOT to adopt GOV.UK's separate accessible title and description per diagram as a writing rule; the diagram caption does that job (REQ-DOCS-118)."
       - "Decided the pattern-shaped rhetorical tics ('it's not X, it's Y', rule-of-three padding, ending a section on a punchy one-liner) live in the reader-judgement skill (REQ-DOCS-131), because no fixed string catches them and the critic is the agent that has to judge them. Only fixed-phrase tics such as 'here's the thing' stay in this standard's banned lists."
       - "Decided the standard is written general enough for a second document type (round 12), because the same team is expected to write 'Running Mothman' later. Only explanation rules are written now."
+      - "Decided three anti-AI-voice changes to the house standard, exact wording approved by Keith 2026-10-02: Wikipedia's 'Signs of AI writing' gaps intricate, 'serves as' and 'stands as' added to the banned AI-voice list (the last two because they dodge a plain 'is'); underscore and enhance put on the new watch list rather than banned, because underscore is also the _ character a data page may need; and the watch list itself (crucial, robust, landscape, underscore, enhance in their forms, quick, simple), whose words fail only when two or more gather in one paragraph, list item or heading."
     open_questions: []
 
   - id: REQ-DOCS-116
@@ -25183,6 +25184,7 @@ requirements:
       - "Decided 'never state a fact that is not in a named source file; write a pointer, not a guess' (research, docs-drift-editor), which also blunts injected facts. The one exception is the single sentence under an idea badge (Keith, set 6; REQ-DOCS-116, bounded by REQ-DOCS-122)."
       - "Decided Keith feeds the topics and each is scoped together before writing (round 3). The team does NOT sweep the repo and pick its own."
       - "Decided a signed page is FROZEN - only edited, never regenerated (round 13)."
+      - "Decided docs-writer's prompt describes the voice as POSITIVE PROSE and never lists a banned word (Keith, 2026-10-02, from Anthropic's prompting guidance that a prompt's style leaks into its output), in fresh words rather than the standard's own (REQ-DOCS-124 forbids copying a skill's wording into a prompt). The approved paragraph, to be used verbatim: 'You write the way a good colleague explains something at the end of a long day: plainly, kindly, and without showing off. Start with the moment that made someone look twice, then say what the idea does and who it touches. Use the words you would say out loud, in short sentences. When something is fiddly, say so once and carry on. Show the reader the thing before you give it a name. Choose the specific over the impressive: a real dataset, a real due date, a number the system can confirm. Trust the reader, and explain each step once rather than saying it twice in different words. Let warmth come from the people in the story and from stakes that are small and real. If a sentence would sit happily in a press release or a strategy paper, say it again the way you would to the person next to you.'"
     open_questions: []
 
   - id: REQ-DOCS-126
@@ -25523,6 +25525,11 @@ requirements:
       - "tests/test_validate_explainers.py::test_no_banned_word_is_copied_into_the_code"
       - "tests/test_validate_explainers.py::test_the_rule_ids_match_the_house_standard_both_ways"
       - "tests/test_validate_explainers.py::test_the_good_page_passes_with_zero_findings"
+      - "tests/test_validate_explainers.py::test_one_watch_word_alone_passes"
+      - "tests/test_validate_explainers.py::test_two_watch_words_in_one_paragraph_fail"
+      - "tests/test_validate_explainers.py::test_the_same_watch_word_twice_counts_twice"
+      - "tests/test_validate_explainers.py::test_watch_words_in_different_paragraphs_pass"
+      - "tests/test_validate_explainers.py::test_wikipedias_gaps_fail_on_sight"
     implemented_by:
       - "qa_tools/common/validate_explainers.py::Validator"
       - "qa_tools/common/validate_explainers.py::load_house_rules"
@@ -25542,7 +25549,7 @@ requirements:
       - "IF a sentence other than a heading is longer than 25 words, THEN THE SYSTEM SHALL reject it."
       - "IF a paragraph holds more than five sentences, THEN THE SYSTEM SHALL reject it."
       - "IF a page's prose contains a word or phrase on the house standard's banned lists, THEN THE SYSTEM SHALL reject it, unless the house standard's exemption list covers that use."
-      - "THE SYSTEM SHALL read the banned lists and the exemption list from the house standard's YAML block (REQ-DOCS-115), and SHALL NOT keep a copy of either in its own code."
+      - "THE SYSTEM SHALL read the banned lists, the watch list and the exemption list from the house standard's YAML block (REQ-DOCS-115), and SHALL NOT keep a copy of any of them in its own code."
       - "IF a page's prose contains a semicolon, or eg, ie or etc in any spelling, THEN THE SYSTEM SHALL reject it."
       - "IF a page's prose contains a negative contraction, THEN THE SYSTEM SHALL reject it."
       - "IF a page's prose contains the word 'midnight', THEN THE SYSTEM SHALL reject it."
@@ -25550,6 +25557,7 @@ requirements:
       - "IF a page's prose contains an em dash, an en dash without a space on both sides, a spaced hyphen used as a dash, or a hyphen or dash joining two numbers or two dates, THEN THE SYSTEM SHALL reject it."
       - "THE SYSTEM SHALL NOT treat a period name of the form 2026-Q3 as a dash in a date or range."
       - "IF a page's body contains a requirement id, an inline code span, a fenced block other than Mermaid, or a repository file path outside a link target, THEN THE SYSTEM SHALL reject it."
+      - "IF one paragraph, list item or heading contains two or more matches from the house standard's watch list, THEN THE SYSTEM SHALL reject it under its own rule id, counting a repeated word each time, unless the exemption list covers that use."
     non_functional_requirements:
       - "Precise definitions of 'sentence' and 'word' are what make a 25-word cap mean the same to the writer, the validator and Keith. Without them the same page passes on one reading and fails on another, and the writer cannot fix what it cannot predict."
       - "False positives are expected - 'just' is on the condescension list and also appears in 'just-in-time'. The fix is an exemption in the house standard, which Keith approves, never a marker in the page, which an agent could add to silence the check."
@@ -25568,4 +25576,5 @@ requirements:
       - "Decided the pattern-shaped rhetorical tics stay with the critic (the reader-judgement skill, REQ-DOCS-131), since they are judgement calls rather than fixed strings; only fixed-phrase tics are on the banned lists."
       - "Decided exemptions live in the house standard's YAML block from the start (delivery-architect, adopted), replacing the earlier draft's 'no exemptions until a real page proves the check too blunt'. Still no per-line override."
       - "Decided a requirement of its own, split out of REQ-DOCS-122 (scoper's call in this revision): the safety validator and the style rules it enforces had grown to about forty criteria together, and they change for different reasons - security hardening versus the house standard's wording."
+      - "Decided a TIERED word list (Keith, 2026-10-02, after the research on writing that does not sound like Claude): the banned lists fail on any use, and a separate watch list of words that are fine alone fails only when two or more gather in one paragraph, list item or heading, under its own rule id V-banned-cluster. Borrowed from the MIT-licensed avoid-ai-writing skill's tiers. It let quick and simple, which Keith had taken off the banned list, come back as signals rather than bans, and let crucial, robust and landscape, which have honest uses, move down from the banned list."
     open_questions: []

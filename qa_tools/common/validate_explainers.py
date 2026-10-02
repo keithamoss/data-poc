@@ -62,6 +62,7 @@ RULES: dict[str, str] = {
     "V-sentence-length": "A sentence other than a heading is at most 25 words.",
     "V-paragraph-length": "A paragraph is at most 5 sentences.",
     "V-banned-phrase": "No word or phrase from the house standard's banned lists.",
+    "V-banned-cluster": "No two watch-list words in one paragraph, list item or heading.",
     "V-semicolon": "No semicolons in prose.",
     "V-latin-abbreviation": "No eg, ie or etc in any spelling.",
     "V-negative-contraction": "No negative contractions such as don't or can't.",
@@ -170,12 +171,19 @@ def standard_rule_ids(repo: Path = REPO_ROOT) -> set[str]:
     return set(re.findall(r"\[(V-[a-z-]+)\]", text))
 
 
+def _word_pattern(w: str) -> re.Pattern:
+    return re.compile(r"(?<![\w'])" + re.escape(w) + r"(?![\w'])", re.I)
+
+
 def _banned_patterns(rules: dict) -> list[tuple[str, re.Pattern]]:
-    out = []
-    for words in (rules.get("banned") or {}).values():
-        for w in words:
-            out.append((w, re.compile(r"(?<![\w'])" + re.escape(w) + r"(?![\w'])", re.I)))
-    return out
+    return [(w, _word_pattern(w)) for words in (rules.get("banned") or {}).values() for w in words]
+
+
+def _watch_patterns(rules: dict) -> list[tuple[str, re.Pattern]]:
+    """The watch list: words that are fine alone and a tell when they
+    gather (Keith, 2026-10-02). Read from the standard like the banned
+    lists, so no word is ever copied into this module."""
+    return [(w, _word_pattern(w)) for w in rules.get("watch") or []]
 
 
 def _exemption_spans(text: str, rules: dict) -> list[tuple[int, int]]:
@@ -467,6 +475,7 @@ class Validator:
         self.repo = repo
         self.rules = load_house_rules(repo)
         self.banned = _banned_patterns(self.rules)
+        self.watch = _watch_patterns(self.rules)
         self.seed = self.rules.get("hand_drawn_seed")
         self._req_states: dict[str, str] | None = None
         self._tracked: set[str] | None = None
@@ -723,6 +732,12 @@ class Validator:
                     if not any(a <= m.start() and m.end() <= b for a, b in spans):
                         self.add(page.rel, u.line, "V-banned-phrase",
                                  f"replace '{m.group(0)}', which is on the house standard's banned list")
+            gathered = [m.group(0) for _, pat in self.watch for m in pat.finditer(text)
+                        if not any(a <= m.start() and m.end() <= b for a, b in spans)]
+            if len(gathered) >= 2:
+                self.add(page.rel, u.line, "V-banned-cluster",
+                         "reword so at most one watch-list word is left here - found "
+                         + ", ".join(f"'{w}'" for w in gathered))
             sents = sentences(text)
             if u.kind != "heading":
                 for s in sents:

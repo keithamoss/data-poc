@@ -109,9 +109,40 @@ def test_the_rule_ids_match_the_house_standard_both_ways():
 def test_no_banned_word_is_copied_into_the_code():
     """The standard owns the lists (REQ-DOCS-132 criterion 8)."""
     code = (REAL / "qa_tools/common/validate_explainers.py").read_text().lower()
-    for words in v.load_house_rules()["banned"].values():
-        for w in words:
-            assert f'"{w.lower()}"' not in code and f"'{w.lower()}'" not in code, w
+    rules = v.load_house_rules()
+    words = [w for ws in rules["banned"].values() for w in ws] + list(rules["watch"])
+    for w in words:
+        assert f'"{w.lower()}"' not in code and f"'{w.lower()}'" not in code, w
+
+
+def test_one_watch_word_alone_passes(repo):
+    write(repo, GOOD.replace("Sam wonders where it will land.", "Sam runs a quick check."))
+    assert rules_hit(repo) == set()
+
+
+def test_two_watch_words_in_one_paragraph_fail(repo):
+    """Keith, 2026-10-02: fine alone, a tell when they gather."""
+    write(repo, GOOD.replace("Sam wonders where it will land.", "Sam runs a quick, robust check."))
+    assert "V-banned-cluster" in rules_hit(repo)
+    assert "V-banned-phrase" not in rules_hit(repo)
+
+
+def test_the_same_watch_word_twice_counts_twice(repo):
+    write(repo, GOOD.replace("Sam wonders where it will land.", "A quick look, then a quick fix."))
+    assert "V-banned-cluster" in rules_hit(repo)
+
+
+def test_watch_words_in_different_paragraphs_pass(repo):
+    write(repo, GOOD.replace("Sam wonders where it will land.", "Sam runs a quick check.")
+                    .replace("It lands in the slot for its period, which is how you find it later.",
+                             "It lands in the slot for its period.\n\nThe slot is simple to find."))
+    assert "V-banned-cluster" not in rules_hit(repo)
+
+
+@pytest.mark.parametrize("phrase", ["intricate", "serves as", "stands as"])
+def test_wikipedias_gaps_fail_on_sight(repo, phrase):
+    write(repo, GOOD.replace("Sam wonders where it will land.", f"Sam wonders, and it {phrase} a clue."))
+    assert "V-banned-phrase" in rules_hit(repo)
 
 
 @pytest.mark.parametrize("old,new,rule", [
