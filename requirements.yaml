@@ -6643,7 +6643,7 @@ requirements:
       2026-09-22.
     signed_off:
       by: Keith
-      date: "2026-09-22"
+      date: "2026-10-02"
     acceptance_criteria:
       - THE SYSTEM SHALL generate, into the generated supply history and
         its recorded QA results, a real instance of every scenario the
@@ -6677,6 +6677,19 @@ requirements:
       - THE SYSTEM SHALL NOT generate two scenarios requiring
         incompatible schedule configurations within the same version's
         period of effect.
+      - >
+        THE SYSTEM SHALL give every file it generates its own receipt
+        instant, rather than one instant shared by every file in a
+        delivery.
+      - >
+        THE SYSTEM SHALL generate about 80% of multi-file deliveries with
+        every file at precisely the same receipt instant, as if unpacked
+        from one archive, and the rest with each file at its own instant,
+        all within 10 minutes of the delivery's first file,
+        deterministically from the seed.
+      - >
+        WHERE a delivery's files arrive at different instants, THE SYSTEM
+        SHALL vary the order in which its datasets arrive.
     non_functional_requirements:
       - Injected scenarios add deliveries to a history whose generation
         already builds a 70,000-person population per run. Derive the
@@ -6706,6 +6719,41 @@ requirements:
         message.
     dependencies: [REQ-GEN-040, REQ-GEN-042, REQ-GEN-043, REQ-PIPE-049, REQ-PIPE-051]
     decisions:
+      - >
+        CRITERIA 12 TO 14 ADDED AND SIGNED 2026-10-02 (Keith), wording
+        approved as put, so the signed_off date moved from 2026-09-22 -
+        the earlier signature covers criteria 1-11 and is not withdrawn.
+        Hand-drafted rather than through delivery-scoper, and said so when
+        presented. Scoped into this requirement rather than a new one by
+        Keith's own call earlier the same day: this is where "the
+        generated history contains the shapes the model needs" lives.
+
+        WHY. REQ-PIPE-105 made every file its own arrival, so a file's
+        receipt instant identifies its run and orders the pipeline - and
+        until now every file in a generated delivery shared one instant
+        (all six CP files of the 1 May 2023 drop at 01:00:00), which
+        exercises none of that. A real S3 drop gives every object its own
+        LastModified.
+
+        THE MIX IS KEITH'S AND IS A DESIGN IDEA, not just fidelity: ~80%
+        of multi-file deliveries arrive at ONE instant, standing in for a
+        future zip or bundle so the model meets that shape before any
+        archive support exists; ~20% trickle in, each file within 10
+        minutes of the delivery's first. Same-instant collisions need no
+        new mechanism - the dataset is part of every run and supply id,
+        and two files for ONE dataset at one instant already get `#1` and
+        an ordinal, which is REQ-PIPE-105 criterion 6's contested case.
+
+        ONE RECEIPT PER FILE (Keith, 2026-10-02), over one receipt per
+        delivery carrying a per-file map. It matches production, where
+        storage gives each object its own instant and REQ-PIPE-105
+        criterion 3 takes the receipt from storage; a zip-style delivery
+        is then just several receipts sharing an instant. REJECTED the
+        per-delivery map because it keeps the delivery as a unit the
+        receipt layer depends on, which criterion 1 of REQ-PIPE-105 moved
+        away from. The cost, accepted: the receipt format and its readers
+        change, and the transport questions in plans/supply-thoughts.md
+        items 1-3 are adjacent to this without being settled by it.
       - >
         BUILT IN PART ON 2026-09-28, and this records exactly which part so
         nobody infers it from the code. `in_progress` rather than `built`,
