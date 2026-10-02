@@ -20767,14 +20767,18 @@ requirements:
         property of the AGREEMENT, true of every skipped period, while
         "no Q1 file, ERP migration" is an exception to it.
 
-        WHAT IS THERE TODAY IS THE EVIDENCE THAT THIS IS A REAL GAP
-        rather than a refinement: `delivery_months: [February, August]`
-        is really on cp-case-workers and nothing but one test assertion
-        reads it, while not_expected_periods() is fully implemented WITH
-        its mandatory reason and appears in no contract at all. Somebody
-        has already written down that Case Workers skips two quarters,
-        the system does nothing with it, and the half that carries a
-        reason has never been used.
+        WHAT WAS THERE ON 2026-09-26, WHEN THIS WAS WRITTEN, WAS THE
+        EVIDENCE THAT THIS IS A REAL GAP rather than a refinement:
+        `delivery_months: [February, August]` was on cp-case-workers and
+        nothing but one test assertion read it, while
+        not_expected_periods() was fully implemented WITH its mandatory
+        reason and appeared in no contract at all. Somebody had already
+        written down that Case Workers skips two quarters, the system did
+        nothing with it, and the half that carries a reason had never
+        been used. (Since then qa_tools/common/schedule.py derives slots
+        from delivery_months; marked historical 2026-10-02 with Keith's
+        approval, after it misled a fact-checker into reading it as
+        today's behaviour.)
       - >
         SCALE: a period's birth creates up to one object and one log
         entry per dataset - up to 30 on the quarterly asset, and
