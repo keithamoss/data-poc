@@ -2265,3 +2265,52 @@ survives context compaction. Tick items off here as they land.
      Sonnet like the critic.
    Next: delivery-scoper drafts the amended and new requirements, then
    Keith signs them off before anything is built.
+
+   **Scoped and reviewed, 2026-10-02.** delivery-scoper drafted a new
+   REQ-DOCS-133 (docs-finding-checker) and amendments to REQ-DOCS-127,
+   -125, -129 and -123, with knock-ons in -124 (built) and -131.
+   delivery-architect found what would not work as worded: the checker
+   cannot read an eval page by path (the eval folder is denied); a
+   re-review needs a saved copy of each round and an exact diff recipe;
+   Keith's triage decisions need saving as a file; the shared snapshot
+   would flag the main session's own report saves mid-run; and the eval
+   schema cannot express the new expectations.
+
+   **Keith's further answers, 2026-10-02:**
+   - the manager and returning-reader passes anchor to the brief: it
+     gains 2-3 operating questions he approves, and the manager pass's
+     test is "the In short box can be explained upward without getting
+     anything wrong";
+   - a critic sensitivity blocker holds the push even if the checker
+     rejects it;
+   - a declined finding is never raised again on re-review;
+   - the checker is evaluated on all three seeded-defect pages as well
+     as the clean page, the injection page and a seeded critic report;
+   - the mechanical rules (quote on page, criterion exists, one verdict
+     per finding, re-review finding inside changed text) live in code,
+     a schema plus `mothman docs check-findings`, like quote-check;
+   - a rejected blocker stays expanded at triage, marked rejected;
+     rejected should-fixes stay collapsed;
+   - polish findings sit collapsed with the leftovers;
+   - a new reader-judgement rule on excess, wording approved word for
+     word (to be applied when building starts, not before):
+
+         ## Every sentence earns its place
+
+         Each sentence helps the reader with the page's why-question: it
+         answers it, explains the answer, or shows it at work. A sentence
+         that does none of these is excess, even when it is true.
+
+         Detail that belongs to another concept is excess here too. It
+         goes on that concept's page, and this page links to it.
+
+     placed after "A diagram earns its place", and the skill's
+     description, also approved word for word: "The rules a reader
+     judges a finished Mothman documentation page by: answer first,
+     each page stands alone, the sensitivity rule, whether a diagram
+     argues, whether every sentence earns its place, and pattern-shaped
+     rhetorical tics. Preloaded by docs-critic, docs-writer,
+     docs-illustrator, docs-fact-checker, and docs-finding-checker."
+
+   Next: the scoper revises the drafts against the architect's review
+   and these answers, then they go to Keith for sign-off.
