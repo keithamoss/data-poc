@@ -351,13 +351,56 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
    minutes sees colour move. That is a display question, and the
    readiness distinction above is what makes it legible.
 
-   **SO THE RISK IS ENTIRELY IN A FUTURE ALERTING LAYER, and the rule
-   to write down now is which model it copies.** An alerting layer
-   keyed on CHECK RESULTS reintroduces every problem in this item. One
-   keyed on SLOT STATE, reconciled rather than reactive, inherits the
-   ticket design's own answer and has the problem solved before it is
-   built. The existing reconciler is the worked example, and it should
-   be named as the pattern when alerting is scoped.
+   **AND THE PARAGRAPH THAT USED TO SIT HERE WAS WRONG - CORRECTED
+   2026-10-02, Keith caught it.** It claimed that an alerting layer
+   keyed on SLOT STATE would inherit the ticket design's answer and
+   have the problem solved before it was built. It would not, and the
+   reason is one step removed from where this was looking.
+
+   "`slot_state.py` never reads a check result" is TRUE AND
+   IRRELEVANT. The red does not move the slot directly - it moves the
+   slot by BLOCKING THE PROMOTION THAT WOULD HAVE MOVED IT. Traced
+   through the real code:
+   - a cross-table check reading an absent table goes red;
+   - `promotion.status_of()` counts it against the READING dataset,
+     explicitly and by design - "a CROSS-TABLE check filed under
+     another dataset that declares it reads one of this dataset's
+     tables... belongs to both";
+   - `should_promote()` then refuses, because the status is red rather
+     than green or amber;
+   - so the slot stays `awaiting-decision` instead of becoming
+     `promoted`, and the reconciler quite correctly raises a ticket
+     saying somebody is needed.
+
+   A transient red therefore DOES produce a ticket, and under
+   automation would produce an alert. Keith's own words: "as soon as
+   it goes red, it will trigger an email or an SMS".
+
+   **ONE THING THE SLOT-KEYED DESIGN STILL BUYS, and it is worth
+   keeping for it rather than for what was claimed: VOLUME.** Keyed on
+   check results, thirty cross-table checks going red is thirty
+   alerts. Keyed on slot state, it is ONE - the dataset's slot needs a
+   person. That bounds the blast radius and it does not stop the alarm
+   going off.
+
+   **WHICH PUTS BUNDLING BACK AS A REAL ANSWER rather than a deflated
+   one.** The earlier conclusion here - that 079's readiness
+   distinction mostly solved this and bundling only narrowed a
+   residual window - rested on the wrong claim above. The readiness
+   distinction is still worth having and still makes a red legible;
+   it does not prevent the promotion being blocked. So the live
+   options are genuinely: bundle the arrival (#2, #3), alert on a
+   SETTLED verdict rather than on every evaluation, or hold alerting
+   until a period's arrivals are judged complete - which is the
+   completeness problem again, from the alerting side.
+
+   **IN TODAY'S BATCH PIPELINE IT STILL WOULD NOT FLAP**, which is
+   worth separating from the above so nobody reads a present-tense
+   bug into it: `ticket_reconciler` runs ONCE at the end of
+   `run_manifest`, after every arrival has been processed, so the
+   intermediate states are never reconciled. It is the EVENT-DRIVEN
+   shape - one run per arrival, reconcile after each - where every
+   intermediate state becomes a ticket and then an alert.
 
 6. **[investigate, 2026-10-01]** **[Pipeline & publishing]** Parquet
    support for uploads - and no, one file cannot hold several tables.
@@ -448,12 +491,17 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
    collections the tables are disjoint, so there is nothing to
    contend for.
 
-   **IT IS A THING TO SOLVE FOR REAL, AND IT COMES WITH AUTOMATION -
-   Keith, 2026-10-02**, settling both the status and the timing: it
-   will probably come into play, and humans will not trigger it. That
-   is right, and the reason is the serialisation above - a person
-   drives one `mothman` command at a time and the orchestrator chains
-   file, run and promote. **It becomes live the moment arrivals are
+   **IT IS A THING TO SOLVE FOR REAL - Keith, 2026-10-02**, and it
+   comes with automation but NOT only with it.
+
+   **TWO HUMANS CAN CAUSE IT, which he pointed out and this file had
+   wrong.** The serialisation above is WITHIN ONE ORCHESTRATOR
+   PROCESS: `run_manifest` chains file, run and promote for the
+   arrivals in its own manifest. It says nothing about two people
+   running `mothman cp qa` against the same dataset at the same time,
+   which are two processes with nothing between them. So "humans will
+   not trigger it" was wrong, and the honest statement is that
+   automation makes it ROUTINE rather than making it possible. **It becomes live the moment arrivals are
    processed CONCURRENTLY**: the trickle scenario in #1, and the
    event-driven AWS MVP where each object's arrival fires its own
    handler with nothing serialising them.
@@ -608,3 +656,43 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
     and the answer is a real, queryable declaration rather than a
     guess. Any rule of the form "tables in a cross-table relationship
     must arrive together" is defined by this map.
+
+12. **[todo, 2026-10-02]** **[Pipeline & publishing]** A way to UNDO a
+    QA run - take its results out of the reporting.
+
+    **Keith's own idea, 2026-10-02**, arrived at from the lock
+    contention above: if two people can run QA against the same
+    dataset at once, a person can also simply make a mistake - run the
+    wrong file, run against the wrong period, run a trial they meant
+    to throw away - and there is currently no way to take the results
+    back out.
+
+    **What exists today and why it is not enough.** `mothman supply
+    tidy` clears orphaned SCHEMAS, not recorded runs. Deleting a
+    delivery directory does NOT remove its run: CLAUDE.md records the
+    real incident where two orphaned Child Protection runs survived
+    both a directory deletion and a `--force` bootstrap, went on
+    feeding the dashboard, and broke a committed golden fixture - the
+    check is a query comparing `qa.run` against what
+    `arrivals.arrivals_for()` recognises, and there is no command for
+    it.
+
+    **The hard part is not deletion, it is what deletion MEANS.** A
+    run's results are evidence about a moment, and this project's
+    whole stance is that recorded history is not rewritten - the
+    decision log is append-only by a database trigger for exactly that
+    reason. So the likely shape is WITHDRAWN rather than DELETED: the
+    run stays, carrying who withdrew it and why, and every reader -
+    dashboard, promotion gate, tickets, the activity feed - excludes
+    it. That is the same move `check_lifecycle` already makes for a
+    retired check, and the same reasoning the reconciler uses for
+    never closing a ticket.
+
+    **Questions it raises**: whether a withdrawal cascades to a
+    PROMOTION the withdrawn run justified (it must, or the warehouse
+    holds a supply promoted on evidence nobody stands behind); whether
+    an operator can withdraw a run a decision now depends on at all,
+    or has to undo the decision first, which is REQ-PIPE-084 criterion
+    11's shape; and whether this is the same mechanism as a trial
+    (REQ-PIPE-103) seen from the other end - a trial is a run that was
+    never going to count, and this is one that stopped counting.
