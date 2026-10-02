@@ -317,6 +317,48 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
    Still worth costing separately, and independent of both: alerting
    on a SETTLED verdict rather than on every evaluation.
 
+   **TWO FACTS KEITH ASKED FOR DIRECTLY, 2026-10-02, and both are
+   better news than the discussion implied.**
+
+   **BUNDLING IS NOT WRITTEN UP ANYWHERE - it is not a requirement,
+   not a criterion, and nothing is built.** Checked against the whole
+   register: no acceptance criterion mentions a zip, an archive, a
+   delivery-start or delivery-end marker, or an upload-complete
+   signal. He was right not to remember discussing it. It is HIS OWN
+   idea from the 2026-10-01 conversation, it lives only in this file
+   (#2, #3 and here), and it is a proposal rather than a plan.
+
+   **AND NO, TRICKLING WOULD NOT FIRE REPEATED ALERTS - today, and
+   structurally rather than by luck.** Two reasons, both already
+   decided:
+   - **There is no email or SMS alerting at all.** The only
+     notification path that exists is GitHub tickets.
+   - **Tickets are per SLOT and RECONCILED, never per check result
+     and never reactive.** `ticket_reconciler`'s own first line is
+     "One ticket per slot, reconciled to its current state", and its
+     governing rule is "RECONCILE, NEVER REACT - every pass computes
+     where each slot IS and makes the ticket say that. Running it
+     twice over an unchanged world changes nothing." On top of that,
+     `REQ-GHUB-109` is post-on-change.
+   - **And a slot's state does not depend on a check verdict at all** -
+     verified, `slot_state.py` reads the decision log, the filings and
+     the clock, and never a check result. So a cross-table check going
+     transiently red cannot move a slot, cannot change a ticket, and
+     cannot raise anything.
+
+   **WHAT WOULD FLICKER IS THE DASHBOARD**, because a dataset's status
+   rolls up its check results - so a viewer watching during the ten
+   minutes sees colour move. That is a display question, and the
+   readiness distinction above is what makes it legible.
+
+   **SO THE RISK IS ENTIRELY IN A FUTURE ALERTING LAYER, and the rule
+   to write down now is which model it copies.** An alerting layer
+   keyed on CHECK RESULTS reintroduces every problem in this item. One
+   keyed on SLOT STATE, reconciled rather than reactive, inherits the
+   ticket design's own answer and has the problem solved before it is
+   built. The existing reconciler is the worked example, and it should
+   be named as the pattern when alerting is scoped.
+
 6. **[investigate, 2026-10-01]** **[Pipeline & publishing]** Parquet
    support for uploads - and no, one file cannot hold several tables.
 
@@ -406,11 +448,27 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
    collections the tables are disjoint, so there is nothing to
    contend for.
 
-   **It becomes live the moment arrivals are processed CONCURRENTLY**,
-   which is this file's own subject: the trickle scenario in #1, and
-   the event-driven AWS MVP where each object's arrival triggers its
-   own handler with nothing serialising them. So it is a real future
-   problem that belongs here, and not a blocker for 079.
+   **IT IS A THING TO SOLVE FOR REAL, AND IT COMES WITH AUTOMATION -
+   Keith, 2026-10-02**, settling both the status and the timing: it
+   will probably come into play, and humans will not trigger it. That
+   is right, and the reason is the serialisation above - a person
+   drives one `mothman` command at a time and the orchestrator chains
+   file, run and promote. **It becomes live the moment arrivals are
+   processed CONCURRENTLY**: the trickle scenario in #1, and the
+   event-driven AWS MVP where each object's arrival fires its own
+   handler with nothing serialising them.
+
+   So this is OPEN WORK rather than an observation - it needs a real
+   answer before the automation side ships, and it is not a blocker
+   for `REQ-PIPE-079`. The candidates, in rough order of how much they
+   cost: a repeatable-read transaction for the duration of a run; an
+   advisory lock per dataset held across promote; a statement timeout
+   on the promotion so it backs off rather than queueing behind a long
+   run; or accepting the wait and only MEASURING it, since a blocked
+   promotion is correct, just slow. Worth costing properly rather than
+   picking - and note the first two are the ones that also answer the
+   provenance wrinkle above, because they fix WHEN rather than
+   patching WHAT gets recorded.
 
    **SO THE BUNDLING RULE IS NOT NEEDED FOR CORRECTNESS**, which is
    the part that matters for #2, #3 and #5. It is still wanted for the
