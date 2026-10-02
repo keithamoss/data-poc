@@ -58,7 +58,7 @@ Not explained on a page of its own yet.
 
 Build state: partly built.
 
-One table that an agency supplies, with its own contract, its own checks, and its own slot in each period it takes part in.
+One table that an agency supplies, with its own checks and its own slot in each period it takes part in. Several datasets can share one contract, as Child Protection's six tables do.
 
 Not explained on a page of its own yet.
 
