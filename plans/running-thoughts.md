@@ -4626,3 +4626,16 @@ Belongs with batch 5's check work.
     skill, a separate copy-edit pass, or adjusting the house standard.
     Any change to either skill is an authoring-standard change, so the
     exact wording goes to Keith first.
+
+    **Cadence too, same evening.** Keith: the sentences "feel quite...
+    abrupt in places". Read GOV.UK's current guidance (2026-10-02,
+    guidance.publishing.service.gov.uk, writing-guidelines/right-tone and
+    clear-language). Its tone is "brisk, but not terse", and it says
+    "Write conversationally. Picture your audience and write as if you
+    were talking to them one-to-one". On length it says "Try to split up
+    sentences that are over 25 words long" - a target, where our
+    validator makes 25 a hard cap. It says nothing about varying sentence
+    length or rhythm. The numerals rule ("one" in words, digits for 2 to
+    9) is GOV.UK's own. Measured on the page: 67 sentences, mean 15.8
+    words, five of 7 words or fewer, and few joining words (so, because,
+    which means) between them - which reads as terse rather than brisk.
