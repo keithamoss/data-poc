@@ -4542,3 +4542,16 @@ Belongs with batch 5's check work.
     applied to `plans/explainers-glossary-draft.yaml`, with "in
     development" removed and both entries marked `idea: true` until
     this is scoped into a requirement.
+
+    **Fourth round, Keith 2026-10-02.** Sample data's last sentence
+    dropped; it now ends "None of it reaches a data asset's permanent
+    reporting", matching one-off data. "One-off check" replaces "trial"
+    as the term, with "trial" and "trial check" kept as aliases.
+    "Permanent reporting" confirmed over "live reporting". All applied
+    to the glossary draft.
+
+    **Code follow-on, Keith's own note:** the code says "trial"
+    throughout (`qa_tools/common/trial.py`, `trial_<stamp>` schemas,
+    `trial_run_id()`, REQ-PIPE-103's wording, CLI prompts). The rename
+    to "one-off check" belongs in the requirement this item becomes,
+    alongside retiring the `sample` schema and `no_calendar:`.

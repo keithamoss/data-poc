@@ -468,7 +468,7 @@ one when this line suggests it matters.
 - **#58** `todo` 2026-09-28 - The session-start hook reports "Node modules already installed" when they are installed but out of date.
 - **#59** `todo` 2026-09-29 - Reminder: move this repo over to a private repo.
 - **#60** `todo` 2026-09-30 - Simplify sample data: treat it as a one-off run, never kept in the database.
-  - *touches:* `tests/test_no_calendar.py`, `tests/test_sample_data.py`
+  - *touches:* `tests/test_no_calendar.py`, `tests/test_sample_data.py`, `qa_tools/common/trial.py`
 
 ## plans/explainers.md
 

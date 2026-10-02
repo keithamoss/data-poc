@@ -45,7 +45,7 @@ entries:
     idea: true
 
   - term: sample data
-    definition: "Data provided before a dataset's supply calendar is agreed, so we can build its checks. It may be real, synthetic or scrambled. We check it with one-off checks: a new round for each new set of sample data, or another round each time we add more checks. None of it reaches the data asset's permanent reporting. Each round's report and each tool's raw output are kept outside the system as the record."
+    definition: "Data provided before a dataset's supply calendar is agreed, so we can build its checks. It may be real, synthetic or scrambled. We check it with one-off checks: a new round for each new set of sample data, or another round each time we add more checks. None of it reaches a data asset's permanent reporting."
     aliases: [sample dataset, sample data collection]
     forms: []
     defined_by: []
@@ -283,14 +283,23 @@ entries:
     draft: false
     idea: false
 
-  - term: trial
-    definition: "A check of a supply someone received by hand, run without keeping it. Nothing from a trial is recorded."
-    aliases: [trial run]
-    forms: [trials]
-    defined_by: [REQ-PIPE-103]
+  - term: one-off check
+    definition: "Running a dataset's checks on data we don't keep, such as sample data or one-off data. It produces a report and each tool's raw output, for you to keep outside the system. Nothing from it reaches the data asset's permanent reporting."
+    aliases: [trial, trial check]
+    forms: [one-off checks]
+    defined_by: []
     page: null
     draft: false
-    idea: false
+    idea: true
+
+  - term: permanent reporting
+    definition: "What a data asset reports about its quality over time: its dashboard, and the history behind it. Only supplies that arrive on its supply calendar reach it."
+    aliases: []
+    forms: []
+    defined_by: []
+    page: null
+    draft: false
+    idea: true
 
   # ---------------------------------------------------------------- group 4, filing a supply
 
