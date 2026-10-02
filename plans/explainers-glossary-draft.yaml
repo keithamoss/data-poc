@@ -369,7 +369,7 @@ entries:
   # ---------------------------------------------------------------- group 5, filling the gaps
 
   - term: substitute
-    definition: "A person's decision that a period nobody supplied will use an earlier period's promoted supply instead. The period then shows as substituted."
+    definition: "A person's decision that a period nobody supplied will use an earlier period's promoted supply instead. The period then shows as substituted. For example, a supplier misses the second quarter entirely, so a person decides the second quarter will use the first quarter's supply."
     aliases: [standing in, last good one]
     forms: [substitutes, substituted, substituting, substitution, carried forward, carrying forward]
     defined_by: [REQ-PIPE-084, REQ-DASH-085]
@@ -425,7 +425,7 @@ entries:
     idea: false
 
   - term: blocked
-    definition: "Said of a table whose check cannot run because another table it compares against is missing or held. For example, a check that every placement names a real carer cannot run while this quarter's carers table is missing, so placements shows as blocked, even though nothing is wrong with the placements table itself. It is not the same as waiting on a person."
+    definition: "Said of a table whose check cannot run because another table it compares against is missing or held. For example, a check that every notification names a client in the clients table cannot run while this quarter's clients table is missing, so notifications shows as blocked, even though nothing is wrong with the notifications table itself. It is not the same as waiting on a person."
     aliases: []
     forms: []
     defined_by: [REQ-PIPE-079]
@@ -445,7 +445,7 @@ entries:
     idea: false
 
   - term: freshness
-    definition: "Capping a dataset's headline status when its latest expected supply is overdue. Every check may have passed, but the data on show is out of date, so the status should not read as fully green."
+    definition: "Whether a dataset's latest supply arrived when it should have. If it is overdue, the dataset cannot show as fully green, even when every check passed. It's about the supply being late, not about the data inside it."
     aliases: []
     forms: []
     defined_by: []
@@ -467,7 +467,7 @@ entries:
   # ---------------------------------------------------------------- group 9, looking back
 
   - term: in place on
-    definition: "A date picker in the reporting dashboard. Choose a date to see which supply had been promoted into each slot on that date."
+    definition: "A date picker in the reporting dashboard. Choose a date to see the whole data asset as it stood on that date: which supply was in each slot, and what its checks found. It uses everything we know today, including corrections made since. To see what the dashboard itself showed on a past date, open a snapshot instead."
     aliases: [as of]
     forms: []
     defined_by: [REQ-PIPE-081]
