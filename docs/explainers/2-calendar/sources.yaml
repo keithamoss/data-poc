@@ -40,6 +40,8 @@ sources:
   # Config and code
   - source: contract/data-asset.yaml
     context: The named calendars, their authored dates and claim windows, and which calendar each dataset names. The source of every real example.
+  - source: contract/child-protection-contract.yaml
+    context: Child Protection's data contract. Its contract-wide expected time and latency give every Child Protection table the same due time and grace allowance today.
   - source: qa_tools/common/schedule.py
     context: Reads the calendars and works out each dataset's periods.
   - source: qa_tools/common/slots.py
