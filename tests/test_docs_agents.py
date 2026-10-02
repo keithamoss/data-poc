@@ -157,7 +157,7 @@ def _quoted(text: str) -> str:
 
 
 def test_the_critic_carries_both_personas_word_for_word():
-    """REQ-DOCS-127 criteria 5 and 10."""
+    """REQ-DOCS-127 criteria 5 and 9."""
     criteria = _requirement("REQ-DOCS-127")["acceptance_criteria"]
     prompt = " ".join(body("docs-critic").split())
     personas = [c for c in criteria if "persona Keith approved on 2026-09-29, word for word" in c]
@@ -210,3 +210,45 @@ def test_the_fact_checker_searches_before_not_found():
     found' to claims a cited requirement's own title and criterion say."""
     assert ("Before you give a claim 'not found', search every cited source for the claim's key words, "
             "including each cited requirement's title and acceptance criteria.") in " ".join(body("docs-fact-checker").split())
+
+
+def test_the_finding_checker_judges_only_against_its_three_inputs():
+    """REQ-DOCS-133 criterion 8 (wording approved by Keith, 2026-10-02)."""
+    assert ("Judge each finding only against the criterion it names, the page, and the sources the page cites."
+            in " ".join(body("docs-finding-checker").split()))
+
+
+def test_the_fact_checker_gives_an_uncited_claim_not_found():
+    """REQ-DOCS-128 criterion 8 (wording approved by Keith, 2026-10-02):
+    'flagged' named no verdict."""
+    text = " ".join(body("docs-fact-checker").split())
+    assert "A sentence that makes a factual claim and cites nothing gets the verdict `not found`." in text
+    assert "cites nothing is flagged" not in text
+
+
+def test_the_writer_prompt_carries_its_brief_and_its_rules():
+    """REQ-DOCS-125 criteria 1 to 3, 6 to 8, 12, 14 and 15."""
+    text = " ".join(body("docs-writer").split())
+    for needle in ("at most 500 words before its list of sources", "a one-line non-scope",
+                   "five to eight questions", "two or three day-to-day operating questions",
+                   "the validator's rule ids", "`docs/explainers/<group>/sources.yaml`",
+                   "Read the requirements that DEFINE the concept first", "Never cite it",
+                   "only if Keith approved it at the brief", "fix only what the rejection names",
+                   "A signed-off page is never regenerated"):
+        assert needle in text, needle
+
+
+def test_the_illustrator_prompt_carries_its_choices_and_its_notes_file():
+    """REQ-DOCS-126 criteria 2, 3, 5 and 6."""
+    text = " ".join(body("docs-illustrator").split())
+    for needle in ("a story with the recurring cast, an everyday analogy, a scenario from a real kind of incident",
+                   "a short vignette or a few numbered panels", "Decide how many diagrams the page needs",
+                   "`docs/explainers/_work/<date>-<slug>/diagrams.md`, never on the page"):
+        assert needle in text, needle
+
+
+@pytest.mark.parametrize("agent", ex.DOCS_AGENTS)
+def test_every_docs_agent_runs_on_opus(agent):
+    """REQ-DOCS-125 to 128 and 133 each name Opus; the pin test above only
+    proves the id is not an alias."""
+    assert "opus" in front(agent)["model"]

@@ -44,7 +44,7 @@ def test_the_reviews_run_the_fact_checker_twice_and_check_its_quotes():
 
 
 def test_two_revision_loops_then_hand_back():
-    """Criterion 18."""
+    """Criterion 17."""
     assert "After two loops without sign-off, stop" in TEXT
 
 
@@ -93,3 +93,38 @@ def test_triage_shows_confirmed_findings_first_and_collapses_the_rest():
 def test_a_critic_sensitivity_blocker_holds_the_push_whatever_the_checker_says():
     """REQ-DOCS-129: the repository is public."""
     assert "whether or not docs-finding-checker confirmed it" in FLAT
+
+
+def test_the_first_explainer_keeps_both_versions_for_keith_alone_to_compare():
+    """REQ-DOCS-126 criteria 8 and 9, and REQ-DOCS-129 criterion 4."""
+    assert "For the FIRST real explainer only" in TEXT
+    assert "Keep a copy of the illustrated page in the working folder too" in TEXT
+    assert "Keith alone judges that comparison - no agent reviews it." in TEXT
+
+
+def test_check_findings_gets_the_saved_brief_by_its_path():
+    """REQ-DOCS-129 criterion 12: a bare filename would resolve against
+    wherever the main session happens to be."""
+    assert "--brief docs/explainers/_work/<date>-<slug>/questions.yaml" in TEXT
+    assert "--brief questions.yaml" not in TEXT
+
+
+def test_a_failed_agent_stops_the_run_and_nothing_half_written_is_pushed():
+    """REQ-DOCS-129's reliability constraint."""
+    assert "If an agent fails or stops partway, stop the run there." in TEXT
+    assert "never push a half-written page" in TEXT
+
+
+def test_the_snapshot_is_taken_after_the_main_sessions_own_last_edit():
+    """Found running the evals, 2026-10-02: a file edited after the
+    snapshot showed up as the agent's change."""
+    assert "after your own last edit" in TEXT
+
+
+def test_the_eval_procedure_is_written_down():
+    """REQ-DOCS-123: three fresh runs per page, pass only when all three
+    pass, scored against the expected file."""
+    section = TEXT.split("## Running the evals")[1]
+    for needle in ("three times, each in a fresh context", "only when all three runs pass",
+                   "never committed", "dated summary"):
+        assert needle in section, needle

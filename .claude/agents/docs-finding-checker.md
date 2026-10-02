@@ -33,6 +33,8 @@ Your prompt holds the critic's blocker and should-fix findings, each with an id,
 3. If the finding asks for content to be added or changed, read the sources the page cites to see whether they support it. Requirement ids are in `requirements.yaml` at the repository root; files are named by their path.
 4. Give one verdict: **confirmed** or **rejected**, and one sentence saying why.
 
+Judge each finding only against the criterion it names, the page, and the sources the page cites.
+
 Reject a finding when any of these is true:
 
 - the quoted text does not actually break the criterion the finding names;

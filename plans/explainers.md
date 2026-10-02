@@ -2364,11 +2364,14 @@ survives context compaction. Tick items off here as they land.
    "not found". One round of three showed no measurable gain from the
    search rule; it stays, recorded as unproven.
 
-   **STILL OPEN, for a fresh session:** walk REQ-DOCS-123, -125, -126,
-   -127, -128, -129, -131 and -133 criterion by criterion against the
-   code and the eval results, fill `linked_tests`/`implemented_by`/
-   `evidence`, and flip each that is met to built. Then this entry
-   comes out whole, its decisions already carried (rule 3). Not done
-   tonight because each is a 10 to 30 criterion audit, and a status
-   flipped without that walk is the failure CLAUDE.md's sign-off
-   section exists to stop.
+   **Audited and flipped, 2026-10-02 night (Keith: "Audit and flip to
+   built"):** eight read-only audit agents walked every criterion against
+   the code, tests and eval results. Built: REQ-DOCS-123, -127, -128,
+   -131 and -133, each with its remaining run-only criteria recorded as
+   unmet and blocked by REQ-DOCS-130, the first explainer. Kept in
+   progress, Keith's call: REQ-DOCS-125, -126 and -129, whose criteria
+   are mostly behaviour only a real /explain run shows (and -126 and
+   -129 say so in their own constraints). This entry comes out whole
+   when those three are built, as the paragraph above says; its
+   rejected options A and C are already carried in REQ-DOCS-127's and
+   REQ-DOCS-133's decisions.
