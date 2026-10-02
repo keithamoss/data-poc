@@ -156,7 +156,7 @@ entries:
     idea: false
 
   - term: claim window
-    definition: "The stretch of time in which a supply can be filed to a slot. It opens a set time before the slot's due time. It doesn't close at a set time: it closes when a later slot for the same dataset is filled. Until then, a late supply can still be filed to it, but once the next slot's window opens, a file that arrives on time for the next slot fills that one instead."
+    definition: "The stretch of time in which a supply can be filed to a slot. It opens a set time before the slot's due time. It does not close at a set time: it closes when a later slot for the same dataset is filled. Until then, a late supply can still be filed to it, but once the next slot's window opens, a file that arrives on time for the next slot fills that one instead."
     aliases: []
     forms: [claim windows]
     defined_by: [REQ-PIPE-052, REQ-PIPE-049]
@@ -275,7 +275,7 @@ entries:
     idea: false
 
   - term: one-off check
-    definition: "Running a dataset's checks on data we don't keep, such as sample data or one-off data. It produces a report and each tool's raw output, for you to keep outside the system. Nothing from it reaches the data asset's permanent reporting."
+    definition: "Running a dataset's checks on data we do not keep, such as sample data or one-off data. It produces a report and each tool's raw output, for you to keep outside the system. Nothing from it reaches the data asset's permanent reporting."
     aliases: [trial, trial check]
     forms: [one-off checks]
     defined_by: []
@@ -369,8 +369,8 @@ entries:
   # ---------------------------------------------------------------- group 5, filling the gaps
 
   - term: substitute
-    definition: "A person's decision that a period nobody supplied will stand on an earlier period's promoted supply. The period then shows as substituted."
-    aliases: [standing in, last good one, carry forward]
+    definition: "A person's decision that a period nobody supplied will use an earlier period's promoted supply instead. The period then shows as substituted."
+    aliases: [standing in, last good one]
     forms: [substitutes, substituted, substituting, substitution, carried forward, carrying forward]
     defined_by: [REQ-PIPE-084, REQ-DASH-085]
     page: null
@@ -378,7 +378,7 @@ entries:
     idea: false
 
   - term: inherit
-    definition: "When a dataset owes nothing in a period, the period stands on that dataset's most recent promoted supply instead. Nobody has to decide it."
+    definition: "When a dataset does not take part in a period, that period uses the dataset's most recent promoted supply instead. For example, in a data asset where most datasets arrive quarterly, an annual dataset supplied each August has nothing due in the other three quarters, so each of them uses the latest August supply. Mothman does this automatically when a period is set up, and a person can also do it by hand."
     aliases: []
     forms: [inherits, inherited, inheriting, inheritance]
     defined_by: [REQ-PIPE-098, REQ-PIPE-099, REQ-DASH-100]
@@ -387,7 +387,7 @@ entries:
     idea: false
 
   - term: de-substitute
-    definition: "A person's decision to undo a substitute, so the period no longer stands on an earlier supply. It always asks for confirmation first."
+    definition: "A person's decision to undo a substitute, so the period no longer uses an earlier period's supply."
     aliases: []
     forms: [de-substitutes, de-substituted, de-substituting, de-substitution]
     defined_by: [REQ-PIPE-084, REQ-GHUB-082]
@@ -396,7 +396,7 @@ entries:
     idea: false
 
   - term: un-inherit
-    definition: "A person's decision to remove what a period inherited, so the period no longer stands on that earlier supply."
+    definition: "A person's decision to undo an inheritance, so the period no longer uses that earlier supply."
     aliases: []
     forms: [un-inherits, un-inherited, un-inheriting]
     defined_by: [REQ-PIPE-099]
@@ -416,7 +416,7 @@ entries:
     idea: false
 
   - term: waiting on a person
-    definition: "Said of a supply that cannot go any further until someone makes a filing decision about it."
+    definition: "Said of a slot that cannot move on until a person acts. It may be a decision about a supply that arrived, such as whether to promote a resupply or a supply that failed its checks. Or it may be about a supply that never came, such as chasing the supplier."
     aliases: []
     forms: []
     defined_by: [REQ-DASH-070, REQ-PIPE-076]
@@ -425,7 +425,7 @@ entries:
     idea: false
 
   - term: blocked
-    definition: "Said of a healthy table whose check cannot run, because a neighbouring table it reads is missing or held. It never means waiting on a person."
+    definition: "Said of a table whose check cannot run because another table it compares against is missing or held. For example, a check that every placement names a real carer cannot run while this quarter's carers table is missing, so placements shows as blocked, even though nothing is wrong with the placements table itself. It is not the same as waiting on a person."
     aliases: []
     forms: []
     defined_by: [REQ-PIPE-079]
@@ -436,7 +436,7 @@ entries:
   # ---------------------------------------------------------------- group 7, how status works
 
   - term: no data
-    definition: "Said of a dataset with nothing to judge on the date being viewed. Mothman says so in words, never with a misleading blank."
+    definition: "Shown when a dataset has nothing to report on the date you're looking at, such as a date before its first supply arrived. The dashboard says no data rather than leaving a blank."
     aliases: [stale]
     forms: []
     defined_by: [REQ-PIPE-007, REQ-DASH-041]
@@ -445,7 +445,7 @@ entries:
     idea: false
 
   - term: freshness
-    definition: "A cap on a dataset's headline status when its newest expected supply is overdue, even though every check passed."
+    definition: "Capping a dataset's headline status when its latest expected supply is overdue. Every check may have passed, but the data on show is out of date, so the status should not read as fully green."
     aliases: []
     forms: []
     defined_by: []
@@ -456,7 +456,7 @@ entries:
   # ---------------------------------------------------------------- group 8, the checks
 
   - term: recency
-    definition: "The category of check that asks whether the data itself is recent enough. It is never about when a supply arrived."
+    definition: "A category of check that asks whether the data itself is recent enough, such as whether its newest record is from the last few weeks. It's not about when a supply arrived."
     aliases: [timeliness]
     forms: []
     defined_by: [REQ-QAC-024, REQ-QAC-001]
@@ -466,8 +466,8 @@ entries:
 
   # ---------------------------------------------------------------- group 9, looking back
 
-  - term: In place on
-    definition: "The date you choose to see which supply was promoted into each slot on that date."
+  - term: in place on
+    definition: "A date picker in the reporting dashboard. Choose a date to see which supply had been promoted into each slot on that date."
     aliases: [as of]
     forms: []
     defined_by: [REQ-PIPE-081]

@@ -133,3 +133,22 @@ Every other entry is built. Delivery agreement is the only proposed one. It is a
 - **The diagram's caption.** "Each arrival carries one supply" skips a file that cannot be loaded or placed. That is still an arrival, but it stages no table (REQ-PIPE-060, REQ-PIPE-057).
 - **data asset.** The fact that each asset is its own separate deployment with its own dashboard has no requirement, so I left it out. The definition now covers only the hierarchy, which REQ-QAC-039 and REQ-DASH-003 support.
 - **freshness.** It is an idea, and the wording comes from the plans' test scenario, not from a requirement. It is the least certain definition here.
+
+## Canon drift from REQ-DOCS-119's naming-session decision (found 2026-10-02)
+
+REQ-DOCS-119's decisions record the signed canon from the naming
+session. Keith's glossary review has since changed several parts of it,
+so that decision needs updating, with his approval of the exact wording,
+when the glossary moves out of plans:
+- demote: canon says "always with its destination (to staging or to
+  rejected)". Now: demote is only ever back to staging; a promoted
+  supply that will not be used is rejected.
+- acknowledge: canon alias "accept" - dropped.
+- in development: canon term with aliases pre-agreement, calendar-less,
+  not yet agreed - gone; sample data is the term (running-thoughts #60).
+- sample: canon "reserved for the practice-data asset shape" - now the
+  term for data provided before a calendar is agreed.
+- trial: canon term - now "one-off check", with trial and trial check
+  as aliases.
+- stale (alias of no data) and timeliness (alias of recency, the ODCS
+  name) - under review.
