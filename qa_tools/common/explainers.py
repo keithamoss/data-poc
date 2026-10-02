@@ -372,6 +372,69 @@ def eval_expectation_problems(exp: EvalExpectation, page_text: str) -> list[str]
     return problems
 
 
+# ---------------------------------------------------------- quote check
+#
+# REQ-DOCS-128 criteria 13 and 14. The fact-checker copies a supporting
+# quote before it gives each verdict; this checks the quote really is in
+# the source it names, so a paraphrase passed off as a quote is caught.
+
+_WS = re.compile(r"\s+")
+
+
+def _norm(s: str) -> str:
+    return _WS.sub(" ", s).strip()
+
+
+def _requirement_text(rid: str, repo: Path) -> str | None:
+    """Every field VALUE of one requirement, joined - never the raw YAML,
+    whose quoting and line folding would make a true quote fail."""
+    reqs = yaml.load((repo / "requirements.yaml").read_text(), Loader=_Loader)["requirements"]
+    req = next((r for r in reqs if r.get("id") == rid), None)
+    if req is None:
+        return None
+    out: list[str] = []
+
+    def walk(v) -> None:
+        if isinstance(v, dict):
+            for x in v.values():
+                walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+        elif v is not None:
+            out.append(str(v))
+
+    walk(req)
+    return _norm(" ".join(out))
+
+
+def quote_check(report: list[dict], repo: Path = REPO_ROOT) -> list[str]:
+    """Problems with a saved fact-checker report: a quote not found in
+    the source it names, or a source that cannot be read."""
+    problems: list[str] = []
+    for n, row in enumerate(report, 1):
+        quote = (row.get("quote") or "").strip()
+        if not quote:
+            continue
+        source = str(row.get("source") or "").strip()
+        rid = REQ_ID.fullmatch(source)
+        if rid:
+            text = _requirement_text(source, repo)
+            if text is None:
+                problems.append(f"row {n}: {source} is not in requirements.yaml")
+                continue
+        else:
+            path = source.rsplit(":", 1)[0] if re.search(r":\d+$", source) else source
+            f = repo / path
+            if not f.is_file() or not f.resolve().is_relative_to(repo.resolve()):
+                problems.append(f"row {n}: '{source}' is not a file in the repository")
+                continue
+            text = _norm(f.read_text())
+        if _norm(quote) not in text:
+            problems.append(f"row {n}: the quote is not in {source}: '{quote[:80]}'")
+    return problems
+
+
 # ------------------------------------------------------------- rendering
 
 
@@ -444,6 +507,6 @@ def glossary_is_current(repo: Path = REPO_ROOT) -> bool:
 __all__ = [
     "Category", "ConceptMap", "Glossary", "GlossaryEntry", "load_concept_map", "concept_map_problems",
     "SourceIndex", "load_source_index", "source_problem", "term_pattern",
-    "EvalExpectation", "EvalStep", "load_eval_expectation", "eval_expectation_problems", "ValidationError", "load_glossary", "glossary_problems",
+    "quote_check", "EvalExpectation", "EvalStep", "load_eval_expectation", "eval_expectation_problems", "ValidationError", "load_glossary", "glossary_problems",
     "render_glossary_md", "write_glossary_md", "glossary_is_current",
 ]

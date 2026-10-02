@@ -114,3 +114,24 @@ def glossary_command(check: bool) -> None:
         return
     out = explainers.write_glossary_md()
     console.print(f"Wrote {out.relative_to(explainers.REPO_ROOT)}.")
+
+
+@docs_group.command("quote-check")
+@click.argument("report", type=click.Path(path_type=Path, exists=True))
+def quote_check_command(report: Path) -> None:
+    """Check that every quote in a saved docs-fact-checker report appears
+    in the source it names (REQ-DOCS-128). Exits 1 on any mismatch."""
+    import yaml
+
+    from qa_tools.common import explainers
+
+    rows = yaml.safe_load(report.read_text()) or []
+    if not isinstance(rows, list):
+        console.print("The report must be a YAML list, one row per claim.")
+        raise SystemExit(1)
+    problems = explainers.quote_check(rows)
+    for p in problems:
+        console.print(f"[bold red]{p}[/]")
+    if problems:
+        raise SystemExit(1)
+    console.print(f"All {sum(1 for r in rows if (r.get('quote') or '').strip())} quotes found in their sources.")
