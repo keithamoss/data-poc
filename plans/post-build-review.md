@@ -4233,7 +4233,7 @@ twice. It deliberately did not re-find the `TypeError`.
     worse in the meantime: the same hold crashed at dbt before this
     change and crashes at Soda after it, and the corpus has no holds.
 
-73. **[investigate, 2026-10-02]** **[Pipeline & publishing]** `EARLY`
+73. **[done, 2026-10-02]** **[Pipeline & publishing]** `EARLY`
     may be unreachable through the real assignment path, because the
     slot list is capped at the arrival date.
 
@@ -4276,11 +4276,48 @@ twice. It deliberately did not re-find the `TypeError`.
     produce an `early` reading, it would produce a wrong `late` one,
     and the obvious conclusion would be that the classifier is broken.
 
-    **Not fixed here.** It is in the assignment path
-    (`REQ-PIPE-057`/`REQ-PIPE-062`), not in `REQ-PIPE-080`, and
-    changing which slot a supply is filed to is a change to agreed
-    behaviour - Keith's sign-off, per this file's own standing rule.
-    `REQ-PIPE-080`'s own resolver deliberately does NOT inherit the
-    cap (`filing._slot_named()`), because a supply re-filed FORWARD by
-    a person would otherwise lose its verdict; that much is fixed and
-    covered.
+    **FIXED 2026-10-02, with Keith's sign-off** ("we should definitely
+    fix that") - sought because changing which slot a supply is filed
+    to is a change to agreed behaviour, which this file's standing rule
+    reserves for him.
+
+    **The fix is the bound, not the rule.** `slots.claimable_until()`
+    returns the arrival date plus the dataset's claim window - the
+    window's REACH rather than today - and both call sites now use it.
+    Widening the list does not widen what may be CLAIMED:
+    `current_slot()` and `is_claimable()` still filter on
+    `claim_opens_at`, so a slot whose window is shut is offered and not
+    chosen, exactly as the daily feed has always done for the current
+    day. A test asserts that invariant in both directions so a careless
+    later fix cannot let a supply claim forward.
+
+    **IT IS TWO CALL SITES, NOT ONE, and the second was found by
+    enumerating consumers rather than by a failing page** - CLAUDE.md's
+    own shape-change rule earning its place. Once a supply can be FILED
+    to a slot whose period has not begun, it can be PROMOTED into it;
+    and `slot_state.states_for()` listed slots only up to `now`, so
+    that filled slot would have been absent from the dashboard. The
+    early supply would have been accepted, promoted, and then
+    invisible - a worse failure than the one being fixed, and
+    introduced BY fixing it. Both call sites now take the same
+    lookahead, and a structural test fails if either stops.
+
+    **NOTHING ALREADY RECORDED MOVES, measured rather than argued**: 0
+    of the real corpus's 150 supplies file to a different current slot
+    under the new bound, which is the same zero that made this latent
+    in the first place. Filings are write-once in any case, so only new
+    arrivals could differ.
+
+    Covered by `tests/test_claim_window_lookahead.py` (8 tests, 5
+    confirmed failing against the pre-fix code; the 3 that passed
+    before and after are the negative cases, there precisely to catch
+    an over-broad fix). One of them was wrong when first written - it
+    asserted that `slots_for_dataset()` never returns a slot before its
+    window opens, which the design has never promised and the daily
+    feed breaks every morning. Corrected to assert the real invariant,
+    about what `current_slot()` CHOOSES, rather than changing the code
+    to match a rule it never had.
+
+    `REQ-PIPE-080`'s own resolver already avoided the same cap
+    (`filing._slot_named()`), because a supply re-filed FORWARD by a
+    person would otherwise lose its verdict.

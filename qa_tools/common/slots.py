@@ -100,6 +100,59 @@ def _contract_timing(dataset_id: str) -> tuple[str, int, str | None]:
     return cadence["expected_time"], int(cadence["latency_minutes"]), override
 
 
+def claimable_until(dataset_id: str, at: date) -> date:
+    """How far ahead to generate slots for a supply arriving on `at`
+    (post-build-review #73).
+
+    THE BOUND IS THE WINDOW'S REACH, NOT TODAY. `slots_for_dataset`'s
+    `until` is a GENERATION bound - where to stop, which a cadence-rule
+    calendar needs because "every day" has no end. Passing the arrival
+    date turns it into a SELECTION rule saying a supply may only claim a
+    period that has already begun, which is precisely what the claim
+    window exists to contradict: the window's whole job is to let a
+    supply arrive BEFORE its slot's due instant and still be recognised
+    as that period's.
+
+    THE BUG THIS CLOSES, with its worked example, because the old
+    behaviour looks reasonable. Child Protection's 2023-Q3 is due
+    2023-08-01 and its window opens 2023-07-18. A supply arriving on
+    the 25th - a week early, exactly as the calendar allows - was
+    offered only Q1 and Q2, so it was filed against Q2, as a late
+    resupply, and read about twelve weeks LATE. The honest answer is
+    EARLY for Q3. Nothing was wrong with the classifier; it was handed
+    the wrong slot before it was asked.
+
+    ONE FEED HAD IT AND THE OTHER DID NOT, which is why it survived.
+    The fault bites only where the window reaches back ACROSS a period
+    boundary: four hours never leaves its own day, so Birth
+    Registrations was immune, while fourteen days reaches a fortnight
+    into the previous quarter - 14 days of every 91 exposed.
+
+    WIDENING THE LIST IS NOT WIDENING WHAT MAY BE CLAIMED.
+    `assignment.current_slot()` and `is_claimable()` still filter on
+    `claim_opens_at`, so a slot whose window has not opened is offered
+    and not chosen - the behaviour the daily feed has always had for
+    the current day. This only stops a claimable slot being absent.
+    """
+    return at + claim_window(dataset_id)
+
+
+def claim_window(dataset_id: str) -> timedelta:
+    """This dataset's claim window, as things stand today.
+
+    NOT EFFECTIVE-DATED, deliberately, and the difference from
+    `schedule.claim_window(on=...)` matters. That one answers "what
+    window applied to THIS period", which is what a slot's own
+    `claim_opens_at` needs. This one answers "how far ahead could any
+    slot's window reach", which is a bound on generation rather than a
+    property of a slot - so the widest current answer is the safe one,
+    and generating a period too many costs nothing because the slot it
+    makes is still filtered on its own `claim_opens_at`.
+    """
+    _, _, override = _contract_timing(dataset_id)
+    return schedule.claim_window(dataset_id, override)
+
+
 def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
     """Every slot this dataset has, oldest first.
 

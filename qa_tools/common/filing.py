@@ -279,8 +279,14 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                 continue
             if dataset_id not in slots_by_dataset:
                 try:
+                    # THE CLAIM WINDOW'S REACH, NOT THE ARRIVAL DATE
+                    # (post-build-review #73). Capping here at the
+                    # arrival date withheld the very slot a supply
+                    # arriving early is early FOR - see
+                    # slots.claimable_until() for the worked example.
                     slots_by_dataset[dataset_id] = slots_mod.slots_for_dataset(
-                        dataset_id, until=arrival.received_at.date())
+                        dataset_id, until=slots_mod.claimable_until(
+                            dataset_id, arrival.received_at.date()))
                 except (ValueError, KeyError, FileNotFoundError) as exc:
                     # A dataset whose schedule cannot be built yet gets
                     # no slots rather than taking the run down - the

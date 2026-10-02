@@ -112,8 +112,20 @@ releases:
   - date: "2026-10-02"
     summary: >
       Only the supply that turned up unexpectedly waits for you now - the
-      tables that arrived on time go through as they always did.
+      tables that arrived on time go through as they always did, and a
+      file sent ahead of its deadline is credited to the right quarter.
     changes:
+      - category: Fixed
+        items:
+          - headline: An early file counts for the quarter it was sent for
+            components: ["Pipeline & publishing"]
+            description: >
+              Suppliers may send a quarterly file up to a fortnight before
+              it is due. Until now one that arrived in that fortnight was
+              counted against the PREVIOUS quarter and recorded as about
+              three months late. It is now credited to the quarter it was
+              sent for, and reads as early. No existing supply changes -
+              none has ever arrived that far ahead.
       - category: Improved
         items:
           - headline: An early table no longer holds up the rest

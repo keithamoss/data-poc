@@ -8593,6 +8593,60 @@ requirements:
         be settled here rather than adjusted downstream.
     dependencies: [REQ-PIPE-051, REQ-PIPE-049, REQ-PIPE-048]
     decisions:
+      - >
+        CRITERION 5 WAS TRUE OF THE SLOT AND FALSE OF THE SYSTEM until
+        2026-10-02, and the fix is recorded here because this is where
+        the claim-window rule lives (post-build-review #73, fixed with
+        Keith's sign-off). Each slot's `claim_opens_at` was computed
+        correctly; what went wrong is that the slot was not OFFERED to
+        the assignment rule until its period had begun, so a window
+        this criterion says never closes had, in effect, not yet
+        opened.
+
+        THE CAUSE WAS ONE BOUND DOING TWO JOBS. `slots_for_dataset`'s
+        `until` is a GENERATION bound - where to stop, which a
+        cadence-rule calendar needs because "every day" has no end.
+        Callers selecting candidates passed the ARRIVAL DATE, which
+        turns it into a selection rule: a supply may only claim a
+        period that has already begun. Worked example, measured:
+        cp-clients' 2023-Q3 is due 2023-08-01 with a 14-day window
+        opening 2023-07-18, and a supply arriving on the 25th was
+        offered only Q1 and Q2 - so it filed against Q2 as a late
+        resupply and read about twelve weeks LATE where the honest
+        answer is EARLY for Q3.
+
+        WHY ONE FEED HAD IT AND THE OTHER DID NOT, which is why it
+        survived this long: the fault bites only where the window
+        reaches back ACROSS a period boundary. Four hours never leaves
+        its own day, so Birth Registrations was immune; fourteen days
+        reaches a fortnight into the previous quarter, exposing 14 days
+        of every 91.
+
+        THE FIX IS `claimable_until()` - the arrival date plus the
+        dataset's claim window - at the call sites rather than inside
+        `slots_for_dataset()`. REJECTED putting it in the generator:
+        that function also backs `mothman schedule show`, where
+        silently adding a quarter nobody asked for would be its own
+        bug. And widening the list does not widen what may be CLAIMED,
+        because `current_slot()` and `is_claimable()` still filter on
+        `claim_opens_at` - a slot whose window is shut is offered and
+        not chosen, exactly as the daily feed has always done for the
+        current day.
+
+        `claim_window(dataset_id)` here is deliberately NOT
+        effective-dated, unlike `schedule.claim_window(on=...)`. That
+        one answers "what window applied to THIS period", which a
+        slot's own `claim_opens_at` needs; this one bounds GENERATION,
+        where the widest current answer is the safe one and a period
+        too many costs nothing.
+
+        LATENT WHEN FOUND, measured rather than argued: 0 of the real
+        corpus's 150 supplies file to a different current slot under
+        the new bound, because the generator sends nothing early. The
+        reason it was worth fixing anyway is REQ-GEN-044, whose job is
+        to start generating early supplies - they would have read LATE
+        by about a quarter, and the arrival classifier would have got
+        the blame for a slot it never chose.
       - Decided each TABLE claims its own slot rather than a collection
         filling one slot as a unit (Keith, 2026-09-21). Everything
         before that had assumed one table per supply, which holds for
@@ -8675,6 +8729,8 @@ requirements:
     implemented_by:
       - qa_tools/common/slots.py::Slot
       - qa_tools/common/slots.py::slots_for_dataset
+      - qa_tools/common/slots.py::claimable_until
+      - qa_tools/common/slots.py::claim_window
       - qa_tools/common/slots.py::is_claimable
       - qa_tools/common/slots.py::is_overdue
       - qa_tools/common/slots.py::next_unfilled_claimable
@@ -11468,6 +11524,13 @@ requirements:
       - "Config and promotion state only, no read of anything under data/ beyond what the pipeline run legitimately holds open."
     dependencies: [REQ-PIPE-052, REQ-PIPE-061, REQ-PIPE-034]
     decisions:
+      - >
+        THE SLOT LIST IS BOUNDED BY THE CLAIM WINDOW'S REACH, NOT BY
+        TODAY (post-build-review #73, fixed 2026-10-02 with Keith's
+        sign-off). This call site passed the arrival date, which
+        withheld the very slot an early supply is early FOR -
+        REQ-PIPE-052's own decisions carry the full account and the
+        worked example. Changing which slot a supply is filed to is a change to agreed behaviour, hence the sign-off; measured as latent, 0 of the real corpus's 150 supplies move.
       - "The rule, stated once: assign to the oldest slot whose CLAIM WINDOW is open and which is unfilled; if there is no such slot, it is a RESUPPLY of the most recently filled slot - amended by the on-time-wins branch below and by monotonic filling in REQ-PIPE-063."
       - "Decided NEVER CLAIM FORWARD, and the reason is asymmetric risk rather than taste. Mis-attributing an arrival backwards - calling a new delivery a resupply - is one contained error on one supply. Mis-attributing it forwards cascades through every future delivery. The claim window is what makes 'cannot' literal rather than likely: a slot whose window has not opened cannot be claimed at all."
       - "The FORWARD cascade, recorded in full because the broken rule reads perfectly reasonable and would be re-proposed. Daily feed due 12:00 Monday. Mon 14:00 arrives, red, rejected, Monday still unfilled. Mon 16:00 arrives, green, promoted, Monday filled. Mon 20:00 a third file arrives - under 'oldest unfilled slot' the oldest unfilled is TUESDAY, so a Monday resupply files as Tuesday's delivery; the next takes Wednesday; every later supply is off by one permanently. The cause: 'oldest unfilled slot' assumes every arrival fills a NEW obligation, and a resupply does not."
@@ -16732,6 +16795,13 @@ requirements:
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-GHUB-027, REQ-PIPE-098]
     open_questions: []
     decisions:
+      - >
+        THE SLOT LIST IS BOUNDED BY THE CLAIM WINDOW'S REACH, NOT BY
+        TODAY (post-build-review #73, fixed 2026-10-02 with Keith's
+        sign-off). This call site passed the arrival date, which
+        withheld the very slot an early supply is early FOR -
+        REQ-PIPE-052's own decisions carry the full account and the
+        worked example. Found here by enumerating consumers rather than by a failing page: once a supply can be FILED to a slot whose period has not begun it can be PROMOTED into it, and a list stopping at `now` would have made that filled slot invisible - the early supply accepted and then unshowable, a worse fault than the one being fixed and introduced BY fixing it.
       - >
         `gh` IS NOT INSTALLED IN THIS CONTAINER, AND THAT IS WHAT MAKES
         CRITERION 17 OBSERVABLE. "Where the ticketing service cannot be

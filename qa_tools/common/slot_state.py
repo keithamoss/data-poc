@@ -235,8 +235,15 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
     out: list[SlotState] = []
     for entry in hierarchy.datasets_in_collection(collection_id):
         try:
-            dataset_slots = slots_mod.slots_for_dataset(entry.dataset_id,
-                                                         until=now.date())
+            # THE SAME BOUND FILING USES (post-build-review #73), and
+            # it has to be the same one: once a supply can be FILED to
+            # a slot whose window has opened but whose period has not
+            # begun, it can be promoted into it - and a slot this list
+            # stops short of is a filled slot the page cannot show. The
+            # early supply would be accepted and then invisible.
+            dataset_slots = slots_mod.slots_for_dataset(
+                entry.dataset_id,
+                until=slots_mod.claimable_until(entry.dataset_id, now.date()))
         except (ValueError, KeyError, FileNotFoundError) as exc:
             # The blast-radius rule this batch applies everywhere: one
             # dataset whose schedule cannot be built must not cost the
