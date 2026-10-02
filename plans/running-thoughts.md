@@ -4565,3 +4565,23 @@ Belongs with batch 5's check work.
     Open question when scoped: is a zip one arrival carrying several
     tables (so one receipt time for all of them), or is it unpacked
     into one arrival per file inside it?
+
+62. **[investigate, 2026-10-02]** **[Pipeline & publishing]** Amber
+    acknowledgement: the register disagrees with itself, and the
+    mechanism may not run today. Found writing the glossary's
+    "acknowledge" entry with Keith.
+    - REQ-PIPE-091's decisions say "accept this amber supply" is NOT a
+      decision and there is NO acknowledgement entry type (Keith,
+      2026-09-27, withdrawing his own comment). REQ-PIPE-092's
+      decisions, the same day, say an amber accept IS a new entry type
+      and that accepting bars automatic promotion ("happy with that,
+      signed off"). Both requirements are `built`. The code has no
+      acknowledge operation in `filing_decisions.OPERATIONS`.
+    - What exists is REQ-QAC-017's older path: comment `/accept` on the
+      dataset's QA ticket, `acceptance_sync.py` matches it to a run, and
+      the dashboard shows an acknowledgement badge beside the
+      still-amber pill. But its docstring reads windows from committed
+      `qa_results/` (gone since REQ-PIPE-089), and `ticket-sync.yml` is
+      disabled, so it very likely does nothing today.
+    Needs Keith: which of the two decisions stands, and whether
+    acknowledging is meant to work right now.

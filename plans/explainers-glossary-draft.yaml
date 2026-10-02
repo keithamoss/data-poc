@@ -239,7 +239,7 @@ entries:
     idea: false
 
   - term: early
-    definition: "Said of a supply that arrived before the due time of the slot it was filed to. Only ever about arrivals."
+    definition: "Said of a supply that arrived before its slot's due time. Early is fine. It says when the supply arrived, never how good its data is."
     aliases: []
     forms: []
     defined_by: [REQ-PIPE-066]
@@ -248,7 +248,7 @@ entries:
     idea: false
 
   - term: on time
-    definition: "Said of a supply that arrived at or after its slot's due time, but within its grace allowance. Only ever about arrivals."
+    definition: "Said of a supply that arrived at or after its slot's due time, but within its grace allowance. It says when the supply arrived, never how good its data is."
     aliases: []
     forms: []
     defined_by: [REQ-PIPE-066]
@@ -257,7 +257,7 @@ entries:
     idea: false
 
   - term: late
-    definition: "Said of a supply that arrived after its slot's due time and grace allowance had both passed. Only ever about arrivals."
+    definition: "Said of a supply that arrived after its slot's due time and grace allowance had both passed. It says when the supply arrived, never how good its data is."
     aliases: []
     forms: []
     defined_by: [REQ-PIPE-066]
@@ -266,7 +266,7 @@ entries:
     idea: false
 
   - term: QA run
-    definition: "One pass of Mothman's checks over newly arrived data, set off by the data arriving rather than by a clock."
+    definition: "One pass of Mothman's checks over newly arrived data. It starts when the data arrives, not at a set time of day."
     aliases: []
     forms: [QA runs]
     defined_by: [REQ-PIPE-036]
@@ -295,7 +295,7 @@ entries:
   # ---------------------------------------------------------------- group 4, filing a supply
 
   - term: staging
-    definition: "Where every arriving supply waits, checked but not yet decided on, until it is promoted or rejected."
+    definition: "Where every arriving supply waits after its checks, until it is decided on. Mothman promotes a green or amber supply from staging automatically when its slot is empty. Anything else waits for a person, who can promote it or reject it."
     aliases: []
     forms: []
     defined_by: [REQ-PIPE-060, REQ-PIPE-076]
@@ -304,7 +304,7 @@ entries:
     idea: false
 
   - term: filing decision
-    definition: "A recorded choice about where a supply belongs or what a period stands on, made by a person or by a rule."
+    definition: "A recorded choice about where a supply belongs, made by a person or by a rule, such as promoting, rejecting or re-filing it."
     aliases: []
     forms: [filing decisions]
     defined_by: [REQ-GHUB-082, REQ-PIPE-074]
@@ -313,7 +313,7 @@ entries:
     idea: false
 
   - term: promote
-    definition: "To move a supply out of staging into its period, which fills its slot. A green or amber supply promotes itself into an empty slot."
+    definition: "To move a supply out of staging into its period, which fills its slot. Mothman promotes a green or amber supply automatically when its slot is empty. A person can also promote a supply, such as a red one they have decided to use anyway."
     aliases: []
     forms: [promotes, promoted, promoting, promotion]
     defined_by: [REQ-PIPE-075, REQ-PIPE-062]
@@ -331,7 +331,7 @@ entries:
     idea: false
 
   - term: demote
-    definition: "A person's decision to take a promoted supply out of its period, always with a destination: demote to staging, or demote to rejected."
+    definition: "A person's decision to take a promoted supply out of its period and put it back in staging, which leaves its slot unfilled. To take a promoted supply out and not use it at all, a person rejects it instead."
     aliases: [un-decide]
     forms: [demotes, demoted, demoting, demotion]
     defined_by: [REQ-PIPE-076, REQ-GHUB-082]
@@ -340,7 +340,7 @@ entries:
     idea: false
 
   - term: re-file
-    definition: "A person's decision to move a supply to a different slot from the one the rule chose."
+    definition: "A person's decision to move a supply to a different slot from the one the rule chose. For example, a supplier sends their third-quarter file before the third quarter's claim window opens, so the rule files it to the second quarter. A person re-files it to the third quarter."
     aliases: []
     forms: [re-files, re-filed, re-filing]
     defined_by: [REQ-GHUB-082]
@@ -349,8 +349,8 @@ entries:
     idea: false
 
   - term: acknowledge
-    definition: "A person's note that they have seen an amber supply and are content with it. It changes nothing about where the supply is filed."
-    aliases: [accept]
+    definition: "A person's note that they have seen an amber supply and are content for it to stand. They make it by commenting /accept on the dataset's QA ticket in GitHub. The dashboard then shows an acknowledgement badge beside the supply's status, which stays amber. It changes nothing about where the supply is filed."
+    aliases: []
     forms: [acknowledges, acknowledged, acknowledging]
     defined_by: [REQ-QAC-017]
     page: null
