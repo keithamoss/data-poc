@@ -23452,40 +23452,26 @@ requirements:
     dependencies: [REQ-PIPE-035, REQ-PIPE-036]
     open_questions:
       - >
-        IS REQ-PIPE-059'S HOLD REACHABLE AT ALL AFTER CRITERION 1?
-        Raised 2026-09-30 by Keith, asking whether six objects
-        trickling into an S3 prefix are treated identically to one zip
-        of the same contents. Criterion 6 holds several files claiming
-        one dataset "within ONE arrival", which requires an arrival to
-        be able to contain more than one file. Criterion 1 says every
-        arriving FILE is its own arrival. `Arrival.held` is computed as
-        the datasets where more than one file matched, so under one
-        file per arrival it can never be non-empty and the
-        delivery-level hold has no producer left. Decision 4
-        anticipated the shape of this - "the hold is only within one
-        arrival" - but not that the case might become unrealisable.
-      - >
-        AND NOTHING IN THIS SYSTEM UNDERSTANDS AN ARCHIVE, which is
-        what would give criterion 6 a case again. Checked 2026-09-30:
-        neither docs/delivery-format.md, contract/data-asset.yaml,
-        delivery.py nor arrival_patterns.py mentions zip, tar or any
-        container, and every arrival pattern matches a bare `.csv`. A
-        zip arriving today matches no dataset and is reported as an
-        unrecognised artefact. So "a zip is one arrival holding several
-        files" is an INFERENCE about how it would work rather than
-        anything designed - recorded because it was stated to Keith as
-        though it were settled, and it is not.
-      - >
-        WHICH LEAVES THE PACKAGING DECIDING THE OUTCOME, and that is
-        the part worth settling before this is built. Two files both
-        claiming cp_clients are HELD when they share an arrival and NOT
-        held when they arrive separately (criterion 6's second
-        sentence): identical bytes, different treatment, decided by
-        whether the transport happened to bundle them. Decision 4
-        argues it well and it is defensible. It is also the kind of
-        rule that surprises an operator - and REQ-PIPE-078's hold store
-        now carries a `delivery-level` kind that would go quiet without
-        anybody noticing.
+        ANSWERED 2026-10-02 - KEPT AS A RECORD OF WHAT WAS ASKED
+        rather than deleted, because the three questions that stood
+        here were one decision and the answer is what unblocked this
+        requirement and REQ-PIPE-079 with it.
+
+        They asked whether REQ-PIPE-059's delivery-level hold is
+        reachable at all after criterion 1 (it is not - `Arrival.held`
+        can never be non-empty once an arrival is one file), whether
+        an archive could give it a case again (nothing here
+        understands one, checked), and what to do about the packaging
+        deciding the outcome. Keith's answer: RETIRE the hold, because
+        CONTESTED subsumes it. The full account, including the
+        correction that contested is never worse than the hold rather
+        than a trade-off, is in the decisions below, and criterion 6
+        is amended to match.
+
+        NOTHING HERE IS WAITING ON ANYBODY. This field is a record,
+        not a queue - a question left standing after it has been
+        answered is the stale-deferral problem REQ-DOCS-073 exists to
+        prevent, one field over.
     decisions:
       - >
         REQ-PIPE-059'S DELIVERY-LEVEL HOLD IS RETIRED, AND CONTESTED
@@ -23527,6 +23513,28 @@ requirements:
         it is consistent with REQ-PIPE-079's decision 14 - "ambiguity
         blocks the table, not its readers" - which revised exactly this
         behaviour once already.
+
+        AND THE COST WAS OVERSTATED WHEN THE CHOICE WAS PUT TO HIM,
+        which is worth correcting here rather than leaving a decision
+        recorded against a worse trade-off than it actually is. It was
+        framed as a straight swap: a hold makes the table unreadable,
+        contested lets other checks read the period's promoted
+        version. Keith then asked what happens when two cp_clients
+        files arrive alongside the other five tables, and working it
+        through against the code showed the fall-back is NOT always
+        available.
+
+        `period_schema.promoted_in()` is scoped to ONE period, and
+        promotion happens AFTER QA - so on the FIRST supply of a
+        period nothing is promoted to fall back to, the table is
+        absent, and contested behaves exactly like the hold did. The
+        fall-back earns its keep only for a RESUPPLY into an
+        already-filled period, where it genuinely does save the
+        sibling tables' cross-table checks.
+
+        SO CONTESTED IS NEVER WORSE THAN THE HOLD AND SOMETIMES
+        BETTER. There was no trade-off to accept, and the decision is
+        stronger than the argument it was made on.
 
         REJECTED re-scoping the hold by period instead of retiring it:
         it keeps the stricter unreadable-table behaviour at the price
