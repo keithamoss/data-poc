@@ -394,13 +394,31 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
    until a period's arrivals are judged complete - which is the
    completeness problem again, from the alerting side.
 
-   **IN TODAY'S BATCH PIPELINE IT STILL WOULD NOT FLAP**, which is
-   worth separating from the above so nobody reads a present-tense
-   bug into it: `ticket_reconciler` runs ONCE at the end of
-   `run_manifest`, after every arrival has been processed, so the
-   intermediate states are never reconciled. It is the EVENT-DRIVEN
-   shape - one run per arrival, reconcile after each - where every
-   intermediate state becomes a ticket and then an alert.
+   **SETTLED: ALERTING KEYS ON SLOT STATE, NEVER ON CHECKS** (Keith,
+   2026-10-02 - "definitely not checks, that'd be too noisy"). So the
+   volume question above is closed; what remains open is preventing
+   the alert, not shaping it.
+
+   **AND "TODAY'S BATCH PIPELINE WOULD NOT FLAP" IS NOT A MITIGATION -
+   it is an artefact of the harness, and recording it as reassurance
+   was a mistake.** It is true: `ticket_reconciler` runs ONCE at the
+   end of `run_manifest`, after every arrival, so no intermediate
+   state is ever reconciled. Keith's reply is the right one and is why
+   this is demoted rather than deleted: that is a property of how the
+   synthetic data and the supply injection happen to work now, not a
+   property of the design. In the scenario this whole file is about -
+   datasets trickling in, automatically, one run per arrival - it
+   flaps.
+
+   **THE SAME ERROR AS THE 15% FIGURE EARLIER THE SAME WEEK**, and
+   worth naming as a pattern rather than twice as an incident:
+   `REQ-PIPE-077`'s gate appeared to fire on 15% of deliveries, and
+   that turned out to be the generator's fiction rather than the
+   model's behaviour. Here a problem appears not to occur, and that is
+   the batch harness rather than the design. Both directions of the
+   same mistake - reading a property of the test setup as a property
+   of the system. The guard is the same in both: ask what the REAL
+   arrival pattern would be before drawing the conclusion.
 
 6. **[investigate, 2026-10-01]** **[Pipeline & publishing]** Parquet
    support for uploads - and no, one file cannot hold several tables.
