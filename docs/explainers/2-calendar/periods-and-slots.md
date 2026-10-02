@@ -62,15 +62,15 @@ Each of Child Protection's 6 tables is a **[dataset](../glossary.md#dataset)**, 
 
 ## One expectation per collection almost works
 
-The plainest design expects Child Protection's tables as one batch, once per period. That works whenever all 6 arrive together. The flaw shows when one is missing, because the whole batch then reads as short and 5 punctual tables are dragged down by one. One slot per table fixes that. The empty slot names the missing table, and the rest stand alone.
+The plainest design expects Child Protection's tables as one batch, once per period, and that works whenever all 6 arrive together. The flaw shows when one is missing, because the whole batch then reads as short and 5 punctual tables are dragged down by one. One slot per table fixes that, because the empty slot names the missing table and the rest stand alone.
 
 ## One period, shared by every table
 
 A period carries 2 things – a name and a date – and nothing else. Child Protection's tables all follow the quarterly **[supply calendar](../glossary.md#supply-calendar)**, a named set of periods that datasets share. On it, 2026-Q3 is one period, shared by all 6 tables.
 
-In everyday speech a period is a stretch of time, such as a quarter. In Mothman it is one named date. So 2026-Q1 (supply due 1 February 2026) does not mean January to March.
+In everyday speech a period is a stretch of time, such as a quarter, but in Mothman it is one named date. So when you see 2026-Q1 (supply due 1 February 2026), it does not mean January to March.
 
-A calendar can be a rule, such as every day, or a list of dates, as Child Protection's quarterly one is. On a list like that, each period's name is written out by hand, never worked out from the date. Once a period exists, it stays put. A later edit to the calendar applies only from its own start date, so a quarter filed last year still reads the same next year.
+A calendar can be a rule, such as every day, or a list of dates, as Child Protection's quarterly one is. On a list like that, each period's name is written out by hand, never worked out from the date. Once a period exists it stays put, because a later edit to the calendar applies only from its own start date. So a quarter filed last year still reads the same next year.
 
 ## A slot is one table in one period
 
@@ -107,7 +107,7 @@ flowchart TD
 
 *One empty slot names one missing table, and the other 5 slots stand on their own.*
 
-The one thing to notice is the shape: one period branches into 6 separate slots, and only Placements is coloured differently. Placements being empty does not make the other 5 late or empty.
+The one thing to notice is the shape: one period branches into 6 separate slots, and only Placements is coloured differently. Each branch stands apart, so Placements being empty does not make the other 5 late or empty.
 
 Each slot also carries its own timing. Its **[due time](../glossary.md#due-time)** is its period's date at its own dataset's time of day. Its **[grace allowance](../glossary.md#grace-allowance)** is the extra time a supply gets after that. Today all 6 Child Protection tables share a 9am due time and an 8-hour grace allowance, because their contract sets both once for the collection. A table that needs a different time can be given its own, and only its own slots change.
 
@@ -115,7 +115,7 @@ A slot counts as **[filled](../glossary.md#filled)** once a supply is **[promote
 
 ## No slot where a table does not take part
 
-Case Workers is the odd one out in Child Protection. It is a staffing register, sent twice a year, so it takes part only in the February and August periods. It has slots in 2026-Q1 and 2026-Q3, and none in 2026-Q2 (supply due 1 May 2026) or 2026-Q4 (supply due 1 November 2026). So Child Protection has 6 slots in 2026-Q3 and 5 in 2026-Q2.
+Case Workers is the odd one out in Child Protection, because it is a staffing register sent twice a year. So it takes part only in the February and August periods, which gives it slots in 2026-Q1 and 2026-Q3. It has none in 2026-Q2 (supply due 1 May 2026) or 2026-Q4 (supply due 1 November 2026). That is why Child Protection has 6 slots in 2026-Q3 but only 5 in 2026-Q2.
 
 No slot means nothing is owed, so a missing Case Workers file in May is not a gap. A dataset can also mark one period as a **[not-expected period](../glossary.md#not-expected-period)**, one it owes nothing in, with a reason given beforehand. That period still shows, but it has no slot.
 
@@ -123,8 +123,8 @@ No slot means nothing is owed, so a missing Case Workers file in May is not a ga
 
 - We chose one slot per table, and rejected a collection filling one slot as a unit. Earlier designs assumed one table per supply, which holds for Birth Registrations, the only table in its collection, but not for Child Protection's 6. Judging each table on its own is more honest than the whole batch taking the worst result.
 - We chose a period that carries a date and nothing else, and rejected a deadline on the period. Birth Registrations is due at 2pm with an hour's grace, so a supply of it at 4pm is late. Now picture it sharing a period with a table due at 5pm. A period deadline could hold only one of those times, and set at 5pm it would pass that late supply as on time. That false all-clear is the mistake that matters most.
-- We chose to work slots out from the calendar, and rejected writing them down. The quarterly calendar is heading for about 30 datasets over years of periods. A slot that nobody writes down cannot drift from its calendar.
-- We chose one shared calendar that each dataset takes part in, rather than a list of dates for each dataset. A dataset can still have its own dates, but only as an exception. 30 lists would drift, with one saying 2 February and another saying 3 February, and nothing would flag it.
+- We chose to work slots out from the calendar, and rejected writing them down. The quarterly calendar is heading for about 30 datasets over years of periods, which makes a lot of slots to keep in step. A slot that nobody writes down cannot drift from its calendar.
+- We chose one shared calendar that each dataset takes part in, rather than a list of dates for each dataset. A dataset can still have its own dates, but only as an exception. Otherwise, 30 lists would drift, with one saying 2 February and another saying 3 February, and nothing would flag it.
 
 ## Putting it together
 
