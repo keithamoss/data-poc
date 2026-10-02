@@ -18,7 +18,7 @@ findings:
   - id: R1-F2
     severity: should fix
     criterion: operating question 1
-    quote: "So when a slot is still empty after its due time and grace allowance have passed, check staging before chasing the supplier."
+    quote: "So a slot still empty after its due time may have a supply waiting in staging, because a staged supply never fills one."
     suggestion: "Tell the reader that the dashboard emails the team as soon as a slot becomes overdue, so they know a gap will reach them without looking."
   - id: R1-F3
     severity: should fix

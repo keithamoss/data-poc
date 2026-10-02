@@ -1563,7 +1563,7 @@ slaProperties:
   # runs.py's own _quarter_start() anchor exactly (Feb/May/Aug/Nov,
   # day 1) - this is the same real cadence rule the data is actually
   # generated against, not a separate, potentially-drifting copy of it.
-  # latency (8 business hours) is deliberately much larger than BDM's
+  # latency (480 minutes, eight clock hours) is deliberately much larger than BDM's
   # daily 60 min - Keith's own call: a quarterly refresh's own latency
   # tolerance is a real but much less pressing concern than a daily
   # feed's.
