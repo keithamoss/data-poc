@@ -45,13 +45,20 @@ the rest of the queue against a register that recorded a decision he
 had already reversed.
 
 Worth knowing before picking work off that queue, because it is not
-obvious from the outside: THREE of the six signed-and-unbuilt
+obvious from the outside: **FOUR** of the six signed-and-unbuilt
 requirements cannot close without opening a door this file or the
 unsigned calendar work owns. `REQ-PIPE-105`'s unbuilt half IS the
 arrival unit, which is the substance of this file; `REQ-PIPE-078`'s
 last two criteria moved to `REQ-PIPE-115`, which is parked pending
-research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
-`REQ-PIPE-110`/`113`, which are unsigned. That leaves
+research; `REQ-GEN-044`'s criteria 8-11 are repointed at
+`REQ-PIPE-110`/`113`, which are unsigned; and **`REQ-PIPE-079`'s
+wiring joined them 2026-10-02** - the overlay needs a per-run period,
+only `fan_out()` supplies one, and under 105 an arrival carries one
+dataset and therefore one period, so 105 removes the need for fan-out
+rather than merely preceding it. Keith's call that day was to pause
+079's wiring rather than build a mechanism 105 deletes; the full
+reasoning, and the nine real arrivals that have no single period, are
+in `REQ-PIPE-079`'s own decisions. That leaves
 `REQ-PIPE-080` and `REQ-PIPE-081` as the genuinely clean ones.
 
 ---

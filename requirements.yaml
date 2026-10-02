@@ -3403,7 +3403,7 @@ requirements:
       - qa_tools/common/period_schema.py::check_readiness
       - qa_tools/common/period_schema.py::fan_out
       - qa_tools/common/period_schema.py::newest
-      - qa_tools/common/period_schema.py::reference_view
+      - qa_tools/common/drift_reference.py::reference_for
       - qa_tools/common/period_schema.py::period_schema
     evidence:
       - >
@@ -3472,9 +3472,20 @@ requirements:
           this project keeps deleting, and it would put a fabricated
           period into committed QA history. Turning it on is one call
           at the top of each orchestrator once filings are recorded.
-        owner: the promotion sprint (batch 4)
+
+          AMENDED 2026-10-02: filings ARE recorded now, so the original
+          blocker is gone - and a second one took its place. The
+          overlay needs a per-run PERIOD, and nine real arrivals have
+          none, because they file five datasets to one quarter and
+          cp-case-workers to another. fan_out() is what would supply
+          one; REQ-PIPE-105 removes the need for it entirely by making
+          every arrival one file, one dataset, one period. Keith's call
+          that day was to wait for 105 rather than build fan-out for a
+          shape 105 deletes - see REQ-PIPE-079's own decisions.
+        owner: REQ-PIPE-105, which makes every arrival single-period
         blocked_by:
           sprints: [11]
+          requirements: [REQ-PIPE-105]
       - criterion: >
           Criteria 6, 7 and 8 - red-for-unrun - are built as a decision
           function with its own tests, but no check's verdict is
@@ -3486,21 +3497,41 @@ requirements:
           likely to be re-derived wrongly - without it every new dataset
           starts life red on all its drift checks, which is how people
           learn to ignore a signal.
-        owner: the promotion sprint (batch 4)
+
+          AMENDED 2026-10-02: still true, and now waiting on the same
+          thing the overlay waits on - red-for-unrun is asked of a run
+          scoped to a period, and REQ-PIPE-105 is what gives every run
+          one. Wiring it alone was considered and rejected: it would
+          tell a reader WHY a table is absent while what the check
+          reads is still assembled the old way, which is two accounts
+          of one run from two mechanisms.
+        owner: REQ-PIPE-105, which makes every arrival single-period
         blocked_by:
           sprints: [11]
-      - criterion: >
-          Criterion 9's temporal reference resolves a PERIOD schema, and
-          today's drift check still compares against a fixed reference
-          RUN (run_01) rather than a reference period.
-        why: >
-          Reference periods need promotion for the same reason as above.
-          reference_view() is built, tested as a real cross-schema VIEW
-          rather than a copy, and is what the drift check moves onto.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
+          requirements: [REQ-PIPE-105]
     decisions:
+      - >
+        CRITERION 9 IS MET, BY A DIFFERENT ROUTE THAN THE ONE PLANNED,
+        and its deferral was deleted rather than left to go stale
+        (2026-10-02). The plan was `reference_view()`, a view onto the
+        reference period's table. REQ-QAC-108 shipped 2026-09-29 and
+        answers the same question from the reference run's RECORDED
+        NUMBERS instead - `drift_reference.reference_for()` finds the
+        most recent earlier period holding a promoted supply, and
+        `run_evidently_cp._reference_frame()` rebuilds the comparison
+        frame from recorded value counts. That satisfies criterion 9
+        more strongly than the plan did: there is no copy AND no second
+        database, because nothing is read out of the reference period
+        at all. `reference_view()` is deleted, having never had a
+        caller, and `implemented_by` names the route that really
+        serves this.
+
+        Worth knowing because the deferral said the opposite until
+        today - "today's drift check still compares against a fixed
+        reference RUN (run_01)" was true when written and stopped
+        being true three days later, with nothing to notice. A
+        deferral naming a mechanism rather than an outcome goes stale
+        the moment somebody meets the outcome another way.
       - >
         SCOPE NARROWED 2026-09-24 (Keith), in a requirement already
         signed on 2026-09-23. This covered three separable things: the
@@ -14469,11 +14500,12 @@ requirements:
     non_functional_requirements:
       - >
         Everything this needs is BUILT and unwired - fan_out(),
-        create_overlay_views(), reference_view() and the red-for-unrun
-        decision function all exist with their own tests against the
-        real rule. The work is the wiring and the verification that the
-        real pipeline's output is what those units promised, not new
-        machinery.
+        create_overlay_views() and the red-for-unrun decision function
+        all exist with their own tests against the real rule. The work
+        is the wiring and the verification that the real pipeline's
+        output is what those units promised, not new machinery.
+        (`reference_view()` was in this list and is deleted - criterion
+        3 is met by REQ-QAC-108 instead, see the decisions.)
       - >
         This legitimately changes the recorded QA history's shape, so the
         seeded regenerate-and-diff correctness check this project relies
@@ -14500,30 +14532,114 @@ requirements:
         forbids evidence on anything not built, and a status that
         overclaims is worse than one that cannot carry the detail.
 
-        THE DECISION LAYER IS DONE - every rule about what a check may
-        read and what it should say when it cannot. Criteria 4, 5, 14,
-        15 and 16: `period_schema.check_readiness()` and `_why_missing()`
-        tell four reasons a table is absent apart, most specific first,
-        because "overdue" sends somebody to chase a supplier who has
-        already sent it while "staged awaiting a decision" sends them to
-        decide. Criteria 6 and 7: `reevaluation.plan()` and `mark()`.
-        Criteria 11, 12 and 13: a contested table offers nothing of its
-        own, a check that merely READS it resolves against the period's
-        promoted version, and the table's own checks do not run and it
-        is not promoted.
+        THE DECISION LAYER IS WRITTEN - every rule about what a check
+        may read and what it should say when it cannot. Criteria 4, 5,
+        14, 15 and 16: `period_schema.check_readiness()` and
+        `_why_missing()` tell four reasons a table is absent apart, most
+        specific first, because "overdue" sends somebody to chase a
+        supplier who has already sent it while "staged awaiting a
+        decision" sends them to decide. Criteria 6 and 7:
+        `reevaluation.plan()` and `mark()`. Criteria 11, 12 and 13: a
+        contested table offers nothing of its own, a check that merely
+        READS it resolves against the period's promoted version, and
+        the table's own checks do not run and it is not promoted.
 
-        THE WIRING IS NOT - criteria 1, 2, 3, 8 and 9.
-        `create_overlay_views()`, `fan_out()` and `reference_view()` are
-        built and tested and NOTHING CALLS ANY OF THEM. The orchestrators
-        still assemble a run's schema with
-        `supply_db.create_run_views()` plus `borrow_views()` - this
-        run's own staged tables, with the ones it did not carry BORROWED
-        FROM AN EARLIER RUN rather than read from the period's promoted
-        state. Swapping the one for the other is the whole of the
-        remaining work, and it is a real piece of work rather than a
-        repoint: it changes what every Child Protection cross-table
-        check reads.
+        THE WIRING IS NOT - criteria 1, 2, 8, 9 and 10.
+        `create_overlay_views()` and `fan_out()` are built and tested
+        and NOTHING CALLS EITHER. The orchestrators still assemble a
+        run's schema with `supply_db.create_run_views()` plus
+        `borrow_views()` - this run's own staged tables, with the ones
+        it did not carry BORROWED FROM AN EARLIER RUN rather than read
+        from the period's promoted state. Swapping the one for the
+        other is a real piece of work rather than a repoint: it changes
+        what every Child Protection cross-table check reads.
 
+      - >
+        THE "WRITTEN" ABOVE USED TO READ "DONE", AND THAT WAS WRONG -
+        CORRECTED 2026-10-02 by grepping for a production caller of
+        every function this requirement names. There is none, for any
+        of them: `check_readiness()`, `_why_missing()`,
+        `reevaluation.plan()`, `reevaluation.mark()`,
+        `create_overlay_views()` and `fan_out()` are reached only by
+        their own tests. So criteria 4, 5, 6, 7, 11, 12, 14, 15 and 16
+        are no more observable in the running system than the wiring
+        criteria are, and the remaining work is roughly double what the
+        decision above claimed.
+
+        TWO GENUINE EXCEPTIONS, so this does not overstate it.
+        `held_blast_radius` IS wired in both orchestrators and produces
+        a red naming a held table, which approximates one of the four
+        absence reasons for the held case. And criterion 13's "SHALL
+        NOT promote it" half is live through
+        `should_promote(contested=...)`; its "SHALL NOT run that
+        table's own checks" half is not.
+
+        AND THE REGISTER AS A WHOLE WAS NOT WRONG, which is worth
+        saying because the first draft of this note said it was.
+        REQ-PIPE-035 covers the same functions and records all of it
+        accurately in `unmet_criteria` - built but not wired, no
+        verdict produced through the decision function. It was THIS
+        requirement's decision 1 that overclaimed, in prose, where 035
+        used the structured field a gate can see.
+
+        Worth recording as a shape rather than a one-off: a function
+        that is built, tested and uncalled reads exactly like a
+        finished one from inside its own test file. The check that
+        catches it is grepping for a caller, not reading the tests -
+        and recording the answer somewhere mechanical, as 035 did,
+        rather than in a paragraph.
+      - >
+        CRITERION 3 IS MET BY REQ-QAC-108, not by anything here, and
+        `reference_view()` IS DELETED (2026-10-02, Keith's call).
+        REQ-QAC-108 shipped 2026-09-29 and resolves a drift reference
+        to the most recent earlier period holding a PROMOTED supply,
+        which is what criterion 3 asks for - but it resolves it to that
+        period's RECORDED NUMBERS rather than to its table.
+        `run_evidently_cp._reference_frame()` rebuilds the comparison
+        frame from recorded value counts, falling back to the warehouse
+        only for a run that has never been QA'd, so nothing ever
+        selects from the reference period's schema and the view
+        `reference_view()` created had no reader. Both orchestrators
+        already call `drift_reference.reference_run_for_arrival()`.
+        REJECTED keeping it documented-as-unused: it is a second,
+        live-table route to a reference that the recorded-numbers route
+        deliberately avoids, and git holds it if ever wanted.
+      - >
+        THE WIRING IS PAUSED UNTIL REQ-PIPE-105 LANDS (Keith,
+        2026-10-02), and the reason is a dependency this requirement
+        did not know it had. THE OVERLAY NEEDS A PER-RUN PERIOD, and
+        today a Child Protection run has none - `_build_run_views()`
+        composes purely from this arrival's staged tables plus
+        `borrow_views()`, with no period anywhere in it. `fan_out()` is
+        what supplies one. So the overlay and the fan-out are not
+        separable criteria that happen to sit together; one is the
+        other's precondition.
+
+        AND NINE REAL ARRIVALS HAVE NO SINGLE PERIOD. The 1 May 2023
+        Child Protection delivery files five datasets to 2023-Q2 and
+        `cp-case-workers` to 2023-Q1. Choose Q2 for that run and
+        case-workers' supply is not in Q2's staged set, so the overlay
+        reads it from Q2's promoted state and the supply that actually
+        arrived is never checked - which collides with REQ-PIPE-077
+        criterion 1, that an off-cycle supply SHALL have QA run on it.
+        Resolving it per dataset instead is the table-by-table
+        composition decision 3 below rejected.
+
+        WHICH IS WHY 105 SETTLES IT RATHER THAN DEFERRING IT: under
+        REQ-PIPE-105 an arrival carries one file, one dataset and
+        therefore one period, so the run's period is simply
+        `filing.period_of()` and `fan_out()` is never needed at all.
+        Wiring now would mean building fan-out, and churning run
+        identity across `qa.run`, `tables_read`, `dataset_stats`, the
+        dashboard and `drift_reference.run_for()`, purely to serve a
+        shape 105 deletes.
+
+        REJECTED wiring the decision layer alone in the meantime. It
+        needs no per-run period and would have been safe, but it tells
+        a reader WHY a table is absent while what the check reads is
+        still assembled the old way - two accounts of the same run from
+        two mechanisms, which is the condition this project keeps
+        removing rather than creating.
       - >
         CRITERION 10 NOW CONTRADICTS REQ-PIPE-105 CRITERION 5, AND THAT
         IS FOR KEITH RATHER THAN FOR ME TO SETTLE. This one says a run
@@ -17248,9 +17364,14 @@ requirements:
         itself - recorded so a later session does not read the silence
         as a decision either way.
       - >
-        The mechanism already exists: this is the logical-name-to-physical-table indirection REQ-PIPE-035 establishes, aimed one
-        schema further back, and reference_view() is already built and
-        tested as a real cross-schema VIEW rather than a copy.
+        The mechanism already exists: this is the
+        logical-name-to-physical-table indirection REQ-PIPE-035
+        establishes, aimed one schema further back, and
+        `period_schema.create_overlay_views()` is already built and
+        tested as building real cross-schema VIEWS rather than copies.
+        (This decision cited `reference_view()` when written; that
+        function was deleted 2026-10-02 as uncalled, and the point it
+        was making is unaffected - see REQ-PIPE-035's own decisions.)
       - >
         CHAINS ARE SETTLED - decision 10 rules that a substitution may
         reach any earlier period that received a REAL supply and never
@@ -17345,9 +17466,12 @@ requirements:
       - >
         IT IS A PLAIN DATABASE VIEW (criterion 2, Keith, 2026-09-28,
         on how he pictures it). "Indirection" was accurate and vague;
-        reference_view() is already built and tested as a real
-        cross-schema VIEW, so the criterion may as well say what the
-        thing is. Never a copy, which was never in doubt.
+        this project already builds real cross-schema views for exactly
+        this, so the criterion may as well say what the thing is. Never
+        a copy, which was never in doubt. (The function cited when this
+        was written, `reference_view()`, was deleted 2026-10-02 as
+        uncalled; `substitution.substitute()` is what builds the view
+        this criterion is about.)
       - >
         WHAT RE-RUNS IS THE CROSS-TABLE CHECKS, AND NOTHING ELSE
         (criterion 6, Keith, 2026-09-28, working through it aloud and

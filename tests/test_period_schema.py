@@ -328,46 +328,6 @@ class TestRedForUnrun:
         assert verdict.reason == ps.MISSING_TABLE
 
 
-class TestATemporalReferenceIsACrossSchemaRead:
-    """Criterion 9: within the same database, never a copy into a
-    separate one."""
-
-    def test_the_reference_period_is_readable_from_the_runs_own_schema(self, conn):
-        _promote(conn, "2026-Q2", "clients__20260501010000", [1, 2, 3])
-        _stage(conn, "clients__20260901010000", [9])
-        res = ps.create_overlay_views(
-            conn, "run_1", "2026-Q3",
-            staged={"clients": ["clients__20260901010000"]})
-
-        name = ps.reference_view(conn, "run_1", "clients", "2026-Q2",
-                                  ps.promoted_in(conn, "2026-Q2", ["clients"])["clients"])
-
-        assert name == "clients__reference"
-        assert conn.execute(
-            f'SELECT COUNT(*) FROM "{res.resolution.schema}"."{name}"').fetchone()[0] == 3
-        # The current period's own table is untouched by it.
-        assert conn.execute(
-            f'SELECT n FROM "{res.resolution.schema}"."clients"').fetchall() == [(9,)]
-
-    def test_it_is_a_VIEW_rather_than_a_copy(self, conn):
-        """A copy would make the comparison a snapshot of whenever the
-        copy was taken rather than of the period."""
-        _promote(conn, "2026-Q2", "clients__20260501010000", [1])
-        ps.create_overlay_views(conn, "run_1", "2026-Q3", staged={})
-        ps.reference_view(conn, "run_1", "clients", "2026-Q2",
-                           ["clients__20260501010000"])
-
-        kind = conn.execute(
-            "SELECT table_type FROM information_schema.tables "
-            "WHERE table_schema = ? AND table_name = ?",
-            [supply_db.run_schema("run_1"), "clients__reference"]).fetchone()
-        assert kind[0] == "VIEW"
-
-    def test_an_empty_reference_period_reports_nothing_rather_than_an_empty_view(self, conn):
-        ps.create_overlay_views(conn, "run_1", "2026-Q3", staged={})
-        assert ps.reference_view(conn, "run_1", "clients", "2026-Q2", []) is None
-
-
 class TestAMixedPeriodDeliveryFansOut:
     """Criteria 1 and 2: one QA run per period, never a warehouse
     spanning more than one."""

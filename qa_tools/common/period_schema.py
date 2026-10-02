@@ -557,31 +557,6 @@ def contested_own_checks(contested: Iterable[str],
         if check_id_mod.parse(cid).dataset in datasets)
 
 
-def reference_view(conn, run_id: str, logical: str, reference_period: str,
-                    promoted: Sequence[str]) -> str | None:
-    """Expose a reference period's table to this run, as a view in the
-    run's own schema (criterion 9).
-
-    A CROSS-SCHEMA READ WITHIN THE SAME DATABASE, never a copy into a
-    separate one. Both period schemas are in the one database, so this
-    costs a view definition and no data movement - and a copy would
-    make the comparison a snapshot of whenever the copy was taken
-    rather than of the period.
-
-    Named `<logical>__reference` so a check's own table and its
-    reference cannot be confused for one another in a query somebody
-    reads later.
-    """
-    physical = newest(promoted)
-    if physical is None:
-        return None
-    name = f"{logical}__reference"
-    conn.execute(
-        f'CREATE OR REPLACE VIEW "{supply_db.run_schema(run_id)}"."{name}" AS '
-        f'SELECT * FROM "{period_schema(reference_period)}"."{physical}"')
-    return name
-
-
 # --------------------------------------------------------------------
 # Fan-out (criteria 1 and 2)
 # --------------------------------------------------------------------
