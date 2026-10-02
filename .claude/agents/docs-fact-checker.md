@@ -53,7 +53,7 @@ Return one fenced YAML block, a list with one row per claim, and nothing else af
   quote: "<the exact supporting or contradicting passage>"
 ```
 
-Sort rows with contradicted, not found and sources disagree first, then exempt and story, then supported. Name the exact source for every row, as a requirement id or a file and line. The main session saves the table and checks every quote against its source, so a quote you did not copy exactly will be caught.
+Sort rows with contradicted, not found and sources disagree first, then exempt and story, then supported. Name exactly one source for every row: a requirement id alone, such as REQ-PIPE-052, or one file and line, such as contract/data-asset.yaml:142. Add nothing else to the source. If a claim rests on two sources, give it two rows. The main session saves the table and checks every quote against its source, so a quote you did not copy exactly will be caught.
 
 ## Never
 

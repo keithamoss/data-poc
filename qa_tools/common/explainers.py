@@ -408,30 +408,51 @@ def _requirement_text(rid: str, repo: Path) -> str | None:
     return _norm(" ".join(out))
 
 
+def _source_text(source: str, repo: Path) -> tuple[str | None, str | None]:
+    """The text one named source holds, or why it cannot be read. A
+    requirement id may carry a location note after it, such as
+    'REQ-PIPE-075 (requirements.yaml:13251)', and a file may carry a line
+    or a line range - both are forms the fact-checker really writes."""
+    req = re.match(r"(REQ-[A-Z]+-\d+)(?:\s*\(.*\))?$", source)
+    if req:
+        text = _requirement_text(req.group(1), repo)
+        return (text, None) if text is not None else (None, f"{req.group(1)} is not in requirements.yaml")
+    path = re.sub(r":\d+(?:-\d+)?$", "", source)
+    f = repo / path
+    if not f.is_file() or not f.resolve().is_relative_to(repo.resolve()):
+        return None, f"'{source}' is not a file in the repository"
+    return _norm(f.read_text()), None
+
+
 def quote_check(report: list[dict], repo: Path = REPO_ROOT) -> list[str]:
     """Problems with a saved fact-checker report: a quote not found in
-    the source it names, or a source that cannot be read."""
+    the source it names, or a source that cannot be read.
+
+    A row may name several sources separated by ';', with its quotes
+    joined by ' / '. Each quote must then be in one of them - never
+    split across two, which would let a stitched-together quote pass."""
     problems: list[str] = []
     for n, row in enumerate(report, 1):
         quote = (row.get("quote") or "").strip()
         if not quote:
             continue
         source = str(row.get("source") or "").strip()
-        rid = REQ_ID.fullmatch(source)
-        if rid:
-            text = _requirement_text(source, repo)
-            if text is None:
-                problems.append(f"row {n}: {source} is not in requirements.yaml")
+        texts: list[str] = []
+        for part in (s.strip() for s in source.split(";")):
+            if not part:
                 continue
-        else:
-            path = source.rsplit(":", 1)[0] if re.search(r":\d+$", source) else source
-            f = repo / path
-            if not f.is_file() or not f.resolve().is_relative_to(repo.resolve()):
-                problems.append(f"row {n}: '{source}' is not a file in the repository")
-                continue
-            text = _norm(f.read_text())
-        if _norm(quote) not in text:
-            problems.append(f"row {n}: the quote is not in {source}: '{quote[:80]}'")
+            text, problem = _source_text(part, repo)
+            if problem:
+                problems.append(f"row {n}: {problem}")
+            else:
+                texts.append(text)
+        if len(texts) != len([s for s in source.split(";") if s.strip()]):
+            continue
+        if any(_norm(quote) in t for t in texts):
+            continue
+        missing = [q for q in quote.split(" / ") if not any(_norm(q) in t for t in texts)]
+        if missing:
+            problems.append(f"row {n}: the quote is not in {source}: '{missing[0][:80]}'")
     return problems
 
 

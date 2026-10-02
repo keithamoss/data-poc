@@ -149,6 +149,12 @@ def test_the_fact_checker_lists_story_sentences_but_still_checks_facts_inside_th
     assert "then exempt and story, then supported" in text
 
 
+def test_the_fact_checker_names_one_source_per_row():
+    """REQ-DOCS-128 (Keith, 2026-10-02): quote-check tolerates drift, the
+    prompt still asks for the strict form."""
+    assert "Name exactly one source for every row" in body("docs-fact-checker")
+
+
 def test_the_fact_checker_returns_one_yaml_table_with_the_four_verdicts():
     """REQ-DOCS-128 criteria 1 and 2."""
     text = body("docs-fact-checker")

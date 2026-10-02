@@ -56,3 +56,30 @@ def test_the_command_exits_non_zero_on_a_bad_quote(tmp_path):
     report.write_text(yaml.safe_dump([row("REQ-PIPE-052", "SHALL NOT require a slot to be authored")]))
     result = CliRunner().invoke(cli, ["docs", "quote-check", str(report)])
     assert result.exit_code == 0, result.output
+
+
+# The forms docs-fact-checker actually wrote on its first eval run
+# (REQ-DOCS-123, 2026-10-02). Every row was refused as "not a file", so
+# quote-check reported a whole correct report as failing.
+
+def test_a_requirement_with_a_location_note_reads_the_requirement():
+    assert ex.quote_check([row("REQ-PIPE-075 (requirements.yaml:13251-13253)",
+                               "THE SYSTEM SHALL treat a slot as filled only where a supply has been promoted into it")]) == []
+
+
+def test_a_file_with_a_line_range_reads_the_file():
+    assert ex.quote_check([row("contract/data-asset.yaml:125-127",
+                               "anchored on the 1st of February, May, August and November")]) == []
+
+
+def test_two_sources_and_two_quotes_each_quote_must_be_in_one_of_them():
+    good = row("contract/data-asset.yaml:60; REQ-PIPE-052 (requirements.yaml:8526)",
+               "THE DATES ARE THE SUPPLIER AGREEMENT. / THE SYSTEM SHALL create one slot per dataset per period")
+    assert ex.quote_check([good]) == []
+    bad = row("contract/data-asset.yaml:60; REQ-PIPE-052",
+              "THE DATES ARE THE SUPPLIER AGREEMENT. / words neither source says")
+    assert ex.quote_check([bad]) and "words neither source says" in ex.quote_check([bad])[0]
+
+
+def test_a_location_note_cannot_smuggle_in_an_unknown_requirement():
+    assert "REQ-PIPE-999 is not in requirements.yaml" in ex.quote_check([row("REQ-PIPE-999 (requirements.yaml:1)", "x")])[0]
