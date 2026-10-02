@@ -81,7 +81,7 @@ The green slots each hold a supply. The red one is the gap Sam spotted.
 
 Build state: partly built.
 
-A supply fills its slot only when it is **promoted**, which means moved out of staging and into its period. Staging is where every new supply waits after its checks have run.
+A supply fills its slot only when it is **promoted**, which means moved out of staging and into its period. Staging holds every supply that nobody has decided on yet.
 
 Mothman promotes a green or amber supply automatically when its slot is empty. A red supply stays in staging until a person decides what to do with it.
 
@@ -99,7 +99,7 @@ Build state: partly built.
 
 - We chose one slot per dataset per period, rather than one per collection. A single late table then shows up on its own, instead of hiding among 6.
 - We chose periods that never move, rather than recalculating them when the calendar changes. A past due date always means what it meant at the time.
-- We chose to hold a red supply in staging for a person, rather than promote it automatically. A queue waiting on a person is the check doing its job, not a hold-up.
+- We chose to hold a red supply in staging for a person, rather than promote it automatically. A queue of red supplies waiting on a person is the intended result, not a hold-up.
 
 Each period comes from the calendar. Each dataset gets its own slot in every period it takes part in. A slot stays empty until a supply is promoted into it. Next, read the [glossary](../../../../docs/explainers/glossary.md) entry for claim window, which decides which slot a supply fills.
 
