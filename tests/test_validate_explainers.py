@@ -273,3 +273,113 @@ def test_list_rules_prints_every_rule():
     out = CliRunner().invoke(cli, ["docs", "validate", "--list-rules"]).output
     for rule in v.RULES:
         assert rule in out
+
+
+# ---- REQ-DOCS-121: the source index and the recall check
+
+GLOSSARY = {
+    "categories": [{"key": "c", "title": "C"}],
+    "entries": [
+        {"term": "slot", "definition": "One expected supply.", "aliases": [], "forms": [],
+         "defined_by": ["REQ-DOCS-900"], "page": None, "draft": False, "idea": False, "category": "c"},
+        {"term": "promote", "definition": "Move it in.", "aliases": [], "forms": ["promotion"],
+         "defined_by": ["REQ-DOCS-901"], "page": None, "draft": False, "idea": False, "category": "c"},
+    ],
+    "diagram": "x",
+}
+
+
+def with_glossary(repo: Path) -> None:
+    (repo / "docs/explainers/glossary.yaml").write_text(yaml.safe_dump(GLOSSARY, sort_keys=False))
+
+
+def recall(repo: Path) -> list[str]:
+    return [f.message for f in v.Validator(repo).run() if f.rule == "recall"]
+
+
+def test_a_defined_term_must_cite_its_defining_requirement(repo):
+    with_glossary(repo)
+    write(repo, GOOD.replace("Sam wonders where it will land.", "Sam meets a **promotion** today."))
+    msgs = recall(repo)
+    assert len(msgs) == 1 and "'promote'" in msgs[0] and "REQ-DOCS-901" in msgs[0]
+
+
+def test_a_passing_mention_needs_no_citation(repo):
+    with_glossary(repo)
+    write(repo, GOOD.replace("Sam wonders where it will land.", "Sam waits for the promotion."))
+    assert recall(repo) == []
+
+
+def test_a_cited_definition_passes(repo):
+    with_glossary(repo)
+    write(repo, GOOD.replace("Sam wonders where it will land.", "Each period has one **slot** per dataset."))
+    assert recall(repo) == []
+
+
+@pytest.mark.parametrize("word", ["promoted", "promoting", "Promotes", "PROMOTION"])
+def test_regular_inflections_and_listed_forms_match(repo, word):
+    with_glossary(repo)
+    write(repo, GOOD.replace("Sam wonders where it will land.", f"It was **{word}** today."))
+    assert recall(repo), word
+
+
+def test_bold_in_the_sources_list_does_not_count(repo):
+    with_glossary(repo)
+    write(repo, GOOD.replace("- [contract/data-asset.yaml]", "- **promotion** [contract/data-asset.yaml]"))
+    assert recall(repo) == []
+
+
+@pytest.mark.parametrize("src,msg", [
+    ("plans/explainers.md", "neither may be cited"),
+    ("CLAUDE.md", "neither may be cited"),
+    ("REQ-DOCS-999", "not in requirements.yaml"),
+    ("contract/missing.yaml", "not a file in the repository"),
+])
+def test_a_page_cannot_cite_plans_claude_or_what_does_not_exist(repo, src, msg):
+    write(repo, GOOD.replace("  - contract/data-asset.yaml\n", f"  - contract/data-asset.yaml\n  - {src}\n")
+                    .replace("- [contract/data-asset.yaml](../../../contract/data-asset.yaml)",
+                             f"- [contract/data-asset.yaml](../../../contract/data-asset.yaml)\n- {src}"))
+    assert any(msg in f.message for f in v.Validator(repo).run() if f.rule == "sources")
+
+
+def test_front_matter_and_the_closing_list_must_agree(repo):
+    write(repo, GOOD.replace("- [contract/data-asset.yaml](../../../contract/data-asset.yaml)\n", ""))
+    msgs = [f.message for f in v.Validator(repo).run() if f.rule == "sources"]
+    assert msgs and "add contract/data-asset.yaml to the list" in msgs[0]
+
+
+def write_index(repo: Path, body: dict) -> Path:
+    path = repo / "docs/explainers/2-calendar/sources.yaml"
+    path.write_text(yaml.safe_dump(body, sort_keys=False))
+    return path
+
+
+def test_a_good_source_index_passes(repo):
+    write_index(repo, {"group": "2-calendar", "sources": [
+        {"source": "REQ-DOCS-900", "context": "What a slot is."},
+        {"source": "contract/data-asset.yaml", "context": "The calendars."}]})
+    assert v.Validator(repo).run() == []
+
+
+def test_a_source_index_is_strict(repo):
+    write_index(repo, {"group": "2-calendar", "sources": [{"source": "REQ-DOCS-900"}]})
+    assert any(f.rule == "sources-schema" for f in v.Validator(repo).run())
+
+
+@pytest.mark.parametrize("src", ["plans/supply-model.md", "CLAUDE.md", "REQ-DOCS-999", "nope.yaml"])
+def test_a_source_index_cannot_list_what_may_not_be_cited(repo, src):
+    write_index(repo, {"group": "2-calendar", "sources": [{"source": src, "context": "x"}]})
+    assert any(f.rule == "sources" for f in v.Validator(repo).run())
+
+
+def test_a_source_index_names_its_own_group(repo):
+    write_index(repo, {"group": "3-arrives", "sources": []})
+    assert any("set group to '2-calendar'" in f.message for f in v.Validator(repo).run())
+
+
+def test_the_working_folder_is_not_recall_checked(repo):
+    with_glossary(repo)
+    work = repo / "docs/explainers/_work/run"
+    work.mkdir(parents=True)
+    (work / "brief.md").write_text(GOOD.replace("Sam wonders where it will land.", "A **promotion**."))
+    assert recall(repo) == []

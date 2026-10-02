@@ -17,6 +17,7 @@ can guarantee.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -226,6 +227,74 @@ def concept_map_problems(cmap: ConceptMap) -> list[str]:
     return problems
 
 
+# --------------------------------------------------------- source index
+#
+# REQ-DOCS-121. One per group, at docs/explainers/<group>/sources.yaml:
+# every requirement and config or code file relevant to the group, each
+# with one line of context, reviewed once by Keith before the group's
+# first brief. It closes the gap the fact-checker leaves - faithfulness
+# to CITED sources says nothing about a source nobody cited.
+
+SOURCE_INDEX = "sources.yaml"
+REQ_ID = re.compile(r"REQ-[A-Z]+-\d+")
+
+
+class SourceEntry(_Strict):
+    source: str
+    context: str
+
+
+class SourceIndex(_Strict):
+    group: str
+    sources: list[SourceEntry]
+
+
+def load_source_index(path: Path) -> SourceIndex:
+    return SourceIndex.model_validate(yaml.load(path.read_text(), Loader=_Loader))
+
+
+def source_problem(source: str, repo: Path, known_requirements: set[str]) -> str | None:
+    """Why a cited source may not be cited, or None (criteria 9 and 10).
+    Shared by the source index and a page's own sources, so the two can
+    never disagree about what counts as citable."""
+    s = source.strip()
+    if s == "CLAUDE.md" or s.startswith("plans/"):
+        return f"'{s}' is under plans/ or is CLAUDE.md, and neither may be cited"
+    if REQ_ID.fullmatch(s):
+        return None if s in known_requirements else f"'{s}' is not in requirements.yaml"
+    if not (repo / s).is_file():
+        return f"'{s}' is not a file in the repository"
+    return None
+
+
+# ----------------------------------------------------------- term matching
+#
+# The recall check (REQ-DOCS-121 criteria 5 to 8): a page that DEFINES a
+# glossary term - its bold first use - must cite that term's defining
+# requirements. Matching is deliberately plain: the term, its aliases,
+# its listed forms, and the regular inflections of each, case-
+# insensitively at word boundaries. An irregular form goes in the
+# entry's forms rather than being guessed at here.
+
+
+def _inflections(word: str) -> list[str]:
+    out = [word, word + "s", word + "es", word + "d", word + "ed", word + "ing"]
+    if word.endswith("e"):
+        out += [word[:-1] + "ing", word[:-1] + "ed"]
+    return out
+
+
+def term_pattern(entry: GlossaryEntry) -> re.Pattern:
+    """Every way a page may write this entry's term."""
+    words: set[str] = set()
+    for phrase in [entry.term, *entry.aliases]:
+        head, _, last = phrase.lower().rpartition(" ")
+        words.update(f"{head} {w}".strip() for w in _inflections(last))
+    words.update(f.lower() for f in entry.forms)
+    alts = sorted(words, key=len, reverse=True)
+    return re.compile(r"(?<![\w-])(?:" + "|".join(re.escape(w) for w in alts) + r")(?![\w-])", re.I)
+
+
 # ------------------------------------------------------------- rendering
 
 
@@ -296,6 +365,7 @@ def glossary_is_current(repo: Path = REPO_ROOT) -> bool:
 
 
 __all__ = [
-    "Category", "ConceptMap", "Glossary", "GlossaryEntry", "load_concept_map", "concept_map_problems", "ValidationError", "load_glossary", "glossary_problems",
+    "Category", "ConceptMap", "Glossary", "GlossaryEntry", "load_concept_map", "concept_map_problems",
+    "SourceIndex", "load_source_index", "source_problem", "term_pattern", "ValidationError", "load_glossary", "glossary_problems",
     "render_glossary_md", "write_glossary_md", "glossary_is_current",
 ]

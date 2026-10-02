@@ -127,6 +127,7 @@ IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 LINK = re.compile(r"(?<!!)\[([^\]]*)\]\(([^)\s]*)\)")
 REQ_ID = re.compile(r"\bREQ-[A-Z]+-\d+\b")
 INLINE_CODE = re.compile(r"`[^`]+`")
+BOLD = re.compile(r"\*\*([^*]+)\*\*|__([^_]+)__")
 FILE_PATH = re.compile(r"(?:\b[\w.-]+/)+[\w.-]+\.[A-Za-z0-9]+\b|\b[\w-]+\.(?:ya?ml|py|mjs|js|json|toml|sql|csv|md)\b")
 LATIN = re.compile(r"\b(?:e\.?\s?g|i\.?\s?e|etc)\b\.?", re.I)
 NEG_CONTRACTION = re.compile(r"\b[A-Za-z]+n['’]t\b", re.I)
@@ -612,6 +613,31 @@ class Validator:
         self.check_safety(str(rel), text.split("\n"))
         if rel.suffix == ".md" and rel.name != "glossary.md":
             self.check_page(rel, text)
+        if rel.name == "sources.yaml":
+            self.check_source_index(rel)
+
+    def check_source_index(self, rel: Path) -> None:
+        """REQ-DOCS-121 criteria 1, 2, 9 and 10: the strict schema, and
+        every listed source citable and real."""
+        from qa_tools.common import explainers
+
+        try:
+            index = explainers.load_source_index(self.repo / rel)
+        except explainers.ValidationError as exc:
+            for err in exc.errors():
+                where = ".".join(str(x) for x in err["loc"])
+                self.add(str(rel), 1, "sources-schema", f"{where}: {err['msg']}")
+            return
+        except yaml.YAMLError as exc:
+            self.add(str(rel), 1, "sources-schema", f"sources.yaml does not parse: {exc}")
+            return
+        if index.group != rel.parent.name:
+            self.add(str(rel), 1, "sources",
+                     f"set group to '{rel.parent.name}', the folder this index lives in")
+        for e in index.sources:
+            problem = explainers.source_problem(e.source, self.repo, set(self.req_states))
+            if problem:
+                self.add(str(rel), 1, "sources", problem)
 
     def check_safety(self, path: str, lines: list[str]) -> None:
         for n, line in enumerate(lines, 1):
@@ -636,6 +662,71 @@ class Validator:
         for m in page.mermaid:
             self.check_mermaid(page, m)
         self.check_build_state(page)
+        self.check_sources(page)
+        self.check_recall(page)
+
+    def page_sources(self, page: Page) -> list[str]:
+        fm = page.front or {}
+        return [s for s in (fm.get("sources") or []) if isinstance(s, str)]
+
+    def check_sources(self, page: Page) -> None:
+        """REQ-DOCS-121 criteria 9 to 11: every cited source is citable
+        and real, and the front matter and the closing list agree."""
+        from qa_tools.common import explainers
+
+        cited = self.page_sources(page)
+        for src in cited:
+            problem = explainers.source_problem(src, self.repo, set(self.req_states))
+            if problem:
+                self.add(page.rel, 1, "sources", problem)
+        if page.sources_from is None:
+            return
+        listed = []
+        for line in page.lines[page.sources_from:]:
+            item = re.match(r"^\s*[-*+]\s+(.*\S)", line)
+            if item:
+                link = LINK.fullmatch(item.group(1).strip())
+                listed.append((link.group(1) if link else item.group(1)).strip())
+        if set(listed) != set(cited):
+            gone = sorted(set(cited) - set(listed))
+            extra = sorted(set(listed) - set(cited))
+            parts = ([f"add {', '.join(gone)} to the list"] if gone else []) + \
+                    ([f"add {', '.join(extra)} to the front-matter sources"] if extra else [])
+            self.add(page.rel, page.sources_from, "sources",
+                     "the front-matter sources and the 'where this comes from' list must name the same "
+                     "things - " + " and ".join(parts))
+
+    @property
+    def glossary_terms(self) -> list:
+        if getattr(self, "_glossary_terms", None) is None:
+            from qa_tools.common import explainers
+            terms = []
+            if (self.repo / EXPLAINERS / "glossary.yaml").exists():
+                try:
+                    for e in explainers.load_glossary(self.repo).entries:
+                        terms.append((e, explainers.term_pattern(e)))
+                except Exception:  # noqa: BLE001 - reported by check_glossary
+                    pass
+            self._glossary_terms = terms
+        return self._glossary_terms
+
+    def check_recall(self, page: Page) -> None:
+        """REQ-DOCS-121 criteria 5 to 8. A page DEFINES a term where it
+        writes it in bold, and must then cite every requirement that
+        defines it. A passing, unbolded mention needs nothing, so a page
+        that only says 'supply' in passing is not dragged to 'partly
+        built' by a requirement it does not explain."""
+        cited = set(self.page_sources(page))
+        for u in page.units:
+            for bold in BOLD.finditer(u.text):
+                for entry, pat in self.glossary_terms:
+                    if not pat.search(bold.group(1) or bold.group(2)):
+                        continue
+                    for rid in entry.defined_by:
+                        if rid not in cited:
+                            self.add(page.rel, u.line, "recall",
+                                     f"this page defines '{entry.term}', so cite {rid}, which defines it, "
+                                     "in the front-matter sources and the 'where this comes from' list")
 
     def check_front(self, page: Page) -> None:
         fm = page.front

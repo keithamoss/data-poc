@@ -1,0 +1,53 @@
+# DRAFT, NOT APPROVED. Group 2's source index (REQ-DOCS-121), awaiting Keith's
+# review (criterion 3: reviewed before the writer drafts the group's first
+# brief). Kept in plans/ only so it survives the container; it moves to
+# docs/explainers/2-calendar/sources.yaml once approved, and this file is
+# deleted in that commit.
+
+group: 2-calendar
+sources:
+  # The delivery agreement and the supply calendar
+  - source: REQ-PIPE-049
+    context: The asset carries named delivery calendars, and each dataset names one. Defines the supply calendar and delivery months.
+  - source: REQ-PIPE-110
+    context: The delivery agreement's one home (not built). Defines the delivery agreement the supply calendar sits inside.
+  - source: REQ-PIPE-111
+    context: A calendar's history cannot be edited (not built). Why a past due date never changes.
+  - source: REQ-PIPE-050
+    context: A config error can never silently produce zero slots, and a past date cannot move quietly.
+  - source: REQ-PIPE-053
+    context: A schedule that runs out is loud, and only for its own dataset. Defines runway and schedule ended.
+
+  # Periods and slots
+  - source: REQ-PIPE-051
+    context: Periods are derived from the schedule, and never move. Defines period and authored dates.
+  - source: REQ-PIPE-052
+    context: Slots are derived, one per table per period it takes part in. Defines slot, due time, grace allowance and claim window.
+  - source: REQ-PIPE-048
+    context: One timezone for the asset, so every due time is an instant in the asset's own time.
+  - source: REQ-PIPE-112
+    context: The asset's timezone is versioned (not built). Background only - timezone versioning belongs to the pipeline docs.
+
+  # Claim windows and overdue
+  - source: REQ-PIPE-113
+    context: A slot's due instant comes from the agreement, and overlapping windows are refused at config time (not built). Why windows never overlap.
+  - source: REQ-PIPE-062
+    context: A supply is assigned to a slot by rule, and the rule never claims forward. How a claim window decides which slot a file fills.
+  - source: REQ-PIPE-063
+    context: A slot stops being claimable once a later one is filled. Defines closed unfilled.
+  - source: REQ-PIPE-106
+    context: A dataset can exist with no calendar (built, but to be reworked by running-thoughts #60). Why some datasets have no slots at all.
+
+  # Config and code
+  - source: contract/data-asset.yaml
+    context: The named calendars, their authored dates and claim windows, and which calendar each dataset names. The source of every real example.
+  - source: qa_tools/common/schedule.py
+    context: Reads the calendars and works out each dataset's periods.
+  - source: qa_tools/common/slots.py
+    context: Derives each dataset's slots, with their due times, grace and claim windows.
+  - source: qa_tools/common/assignment.py
+    context: The rule that files a supply to a slot, including the claim-window and never-claim-forward logic.
+  - source: qa_tools/common/runway.py
+    context: Counts the slots a dataset's dates still cover, and warns when few remain.
+  - source: qa_tools/common/asset_time.py
+    context: The asset's clock - how a due date becomes an instant.
