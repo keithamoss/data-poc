@@ -99,3 +99,15 @@ def test_the_house_standard_holds_the_approved_tone_and_length_rules():
         "point off from its reason. - Never write a sentence longer than 30 words. A heading is exempt, because "
         "a heading is not a sentence. Every other prose rule still applies to headings. (Keith) "
         "[V-sentence-length]") in house
+
+
+def test_figurative_language_rules_are_keiths_approved_wording():
+    """Keith, 2026-10-02, approved word for word after the first real
+    explainer leaned on 'stands alone' and 'names the missing table'."""
+    tics = " ".join(BODY.split("## Rhetorical tics that follow a pattern")[1].split())
+    assert ("- A figure of speech where a plain statement would do, or one image leaned on until it "
+            "becomes a habit.") in tics
+    house = " ".join(HOUSE.read_text().split())
+    assert ("- Say what actually happens, in the words you would use with a colleague across a desk. "
+            "Use a figure of speech only where plain words cannot do the job, and do not let one image "
+            "become a habit across the page. (Keith)") in house

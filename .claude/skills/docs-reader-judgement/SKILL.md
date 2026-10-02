@@ -56,3 +56,4 @@ No fixed phrase catches these, so a reader has to spot them:
 - A sentence built as "it's not X, it's Y".
 - Rule-of-three padding, where a third item is there for rhythm rather than meaning.
 - Ending a section on a punchy one-liner.
+- A figure of speech where a plain statement would do, or one image leaned on until it becomes a habit.

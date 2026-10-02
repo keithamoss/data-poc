@@ -4614,4 +4614,6 @@ Belongs with batch 5's check work.
     `docs/explainers/2-calendar/periods-and-slots.md` against the new
     rules before Keith signs it off, and re-run the clean eval page
     against docs-critic, since a new rule may give it findings it did
-    not have before.
+    not have before. The page revision is DONE (2026-10-02 night, plus a
+    later rule on figurative wording, REQ-DOCS-131's decisions); the
+    eval re-run is still to do.

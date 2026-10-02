@@ -60,6 +60,7 @@ The validator counts sentences and words this way:
 - Write conversationally. Picture one reader and write as if you were explaining the concept to them, with the authority of someone who knows how Mothman works.
 - Be brisk, but not terse.
 - Show how each sentence follows from the one before. Use joining words such as "so", "because", and "which means" rather than setting short statements side by side. (Keith)
+- Say what actually happens, in the words you would use with a colleague across a desk. Use a figure of speech only where plain words cannot do the job, and do not let one image become a habit across the page. (Keith)
 
 ### Dates, times, numbers, and ranges
 
