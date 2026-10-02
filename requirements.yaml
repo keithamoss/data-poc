@@ -23482,6 +23482,39 @@ requirements:
         prevent, one field over.
     decisions:
       - >
+        CRITERION 1 CANNOT STAND WITHOUT CRITERION 5, found 2026-10-02
+        by building 1 on its own and watching the suite go red. This
+        is a BUILD-ORDER fact rather than a change to either
+        criterion, and it is recorded because the mistake is easy to
+        repeat: the two read as separable and are not.
+
+        One file per arrival means a run's view schema holds ONE
+        TABLE. Every cross-table check then asks a one-table run for
+        six:
+
+            Soda  relation "cp_clients" does not exist
+            dbt   relation "qa_cp_run_001.cp_carers" does not exist
+
+        Criterion 5 is what makes a one-file arrival viable - the
+        overlay reading the version staged for the PERIOD rather than
+        this run's own tables. Until it lands, criterion 1 is not a
+        partial improvement, it is a broken pipeline.
+
+        SO THEY LAND TOGETHER. The first attempt put criterion 1 in by
+        itself at 1b10d1f, which left 54 failures; Keith chose to hand
+        that off as-is rather than revert it, so the branch head is
+        deliberately red and its commit message says so.
+
+        AND IT IS WHY `CP_REF_RUN_ID` COULD NOT BE SETTLED SEPARATELY,
+        which was the obvious next move and is a trap.
+        `tests/fixture_ids.py`'s constant meant "the clean fixture CP
+        run" when a run was all six tables. Under criterion 1 it is
+        six runs - but what a CP "reference run" SHOULD name depends
+        on whether a run can see its sibling tables, which is
+        criterion 5's answer. Choosing a value first would be guessing
+        at that, and a wrong guess makes tests pass against the wrong
+        run in silence.
+      - >
         A RUN'S ID BECOMES ITS SUPPLY'S ID (Keith, 2026-10-02), which
         settles REQ-PIPE-057 criterion 18 for this change rather than
         inheriting its hole. Today a run id is POSITIONAL -
