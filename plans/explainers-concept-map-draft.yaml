@@ -1,0 +1,199 @@
+# DRAFT, NOT APPROVED. The explainers' concept map (REQ-DOCS-120), awaiting
+# Keith's approval (criterion 7). Kept in plans/ only so it survives the
+# container; it moves to docs/explainers/concept-map.yaml once approved, and
+# this file is deleted in that commit.
+#
+# Transcribed from plans/explainers.md item 4's settled page list (32 concept
+# pages, tiering complete 2026-09-29), updated for the glossary review
+# (2026-09-30 to 2026-10-02): "in development" became sample data, "trial"
+# became one-off check, "the seven filing decisions" became eight.
+
+# The four parts every group page carries, in order (criterion 5).
+group_page_parts: [story, overview_diagram, concept_cards, read_first]
+
+groups:
+  - number: 0
+    slug: 0-overview
+    title: The overview
+    read_first: []
+    # The group page itself is the overview: the problem, one supply's
+    # journey from arriving to the dashboard, a red/amber/green primer, the
+    # cast, and a tour of the groups.
+    pages: []
+
+  - number: 1
+    slug: 1-shape
+    title: The shape of the data asset
+    read_first: [0]
+    pages:
+      - slug: the-data-asset-and-its-hierarchy
+        title: The data asset and its hierarchy
+        sections: [agency, collection, dataset, column]
+      - slug: one-tool-several-shapes
+        title: One tool, several shapes
+        sections: [scheduled data asset, one-off data, environments, same code with a separate deployment per asset]
+      - slug: the-data-contract
+        title: The data contract
+        sections: []
+      - slug: sample-data
+        title: Sample data
+        sections: [graduating to a supply calendar]
+
+  - number: 2
+    slug: 2-calendar
+    title: The calendar
+    read_first: [0, 1]
+    pages:
+      - slug: the-delivery-agreement
+        title: The delivery agreement
+        sections: []
+      - slug: the-supply-calendar
+        title: The supply calendar
+        sections: [runway, a schedule that runs out, delivery month, not-expected period, cadence rule, calendar version]
+      - slug: periods-and-slots
+        title: Periods and slots
+        sections: []
+      - slug: claim-windows
+        title: Claim windows
+        sections: [due time, grace allowance, overdue, windows never overlap, the following period]
+
+  - number: 3
+    slug: 3-arrives
+    title: What arrives
+    read_first: [0, 2]
+    pages:
+      - slug: deliveries-arrivals-and-supplies
+        title: Deliveries, arrivals and supplies
+        sections: [receipt, a hand-filed supply, one-off check]
+      - slug: how-a-file-is-recognised
+        title: How a file is recognised
+        sections: []
+      - slug: when-a-file-cannot-be-placed-or-read
+        title: When a file cannot be placed or read
+        sections: [load failure]
+      - slug: early-on-time-and-late
+        title: Early, on time and late
+        sections: [an arrival verdict follows its filing]
+
+  - number: 4
+    slug: 4-filing
+    title: Filing a supply
+    read_first: [0, 2, 3]
+    pages:
+      - slug: how-a-supply-is-filed
+        title: How a supply is filed
+        sections: [unfiled, filed under ambiguity, closed unfilled]
+      - slug: the-promotion-gate
+        title: The promotion gate
+        sections: [where a supply lives, a person always wins]
+      - slug: arrived-versus-promoted
+        title: Arrived versus promoted
+        sections: [the three moments, the newest promoted supply wins]
+      - slug: the-eight-filing-decisions
+        title: The eight filing decisions
+        sections: [acknowledging or rejecting an amber supply]
+      - slug: changing-your-mind-about-a-supply
+        title: Changing your mind about a supply
+        sections: []
+      - slug: resupply
+        title: Resupply
+        sections: [the mixed-period delivery]
+      - slug: the-decision-log
+        title: The decision log
+        sections: []
+
+  - number: 5
+    slug: 5-gaps
+    title: Filling the gaps
+    read_first: [0, 2, 4]
+    pages:
+      - slug: substitute
+        title: Substitute
+        sections: []
+      - slug: inherit-and-un-inherit
+        title: Inherit and un-inherit
+        sections: []
+
+  - number: 6
+    slug: 6-people
+    title: When a person is needed
+    read_first: [0, 4, 5]
+    pages:
+      - slug: tickets
+        title: Tickets
+        sections: []
+      - slug: what-needs-a-person
+        title: What needs a person and where to see it
+        sections: [holds]
+
+  - number: 7
+    slug: 7-status
+    title: How status works
+    read_first: [0]
+    pages:
+      - slug: red-amber-and-green
+        title: Red, amber and green, and how they roll up
+        sections: [red for a check that did not run, why a check could not run]
+      - slug: statuses-that-are-not-verdicts
+        title: Statuses that are not verdicts
+        sections: [qualifiers, event severity, no data, anomalies]
+
+  - number: 8
+    slug: 8-checks
+    title: The checks
+    read_first: [0, 7]
+    # The group page carries the check scopes.
+    pages:
+      - slug: what-a-check-is
+        title: What a check is
+        sections: [warn and fail thresholds, a check's plain-English fields]
+      - slug: column-checks
+        title: Column checks
+        sections: []
+      - slug: dataset-checks
+        title: Dataset checks
+        sections: []
+      - slug: cross-table-checks
+        title: Cross-table checks
+        sections: [check dependencies]
+      - slug: file-checks
+        title: File checks
+        sections: []
+      - slug: drift-and-volume
+        title: Drift and volume
+        sections: [the comparison point]
+
+  - number: 9
+    slug: 9-looking-back
+    title: Looking back
+    read_first: [0, 4]
+    pages:
+      - slug: in-place-on
+        title: In place on, versus what the page said then
+        sections: [history is permanent, snapshots, recorded QA history]
+
+# Glossary entries no page or section carries.
+glossary_only: [authored dates, permanent reporting, recency, waiting on a person, blocked]
+
+excluded:
+  - concept: freshness capping
+    went: parked
+    why: No requirement yet. It gets a page once one is written.
+  - concept: the built resupply chain
+    went: not-explained
+    why: Triage 27 - explain the new model instead.
+  - concept: who can decide
+    went: pipeline-docs
+    why: Triage 9 - operating the system, not what it means.
+  - concept: changing or retiring a check
+    went: pipeline-docs
+    why: Triage 30 - check upkeep is operating the system.
+  - concept: environment setup
+    went: pipeline-docs
+    why: Setting environments up is operating the system. Which environment a dashboard shows stays a section in group 1.
+  - concept: the check_id detail
+    went: pipeline-docs
+    why: A check's identity matters to whoever maintains checks, not to a reader.
+  - concept: the four QA tools and why there are four
+    went: not-explained
+    why: Not a concept (item 1, third round).

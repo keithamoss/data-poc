@@ -532,6 +532,7 @@ class Validator:
                     continue
                 self.check_file(rel)
         self.check_glossary()
+        self.check_concept_map()
         for extra in (HOUSE_STANDARD, READER_JUDGEMENT, EXPLAIN_SKILL):
             if (self.repo / extra).exists():
                 self.check_hidden(extra)
@@ -572,6 +573,28 @@ class Validator:
             page = Page(str(EXPLAINERS / "glossary.md"), md.read_text())
             for m in page.mermaid:
                 self.check_mermaid(page, m)
+
+    def check_concept_map(self) -> None:
+        """REQ-DOCS-120 criterion 6: the schema, no repeated group or
+        page, and no concept in two places. A configuration check, so
+        it reports under its own names outside the V- rule set."""
+        from qa_tools.common import explainers
+
+        path = str(explainers.CONCEPT_MAP)
+        if not (self.repo / explainers.CONCEPT_MAP).exists():
+            return
+        try:
+            cmap = explainers.load_concept_map(self.repo)
+        except explainers.ValidationError as exc:
+            for err in exc.errors():
+                where = ".".join(str(x) for x in err["loc"])
+                self.add(path, 1, "concept-map-schema", f"{where}: {err['msg']}")
+            return
+        except yaml.YAMLError as exc:
+            self.add(path, 1, "concept-map-schema", f"concept-map.yaml does not parse: {exc}")
+            return
+        for problem in explainers.concept_map_problems(cmap):
+            self.add(path, 1, "concept-map", problem)
 
     def check_hidden(self, rel: Path) -> None:
         for n, line in enumerate((self.repo / rel).read_text().split("\n"), 1):

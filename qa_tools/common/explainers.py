@@ -26,6 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 EXPLAINERS = Path("docs/explainers")
 GLOSSARY_YAML = EXPLAINERS / "glossary.yaml"
 GLOSSARY_MD = EXPLAINERS / "glossary.md"
+CONCEPT_MAP = EXPLAINERS / "concept-map.yaml"
 
 _Loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
@@ -129,6 +130,102 @@ def glossary_problems(glossary: Glossary, known_requirements: set[str]) -> list[
     return problems
 
 
+# ----------------------------------------------------------- concept map
+#
+# REQ-DOCS-120. The agreed groups, reading order and page list, so the
+# tiering decisions made one by one with Keith survive the plans file
+# that recorded them being deleted. Configuration for the next /explain
+# run rather than anything a reader sees.
+
+#: The four parts every group page carries (criterion 5), in order.
+GROUP_PAGE_PARTS = ("story", "overview_diagram", "concept_cards", "read_first")
+
+#: Where an excluded concept went (criterion 4).
+EXCLUDED_TO = ("pipeline-docs", "parked", "not-explained")
+
+
+class MapPage(_Strict):
+    slug: str
+    title: str
+    # The concepts this page carries as sections, beyond its own.
+    sections: list[str]
+
+
+class MapGroup(_Strict):
+    number: int
+    slug: str
+    title: str
+    read_first: list[int]
+    pages: list[MapPage]
+
+
+class Excluded(_Strict):
+    concept: str
+    went: str
+    why: str
+
+
+class ConceptMap(_Strict):
+    group_page_parts: list[str]
+    groups: list[MapGroup]
+    glossary_only: list[str]
+    excluded: list[Excluded]
+
+
+def load_concept_map(repo: Path = REPO_ROOT) -> ConceptMap:
+    raw = yaml.load((repo / CONCEPT_MAP).read_text(), Loader=_Loader)
+    return ConceptMap.model_validate(raw)
+
+
+def concept_map_problems(cmap: ConceptMap) -> list[str]:
+    """Criterion 6's rules beyond the schema: no repeated group number
+    or page, and no concept in more than one place. A concept's PLACE
+    is a page (its title), a section of a page, the glossary-only list,
+    or the excluded list - so one concept answered twice is a tiering
+    decision recorded twice, and the two copies can disagree."""
+    problems: list[str] = []
+    if tuple(cmap.group_page_parts) != GROUP_PAGE_PARTS:
+        problems.append("group_page_parts must be exactly " + ", ".join(GROUP_PAGE_PARTS) + ", in that order")
+    numbers = [g.number for g in cmap.groups]
+    for n in sorted({n for n in numbers if numbers.count(n) > 1}):
+        problems.append(f"group {n} is listed more than once")
+    if numbers != sorted(numbers):
+        problems.append("groups must be listed in their numbered reading order")
+    if numbers and (numbers[0] != 0 or numbers != list(range(len(numbers)))):
+        problems.append("groups must be numbered 0, 1, 2 and so on, with no gaps")
+    for g in cmap.groups:
+        for r in g.read_first:
+            if r not in numbers:
+                problems.append(f"group {g.number} reads group {r} first, which does not exist")
+            elif r >= g.number:
+                problems.append(f"group {g.number} reads group {r} first, which comes after it")
+    places: dict[str, str] = {}
+
+    def place(concept: str, where: str) -> None:
+        key = " ".join(concept.lower().split())
+        if key in places:
+            problems.append(f"'{concept}' is in two places: {places[key]} and {where}")
+        else:
+            places[key] = where
+
+    slugs: dict[str, int] = {}
+    for g in cmap.groups:
+        for pg in g.pages:
+            if pg.slug in slugs:
+                problems.append(f"page '{pg.slug}' is listed in group {slugs[pg.slug]} and group {g.number}")
+            slugs[pg.slug] = g.number
+            place(pg.title, f"the page '{pg.slug}'")
+            for s in pg.sections:
+                place(s, f"a section of '{pg.slug}'")
+    for c in cmap.glossary_only:
+        place(c, "the glossary-only list")
+    for x in cmap.excluded:
+        place(x.concept, "the excluded list")
+        if x.went not in EXCLUDED_TO:
+            problems.append(f"'{x.concept}' went to '{x.went}' - say one of " + ", ".join(EXCLUDED_TO))
+    return problems
+
+
 # ------------------------------------------------------------- rendering
 
 
@@ -199,6 +296,6 @@ def glossary_is_current(repo: Path = REPO_ROOT) -> bool:
 
 
 __all__ = [
-    "Category", "Glossary", "GlossaryEntry", "ValidationError", "load_glossary", "glossary_problems",
+    "Category", "ConceptMap", "Glossary", "GlossaryEntry", "load_concept_map", "concept_map_problems", "ValidationError", "load_glossary", "glossary_problems",
     "render_glossary_md", "write_glossary_md", "glossary_is_current",
 ]
