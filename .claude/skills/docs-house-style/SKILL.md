@@ -50,9 +50,16 @@ The validator counts sentences and words this way:
 ### Sentences and paragraphs
 
 - Aim for sentences of 15 to 20 words. (Keith)
-- Keep every sentence to 25 words or fewer. A heading is exempt, because a heading is not a sentence. Every other prose rule still applies to headings. [V-sentence-length]
+- Try to keep sentences to 25 words or fewer. A longer sentence is fine when splitting it would cut a point off from its reason.
+- Never write a sentence longer than 30 words. A heading is exempt, because a heading is not a sentence. Every other prose rule still applies to headings. (Keith) [V-sentence-length]
 - Keep every paragraph to 5 sentences or fewer. [V-paragraph-length]
 - Write prose first. Use a list only for a real set, such as the 8 filing decisions. (Keith)
+
+### Tone
+
+- Write conversationally. Picture one reader and write as if you were explaining the concept to them, with the authority of someone who knows how Mothman works.
+- Be brisk, but not terse.
+- Show how each sentence follows from the one before. Use joining words such as "so", "because", and "which means" rather than setting short statements side by side. (Keith)
 
 ### Dates, times, numbers, and ranges
 

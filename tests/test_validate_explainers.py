@@ -183,8 +183,13 @@ def test_each_rule_catches_its_own_breakage(repo, old, new, rule):
 
 
 def test_a_long_sentence_and_a_long_paragraph(repo):
-    long = " ".join(["word"] * 26) + "."
-    write(repo, GOOD.replace("Sam wonders where it will land.", long))
+    """25 words is a target, 30 the hard limit (Keith, 2026-10-02)."""
+    whole = "Priya sends a file on a Tuesday, and Sam wonders where it will land."
+    at_limit = " ".join(["word"] * 30) + "."
+    write(repo, GOOD.replace(whole, at_limit))
+    assert "V-sentence-length" not in rules_hit(repo)
+    long = " ".join(["word"] * 31) + "."
+    write(repo, GOOD.replace(whole, long))
     assert "V-sentence-length" in rules_hit(repo)
     many = " ".join(["One short one."] * 6)
     write(repo, GOOD.replace("Sam wonders where it will land.", many))

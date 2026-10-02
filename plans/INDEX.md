@@ -471,7 +471,7 @@ one when this line suggests it matters.
   - *touches:* `tests/test_no_calendar.py`, `tests/test_sample_data.py`, `qa_tools/common/trial.py`
 - **#61** `todo` 2026-10-02 - An arrival may be a zip holding several files.
 - **#62** `investigate` 2026-10-02 - Amber acknowledgement: the register disagrees with itself, and the mechanism may not run today.
-- **#63** `investigate` 2026-10-02 - Explainer prose reads clunky in places, and no agent is looking for that.
+- **#63** `todo` 2026-10-02 - Explainer cadence: two follow-ups.
 
 ## plans/explainers.md
 

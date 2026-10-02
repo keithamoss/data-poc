@@ -4604,38 +4604,14 @@ Belongs with batch 5's check work.
 
     REQ-PIPE-091 now carries a SUPERSEDED note (Keith approved, 2026-10-02).
 
-63. **[investigate, 2026-10-02]** **[Documentation]** Explainer prose
-    reads clunky in places, and no agent is looking for that. Keith,
-    reading the finished "Periods and slots" page: "mostly good. Some of
-    the language is a bit clunky though. Do any of the agents apply a
-    clear communication lens?"
-
-    The answer is no, and partly by design. The critic judges whether a
-    reader gets the right answer, and how much effort it costs them. It
-    is told not to report "a wording you would have chosen differently
-    when the existing text is already clear", and every serious finding
-    must name a criterion, which keeps it from looping forever
-    (`docs/explainer-agents-research.md` section 10). The validator
-    checks mechanical rules only. So a sentence that is understandable
-    but awkward passes everything.
-
-    Some of the clunk may come from the house standard itself (digits
-    for every number, "2 things", "the 6 share one contract"; the
-    25-word cap forcing splits). Needs Keith: the sentences he found
-    clunky, then which fix - a fluency rule in the reader-judgement
-    skill, a separate copy-edit pass, or adjusting the house standard.
-    Any change to either skill is an authoring-standard change, so the
-    exact wording goes to Keith first.
-
-    **Cadence too, same evening.** Keith: the sentences "feel quite...
-    abrupt in places". Read GOV.UK's current guidance (2026-10-02,
-    guidance.publishing.service.gov.uk, writing-guidelines/right-tone and
-    clear-language). Its tone is "brisk, but not terse", and it says
-    "Write conversationally. Picture your audience and write as if you
-    were talking to them one-to-one". On length it says "Try to split up
-    sentences that are over 25 words long" - a target, where our
-    validator makes 25 a hard cap. It says nothing about varying sentence
-    length or rhythm. The numerals rule ("one" in words, digits for 2 to
-    9) is GOV.UK's own. Measured on the page: 67 sentences, mean 15.8
-    words, five of 7 words or fewer, and few joining words (so, because,
-    which means) between them - which reads as terse rather than brisk.
+63. **[todo, 2026-10-02]** **[Documentation]** Explainer cadence: two
+    follow-ups. Keith found the first real explainer clunky and abrupt,
+    and approved three fixes the same evening, now built and recorded in
+    `requirements.yaml`: a Tone section in the house standard, 25 words
+    as a target under a hard limit of 30 (REQ-DOCS-132's decisions), and
+    a seventh reader-judgement rule, "The page reads as one person
+    talking" (REQ-DOCS-131's decisions). Still to do: revise
+    `docs/explainers/2-calendar/periods-and-slots.md` against the new
+    rules before Keith signs it off, and re-run the clean eval page
+    against docs-critic, since a new rule may give it findings it did
+    not have before.

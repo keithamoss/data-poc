@@ -59,7 +59,7 @@ _Loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 # exactly the set the house standard marks - tests/test_validate_explainers.py
 # holds them equal in both directions.
 RULES: dict[str, str] = {
-    "V-sentence-length": "A sentence other than a heading is at most 25 words.",
+    "V-sentence-length": "A sentence other than a heading is at most 30 words.",
     "V-paragraph-length": "A paragraph is at most 5 sentences.",
     "V-banned-phrase": "No word or phrase from the house standard's banned lists.",
     "V-banned-cluster": "No two watch-list words in one paragraph, list item or heading.",
@@ -860,9 +860,9 @@ class Validator:
             sents = sentences(text)
             if u.kind != "heading":
                 for s in sents:
-                    if word_count(s) > 25:
+                    if word_count(s) > 30:
                         self.add(page.rel, u.line, "V-sentence-length",
-                                 f"split this {word_count(s)}-word sentence - the limit is 25")
+                                 f"split this {word_count(s)}-word sentence - the limit is 30")
             if u.kind == "paragraph" and len(sents) > 5:
                 self.add(page.rel, u.line, "V-paragraph-length",
                          f"split this {len(sents)}-sentence paragraph - the limit is 5")

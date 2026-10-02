@@ -17,7 +17,8 @@ FRONT = yaml.safe_load(TEXT.split("---")[1])
 BODY = TEXT.split("---", 2)[2]
 
 RULES = ["The answer comes first", "Every page stands alone", "Stories are about data, never the people in it",
-         "A diagram earns its place", "Every sentence earns its place", "Rhetorical tics that follow a pattern"]
+         "A diagram earns its place", "Every sentence earns its place", "The page reads as one person talking",
+         "Rhetorical tics that follow a pattern"]
 
 
 def _sentences(text: str) -> set[str]:
@@ -25,9 +26,10 @@ def _sentences(text: str) -> set[str]:
     return {s.strip() for s in re.split(r"(?<=[.!?])\s+", flat) if len(s.split()) >= 8}
 
 
-def test_it_holds_the_six_rules_in_order():
+def test_it_holds_the_seven_rules_in_order():
     """Criteria 4 to 8 and 11: one heading per rule, the approved sixth
-    rule after the diagram rule."""
+    rule after the diagram rule, and the cadence rule after it (Keith,
+    2026-10-02)."""
     assert re.findall(r"^## (.+)$", BODY, re.M) == RULES
 
 
@@ -46,8 +48,8 @@ def test_the_every_sentence_rule_and_the_description_are_keiths_approved_wording
         "belongs to another concept is excess here too. It goes on that concept's page, and this page links to it.")
     assert FRONT["description"] == (
         "The rules a reader judges a finished Mothman documentation page by: answer first, each page stands "
-        "alone, the sensitivity rule, whether a diagram argues, whether every sentence earns its place, and "
-        "pattern-shaped rhetorical tics. Preloaded by docs-critic, docs-writer, docs-illustrator, "
+        "alone, the sensitivity rule, whether a diagram argues, whether every sentence earns its place, whether it "
+        "reads as one person talking, and pattern-shaped rhetorical tics. Preloaded by docs-critic, docs-writer, docs-illustrator, "
         "docs-fact-checker, and docs-finding-checker.")
 
 
@@ -69,3 +71,31 @@ def test_neither_skill_restates_the_other():
     """Criterion 1: one copy of each rule. Same test as the agent prompts
     get (test_docs_agents.test_no_prompt_copies_a_skills_wording)."""
     assert not _sentences(BODY) & _sentences(HOUSE.read_text())
+
+
+def test_the_cadence_rule_is_keiths_approved_wording():
+    """Keith, 2026-10-02, approved word for word after finding the first
+    real explainer abrupt. Its last sentence keeps the critic finite."""
+    section = " ".join(BODY.split("## The page reads as one person talking")[1].split("## ")[0].split())
+    assert section == (
+        "Read aloud, the page sounds like one person explaining the concept to another. A run of short "
+        "statements set side by side, with nothing showing how each follows from the last, fails this rule. "
+        "So does a sentence that only makes sense on a second reading. A finding under this rule quotes the "
+        "whole run and shows it joined up. A sentence worded differently from how you would write it is not "
+        "a finding.")
+
+
+def test_the_house_standard_holds_the_approved_tone_and_length_rules():
+    """Keith, 2026-10-02, approved word for word: GOV.UK's tone, and 25
+    words as a target under a hard limit of 30."""
+    house = " ".join(HOUSE.read_text().split())
+    assert (
+        "### Tone - Write conversationally. Picture one reader and write as if you were explaining the concept "
+        "to them, with the authority of someone who knows how Mothman works. - Be brisk, but not terse. - Show "
+        "how each sentence follows from the one before. Use joining words such as \"so\", \"because\", and "
+        "\"which means\" rather than setting short statements side by side. (Keith)") in house
+    assert (
+        "- Try to keep sentences to 25 words or fewer. A longer sentence is fine when splitting it would cut a "
+        "point off from its reason. - Never write a sentence longer than 30 words. A heading is exempt, because "
+        "a heading is not a sentence. Every other prose rule still applies to headings. (Keith) "
+        "[V-sentence-length]") in house

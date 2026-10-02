@@ -1,6 +1,6 @@
 ---
 name: docs-reader-judgement
-description: "The rules a reader judges a finished Mothman documentation page by: answer first, each page stands alone, the sensitivity rule, whether a diagram argues, whether every sentence earns its place, and pattern-shaped rhetorical tics. Preloaded by docs-critic, docs-writer, docs-illustrator, docs-fact-checker, and docs-finding-checker."
+description: "The rules a reader judges a finished Mothman documentation page by: answer first, each page stands alone, the sensitivity rule, whether a diagram argues, whether every sentence earns its place, whether it reads as one person talking, and pattern-shaped rhetorical tics. Preloaded by docs-critic, docs-writer, docs-illustrator, docs-fact-checker, and docs-finding-checker."
 user-invocable: false
 ---
 
@@ -42,6 +42,12 @@ A diagram that adds nothing the prose has not already said is excess.
 Each sentence helps the reader with the page's why-question: it answers it, explains the answer, or shows it at work. A sentence that does none of these is excess, even when it is true.
 
 Detail that belongs to another concept is excess here too. It goes on that concept's page, and this page links to it.
+
+## The page reads as one person talking
+
+Read aloud, the page sounds like one person explaining the concept to another. A run of short statements set side by side, with nothing showing how each follows from the last, fails this rule. So does a sentence that only makes sense on a second reading.
+
+A finding under this rule quotes the whole run and shows it joined up. A sentence worded differently from how you would write it is not a finding.
 
 ## Rhetorical tics that follow a pattern
 
