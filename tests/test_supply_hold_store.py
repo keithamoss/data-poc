@@ -33,11 +33,12 @@ def dataset():
     return f"cp-{uuid.uuid4().hex[:12]}"
 
 
-def raise_one(conn, dataset, *, supply="s1", kind=supply_holds.DELIVERY_LEVEL,
+def raise_one(conn, dataset, *, supply="s1", kind=supply_holds.ASSIGNMENT_RULE,
                reason=None, raised_by="cp_run_001", delivery="d-001"):
     return supply_holds.raise_hold(
         conn, dataset_id=dataset, supply_id=supply, kind=kind,
-        reason=reason if reason is not None else {"files": ["a.csv", "b.csv"]},
+        reason=reason if reason is not None else {
+            "unavailable": [["2026-Q1", "already filled"]]},
         raised_by=raised_by, delivery=delivery)
 
 
@@ -60,7 +61,7 @@ class TestAHoldIsRecorded:
         [held] = supply_holds.outstanding(conn, dataset_id=dataset)
         assert held.supply_id == "cp@1"
         assert held.raised_by == "cp_run_042"
-        assert held.files == ("a.csv", "b.csv")
+        assert held.unavailable == (("2026-Q1", "already filled"),)
 
     def test_an_unknown_kind_is_refused_rather_than_stored(self, conn, dataset):
         """A kind nothing can resolve is a hold nobody can clear, which
@@ -68,19 +69,13 @@ class TestAHoldIsRecorded:
         with pytest.raises(ValueError, match="unknown hold kind"):
             raise_one(conn, dataset, kind="whatever")
 
-    def test_both_kinds_land_in_one_place(self, conn, dataset):
-        """Criterion 3 - an assignment-rule hold is recorded on the same
-        terms as a delivery-level one. They used to be a row and a
-        `continue`."""
-        other = f"{dataset}-b"
-        raise_one(conn, dataset, kind=supply_holds.DELIVERY_LEVEL)
-        raise_one(conn, other, kind=supply_holds.ASSIGNMENT_RULE,
-                   reason={"unavailable": [["2026-Q1", "already filled"]]})
-        kinds = {h.dataset_id: h.kind
-                 for h in supply_holds.outstanding(conn)
-                 if h.dataset_id in {dataset, other}}
-        assert kinds == {dataset: supply_holds.DELIVERY_LEVEL,
-                          other: supply_holds.ASSIGNMENT_RULE}
+    def test_the_retired_delivery_level_kind_is_refused(self, conn, dataset):
+        """Criterion 3 used to put two kinds in one place. The
+        delivery-level one is retired (REQ-PIPE-105 criterion 6,
+        2026-10-02) - two files for one dataset are CONTESTED instead -
+        and a kind nothing produces any more is refused, not stored."""
+        with pytest.raises(ValueError, match="unknown hold kind"):
+            raise_one(conn, dataset, kind="delivery-level")
 
     def test_each_kind_carries_what_a_person_does_about_it(self, conn, dataset):
         """NFR 2 - the record carries the resolution path, not just the
@@ -89,7 +84,6 @@ class TestAHoldIsRecorded:
                    reason={"unavailable": [["2026-Q1", "already filled"]]})
         [held] = supply_holds.outstanding(conn, dataset_id=dataset)
         assert "slot" in " ".join(held.responses)
-        assert "file" in " ".join(supply_holds.RESPONSES[supply_holds.DELIVERY_LEVEL])
 
 
 class TestALaterRunDoesNotClearIt:

@@ -473,13 +473,17 @@ def run_pipeline(sequential: bool = False) -> dict:
                f"({len(entry.files)} file(s): {', '.join(entry.files) or 'none'}) - "
                f"not processed.")
     in_flight_log.record(COLLECTION_ID, asset_time.now().isoformat(), still_arriving)
-    # A HELD SUPPLY IS SKIPPED, NOT FATAL (REQ-PIPE-059). Birth
-    # Registrations is the only dataset in its collection, so a held
-    # one means this arrival contributes nothing - but path_for() still
-    # refuses to choose, and that refusal used to arrive as an
-    # exception and take every other arrival with it.
-    manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
-                for a in found_arrivals if "birth-registrations" not in a.held]
+    # TWO FILES IN ONE ARRIVAL GET A RUN NOW (REQ-PIPE-105 criterion 6,
+    # 2026-10-02). They were a delivery-level HOLD and were skipped here;
+    # they are CONTESTED instead - filed, so the run has a period, and
+    # the overlay refuses to choose between the two staged tables. The
+    # run records why in its tables_read and checks nothing of its own.
+    # path_for() still refuses to choose, so such a run is pointed at its
+    # delivery directory, which is all `csv_path` is used for here.
+    manifest = [a.as_entry() | {"csv_path": str(
+                    a.path_for("birth-registrations") if "birth-registrations" not in a.held
+                    else a.path)}
+                for a in found_arrivals]
 
     # THE BATCH NO LONGER CHOOSES A REFERENCE RUN (REQ-QAC-108
     # criterion 4, 2026-09-29). It used to take the first manifest

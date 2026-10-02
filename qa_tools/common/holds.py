@@ -1,5 +1,15 @@
 """A supply nobody may choose for you (REQ-PIPE-059).
 
+THE HOLD IT DESCRIBES IS RETIRED as a SUPPLY state (REQ-PIPE-105
+criterion 6, Keith, 2026-10-02): two files for one dataset in one
+arrival are now CONTESTED - filed, never chosen between, not checked as
+the arrival's own table and not promoted. What survives here is the
+RECOGNITION-time observation the delivery log records ("these files all
+claim that dataset"), still named `held` there; renaming that field is
+recorded as outstanding on REQ-PIPE-105 rather than done in passing.
+Read the account below as history of the reasoning, which still holds,
+not of the mechanism.
+
 WHEN TWO FILES IN ONE DELIVERY ARE BOTH THE SAME DATASET, that dataset's
 supply is HELD. Not merged, not resolved by picking one - held, and left
 for a person.

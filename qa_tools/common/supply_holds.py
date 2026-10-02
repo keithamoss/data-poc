@@ -60,21 +60,21 @@ from qa_tools.common.assignment import Assignment
 
 TABLE = "qa.hold"
 
-#: Two files in one delivery both matched one dataset (REQ-PIPE-059).
-#: Resolved by somebody saying which file is the supply.
-DELIVERY_LEVEL = "delivery-level"
+#: THE DELIVERY-LEVEL KIND IS RETIRED (REQ-PIPE-105 criterion 6, Keith,
+#: 2026-10-02): two files for one dataset in one arrival are CONTESTED
+#: now, filed and visible to the promotion gate, rather than held. The
+#: kind went rather than staying defined and unable to fire.
+#:
 #: The assignment rule found no slot it could confidently claim
 #: (REQ-PIPE-064). Resolved by somebody saying which slot it fills.
 ASSIGNMENT_RULE = "assignment-rule"
 
-KINDS = (DELIVERY_LEVEL, ASSIGNMENT_RULE)
+KINDS = (ASSIGNMENT_RULE,)
 
 #: What a person can do about each kind. NAMED, NEVER GUESSED: a hold
 #: whose record does not carry the resolution path is indistinguishable
 #: from a bug (NFR 2), and the two kinds genuinely need different acts.
 RESPONSES = {
-    DELIVERY_LEVEL: ("say which file is the supply",
-                      "reject the supply and ask the supplier which to send"),
     ASSIGNMENT_RULE: ("file it to a slot yourself",
                        "reject the supply"),
 }
@@ -160,11 +160,6 @@ class Held:
         return RESPONSES.get(self.kind, ())
 
     @property
-    def files(self) -> tuple[str, ...]:
-        """The competing filenames, for a delivery-level hold."""
-        return tuple(self.reason.get("files") or ())
-
-    @property
     def unavailable(self) -> tuple[tuple[str, str], ...]:
         """Each slot considered and what made it unavailable, for an
         assignment-rule hold."""
@@ -178,14 +173,9 @@ class Held:
         this is that record read back, and it says what to do about it
         because a hold nobody can clear is indistinguishable from a bug.
         """
-        if self.kind == DELIVERY_LEVEL:
-            files = ", ".join(self.files)
-            why = (f"{len(self.files)} files in delivery {self.delivery!r} are all "
-                    f"{self.dataset_id} ({files}), so nothing will choose between them")
-        else:
-            reasons = "; ".join(f"{name}: {why}" for name, why in self.unavailable)
-            why = (f"{self.supply_id} could not be placed - "
-                    f"{reasons or 'no slot was open'}")
+        reasons = "; ".join(f"{name}: {why}" for name, why in self.unavailable)
+        why = (f"{self.supply_id} could not be placed - "
+                f"{reasons or 'no slot was open'}")
         return (f"{why}. It stays staged and is not checked until somebody "
                 f"resolves it. Raised by {self.raised_by}.")
 
@@ -375,10 +365,9 @@ def resolve_for_supply(conn, *, dataset_id: str, supply: str,
     decisions are about supplies nobody held.
 
     MATCHED ON THE ARRIVAL KEY rather than on the id, for the reason
-    `arrival_key_of` gives. The one case this deliberately resolves
-    MORE than one hold is the delivery-level hold whose competing files
-    share an arrival: choosing between them answers the hold, whichever
-    file was chosen.
+    `arrival_key_of` gives. (It used to resolve several at once for the
+    delivery-level hold, retired 2026-10-02 by REQ-PIPE-105 criterion 6;
+    matching on the key costs nothing and stays.)
     """
     if not supply:
         return ()

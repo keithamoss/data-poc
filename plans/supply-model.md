@@ -241,9 +241,9 @@ so in one line, and finishes normally.
 
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
 `REQ-PIPE-079` (decision layer written but uncalled; the overlay WIRED
-2026-10-02), `REQ-PIPE-105` (criteria 1-5, 7, 8, 11's guard and 12 done
-as of 2026-10-02; 6's hold retirement, 9, 10 and 13 not - see its first
-decision).
+2026-10-02), `REQ-PIPE-105` (criteria 1-8, 11's guard and 12 done as of
+2026-10-02 - 6 amended that evening so a correction reads its own
+table; 9, 10 and 13 not - see its decisions).
 
 **THE SWITCH-OVER BELOW LANDED 2026-10-02** as one piece, as this
 paragraph asked: `period_overlay.py` calls `create_overlay_views()` right

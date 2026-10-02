@@ -127,16 +127,26 @@ class TestSeveralStagedVersionsAreContested:
             f"cp_clients__{a}", f"cp_clients__{b}"}
         assert world.read(f"cp_placements__{own}", "cp_clients") == 1
 
-    def test_the_runs_own_table_is_contested_by_an_earlier_unpromoted_one(self, world):
-        """Keith, 2026-10-02: criterion 6 wins over criterion 5's 'read
-        from that arrival' - a correction beside a red supply is
-        contested, however they arrived."""
+    def test_a_correction_beside_an_unpromoted_red_supply_reads_its_own(self, world):
+        """Criterion 6 as amended 2026-10-02 evening (Keith): the run's
+        own table is its own arrival's, whatever else is staged for the
+        period. The first reading made this contested, which left the
+        correction unchecked and unpromotable - TS-1/TS-4 broken."""
         red, fix = _key(), _key()
         world.stage("cp_clients", red, value=1)
         world.stage("cp_clients", fix, value=2)
         out = world.build("cp_clients", fix)
+        assert not period_overlay.own_table_contested(out.resolution, "cp_clients")
+        assert world.read(f"cp_clients__{fix}", "cp_clients") == 2
+
+    def test_two_files_in_one_arrival_are_still_contested(self, world):
+        """The one case criterion 6 keeps: nothing says which of two
+        files in a single arrival is the supply."""
+        key = _key()
+        world.stage("cp_clients", f"{key}__1", period_to=None)
+        world.stage("cp_clients", f"{key}__2", period_to=None)
+        out = world.build("cp_clients", key)
         assert period_overlay.own_table_contested(out.resolution, "cp_clients")
-        assert "cp_clients" not in out.resolution.resolved
 
     def test_a_resupply_into_a_promoted_period_is_not_contested(self, world):
         """Promotion MOVES the first supply, so the resupply is alone in
@@ -160,13 +170,15 @@ class TestAHeldOwnTableIsWithheld:
         assert "cp_clients" not in out.resolution.absent
 
 
-class TestPromotionSeesThePeriodScopedContest:
-    """Criterion 6 at the promotion gate: filing.supplies_of() reports a
-    supply CONTESTED where another of its dataset is still staged for the
-    same period, not only where one arrival carried two files - so
-    should_promote(contested=True) refuses it."""
+class TestThePromotionGateSeesOnlyTheArrivalsOwnContest:
+    """Criterion 6 at the promotion gate, as amended 2026-10-02 evening:
+    filing.supplies_of() reports CONTESTED only where one arrival carried
+    two files for a dataset - never because another arrival's supply is
+    staged for the same period."""
 
-    def test_a_correction_beside_an_unpromoted_red_supply_is_contested(self, conn, world):
+    def test_a_correction_beside_an_unpromoted_red_supply_is_not_contested(self, conn, world):
+        """Criterion 6 as amended 2026-10-02 evening: the correction is
+        its own supply and may be promoted on its own verdict."""
         from datetime import datetime, timedelta, timezone
         from types import SimpleNamespace
 
@@ -184,7 +196,7 @@ class TestPromotionSeesThePeriodScopedContest:
 
         assert supply["period"] == world.period
         assert supply["physical_tables"] == [f"cp_clients__{asset_time.arrival_key(fix)}"]
-        assert supply["contested"] is True
+        assert supply["contested"] is False
 
     def test_a_supply_alone_in_its_period_is_not(self, conn, world):
         from datetime import datetime, timedelta, timezone

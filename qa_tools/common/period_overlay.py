@@ -23,15 +23,16 @@ exactly what nobody has decided on. A supply staged for a DIFFERENT
 period is never read, which is criterion 8 of REQ-PIPE-079 - no reading
 across period schemas.
 
-THE RUN'S OWN TABLE IS CONTESTED where another version is staged for
-the same period (criterion 6, settled with Keith 2026-10-02 over
-criterion 5's "read from that arrival"): several files claiming one
-dataset for one period are contested however they arrived, so the view
-falls through to the period's promoted version, `ambiguous` records the
-contest, and the table's own checks and its promotion are withheld
-elsewhere. That is the cost Keith accepted on 2026-09-28 - a correction
-landing beside an unpromoted red supply waits for a person to reject
-the earlier one.
+THE RUN'S OWN TABLE IS READ FROM ITS OWN ARRIVAL, always (criterion 5,
+and criterion 6 as Keith amended it on the evening of 2026-10-02). It
+is contested only where that one arrival carried two files for it. A
+SIBLING with several versions staged for the period is contested for
+the run reading it (criterion 8): the view falls through to the
+period's promoted version and nothing chooses between them by arrival
+time. An earlier reading, that any second staged version contested the
+run's own table "however they arrived", left a correction beside a red
+supply unchecked and unpromotable - 28 supplies in the regenerate - and
+is recorded as rejected on REQ-PIPE-105.
 """
 from __future__ import annotations
 
@@ -100,14 +101,14 @@ def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
     others = [t for t in tables if t != own_table]
     staged = staged_for_period(conn, period, others, staging=staging, loaded=loaded)
 
+    # THE RUN'S OWN TABLE IS ITS OWN ARRIVAL'S, and nothing else staged
+    # for the period competes with it (criterion 6 as amended 2026-10-02
+    # evening). Two files in THIS arrival are contested; a correction
+    # beside an earlier red supply is not - it is checked on its own
+    # data, which is the only way it can ever be accepted.
     own = supply_db.candidates_in(conn, staging, [own_table], arrival=arrival_key,
                                    loaded=loaded).get(own_table) or []
-    # CRITERION 6: anything ELSE staged for this period under the same
-    # name makes the run's own table contested, not just a second file
-    # in this arrival.
-    rivals = staged_for_period(conn, period, [own_table], staging=staging,
-                                loaded=loaded).get(own_table) or []
-    staged[own_table] = sorted(set(own) | set(rivals))
+    staged[own_table] = sorted(own)
 
     withheld = None
     if own_table in set(held) and own:

@@ -785,3 +785,32 @@ Three things it might be, and it is not obvious which:
 
 Nothing done. It needs Keith, because "how much is too much" is a
 judgement about who reads the page rather than about the rule.
+
+15. **[todo, 2026-10-02]** **[Testing & dev tooling]** **`mothman
+    pipeline bootstrap --force` no longer reproduces the same content.**
+
+    Seen while regenerating for REQ-PIPE-105: a `--force` bootstrap over
+    an already-populated database promoted 11 supplies where a clean one
+    promotes dozens, and refused the very first Child Protection arrival
+    of 2023 because "this supply's slot is already filled by a promoted
+    supply". Nothing about the data was wrong: the PREVIOUS bootstrap's
+    promotions were still in the decision log, filling every slot, so
+    every supply filed as a resupply into a filled slot.
+
+    Its own docstring says the opposite - "the pipeline is deterministic
+    and seeded, so re-running is safe and reproduces the same content".
+    That was true before filing became write-once and the decision log
+    append-only (a database trigger refuses TRUNCATE); `--force` re-runs
+    the pipeline but resets neither.
+
+    The figures recorded on REQ-PIPE-105 for the first regenerate (73
+    promoted, 28 contested) came from a `--force` run on top of a crashed
+    one, so they are suspect for the same reason; the second regenerate
+    was taken from a database recreated empty.
+
+    Worked around by dropping and recreating the sandbox's `supply`
+    database. What `--force` SHOULD do - refuse on a populated decision
+    log, recreate the database, or say plainly that it adds to history -
+    is a call about how destructive a dev command may be, so it is
+    Keith's rather than fixed in passing. CI is unaffected: every runner
+    starts from an empty database.

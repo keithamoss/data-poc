@@ -90,8 +90,12 @@ def _delivery(conn, name="monday", **overrides):
         supply_holds.raise_hold(
             conn, dataset_id=entry["dataset_id"],
             supply_id=f"{entry['dataset_id']}@{record['delivery']}",
-            kind=supply_holds.DELIVERY_LEVEL,
-            reason={"files": list(entry.get("files") or ())},
+            # THE ASSIGNMENT-RULE KIND, the only one left: the
+            # delivery-level hold was retired 2026-10-02 (REQ-PIPE-105
+            # criterion 6). This seeds the queue; which kind does not
+            # matter to what these tests assert about it.
+            kind=supply_holds.ASSIGNMENT_RULE,
+            reason={"unavailable": []},
             raised_by=f"run-for-{record['delivery']}", delivery=record["delivery"])
     for entry in record["files"]:
         conn.execute(

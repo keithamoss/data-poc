@@ -23389,16 +23389,17 @@ requirements:
         NOT restrict a run to the tables of the single arrival that
         triggered it.
       - >
-        THE SYSTEM SHALL RETIRE REQ-PIPE-059's delivery-level hold,
-        and SHALL treat several files claiming one dataset for one
-        PERIOD as a CONTESTED table under criterion 8 - however they
-        arrived, and never deciding between them. AMENDED 2026-10-02
-        (Keith). It required the hold where the files shared ONE
-        arrival, which criterion 1 makes impossible: once every file is
-        its own arrival, two files can never share one, so the hold had
-        no producer left. Scoping the same situation by PERIOD rather
-        than by transport is already built and needs no notion of a
-        delivery at all.
+        THE SYSTEM SHALL RETIRE REQ-PIPE-059's delivery-level hold.
+        WHERE one arrival carries several files claiming one dataset,
+        THE SYSTEM SHALL treat that dataset as CONTESTED for that
+        arrival, running none of its own checks and promoting none of
+        them. WHERE supplies of one dataset staged for one PERIOD came
+        from DIFFERENT arrivals, THE SYSTEM SHALL check each arrival's
+        own supply against its own table under criterion 5, and SHALL
+        treat that dataset as contested only where another arrival
+        reads it as context, under criterion 8. AMENDED TWICE ON
+        2026-10-02 (Keith) - see the decision "CRITERION 6 NARROWED
+        AGAIN" for why the "however they arrived" wording went.
       - >
         THE SYSTEM SHALL apply "newest wins" only to PROMOTED
         supplies, and SHALL decide which is newest by PROMOTION time
@@ -23500,6 +23501,45 @@ requirements:
         answered is the stale-deferral problem REQ-DOCS-073 exists to
         prevent, one field over.
     decisions:
+      - >
+        CRITERION 6 NARROWED AGAIN, 2026-10-02 EVENING (Keith), on the
+        evidence of the first regenerate under the overlay. Answer (1) in
+        the decision below made an arrival's OWN table contested whenever
+        another supply of its dataset was still staged for the period.
+        Measured: 28 supplies refused as contested, 73 promoted where 84
+        had (figures from a `--force` bootstrap over an earlier crashed
+        one, so inflated in both directions - see
+        plans/road-testing.md #15), and TS-1/TS-4 broken - the 16:00 Birth Registrations
+        correction landed beside the red 14:00 supply, was never checked
+        or accepted, and the 20:00 arrival never met a filled slot. And
+        nothing re-runs a contested correction once somebody rejects the
+        red one, so it was a dead end, which is the exact objection the
+        "CRITERION 6 NARROWED 2026-09-28" decision raised against an
+        earlier version of this same rule.
+
+        SETTLED: an arrival always reads and checks its own table
+        (criterion 5's own wording, which now governs); contested applies
+        to two files for one dataset in ONE arrival, and to a table read
+        as CONTEXT by somebody else (criterion 8). The arrival-time rule
+        is still not broken: a sibling's run never chooses between the
+        red supply and the correction, it falls back to the period's
+        promoted version. REJECTED keeping "however they arrived" and
+        adding a re-run on rejection - a second mechanism to cover a
+        dead end the narrower rule never creates. REJECTED keeping it and
+        rewriting TS-1/TS-4 to match, which accepts the stuck supplies.
+
+        ANSWER (1) BELOW IS THEREFORE SUPERSEDED in its first half; the
+        promotion gate's period-scoped contest it added to
+        `filing.supplies_of()` is removed with it.
+
+        MEASURED AFTER, from a database recreated empty: 90 supplies
+        promoted (84 before today's change), ZERO refused as contested,
+        50 refused red, 6 not due, 4 into a filled slot. TS-1 behaves as
+        registered - the 14:00 supply red, the 16:00 correction checked
+        and promoted, the 20:00 arrival not auto-promoted. Bootstrap
+        26m08s. The arrival golden and SCENARIOS.md came out
+        byte-identical to the commit before, so filings and verdicts did
+        not move.
       - >
         CRITERION 5 BUILT 2026-10-02, together with criterion 11's guard
         and the three answers below, so criteria 1 and 5 are whole
@@ -23827,11 +23867,15 @@ requirements:
 
         UPDATED 2026-10-02: criteria 1 and 2 built at 1b10d1f, criterion
         5 and criterion 11's guard built the same day (the first
-        decision above). Still NOT DONE: criterion 6's retirement of the
-        delivery-level hold in code (filing still raises one for two
-        files in one arrival, and Birth Registrations' batch still skips
-        such an arrival), criteria 9 and 10's amendments to REQ-PIPE-035
-        and REQ-PIPE-036, and criterion 13. Criterion 13 is SMALLER than
+        decision above). Criterion 6 built the same evening, as amended:
+        filing no longer raises a delivery-level hold - two files for one
+        dataset in one arrival are filed and CONTESTED - the hold KIND is
+        gone from `supply_holds` (a stored one is now refused as unknown),
+        and Birth Registrations' batch runs such an arrival instead of
+        skipping it. Still NOT DONE: criteria 9 and 10's amendments to
+        REQ-PIPE-035 and REQ-PIPE-036, criterion 13, and renaming the
+        delivery log's recognition-time `held` field, which still records
+        "these files all claim one dataset" under the retired word. Criterion 13 is SMALLER than
         it was: a check that cannot read a table is now left out rather
         than recorded red by every tool, so what remains is saying WHY
         it was left out.

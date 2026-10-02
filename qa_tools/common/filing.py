@@ -264,19 +264,14 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
 
     for arrival in found_arrivals:
         for dataset_id in sorted(arrival.files_by_dataset):
-            # A HELD supply is not filed: REQ-PIPE-059 refuses to choose
-            # between two files for one dataset, and filing one of them
-            # would be making that choice by another route.
-            #
-            # IT IS RECORDED, THOUGH (REQ-PIPE-078 criteria 1 and 3),
-            # and that is what this used to get wrong: a bare `continue`
-            # meant the one state in this pass that genuinely needs a
-            # person left no trace at all, while the assignment-rule
-            # hold below got a row. Two holds, two lifetimes, and the
-            # criterion asks for the same terms.
-            if dataset_id in arrival.held:
-                _raise_delivery_hold(arrival, dataset_id)
-                continue
+            # TWO FILES FOR ONE DATASET ARE FILED LIKE ANY SUPPLY
+            # (REQ-PIPE-105 criterion 6, amended 2026-10-02). They were a
+            # delivery-level HOLD - nothing filed, a work item asking which
+            # file was the supply. Now they are CONTESTED: the supply id
+            # carries `#1`, its period is known, the overlay refuses to
+            # choose between its two staged tables and the promotion gate
+            # sees `contested`. Choosing between them is still nobody's
+            # job but a person's; it simply needs no second mechanism.
             if dataset_id not in slots_by_dataset:
                 try:
                     # THE CLAIM WINDOW'S REACH, NOT THE ARRIVAL DATE
@@ -312,24 +307,6 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                 _raise_assignment_hold(arrival, decided)
             written.append(decided)
     return written
-
-
-def _raise_delivery_hold(arrival, dataset_id: str) -> None:
-    """Record a supply nothing may choose between (REQ-PIPE-059).
-
-    THE SUPPLY ID IS DERIVED THE SAME WAY A FILED ONE IS, deliberately:
-    a held supply has to be nameable before anybody can resolve it, and
-    inventing a second naming scheme for the one case where a person is
-    involved is how the two stop joining up.
-    """
-    from qa_tools.common import supply_holds
-
-    with _connect("mothman:hold-raise") as conn:
-        supply_holds.raise_hold(
-            conn, dataset_id=dataset_id, supply_id=_supply_id_for(arrival, dataset_id),
-            kind=supply_holds.DELIVERY_LEVEL,
-            reason={"files": sorted(arrival.files_by_dataset.get(dataset_id) or ())},
-            raised_by=arrival.run_id, delivery=arrival.delivery_name)
 
 
 def _raise_assignment_hold(arrival, decided: Assignment) -> None:
@@ -637,28 +614,16 @@ def supplies_of(conn, arrival) -> list[dict]:
             conn, supply_db.STAGING_SCHEMA, [logical], arrival=key).get(logical) or []
         record = filing_for(dataset_id, supply_id)
         period = (record or {}).get("slot")
-        # CONTESTED AT PERIOD SCOPE, not just within this arrival
-        # (REQ-PIPE-105 criterion 6, as amended 2026-10-02): another
-        # supply of this dataset still staged for the same period means
-        # nobody has said which is the supply, however they arrived.
-        rivals: list[str] = []
-        if period:
-            from qa_tools.common import period_overlay
-
-            rivals = [p for p in period_overlay.staged_for_period(
-                conn, period, [logical], staging=supply_db.STAGING_SCHEMA,
-                loaded=None).get(logical) or [] if p not in staged]
         out.append({
             "dataset_id": dataset_id,
             "supply": supply_id,
             "period": period,
             "physical_tables": sorted(staged),
-            "held": dataset_id in arrival.held,
             # SEVERAL STAGED TABLES FOR ONE NAME is REQ-PIPE-059's case
             # seen from the warehouse rather than from the file listing.
             # Both are reported because they can disagree - a file that
             # matched but failed to load leaves one without the other -
             # and either is a reason not to choose.
-            "contested": len(staged) > 1 or bool(rivals),
+            "contested": len(staged) > 1,
         })
     return out

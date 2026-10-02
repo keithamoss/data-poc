@@ -100,8 +100,9 @@ def load_manifest() -> list[dict]:
     supplies from a declaration rather than from what arrived.
     """
     from qa_tools.common import arrivals
-    # A HELD supply is not pickable: nothing may choose between its
-    # files, so there is no one csv_path to offer (REQ-PIPE-059).
+    # A CONTESTED arrival - two files for the dataset - is not pickable:
+    # nothing may choose between its files, so there is no one csv_path
+    # to offer (REQ-PIPE-105 criterion 6; it was REQ-PIPE-059's hold).
     return [a.as_entry()
                 | {"csv_path": str(a.path_for("birth-registrations"))}
             for a in arrivals.arrivals_for("civil-registration", "run_")
