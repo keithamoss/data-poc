@@ -107,7 +107,7 @@ flowchart TD
 
 *One empty slot names one missing table, and it does not make the 5 filled slots late or empty.*
 
-The one thing to notice is the shape: one period branches into 6 separate slots, and only Placements is coloured differently. The other 5 slots are not late or empty because Placements is.
+The one thing to notice is the shape: one period branches into 6 separate slots, and only Placements is coloured differently. Placements being empty does not make the other 5 late or empty.
 
 Each slot also carries its own timing. Its **[due time](../glossary.md#due-time)** is its period's date at its own dataset's time of day. Its **[grace allowance](../glossary.md#grace-allowance)** is the extra time a supply gets after that. Today all 6 Child Protection tables share a 9am due time and an 8-hour grace allowance, because their contract sets both once for the collection. A table that needs a different time can be given its own, and only its own slots change.
 
