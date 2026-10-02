@@ -2341,3 +2341,34 @@ survives context compaction. Tick items off here as they land.
    and .env, and REQ-DOCS-124 is built again. (2) STILL TO DO: the full
    sweep, critic first so its model is settled, then the checker on that
    critic's runs.
+
+   **The sweep, 2026-10-02 evening: DONE, every eval passes 3 of 3.** In
+   stages, as Keith asked: (1) critic, Opus kept; (2) checker, Opus kept
+   after Sonnet rejected the real seeded finding 3 of 3; (3) fact-checker,
+   writer and illustrator. Then a frozen confirmation sweep of every
+   defect page against the committed pages (c1fa4ac5), because the clean
+   page's fixes flow into every defect page. The per-agent numbers are
+   dated decisions on REQ-DOCS-123, -125, -126, -127, -128 and -133.
+
+   The clean page took nine rounds, and the useful finding is WHY: every
+   round's flags were real, in the page or in its sources - "dataset"
+   undefined, advice no source said ("check staging before chasing"),
+   "missing" where REQ-PIPE-052 says "late", a heading that overclaimed
+   (a schedule that has run out also leaves no slot), "red" undefined in
+   the In short box, a stale "8 business hours" contract comment, and a
+   REQ-PIPE-098 NFR that stated a 2026-09-26 fact in the present tense.
+   Agent and tooling fixes on the way, each approved by Keith where it
+   touched a prompt: quote-check skips injection rows and reads through
+   wrapped YAML comments; the fact-checker lets criteria and evidence
+   outweigh a stale remark, and searches every cited source before
+   "not found". One round of three showed no measurable gain from the
+   search rule; it stays, recorded as unproven.
+
+   **STILL OPEN, for a fresh session:** walk REQ-DOCS-123, -125, -126,
+   -127, -128, -129, -131 and -133 criterion by criterion against the
+   code and the eval results, fill `linked_tests`/`implemented_by`/
+   `evidence`, and flip each that is met to built. Then this entry
+   comes out whole, its decisions already carried (rule 3). Not done
+   tonight because each is a 10 to 30 criterion audit, and a status
+   flipped without that walk is the failure CLAUDE.md's sign-off
+   section exists to stop.

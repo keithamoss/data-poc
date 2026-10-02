@@ -4058,6 +4058,13 @@ twice. It deliberately did not re-find the `TypeError`.
     bug fixed. (3) NOT STARTED: the full sweep waits on #5's research
     and Keith's decision on the critic.
 
+    **(3) DONE, 2026-10-02 evening:** the full sweep passed 3 of 3 for
+    every agent on every page it targets, including a frozen confirmation
+    sweep against the committed pages. Summaries are dated decisions on
+    each agent's requirement; the story is `plans/explainers.md` #5.
+    What remains is the criterion-by-criterion audit to flip the
+    requirements to built, queued for a fresh session.
+
 
 70. **[done, 2026-10-02]** **[Testing & dev tooling]** **An inheritance
     test read "the latest decision" for a real, shared dataset, so it
