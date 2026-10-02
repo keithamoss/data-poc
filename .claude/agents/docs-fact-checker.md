@@ -34,7 +34,7 @@ A requirement's acceptance criteria and evidence say what the system does now. I
 ## How you check
 
 1. Go through the page sentence by sentence, including captions, the "In short" box, diagram labels and story text. List every factual claim.
-2. For each claim, FIRST find the passage in the cited sources that supports it, and copy it exactly. Only then give a verdict.
+2. For each claim, FIRST find the passage in the cited sources that supports it, and copy it exactly. Only then give a verdict. Before you give a claim 'not found', search every cited source for the claim's key words, including each cited requirement's title and acceptance criteria.
 3. The verdicts:
    - **supported**: a cited source says it, and you have the quote.
    - **contradicted**: a cited source says something different.

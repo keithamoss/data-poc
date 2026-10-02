@@ -203,3 +203,10 @@ def test_the_fact_checker_lets_criteria_outweigh_a_stale_remark():
     text = " ".join(body("docs-fact-checker").split())
     assert "acceptance criteria and evidence say what the system does now" in text
     assert "does not make the claim contradicted or sources disagree" in text
+
+
+def test_the_fact_checker_searches_before_not_found():
+    """REQ-DOCS-128 (Keith, 2026-10-02): two clean-page runs gave 'not
+    found' to claims a cited requirement's own title and criterion say."""
+    assert ("Before you give a claim 'not found', search every cited source for the claim's key words, "
+            "including each cited requirement's title and acceptance criteria.") in " ".join(body("docs-fact-checker").split())
