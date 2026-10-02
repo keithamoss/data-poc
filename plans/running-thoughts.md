@@ -4601,3 +4601,5 @@ Belongs with batch 5's check work.
     "happy with that, signed off" on 2026-09-27. He now says "I don't
     know that it bars it from automatic promotion." Revisit before the
     acknowledgement entry type is built.
+
+    REQ-PIPE-091 now carries a SUPERSEDED note (Keith approved, 2026-10-02).
