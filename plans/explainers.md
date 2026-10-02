@@ -930,19 +930,12 @@ survives context compaction. Tick items off here as they land.
    categories he approved, with the supply calendar's terms at the
    back. The plans draft and its notes are deleted.
 
-   **Pending: REQ-DOCS-119's wording no longer matches the approved
-   glossary**, and the fix changes a signed requirement's claims, so the
-   exact text goes to Keith first. What drifted from the naming
-   session's canon: demote is only ever back to staging (a promoted
-   supply that will not be used is rejected); acknowledge lost its
-   "accept" alias; "in development" is gone and sample data is the term
-   (running-thoughts #60); the asset shapes are scheduled data asset,
-   one-off data and sample data, no longer draft placeholders; trial
-   became one-off check (trial and trial check kept as aliases); stale
-   was dropped from no data; timeliness kept as recency's alias;
-   deliver is a word form of delivery, not an entry; carry forward
-   retired. Criteria 2 (one-line definitions), 10 and 11 need amending,
-   and the categories need a criterion of their own.
+   **REQ-DOCS-119 reworded to match (Keith approved the exact text,
+   2026-10-02):** criteria 2, 10 and 11 amended, criterion 14 added for
+   the categories, the naming canon marked AMENDED, and three decisions
+   added - the categories, the example as a field of its own, and
+   sample data as a stage rather than an asset shape. Status moved to
+   in progress: the glossary, its tooling and its gate now exist.
 
    **Glossary forks settled (Keith, 2026-09-29 night):** asset and
    issue stay aliases (REQ-DOCS-119 c11 amended to "cover"); the recall

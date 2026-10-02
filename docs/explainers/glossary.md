@@ -108,7 +108,9 @@ Not explained on a page of its own yet.
 
 Build state: designed, not built yet.
 
-Said of a table whose check cannot run because another table it compares against is missing or held. For example, a check that matches each notification's client identifier to a client in the clients table cannot run while this quarter's clients table is missing, so notifications shows as blocked, even though nothing is wrong with the notifications table itself. It is not the same as waiting on a person.
+Said of a table whose check cannot run because another table it compares against is missing or held. It is not the same as waiting on a person.
+
+**Example:** A check that matches each notification's client identifier to a client in the clients table cannot run while this quarter's clients table is missing, so notifications shows as blocked, even though nothing is wrong with the notifications table itself.
 
 Not explained on a page of its own yet.
 
@@ -176,7 +178,9 @@ Not explained on a page of its own yet.
 
 Build state: partly built.
 
-When a dataset does not take part in a period, that period uses the dataset's most recent promoted supply instead. For example, in a data asset where most datasets arrive quarterly, an annual dataset supplied each August has nothing due in the other three quarters, so each of them uses the latest August supply. Mothman does this automatically when a period is set up, and a person can also do it by hand.
+When a dataset does not take part in a period, that period uses the dataset's most recent promoted supply instead. Mothman does this automatically when a period is set up, and a person can also do it by hand.
+
+**Example:** In a data asset where most datasets arrive quarterly, an annual dataset supplied each August has nothing due in the other three quarters, so each of them uses the latest August supply.
 
 Not explained on a page of its own yet.
 
@@ -192,7 +196,9 @@ Not explained on a page of its own yet.
 
 Build state: partly built.
 
-A person's decision to move a supply to a different slot from the one the rule chose. For example, a supplier sends their third-quarter file so early that it arrives before the third quarter's claim window opens. The rule files it to the second quarter, and a person re-files it to the third quarter.
+A person's decision to move a supply to a different slot from the one the rule chose.
+
+**Example:** A supplier sends their third-quarter file so early that it arrives before the third quarter's claim window opens. The rule files it to the second quarter, and a person re-files it to the third quarter.
 
 Not explained on a page of its own yet.
 
@@ -222,7 +228,9 @@ Not explained on a page of its own yet.
 
 Build state: partly built.
 
-A person's decision that a period nobody supplied will use an earlier period's promoted supply instead. The period then shows as substituted. For example, a supplier misses the second quarter entirely, so we decide the second quarter will use the first quarter's supply.
+A person's decision that a period nobody supplied will use an earlier period's promoted supply instead. The period then shows as substituted.
+
+**Example:** A supplier misses the second quarter entirely, so we decide the second quarter will use the first quarter's supply.
 
 Also called: standing in, last good one.
 
@@ -372,7 +380,9 @@ Not explained on a page of its own yet.
 
 ### Delivery month
 
-One of the months in which a supply calendar's authored dates fall. A dataset can take part in only some of them. For example, in a data asset where most datasets arrive quarterly, a dataset supplied once a year names just its one month, such as August, and has no slot in the other three quarters. A dataset that names none takes part in every month.
+One of the months in which a supply calendar's authored dates fall. A dataset can take part in only some of them. A dataset that names none takes part in every month.
+
+**Example:** In a data asset where most datasets arrive quarterly, a dataset supplied once a year names just its one month, such as August, and has no slot in the other three quarters.
 
 Not explained on a page of its own yet.
 
@@ -392,7 +402,9 @@ Not explained on a page of its own yet.
 
 ### Not-expected period
 
-A period in which a dataset owes no supply, declared beforehand with a reason. It still shows, marked as not expected, and it has no slot. For example, a supplier tells us there will be no third-quarter supply because they are moving to a new system.
+A period in which a dataset owes no supply, declared beforehand with a reason. It still shows, marked as not expected, and it has no slot.
+
+**Example:** A supplier tells us there will be no third-quarter supply because they are moving to a new system.
 
 Explained in: [2-calendar/periods-and-slots.md](2-calendar/periods-and-slots.md).
 
@@ -408,7 +420,9 @@ Explained in: [2-calendar/periods-and-slots.md](2-calendar/periods-and-slots.md)
 
 Build state: partly built.
 
-How many future slots a dataset's authored dates still cover. When few remain, Mothman warns, counting slots rather than months. For example, a quarterly dataset whose dates run to the end of 2027 has five slots of runway in September 2026. Mothman warns once four or fewer remain, which for a quarterly dataset is about a year ahead.
+How many future slots a dataset's authored dates still cover. When few remain, Mothman warns, counting slots rather than months.
+
+**Example:** A quarterly dataset whose dates run to the end of 2027 has five slots of runway in September 2026. Mothman warns once four or fewer remain, which for a quarterly dataset is about a year ahead.
 
 Not explained on a page of its own yet.
 

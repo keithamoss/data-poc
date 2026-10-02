@@ -39,6 +39,10 @@ class _Strict(BaseModel):
 class GlossaryEntry(_Strict):
     term: str
     definition: str
+    # Optional, and held APART from the definition so a reader can tell
+    # what the term means from an illustration of it, and so each can be
+    # styled on its own (Keith, 2026-10-02).
+    example: str | None = None
     aliases: list[str]
     forms: list[str]
     defined_by: list[str]
@@ -51,6 +55,13 @@ class GlossaryEntry(_Strict):
     # Optional: the entry this one sits inside, such as the supply
     # calendar inside the delivery agreement (criterion 12).
     part_of: str | None = None
+
+    @field_validator("example")
+    @classmethod
+    def _example_not_blank(cls, v: str | None) -> str | None:
+        if v is not None and not v:
+            raise ValueError("must not be blank - leave the key out instead")
+        return v
 
     @field_validator("term", "definition")
     @classmethod
@@ -157,6 +168,8 @@ def _render_entries(entries: list[GlossaryEntry], req_states: dict[str, str]) ->
         if e.draft:
             lines += ["Draft: this name is a placeholder and may change.", ""]
         lines += [e.definition, ""]
+        if e.example:
+            lines += [f"**Example:** {e.example}", ""]
         if e.part_of:
             lines += [f"Part of: {e.part_of}.", ""]
         if e.aliases:

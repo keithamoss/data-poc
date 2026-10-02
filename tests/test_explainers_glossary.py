@@ -172,3 +172,21 @@ def test_sections_render_in_the_listed_order_not_alphabetically(repo):
 def test_entries_sort_alphabetically_within_a_section(repo):
     md = (repo / "docs/explainers/glossary.md").read_text()
     assert md.index("### One-off extraction\n") < md.index("### Supply\n")
+
+
+def test_an_example_renders_apart_from_its_definition(repo):
+    """Keith, 2026-10-02: the example is its own field, so it can be
+    styled separately from the definition."""
+    write(repo, [entry("supply", example="A births table sent on a Tuesday.")], CATEGORIES[:1])
+    ex.write_glossary_md(repo)
+    md = (repo / "docs/explainers/glossary.md").read_text()
+    supply = md.split("### Supply\n", 1)[1]
+    assert supply.index("What supply means.") < supply.index("**Example:** A births table sent on a Tuesday.")
+    assert findings(repo) == [], "\n".join(f.render() for f in findings(repo))
+
+
+def test_an_example_is_optional_but_never_blank(repo):
+    md = (repo / "docs/explainers/glossary.md").read_text()
+    assert "Example:" not in md
+    write(repo, [entry("supply", example="")], CATEGORIES[:1])
+    assert any(f.rule == "glossary-schema" for f in v.Validator(repo).run())
