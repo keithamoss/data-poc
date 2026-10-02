@@ -129,7 +129,7 @@ entries:
     idea: false
 
   - term: slot
-    definition: "One dataset's expected supply for one period, with its own due time, grace allowance, and claim window. Each dataset has its own run of slots."
+    definition: "One dataset's expected supply for one period, with its own due time, grace allowance, and claim window. Each dataset has its own slots, one for each period it takes part in."
     aliases: []
     forms: [slots]
     defined_by: [REQ-PIPE-052]
@@ -139,7 +139,7 @@ entries:
 
   - term: due time
     definition: "The moment a slot's supply is expected: its period's date at its dataset's expected time of day, in the data asset's time zone."
-    aliases: [due instant]
+    aliases: []
     forms: [due times]
     defined_by: [REQ-PIPE-052, REQ-PIPE-048]
     page: null
@@ -192,7 +192,7 @@ entries:
     idea: false
 
   - term: runway
-    definition: "How many future slots a dataset's authored dates still cover. When few remain, Mothman warns, counting slots rather than months."
+    definition: "How many future slots a dataset's authored dates still cover. When few remain, Mothman warns, counting slots rather than months. For example, a quarterly dataset whose dates run to the end of 2027 has five slots of runway in September 2026. Mothman warns once four or fewer remain, which for a quarterly dataset is about a year ahead."
     aliases: []
     forms: []
     defined_by: [REQ-PIPE-053]
@@ -201,7 +201,7 @@ entries:
     idea: false
 
   - term: schedule ended
-    definition: "The status of a dataset whose authored dates have run out, so no slot covers the date being viewed. It is not a quality verdict."
+    definition: "The status of a dataset whose authored dates have run out, so no slot covers the date being viewed. It is not a quality verdict: the data may be perfectly fine. It means someone needs to add more dates to the supply calendar."
     aliases: [exhausted schedule]
     forms: []
     defined_by: [REQ-PIPE-053]
@@ -212,18 +212,9 @@ entries:
   # ---------------------------------------------------------------- group 3, what arrives
 
   - term: delivery
-    definition: "One drop from a supplier, which may hold several files. It never means the obligation to supply, which is a slot."
+    definition: "One drop from a supplier, which may hold several files."
     aliases: []
-    forms: [deliveries]
-    defined_by: [REQ-GEN-042]
-    page: null
-    draft: false
-    idea: false
-
-  - term: deliver
-    definition: "What a supplier does when it sends us a delivery of one or more files."
-    aliases: []
-    forms: [delivers, delivered, delivering]
+    forms: [deliveries, deliver, delivers, delivered]
     defined_by: [REQ-GEN-042]
     page: null
     draft: false
@@ -239,7 +230,7 @@ entries:
     idea: false
 
   - term: supply
-    definition: "One version of one dataset's table, which is filed to a slot and judged by checks."
+    definition: "One version of one dataset's table, which is filed to a slot and judged by checks. One arrival can bring several supplies."
     aliases: []
     forms: [supplies]
     defined_by: [REQ-PIPE-034, REQ-PIPE-062]

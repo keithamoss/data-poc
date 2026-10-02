@@ -4555,3 +4555,13 @@ Belongs with batch 5's check work.
     `trial_run_id()`, REQ-PIPE-103's wording, CLI prompts). The rename
     to "one-off check" belongs in the requirement this item becomes,
     alongside retiring the `sample` schema and `no_calendar:`.
+
+61. **[todo, 2026-10-02]** **[Pipeline & publishing]** An arrival may
+    be a zip holding several files. Keith, 2026-10-02, reviewing the
+    glossary's "arrival" entry: "it might be one file or it might be a
+    zip file with multiple files in it." Nothing handles this today -
+    no requirement mentions zip or archive arrivals, and REQ-PIPE-105
+    (signed, in progress) says every arriving FILE is its own arrival.
+    Open question when scoped: is a zip one arrival carrying several
+    tables (so one receipt time for all of them), or is it unpacked
+    into one arrival per file inside it?
