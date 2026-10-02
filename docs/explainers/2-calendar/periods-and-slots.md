@@ -54,7 +54,7 @@ Build state, by section:
 > A **[period](../glossary.md#period)**, the one named date that every table on a calendar shares, never moves once it exists.
 > A table that does not take part in a period has no slot there, and that is not a gap.
 
-Priya, a data steward at the Department for Child Protection and Family Support, sends her 2026-Q3 files (supply due 1 August 2026). Her agency has moved Placements to a new system, and its file is not ready, so she sends the other 5 tables on time. Later that week, Sam, a data engineer new to the asset team, opens 2026-Q3 and finds 6 slots there. Every one is filled except Placements, which sits empty.
+Priya, a data steward at the Department for Child Protection and Family Support, sends the 2026-Q3 files (supply due 1 August 2026). One extract is still running on her side, so Placements stays behind and only 5 of Child Protection's 6 tables go. A few days later, Sam, a data engineer new to the asset team, looks at 2026-Q3 to see how it went. There are 6 places, one for each table, and 5 of them are filled. The one marked Placements is empty, and Sam is surprised that the other 5 are not counted as late or short.
 
 That empty space is the whole point of a slot. It tells Sam which table is missing, and it says nothing against the 5 that came in.
 
@@ -88,9 +88,9 @@ config:
   theme: neutral
 ---
 flowchart TD
-  accTitle: One empty slot names one missing table, and it does not make the 5 filled slots late or empty.
-  accDescr: One empty slot names one missing table, and it does not make the 5 filled slots late or empty.
-  P["2026-Q3 period"]
+  accTitle: One empty slot names one missing table, and the other 5 slots stand on their own.
+  accDescr: One empty slot names one missing table, and the other 5 slots stand on their own.
+  P["Period 2026-Q3, supply due 1 August 2026"]
   P --> S1["Client Register: filled"]
   P --> S2["Notifications: filled"]
   P --> S3["Investigations: filled"]
@@ -105,7 +105,7 @@ flowchart TD
   class S4 empty
 ```
 
-*One empty slot names one missing table, and it does not make the 5 filled slots late or empty.*
+*One empty slot names one missing table, and the other 5 slots stand on their own.*
 
 The one thing to notice is the shape: one period branches into 6 separate slots, and only Placements is coloured differently. Placements being empty does not make the other 5 late or empty.
 
