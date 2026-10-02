@@ -2249,3 +2249,19 @@ survives context compaction. Tick items off here as they land.
    REQ-DOCS-123 (the control's bar); possibly REQ-DOCS-131 if a rule
    moves into the reader-judgement skill, which is a gated standard.
    The full eval sweep waits on Keith's choice.
+
+   **Keith chose B, 2026-10-02** ("Let's do B"), with four answers:
+   - the validator is a NEW docs-* agent that reads the page and the
+     cited sources, read-only like the fact-checker, under the same
+     guards, so it can reject an omission the sources do not support;
+   - Keith sees both leftovers at triage, collapsed below the confirmed
+     findings: the critic's outside-the-brief list and the findings the
+     validator rejected. Neither drives a revision unless he picks one,
+     and promoting an outside-the-brief item adds it to that page's
+     reader questions;
+   - no cap on findings per run - anchoring plus the validator bound
+     it, and a cap could hide a real third blocker;
+   - the validator runs on Opus, pinned, and is evaluated on Opus and
+     Sonnet like the critic.
+   Next: delivery-scoper drafts the amended and new requirements, then
+   Keith signs them off before anything is built.
