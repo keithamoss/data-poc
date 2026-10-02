@@ -150,8 +150,8 @@ when the glossary moves out of plans:
   term for data provided before a calendar is agreed.
 - trial: canon term - now "one-off check", with trial and trial check
   as aliases.
-- stale (alias of no data) and timeliness (alias of recency, the ODCS
-  name) - under review.
+- stale (alias of no data): DROPPED by Keith 2026-10-02. timeliness (alias of recency, the ODCS
+  name): KEPT by Keith 2026-10-02.
 
 ## Categories, approved by Keith 2026-10-02
 
