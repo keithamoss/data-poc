@@ -32,7 +32,7 @@ Build state, by section:
 > Each dataset gets its own slot in every period it takes part in, so one missing table shows up on its own.
 > A period is one agreed date on the supply calendar, and a slot is one table's expected supply for that period.
 > A slot stays empty until a supply is promoted into it, that is, moved out of staging, the waiting area, into the period.
-> So when a slot is still empty after its due time, check staging before chasing the supplier.
+> So when a slot is still empty after its due time and grace allowance have passed, check staging before chasing the supplier.
 
 On 3 August 2026, Sam, a data engineer new to the team that looks after this data, opens the dashboard. Child Protection is a collection of 6 tables from one supplying agency. Five of its tables show this quarter's supply, and the carers table shows nothing at all.
 
@@ -84,15 +84,13 @@ Each supply's checks give it a status of green, amber, or red. A supply fills it
 
 A green or amber supply is promoted automatically when its slot is empty. A red supply stays in staging, awaiting a person.
 
-One part of this is not built yet. If a person promotes a supply into a different period from the one it was checked against, it is not yet checked again.
-
 So an empty slot does not always mean nothing arrived. A supply may be waiting in staging for a decision. Sam finds no carers supply there either, so the next step is to chase the supplier.
 
 ## Not every dataset takes part in every period
 
 Build state: partly built.
 
-Child Protection's case workers table is only supplied in February and August. These are its **delivery months**, the months of the calendar it takes part in, and the data asset's configuration names them. So it has a slot in 2026-Q1 (dated 1 February 2026) and in 2026-Q3, and no slot in the other 2 periods.
+Child Protection's case workers table is only supplied in February and August. These are its **delivery months**, the months of the calendar it takes part in. So it has a slot in 2026-Q1 (dated 1 February 2026) and in 2026-Q3, and no slot in the other 2 periods.
 
 Nothing is owed for case workers in May, so its absence is not reported as overdue or missing.
 

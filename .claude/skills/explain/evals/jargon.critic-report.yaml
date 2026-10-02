@@ -4,7 +4,10 @@
 # CONFIRM, and three false ones it must REJECT, each taken from a shape the
 # critic really produced on the clean page that day. The expected verdicts
 # live in jargon.expected.yaml, never here, so the report reads like a real
-# one. Every quote is on the page and every criterion is real, so all four
+# one. (R1-F2 first asked the page to define green, amber and red; the
+# stage 2 checker runs rightly confirmed it, because REQ-PIPE-075 does
+# record the pass/warn/fail-to-colour rollup, so it was replaced
+# 2026-10-02 with an ask no cited source supports.) Every quote is on the page and every criterion is real, so all four
 # pass `mothman docs check-findings` and reach the checker's judgement.
 findings:
   - id: R1-F1
@@ -14,9 +17,9 @@ findings:
     suggestion: "Say what a slot is in plain words, as one dataset's expected supply for one period with its own due time, and drop the database terms."
   - id: R1-F2
     severity: should fix
-    criterion: Every page stands alone
-    quote: "Each supply's checks give it a status of green, amber, or red."
-    suggestion: "Define each colour here: green means every check passed, amber means it passed with warnings, and red means at least one check failed."
+    criterion: operating question 1
+    quote: "So when a slot is still empty after its due time and grace allowance have passed, check staging before chasing the supplier."
+    suggestion: "Tell the reader that the dashboard emails the team as soon as a slot becomes overdue, so they know a gap will reach them without looking."
   - id: R1-F3
     severity: should fix
     criterion: reader question 5
