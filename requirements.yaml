@@ -15150,7 +15150,7 @@ requirements:
       August changes the June answer only where it genuinely should -
       and whoever asks can see which decision changed it.
     moscow: must
-    status: not_started
+    status: in_progress
     source: >
       Keith, 2026-09-26, batch 4 scoping input (b): "we're going to have
       to work out how demotion fits in and keeps as-at-T stable." Thread
@@ -15267,9 +15267,11 @@ requirements:
         that does not fail the build.
       - >
         WHERE the warehouse supports moving a table between schemas as a
-        catalogue operation, THE SYSTEM SHALL use it, and SHALL fall
-        back to copying the table and dropping the original only where
-        it does not.
+        catalogue operation, THE SYSTEM SHALL use it, and SHALL REFUSE
+        the move where it does not, naming the missing capability.
+        AMENDED 2026-10-02 (Keith): it required a fall-back to copying
+        the table and dropping the original, and the built code
+        deliberately refuses instead - see the decisions.
       - >
         THE SYSTEM SHALL determine which of those two it can use from a
         declared capability of the warehouse it is connected to, and
@@ -15337,6 +15339,56 @@ requirements:
         generated event sequences rather than only worked examples.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-DASH-041]
     decisions:
+      - >
+        CRITERION 17'S FALL-BACK WAS DROPPED, NOT BUILT (Keith,
+        2026-10-02), after the conflict was put to him rather than
+        resolved quietly: the criterion required copy-and-drop where a
+        warehouse cannot move a table as a catalogue operation, and
+        `supply_db.move_table()` raises instead, with its own docstring
+        arguing the refusal.
+
+        THE ARGUMENT IN THE CODE IS THE ONE THAT WON: a silent
+        copy-and-drop turns a promotion from an instant rename into an
+        operation whose cost scales with the data, and nobody sees it
+        happen. Since REQ-PIPE-087 PostgreSQL is the only engine and it
+        supports SET SCHEMA, so the fall-back would have been a branch
+        no supported warehouse can exercise - untested in practice, and
+        rotting. REJECTED leaving the criterion unmet with a
+        `blocked_by` naming a future warehouse, the third option put to
+        him: it parks the requirement short of `built` over a path
+        nobody wants.
+      - >
+        BUILT IN PHASES, and this records which, so an unwired module
+        is not later read as a finished one - the mistake REQ-PIPE-079's
+        own decision 1 made and this register had to correct.
+
+        PHASE 1 (2026-10-02) is `pipeline/slot_timeline.py`: what each
+        slot held and when that changed, from the decision log alone.
+        IT HAS NO PRODUCTION CALLER YET. The dashboard still answers
+        as-of by filtering runs on their ARRIVAL date
+        (`clipDatasetToAsOf`), which is exactly what criteria 1, 2 and
+        8 exist to replace.
+
+        STILL TO DO: that swap (1, 2, 5, 6, 7, 8, 11), the census
+        (12-16), and the "As of" -> "In place on" rename (20-26) -
+        98 occurrences in the template plus the Python, both test
+        suites and this file's own prose.
+      - >
+        THE ANSWERS TRAVEL, NOT THE RULE, which is the design decision
+        phase 1 turns on. `decision_log.promoted_into(as_at=...)`
+        already resolves a slot correctly, but a static page cannot
+        call it once per date a reader picks. Shipping the DECISIONS
+        and letting the page apply the rule would put a second
+        implementation of it in JavaScript, free to drift - which this
+        project has paid for: REQ-DASH-054 deleted a JS port of the
+        cadence rule for this reason, and CLAUDE.md records the day
+        four implementations of status existed and one rendered a
+        check with fourteen real violations green.
+
+        So a timeline of ANSWERS travels and the page does a lookup.
+        `slot_timeline.in_place_on()` is that lookup written in Python
+        purely so the suite can hold it against `promoted_into()` at
+        several instants and fail if the two ever disagree.
       - >
         POINTER ADDED 2026-09-28 (Keith's approval to touch this signed
         requirement): criterion 9's demotion is REFUSED while a later
