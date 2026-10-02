@@ -36,6 +36,14 @@ One file we received, with its receipt time, which is the moment our own storage
 
 Not explained on a page of its own yet.
 
+### Collection
+
+Build state: partly built.
+
+A group of datasets that one agency supplies together, such as Child Protection's six tables.
+
+Not explained on a page of its own yet.
+
 ### Data asset
 
 Build state: partly built.
@@ -406,7 +414,7 @@ A period in which a dataset owes no supply, declared beforehand with a reason. I
 
 **Example:** A supplier tells us there will be no third-quarter supply because they are moving to a new system.
 
-Explained in: [2-calendar/periods-and-slots.md](2-calendar/periods-and-slots.md).
+Not explained on a page of its own yet.
 
 ### Period
 
