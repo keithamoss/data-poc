@@ -29,7 +29,7 @@ import json
 import os
 from datetime import datetime
 
-from pipeline import recorded_arrival
+from pipeline import recorded_arrival, slot_timeline
 from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
@@ -488,6 +488,13 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # what criterion 5 protects. Quiet when they agree: `differs`
         # is False in the ordinary case and the page renders nothing
         # extra, which is the point at thirty datasets.
+        # WHAT EACH SLOT HELD, AND WHEN THAT CHANGED (REQ-PIPE-081
+        # criteria 1, 2, 3 and 6). The ANSWERS, not the rule - see
+        # pipeline/slot_timeline.py for why the page must not be taught
+        # to derive these for itself. Read from the decision log, with
+        # each entry tied to the run that checked it.
+        "slotTimeline": slot_timeline.with_runs(
+            slot_timeline.for_dataset(dataset_id), dataset_id),
         "promotionState": promotion_state.state_for(dataset_id).as_record(),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,

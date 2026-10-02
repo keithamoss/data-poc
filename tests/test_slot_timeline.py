@@ -175,3 +175,44 @@ class TestItReadsTheLogAndNothingElse:
                         f"slot_timeline builds a string naming {forbidden!r}, "
                         f"which is about the warehouse's contents rather "
                         f"than the decisions taken")
+
+
+class TestEachEntryCanBeTiedToItsRun:
+    """The page needs to get from "this slot held supply X" to the run
+    whose results it should show, and the supply id is not a run id.
+
+    KEPT SEPARATE FROM for_dataset() ON PURPOSE. Criterion 3 says an
+    "as at T" answer comes from the decision log alone, and that is
+    what for_dataset() reads. The run lookup is a different recorded
+    fact in a different table, so it is a different function - rather
+    than quietly widening what the log-only one touches.
+    """
+
+    def test_it_adds_the_run_that_checked_each_supply(self, clean, dataset, monkeypatch):
+        from pipeline import slot_timeline as st
+
+        _decide(clean, dataset, decision_log.PROMOTE, supply="s1",
+                at="2026-02-01T09:00:00+08:00", to_slot="2026-Q1")
+        monkeypatch.setattr(st, "_run_for", lambda conn, d, supply: "run_042")
+
+        got = st.with_runs(st.for_dataset(dataset, conn=clean), dataset, conn=clean)
+        assert got[0]["run_id"] == "run_042"
+
+    def test_an_emptied_slot_names_no_run(self, clean, dataset):
+        from pipeline import slot_timeline as st
+
+        _decide(clean, dataset, decision_log.DEMOTE, supply="s1",
+                at="2026-08-01T09:00:00+08:00", from_slot="2026-Q1")
+        got = st.with_runs(st.for_dataset(dataset, conn=clean), dataset, conn=clean)
+        assert got[0]["supply"] is None and got[0]["run_id"] is None
+
+    def test_a_supply_no_run_checked_is_not_an_error(self, clean, dataset):
+        """A real state rather than a fault - a supply promoted by hand
+        before any QA run read it has no run, and the entry is still
+        the truth about what the slot held."""
+        from pipeline import slot_timeline as st
+
+        _decide(clean, dataset, decision_log.PROMOTE, supply="never-checked",
+                at="2026-02-01T09:00:00+08:00", to_slot="2026-Q1")
+        got = st.with_runs(st.for_dataset(dataset, conn=clean), dataset, conn=clean)
+        assert got[0]["supply"] == "never-checked" and got[0]["run_id"] is None

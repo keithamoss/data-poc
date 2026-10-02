@@ -99,3 +99,56 @@ def in_place_on(timeline: list[dict], slot: str, at: str) -> str | None:
             break
         answer = entry["supply"]
     return answer
+
+
+# --------------------------------------------------------------------
+# Tying an answer to a run
+#
+# SEPARATE FROM for_dataset() DELIBERATELY. Criterion 3 says an "as at
+# T" answer is derived from the decision log alone, and that is exactly
+# what for_dataset() reads. Getting from a supply to the run that
+# CHECKED it is a different recorded fact in a different table, so it
+# is a different function rather than a quiet widening of the log-only
+# one. A caller that wants both asks for both.
+# --------------------------------------------------------------------
+
+
+def _run_for(conn, dataset_id: str, supply: str) -> str | None:
+    """The run that checked this supply, via drift_reference.
+
+    ONE IMPLEMENTATION OF THE MAPPING, not a second. The supply id and
+    the physical table share an ARRIVAL KEY, and `drift_reference`
+    already works that out - including the rule about which run wins
+    where several read the same table. Re-deriving it here would be the
+    thing this module's own docstring argues against, one layer down.
+    """
+    from qa_tools.common import drift_reference
+
+    return drift_reference.run_for(conn, dataset_id, supply)
+
+
+def with_runs(timeline: list[dict], dataset_id: str,
+               conn: supply_db.SupplyConnection | None = None) -> list[dict]:
+    """The same timeline, each entry naming the run that checked it.
+
+    `run_id` IS NONE FOR AN EMPTIED SLOT, because nothing is in place
+    to show, and None for a supply no run ever read - a real state
+    rather than a fault, true of anything promoted by hand before QA
+    saw it. The entry is still the truth about what the slot held.
+
+    LOOKED UP ONCE PER SUPPLY rather than once per entry: a supply
+    promoted, demoted and promoted again appears several times and the
+    answer cannot differ between them.
+    """
+    if conn is None:
+        with supply_db.connect(read_only=True, label="mothman:slot-timeline-runs") as opened:
+            return with_runs(timeline, dataset_id, conn=opened)
+
+    cache: dict[str, str | None] = {}
+    out = []
+    for entry in timeline:
+        supply = entry.get("supply")
+        if supply and supply not in cache:
+            cache[supply] = _run_for(conn, dataset_id, supply)
+        out.append({**entry, "run_id": cache.get(supply) if supply else None})
+    return out

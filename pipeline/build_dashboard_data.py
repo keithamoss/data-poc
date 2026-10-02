@@ -34,7 +34,7 @@ from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import parse_cadence_from_contract
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
-from pipeline import recorded_arrival
+from pipeline import recorded_arrival, slot_timeline
 from qa_tools.common import promotion_state
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
@@ -466,6 +466,13 @@ def build() -> dict:
         "lastArrival": {"run_date": _run_date(latest_entry), **latest_block},
         # See build_cp_dashboard_data.py's identical block
         # (REQ-DASH-056).
+        # WHAT EACH SLOT HELD, AND WHEN THAT CHANGED (REQ-PIPE-081
+        # criteria 1, 2, 3 and 6). The ANSWERS, not the rule - see
+        # pipeline/slot_timeline.py for why the page must not be taught
+        # to derive these for itself. Read from the decision log, with
+        # each entry tied to the run that checked it.
+        "slotTimeline": slot_timeline.with_runs(
+            slot_timeline.for_dataset("birth-registrations"), "birth-registrations"),
         "promotionState": promotion_state.state_for(
             "birth-registrations").as_record(),
         "arrivalHistory": arrival_history,
