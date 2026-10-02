@@ -623,13 +623,16 @@ requirements:
         is cadence-aware rather than daily-only with an exception.
     decisions:
       - >
+        `pipeline/cadence.py::classify_arrival` WAS LISTED HERE AND IS
+        DELETED (REQ-PIPE-080 criterion 2, 2026-10-02). What it contributed - a per-run early/on-time/late verdict for the as-of view - is now READ from the filing rather than derived from the arrival date, so `pipeline/recorded_arrival.py::for_run` takes its place in this list. The criteria are unaffected: staleness still comes from each dataset's own cadence.
+      - >
         A single global as-of day-count was tried, corrected from per-dataset to data-asset-level, then removed entirely - a flat day-count was the wrong shape, not the wrong number. A quarterly dataset's real ~92-day delivery gap made it read 'no data' for roughly two-thirds of every quarter.
       - >
         Replaced by per-dataset cadence declared in each dataset's own ODCS contract, so 'no data' means nothing has landed in the CURRENT expected cycle rather than the last delivery being more than N days old.
     implemented_by:
       - pipeline/cadence.py::parse_cadence_from_contract
       - pipeline/cadence.py::cycle_start
-      - pipeline/cadence.py::classify_arrival
+      - pipeline/recorded_arrival.py::for_run
       - contract/data-asset.yaml
 
   - id: REQ-QAC-008
@@ -7703,7 +7706,7 @@ requirements:
       - qa_tools/common/asset_time.py::wall_clock
       - qa_tools/common/asset_time.py::end_of_day
       - pipeline/cadence.py::expected_moment
-      - pipeline/cadence.py::classify_arrival
+      - qa_tools/common/arrival_classification.py::classify
       - qa_tools/bdm/dataset_stats.py::_arrival
       - contract/data-asset.yaml
       - dashboard/qa-reporting-dashboard.template.html
@@ -7746,6 +7749,9 @@ requirements:
         2026-09-23: 913 Python tests, 162 JS tests, all eight mothman
         gates, plus check-lifecycle and the real-browser render check.
     decisions:
+      - >
+        `pipeline/cadence.py::classify_arrival` WAS LISTED HERE AND IS
+        DELETED (REQ-PIPE-080 criterion 2, 2026-10-02). It was one of the callers demonstrating criterion 4 - a naive timestamp refused with its source named. That guard lives in `asset_time.parse_instant` and is still exercised by `arrival_classification.classify`, which replaced it; the criterion is unaffected and `tests/test_asset_time.py` covers the `where` naming directly.
       - >
         Decided an IANA ZONE NAME, not an offset. An offset is one
         zone's answer for one moment; Western Australia does not observe
@@ -14886,7 +14892,7 @@ requirements:
       supply that is on time for Q3 is never shown as late for Q2 just
       because something worked it out a different way.
     moscow: must
-    status: in_progress
+    status: built
     source: >
       REQ-PIPE-066's four unmet criteria (9, 10, 11 and 12) and REQ-PIPE-067's criterion 4, all deferred to the promotion sprint
       because the classifier had no filings to measure against. Scoped
@@ -14958,6 +14964,51 @@ requirements:
         Assert at the render layer in a real browser, both toolchains,
         not just at the data layer.
     dependencies: [REQ-PIPE-075, REQ-PIPE-066, REQ-PIPE-067]
+    linked_tests:
+      - tests/test_recorded_arrival_classification.py
+      - tests/test_claim_window_lookahead.py
+      - tests-js/recorded-arrival.test.js
+    implemented_by:
+      - qa_tools/common/filing.py::record
+      - qa_tools/common/filing.py::refile
+      - qa_tools/common/filing.py::recorded_arrival
+      - qa_tools/common/filing.py::recorded_arrival_at
+      - qa_tools/common/filing.py::RecordedArrival
+      - qa_tools/common/filing.py::_classification_for
+      - qa_tools/common/assignment.py::assign
+      - pipeline/recorded_arrival.py::for_run
+    evidence:
+      - >
+        15 tests in tests/test_recorded_arrival_classification.py and
+        8 in tests-js/recorded-arrival.test.js, all passing, each
+        confirmed failing against the code before its own half landed.
+      - >
+        THE PUBLISHED NUMBERS MOVED, which NFR 1 asks to be said rather
+        than discovered in a diff. Measured on the real corpus either
+        side of the change, 2026-10-02:
+
+        Birth Registrations  21 onTime / 18 early /  3 late  ->  23 on_time / 14 early /  5 late
+        Child Protection    108 onTime /  0 early /  0 late  ->  83 on_time /  0 early / 25 late
+
+        NFR 1'S OWN FIGURE WAS STALE and is corrected here: it quotes
+        "0 early / 240 on time / 112 late", which predates the
+        supply-model rework and matched neither side of this
+        measurement.
+      - >
+        THE 25 NEWLY-LATE CHILD PROTECTION SUPPLIES ARE THE POINT, and
+        one was verified by hand rather than assumed: cp-clients in
+        cp_run_008 was RECEIVED 2024-08-13 09:00 Perth against a
+        2024-Q3 slot due 2024-08-01 09:00 with grace to 17:00 - late by
+        11 days 16 hours. The old derivation read it as ON TIME,
+        because it compared `earliest_extract` - a timestamp inside the
+        supplier's own file - rather than when the supply reached us.
+        That is criterion 4 in one example: letting the supplier's file
+        decide meant the supplier decided whether they were late.
+      - >
+        150 supplies carry a recorded wait, 68 of them still open
+        (25 Birth Registrations, 43 Child Protection) - presented as
+        running rather than as absent or zero, which criterion 10
+        requires and which both of the obvious renderings get wrong.
     decisions:
       - >
         BUILT IN TWO PARTS, and this records which is which so the
@@ -14974,7 +15025,53 @@ requirements:
         intermediate state and retirement-without-recording is the
         forbidden one. Keith's own measured reason, carried in NFR 2:
         retiring early would replace the dashboard's current answer
-        with 352 supplies reading "unfiled".
+        with every supply reading "unfiled".
+
+        BOTH PARTS ARE IN as of 2026-10-02, so the split is history
+        rather than a live state.
+      - >
+        PART 1 RECORDED NOTHING IN PRODUCTION AND THE TESTS DID NOT
+        NOTICE - found while starting part 2, and worth recording as a
+        shape rather than a slip. `Assignment` gained `received_at`
+        with a default of None, and every test built one BY HAND with
+        `received_at=` set, so all twelve passed. `assign()` - the only
+        thing that constructs an Assignment in production - set it on
+        NONE of its six branches, so every real filing recorded a null
+        instant and therefore no classification.
+
+        It is CLAUDE.md's own standing lesson in miniature: a green
+        data layer says nothing about the path that actually feeds it.
+        The test that now guards it walks `assign()`'s AST and fails if
+        any `Assignment(...)` omits the field, because five branches
+        right and one wrong is just as broken as six wrong.
+      - >
+        THE EXISTING CORPUS WAS REGENERATED RATHER THAN BACKFILLED
+        (Keith, 2026-10-02), consistent with his REQ-PIPE-089 call to
+        regenerate rather than migrate. Filings are write-once, so the
+        150 rows already in the database could never gain the new
+        columns from a re-run; the database was dropped and rebuilt
+        from empty instead. REJECTED a `mothman supply
+        backfill-arrivals` command, which was the alternative put to
+        him: the values are derivable from the row itself, so it would
+        have worked and been non-destructive, but it adds a migration
+        path to maintain for data this PoC can simply regenerate.
+        Worth knowing for a real deployment, where regenerating is not
+        an option and that command would have to exist.
+      - >
+        THE TEMPLATE'S AS-OF PATH COPIED ARRIVAL FIELDS BY NAME, and
+        would have dropped all three new ones in silence - the live
+        dataset page showing a wait that the as-of view did not. Fixed
+        to a spread in the same change. This is the exact failure
+        CLAUDE.md's shape-change rule describes, found by looking for
+        it rather than by a test going red, because no test existed
+        that compared the two views' fields.
+      - >
+        THE CLASSIFIER'S OWN VOCABULARY IS EMITTED UNMAPPED. The
+        retired derivation returned `onTime`; `arrival_classification`
+        returns `on_time` and also `unfiled`. The template's
+        ARRIVAL_STATUS_LABEL and ARRIVAL_STATUS_CLASS already carried
+        all three, so a translation layer in the builders would have
+        been a second naming scheme for no gain.
       - >
         Decided classification measures against the period the supply
         was FILED to rather than one inferred from its arrival date

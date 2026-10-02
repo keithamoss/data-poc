@@ -27,13 +27,14 @@ embed_dashboard_data.py as a second JS const (REAL_CP_DATA).
 from __future__ import annotations
 import json
 import os
-from datetime import date, datetime
+from datetime import datetime
 
+from pipeline import recorded_arrival
 from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
-from pipeline.cadence import classify_arrival, parse_cadence_from_contract
+from pipeline.cadence import parse_cadence_from_contract
 from qa_tools.common import asset_time
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
@@ -454,25 +455,19 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
     # Before this the element was parsed and discarded, so all six
     # inherited cp_clients' values whether or not they had their own.
     cadence = parse_cadence_from_contract(CONTRACT_PATH, element=table)
-    earliest_extract = dataset_stats[latest_run]["arrival"][table]["earliest_extract"]
-    latest_status = classify_arrival(
-        cadence, date.fromisoformat(_run_date(latest_entry)), _parse_extract_timestamp(str(earliest_extract)))
 
-    # Genuinely per-run now, not a hardcoded True for every run but the
-    # latest - see build_dashboard_data.py's identical comment.
-    # arrivalStatus (replacing the old onTime boolean) is a real 3-state
-    # classify_arrival() result.
+    # READ, NOT COMPUTED (REQ-PIPE-080 criteria 1 and 2) - see
+    # build_dashboard_data.py's identical block for the full account of
+    # what cadence.classify_arrival() got wrong and why it is gone.
     arrival_by_run = {}
     arrival_history = []
     for m in manifest:
         run_id = m["run_id"]
-        arrival = dataset_stats[run_id]["arrival"][table]
-        status = classify_arrival(
-            cadence, date.fromisoformat(_run_date(m)), _parse_extract_timestamp(str(arrival["earliest_extract"])))
-        arrival_by_run[run_id] = {
-            "arrivedAt": str(arrival["earliest_extract"]), "arrivalStatus": status,
-        }
-        arrival_history.append({"run_id": run_id, "run_date": _run_date(m), "arrivalStatus": status})
+        block = recorded_arrival.for_run(dataset_id, m["received_at"])
+        arrival_by_run[run_id] = block
+        arrival_history.append({"run_id": run_id, "run_date": _run_date(m),
+                                 **block})
+    latest_block = arrival_by_run[latest_run]
 
     return {
         "id": dataset_id,
@@ -486,11 +481,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # the point at 30 datasets: a marker on every tile is noise that
         # trains people to stop reading markers.
         "scheduleNotAgreed": _schedule_not_agreed(dataset_id),
-        "lastArrival": {
-            "run_date": _run_date(latest_entry),
-            "arrivedAt": str(earliest_extract),
-            "arrivalStatus": latest_status,
-        },
+        "lastArrival": {"run_date": _run_date(latest_entry), **latest_block},
         # WHAT ARRIVED VERSUS WHAT IS PROMOTED (REQ-DASH-056). From
         # the recorded filing and the recorded decision, never from
         # supply rows - both are facts somebody WROTE DOWN, which is

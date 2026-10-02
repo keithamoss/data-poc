@@ -1327,6 +1327,43 @@ function arrivalPill(status, size){
   const cls = ARRIVAL_STATUS_CLASS[status] || "nodata";
   return `<span class="pill ${cls} ${size||""}"><span class="ico"></span>${arrivalStatusLabel(status)}</span>`;
 }
+// HOW LONG A SUPPLY WAITED on us, from our receipt of it to the
+// decision that promoted it (REQ-PIPE-080 criteria 9 and 10).
+//
+// STILL RUNNING IS SAID, NEVER IMPLIED. A supply nobody has decided on
+// is the one worth looking at, and both of the obvious renderings hide
+// it: blank reads as "nothing to report" and "0m" reads as "dealt with
+// instantly". So an open wait is rendered with its elapsed time AND
+// the word waiting, and the two cases never share a format.
+//
+// COARSE ON PURPOSE. Nobody acts differently on 3 days 4 hours than on
+// 3 days, and at thirty datasets a column of precise durations is a
+// column nobody reads.
+function fmtWaited(seconds, awaiting){
+  if (seconds === null || seconds === undefined) return "";
+  const mins = Math.max(0, Math.round(seconds / 60));
+  const text = mins < 60 ? `${mins}m`
+    : mins < 60 * 48 ? `${Math.round(mins / 60)}h`
+    : `${Math.round(mins / 1440)}d`;
+  return awaiting ? `waiting ${text}` : text;
+}
+// WHAT IT MEANS, for a reader who has not read the requirement. Two
+// instants and a gap, named - because "4h" beside an arrival time
+// reads as part of the arrival unless something says otherwise.
+function waitedTitle(e){
+  if (e.waitedSeconds === null || e.waitedSeconds === undefined) return "";
+  return e.awaiting
+    ? "Received " + (e.arrivedAt ? fmtInstant(e.arrivedAt) : "") +
+      ". Nothing has promoted it yet, so this is how long it has been waiting for a decision."
+    : "Received " + (e.arrivedAt ? fmtInstant(e.arrivedAt) : "") +
+      ", promoted " + (e.filledAt ? fmtInstant(e.filledAt) : "") +
+      ". When the supplier delivered and when we acted are different facts.";
+}
+function waitedChip(e){
+  const text = fmtWaited(e.waitedSeconds, e.awaiting);
+  if (!text) return "";
+  return `<span class="mono" title="${waitedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;${e.awaiting ? "font-style:italic;" : ""}">${text}</span>`;
+}
 // CRITERION 11. A punctuality verdict is measured against the slot the
 // supply is CURRENTLY filed to, and a re-filing changes it - so the
 // figure a reader is looking at is not a fixed historical fact, and
@@ -2180,15 +2217,24 @@ function buildSupplyHistory(d){
     current.entries.push({
       run_id: run.run_id, run_date: run.run_date,
       status,
-      // arrivalStatus only means anything for the FIRST arrival of a
-      // chain (item 69's own reasoning, now derived from real chain
-      // position instead of the since-retired is_resupply flag): every
-      // later attempt in an open chain reuses its predecessor's real
-      // row data via the generator's churn design, so comparing its
-      // stale extract_timestamp against whatever cycle it eventually
-      // lands in is a category error, not a real fact about lateness.
-      arrivalStatus: idx===0 ? arrival.arrivalStatus : undefined,
-      arrivedAt: idx===0 ? arrival.arrivedAt : undefined,
+      // EVERY ATTEMPT CARRIES ITS OWN VERDICT (REQ-PIPE-080
+      // criterion 3). This used to blank all but the first in a
+      // chain, and the reasoning was sound about the derivation it
+      // was written for: a resupply reuses its predecessor's rows, so
+      // its stale extract_timestamp compared against whatever cycle
+      // it landed in was a category error rather than a fact about
+      // lateness. That derivation is gone. The verdict now comes from
+      // OUR RECEIPT INSTANT measured against the slot the supply is
+      // filed to, which every attempt has its own of - so blanking it
+      // would now be hiding a real answer rather than suppressing a
+      // meaningless one.
+      arrivalStatus: arrival.arrivalStatus,
+      arrivedAt: arrival.arrivedAt,
+      // WHEN WE ACTED, kept distinct from when it arrived (criterion
+      // 11), and the wait between them (criteria 9 and 10).
+      filledAt: arrival.filledAt,
+      waitedSeconds: arrival.waitedSeconds,
+      awaiting: arrival.awaiting,
       // "how long since the previous supply or resupply" (Keith's own
       // framing) - now just the previous entry in this SAME chain,
       // walked in chronological order, rather than a separate
@@ -2308,8 +2354,15 @@ function clipDatasetToAsOf(d, asOfDateStr){
 
   const arrivalByRun = d.arrivalByRun || {};
   const arrival = arrivalByRun[effectiveRunId];
+  // SPREAD, NOT A HAND-LISTED SET OF FIELDS. This copied `arrivedAt`
+  // and `arrivalStatus` by name, so REQ-PIPE-080's `waitedSeconds`,
+  // `filledAt` and `awaiting` would have been dropped here in silence
+  // while the dataset page showed them - the as-of view quietly
+  // missing what the live one had. CLAUDE.md's own shape-change rule
+  // names this exact failure: an allowlist drops new fields, a spread
+  // carries them by default.
   const lastArrival = arrival
-    ? {run_date: eligibleRuns[eligibleRuns.length-1].run_date, arrivedAt: arrival.arrivedAt, arrivalStatus: arrival.arrivalStatus}
+    ? {...arrival, run_date: eligibleRuns[eligibleRuns.length-1].run_date}
     : d.lastArrival;
 
   return {
@@ -4244,7 +4297,7 @@ function renderAgency(view, agencyId){
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
-            <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> ${ambiguityChip(ds.id)} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)}</span></td>
+            <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> ${ambiguityChip(ds.id)} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="When we received this supply">${fmtArrival(ds.lastArrival)}</span> ${waitedChip(ds.lastArrival)}</td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
             <td style="min-width:100px;">${dsSpark}</td>
@@ -4340,7 +4393,7 @@ function renderSupplyCycleRows(entries, datasetId){
       // e.arrivedAt used to be emitted RAW here - offset, microseconds
       // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
       // one column. REQ-DASH-071.
-      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPill(e.arrivalStatus,"sm")}</span>` : ""} ${ambiguityChip(datasetId, e.run_id)} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt) : ""}</span>`;
+      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPill(e.arrivalStatus,"sm")}</span>` : ""} ${ambiguityChip(datasetId, e.run_id)} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt) : ""}</span> ${waitedChip(e)}`;
     // data-run-id alongside data-run-date: run_date is NOT unique (a
     // resupply shares its base run's date - plans/conceptual-design.md
     // Thread A found 352 real BDM runs across only 123 distinct dates),

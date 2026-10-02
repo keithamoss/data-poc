@@ -3,9 +3,7 @@
 from __future__ import annotations
 from datetime import date, datetime, timezone
 
-import pytest
 
-from qa_tools.common import asset_time
 from pipeline import cadence
 from generator.generate_cp_runs import _quarter_start
 
@@ -80,59 +78,12 @@ def test_expected_moment_rolls_back_a_day_for_early_local_times():
     assert got == datetime(2026, 7, 31, 18, 0, tzinfo=timezone.utc)
 
 
-def test_classify_arrival_on_time_exactly_at_the_expected_moment():
-    ts = datetime(2026, 8, 1, 1, 0, tzinfo=timezone.utc)  # exactly 09:00 AWST
-    assert cadence.classify_arrival(QUARTERLY, date(2026, 8, 1), ts) == "onTime"
-
-
-def test_classify_arrival_late_past_the_grace_window():
-    from datetime import timedelta
-    ts = datetime(2026, 8, 1, 1, 0, tzinfo=timezone.utc) + timedelta(minutes=QUARTERLY["latency_minutes"] + 1)
-    assert cadence.classify_arrival(QUARTERLY, date(2026, 8, 1), ts) == "late"
-
-
-def test_classify_arrival_within_grace_window_is_on_time():
-    from datetime import timedelta
-    ts = datetime(2026, 8, 1, 1, 0, tzinfo=timezone.utc) + timedelta(minutes=QUARTERLY["latency_minutes"])
-    assert cadence.classify_arrival(QUARTERLY, date(2026, 8, 1), ts) == "onTime"
-
-
-def test_classify_arrival_early_before_the_expected_moment():
-    ts = datetime(2026, 7, 31, 20, 0, tzinfo=timezone.utc)  # before 01:00 UTC = 09:00 AWST 1 Aug
-    assert cadence.classify_arrival(QUARTERLY, date(2026, 8, 1), ts) == "early"
-
-
-def test_classify_arrival_refuses_a_naive_timestamp_rather_than_guessing():
-    """REQ-PIPE-048 reversed this test's own former assertion, and that
-    is the point of it. It used to read
-    `test_classify_arrival_handles_naive_timestamps_as_utc` and pass a
-    tz-less value expecting "onTime" - pinning the very behaviour the
-    requirement is named for. A supply that arrived at 10pm in Perth,
-    stored without an offset and read as UTC, is judged against the
-    following afternoon.
-
-    Guessing UTC is not safer than guessing local time; it is the same
-    mistake with a different sign. So the value is refused, and the
-    error names where it came from, because the fix is always at the
-    source."""
-    ts = datetime(2026, 8, 1, 1, 0)  # no tzinfo
-    with pytest.raises(asset_time.NaiveTimestampError) as exc:
-        cadence.classify_arrival(QUARTERLY, date(2026, 8, 1), ts,
-                                  where="arrival.earliest_extract in run_007/dataset_stats.json")
-    assert "run_007/dataset_stats.json" in str(exc.value), "the error must name its source"
-
-
-def test_classify_arrival_resolves_the_right_cycle_for_a_late_resupply():
-    # a resupply dated a few days after the anchor should still resolve
-    # to the SAME quarter's expected moment, not roll forward into the
-    # next quarter
-    from datetime import timedelta
-    resupply_date = date(2026, 8, 4)
-    ts = datetime(2026, 8, 4, 1, 0, tzinfo=timezone.utc)
-    assert cadence.classify_arrival(QUARTERLY, resupply_date, ts) == "late"
-    # sanity: still measured against 1 Aug's expected moment, not 4 Aug's
-    expected = cadence.expected_moment(QUARTERLY, date(2026, 8, 1))
-    assert ts - expected > timedelta(minutes=QUARTERLY["latency_minutes"])
+# classify_arrival()'s own six tests lived here and went with it
+# (REQ-PIPE-080 criterion 2). What they covered is covered elsewhere
+# rather than lost: the early/on-time/late bands against a slot are
+# tests/test_arrival_classification.py, and the refusal of a naive
+# timestamp - with the error naming its source - is
+# tests/test_asset_time.py's own test of parse_instant(where=...).
 
 
 def test_parse_cadence_from_contract_daily(tmp_path):

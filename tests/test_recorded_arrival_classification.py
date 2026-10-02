@@ -160,3 +160,85 @@ class TestTheIntervalFromReceiptToPromotion:
         _file()
         got = filing.recorded_arrival(DATASET, "s")
         assert hasattr(got, "received_at") and hasattr(got, "filled_at")
+
+
+class TestTheRealFilingPathRecordsIt:
+    """The gap the first cut of this requirement left, and the reason
+    it was invisible: every test above builds an `Assignment` by hand
+    with `received_at=`, so they passed while `assign()` - the only
+    thing that constructs one in production - set it on none of its six
+    branches. The columns would have been null for every real supply.
+
+    Same shape as CLAUDE.md's own standing lesson: a green data layer
+    says nothing about the path that actually feeds it.
+    """
+
+    def test_every_branch_of_the_rule_carries_the_arrival_instant(self):
+        """Asserted over the real function rather than one branch,
+        because the bug was five branches being right and one wrong
+        being just as broken as all six."""
+        import ast
+        import inspect
+        import textwrap
+
+        tree = ast.parse(textwrap.dedent(inspect.getsource(assignment.assign)))
+        built = [n for n in ast.walk(tree)
+                 if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "Assignment"]
+        assert built, "assign() builds no Assignment - has it been renamed?"
+        missing = [n.lineno for n in built
+                   if "received_at" not in {k.arg for k in n.keywords}]
+        assert not missing, (
+            f"{len(missing)} of {len(built)} Assignment(...) in assign() omit "
+            f"received_at, at lines {missing} - those supplies record no "
+            f"arrival instant and so no classification")
+
+    def test_and_the_rule_really_returns_one(self, clean):
+        """The structural test above would pass on a literal `None`, so
+        this drives the real function and looks at the value."""
+        from qa_tools.common import slots as slots_mod
+
+        got = assignment.assign(
+            DATASET, f"{DATASET}@202307250100000000", ARRIVED,
+            slots_mod.slots_for_dataset(
+                DATASET, until=slots_mod.claimable_until(DATASET, ARRIVED.date())),
+            frozenset())
+        assert got.received_at == ARRIVED
+class TestTheRetiredDerivations:
+    """Criteria 2 and 3 - gone, not merely unused."""
+
+    def test_the_arrival_date_derivation_is_gone(self):
+        """Criterion 2. It could only look BACKWARDS from the arrival
+        date, so it could never see a slot that had not started - which
+        is why 'early' was unreachable through it."""
+        from pipeline import cadence
+
+        assert not hasattr(cadence, "classify_arrival")
+
+    def test_the_builders_no_longer_derive_it(self):
+        """Criterion 3. Blanking was a workaround for the derivation
+        being wrong on exactly those supplies; with the derivation gone
+        the workaround hides a real answer."""
+        import pathlib
+
+        # ON THE IMPORT, not on the text: both modules still MENTION
+        # the retired function in a comment explaining why it is gone,
+        # and a substring check cannot tell that from a call. An
+        # import is unambiguous - and since the function no longer
+        # exists, one would fail at module load anyway.
+        import ast
+
+        for name in ("build_dashboard_data.py", "build_cp_dashboard_data.py"):
+            tree = ast.parse(pathlib.Path("pipeline", name).read_text())
+            imported = {a.name for n in ast.walk(tree)
+                        if isinstance(n, ast.ImportFrom) for a in n.names}
+            assert "classify_arrival" not in imported, f"{name} still imports it"
+
+    def test_the_template_no_longer_blanks_a_resupplys_verdict(self):
+        """Criterion 3. Blanking was a workaround for the derivation
+        being wrong on exactly those supplies; with the derivation gone
+        the workaround hides a real answer."""
+        import pathlib as _p
+
+        src = _p.Path("dashboard/qa-reporting-dashboard.template.html").read_text()
+        assert "arrivalStatus: idx===0" not in src
+        assert "arrivedAt: idx===0" not in src

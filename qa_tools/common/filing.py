@@ -519,6 +519,39 @@ def recorded_arrival(dataset_id: str, supply_id: str) -> RecordedArrival | None:
                             classification=classification)
 
 
+def recorded_arrival_at(dataset_id: str, received_at) -> "RecordedArrival | None":
+    """This dataset's recorded arrival facts for the supply that came
+    in at `received_at` (REQ-PIPE-080 criterion 1).
+
+    THE DASHBOARD BUILD'S ENTRY POINT. A builder knows a dataset and a
+    run's receipt instant - the manifest has carried one since
+    REQ-GEN-042 - and this answers with the verdict, the two instants
+    and the wait, so the builder never computes punctuality itself.
+    That is criterion 1's "every consumer reads it" in one call.
+
+    MATCHED ON THE ARRIVAL KEY, exactly as period_of() does, including
+    the `#1` suffix a held supply carries. Deriving a supply id here
+    instead would be a second naming scheme to keep in step, which is
+    the thing _supply_id_for()'s docstring exists to prevent.
+
+    RECORDED METADATA, NEVER SUPPLY ROWS. This reads `qa.filing` and
+    `qa.decision` and nothing else - the same access
+    `promotion_state.state_for()` already has from this build path, and
+    well inside Keith's rule that a build may read recorded results and
+    never the extract itself.
+    """
+    from qa_tools.common import asset_time
+
+    key = asset_time.arrival_key(received_at)
+    for record in filings_of(dataset_id):
+        supply = record.get("supply_id") or ""
+        if "@" not in supply:
+            continue
+        if supply.rsplit("@", 1)[1].split("#", 1)[0] == key:
+            return recorded_arrival(dataset_id, supply)
+    return None
+
+
 def _filled_at(conn, dataset_id: str, supply_id: str, slot: str | None):
     """When a decision promoted THIS supply into its slot, or None.
 

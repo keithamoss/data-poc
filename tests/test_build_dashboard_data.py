@@ -157,36 +157,41 @@ def test_stats_by_run_carries_every_run_not_just_latest_and_previous(tmp_path, m
     assert set(uncovered["stats"]["byRun"]) == {"run_001", "run_002"}
 
 
-def test_arrival_status_is_genuinely_computed_from_real_cadence(tmp_path, monkeypatch):
-    """arrivalStatus (Phase 5j, replacing the old hardcoded-then-max-lag-
-    based onTime boolean) is a real classify_arrival() result against
-    this dataset's own real cadence (contract/bdm-birth-registrations-
-    contract.yaml's slaProperties: - daily, 14:00 AWST = 06:00 UTC the
-    same day, 60 min latency grace - corrected from an original 06:00
-    AWST placeholder that made "on time" structurally unreachable
-    against the real extract-timestamp-ordering check, plans/qa-
-    pipeline.md item 67) - not a hardcoded value. Mutating
-    earliest_extract to fall inside vs. well outside that grace window
-    must flip arrivalStatus accordingly."""
+def test_the_suppliers_own_timestamp_no_longer_decides_punctuality(tmp_path, monkeypatch):
+    """REQ-PIPE-080 criterion 4, and this test used to assert the
+    opposite - deliberately rewritten rather than deleted, because
+    what it pinned is exactly what changed.
+
+    It read `test_arrival_status_is_genuinely_computed_from_real_cadence`
+    and proved that MUTATING `earliest_extract` flipped arrivalStatus
+    between onTime and late. That was true, and it is the defect:
+    `earliest_extract` is `MIN(extract_timestamp)` over a column
+    INSIDE THE SUPPLIER'S OWN FILE, so a supplier choosing what to
+    write there chose whether they were late.
+
+    Punctuality is now measured from OUR RECEIPT INSTANT against the
+    slot the supply is filed to, and recorded with the filing. So the
+    assertion inverts: moving the supplier's timestamp by four hours
+    must change NOTHING.
+    """
     _no_retired_checks(monkeypatch)
-    mixed_stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
-    # run_01: inside the grace window (expected 2026-09-01T06:00:00Z, 60
-    # min grace) -> onTime.
-    mixed_stats["run_001"]["arrival"]["earliest_extract"] = "2026-09-01T06:30:00+00:00"
-    # run_02: hours after the grace window -> late.
-    mixed_stats["run_002"]["arrival"]["earliest_extract"] = "2026-09-02T10:00:00+00:00"
-    results_path = tmp_path / "results_bdm.json"
-    results_path.write_text(json.dumps({
-        "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": mixed_stats,
-    }))
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
 
-    data = bdd.build()
+    def _build(extract_run_1, extract_run_2):
+        stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
+        stats["run_001"]["arrival"]["earliest_extract"] = extract_run_1
+        stats["run_002"]["arrival"]["earliest_extract"] = extract_run_2
+        path = tmp_path / f"results_{extract_run_1[-9:-6]}.json"
+        path.write_text(json.dumps({
+            "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": stats,
+        }))
+        monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(path))
+        return bdd.build()
 
-    assert data["arrivalByRun"]["run_001"]["arrivalStatus"] == "onTime"
-    assert data["arrivalByRun"]["run_002"]["arrivalStatus"] == "late"
-    history_by_run = {h["run_id"]: h["arrivalStatus"] for h in data["arrivalHistory"]}
-    assert history_by_run == {"run_001": "onTime", "run_002": "late"}
+    inside = _build("2026-09-01T06:30:00+00:00", "2026-09-02T06:30:00+00:00")
+    outside = _build("2026-09-01T10:00:00+00:00", "2026-09-02T10:00:00+00:00")
+
+    assert ({r: v["arrivalStatus"] for r, v in inside["arrivalByRun"].items()}
+            == {r: v["arrivalStatus"] for r, v in outside["arrivalByRun"].items()}), "the supplier's own extract timestamp still moves the verdict"
 
 
 def test_a_retired_checks_metadata_is_carried_through(tmp_path, monkeypatch):

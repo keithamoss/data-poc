@@ -27,28 +27,21 @@ Two things this module does, deliberately kept separate:
    dates (see tests/test_cadence.py's own cross-check against
    generator/generate_cp_runs.py's _quarter_start(), which this
    generalizes).
-2. classify_arrival(cadence, run_date, arrived_at) - "was
-   THIS SPECIFIC, ALREADY-HAPPENED delivery early, on time, or late?"
-   A real timestamp comparison (this run's own real earliest_extract,
-   already committed to qa_results/, against the expected UTC moment +
-   latency_minutes grace) - computed here, at dashboard-build time (a
-   pure function of committed data, no live DuckDB access - see
-   CLAUDE.md's CI-never-touches-data rule).
+2. classify_arrival() USED TO LIVE HERE AND IS GONE (REQ-PIPE-080
+   criterion 2, 2026-10-02). It answered "was this delivery early, on
+   time or late?" by resolving the cycle from the ARRIVAL DATE via
+   cycle_start(), which only ever looks BACKWARDS - so it could never
+   land on a slot that had not started, which made `early` unreachable
+   for anything but a within-cycle arrival, and read a supply arriving
+   a week before its quarter as about twelve weeks late for the
+   quarter before.
 
-   CORRECTED 2026-09-25 (REQ-PIPE-067). This used to say the verdict
-   was "embedded as a fixed historical fact" and that a past run's
-   arrival never changes. The ARRIVAL TIME still never changes - that
-   half was and remains true. The VERDICT does: it is a function of
-   the slot a supply is currently FILED to, and re-filing a supply
-   moves it. A supply reported late purely because it was misfiled was
-   never actually late, and keeping a known-wrong verdict for the sake
-   of immutability is the one place this design would knowingly say
-   something untrue.
-
-   It still never needs porting to JS, but for a different reason than
-   the one given here before: the verdict TRAVELS WITH THE SUPPLY and
-   the page renders it. That is what makes a mutable verdict safe
-   rather than a second source of answers.
+   The verdict is now RECORDED against the filing, by
+   `qa_tools/common/arrival_classification.py` measuring our receipt
+   instant against the slot the supply is filed to, and read back by
+   `pipeline/recorded_arrival.py`. It never needed porting to JS and
+   still does not: the verdict travels with the supply and the page
+   renders it.
 
    This function is itself the derivation REQ-PIPE-066 replaces - see
    qa_tools/common/arrival_classification.py - and is retired once
@@ -162,32 +155,6 @@ def expected_moment(cadence: dict, expected_day: date) -> datetime:
     naming a representation in the function encouraged callers to think
     in offsets."""
     return asset_time.wall_clock(expected_day, cadence["expected_time"])
-
-
-def classify_arrival(cadence: dict, run_date: date, arrived_at: datetime,
-                      where: str = "classify_arrival(arrived_at)") -> str:
-    """"early" | "onTime" | "late" - run_date is this specific real
-    delivery's own date (used to resolve which cycle it belongs to, via
-    the same cycle_start() rule); arrived_at is that delivery's own
-    real, already-committed arrival instant.
-
-    A NAIVE arrived_at is a hard error (REQ-PIPE-048), not a value
-    quietly read as UTC. This function used to do exactly that, and its
-    own docstring said so - "naive values are treated as already UTC,
-    matching how this repo's timestamps are stored". Which was true, and
-    is the bug: a supply that arrived at 10pm in Perth classified
-    against a UTC reading of its own timestamp is being judged against
-    the following afternoon. `where` names the source in the error,
-    since the fix is always at the source rather than here."""
-    expected_day = cycle_start(cadence, run_date)
-    expected = expected_moment(cadence, expected_day)
-    grace_end = expected + timedelta(minutes=cadence["latency_minutes"])
-    arrived_at = asset_time.parse_instant(arrived_at, where)
-    if arrived_at < expected:
-        return "early"
-    if arrived_at <= grace_end:
-        return "onTime"
-    return "late"
 
 
 def parse_claim_window_from_contract(contract_path: str, element: str | None = None) -> str | None:

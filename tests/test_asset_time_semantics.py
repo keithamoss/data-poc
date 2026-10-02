@@ -65,6 +65,7 @@ from pathlib import Path
 import pytest
 
 from pipeline import cadence
+from qa_tools.common import asset_time
 
 # NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
 # reads `reports/*.json`, which is built from the deployment's recorded
@@ -146,6 +147,25 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     So: before extending this golden, count the deliveries. `mothman
     debug capture-arrival-golden` is still the recorded procedure, and
     `ls data/deliveries | wc -l` is the question to ask first.
+
+    RE-CAPTURED 2026-10-02 FOR REQ-PIPE-080, which moved both axes this
+    pin exists to hold still - so it failed, which is the pin working
+    rather than a regression. Recorded here because "the golden
+    changed" is exactly the event its own lesson says to be suspicious
+    of, and the procedure was followed before re-capturing: 60
+    deliveries, 18 Child Protection runs, zero `handfiled-*`, matching
+    a clean checkout.
+
+    WHAT MOVED, and why each is intended:
+      - 133 verdicts. Most are the vocabulary: the retired
+        `cadence.classify_arrival()` said `onTime` where
+        `arrival_classification` says `on_time`. Twenty-five are real -
+        Child Protection supplies that read on time and are genuinely
+        late, one of them by eleven days.
+      - 34 arrival instants, where our RECEIPT instant differs from the
+        `earliest_extract` this used to carry (criterion 4). The other
+        116 were already equal, which is why the diff is smaller than
+        the change sounds.
     """
 
     def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):
@@ -234,13 +254,34 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         over receipt order, so two suppressed days renumber the tail and
         run_022 through run_027 each carry the instant that used to
         belong to a neighbour.
+
+        AND IT MOVED AGAIN FOR REQ-PIPE-080, to 106 / 14 / 30, which is
+        the largest shift this figure has taken and the one with a real
+        cause rather than a relabelling. Two things moved it:
+
+          - 25 CHILD PROTECTION SUPPLIES WENT ON-TIME TO LATE, and they
+            are the requirement's whole point. Punctuality used to be
+            measured from `earliest_extract` - a timestamp inside the
+            SUPPLIER'S OWN FILE - so a supplier effectively decided
+            whether they were late. It is now measured from when the
+            file reached us. Verified by hand rather than inferred:
+            cp-clients in cp_run_008 was received 2024-08-13 against a
+            2024-Q3 slot due 2024-08-01 with grace to 17:00, so it is
+            late by eleven days, and the old reading of "on time" was
+            simply wrong.
+          - 4 BIRTH REGISTRATIONS SUPPLIES moved between early, on time
+            and late for the same reason, in both directions.
+
+        The key `onTime` also becomes `on_time`: the retired
+        `cadence.classify_arrival()` and `arrival_classification` spell
+        it differently, and the page has rendered both for some time.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"onTime": 129, "early": 18, "late": 3}
+        assert counts == {"on_time": 106, "early": 14, "late": 30}
         assert sum(counts.values()) == 150
 
 
@@ -256,6 +297,25 @@ class TestTheClassificationBoundaries:
     def _expected(self, run_date):
         return cadence.expected_moment(self.CADENCE, cadence.cycle_start(self.CADENCE, run_date))
 
+    def _verdict(self, run_date, arrived):
+        """Early / on time / late against this cadence's own expected
+        moment and grace.
+
+        SPELLED OUT HERE rather than calling a shared classifier, since
+        REQ-PIPE-080 retired `cadence.classify_arrival()`. What these
+        tests are about is ASSET TIME - that the expected moment is a
+        wall clock in the asset's own zone, and that the grace window is
+        closed at both ends - not about which module owns the comparison.
+        The arithmetic is three lines and keeping it local is what lets
+        them go on asserting the thing they are named for.
+        """
+        grace = timedelta(minutes=self.CADENCE["latency_minutes"])
+        expected = self._expected(run_date)
+        arrived = asset_time.parse_instant(arrived, "test arrival")
+        if arrived < expected:
+            return "early"
+        return "onTime" if arrived <= expected + grace else "late"
+
     @pytest.mark.parametrize("delta,verdict", [
         (timedelta(seconds=-1), "early"),
         (timedelta(0), "onTime"),
@@ -265,7 +325,7 @@ class TestTheClassificationBoundaries:
     def test_the_grace_window_is_closed_at_both_ends(self, delta, verdict):
         run_date = date(2026, 9, 1)
         arrived = self._expected(run_date) + delta
-        assert cadence.classify_arrival(self.CADENCE, run_date, arrived) == verdict
+        assert self._verdict(run_date, arrived) == verdict
 
     def test_the_expected_moment_is_the_wall_clock_time_in_the_assets_own_zone(self):
         """14:00 in Perth is 06:00 UTC the same day. Pinned as a real
@@ -280,4 +340,4 @@ class TestTheClassificationBoundaries:
         made "on time" structurally unreachable once before."""
         run_date = date(2026, 9, 1)
         arrived = self._expected(run_date) - timedelta(hours=12)
-        assert cadence.classify_arrival(self.CADENCE, run_date, arrived) == "early"
+        assert self._verdict(run_date, arrived) == "early"

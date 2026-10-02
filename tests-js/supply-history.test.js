@@ -177,7 +177,7 @@ describe("buildSupplyHistory", () => {
     ]);
   });
 
-  it("a resupply (any entry after the first in its chain) carries NO real arrivalStatus (item 69's reasoning, now keyed off real chain position instead of a synthetic flag) but DOES carry rowCount", () => {
+  it("EVERY entry in a chain carries its own arrival verdict, including a resupply (REQ-PIPE-080 criterion 3 - this test used to assert the opposite)", () => {
     const w = load();
     const d = datasetWithStatuses(
       [
@@ -192,9 +192,23 @@ describe("buildSupplyHistory", () => {
     const [{ entries }] = w.buildSupplyHistory(d);
     const byId = Object.fromEntries(entries.map((e) => [e.run_id, e]));
 
-    expect(byId.r1.arrivalStatus).toBe("onTime"); // chain-first entry keeps its real arrival status
-    expect(byId.r2.arrivalStatus).toBeUndefined(); // resupply - category error, dropped
-    expect(byId.r2.arrivedAt).toBeUndefined();
+    // REWRITTEN RATHER THAN DELETED, and the half that changed is
+    // named so the history is readable. It used to assert
+    // `byId.r2.arrivalStatus` was undefined, on item 69's reasoning:
+    // a resupply reuses its predecessor's rows, so comparing its
+    // stale extract_timestamp against whatever cycle it landed in was
+    // a category error rather than a fact about lateness. That was
+    // sound ABOUT THE DERIVATION IT WAS WRITTEN FOR, which
+    // REQ-PIPE-080 has since deleted. The verdict now comes from OUR
+    // RECEIPT INSTANT against the slot the supply is filed to, which
+    // every attempt has its own of - so blanking it would hide a real
+    // answer rather than suppress a meaningless one.
+    //
+    // The rowCount half is untouched and still asserted: it was never
+    // part of what changed.
+    expect(byId.r1.arrivalStatus).toBe("onTime");
+    expect(byId.r2.arrivalStatus).toBe("early");
+    expect(byId.r2.arrivedAt).toBe("16:30 AWST");
     expect(byId.r2.rowCount).toBe(4321);
   });
 

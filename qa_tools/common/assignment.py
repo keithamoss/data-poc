@@ -258,7 +258,7 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
     if current is not None:
         considered.append(current.name)
         if current.name not in filled and at <= current.late_after:
-            return Assignment(dataset_id=dataset_id, supply_id=supply_id,
+            return Assignment(dataset_id=dataset_id, supply_id=supply_id, received_at=at,
                                slot=current.name, branch=ON_TIME,
                                considered=tuple(considered))
 
@@ -278,7 +278,7 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
         earlier = [s.name for s in slots
                     if s.name != oldest.name and s.due_at < oldest.due_at
                     and s.name not in filled]
-        return Assignment(dataset_id=dataset_id, supply_id=supply_id,
+        return Assignment(dataset_id=dataset_id, supply_id=supply_id, received_at=at,
                            slot=oldest.name, branch=OLDEST_CLAIMABLE,
                            considered=tuple(considered),
                            ambiguous=bool(earlier),
@@ -297,7 +297,7 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
     if latest is not None and current is not None and latest.name == current.name:
         if latest.name not in considered:
             considered.append(latest.name)
-        return Assignment(dataset_id=dataset_id, supply_id=supply_id,
+        return Assignment(dataset_id=dataset_id, supply_id=supply_id, received_at=at,
                            slot=latest.name, branch=RESUPPLY,
                            considered=tuple(considered), resupply_of=latest.name)
 
@@ -316,14 +316,14 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
     #    because it manufactures a delivery that never happened.
     if closed:
         return Assignment(
-            dataset_id=dataset_id, supply_id=supply_id, slot=None, branch=HELD,
+            dataset_id=dataset_id, supply_id=supply_id, received_at=at, slot=None, branch=HELD,
             considered=tuple(considered) or tuple(sorted(closed)),
             unavailable=_why_unavailable(slots, at, filled, closed))
 
     if latest is not None:
         if latest.name not in considered:
             considered.append(latest.name)
-        return Assignment(dataset_id=dataset_id, supply_id=supply_id,
+        return Assignment(dataset_id=dataset_id, supply_id=supply_id, received_at=at,
                            slot=latest.name, branch=RESUPPLY,
                            considered=tuple(considered), resupply_of=latest.name)
 
@@ -332,7 +332,7 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
     # unassignable rather than forced into a slot, because forcing it
     # would be claiming forward - the one thing criterion 5 makes
     # absolute.
-    return Assignment(dataset_id=dataset_id, supply_id=supply_id, slot=None,
+    return Assignment(dataset_id=dataset_id, supply_id=supply_id, received_at=at, slot=None,
                        branch=UNASSIGNABLE, considered=tuple(considered),
                        unavailable=_why_unavailable(slots, at, filled, closed))
 

@@ -144,6 +144,30 @@ releases:
               more than one period", which left you working out which one
               was odd. It now names the dataset, the quarter it arrived in
               and the quarter it was filed to.
+          - headline: Late means late, measured from when we received it
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              Whether a supply was early, on time or late was worked out
+              from a timestamp inside the supplier's own file - so in
+              effect the supplier decided whether they were late. It is now
+              measured from when the file reached us, against the quarter
+              it was filed to. Twenty-five Child Protection supplies that
+              read as on time are now correctly late; one of them arrived
+              eleven days after its deadline.
+          - headline: Every resupply shows its own verdict
+            components: ["Dashboard UI"]
+            description: >
+              Only the first attempt in a chain used to show early, on time
+              or late - the rest were left blank, because the old
+              calculation could not say anything meaningful about them. Each
+              attempt now carries its own.
+          - headline: See how long a supply has been waiting on you
+            components: ["Dashboard UI"]
+            description: >
+              The dataset page and the supply-history panel now show the
+              time between a supply reaching us and somebody promoting it.
+              Where nobody has yet, it reads as still waiting rather than
+              as nothing at all.
   - date: "2026-09-30"
     summary: >
       A supply nothing could place now waits for you until you deal with

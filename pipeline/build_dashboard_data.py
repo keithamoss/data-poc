@@ -27,13 +27,14 @@ by embed_dashboard_data.py as a JS const.
 from __future__ import annotations
 import json
 import os
-from datetime import date, datetime
+from datetime import datetime
 
 from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
-from pipeline.cadence import classify_arrival, parse_cadence_from_contract
+from pipeline.cadence import parse_cadence_from_contract
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
+from pipeline import recorded_arrival
 from qa_tools.common import promotion_state
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
@@ -429,30 +430,26 @@ def build() -> dict:
     # its slaProperties carry `element: birth_registrations`, and since
     # REQ-PIPE-049 that means something rather than being ignored.
     cadence = parse_cadence_from_contract(CONTRACT_PATH, element=hierarchy.dataset("birth-registrations").table)
-    earliest_extract = dataset_stats[latest_run]["arrival"]["earliest_extract"]
-    latest_status = classify_arrival(
-        cadence, date.fromisoformat(_run_date(latest_entry)), _parse_extract_timestamp(earliest_extract))
 
-    # Genuinely per-run now, not a hardcoded True for every run but the
-    # latest - every run's own earliest_extract already
-    # exists in its committed dataset_stats.json (Phase 3), just not
-    # previously surfaced here. arrival_by_run mirrors stats["byRun"]
-    # above (run_id-keyed, for Thread C's as-of UI); arrival_history
-    # keeps its existing array shape (one entry per run, in order).
-    # arrivalStatus (Phase 5j, replacing the old onTime boolean) is a
-    # real 3-state classify_arrival() result against this run's own
-    # cadence-derived expected moment - see pipeline/cadence.py.
+    # READ, NOT COMPUTED (REQ-PIPE-080 criteria 1 and 2). This block
+    # used to call cadence.classify_arrival() twice - once here and
+    # once per run below - deriving the cycle by looking BACKWARDS from
+    # the arrival date, which could never land on a slot that had not
+    # started. The verdict is recorded against the filing now, so the
+    # build reads it and the one derivation is gone.
+    #
+    # KEYED ON THE RUN'S OWN `received_at`, which the manifest has
+    # carried since REQ-GEN-042 and which IS our receipt instant - the
+    # same key `filing.period_of()` matches a supply on.
     arrival_by_run = {}
     arrival_history = []
     for m in manifest:
         run_id = m["run_id"]
-        arrival = dataset_stats[run_id]["arrival"]
-        status = classify_arrival(
-            cadence, date.fromisoformat(_run_date(m)), _parse_extract_timestamp(arrival["earliest_extract"]))
-        arrival_by_run[run_id] = {
-            "arrivedAt": arrival["earliest_extract"], "arrivalStatus": status,
-        }
-        arrival_history.append({"run_id": run_id, "run_date": _run_date(m), "arrivalStatus": status})
+        block = recorded_arrival.for_run("birth-registrations", m["received_at"])
+        arrival_by_run[run_id] = block
+        arrival_history.append({"run_id": run_id, "run_date": _run_date(m),
+                                 **block})
+    latest_block = arrival_by_run[latest_run]
 
     return {
         "id": "birth-registrations",
@@ -466,11 +463,7 @@ def build() -> dict:
         # the point at 30 datasets: a marker on every tile is noise that
         # trains people to stop reading markers.
         "scheduleNotAgreed": _schedule_not_agreed("birth-registrations"),
-        "lastArrival": {
-            "run_date": _run_date(latest_entry),
-            "arrivedAt": earliest_extract,
-            "arrivalStatus": latest_status,
-        },
+        "lastArrival": {"run_date": _run_date(latest_entry), **latest_block},
         # See build_cp_dashboard_data.py's identical block
         # (REQ-DASH-056).
         "promotionState": promotion_state.state_for(

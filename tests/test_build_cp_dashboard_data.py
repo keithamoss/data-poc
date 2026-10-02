@@ -82,17 +82,28 @@ def test_stats_by_run_carries_every_run_not_just_latest_and_previous():
     assert col["stats"]["current"]["valueCounts"] == [["Neglect", 3], ["Physical abuse", 1]]
 
 
-def test_arrival_status_is_genuinely_computed_from_real_cadence():
-    """arrivalStatus (Phase 5j, replacing the old hardcoded-then-max-lag-
-    based onTime boolean) is a real classify_arrival() result against
-    this collection's own real quarterly cadence (contract/child-
-    protection-contract.yaml's slaProperties:) - not a hardcoded value.
-    FIXTURE_DATASET_STATS' earliest_extract values are placed inside vs.
-    well outside each run's own cycle's grace window specifically to
-    prove that."""
-    dataset = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, FIXTURE_DATASET_STATS, {})
+def test_the_suppliers_own_timestamp_no_longer_decides_punctuality():
+    """REQ-PIPE-080 criterion 4 - the Child Protection half, and the
+    counterpart of test_build_dashboard_data.py's own. See that one
+    for the full account of why this test now asserts the opposite of
+    what it used to.
 
-    assert dataset["arrivalByRun"]["cp_run_001"]["arrivalStatus"] == "onTime"
-    assert dataset["arrivalByRun"]["cp_run_002"]["arrivalStatus"] == "late"
-    history_by_run = {h["run_id"]: h["arrivalStatus"] for h in dataset["arrivalHistory"]}
-    assert history_by_run == {"cp_run_001": "onTime", "cp_run_002": "late"}
+    In short: it proved that FIXTURE_DATASET_STATS' `earliest_extract`
+    values, placed inside and outside each cycle's grace window, drove
+    arrivalStatus to onTime and late. They did - and that value comes
+    from inside the supplier's own file, so the supplier was deciding
+    whether they were late. The verdict is now read from the recorded
+    filing, so moving those timestamps must change nothing."""
+    import json
+
+    moved = json.loads(json.dumps(FIXTURE_DATASET_STATS))
+    for run in moved.values():
+        run["arrival"]["cp_notifications"]["earliest_extract"] = "2026-02-01T23:59:00+00:00"
+
+    before = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS,
+                                  FIXTURE_DATASET_STATS, {})
+    after = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, moved, {})
+
+    assert ({r: v["arrivalStatus"] for r, v in before["arrivalByRun"].items()}
+            == {r: v["arrivalStatus"] for r, v in after["arrivalByRun"].items()}), (
+        "the supplier's own extract timestamp still moves the verdict")
