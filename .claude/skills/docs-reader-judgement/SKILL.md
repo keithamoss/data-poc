@@ -1,6 +1,6 @@
 ---
 name: docs-reader-judgement
-description: "The rules a reader judges a finished Mothman documentation page by: answer first, each page stands alone, the sensitivity rule, whether a diagram argues, and pattern-shaped rhetorical tics. Preloaded by docs-critic, docs-writer, docs-illustrator, and docs-fact-checker."
+description: "The rules a reader judges a finished Mothman documentation page by: answer first, each page stands alone, the sensitivity rule, whether a diagram argues, whether every sentence earns its place, and pattern-shaped rhetorical tics. Preloaded by docs-critic, docs-writer, docs-illustrator, docs-fact-checker, and docs-finding-checker."
 user-invocable: false
 ---
 
@@ -36,6 +36,12 @@ A diagram has to argue a point rather than decorate the page. It passes only if 
 - A reader could learn something from it.
 
 A diagram that adds nothing the prose has not already said is excess.
+
+## Every sentence earns its place
+
+Each sentence helps the reader with the page's why-question: it answers it, explains the answer, or shows it at work. A sentence that does none of these is excess, even when it is true.
+
+Detail that belongs to another concept is excess here too. It goes on that concept's page, and this page links to it.
 
 ## Rhetorical tics that follow a pattern
 

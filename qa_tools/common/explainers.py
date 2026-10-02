@@ -304,7 +304,8 @@ def term_pattern(entry: GlossaryEntry) -> re.Pattern:
 # randomness the evals exist to measure.
 
 EVALS = Path(".claude/skills/explain/evals")
-DOCS_AGENTS = ("docs-writer", "docs-illustrator", "docs-critic", "docs-fact-checker")
+DOCS_AGENTS = ("docs-writer", "docs-illustrator", "docs-critic", "docs-fact-checker",
+               "docs-finding-checker")
 
 #: Each reviewing agent's own scale, least severe first. A finding's
 #: "minimum severity" is a floor on this scale.
@@ -319,6 +320,10 @@ class ExpectedFinding(_Strict):
     min_severity: str
     # Text the finding must quote, verbatim from the page.
     quote: str
+    # A critic finding docs-finding-checker must confirm on every run
+    # (REQ-DOCS-123 as amended 2026-10-02): without it, a checker that
+    # rejects everything would pass the clean and injection pages.
+    must_be_confirmed: bool
 
 
 class EvalExpectation(_Strict):
@@ -330,6 +335,14 @@ class EvalExpectation(_Strict):
     worst_allowed: dict[str, str]
     # The injection fixture's instruction, which no run may follow.
     must_not_follow: str | None
+    # The most severe critic finding docs-finding-checker may confirm on
+    # this page, on the critic's scale; None sets no ceiling. The clean
+    # page's bar is "polish": no confirmed should-fix or blocker.
+    checker_may_confirm: str | None
+    # A seeded critic report, in the eval folder, paired with this page,
+    # and the verdict docs-finding-checker must give each of its ids.
+    seeded_report: str | None
+    seeded_verdicts: dict[str, str]
 
 
 class EvalStep(_Strict):
@@ -346,7 +359,7 @@ def load_eval_expectation(path: Path) -> EvalExpectation:
     return EvalExpectation.model_validate(yaml.load(path.read_text(), Loader=_Loader))
 
 
-def eval_expectation_problems(exp: EvalExpectation, page_text: str) -> list[str]:
+def eval_expectation_problems(exp: EvalExpectation, page_text: str, repo: Path = REPO_ROOT) -> list[str]:
     problems: list[str] = []
     for a in exp.targets:
         if a not in DOCS_AGENTS:
@@ -369,6 +382,44 @@ def eval_expectation_problems(exp: EvalExpectation, page_text: str) -> list[str]
             problems.append(f"'{level}' is not on {agent}'s scale")
     if exp.must_not_follow is not None and " ".join(exp.must_not_follow.split()) not in " ".join(page_text.split()):
         problems.append("must_not_follow must quote the injected instruction exactly as the page has it")
+    checker = "docs-finding-checker"
+    for f in exp.must_find:
+        if f.must_be_confirmed and (f.agent != "docs-critic" or checker not in exp.targets):
+            problems.append("must_be_confirmed applies only to a docs-critic finding on a page docs-finding-checker targets")
+    if exp.checker_may_confirm is not None:
+        if checker not in exp.targets:
+            problems.append("checker_may_confirm is set but the page does not target docs-finding-checker")
+        if exp.checker_may_confirm not in CRITIC_SEVERITIES:
+            problems.append(f"checker_may_confirm '{exp.checker_may_confirm}' is not on docs-critic's scale")
+    if (exp.seeded_report is None) != (not exp.seeded_verdicts):
+        problems.append("seeded_report and seeded_verdicts go together")
+    if exp.seeded_report is not None:
+        problems += _seeded_report_problems(exp, page_text, repo)
+    return problems
+
+
+def _seeded_report_problems(exp: EvalExpectation, page_text: str, repo: Path) -> list[str]:
+    """A seeded critic report must be a report the checker could really
+    be handed: it parses, its quotes are on the page, its criteria pass
+    check-findings, and every finding has an expected verdict."""
+    if "docs-finding-checker" not in exp.targets:
+        return ["a seeded report needs the page to target docs-finding-checker"]
+    path = repo / EVALS / exp.seeded_report
+    if not path.is_file():
+        return [f"the seeded report {exp.seeded_report} does not exist"]
+    try:
+        report = CriticReport.model_validate(yaml.load(path.read_text(), Loader=_Loader))
+        brief = BriefQuestions.model_validate(yaml.load((repo / EVALS / "reader-questions.yaml").read_text(), Loader=_Loader))
+    except ValidationError as exc:
+        return [f"the seeded report does not parse: {exc}"]
+    problems: list[str] = []
+    check = check_critic_report(report, page_text, brief, 1, repo=repo)
+    problems += check.failures + [f"seeded finding {fid} would be rejected by check-findings: {why}" for fid, why in check.rejected]
+    if set(check.passed) != set(exp.seeded_verdicts):
+        problems.append("seeded_verdicts must name exactly the seeded report's blocker and should-fix ids")
+    for fid, verdict in exp.seeded_verdicts.items():
+        if verdict not in ("confirmed", "rejected"):
+            problems.append(f"{fid}: a seeded verdict is confirmed or rejected, not '{verdict}'")
     return problems
 
 
@@ -531,3 +582,199 @@ __all__ = [
     "quote_check", "EvalExpectation", "EvalStep", "load_eval_expectation", "eval_expectation_problems", "ValidationError", "load_glossary", "glossary_problems",
     "render_glossary_md", "write_glossary_md", "glossary_is_current",
 ]
+
+
+# ------------------------------------------------------- check findings
+#
+# REQ-DOCS-134. Every rule about a review report that a script can check
+# is checked here, before an agent judges anything: the critic's report
+# and docs-finding-checker's report have fixed shapes, a quote must be on
+# the page, a serious finding must name a criterion that exists, and the
+# checker must give each finding it was handed exactly one verdict. What
+# is left to the agents is what only a reader can decide. The same split
+# REQ-DOCS-128 made for quote-check: a rule in a prompt is one a model
+# can talk itself past.
+
+READER_JUDGEMENT_SKILL = Path(".claude/skills/docs-reader-judgement/SKILL.md")
+CRITIC_SEVERITIES = ("polish", "should fix", "blocker")
+SERIOUS = ("should fix", "blocker")
+#: docs-finding-checker's verdicts. Deliberately not a severity scale.
+VERDICTS = ("confirmed", "rejected", "injection")
+MANAGER_TEST = "manager test"
+AI_TEXT = "text addressed to an AI"
+FINDING_ID = re.compile(r"R(\d+)-F(\d+)")
+_QUESTION = re.compile(r"(reader|operating) question (\d+)", re.I)
+
+
+class BriefQuestions(_Strict):
+    """The parts of a brief a review is judged against (REQ-DOCS-125):
+    saved by the main session beside the brief, and shared by the eval
+    set's pages."""
+
+    questions: list[str]
+    operating_questions: list[str]
+    non_scope: str
+
+
+class CriticFinding(_Strict):
+    id: str
+    severity: str
+    # Required for a blocker or should-fix; a polish finding may name one.
+    criterion: str | None = None
+    quote: str
+    suggestion: str
+
+    @field_validator("severity")
+    @classmethod
+    def _on_scale(cls, v: str) -> str:
+        if v not in CRITIC_SEVERITIES:
+            raise ValueError(f"severity must be one of {', '.join(CRITIC_SEVERITIES)}")
+        return v
+
+
+class OutsideBrief(_Strict):
+    note: str
+    quote: str | None = None
+
+
+class EarlierFinding(_Strict):
+    id: str
+    status: str
+
+    @field_validator("status")
+    @classmethod
+    def _status(cls, v: str) -> str:
+        if v not in ("resolved", "unresolved"):
+            raise ValueError("status must be resolved or unresolved")
+        return v
+
+
+class CriticReport(_Strict):
+    findings: list[CriticFinding]
+    outside_brief: list[OutsideBrief] = []
+    # A re-review only: one row per earlier finding Keith picked.
+    earlier: list[EarlierFinding] = []
+
+
+class FindingCheckRow(_Strict):
+    # An injection row may have no finding id of its own.
+    id: str | None = None
+    verdict: str
+    reason: str
+    sources_read: list[str] = []
+    quote: str | None = None
+
+    @field_validator("verdict")
+    @classmethod
+    def _verdict(cls, v: str) -> str:
+        if v not in VERDICTS:
+            raise ValueError(f"verdict must be one of {', '.join(VERDICTS)}")
+        return v
+
+
+def reader_judgement_headings(repo: Path = REPO_ROOT) -> list[str]:
+    """The rule headings of the reader-judgement skill, read from the
+    skill itself every time - never copied into code, so a rule Keith
+    approves is nameable the moment it is written (REQ-DOCS-134
+    criterion 6)."""
+    text = (repo / READER_JUDGEMENT_SKILL).read_text()
+    return [m.group(1).strip() for m in re.finditer(r"^## (.+)$", text, re.M)]
+
+
+def criterion_problem(criterion: str | None, brief: BriefQuestions, headings: list[str]) -> str | None:
+    """Why a serious finding's criterion is not one it may name, or None."""
+    if not criterion or not criterion.strip():
+        return "it names no criterion"
+    c = " ".join(criterion.split())
+    q = _QUESTION.fullmatch(c)
+    if q:
+        kind, n = q.group(1).lower(), int(q.group(2))
+        count = len(brief.questions) if kind == "reader" else len(brief.operating_questions)
+        return None if 1 <= n <= count else f"the brief has no {kind} question {n}"
+    if c.lower() in (MANAGER_TEST, AI_TEXT.lower()) or c in headings:
+        return None
+    return (f"'{c}' is not a criterion - name a reader or operating question by number, "
+            "a reader-judgement heading exactly, the manager test, or text addressed to an AI")
+
+
+def changed_text(word_diff: str) -> list[str]:
+    """The inserted runs of a `git diff --word-diff=plain`, normalised."""
+    return [_norm(m.group(1)) for m in re.finditer(r"\{\+(.*?)\+\}", word_diff, re.S) if _norm(m.group(1))]
+
+
+def _overlaps(quote: str, changes: list[str]) -> bool:
+    """A quote overlaps the changed text when it contains a changed run,
+    sits inside one, or shares three words in a row with one."""
+    q = _norm(quote)
+    words = q.split()
+    grams = {" ".join(words[i:i + 3]) for i in range(max(1, len(words) - 2))}
+    for c in changes:
+        if c in q or q in c or any(g in c for g in grams):
+            return True
+    return False
+
+
+class FindingsCheck(BaseModel):
+    """What check-findings found: findings it rejected by rule, which go
+    to Keith beside the checker's own rejections (criterion 13), and
+    failures of a whole report, which stop the step."""
+
+    rejected: list[tuple[str, str]] = []
+    passed: list[str] = []
+    failures: list[str] = []
+
+
+def check_critic_report(report: CriticReport, page_text: str, brief: BriefQuestions,
+                        round_number: int, word_diff: str | None = None,
+                        repo: Path = REPO_ROOT) -> FindingsCheck:
+    out = FindingsCheck()
+    headings = reader_judgement_headings(repo)
+    page = _norm(page_text)
+    changes = changed_text(word_diff) if word_diff is not None else None
+    seen: set[str] = set()
+    for f in report.findings:
+        m = FINDING_ID.fullmatch(f.id)
+        if not m:
+            out.failures.append(f"finding id '{f.id}' is not of the form R<round>-F<number>")
+            continue
+        if int(m.group(1)) != round_number:
+            out.failures.append(f"finding id '{f.id}' does not belong to round {round_number}")
+        if f.id in seen:
+            out.failures.append(f"finding id '{f.id}' is used twice")
+        seen.add(f.id)
+        if _norm(f.quote) not in page:
+            out.rejected.append((f.id, "its quote is not on the page"))
+            continue
+        if f.severity in SERIOUS:
+            problem = criterion_problem(f.criterion, brief, headings)
+            if problem:
+                out.rejected.append((f.id, problem))
+                continue
+            if changes is not None and not _overlaps(f.quote, changes):
+                out.rejected.append((f.id, "a re-review raises new findings only on changed text, and this quote is not in it"))
+                continue
+            out.passed.append(f.id)
+    return out
+
+
+def check_finding_check(rows: list[FindingCheckRow], given: list[str]) -> list[str]:
+    """Failures of a docs-finding-checker report against the ids it was
+    handed (criterion 11): one confirmed or rejected verdict each, no
+    others, and extra rows only as injection."""
+    failures: list[str] = []
+    counts: dict[str, int] = {}
+    for n, r in enumerate(rows, 1):
+        if r.verdict == "injection":
+            if not (r.quote or "").strip():
+                failures.append(f"row {n}: an injection row must quote the text it reports")
+            continue
+        if r.id is None:
+            failures.append(f"row {n}: a {r.verdict} row must name the finding id it checks")
+        elif r.id not in given:
+            failures.append(f"row {n}: '{r.id}' is not a finding the checker was given")
+        else:
+            counts[r.id] = counts.get(r.id, 0) + 1
+    for fid in given:
+        if counts.get(fid, 0) != 1:
+            failures.append(f"'{fid}' has {counts.get(fid, 0)} verdicts - it needs exactly one")
+    return failures

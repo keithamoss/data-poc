@@ -16,7 +16,8 @@ THREE LAYERS, because each one covers a gap in the others.
 2. A WRITE GUARD, run as a PreToolUse hook on
    Write|Edit|MultiEdit|NotebookEdit. The writer may write explainer
    pages, glossary.yaml and the gitignored working folder; the
-   illustrator pages and the working folder; nobody else anything. It
+   illustrator pages and the working folder; nobody else anything - the
+   critic, the fact-checker and the finding-checker write nothing. It
    is the ONLY guard for paths outside the repository - a shell rc
    file, ~/.claude/settings.json - because the snapshot below cannot
    see those.
@@ -69,7 +70,7 @@ EVALS = Path(".claude/skills/explain/evals")
 DENIED_READ_DIRS = (Path("data"), Path("reports"), EVALS)
 
 WRITING_AGENTS = {"docs-writer", "docs-illustrator"}
-READING_AGENTS = {"docs-writer", "docs-illustrator", "docs-fact-checker"}
+READING_AGENTS = {"docs-writer", "docs-illustrator", "docs-fact-checker", "docs-finding-checker"}
 ALL_AGENTS = READING_AGENTS | {"docs-critic"}
 
 # Files a person reviews that live beside the pages but that no agent

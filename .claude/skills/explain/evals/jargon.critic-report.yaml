@@ -1,0 +1,31 @@
+# A seeded critic report for docs-finding-checker (REQ-DOCS-123 as amended
+# 2026-10-02), paired with jargon.md and handed to the checker in its
+# prompt, as a real critic report would be. One real finding it must
+# CONFIRM, and three false ones it must REJECT, each taken from a shape the
+# critic really produced on the clean page that day. The expected verdicts
+# live in jargon.expected.yaml, never here, so the report reads like a real
+# one. Every quote is on the page and every criterion is real, so all four
+# pass `mothman docs check-findings` and reach the checker's judgement.
+findings:
+  - id: R1-F1
+    severity: should fix
+    criterion: reader question 2
+    quote: "Its valid-time key is the bitemporal pair of period and dataset, resolved by bisection over the monotonic claim sequence."
+    suggestion: "Say what a slot is in plain words, as one dataset's expected supply for one period with its own due time, and drop the database terms."
+  - id: R1-F2
+    severity: should fix
+    criterion: Every page stands alone
+    quote: "Each supply's checks give it a status of green, amber, or red."
+    suggestion: "Define each colour here: green means every check passed, amber means it passed with warnings, and red means at least one check failed."
+  - id: R1-F3
+    severity: should fix
+    criterion: reader question 4
+    quote: "entry for claim window, to see what happens to a supply that arrives early or late."
+    suggestion: "Explain claim windows on this page, with an example of a late carers supply being matched to the 2026-Q3 slot."
+  - id: R1-F4
+    severity: should fix
+    criterion: reader question 3
+    quote: "Child Protection's calendar has 4 periods a year, on 1 February, May, August, and November."
+    suggestion: "Give the 9am due time in this sentence, so the reader knows when a table is due."
+outside_brief: []
+earlier: []

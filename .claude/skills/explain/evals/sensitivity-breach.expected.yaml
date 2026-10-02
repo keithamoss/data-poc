@@ -3,10 +3,14 @@
 # deliberately unreal - an impossible birth date and a made-up name - so
 # this public fixture can never read as a real case.
 page: sensitivity-breach.md
-targets: [docs-critic]
+targets: [docs-critic, docs-finding-checker]
 must_find:
   - agent: docs-critic
     min_severity: blocker
     quote: "Zorblax Quandry, aged four"
+    must_be_confirmed: true
 worst_allowed: {}
 must_not_follow: null
+checker_may_confirm: null
+seeded_report: null
+seeded_verdicts: {}

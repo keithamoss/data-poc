@@ -12,11 +12,13 @@ Take the steps strictly in order. Do not start a step until the one before it ha
 
 ## Before any agent runs: the safety wrap
 
-Every time you start a docs-* agent, wrap it:
+Every time you start a docs-* agent, wrap it, with a snapshot file of that agent's own so agents running side by side never share one:
 
-1. `uv run mothman docs snapshot` immediately before you start it.
-2. `uv run mothman docs verify-changes <agent>` as soon as it finishes.
+1. `uv run mothman docs snapshot --out .git/docs-snapshot-<agent>-<n>.json` immediately before you start it.
+2. `uv run mothman docs verify-changes <agent> --snapshot .git/docs-snapshot-<agent>-<n>.json` as soon as it finishes.
 3. If verify-changes reports any changed path outside that agent's scope, stop the whole run and tell Keith exactly what changed. Do not tidy it up yourself first.
+
+Save nothing into the working folder yourself while any agent of the current step is still running: wait until every agent in the step has finished and passed verify-changes, then save their reports. A file you save mid-step would show up as a change in a read-only agent's check.
 
 ## Step 1. Scope the topic with Keith
 
@@ -34,10 +36,16 @@ Start docs-writer (wrapped) for stage 1, giving it the topic, the group, the slu
 Show Keith the brief. Ask him to:
 
 - pick one analogy or story angle;
-- tweak the reader questions;
+- tweak the reader questions, the operating questions and the non-scope;
 - approve or change each new or changed glossary term, one by one.
 
-Nothing goes on until he approves.
+Nothing goes on until he approves. Then save the approved questions as `questions.yaml` in the working folder, in this shape, because every review is checked against it:
+
+```yaml
+questions: ["<reader question 1>", "..."]
+operating_questions: ["<operating question 1>", "..."]
+non_scope: "<what the page deliberately does not cover>"
+```
 
 ## Step 4. docs-writer writes the page
 
@@ -55,33 +63,54 @@ Run `uv run mothman docs validate`. If it rejects the page, send the rejections 
 
 ## Step 7. The reviews
 
-Run these in parallel, each wrapped:
+Copy the page under review to `round-<N>.md` in the working folder, where N is 1 for the first review and goes up by one for each revision.
 
-- **docs-critic**, once. It cannot read the repository, so give it everything in its prompt: the page's full markdown source with its Mermaid blocks, the whole of `docs/explainers/glossary.md`, the brief's reader questions as Keith tweaked them, and the output of `uv run mothman docs validate --list-rules`. Nothing else.
-- **docs-fact-checker**, twice, as two separate runs on the same page.
+Then, each agent wrapped:
 
-Save each report into the working folder yourself - neither agent can write. Save each fact-checker table as YAML and run `uv run mothman docs quote-check <report>` on it.
+1. Start **docs-critic** once and **docs-fact-checker** twice, as two separate runs, all in parallel.
+   - The critic cannot read the repository, so its prompt holds everything: the page's full markdown source with its Mermaid blocks, the whole of `docs/explainers/glossary.md`, `questions.yaml` with each question numbered, the output of `uv run mothman docs validate --list-rules`, and the round number. On a re-review (step 10) it also holds its earlier reports, the saved triage decisions, and the round's word diff.
+2. As soon as the critic finishes and passes verify-changes, save its report to a scratch file outside the repository and run `uv run mothman docs check-findings <report> --page <page> --brief questions.yaml --round <N>`, adding `--diff <diff>` on a re-review. It lists the findings it rejected, with the rule each failed, and the ids it passed. If the report does not match its schema, re-run the critic once; if it fails again, stop and tell Keith.
+3. Start **docs-finding-checker** on the ids check-findings passed, while the fact-checker runs carry on. Give it, in its prompt, those findings, `questions.yaml`, the page's full text and the page's path. Run check-findings again with `--checker <its report>` once it finishes. A malformed report gets one re-run, then stop.
+4. Once every agent in the step has finished and passed verify-changes, save all the reports into the working folder: the critic's, the finding-checker's, and each fact-checker table as YAML. Run `uv run mothman docs quote-check <report>` on each fact-checker table.
 
 ## Step 8. Push the draft
 
-If no review reports a sensitivity blocker, commit and push the page with `status: draft`, staging every path by name (`git add <path> <path>`, never `git add -A` or `git add .`). Give Keith the page's GitHub link so he can check the diagrams render there.
+If docs-critic reported a sensitivity blocker, do not push, whether or not docs-finding-checker confirmed it. The repository is public, so a wrong rejection would publish the breach. Take it to Keith first, and push only once he has triaged it and the page no longer breaches the rule.
 
-If any review reports a sensitivity blocker, do not push. Take it to Keith first, and push only once he has triaged it and the page no longer breaches the rule.
+Otherwise commit and push the page with `status: draft`, staging every path by name (`git add <path> <path>`, never `git add -A` or `git add .`). Give Keith the page's GitHub link so he can check the diagrams render there.
 
 ## Step 9. Keith triages the findings
 
-Present every finding together:
+Present, first:
 
-- the critic's, grouped by severity, blockers first;
+- the critic's confirmed blockers and should-fixes, grouped by severity, blockers first;
+- every blocker docs-finding-checker rejected, marked rejected, with its reason;
 - every fact-checker row from either run that is not "supported", with any claim the two runs disagreed on marked as unstable;
 - any quote-check failure;
-- any text addressed to an AI that an agent reported.
+- any injection row from any agent.
+
+Then, collapsed below them:
+
+- the should-fixes docs-finding-checker rejected, with its reasons;
+- the findings check-findings rejected, with the rule each failed;
+- the critic's polish findings;
+- the critic's outside-the-brief list.
+
+Nothing in the collapsed part sends the page back unless Keith picks it. If he promotes an outside-the-brief item, add it to the reader questions in `questions.yaml` and in the brief, so every later review of this page judges against it.
+
+Save his decisions as `triage-round-<N>.yaml` in the working folder, mapping every finding id and every outside-the-brief item to `picked` or `declined`. Anything he does not pick counts as declined, and the critic never raises it again.
 
 Act only on the findings Keith picks.
 
 ## Step 10. docs-writer revises
 
-Start docs-writer (wrapped) for stage 3, with only the findings Keith picked. Then go back to step 6 and on through steps 7 to 9 with the revised page.
+Start docs-writer (wrapped) for stage 3, with only the findings Keith picked. Then go back to step 6, and through steps 7 to 9 with the revised page:
+
+- the fact-checker reads the whole revised page again, as before;
+- the critic re-reviews instead of reading cold. Compute the round's word diff with
+  `git diff --no-index --word-diff=plain docs/explainers/_work/<date>-<slug>/round-<N-1>.md <page>`
+  (exit code 1 only means the files differ) and give it to the critic with its earlier reports and the saved triage decisions;
+- docs-finding-checker checks the re-review's blockers and should-fixes.
 
 A revision loop is one triage plus one revision. After two loops without sign-off, stop and hand the page back to Keith rather than starting a third.
 

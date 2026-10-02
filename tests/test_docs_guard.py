@@ -95,6 +95,14 @@ class TestReadGuard:
         assert g.guard_read("docs-writer", _call("Grep", pattern="slot", path=str(repo / "contract")), repo).allowed
         assert g.guard_read("docs-writer", _call("Glob", pattern="*.yaml", path=str(repo / "docs")), repo).allowed
 
+    @pytest.mark.parametrize("rel,allowed", [
+        ("requirements.yaml", True), ("contract/data-asset.yaml", True),
+        (".env", False), ("data/deliveries/x.csv", False), (".claude/skills/explain/evals/jargon.expected.yaml", False),
+    ])
+    def test_the_finding_checker_reads_sources_but_not_secrets_data_or_answers(self, repo, rel, allowed):
+        """REQ-DOCS-133 criteria 2, 3 and 18: read-only like the fact-checker."""
+        assert g.guard_read("docs-finding-checker", _call("Read", file_path=str(repo / rel)), repo).allowed is allowed
+
     def test_the_critic_may_read_nothing_at_all(self, repo):
         d = g.guard_read("docs-critic", _call("Read", file_path=str(repo / "requirements.yaml")), repo)
         assert not d.allowed
@@ -141,7 +149,7 @@ class TestWriteGuard:
         assert g.guard_write("docs-illustrator", _call("Write", file_path=str(work)), repo).allowed
         assert not g.guard_write("docs-illustrator", _call("Edit", file_path=str(repo / "docs/explainers/glossary.yaml")), repo).allowed
 
-    @pytest.mark.parametrize("agent", ["docs-critic", "docs-fact-checker", "unknown"])
+    @pytest.mark.parametrize("agent", ["docs-critic", "docs-fact-checker", "docs-finding-checker", "unknown"])
     def test_nobody_else_writes_anything(self, repo, agent):
         page = repo / "docs/explainers/2-calendar/periods-and-slots.md"
         assert not g.guard_write(agent, _call("Write", file_path=str(page)), repo).allowed

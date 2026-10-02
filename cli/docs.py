@@ -135,3 +135,59 @@ def quote_check_command(report: Path) -> None:
     if problems:
         raise SystemExit(1)
     console.print(f"All {sum(1 for r in rows if (r.get('quote') or '').strip())} quotes found in their sources.")
+
+
+def _report_yaml(path: Path):
+    """A saved agent report: the YAML itself, or the agent's reply with
+    its one fenced YAML block, which is taken as the report."""
+    import re
+
+    import yaml
+
+    text = path.read_text()
+    fence = re.search(r"```ya?ml\s*\n(.*?)```", text, re.S)
+    return yaml.safe_load(fence.group(1) if fence else text)
+
+
+@docs_group.command("check-findings")
+@click.argument("critic_report", type=click.Path(path_type=Path, exists=True))
+@click.option("--page", "page", required=True, type=click.Path(path_type=Path, exists=True),
+              help="The page the critic reviewed.")
+@click.option("--brief", "brief", required=True, type=click.Path(path_type=Path, exists=True),
+              help="The brief's questions, operating questions and non-scope, as YAML.")
+@click.option("--round", "round_number", required=True, type=int, help="The review round, from 1.")
+@click.option("--diff", "diff", type=click.Path(path_type=Path, exists=True), default=None,
+              help="On a re-review, the round's `git diff --no-index --word-diff=plain` output.")
+@click.option("--checker", "checker", type=click.Path(path_type=Path, exists=True), default=None,
+              help="docs-finding-checker's report, checked against the findings that passed.")
+def check_findings_command(critic_report: Path, page: Path, brief: Path, round_number: int,
+                           diff: Path | None, checker: Path | None) -> None:
+    """Check the critic's report, and the finding-checker's when given,
+    against every rule a script can decide (REQ-DOCS-134). Findings it
+    rejects are listed for Keith with the rule each failed; a malformed
+    report exits 1."""
+    import yaml
+    from pydantic import TypeAdapter, ValidationError
+
+    from qa_tools.common import explainers as ex
+
+    try:
+        report = ex.CriticReport.model_validate(_report_yaml(critic_report))
+        questions = ex.BriefQuestions.model_validate(yaml.safe_load(brief.read_text()))
+        rows = (TypeAdapter(list[ex.FindingCheckRow]).validate_python(_report_yaml(checker) or [])
+                if checker else None)
+    except (ValidationError, yaml.YAMLError) as exc:
+        console.print(f"[bold red]A report does not match its schema:[/]\n{exc}")
+        raise SystemExit(1) from None
+    result = ex.check_critic_report(report, page.read_text(), questions, round_number,
+                                    diff.read_text() if diff else None)
+    failures = list(result.failures)
+    if rows is not None:
+        failures += ex.check_finding_check(rows, result.passed)
+    for fid, rule in result.rejected:
+        console.print(f"{fid} rejected by rule: {rule}")
+    console.print(f"Passed to docs-finding-checker: {', '.join(result.passed) or 'none'}")
+    for f in failures:
+        console.print(f"[bold red]{f}[/]")
+    if failures:
+        raise SystemExit(1)

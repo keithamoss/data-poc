@@ -44,12 +44,14 @@ Write it to `docs/explainers/_work/<date>-<slug>/brief.md`, at most 500 words be
 
 - the page's why-question, and who it is for;
 - its key points;
+- a one-line non-scope: what the page deliberately does not cover, so a reviewer judges what is missing against the page's scope rather than against everything the glossary holds;
 - two or three candidate analogies or story angles, for Keith to pick from;
 - the diagrams and stories you plan, as slots;
 - the sources it will cite, and the build state those sources give the page;
 - five to eight questions a new engineer should be able to answer from the page;
+- two or three day-to-day operating questions a returning reader should find answered from the headings and the 'In short' box alone;
 - every new or changed glossary term;
-- what the page will be checked against: the validator's rule ids, the reader-judgement rules, and the fact-checker's verdicts.
+- what the page will be checked against: the validator's rule ids, the reader-judgement rules, the reader and operating questions above, and the fact-checker's verdicts.
 
 Then stop. Keith approves the brief before anything else happens.
 

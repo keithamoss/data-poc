@@ -21,14 +21,15 @@ EVALS = ROOT / ex.EVALS
 PAGES = sorted(EVALS.glob("*.md"))
 EXPECTED = sorted(EVALS.glob("*.expected.yaml"))
 
-#: Which agents each page targets (criterion 8, Keith set 6).
+#: Which agents each page targets (criterion 8, Keith set 6, amended
+#: 2026-10-02 to add docs-finding-checker).
 TARGETS = {
-    "jargon.md": {"docs-critic"},
-    "decorative-diagram.md": {"docs-critic"},
-    "sensitivity-breach.md": {"docs-critic"},
+    "jargon.md": {"docs-critic", "docs-finding-checker"},
+    "decorative-diagram.md": {"docs-critic", "docs-finding-checker"},
+    "sensitivity-breach.md": {"docs-critic", "docs-finding-checker"},
     "wrong-fact.md": {"docs-fact-checker"},
     "naming-trap.md": {"docs-fact-checker"},
-    "clean.md": {"docs-critic", "docs-fact-checker"},
+    "clean.md": {"docs-critic", "docs-fact-checker", "docs-finding-checker"},
     "injection.md": set(ex.DOCS_AGENTS),
 }
 
@@ -66,10 +67,43 @@ def test_only_the_injection_page_names_an_instruction_not_to_follow():
         assert (exp.must_not_follow is not None) == (exp.page == "injection.md"), exp.page
 
 
-def test_the_clean_page_tolerates_nothing_beyond_polish():
+def test_the_clean_page_allows_no_critic_blocker_and_no_confirmed_should_fix():
+    """REQ-DOCS-123 as amended 2026-10-02: the critic may raise a
+    should-fix on a clean page, but the checker must confirm none."""
     exp = ex.load_eval_expectation(EVALS / "clean.expected.yaml")
     assert exp.must_find == []
-    assert exp.worst_allowed == {"docs-critic": "polish", "docs-fact-checker": "supported"}
+    assert exp.worst_allowed == {"docs-critic": "should fix", "docs-fact-checker": "supported"}
+    assert exp.checker_may_confirm == "polish"
+
+
+@pytest.mark.parametrize("page", ["jargon.md", "decorative-diagram.md", "sensitivity-breach.md"])
+def test_the_checker_must_confirm_every_planted_critic_defect(page):
+    """Without this, a checker that rejects everything would pass."""
+    exp = ex.load_eval_expectation(EVALS / page.replace(".md", ".expected.yaml"))
+    assert exp.must_find and all(f.must_be_confirmed for f in exp.must_find)
+
+
+def test_the_seeded_report_holds_one_real_finding_and_three_false_ones():
+    """REQ-DOCS-123: the three false shapes the critic really produced."""
+    exp = ex.load_eval_expectation(EVALS / "jargon.expected.yaml")
+    assert exp.seeded_report == "jargon.critic-report.yaml"
+    assert sorted(exp.seeded_verdicts.values()) == ["confirmed", "rejected", "rejected", "rejected"]
+
+
+def test_the_seeded_report_passes_check_findings_so_it_reaches_the_checker():
+    exp = ex.load_eval_expectation(EVALS / "jargon.expected.yaml")
+    assert ex.eval_expectation_problems(exp, (EVALS / "jargon.md").read_text()) == []
+
+
+def test_a_seeded_verdict_for_an_id_the_report_lacks_fails():
+    exp = ex.load_eval_expectation(EVALS / "jargon.expected.yaml")
+    exp.seeded_verdicts["R1-F9"] = "rejected"
+    assert any("exactly the seeded report" in p for p in ex.eval_expectation_problems(exp, (EVALS / "jargon.md").read_text()))
+
+
+def test_the_shared_brief_questions_carry_a_non_scope_and_operating_questions():
+    brief = ex.BriefQuestions.model_validate(yaml.safe_load((EVALS / "reader-questions.yaml").read_text()))
+    assert brief.non_scope and 2 <= len(brief.operating_questions) <= 3
 
 
 def test_the_sensitivity_breach_must_be_a_blocker():

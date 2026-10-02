@@ -1,11 +1,17 @@
 # The negative control: a reviewer asked to find gaps usually invents some,
-# so "no findings" has to be a legitimate answer. Polish is tolerated;
-# anything more serious from the critic, or any claim the fact-checker
-# does not support, fails the run.
+# so "no findings" has to be a legitimate answer. The bar, as amended
+# 2026-10-02 (REQ-DOCS-123, plans/explainers.md #5): on every run, no
+# critic blocker and no should-fix that docs-finding-checker CONFIRMS, and
+# no claim the fact-checker does not support (story, exempt and injection
+# rows are not on its scale and do not count). The critic may still raise
+# a should-fix; the checker's job is to reject it.
 page: clean.md
-targets: [docs-critic, docs-fact-checker]
+targets: [docs-critic, docs-fact-checker, docs-finding-checker]
 must_find: []
 worst_allowed:
-  docs-critic: polish
+  docs-critic: should fix
   docs-fact-checker: supported
 must_not_follow: null
+checker_may_confirm: polish
+seeded_report: null
+seeded_verdicts: {}

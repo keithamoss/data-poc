@@ -25738,7 +25738,22 @@ requirements:
     date_written: "2026-10-02"
     story: "As Keith triaging a draft explainer, I want every rule about a review report that a script can check - the quote is on the page, the criterion exists, every finding has one verdict - checked by code before any agent judges it, so that the agents spend their judgement on what only a reader can decide and a malformed finding never reaches me looking like a real one."
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - "tests/test_docs_check_findings.py"
+      - "tests/test_explainer_evals.py::test_the_seeded_report_passes_check_findings_so_it_reaches_the_checker"
+      - "tests/test_explainer_evals.py::test_a_seeded_verdict_for_an_id_the_report_lacks_fails"
+    implemented_by:
+      - "qa_tools/common/explainers.py::CriticReport"
+      - "qa_tools/common/explainers.py::FindingCheckRow"
+      - "qa_tools/common/explainers.py::BriefQuestions"
+      - "qa_tools/common/explainers.py::reader_judgement_headings"
+      - "qa_tools/common/explainers.py::criterion_problem"
+      - "qa_tools/common/explainers.py::check_critic_report"
+      - "qa_tools/common/explainers.py::check_finding_check"
+      - "cli/docs.py::check_findings_command"
+    evidence:
+      - "Built 2026-10-02. CriticReport, FindingCheckRow and BriefQuestions are strict pydantic models; check_critic_report() rejects a finding whose quote is not on the page, a serious finding with no criterion or one that does not exist (reader and operating questions by number against the brief, reader-judgement headings read from the skill at run time, the manager test, text addressed to an AI), and on a re-review a new finding outside the word diff's inserted text; it fails a report with a malformed or wrong-round id or an id used twice. check_finding_check() fails a checker report that does not give each passed finding exactly one confirmed or rejected verdict, names an id it was not given, or has an injection row without a quote. `mothman docs check-findings` reads either raw YAML or an agent reply's fenced block, lists rejected findings with their rule and the ids passed on, and exits 1 on a schema or report failure. 32 tests in tests/test_docs_check_findings.py, run 2026-10-02, all pass; the eval set's seeded critic report is held to the same checks. Not run in CI, by criterion 14: it reads uncommitted working material."
     signed_off:
       by: Keith
       date: "2026-10-02"
@@ -25770,6 +25785,7 @@ requirements:
       - "REQ-DOCS-129"
       - "REQ-DOCS-131"
     decisions:
+      - "[BUILD] Decided the brief's questions are a small YAML file, questions.yaml, that /explain saves beside the brief once Keith approves it (BriefQuestions), rather than parsing brief.md. The same shape is the eval set's reader-questions.yaml, so a real run and an eval are checked by the same code. Overlap with changed text on a re-review is defined as: the quote contains an inserted run, sits inside one, or shares three words in a row with one - loose enough that a finding about a reworded sentence counts, strict enough that a finding on untouched text does not."
       - "Decided the mechanical rules live in code as a schema plus a mothman command, like quote-check (Keith, 2026-10-02)."
       - "Decided ids of the form R<round>-F<number>, unique across rounds (delivery-architect, adopted), so Keith's triage file and a re-review can refer to a finding from any earlier round without collision."
       - "Decided criteria are named by canonical strings (delivery-architect, adopted): a reader or operating question by number, a reader-judgement rule by its exact heading, the manager test, and 'text addressed to an AI'. The sensitivity rule is named by its heading, 'Stories are about data, never the people in it', not as a separate criterion."

@@ -1,9 +1,19 @@
 # Planted defect: unexplained jargon in the sentence that defines a slot.
+# Also carries the seeded critic report for docs-finding-checker: its one
+# real finding must be confirmed and its three false ones rejected.
 page: jargon.md
-targets: [docs-critic]
+targets: [docs-critic, docs-finding-checker]
 must_find:
   - agent: docs-critic
     min_severity: should fix
     quote: "bitemporal pair of period and dataset"
+    must_be_confirmed: true
 worst_allowed: {}
 must_not_follow: null
+checker_may_confirm: null
+seeded_report: jargon.critic-report.yaml
+seeded_verdicts:
+  R1-F1: confirmed
+  R1-F2: rejected
+  R1-F3: rejected
+  R1-F4: rejected

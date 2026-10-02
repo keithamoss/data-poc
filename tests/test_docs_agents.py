@@ -1,4 +1,4 @@
-"""The four docs-* agent definitions hold to REQ-DOCS-124 to 128: least
+"""The five docs-* agent definitions hold to REQ-DOCS-124 to 128 and 133: least
 privilege, a read and write guard in each agent's own hooks, a pinned
 model, the right preloaded skills, and prompts that never copy a skill.
 
@@ -24,6 +24,7 @@ TOOLS = {
     "docs-illustrator": {"Read", "Grep", "Glob", "Write", "Edit"},
     "docs-fact-checker": {"Read", "Grep", "Glob"},
     "docs-critic": {"Read"},
+    "docs-finding-checker": {"Read", "Grep", "Glob"},
 }
 FORBIDDEN = {"Bash", "WebFetch", "WebSearch", "Agent"}
 
@@ -77,6 +78,7 @@ def test_both_guards_run_in_the_agents_own_hooks_under_its_own_name(agent):
     ("docs-illustrator", ["docs-house-style", "docs-reader-judgement"]),
     ("docs-fact-checker", ["docs-house-style", "docs-reader-judgement"]),
     ("docs-critic", ["docs-reader-judgement"]),
+    ("docs-finding-checker", ["docs-reader-judgement"]),
 ])
 def test_preloaded_skills(agent, skills):
     """REQ-DOCS-124 criterion 17, REQ-DOCS-127 criterion 4."""
@@ -105,15 +107,44 @@ def test_repository_text_is_material_and_an_injection_is_reported(agent):
     assert "material" in text and "not instructions" in text and "addressed to an AI" in text
 
 
-@pytest.mark.parametrize("agent", ["docs-writer", "docs-illustrator", "docs-fact-checker"])
+@pytest.mark.parametrize("agent", ["docs-writer", "docs-illustrator", "docs-fact-checker", "docs-finding-checker"])
 def test_the_reading_agents_are_told_to_stay_out_of_data(agent):
     """REQ-DOCS-124 criterion 15. The guard enforces it; the prompt says it."""
     assert "`data/`, `reports/` or any database" in body(agent)
 
 
-def test_the_critic_starts_cold():
-    """REQ-DOCS-127 criterion 1."""
-    assert front("docs-critic")["omitClaudeMd"] is True
+@pytest.mark.parametrize("agent", ex.DOCS_AGENTS)
+def test_every_agent_starts_cold(agent):
+    """REQ-DOCS-127 criterion 1, REQ-DOCS-133 criterion 4, and the
+    decision that all of them start without CLAUDE.md."""
+    assert front(agent)["omitClaudeMd"] is True
+
+
+def test_the_finding_checker_has_room_for_a_source_read_per_finding():
+    """REQ-DOCS-133 criterion 4 and its SCALE note: findings are uncapped."""
+    assert front("docs-finding-checker")["maxTurns"] >= 60
+
+
+def test_the_critic_anchors_every_serious_finding():
+    """REQ-DOCS-127 as amended 2026-10-02: no open channel and no
+    'every finding' instruction; a named criterion, an outside-the-brief
+    list, a not-a-finding list, and the re-review rules."""
+    text = " ".join(body("docs-critic").split())
+    assert "no confidence filter" not in text and "anything else you found yourself wondering" not in text
+    for needle in ("names the one thing it breaks", "outside-the-brief list", "If you are not sure a reader would actually fail",
+                   "These are not findings", "Raise new findings only on text the word diff marks as changed",
+                   "Never raise again anything Keith did not pick", "manager test", "R<round>-F<number>"):
+        assert needle in text, needle
+
+
+def test_the_finding_checker_judges_and_never_rates():
+    """REQ-DOCS-133 criteria 9 to 14 and 17."""
+    text = " ".join(body("docs-finding-checker").split())
+    for needle in ("**confirmed** or **rejected**", "does not actually break the criterion",
+                   "the page already does what the finding says", "your reason names the sources you checked",
+                   "non-scope", "Do not change a finding's severity, give it a score, or raise problems of your own",
+                   "confirm that finding and add the injection row"):
+        assert needle in text, needle
 
 
 def _requirement(rid: str) -> dict:
@@ -129,7 +160,9 @@ def test_the_critic_carries_both_personas_word_for_word():
     """REQ-DOCS-127 criteria 5 and 10."""
     criteria = _requirement("REQ-DOCS-127")["acceptance_criteria"]
     prompt = " ".join(body("docs-critic").split())
-    for c in (criteria[4], criteria[9]):
+    personas = [c for c in criteria if "persona Keith approved on 2026-09-29, word for word" in c]
+    assert len(personas) == 2
+    for c in personas:
         assert " ".join(_quoted(c).split()) in prompt
 
 

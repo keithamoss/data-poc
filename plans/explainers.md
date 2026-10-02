@@ -2326,3 +2326,17 @@ survives context compaction. Tick items off here as they land.
    comment shapes developers dismissed). There is no triage history yet;
    the `triage-round-N.yaml` files REQ-DOCS-129 now saves are the data it
    will need.
+
+   **Built 2026-10-02, the same session:** REQ-DOCS-134 in full
+   (`mothman docs check-findings`, built); docs-finding-checker's agent
+   file, the critic's anchored prompt, the writer's brief additions, the
+   /explain steps, the approved reader-judgement rule, and the eval set's
+   new schema, targets, shared brief questions and seeded critic report.
+   What stays open is what only a real run proves: the new agent could
+   not be launched in the session that wrote it (Claude Code reads its
+   agent list at session start), so its guard-firing proof (REQ-DOCS-124)
+   and every eval run (REQ-DOCS-123, -127, -133) wait for a FRESH session.
+   That session: (1) ask docs-finding-checker to read an eval answer file
+   and .env - both must be refused - then REQ-DOCS-124 goes back to built;
+   (2) run the full sweep, critic first so its model is settled, then the
+   checker on that critic's runs.

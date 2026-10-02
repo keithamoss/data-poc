@@ -1,6 +1,8 @@
-# The reader questions docs-critic is given for every eval page, standing in
-# for the brief's questions a real run would carry. Every eval page is a
-# version of the same periods-and-slots page, so one set serves them all.
+# The brief questions docs-critic and docs-finding-checker are given for
+# every eval page, standing in for a real run's questions.yaml (REQ-DOCS-125,
+# REQ-DOCS-129). Every eval page is a version of the same periods-and-slots
+# page, so one set serves them all. Its shape is BriefQuestions in
+# qa_tools/common/explainers.py, the same file a real run saves.
 questions:
   - What is a period, and where do its dates come from?
   - What is a slot, and how many does a dataset get?
@@ -9,3 +11,7 @@ questions:
   - Does an empty slot always mean a supply is missing?
   - Why does the case workers table have no slot in some periods?
   - Why is there one slot per table rather than one per collection?
+operating_questions:
+  - A table's slot is still empty after its due time. What do I check first?
+  - A table has no slot this period. Does it owe a supply?
+non_scope: Claim windows, and how a supply that arrives early or late is matched to a slot; what happens to a supply after it is promoted.
