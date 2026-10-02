@@ -143,7 +143,7 @@ flowchart LR
 
 ### House rules as data
 
-The validator reads this block directly. It holds the banned lists, the exemptions, the house seed, and the diagram palette.
+The validator reads this block directly. It holds the banned lists, the watch list, the exemptions, the house seed, and the diagram palette.
 
 The palette is provisional. It is drawn from the dashboard's own colours, as pale fills with dark text and a darker stroke. Each classDef has one set of colours for both modes. A pale node reads on a dark page, and its stroke carries it on a light one. Every text colour reaches at least 12.7 to 1 contrast against its fill. It still needs checking on GitHub in light and dark mode before it stops being provisional.
 

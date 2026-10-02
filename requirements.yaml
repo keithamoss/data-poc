@@ -24892,6 +24892,7 @@ requirements:
       - "Carried - the line between the two tracks (Keith, confirmed 2026-09-29): what things MEAN to a reader is an explainer; how the system is OPERATED AND MAINTAINED - permissions, configuration changes, check upkeep - is Running Mothman. The tracks split by Diataxis type: explanation here, how-to, reference and technical explanation there."
       - "Carried - 'the four QA tools and why there are four' is NOT a concept and is not explained (item 1, third round); the CI-never-touches-data rule and the delivery-* agent pipeline go to the pipeline docs."
       - "Carried from the re-baseline - group 6's ticket page explains the NEW model, one ticket per slot always showing where that supply has got to (REQ-PIPE-083, REQ-GHUB-109), with the reconciling mechanics in the pipeline docs; and REQ-PIPE-110 to 113 give the explainers their MEANING only (a past due date can never change, windows never overlap), with file location and timezone versioning in the pipeline docs, as is REQ-TEST-114. The re-baseline said 'badged not built'; since 110 to 113 are unsigned, under Q3 that badge is now 'proposed' until Keith signs them."
+      - "Approved the concept map's content (Keith, 2026-10-02): 32 pages in ten groups as tiered on 2026-09-29, with three calls the main session made and Keith accepted - each group's read-first prerequisites, group 1's 'in development' page becoming 'Sample data' (and trial becoming one-off check) after the glossary review, and authored dates, permanent reporting, recency, waiting on a person and blocked as glossary-only."
     open_questions: []
 
   - id: REQ-DOCS-121
@@ -24937,6 +24938,7 @@ requirements:
       - "Decided the page's front-matter sources and its closing list must agree (scoper's addition in this revision, flagged for Keith), because two copies of one list that may differ is the drift this project keeps paying for."
       - "Decided the staleness gate fingerprints the index too (round 13) - deferred to explainers slice 2."
       - "Decided unsigned requirements may appear in an index and be cited (Keith, slice 1 Q3); the page then carries the 'proposed' badge."
+      - "Keith DELEGATED the review of group 2's source index to the main session (2026-10-02, 'happy with you making a call'), satisfying criterion 3 for group 2. The index lists 13 requirements plus contract/data-asset.yaml and five calendar code files; REQ-PIPE-112 (timezone versioning) is listed as background only, and REQ-PIPE-106 is flagged as due for rework under running-thoughts #60."
     open_questions: []
 
   - id: REQ-DOCS-122
@@ -25164,6 +25166,7 @@ requirements:
       - "Decided shared knowledge goes in preloaded skills (round 2 research). A skill with disable-model-invocation cannot be preloaded, so the two preloaded skills use user-invocable false instead. The glossary is not a sibling file of either skill, as the research first suggested: it lives at docs/explainers/glossary.yaml, where the writer's guard allows it and readers find it."
       - "Decided models are pinned by full id (round 13)."
       - "Decided the team is named docs-* (round 11) - docs-writer, docs-illustrator, docs-critic, docs-fact-checker - over explainer-*, because it is broader and the same team is expected to write the pipeline docs later."
+      - "Decided ALL FOUR docs-* agents start without CLAUDE.md (omitClaudeMd: true), not only the critic (main session's call, accepted by Keith 2026-10-02). CLAUDE.md's dense, caveat-heavy internal prose is the voice the house standard names as the thing not to sound like, and a prompt's style leaks into its output; everything the agents need is in their own prompts and preloaded skills."
     open_questions: []
 
   - id: REQ-DOCS-125
