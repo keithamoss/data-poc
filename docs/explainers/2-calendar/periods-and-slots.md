@@ -49,7 +49,7 @@ Build state, by section:
 - Built: "One expectation per collection almost works", "One period, shared by every table", "No slot where a table does not take part", "Why it's this way", "Putting it together".
 
 > [!NOTE]
-> Every table gets its own **[slot](../glossary.md#slot)**, a place waiting for it each time it is due, so a gap names the missing table.
+> Every table gets its own **[slot](../glossary.md#slot)**, a place waiting for it each time it is due, so a gap shows which table is missing.
 > If Child Protection sends 5 of 6 tables, one slot sits empty and the other 5 are not counted as late or short.
 > A **[period](../glossary.md#period)**, the one named date that every table on a calendar shares, never moves once it exists.
 > A table that does not take part in a period has no slot there, and that is not a gap.
@@ -62,7 +62,7 @@ Each of Child Protection's 6 tables is a **[dataset](../glossary.md#dataset)**, 
 
 ## One expectation per collection almost works
 
-The plainest design expects Child Protection's tables as one batch, once per period, and that works whenever all 6 arrive together. The flaw shows when one is missing, because the whole batch then reads as short and 5 punctual tables are dragged down by one. One slot per table fixes that, because the empty slot names the missing table and the rest stand alone.
+The plainest design expects Child Protection's tables as one batch, once per period, and that works whenever all 6 arrive together. The flaw shows when one is missing, because the whole batch then reads as short and 5 punctual tables are dragged down by one. One slot per table fixes that, because the empty slot shows which table is missing, and the other 5 are not marked late or short.
 
 ## One period, shared by every table
 
@@ -88,8 +88,8 @@ config:
   theme: neutral
 ---
 flowchart TD
-  accTitle: One empty slot names one missing table, and the other 5 slots stand on their own.
-  accDescr: One empty slot names one missing table, and the other 5 slots stand on their own.
+  accTitle: One empty slot shows one missing table, and the other 5 slots are not affected.
+  accDescr: One empty slot shows one missing table, and the other 5 slots are not affected.
   P["Period 2026-Q3, supply due 1 August 2026"]
   P --> S1["Client Register: filled"]
   P --> S2["Notifications: filled"]
@@ -105,9 +105,9 @@ flowchart TD
   class S4 empty
 ```
 
-*One empty slot names one missing table, and the other 5 slots stand on their own.*
+*One empty slot shows one missing table, and the other 5 slots are not affected.*
 
-The one thing to notice is the shape: one period branches into 6 separate slots, and only Placements is coloured differently. Each branch stands apart, so Placements being empty does not make the other 5 late or empty.
+The one thing to notice is the shape: one period branches into 6 separate slots, and only Placements is coloured differently. Each branch is separate, so Placements being empty does not make the other 5 late or empty.
 
 Each slot also carries its own timing. Its **[due time](../glossary.md#due-time)** is its period's date at its own dataset's time of day. Its **[grace allowance](../glossary.md#grace-allowance)** is the extra time a supply gets after that. Today all 6 Child Protection tables share a 9am due time and an 8-hour grace allowance, because their contract sets both once for the collection. A table that needs a different time can be given its own, and only its own slots change.
 
@@ -124,11 +124,11 @@ No slot means nothing is owed, so a missing Case Workers file in May is not a ga
 - We chose one slot per table, and rejected a collection filling one slot as a unit. Earlier designs assumed one table per supply, which holds for Birth Registrations, the only table in its collection, but not for Child Protection's 6. Judging each table on its own is more honest than the whole batch taking the worst result.
 - We chose a period that carries a date and nothing else, and rejected a deadline on the period. Birth Registrations is due at 2pm with an hour's grace, so a supply of it at 4pm is late. Now picture it sharing a period with a table due at 5pm. A period deadline could hold only one of those times, and set at 5pm it would pass that late supply as on time. That false all-clear is the mistake that matters most.
 - We chose to work slots out from the calendar, and rejected writing them down. The quarterly calendar is heading for about 30 datasets over years of periods, which makes a lot of slots to keep in step. A slot that nobody writes down cannot drift from its calendar.
-- We chose one shared calendar that each dataset takes part in, rather than a list of dates for each dataset. A dataset can still have its own dates, but only as an exception. Otherwise, 30 lists would drift, with one saying 2 February and another saying 3 February, and nothing would flag it.
+- We chose one shared calendar that each dataset takes part in, rather than a list of dates for each dataset. A dataset can still have its own dates, but only as an exception. With a list of dates for every dataset, 30 lists would drift, with one saying 2 February and another saying 3 February, and nothing would flag it.
 
 ## Putting it together
 
-A period is a shared name and date that never moves. A slot is one table's place in one period, and Mothman works it out. An empty slot names one missing table, and no slot means nothing is owed. For the rest of the calendar's words, see the [supply calendar terms in the glossary](../glossary.md#the-supply-calendar).
+A period is a shared name and date that never moves. A slot is one table's place in one period, and Mothman works it out. An empty slot shows one missing table, and no slot means nothing is owed. For the rest of the calendar's words, see the [supply calendar terms in the glossary](../glossary.md#the-supply-calendar).
 
 ## Where this comes from
 
