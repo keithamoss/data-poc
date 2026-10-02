@@ -10126,6 +10126,14 @@ requirements:
           Criterion 18 - a run's identity is still derived from its
           position in the receipt-ordered, collection-filtered list
           that recognition produces.
+
+          AN AGREED ANSWER EXISTS SINCE 2026-10-02, though it is not
+          built: a run's id becomes its SUPPLY's id, which
+          REQ-PIPE-105 criterion 1 makes possible by collapsing one
+          arrival to one file and so to one supply. See that
+          requirement's own decisions. This stays unmet until that
+          change lands, because re-keying runs before the arrival unit
+          moves would be two migrations of one identity.
         why: >-
           The criterion forbids that derivation and names no
           replacement. Keith's call, 2026-09-25, over two alternatives:
@@ -23473,6 +23481,36 @@ requirements:
         answered is the stale-deferral problem REQ-DOCS-073 exists to
         prevent, one field over.
     decisions:
+      - >
+        A RUN'S ID BECOMES ITS SUPPLY'S ID (Keith, 2026-10-02), which
+        settles REQ-PIPE-057 criterion 18 for this change rather than
+        inheriting its hole. Today a run id is POSITIONAL -
+        `arrivals.py` builds `cp_run_007` from `len(out) + 1`, "the
+        seventh delivery recognised" - and criterion 18 forbids exactly
+        that: an id must not come from a position a recognition pass
+        can reorder or shorten. It has already bitten once, when two
+        suppressed days left run_022 through run_027 each carrying a
+        neighbour's instant.
+
+        CRITERION 1 IS WHAT MAKES THE ANSWER EASY, and that is the
+        point. One arrival becomes one file, so one arrival is one
+        dataset and therefore one supply - run identity and supply
+        identity CONVERGE, and there is no second scheme to invent or
+        keep in step. `cp_run_002` becomes
+        `cp-clients@202305010100000000` and its five siblings: each
+        says what arrived and when, nothing renumbers when a file is
+        added or a delivery stops being recognised, and they sort
+        chronologically within a dataset.
+
+        THE COLLISION CASE ALREADY HAS ITS DISAMBIGUATOR and needs no
+        new one, which is worth saying because it looks like a gap. The
+        arrival key alone is NOT unique - six files in one folder share
+        a receipt instant today - so uniqueness comes from the dataset
+        being part of the id. Where two files claim ONE dataset at one
+        instant, `filing._supply_id_for()` already appends `#1` and
+        `supply_db.staged_table()` already appends an ordinal. That is
+        the contested case, and criterion 6 now sends it to the
+        contested rule rather than to a hold.
       - >
         REQ-PIPE-059'S DELIVERY-LEVEL HOLD IS RETIRED, AND CONTESTED
         SUBSUMES IT (Keith, 2026-10-02), settling the open question

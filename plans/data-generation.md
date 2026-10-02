@@ -451,3 +451,52 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
     generated history contains the shapes the model needs - a history
     that contradicts its own configured participation is a history
     nobody should measure against.
+
+12. **[todo, 2026-10-02]** **[Data generation]** Every file should get
+    its OWN receipt instant, with a deliberate mix of
+    arrived-together and arrived-apart.
+
+    **Keith's own call**, 2026-10-02, settling the second of two
+    questions that came out of `REQ-PIPE-105`'s run-identity work (the
+    first - a run's id becomes its supply's id - is recorded on
+    `REQ-PIPE-105` itself).
+
+    **Today a whole delivery shares one instant**, because a delivery
+    is a folder and a folder has one `received_at`. Measured: all six
+    Child Protection files in `cp_run_002` carry
+    `2023-05-01T01:00:00+00:00`, so their arrival key is identically
+    `202305010100000000`. That is a property of how the corpus is
+    MADE, not of the model - the same confusion that produced this
+    file's #11 and `plans/post-build-review.md` #73.
+
+    **Why it matters now rather than cosmetically.** Under
+    `REQ-PIPE-105` an arrival is one file, so each file's own receipt
+    instant becomes the thing that identifies its run and orders the
+    whole pipeline. A corpus where six files claim the same instant
+    exercises none of that - and in a real S3 drop six objects landing
+    over ten minutes would each have their own.
+
+    **The mix Keith asked for, and it is a design idea rather than
+    just fidelity:**
+    - **Some files arriving at PRECISELY the same instant**, as a
+      stand-in for a future bundle-or-zip mechanism. Worth having
+      because it is the shape the transport layer will eventually
+      need, and generating it now means the model meets it before any
+      archive support exists.
+    - **Others with slight variations**, so the ordinary trickle is
+      what the pipeline mostly sees.
+
+    **What already handles a same-instant collision**, so this needs
+    no new mechanism: uniqueness comes from the dataset being part of
+    the supply id, and where two files claim ONE dataset at one
+    instant `filing._supply_id_for()` appends `#1` and
+    `supply_db.staged_table()` appends an ordinal. Two DIFFERENT
+    datasets at one instant collide in neither.
+
+    **Not scoped into a requirement yet** - it needs one before
+    building, per this project's own gate, and it is likely a
+    `REQ-GEN-044` criterion rather than its own requirement since that
+    is where "the generated history contains the shapes the model
+    needs" already lives. The zip/bundle half also touches
+    `plans/supply-thoughts.md` items 1-3, which own the transport
+    layer proper.
