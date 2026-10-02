@@ -39,8 +39,7 @@ def _drop(tmp_path, logs, name, files, when, sequence):
     receipts.mkdir(parents=True, exist_ok=True)
     for filename in files:
         (folder / filename).write_text("a\n1\n")
-    (receipts / f"{name}.json").write_text(json.dumps(
-        {"delivery": name, "received_at": when, "sequence": sequence}))
+    delivery.write_receipts(name, when, receipts, files=files, sequence=sequence)
     d = delivery.read_delivery(name, deliveries, receipts)
     delivery_log.record(d, arrivals.recognise(d), conn=logs)
     return d

@@ -14,6 +14,7 @@ output that tests must not depend on the state of.
 from __future__ import annotations
 
 import json
+import shutil
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -22,6 +23,13 @@ from qa_tools.common import asset_time, delivery
 
 PERTH = timezone(timedelta(hours=8))
 WHEN = datetime(2026, 8, 24, 14, 36, 3, tzinfo=PERTH)
+
+def _receipt(receipts, name):
+    """The one per-file receipt of a one-file delivery (REQ-GEN-044
+    criterion 12): receipts are `<receipts>/<delivery>/<file>.json`."""
+    (path,) = (receipts / name).glob("*.json")
+    return path
+
 
 
 @pytest.fixture
@@ -111,13 +119,13 @@ class TestTheReceiptRecordIsOurs:
         receipt area is ours."""
         d, r = dirs
         path = _write(dirs)
-        assert (r / "BDM_20260824.json").exists()
+        assert _receipt(r, "BDM_20260824").exists()
         assert not any(p.name.startswith("receipt") for p in path.iterdir())
 
     def test_it_carries_its_utc_offset(self, dirs):
         d, r = dirs
         _write(dirs)
-        record = json.loads((r / "BDM_20260824.json").read_text())
+        record = json.loads(_receipt(r, "BDM_20260824").read_text())
         assert record["received_at"].endswith("+08:00")
         assert delivery.read_receipt("BDM_20260824", r) == WHEN
 
@@ -136,7 +144,7 @@ class TestTheReceiptRecordIsOurs:
         generated history onto the seconds it was written in."""
         d, r = dirs
         _write(dirs)
-        (r / "BDM_20260824.json").unlink()
+        shutil.rmtree(r / "BDM_20260824")
         with pytest.raises(delivery.DeliveryFormatError, match="modification time"):
             delivery.read_delivery("BDM_20260824", d, r)
 
@@ -279,7 +287,7 @@ class TestWhichClockStampedTheReceipt:
         d, r = tmp_path / "deliveries", tmp_path / "receipts"
         delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
                                  WHEN, deliveries_dir=d, receipts_dir=r)
-        record = json.loads((r / "monday.json").read_text())
+        record = json.loads(_receipt(r, "monday").read_text())
         assert record["received_from"] == delivery.RECEIVED_FROM_STORAGE
         assert record["received_at"].startswith(WHEN.date().isoformat())
 
@@ -291,7 +299,7 @@ class TestWhichClockStampedTheReceipt:
         before = asset_time.now()
         delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
                                  deliveries_dir=d, receipts_dir=r)
-        record = json.loads((r / "monday.json").read_text())
+        record = json.loads(_receipt(r, "monday").read_text())
         assert record["received_from"] == delivery.RECEIVED_FROM_OUR_CLOCK
         stamped = asset_time.parse_instant(record["received_at"], "test")
         assert stamped >= before, "our clock means now, not some other moment"
@@ -304,7 +312,7 @@ class TestWhichClockStampedTheReceipt:
         delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
                                  WHEN, deliveries_dir=d, receipts_dir=r,
                                  received_from=delivery.RECEIVED_FROM_OUR_CLOCK)
-        assert json.loads((r / "monday.json").read_text())["received_from"] \
+        assert json.loads(_receipt(r, "monday").read_text())["received_from"] \
             == delivery.RECEIVED_FROM_OUR_CLOCK
 
     def test_a_third_source_is_refused(self, tmp_path):
@@ -334,9 +342,9 @@ class TestWhichClockStampedTheReceipt:
         d, r = tmp_path / "deliveries", tmp_path / "receipts"
         delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
                                  WHEN, deliveries_dir=d, receipts_dir=r)
-        record = json.loads((r / "monday.json").read_text())
+        record = json.loads(_receipt(r, "monday").read_text())
         del record["received_from"]
-        (r / "monday.json").write_text(json.dumps(record))
+        _receipt(r, "monday").write_text(json.dumps(record))
         read = delivery.read_delivery("monday", deliveries_dir=d, receipts_dir=r)
         assert read.received_from == delivery.RECEIVED_FROM_OUR_CLOCK
 

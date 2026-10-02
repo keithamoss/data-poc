@@ -6720,6 +6720,33 @@ requirements:
     dependencies: [REQ-GEN-040, REQ-GEN-042, REQ-GEN-043, REQ-PIPE-049, REQ-PIPE-051]
     decisions:
       - >
+        CRITERIA 12 TO 14 BUILT 2026-10-02, the evening they were signed.
+        `generator/receipt_instants.py` decides each multi-file delivery's
+        instants - one for all of them about 80% of the time, otherwise a
+        shuffled order with strictly increasing offsets inside ten minutes
+        of the first - seeded from the delivery's own name. Receipts are
+        one per FILE at `data/receipts/<delivery>/<file>.json`, written by
+        the single `delivery.write_receipts()` (four tests had hand-copied
+        the old format; they call it now). A delivery's own instant is its
+        FIRST file's; each arrival - one file since REQ-PIPE-105 - takes
+        its own, and arrivals are processed in the order storage took the
+        files rather than in dataset-name order. An old one-per-delivery
+        receipt is refused with the regenerate instruction, the same
+        clear-and-rebuild call REQ-PIPE-061 made.
+
+        AN INJECTED SCENARIO KEEPS ONE INSTANT, deliberately: its stated
+        time is part of what it demonstrates, and spreading its files
+        would make the scenario say something else.
+
+        MEASURED on a regenerate from empty: 18 multi-file deliveries, 16
+        together (89%) and 2 trickled, spanning 534s and 491s with a
+        different dataset first in each. 89% is one sample of 18 around
+        an 80% target; the proportion itself is pinned over 500
+        deliveries in tests/test_receipt_instants.py (74-86%). The arrival
+        golden moved on exactly 10 arrivals - the trickled files - with
+        zero verdicts moved; promotions 88 where the single-instant corpus
+        gave 90, because filing follows the order files really landed.
+      - >
         CRITERIA 12 TO 14 ADDED AND SIGNED 2026-10-02 (Keith), wording
         approved as put, so the signed_off date moved from 2026-09-22 -
         the earlier signature covers criteria 1-11 and is not withdrawn.

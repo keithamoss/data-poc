@@ -17,6 +17,13 @@ import pytest
 
 from qa_tools.common import backlog, delivery, load_log
 
+def _receipt(receipts, name):
+    """The one per-file receipt of a one-file delivery (REQ-GEN-044
+    criterion 12): receipts are `<receipts>/<delivery>/<file>.json`."""
+    (path,) = (receipts / name).glob("*.json")
+    return path
+
+
 
 @dataclass(frozen=True)
 class _Arrival:
@@ -75,7 +82,7 @@ class TestReceiptOrderIsTheOnlyOrder:
         for i in range(5):
             delivery.write_delivery(f"drop-{i}", {"birth_registrations_x.csv": "a\n1\n"},
                                      "2026-02-01T09:00:00+08:00", deliveries, receipts)
-        seen = [json.loads(p.read_text())["sequence"] for p in sorted(receipts.glob("*.json"))]
+        seen = [json.loads(p.read_text())["sequence"] for p in sorted(receipts.rglob("*.json"))]
         assert sorted(seen) == [1, 2, 3, 4, 5], (
             "a sequence must be total - two receipts sharing one puts the order back in the "
             "hands of whatever the sort does")
@@ -86,7 +93,7 @@ class TestReceiptOrderIsTheOnlyOrder:
         deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
         delivery.write_delivery("drop", {"birth_registrations_x.csv": "a\n1\n"},
                                  "2026-02-01T09:00:00+08:00", deliveries, receipts)
-        path = receipts / "drop.json"
+        path = _receipt(receipts, "drop")
         record = json.loads(path.read_text())
         del record["sequence"]
         path.write_text(json.dumps(record))
@@ -103,7 +110,7 @@ class TestReceiptOrderIsTheOnlyOrder:
         deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
         delivery.write_delivery("drop", {"birth_registrations_x.csv": "a\n1\n"},
                                  "2026-02-01T09:00:00+08:00", deliveries, receipts)
-        path = receipts / "drop.json"
+        path = _receipt(receipts, "drop")
         record = json.loads(path.read_text())
         del record["sequence"]
         path.write_text(json.dumps(record))

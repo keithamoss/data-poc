@@ -30,6 +30,7 @@ deriving them from arrival rather than from anything a supplier said.
 from __future__ import annotations
 
 import warnings
+import dataclasses
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -286,10 +287,17 @@ def arrivals_for(collection_id: str, run_id_prefix: str,
         # ever the same thing by coincidence of this PoC's data.
         if not by_dataset:
             continue
-        key = asset_time.arrival_key(d.received_at)
         for dataset_id in sorted(by_dataset):
             names = by_dataset[dataset_id]
             table = hierarchy.dataset(dataset_id).table
+            # THIS FILE'S OWN RECEIPT, not the delivery's (REQ-GEN-044
+            # criterion 12). Six files can land over ten minutes, and the
+            # instant is what names the run and orders the pipeline. Two
+            # files for one dataset - the contested case - take the
+            # earlier of the two, which is when that supply began to land.
+            received_at, sequence = min(
+                (d.received_at_of(n), d.sequence_of(n)) for n in names)
+            key = asset_time.arrival_key(received_at)
             out.append(Arrival(
                 run_id=f"{table}__{key}",
                 # POSITION IS STILL REPORTED, and is no longer
@@ -300,14 +308,21 @@ def arrivals_for(collection_id: str, run_id_prefix: str,
                 # keying on it.
                 run_index=len(out) + 1,
                 collection_id=collection_id, delivery_name=d.name, path=d.path,
-                received_at=d.received_at, sequence=d.sequence,
+                received_at=received_at, sequence=sequence,
                 # SEVERAL FILES FOR ONE DATASET STAY TOGETHER in one
                 # arrival, which is the contested case rather than two
                 # arrivals: nobody has said which file is the supply,
                 # so splitting them would be choosing between them.
                 files_by_dataset={dataset_id: names},
                 unmatched=found.unmatched, anomalies=d.anomalies))
-    return out
+    # IN THE ORDER STORAGE TOOK THEM, across every delivery: receipt
+    # instant, then the order receipts were written (REQ-PIPE-061). Once
+    # files carry their own instants a delivery's files no longer arrive
+    # in dataset-name order, and processing them that way would file
+    # each against a decision log one step out of date. `run_index` is
+    # renumbered to match - it reports position and is not identity.
+    out.sort(key=lambda a: (a.received_at, a.sequence, a.run_id))
+    return [dataclasses.replace(a, run_index=i) for i, a in enumerate(out, start=1)]
 
 
 def unplaceable(deliveries_dir: Path | None = None,

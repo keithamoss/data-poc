@@ -92,6 +92,7 @@ import pandas as pd
 
 from qa_tools.common import hierarchy
 from generator.anchor_date import get_anchor_date
+from generator import receipt_instants
 from generator import dirty as dirty_mod
 from generator import delivery_names, scenario_injection
 from generator.resupply import MAX_ATTEMPTS, Delivery, DatasetProvider, run_slot_chain
@@ -648,9 +649,16 @@ def main() -> None:
                 # recognition below - see scenario_injection's own
                 # resolve_run_ids() for why not this manifest's id.
                 injected[1].arrivals[n - 1]["delivery"] = dname
+            first = asset_time.parse_instant(entry["received_at"], entry["run_id"])
             delivery.write_delivery(
                 dname, csvs,
-                received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]),
+                # EACH FILE ITS OWN INSTANT (REQ-GEN-044 criteria 12-14):
+                # mostly all at once, as if unzipped, sometimes trickling
+                # in over ten minutes. An INJECTED scenario keeps the one
+                # instant it states, because that instant is part of what
+                # the scenario demonstrates.
+                received_at=(first if injected is not None
+                             else receipt_instants.instants_for(csvs, first, dname)),
                 deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR,
                 # STORAGE - see generate_runs.py's identical note. The
                 # generator plays the object store here.

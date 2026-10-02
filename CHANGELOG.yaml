@@ -142,6 +142,13 @@ releases:
               is checked on arrival against the rest of its quarter - whatever
               else has arrived, or what you have already accepted - and its
               results are recorded once, against its own table.
+          - headline: Files arrive on their own time
+            components: ["Data generation", "Pipeline & publishing"]
+            description: >
+              Each file now carries the moment it reached us, not one
+              time for its whole delivery. Most synthetic deliveries still
+              land at once, as if unzipped together; some trickle in over a
+              few minutes, in a different order each time.
           - headline: An early table no longer holds up the rest
             components: ["Pipeline & publishing"]
             description: >

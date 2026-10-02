@@ -14,13 +14,12 @@ from them.
 """
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from qa_tools.common import assignment, filing
+from qa_tools.common import assignment, delivery, filing
 
 PERTH = timezone(timedelta(hours=8))
 
@@ -170,8 +169,7 @@ class TestFilingRealArrivals:
         receipts.mkdir(parents=True, exist_ok=True)
         for filename in files:
             (folder / filename).write_text("a\n1\n")
-        (receipts / f"{name}.json").write_text(json.dumps(
-            {"delivery": name, "received_at": when, "sequence": sequence}))
+        delivery.write_receipts(name, when, receipts, files=files, sequence=sequence)
         return deliveries, receipts
 
     def _arrivals(self, tmp_path, collection="child-protection", prefix="cp_run_"):

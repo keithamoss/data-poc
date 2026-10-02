@@ -156,11 +156,22 @@ out of scope for this PoC. See `plans/running-thoughts.md` #39 and #40.
 ```json
 {
   "delivery": "BDM_20260824",
-  "received_at": "2026-08-24T14:36:03.084997+08:00"
+  "file": "birth_registrations_2026-08-24.csv",
+  "received_at": "2026-08-24T14:36:03.084997+08:00",
+  "received_from": "storage",
+  "sequence": 41
 }
 ```
 
-One file per delivery, at `data/receipts/<delivery name>.json`.
+One record per FILE, at `data/receipts/<delivery name>/<file name>.json`
+(`REQ-GEN-044` criterion 12, 2026-10-02) - because storage gives every
+object its own instant, and since `REQ-PIPE-105` each file is its own
+arrival. A delivery's own instant is its first file's. Files unpacked
+from one archive simply share an instant; `sequence` still orders them.
+A file present with no receipt has not been received yet and is not
+processed. (Until 2026-10-02 this was one record per delivery at
+`data/receipts/<delivery name>.json`; such a record is now refused with
+an instruction to regenerate.)
 
 **Three rules, and they are all the same rule seen from different
 angles.**

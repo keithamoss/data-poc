@@ -33,7 +33,8 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -139,10 +140,26 @@ class Delivery:
     #: provenance rather than asserting storage said something it never
     #: did.
     received_from: str = RECEIVED_FROM_OUR_CLOCK
+    #: EACH FILE'S OWN RECEIPT (REQ-GEN-044 criterion 12; Keith,
+    #: 2026-10-02: one receipt per file). filename -> (instant, sequence,
+    #: source). `received_at`/`sequence` above are the delivery's FIRST
+    #: file's, which is what a delivery-level reader means by "when it
+    #: arrived"; an ARRIVAL - one file since REQ-PIPE-105 - reads its own.
+    file_receipts: Mapping[str, tuple[datetime, int, str]] = field(default_factory=dict)
 
     @property
     def file_paths(self) -> tuple[Path, ...]:
         return tuple(self.path / name for name in self.files)
+
+    def received_at_of(self, filename: str) -> datetime:
+        """When OUR storage took this one file."""
+        return self.file_receipts[filename][0] if filename in self.file_receipts \
+            else self.received_at
+
+    def sequence_of(self, filename: str) -> int:
+        """Where this file's receipt fell in the order receipts were written."""
+        return self.file_receipts[filename][1] if filename in self.file_receipts \
+            else self.sequence
 
 
 def remove_deliveries(names, deliveries_dir: Path | None = None,
@@ -173,9 +190,18 @@ def remove_deliveries(names, deliveries_dir: Path | None = None,
                 child.unlink()
             path.rmdir()
             removed += 1
-        receipt = receipts_dir / f"{name}.json"
-        if receipt.exists():
-            receipt.unlink()
+        # ONE RECEIPT PER FILE now, in a directory per delivery
+        # (REQ-GEN-044 criterion 12) - and the single per-delivery file
+        # an older tree may still carry, so a regenerate over it leaves
+        # nothing behind.
+        receipt_dir = receipts_dir / name
+        if receipt_dir.is_dir():
+            for child in receipt_dir.iterdir():
+                child.unlink()
+            receipt_dir.rmdir()
+        legacy = receipts_dir / f"{name}.json"
+        if legacy.exists():
+            legacy.unlink()
     return removed
 
 
@@ -216,7 +242,7 @@ def validate_delivery_name(name: str) -> str:
 
 
 def write_delivery(name: str, files: dict[str, str | bytes],
-                    received_at: datetime | None = None,
+                    received_at: "datetime | Mapping[str, datetime] | None" = None,
                     deliveries_dir: Path | None = None,
                     receipts_dir: Path | None = None,
                     received_from: str | None = None) -> Path:
@@ -244,6 +270,13 @@ def write_delivery(name: str, files: dict[str, str | bytes],
     The receipt is written to a SEPARATE directory, which is what makes
     it ours. Passing a `receipts_dir` inside `deliveries_dir` is
     refused, because that would hand a supplier a path to our clock.
+
+    ONE RECEIPT PER FILE (REQ-GEN-044 criterion 12; Keith, 2026-10-02),
+    at `<receipts_dir>/<delivery>/<file>.json`, because storage gives
+    every object its own instant. `received_at` may be ONE instant - every
+    file at once, as if unpacked from an archive - or a mapping from each
+    file name to its own. A mapping missing a file is refused rather than
+    defaulted: a file with no instant has not been received.
     """
     deliveries_dir = deliveries_dir or DELIVERIES_DIR
     receipts_dir = receipts_dir or RECEIPTS_DIR
@@ -259,6 +292,15 @@ def write_delivery(name: str, files: dict[str, str | bytes],
     if received_at is None:
         received_at = asset_time.now()
     validate_delivery_name(name)
+    if isinstance(received_at, Mapping):
+        missing = sorted(set(files) - set(received_at))
+        if missing:
+            raise DeliveryFormatError(
+                f"delivery {name!r}: no receipt instant for {', '.join(missing)} - a file "
+                f"with no instant has not been received, so it is not written as if it had")
+        instants = {f: received_at[f] for f in files}
+    else:
+        instants = {f: received_at for f in files}
     if not files:
         raise DeliveryFormatError(f"delivery {name!r} has no files - a delivery is an ARRIVAL, "
                                    f"and nothing arriving is not one")
@@ -286,20 +328,49 @@ def write_delivery(name: str, files: dict[str, str | bytes],
         with open(path / filename, mode) as f:
             f.write(payload)
 
-    receipts_dir.mkdir(parents=True, exist_ok=True)
-    with open(receipts_dir / f"{name}.json", "w") as f:
-        json.dump({"delivery": name,
-                   "received_at": asset_time.isoformat(
-                       asset_time.parse_instant(received_at, f"received_at for delivery {name!r}")),
-                   # WHICH CLOCK STAMPED IT (REQ-PIPE-105 criterion 4).
-                   "received_from": received_from,
-                   # THE ORDER THIS RECORD WAS WRITTEN (REQ-PIPE-061
-                   # criterion 3), and the only fact available for
-                   # breaking a tie between two arrivals sharing a
-                   # receipt instant. Ours, like the instant beside it.
-                   "sequence": next_sequence(receipts_dir)},
-                   f, indent=2)
+    write_receipts(name, instants, receipts_dir, received_from=received_from)
     return path
+
+
+def write_receipts(name: str, received_at: "datetime | Mapping[str, datetime]",
+                   receipts_dir: Path | None = None, *,
+                   files=None, received_from: str = RECEIVED_FROM_STORAGE,
+                   sequence: int | None = None) -> None:
+    """Write one receipt per FILE for a delivery (REQ-GEN-044 criterion
+    12), and nothing else - the one writer of the receipt format.
+
+    `received_at` is one instant for every file in `files`, or a mapping
+    from each file to its own. `sequence` is where the FIRST receipt
+    falls in the write order; omitted, it continues from the highest
+    already written. Public because a test that builds a delivery
+    write_delivery() would refuse still needs receipts in the real
+    format - four tests used to hand-copy it.
+    """
+    receipts_dir = Path(receipts_dir or RECEIPTS_DIR)
+    instants = (dict(received_at) if isinstance(received_at, Mapping)
+                else {f: received_at for f in (files or ())})
+    receipt_dir = receipts_dir / name
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    if sequence is None:
+        sequence = next_sequence(receipts_dir)
+    # IN RECEIPT ORDER, so the sequence says which file storage took
+    # first; the filename only breaks a tie between files taken at the
+    # same instant, where the sequence is still total (REQ-PIPE-061).
+    parsed = {f: asset_time.parse_instant(when, f"received_at for {name}/{f}")
+              for f, when in instants.items()}
+    for filename in sorted(parsed, key=lambda f: (parsed[f], f)):
+        with open(receipt_dir / f"{filename}.json", "w") as f:
+            json.dump({"delivery": name, "file": filename,
+                       "received_at": asset_time.isoformat(parsed[filename]),
+                       # WHICH CLOCK STAMPED IT (REQ-PIPE-105 criterion 4).
+                       "received_from": received_from,
+                       # THE ORDER THIS RECORD WAS WRITTEN (REQ-PIPE-061
+                       # criterion 3), and the only fact available for
+                       # breaking a tie between two arrivals sharing a
+                       # receipt instant. Ours, like the instant beside it.
+                       "sequence": sequence},
+                      f, indent=2)
+        sequence += 1
 
 
 def next_sequence(receipts_dir: Path | None = None) -> int:
@@ -329,7 +400,7 @@ def next_sequence(receipts_dir: Path | None = None) -> int:
     if not receipts_dir.is_dir():
         return 1
     highest = 0
-    for path in receipts_dir.glob("*.json"):
+    for path in receipts_dir.rglob("*.json"):
         try:
             value = json.loads(path.read_text()).get("sequence")
         except (OSError, json.JSONDecodeError):
@@ -351,52 +422,80 @@ def read_receipt(name: str, receipts_dir: Path | None = None) -> datetime:
 
 def read_receipt_record(name: str,
                          receipts_dir: Path | None = None) -> tuple[datetime, int, str]:
-    """Our receipt for one delivery: when it arrived, where it fell in the
-    order receipts were written, and which clock stamped the instant.
+    """Our receipt for one delivery as a whole: its FIRST file's instant,
+    sequence and clock - when the delivery began to arrive.
+
+    Built from the per-file receipts (REQ-GEN-044 criterion 12); see
+    read_file_receipts() for the rules each one is held to.
+    """
+    receipts = read_file_receipts(name, receipts_dir)
+    first = min(receipts.values(), key=lambda r: (r[0], r[1]))
+    return first
+
+
+def read_file_receipts(name: str, receipts_dir: Path | None = None
+                       ) -> dict[str, tuple[datetime, int, str]]:
+    """Every file's receipt for one delivery: filename -> (instant,
+    sequence, clock).
+
+    A DELIVERY WITH NO RECEIPTS IS A HARD ERROR, not a fallback to a
+    file's mtime: an arrival we have no record of receiving is a gap to
+    notice, and inventing a time for it would hide exactly the thing
+    worth seeing. survey() reads that error as "in flight".
 
     A MISSING SEQUENCE IS A HARD ERROR, not a default of zero
-    (REQ-PIPE-061). Defaulting would put every pre-sequence receipt at
-    the same position, so a tie between two of them would fall to sort
-    stability over a directory listing - exactly the non-determinism
-    criterion 3 removes, reintroduced by the fallback written to
-    tolerate it. Receipts live under gitignored `data/`, so the fix is
-    to regenerate rather than to migrate, and the error says so.
+    (REQ-PIPE-061). Defaulting would put every such receipt at the same
+    position, so a tie between two of them would fall to sort stability
+    over a directory listing - exactly the non-determinism criterion 3
+    removes, reintroduced by the fallback written to tolerate it.
+
+    A RECEIPT IN THE OLD ONE-PER-DELIVERY FORMAT is refused with the fix
+    in the message. Receipts live under gitignored `data/`, so the answer
+    is to regenerate rather than to migrate - the same call REQ-PIPE-061
+    made when the sequence arrived.
     """
     receipts_dir = Path(receipts_dir or RECEIPTS_DIR)
-    path = receipts_dir / f"{name}.json"
-    if not path.exists():
+    receipt_dir = receipts_dir / name
+    if not receipt_dir.is_dir():
+        if (receipts_dir / f"{name}.json").exists():
+            raise ReceiptOrderError(
+                f"delivery {name!r} has a receipt in the old one-per-delivery format at "
+                f"{receipts_dir / (name + '.json')}. Receipts are one per FILE since "
+                f"2026-10-02 (REQ-GEN-044 criterion 12).\n\nFix: remove data/deliveries/ "
+                f"and data/receipts/, then regenerate BOTH collections (`mothman bdm "
+                f"generate-synthetic-data` and `mothman cp generate-synthetic-data`).")
         raise DeliveryFormatError(
-            f"delivery {name!r} has no receipt record at {path}. The receipt is written by the "
-            f"receiving side; an arrival with none is a gap to investigate, and this will not "
-            f"fall back to a file modification time.")
-    with open(path) as f:
-        record = json.load(f)
-    received_at = asset_time.parse_instant(record["received_at"], f"received_at in {path}")
-    sequence = record.get("sequence")
-    if not isinstance(sequence, int):
-        raise ReceiptOrderError(
-            f"the receipt at {path} has no `sequence`, so this arrival cannot be placed in the "
-            f"processing order. Receipts written before REQ-PIPE-061 carry none.\n\n"
-            f"Fix: remove data/deliveries/ and data/receipts/, then regenerate BOTH collections "
-            f"(`mothman bdm generate-synthetic-data` and `mothman cp generate-synthetic-data`). "
-            f"Regenerating one on its own is not enough - each generator reads every arrival "
-            f"back afterwards, so one collection's stale receipts stop the other's run too, and "
-            f"that is what makes this a clear-and-rebuild rather than a migration.\n\n"
-            f"Not defaulted to zero on purpose: that would put every pre-sequence receipt in one "
-            f"place, so a tie between two of them would fall to a directory listing - the "
-            f"non-determinism this sequence exists to remove, reintroduced by the fallback "
-            f"written to tolerate it.")
-    # A MISSING SOURCE READS AS OUR_CLOCK rather than raising, and the
-    # asymmetry with `sequence` above is deliberate. A missing sequence
-    # breaks ORDERING, which is a correctness property with no safe
-    # default. A missing source only makes a receipt's provenance less
-    # certain, and the honest default is the weaker of the two claims: we
-    # do not get to say storage reported an instant when the record does
-    # not say so.
-    received_from = record.get("received_from")
-    if received_from not in RECEIPT_SOURCES:
-        received_from = RECEIVED_FROM_OUR_CLOCK
-    return received_at, sequence, received_from
+            f"delivery {name!r} has no receipt record at {receipt_dir}. The receipt is written "
+            f"by the receiving side; an arrival with none is a gap to investigate, and this "
+            f"will not fall back to a file modification time.")
+    out: dict[str, tuple[datetime, int, str]] = {}
+    for path in sorted(receipt_dir.glob("*.json")):
+        with open(path) as f:
+            record = json.load(f)
+        received_at = asset_time.parse_instant(record["received_at"], f"received_at in {path}")
+        sequence = record.get("sequence")
+        if not isinstance(sequence, int):
+            raise ReceiptOrderError(
+                f"the receipt at {path} has no `sequence`, so this arrival cannot be placed in "
+                f"the processing order.\n\nFix: remove data/deliveries/ and data/receipts/, then "
+                f"regenerate BOTH collections. Not defaulted to zero on purpose: that would put "
+                f"every such receipt in one place, so a tie between two of them would fall to a "
+                f"directory listing - the non-determinism this sequence exists to remove.")
+        # A MISSING SOURCE READS AS OUR_CLOCK rather than raising, and the
+        # asymmetry with `sequence` above is deliberate: a missing sequence
+        # breaks ORDERING, which has no safe default, while a missing
+        # source only makes provenance less certain, and the honest default
+        # is the weaker of the two claims.
+        received_from = record.get("received_from")
+        if received_from not in RECEIPT_SOURCES:
+            received_from = RECEIVED_FROM_OUR_CLOCK
+        out[record.get("file") or path.name[:-len(".json")]] = (
+            received_at, sequence, received_from)
+    if not out:
+        raise DeliveryFormatError(
+            f"delivery {name!r} has a receipt directory at {receipt_dir} with nothing in it - "
+            f"no file of it has been received yet.")
+    return out
 
 
 def read_delivery(name: str, deliveries_dir: Path | None = None,
@@ -433,10 +532,21 @@ def read_delivery(name: str, deliveries_dir: Path | None = None,
             continue
         files.append(entry.name)
 
-    received_at, sequence, received_from = read_receipt_record(name, receipts_dir)
+    receipts = read_file_receipts(name, receipts_dir)
+    # A FILE PRESENT WITH NO RECEIPT HAS NOT BEEN RECEIVED YET - storage
+    # has not told us it took it - so it is reported and left out, the
+    # same treatment survey() gives a whole delivery with none.
+    for filename in [f for f in files if f not in receipts]:
+        anomalies.append(f"{filename} is present with no receipt - not received yet, so "
+                          f"not processed")
+        files.remove(filename)
+    received_at, sequence, received_from = min(
+        (receipts[f] for f in files if f in receipts),
+        key=lambda r: (r[0], r[1]), default=read_receipt_record(name, receipts_dir))
     return Delivery(name=name, path=path, received_at=received_at, sequence=sequence,
                      received_from=received_from,
-                     files=tuple(files), anomalies=tuple(anomalies))
+                     files=tuple(files), anomalies=tuple(anomalies),
+                     file_receipts={f: receipts[f] for f in files})
 
 
 @dataclass(frozen=True)

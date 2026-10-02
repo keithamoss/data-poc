@@ -243,7 +243,10 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
     filed = list((tmp_path / "deliveries").iterdir())
     assert len(filed) == 1, f"expected ONE delivery, got {[d.name for d in filed]}"
     assert len(list(filed[0].iterdir())) == len(cp.TABLES)
-    assert len(list((tmp_path / "receipts").glob("*.json"))) == 1
+    # ONE RECEIPT PER FILE, in one directory for the one delivery
+    # (REQ-GEN-044 criterion 12).
+    assert [p.name for p in (tmp_path / "receipts").iterdir()] == [filed[0].name]
+    assert len(list((tmp_path / "receipts" / filed[0].name).glob("*.json"))) == len(cp.TABLES)
 
     # SIX RUNS RECORDED, one per table, all at the filed delivery's one
     # receipt instant - the newest key among this worker's runs.

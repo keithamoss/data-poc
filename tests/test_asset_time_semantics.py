@@ -176,6 +176,15 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     their arrival INSTANT: all 150 matched, none only on one side, and
     zero verdicts moved. Still 18 arrivals per Child Protection dataset -
     108 runs in all, six per delivery, each dataset seeing its own.
+
+    AND ONCE MORE THE SAME EVENING FOR REQ-GEN-044 criteria 12-14, which
+    gave every file its own receipt instant. Procedure followed again (60
+    deliveries, no `handfiled-*`). This time instants MOVED, as intended,
+    and only where intended: 10 arrivals, all of them files of the two
+    deliveries that trickled in (2024-08-01 and 2025-05-01), each now
+    within ten minutes of its delivery's first file - which kept its
+    instant. Every other arrival matched old-to-new, and zero verdicts
+    moved: a few minutes inside a quarter's window changes no lateness.
     """
 
     def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):

@@ -7,7 +7,6 @@ would pass with the group unregistered.
 """
 from __future__ import annotations
 
-import json
 
 from datetime import datetime, timezone
 
@@ -43,9 +42,7 @@ def _drop(dirs, name, files, when=WHEN, receipt=True):
         # refuses - but the record still has to be one the pipeline can
         # ORDER, or every test here fails on a receipt it invented
         # rather than on the thing it is testing.
-        (receipts / f"{name}.json").write_text(json.dumps(
-            {"delivery": name, "received_at": when.isoformat(),
-             "sequence": delivery.next_sequence(receipts)}))
+        delivery.write_receipts(name, when, receipts, files=list(files))
     return folder
 
 
