@@ -2336,7 +2336,8 @@ survives context compaction. Tick items off here as they land.
    not be launched in the session that wrote it (Claude Code reads its
    agent list at session start), so its guard-firing proof (REQ-DOCS-124)
    and every eval run (REQ-DOCS-123, -127, -133) wait for a FRESH session.
-   That session: (1) ask docs-finding-checker to read an eval answer file
-   and .env - both must be refused - then REQ-DOCS-124 goes back to built;
-   (2) run the full sweep, critic first so its model is settled, then the
-   checker on that critic's runs.
+   (1) DONE the same session after all - the agent list refreshed
+   mid-session: docs-finding-checker was refused both an eval answer file
+   and .env, and REQ-DOCS-124 is built again. (2) STILL TO DO: the full
+   sweep, critic first so its model is settled, then the checker on that
+   critic's runs.
