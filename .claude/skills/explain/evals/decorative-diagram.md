@@ -42,7 +42,7 @@ The dashboard knew carers was owed, because every table has a slot waiting for i
 
 A **period** is one named date on a supply calendar. Child Protection's calendar has 4 periods a year, on 1 February, May, August, and November. These dates are the ones agreed with the supplier, and each carries a name. The period dated 1 August 2026 is called 2026-Q3.
 
-A period never moves once it is written down. If the calendar changes later, the change applies to future periods only.
+A period never moves: when a new version of the calendar is added, every earlier period stays as it was.
 
 ## Each dataset gets a slot with its own due time
 
@@ -89,7 +89,7 @@ Child Protection's case workers table is only supplied in February and August. T
 
 Nothing is owed for case workers in May, so its absence is not reported as overdue or missing.
 
-A dataset can also declare beforehand that it will not supply in a particular period. It gives a reason, such as a move to a new system. It then has no slot in that period either. The period still shows, marked as not expected.
+A dataset can also declare that it will not supply in a particular period. It gives a reason, such as a move to a new system. It then has no slot in that period either. The period still shows, marked as not expected.
 
 ## Why it's this way
 
