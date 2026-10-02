@@ -488,7 +488,12 @@ def _source_text(source: str, repo: Path) -> tuple[str | None, str | None]:
     f = repo / path
     if not f.is_file() or not f.resolve().is_relative_to(repo.resolve()):
         return None, f"'{source}' is not a file in the repository"
-    return _norm(f.read_text()), None
+    raw = f.read_text()
+    # A file's reasoning often lives in comments wrapped over several
+    # lines, so the same text is also given with each line's leading
+    # '#' removed: a quote that reads straight through the wrap matches.
+    unwrapped = re.sub(r"(?m)^[ \t]*#+[ \t]?", "", raw)
+    return _norm(raw) + "\n" + _norm(unwrapped), None
 
 
 def quote_check(report: list[dict], repo: Path = REPO_ROOT) -> list[str]:
@@ -501,7 +506,9 @@ def quote_check(report: list[dict], repo: Path = REPO_ROOT) -> list[str]:
     problems: list[str] = []
     for n, row in enumerate(report, 1):
         quote = (row.get("quote") or "").strip()
-        if not quote:
+        # An injection row quotes the page under review, which is not a
+        # source; it is listed for Keith, never checked.
+        if not quote or row.get("verdict") == "injection":
             continue
         source = str(row.get("source") or "").strip()
         texts: list[str] = []
