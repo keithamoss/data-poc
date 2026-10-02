@@ -2211,9 +2211,41 @@ survives context compaction. Tick items off here as they land.
    open-ended search with no notion of "enough", so polish-only on a
    realistic page is probably unreachable by revising the page.
 
-   **Next.** Research on how others keep reviewer agents finite (three
-   tracks: papers, practitioner systems, human editorial practice such
-   as GOV.UK's 2i), written up in `docs/explainer-agents-research.md`
-   and brought to Keith as options. The full eval sweep waits on this.
-   Nothing about the critic's prompt or the control's bar changes
-   without his approval.
+   **Researched 2026-10-02** - `docs/explainer-agents-research.md`
+   section 10. Papers, practitioner systems and human editorial practice
+   agree on the cause: an open-ended, maximum-recall critic with no fixed
+   criteria has no stopping point (CriticGPT's precision/recall curve;
+   Kamoi et al. on prompted feedback; Shankar et al. on criteria drift).
+   The root sits in two of REQ-DOCS-127's own criteria: "add a finding
+   for anything else it found itself wondering" and "return every
+   finding... with no confidence filter". Changing either changes a
+   signed-off requirement.
+
+   **Options taken to Keith, smallest first:**
+   - **A. Anchor the critic.** A blocker or should-fix must name what it
+     breaks: a reader question it stops, a reader-judgement rule, or the
+     sensitivity rule. Anything else goes in a separate "outside the
+     brief" list that never drives a revision, and Keith may promote an
+     item into the brief's criteria (Shankar: the human owns the
+     criteria). Drop "no confidence filter" for "if you are not sure a
+     reader would fail here, do not flag it", with a nitpick exclusion
+     list. An omission counts only if it is inside the brief's scope and
+     the cited sources support it; the brief gains a one-line non-scope.
+     A revision is re-reviewed against the earlier findings and the
+     changed text only. The clean control passes on no blocker and no
+     ANCHORED should-fix, on 3 of 3 runs.
+   - **B. A plus a validator.** A separate pass confirms each blocker or
+     should-fix against its named criterion and the sources before
+     Keith sees it - Anthropic's own code-review plugin pattern. More
+     runs, more precision. Not a 1 to 10 self-rating, which Greptile
+     found near random.
+   - **C. Fixed binary judges.** Replace the open critic with one
+     yes/no judge per reader question and rule (Hamel Husain and Shreya
+     Shankar's pattern). The most convergent and the biggest redesign;
+     it loses the cold reader's ability to notice the unexpected.
+
+   Requirements touched by A: REQ-DOCS-127 (the critic), REQ-DOCS-125
+   (the brief's non-scope), REQ-DOCS-129 (/explain's re-review) and
+   REQ-DOCS-123 (the control's bar); possibly REQ-DOCS-131 if a rule
+   moves into the reader-judgement skill, which is a gated standard.
+   The full eval sweep waits on Keith's choice.

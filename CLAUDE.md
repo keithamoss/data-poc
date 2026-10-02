@@ -1816,6 +1816,36 @@ Rough layout:
       the ACL Anthology is the usual non-arXiv home of NLP papers
       (citation evaluation, "Lost in the Middle"). Findings from them
       recorded before that date are labelled snippet-only.
+    - **Research on keeping a reviewer agent finite** (2026-10-02,
+      `plans/explainers.md` #5, `docs/explainer-agents-research.md`
+      section 10), every one a real `curl: (56) CONNECT tunnel failed,
+      response 403`, found by three research subagents:
+      - AI code review and evals: `hamel.dev`, `eugeneyan.com`,
+        `applied-llms.org`, `www.sh-reya.com`, `www.coderabbit.ai`,
+        `docs.coderabbit.ai`, `graphite.dev`, `www.greptile.com`,
+        `qodo-merge-docs.qodo.ai`, `github.blog`, `research.google`,
+        `storm.genie.stanford.edu`, `langchain-ai.github.io`,
+        `www.promptfoo.dev`, `www.braintrust.dev`, `www.gresearch.com`,
+        `www.cubic.dev`, `docs.gitlab.com`, `grafana.com`,
+        `hn.algolia.com`. Hamel Husain's and Eugene Yan's blogs are the
+        two most worth allowing; their judge guidance was read from the
+        `ai-evals-course/evals-skills` repo instead.
+      - Editorial practice: `insidegovuk.blog.gov.uk` (the primary
+        history of GOV.UK's 2i review, most worth allowing),
+        `defradigital.blog.gov.uk`, `www.gov.wales`, `digital.gov`,
+        `www.plainlanguage.gov`, `www.dta.gov.au`,
+        `www.digital.nsw.gov.au`, `developers.google.com`,
+        `google.github.io`, `www.writethedocs.org`,
+        `contentdesign.london`, `www.contentdesign.london`,
+        `readabilityguidelines.co.uk`, `www.editors.ca`, `editors.ca`,
+        `blog.editors.ca`, `www.ciep.uk`, `www.iped-editors.org` (the
+        Australian editing standards body), `www.the-efa.org`,
+        `www.chicagomanualofstyle.org`, `learn.microsoft.com`,
+        `plos.org`, `pmc.ncbi.nlm.nih.gov`, `scotentsd.github.io`,
+        `digitalblog.coop.co.uk`. Where a source repo existed it was
+        read from `raw.githubusercontent.com` or a git clone instead.
+      - `marmelab.com` and `bestofai.com` were refused by WebFetch only
+        and not re-tested with `curl`, so they are unconfirmed.
     - **`github.com` HTML and `api.github.com`** returned a plain HTTP
       403 rather than a tunnel failure, so that is probably GitHub
       itself (rate limiting, or no auth on the API) rather than this

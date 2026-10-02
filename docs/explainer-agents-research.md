@@ -525,6 +525,142 @@ Headings throughout are statements that tell the story on their own (GDS). All t
 - https://monzo.com/blog/slowing-down-to-speed-up-how-a-2-month-engineering-pause-rebooted-our-mortgage-strategy. Read in full.
 - https://monzo.com/blog/technology (index)
 
+## 10. Keeping a reviewer agent finite (researched 2026-10-02)
+
+**Why this was researched.** REQ-DOCS-123's clean negative control
+could not pass. Over four revisions of a page meant to be clean,
+docs-critic returned 9, 6, 9 and 9 "should fix" findings, mostly new
+each round, while the fact-checker converged (`plans/explainers.md`
+#5). Keith asked how others have solved this. Three research subagents
+covered papers, practitioner systems, and human editorial practice. The
+main session re-checked a sample of their key quotes against the
+primary text (CriticGPT, Kamoi et al., the code-review plugin, PR-Agent's
+configuration, Google's code review standard, GOV.UK's 2i guidance and
+Diátaxis); all matched.
+
+### Why our critic cannot converge
+
+Three published results fit what we saw, and together they say the
+fault is the critic's DESIGN, not the page:
+
+- **We set the critic at maximum recall.** CriticGPT (McAleese et al.,
+  OpenAI 2024, primary) treats critique as precision against recall:
+  "longer critiques are, however, also more likely to include
+  hallucinations and nitpicks", and the nitpick rate "is much higher for
+  models than for humans". "Return every finding, with no confidence
+  filter" is the extreme-recall end of that curve.
+- **Prompted feedback with no external referent does not converge.**
+  Kamoi et al.'s survey (2024, primary): "no prior work demonstrates
+  successful self-correction with feedback from prompted LLMs, except
+  for studies in tasks that are exceptionally suited for
+  self-correction", and it "works well in tasks that can use reliable
+  external feedback". Huang et al. (2023, primary) found self-correction
+  without external feedback tends to make answers worse. The
+  fact-checker converged because it has exactly what the literature
+  says is needed: claims that decompose, and cited sources to check
+  them against. The critic has neither.
+- **The critic invents its criteria from each draft.** Shankar et al.,
+  "Who Validates the Validators?" (2024, primary): criteria drift is
+  real and legitimate, but a HUMAN owns and versions the criteria. Our
+  critic writes new criteria every round, judged against a glossary far
+  wider than the page, so every fix that adds text exposes new
+  "the page doesn't say X" findings.
+
+A public case of the same symptom: GitHub Copilot code review, community
+discussion #189767 (2026), "generates new comments on every push,
+creating an endless fix-push-review loop" - five rounds, each raising
+new comments on code already reviewed.
+
+### What others do, by mechanism
+
+1. **Findings must cite a fixed criterion.** Every track arrived here.
+   - GOV.UK's 2i is a closed checklist ending in publish or reject; it
+     has no "what else could this say" category (review guidance in
+     `alphagov/govuk-content-publishing-guidance`, primary).
+   - Google's code review standard: the style guide is "the absolute
+     authority"; anything not in it is preference, and the author's
+     preference stands (`google/eng-practices`, primary).
+   - Google's AutoCommenter (2024, primary) makes every comment point at
+     a best-practice document. A G-Research write-up (snippet) validates
+     that each finding names a real rule id: "the model can suggest, but
+     never define".
+   - TICK (Cook et al. 2024, primary) and CheckEval (2024, primary):
+     fixed yes/no checklists cut variance between runs and between
+     judges. Google ADK's own writer/critic example has three fixed
+     completion criteria and returns feedback only on unmet ones
+     (`google/adk-docs`, primary).
+   - Hamel Husain and Shreya Shankar's judge skills (primary): binary
+     pass/fail, each judge checks one failure mode, and a "holistic
+     judge" is a named anti-pattern.
+2. **Scope, non-scope, and a "belongs elsewhere" outcome.**
+   - GOV.UK: "publish only what's needed to meet that user need and
+     nothing more"; user needs carry acceptance criteria (primary).
+   - Diátaxis: "keep explanation closely bounded... it tends to absorb
+     other things" (primary).
+   - Google's Technical Writing One (snippet): state the non-scope, and
+     either refocus or change the scope statement when content strays.
+   - Kubernetes SIG Docs: issues unrelated to the change are "treated
+     as a separate issue" (primary).
+3. **On re-review, check the change and the earlier findings only.**
+   - Anthropic's code-review plugin reviews changed code only and skips a
+     PR it has already reviewed (`anthropics/claude-code`, primary).
+   - Qodo PR-Agent keeps finding state across runs and feeds earlier
+     threads back in (primary). AutoCommenter dropped the 80% of
+     candidate comments that fell on unchanged lines.
+   - Kubernetes: "unless the author is clearly aiming to update the
+     entire page, they have no obligation to fix every issue on the
+     page" (primary).
+4. **A separate validation pass, not a self-rated severity.**
+   - The code-review plugin sends each finding to its own subagent to
+     confirm it, keeps only "HIGH SIGNAL" issues, and says "if you are
+     not certain an issue is real, do not flag it" (primary). Its
+     false-positive list includes "pedantic nitpicks that a senior
+     engineer would not flag".
+   - Nielsen (NN/g, primary): finders rate severity badly while
+     hunting, so rate it afterwards in a separate pass, against impact
+     on a task, with 0 meaning "not a problem at all".
+   - What did NOT work: Greptile (snippet) found an LLM rating its own
+     comments 1 to 10 "nearly random", and prompting alone could not cut
+     nits without cutting real findings too. The validator must check
+     against criteria, not score.
+5. **Precision first, and caps.** PR-Agent defaults to at most 3
+   findings and problems only (primary). AutoCommenter's stated priority
+   is "very high precision". CriticGPT's default setting averaged about
+   four highlights per critique.
+6. **Stop on "better", never on "the critic found nothing".**
+   - Google: "favor approving a CL once it... definitely improves the
+     overall code health... even if the CL isn't perfect" (primary).
+   - GitLab: documentation reviews "must not be blockers", and issues go
+     to follow-up changes (primary). Kubernetes merges when only nits
+     remain.
+   - Anthropic's cookbook evaluator, which may pass only "if all
+     criteria are met and you have no further suggestions", inside an
+     uncapped loop, is the anti-pattern that produces our symptom
+     (primary).
+7. **Calibrate against the human's decisions.** Hamel and Shankar
+   validate a judge against human labels; LLM-Rubric (2024, abstract)
+   halved error by calibrating; Greptile's acted-on rate went from 19% to
+   over 55% by suppressing comments like ones developers had dismissed
+   (snippet). Keith's triage decisions are exactly this data.
+8. **Move recurring concerns into the writer's brief.** Huang et al.: a
+   requirement that can be stated up front belongs in the generation
+   prompt, not only in the feedback.
+9. **Count length as a cost.** Content highlighter testing (digital.gov,
+   snippet) marks text that is "confusing or unnecessary", not only
+   gaps. Google warns against solving problems the reader does not have
+   yet.
+
+### What this suggests for docs-critic
+
+Most of the machinery already exists: every brief carries five to eight
+reader questions, which are acceptance criteria in GOV.UK's sense, and
+the reader-judgement skill has named rules. What is missing is the rule
+that ONLY those may produce a blocker or a should-fix. The open channel
+("add a finding for anything else you wondered", "no confidence
+filter") is the part the literature says cannot converge. The options
+this gives, and what each changes, are taken to Keith in
+`plans/explainers.md` #5. None is adopted until he decides.
+
 ## Network notes
 
 - **`github.com` refuses its web pages and API here, but `git clone`
