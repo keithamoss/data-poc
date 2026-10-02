@@ -29,7 +29,7 @@ Build state, by section:
 - Built: "Periods come from the calendar", "Each dataset gets a slot with its own due time".
 
 > [!NOTE]
-> Each dataset gets its own slot in every period it takes part in, so one missing table shows up on its own.
+> Each dataset, meaning one table, gets its own slot in every period it takes part in, so one missing table shows up on its own.
 > A period is one agreed date on the supply calendar, and a slot is one table's expected supply for that period.
 > A slot stays empty until a supply is promoted into it, that is, moved out of staging, the waiting area, into the period.
 > So when a slot is still empty after its due time and grace allowance have passed, check staging before chasing the supplier.

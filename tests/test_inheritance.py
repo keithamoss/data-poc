@@ -393,7 +393,11 @@ class TestAnOperatorAsksForOneInheritance:
         assert found is not None and found.stands_on == first
         latest = dl.latest_for_slot(conn, annual.dataset_id, second)
         assert latest[0] == dl.INHERIT
-        entry = dl.decisions_for(conn, annual.dataset_id)[-1]
+        # This test's own period only: the dataset is real and shared, and
+        # other tests' rule entries are dated now, after WHEN, so the last
+        # entry for the whole dataset is not this one.
+        entry = [d for d in dl.decisions_for(conn, annual.dataset_id)
+                 if d["to_slot"] == second][-1]
         assert entry["action"] == dl.INHERIT
         assert entry["actor"] == "Keith"
         assert entry["actor_kind"] == dl.PERSON, (

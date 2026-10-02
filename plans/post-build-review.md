@@ -4058,3 +4058,26 @@ twice. It deliberately did not re-find the `TypeError`.
     bug fixed. (3) NOT STARTED: the full sweep waits on #5's research
     and Keith's decision on the critic.
 
+
+70. **[done, 2026-10-02]** **[Testing & dev tooling]** **An inheritance
+    test read "the latest decision" for a real, shared dataset, so it
+    went red once the calendar moved past the date it hard-codes.**
+
+    Found by this session on CI run 885 (`test.yml`, commit 897d0eb):
+    `tests/test_inheritance.py::TestAnOperatorAsksForOneInheritance::
+    test_it_creates_the_view_and_records_the_PERSON` failed with
+    `'inheritance rule' == 'Keith'`. It passed alone and failed only
+    with the whole file (`uv run pytest tests/test_inheritance.py -n0`:
+    1 failed, 38 passed). The cause: the test's dataset is the real
+    `cp-carers`, the decision log is shared across the worker's tests,
+    and earlier tests record the rule's own INHERIT entries dated NOW,
+    after the test's fixed `WHEN` of 2026-09-29. `decisions_for()` sorts
+    by `effective_at`, so `[-1]` was another test's rule entry. Nothing
+    is wrong with the code under test; the test's own read was.
+
+    Minor test defect, fixed without sign-off under the 2026-09-25
+    rule: the test now reads only the entries for its own period (each
+    test's periods carry a fresh uuid, so this isolates it fully).
+    Confirmed failing before the fix and 39 of 39 after. Same family as
+    the date-dependent e2e failures in CLAUDE.md's runtime log: a test
+    that mixes a fixed date with "now" has a shelf life.
