@@ -35,32 +35,23 @@ entries:
     draft: true
     idea: false
 
-  - term: one-off extraction
-    definition: "A data asset gathered once, at one point in time, for a single purpose. It has no supply calendar, because nothing further is owed."
-    aliases: []
-    forms: [one-off extractions]
-    defined_by: [REQ-PIPE-106]
-    page: null
-    draft: true
-    idea: false
-
-  - term: sample data collection
-    definition: "Sample or test data, supplied as one table, which is a sample dataset, or as several tables, which is a sample data collection. It never holds real data."
-    aliases: [sample dataset, sample]
-    forms: [samples]
+  - term: one-off data
+    definition: "Any table, or set of tables, that we check once rather than on a schedule. Data extracted for a single project is the most common case, but it can be any tabular data we want to check. It has no supply calendar. We check it with one-off checks, so none of it reaches a data asset's permanent reporting."
+    aliases: [one-off dataset, one-off data collection, one-off extraction]
+    forms: []
     defined_by: []
     page: null
-    draft: true
+    draft: false
     idea: true
 
-  - term: in development
-    definition: "A dataset, or a whole data collection, that we expect to receive regularly, but whose supply calendar has not been agreed yet. Its checks run and show real results, which never count towards any agreed status."
-    aliases: [pre-agreement, not yet agreed]
-    forms: [in-development]
-    defined_by: [REQ-PIPE-106]
+  - term: sample data
+    definition: "Data provided before a dataset's supply calendar is agreed, so we can build its checks. It may be real, synthetic or scrambled. We check it with one-off checks: a new round for each new set of sample data, or another round each time we add more checks. None of it reaches the data asset's permanent reporting. Each round's report and each tool's raw output are kept outside the system as the record."
+    aliases: [sample dataset, sample data collection]
+    forms: []
+    defined_by: []
     page: null
     draft: false
-    idea: false
+    idea: true
 
   # ---------------------------------------------------------------- group 2, the calendar
 

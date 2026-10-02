@@ -4534,3 +4534,11 @@ Belongs with batch 5's check work.
     - One-off extraction: make it broader. Project extractions use this
       path, but so may any other table or set of tables we want to check
       once - it is a generic path for tabular data, not a project thing.
+
+    **Third round, Keith 2026-10-02.** "One-off data" is the term,
+    aliased "one-off dataset" and "one-off data collection" (read as
+    keeping "one-off extraction" too - confirm). Sample data streamlined
+    to "We check it with one-off checks: a new round for each...". Both
+    applied to `plans/explainers-glossary-draft.yaml`, with "in
+    development" removed and both entries marked `idea: true` until
+    this is scoped into a requirement.
