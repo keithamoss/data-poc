@@ -58,7 +58,7 @@ Priya, a data steward at the Department for Child Protection and Family Support,
 
 That empty space is the whole point of a slot. It tells Sam which table is missing, and it says nothing against the 5 that came in.
 
-Each of Child Protection's 6 tables is a **[dataset](../glossary.md#dataset)**, one table an agency sends, and the 6 share one contract. Together they make a **[collection](../glossary.md#collection)**, a group of datasets that one agency sends together. Each copy of a table that comes in is a **[supply](../glossary.md#supply)**, and in the usual case it is filed to one slot.
+Each of Child Protection's 6 tables is a **[dataset](../glossary.md#dataset)**, one table an agency sends, and the 6 share one contract. Together they make a **[collection](../glossary.md#collection)**, a group of datasets that one agency sends together. Each copy of a table that comes in is a **[supply](../glossary.md#supply)**. Mothman files it to one of that table's slots or holds it for a person to decide.
 
 ## One expectation per collection almost works
 
