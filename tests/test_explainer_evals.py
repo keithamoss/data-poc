@@ -168,3 +168,14 @@ def test_the_clean_page_meets_the_house_standard(tmp_path):
     subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
     findings = v.Validator(tmp_path).run()
     assert findings == [], "\n".join(f.render() for f in findings)
+
+
+def test_an_expected_finding_may_list_several_quotes_and_any_one_matches():
+    """Keith, 2026-10-02: stage 1's critic runs all caught the decorative
+    diagram, each quoting a different part of it."""
+    exp = ex.load_eval_expectation(EVALS / "decorative-diagram.expected.yaml")
+    f = exp.must_find[0]
+    assert len(ex.expected_quotes(f)) == 3
+    assert ex.finding_matches(f, 'A["Periods"] --> B["Slots"]\n  B --> C["Data"]')
+    assert ex.finding_matches(f, "accTitle: Periods and slots work together.")
+    assert not ex.finding_matches(f, "Each supply's checks give it a status of green, amber, or red.")

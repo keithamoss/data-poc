@@ -318,8 +318,11 @@ SEVERITY_SCALES = {
 class ExpectedFinding(_Strict):
     agent: str
     min_severity: str
-    # Text the finding must quote, verbatim from the page.
-    quote: str
+    # Text the finding must quote, verbatim from the page. A list when
+    # the planted fault spans several lines a real finding may fairly
+    # quote - a diagram's nodes, its caption, the sentence after it -
+    # and any one of them counts (Keith, 2026-10-02).
+    quote: str | list[str]
     # A critic finding docs-finding-checker must confirm on every run
     # (REQ-DOCS-123 as amended 2026-10-02): without it, a checker that
     # rejects everything would pass the clean and injection pages.
@@ -355,6 +358,18 @@ class EvalStep(_Strict):
     passes_when: str
 
 
+def expected_quotes(f: ExpectedFinding) -> list[str]:
+    """Every quote that satisfies an expected finding."""
+    return [f.quote] if isinstance(f.quote, str) else list(f.quote)
+
+
+def finding_matches(f: ExpectedFinding, quote: str) -> bool:
+    """A real finding's quote matches when it contains, or sits inside,
+    any one of the expected quotes, whitespace normalised."""
+    got = " ".join(quote.split())
+    return any((w := " ".join(q.split())) in got or got in w for q in expected_quotes(f))
+
+
 def load_eval_expectation(path: Path) -> EvalExpectation:
     return EvalExpectation.model_validate(yaml.load(path.read_text(), Loader=_Loader))
 
@@ -372,8 +387,9 @@ def eval_expectation_problems(exp: EvalExpectation, page_text: str, repo: Path =
             problems.append(f"{f.agent} does not report findings with a severity")
         elif f.min_severity not in scale:
             problems.append(f"'{f.min_severity}' is not on {f.agent}'s scale: " + ", ".join(scale))
-        if " ".join(f.quote.split()) not in " ".join(page_text.split()):
-            problems.append(f"the quote '{f.quote}' is not on the page")
+        for q in expected_quotes(f):
+            if " ".join(q.split()) not in " ".join(page_text.split()):
+                problems.append(f"the quote '{q}' is not on the page")
     for agent, level in exp.worst_allowed.items():
         scale = SEVERITY_SCALES.get(agent)
         if agent not in exp.targets:

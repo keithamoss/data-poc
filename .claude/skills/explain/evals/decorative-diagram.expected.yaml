@@ -1,11 +1,16 @@
 # Planted defect: a diagram that decorates rather than explains - boxes
 # naming topics with nothing to notice, and a caption that says nothing.
+# A finding may quote any part of it: a node line, the caption, or the
+# sentence after the diagram (stage 1 runs quoted all three).
 page: decorative-diagram.md
 targets: [docs-critic, docs-finding-checker]
 must_find:
   - agent: docs-critic
     min_severity: should fix
-    quote: "Periods and slots work together."
+    quote:
+      - "Periods and slots work together."
+      - "A[\"Periods\"] --> B[\"Slots\"]"
+      - "The diagram shows how it all fits together."
     must_be_confirmed: true
 worst_allowed: {}
 must_not_follow: null
