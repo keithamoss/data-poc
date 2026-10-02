@@ -24566,7 +24566,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As whoever writes, illustrates or fact-checks an explainer, I want one approved written standard for how explainer prose reads, so that every page sounds like the same colleague and can be held to the same rules."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -24650,7 +24650,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As a manager or a new engineer opening an explainer, I want the answer at the top, the reasoning in one place, the sources at the end and a clear sign of whether the thing described exists yet, so that I can stop reading as soon as I have what I came for and trust what I read."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -24716,7 +24716,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As a reader working through several explainers, I want the same small cast in every story, so that I get to know them, and I want every story to stay clear of the people the data describes, so that nothing here trivialises child protection or birth records."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -24755,7 +24755,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As a reader on GitHub today and on the dashboard later, I want every explainer diagram to argue a point, look the same in both places and carry a description a screen reader can announce, so that the pictures teach rather than decorate."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -24944,7 +24944,24 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith, about to publish a page an agent wrote, I want a mechanical check that the page carries no script, no outside links, no malformed diagram, no false claim of sign-off, no edit since Keith signed it and no badge that disagrees with the register, so that a bad or injected output cannot reach GitHub on the strength of a model's judgement."
     moscow: must
-    status: in_progress
+    status: built
+    linked_tests:
+      - "tests/test_validate_explainers.py::test_the_good_page_passes_with_zero_findings"
+      - "tests/test_validate_explainers.py::test_each_rule_catches_its_own_breakage"
+      - "tests/test_validate_explainers.py::test_the_rule_ids_match_the_house_standard_both_ways"
+      - "tests/test_validate_explainers.py::test_a_signed_page_passes_with_its_hash_and_fails_after_an_edit"
+      - "tests/test_validate_explainers.py::test_a_missing_node_fails_rather_than_skips"
+      - "tests/test_explainers_concept_map.py::test_an_unknown_key_is_rejected"
+      - "tests/test_validate_explainers.py::test_a_source_index_is_strict"
+    implemented_by:
+      - "qa_tools/common/validate_explainers.py::Validator"
+      - "qa_tools/common/explainers.py::load_glossary"
+      - "qa_tools/common/explainers.py::load_concept_map"
+      - "qa_tools/common/explainers.py::load_source_index"
+      - "qa_tools/common/mermaid_parse.mjs"
+      - "cli/docs.py::validate_command"
+    evidence:
+      - "Built 2026-10-02. mothman docs validate checks every file under docs/explainers/ outside _work/, with glossary.yaml, concept-map.yaml and every sources.yaml parsed through the one module qa_tools/common/explainers.py (criterion 2, the last to land). It runs in mothman check and validate-config.yml. The explainer test modules ran 244 passed, 1 skipped on 2026-10-02, the skip being the real-concept-map test, which waits for Keith to approve the map."
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -25018,7 +25035,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith deciding whether to trust the docs-* agents, I want a few pages with known defects, a clean page and an injection attempt that every agent is run against before real use, so that I know they catch real problems without inventing false ones."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -25076,7 +25093,27 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith, letting agents write into a public repository for the first time, I want each docs-* agent limited to the tools, reads and folders its job needs, so that a confused or manipulated agent cannot reach beyond them or act on text it reads."
     moscow: must
-    status: in_progress
+    status: built
+    linked_tests:
+      - "tests/test_docs_agents.py::test_tools_are_exactly_what_the_job_needs"
+      - "tests/test_docs_agents.py::test_both_guards_run_in_the_agents_own_hooks_under_its_own_name"
+      - "tests/test_docs_agents.py::test_each_agent_has_a_turn_limit_and_a_pinned_model"
+      - "tests/test_docs_agents.py::test_preloaded_skills"
+      - "tests/test_docs_agents.py::test_no_prompt_copies_a_skills_wording"
+      - "tests/test_docs_agents.py::test_repository_text_is_material_and_an_injection_is_reported"
+      - "tests/test_docs_guard.py"
+      - "tests/test_validate_agents.py"
+    implemented_by:
+      - ".claude/agents/docs-writer.md"
+      - ".claude/agents/docs-illustrator.md"
+      - ".claude/agents/docs-critic.md"
+      - ".claude/agents/docs-fact-checker.md"
+      - "qa_tools/common/docs_guard.py::guard_read"
+      - "qa_tools/common/docs_guard.py::guard_write"
+      - "qa_tools/common/docs_guard.py::take_snapshot"
+      - "qa_tools/common/docs_guard.py::verify_changes"
+    evidence:
+      - "Built 2026-10-02. The four agent files carry least-privilege tools, Bash, web and Agent disallowed, a turn limit, a model pinned by full id, and PreToolUse hooks calling mothman docs guard-read and guard-write under their own name with '|| exit 2'. The hook commands were run by hand as Claude Code runs them: an allowed read and write exited 0, and a .env read, an eval-folder read, a critic read of CLAUDE.md, a write to CLAUDE.md, unparseable input and a missing project directory each exited 2. Whether the agents BEHAVE is REQ-DOCS-123's eval set, run in a fresh session."
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -25134,7 +25171,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith scoping a new explainer, I want a writer agent that reads the sources itself, gives me a short brief to approve and then drafts the page to the house standard, so that the page rests on a specialist's reading and I steer it before any prose exists."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -25192,7 +25229,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As a reader of an explainer, I want its diagrams and stories made by an agent that has read the prose first, so that each picture answers a question the text raises - and as Keith, I want proof on a real topic that a separate illustrator beats the writer drawing its own."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -25235,7 +25272,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith triaging a draft, I want a critic that knows nothing but the page and what a real reader could look up, reads it as a competent engineer new to Mothman and tells me exactly where it stumbled, so that I find out whether the page teaches before a real newcomer does."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -25298,7 +25335,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith, about to put an explainer in front of managers, I want every factual claim on it checked against the requirements and files it cites, with the problems at the top, so that a wrong or unsupported sentence is found by a table rather than by a reader."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -25358,7 +25395,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith commissioning an explainer, I want one command that walks the main session through scoping, brief, writing, illustrating, checking, review, triage and sign-off in a fixed order, so that no step - and especially neither of my checkpoints - can be skipped or reordered by accident."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
@@ -25480,7 +25517,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith, I want the rules a reader judges a page by held in one small skill that the critic and the writers all preload, so that the critic applies exactly the rules the writer wrote to without being handed the cast, glossary or examples that a cold reader would not have."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: "2026-09-29"
