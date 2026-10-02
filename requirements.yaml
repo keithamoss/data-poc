@@ -25095,7 +25095,7 @@ requirements:
     date_written: "2026-09-29"
     story: "As Keith, letting agents write into a public repository for the first time, I want each docs-* agent limited to the tools, reads and folders its job needs, so that a confused or manipulated agent cannot reach beyond them or act on text it reads."
     moscow: must
-    status: built
+    status: in_progress
     linked_tests:
       - "tests/test_docs_agents.py::test_tools_are_exactly_what_the_job_needs"
       - "tests/test_docs_agents.py::test_both_guards_run_in_the_agents_own_hooks_under_its_own_name"
@@ -25116,6 +25116,7 @@ requirements:
       - "qa_tools/common/docs_guard.py::verify_changes"
     evidence:
       - "Built 2026-10-02. The four agent files carry least-privilege tools, Bash, web and Agent disallowed, a turn limit, a model pinned by full id, and PreToolUse hooks calling mothman docs guard-read and guard-write under their own name with '|| exit 2'. The hook commands were run by hand as Claude Code runs them: an allowed read and write exited 0, and a .env read, an eval-folder read, a critic read of CLAUDE.md, a write to CLAUDE.md, unparseable input and a missing project directory each exited 2. Whether the agents BEHAVE is REQ-DOCS-123's eval set, run in a fresh session."
+      - "2026-10-02, later the same day: NOT built after all. The first eval step (docs-critic asked to read CLAUDE.md) read it on all six runs - the frontmatter hooks did not run in a real session, though their commands behave when run by hand. Likely cause: project-level subagent frontmatter hooks are skipped until workspace trust is accepted, and a cloud session has no trust dialog. Status back to in progress; plans/post-build-review.md #69."
     signed_off:
       by: Keith
       date: "2026-09-29"
