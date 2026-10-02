@@ -140,6 +140,15 @@ def test_the_writer_carries_its_approved_voice_word_for_word():
     assert " ".join(voice.split()) in " ".join(body("docs-writer").split())
 
 
+def test_the_fact_checker_lists_story_sentences_but_still_checks_facts_inside_them():
+    """REQ-DOCS-128 (Keith, 2026-10-02): an invented story sentence gets
+    the verdict `story`, and a real fact inside a story is still checked."""
+    text = body("docs-fact-checker")
+    assert "gets the verdict `story`, with no source and no quote" in text
+    assert "A real fact inside a story is still a claim of its own and is checked" in text
+    assert "then exempt and story, then supported" in text
+
+
 def test_the_fact_checker_returns_one_yaml_table_with_the_four_verdicts():
     """REQ-DOCS-128 criteria 1 and 2."""
     text = body("docs-fact-checker")

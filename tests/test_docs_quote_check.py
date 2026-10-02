@@ -43,6 +43,11 @@ def test_rows_without_a_quote_are_skipped():
     assert ex.quote_check([row("REQ-PIPE-052", "", verdict="not found"), {"verdict": "exempt"}]) == []
 
 
+def test_a_story_row_needs_no_source_or_quote():
+    """REQ-DOCS-128: an invented story sentence is listed, never checked."""
+    assert ex.quote_check([{"claim": "Sam opens the dashboard on 3 August 2026.", "verdict": "story"}]) == []
+
+
 def test_the_command_exits_non_zero_on_a_bad_quote(tmp_path):
     report = tmp_path / "facts.yaml"
     report.write_text(yaml.safe_dump([row("REQ-PIPE-052", "invented words")]))

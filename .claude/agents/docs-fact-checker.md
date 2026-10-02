@@ -39,7 +39,8 @@ A requirement is in `requirements.yaml`. Read the requirement by its id, includi
    - **not found**: no cited source says it, or only part of it is supported. Partial support is "not found".
    - **sources disagree**: a cited requirement and cited code say different things. Never pick a side.
 4. A sentence that makes a factual claim and cites nothing is flagged. The one sentence under an "an idea, not designed yet" badge is exempt: list it with the verdict `exempt` and no source, so Keith still sees it.
-5. Watch for words used in an old sense. A word can look right and still mean something the sources have since renamed.
+5. A sentence that only tells the page's invented story - what a cast member did, saw, said, or found - gets the verdict `story`, with no source and no quote, so Keith still sees it. A real fact inside a story is still a claim of its own and is checked: a period name, a date, a due time, a table name, or how Mothman behaves. 'Sam opens the dashboard on 3 August 2026' is `story`. 'The carers slot was due at 9am on 1 August 2026' is checked, wherever it appears.
+6. Watch for words used in an old sense. A word can look right and still mean something the sources have since renamed.
 
 ## Your report
 
@@ -52,7 +53,7 @@ Return one fenced YAML block, a list with one row per claim, and nothing else af
   quote: "<the exact supporting or contradicting passage>"
 ```
 
-Sort rows with contradicted, not found and sources disagree first, then exempt, then supported. Name the exact source for every row, as a requirement id or a file and line. The main session saves the table and checks every quote against its source, so a quote you did not copy exactly will be caught.
+Sort rows with contradicted, not found and sources disagree first, then exempt and story, then supported. Name the exact source for every row, as a requirement id or a file and line. The main session saves the table and checks every quote against its source, so a quote you did not copy exactly will be caught.
 
 ## Never
 

@@ -25356,6 +25356,7 @@ requirements:
       - "THE SYSTEM SHALL have docs-fact-checker judge support sentence by sentence against the whole cited set, and SHALL mark partial support as not found."
       - "IF a sentence makes a factual claim and cites nothing, THEN THE SYSTEM SHALL flag it, unless it is the one sentence under an 'an idea, not designed yet' badge (REQ-DOCS-116)."
       - "THE SYSTEM SHALL list the sentence under an 'an idea, not designed yet' badge in the report as exempt, with no verdict, so that Keith still sees it."
+      - "THE SYSTEM SHALL list a sentence that only tells the page's invented story - what a cast member did, saw, said or found - with the verdict story, with no source and no quote, so that Keith still sees it, and SHALL still check every real fact inside a story - a period name, a date, a due time, a table name, or how Mothman behaves - as a claim of its own."
       - "IF a claim is supported only by plans/*.md or CLAUDE.md, THEN THE SYSTEM SHALL mark it not found."
       - "IF a cited requirement and the cited code say different things, THEN THE SYSTEM SHALL mark the claim sources disagree and SHALL always show it to Keith, and the page SHALL NOT pick a side."
       - "WHEN a round of review runs, THE SYSTEM SHALL run docs-fact-checker twice on the same page, SHALL show Keith every claim either run marks other than supported, and SHALL flag as unstable any claim the two runs disagree on."
@@ -25381,6 +25382,7 @@ requirements:
       - REQ-DOCS-123
       - REQ-DOCS-124
     decisions:
+      - "Decided invented story text gets its own verdict, story (Keith, 2026-10-02, wording approved as drafted). Found by REQ-DOCS-123's first clean-page run: the house standard makes every body open on an invented scene, the fact-checker had no verdict for one, so it marked each story sentence not found - and a negative control whose bar is every row supported could then never pass. Rejected: exempting story sentences only in the eval scorer, which would still bring Keith a pile of story rows on every real page; and scoring by the main session's judgement, which REQ-DOCS-123 rules out by fixing the schema. Facts inside a story are still checked, because a story is exactly where a wrong due time would hide."
       - "Decided quote checks match parsed, whitespace-normalised requirement field values, not raw YAML text, and the report is a fenced YAML table the main session saves (delivery-architect, adopted)."
       - "Decided reports are working material in the gitignored folder, never committed (Keith, slice 1 Q4); eval outcomes for this agent are summarised in this requirement's evidence and decisions (Q11)."
       - "Decided a separate fact-checker, making a team of four (round 7), for cleaner roles - a reader who knows the answer cannot tell whether the page taught it."
