@@ -23497,10 +23497,34 @@ requirements:
         dataset and therefore one supply - run identity and supply
         identity CONVERGE, and there is no second scheme to invent or
         keep in step. `cp_run_002` becomes
-        `cp-clients@202305010100000000` and its five siblings: each
+        `cp_clients__202305010100000000` and its five siblings: each
         says what arrived and when, nothing renumbers when a file is
         added or a delivery stops being recognised, and they sort
         chronologically within a dataset.
+
+        IN THE TABLE'S SPELLING, NOT THE SUPPLY'S, and the correction
+        matters because the first form recorded here would have been
+        REFUSED (caught 2026-10-02 before any code was written).
+        `run_schema()` uses a run id UNCHANGED as a PostgreSQL schema
+        name and `_ident()` rejects anything that is not already a safe
+        lowercase identifier - so `cp-clients@...`, with its `-` and
+        `@`, raises. That guard is Keith's own call from 2026-09-27,
+        when hex-encoding was dropped because `qa_run_run_5f_001` is
+        what a person then reads in psql, in logs and in every error
+        message.
+
+        So the run id takes the spelling the staged PHYSICAL TABLE
+        already uses - `cp_clients__202305010100000000` - which carries
+        the same dataset and the same arrival key, passes `_ident()`
+        unchanged, needs no encoding and no second scheme, and stays
+        readable. Worst case
+        `qa_cp_investigations__202305010100000000` is 40 of the 63
+        bytes PostgreSQL allows. A run id then equals the table it
+        checked rather than the supply it checked, which is arguably
+        the clearer of the two. REJECTED keeping the `@` form as the
+        real identity and translating it for the schema: that is the
+        encoding already rejected, and it makes the id in a log differ
+        from the id in the database.
 
         THE COLLISION CASE ALREADY HAS ITS DISAMBIGUATOR and needs no
         new one, which is worth saying because it looks like a gap. The

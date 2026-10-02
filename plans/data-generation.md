@@ -493,10 +493,12 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
     `supply_db.staged_table()` appends an ordinal. Two DIFFERENT
     datasets at one instant collide in neither.
 
-    **Not scoped into a requirement yet** - it needs one before
-    building, per this project's own gate, and it is likely a
-    `REQ-GEN-044` criterion rather than its own requirement since that
-    is where "the generated history contains the shapes the model
-    needs" already lives. The zip/bundle half also touches
+    **It goes into `REQ-GEN-044` as new criteria** (Keith,
+    2026-10-02, answering exactly that question) rather than becoming
+    its own requirement - that is where "the generated history
+    contains the shapes the model needs" already lives. The criteria
+    still need drafting and signing off before anything is built, per
+    this project's own gate; the scoping decision is what is settled
+    here. The zip/bundle half also touches
     `plans/supply-thoughts.md` items 1-3, which own the transport
     layer proper.
