@@ -15340,6 +15340,49 @@ requirements:
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-DASH-041]
     decisions:
       - >
+        AS-AT-T HAD NO HISTORY TO ANSWER OVER, found 2026-10-02 while
+        wiring phase 2 and fixed in the same change - the requirement
+        was buildable and undemonstrable. A bootstrap replays four
+        years of arrivals under one wall clock, so every promotion took
+        effect within the same few minutes: 91 decisions across ONE
+        distinct day. Any past date resolved to "nothing in place", for
+        everything.
+
+        THE FICTION DISAGREED WITH ITSELF rather than being merely
+        thin, which is what made it a defect and not a limitation. The
+        ARRIVALS are backdated properly across 2023-2026; only the
+        decisions were not. So one supply's record said it arrived in
+        February 2023 and was promoted on 2 October 2026.
+
+        FIXED AS A RULE, NOT A REPLAY FLAG:
+        `promotion.effective_at_for()` returns `min(now, received_at +
+        lag)`. Two things are true of any promotion, synthetic or real
+        - it cannot take effect before the supply arrived, and it
+        cannot take effect in the future - so the same expression is
+        correct in both worlds. In production an arrival is minutes
+        old, the sum is ahead of now, and it returns `now` unchanged.
+        REJECTED plumbing a "we are replaying" flag through both
+        orchestrators: a mode somebody can forget to set is a mode that
+        will be wrong.
+
+        MEASURED EITHER SIDE: 91 decisions over 1 distinct day became
+        91 over 30, spanning 2023-02-03 to 2026-09-23.
+      - >
+        THE LAG IS INVENTED AND THE CODE SAYS SO (Keith, 2026-10-02).
+        Asked whether to promote at the arrival instant or after a
+        realistic lag, he chose the lag so that REQ-PIPE-080's
+        receipt-to-promotion interval shows a spread rather than a
+        column of zeros. It was put to him at the time that this is
+        decoration rather than data, and he took it on those terms.
+
+        Seeded off the run id, so a regeneration reproduces it like
+        everything else here, and bounded to 1 hour - 3 days: long
+        enough to read as somebody getting to it, short enough not to
+        read as neglect. Measured after: 82 closed waits, median 42.4h,
+        range 10.5h to 71.5h. NO PARTICULAR SUPPLY'S WAIT IS A
+        MEASUREMENT OF ANYTHING, which `effective_at_for`'s own
+        docstring states rather than leaving to be rediscovered.
+      - >
         CRITERION 17'S FALL-BACK WAS DROPPED, NOT BUILT (Keith,
         2026-10-02), after the conflict was put to him rather than
         resolved quietly: the criterion required copy-and-drop where a

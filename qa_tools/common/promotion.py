@@ -28,8 +28,10 @@ same division decision_log.Decision already makes for `supply_is_red`.
 """
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 from qa_tools.common import decision_log, period_schema, supply_db
 
@@ -147,6 +149,58 @@ def filled_slots(conn: supply_db.SupplyConnection, dataset_id: str) -> frozenset
 #: something worth knowing about it, and holding every one of them for a
 #: person is how a queue becomes noise nobody reads.
 PROMOTES_ITSELF = frozenset({"green", "amber"})
+
+
+#: The window a promotion's invented lag falls in, for a supply being
+#: replayed from history. Hours to a couple of days: long enough to
+#: read as somebody getting to it, short enough not to read as
+#: neglect.
+_LAG_MIN = timedelta(hours=1)
+_LAG_SPAN = timedelta(days=3) - _LAG_MIN
+
+
+def effective_at_for(received_at: datetime, *, now: datetime | None = None,
+                      seed: str = "") -> datetime:
+    """When a promotion of this supply took effect.
+
+    TWO THINGS ARE TRUE OF ANY PROMOTION, synthetic or real, and this
+    is just both of them: it cannot have taken effect BEFORE the supply
+    arrived, and it cannot have taken effect in the FUTURE. So the
+    answer is `min(now, received_at + lag)`.
+
+    WHY THAT IS NOT A REPLAY HACK, which is the point of expressing it
+    this way. In production an arrival is minutes old, `received_at +
+    lag` is ahead of now, and the rule returns `now` - unchanged
+    behaviour, no mode to set. In a replay the arrival is years old and
+    the rule returns the backdated instant. One expression, correct in
+    both, and nothing to forget to switch on.
+
+    WHAT IT FIXES. A bootstrap replays four years of arrivals under one
+    wall clock, so every promotion used to take effect within the same
+    few minutes - 91 decisions across one distinct day, measured
+    2026-10-02 - and "what did we hold as at 30 June 2024" resolved to
+    nothing in place, for everything. Meanwhile the ARRIVALS were
+    backdated properly, so the generator's fiction disagreed with
+    itself: February 2023 for the arrival, today for its promotion.
+
+    THE LAG IS INVENTED, AND SAYING SO IS PART OF THE DESIGN. Keith
+    chose it (2026-10-02) over promoting at the arrival instant, so
+    REQ-PIPE-080's receipt-to-promotion interval shows a spread rather
+    than a column of zeros. It is seeded off the run id so a
+    regeneration reproduces it, like everything else here - but no
+    particular supply's wait is a measurement of anything, and nothing
+    should be inferred from one. The synthetic corpus is fiction
+    throughout; this part of it is merely newer.
+    """
+    from qa_tools.common import asset_time
+
+    now = now or asset_time.now()
+    digest = hashlib.sha256((seed or "").encode()).digest()
+    # A FRACTION OF THE WINDOW from the digest, rather than a modulo
+    # over hours - the window is a duration, so the lag should move
+    # with it if it is ever retuned.
+    fraction = int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
+    return min(now, received_at + _LAG_MIN + _LAG_SPAN * fraction)
 
 
 def arrived_off_cycle(dataset_id: str, at) -> tuple[bool, str]:

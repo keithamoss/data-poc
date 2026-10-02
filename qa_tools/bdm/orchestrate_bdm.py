@@ -473,7 +473,15 @@ def run_pipeline(sequential: bool = False) -> dict:
             [by_run_id[entry["run_id"]]], got,
             agency_id=AGENCY_ID, collection_id=COLLECTION_ID,
             actor=run_by, actor_kind=decision_log.RULE,
-            effective_at=asset_time.now().isoformat()))
+            # WHEN THE DECISION TOOK EFFECT, not when this replay ran
+            # (REQ-PIPE-081). A bootstrap walks four years of arrivals
+            # under one wall clock, and stamping every promotion with
+            # it left as-at-T with one day of history to answer over.
+            # See promotion.effective_at_for for why this is the same
+            # expression in production, where it still returns now.
+            effective_at=promotion.effective_at_for(
+                by_run_id[entry["run_id"]].received_at,
+                seed=entry["run_id"]).isoformat()))
 
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, run_by, None,

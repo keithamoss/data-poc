@@ -161,6 +161,14 @@ releases:
               or late - the rest were left blank, because the old
               calculation could not say anything meaningful about them. Each
               attempt now carries its own.
+          - headline: Decisions are dated when they were taken
+            components: ["Pipeline & publishing"]
+            description: >
+              Every promotion in the synthetic history was stamped with the
+              moment the history was generated, so all four years of
+              decisions appeared to happen at once. They now carry the date
+              they would really have been taken, which is what makes asking
+              "what did we hold back in June" possible at all.
           - headline: See how long a supply has been waiting on you
             components: ["Dashboard UI"]
             description: >
