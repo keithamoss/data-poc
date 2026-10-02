@@ -35,7 +35,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-from qa_tools.common import delivery, hierarchy, holds, slots
+from qa_tools.common import asset_time, delivery, hierarchy, holds, slots
 
 
 @dataclass(frozen=True)
@@ -237,16 +237,42 @@ def arrivals_for(collection_id: str, run_id_prefix: str,
     processing nothing and reporting nothing wrong
     (post-build-review #41).
 
-    RUN IDS ARE STILL POSITIONAL, and that is a known gap rather than
-    an oversight: REQ-PIPE-057 criterion 18 forbids deriving a run's
-    identity from a position in a list recognition can reorder or
-    shorten, and names no replacement. Keith's call, 2026-09-25: the
-    identity belongs with REQ-PIPE-069's delivery log, which is where a
-    delivery gets a durable record of its own, rather than being given
-    a committed mapping here that 069 would absorb almost immediately.
-    What IS built is criterion 19's guard - see run_id_guard.py - so a
-    recognition change that would re-key committed history fails
-    loudly, naming the runs, instead of being found when CI goes red.
+    ONE ARRIVAL IS ONE FILE (REQ-PIPE-105 criterion 1). It was one
+    delivery FOLDER until 2026-10-02, so Child Protection's six files
+    were recognised as one thing and checked as one run - which is
+    what made "is the delivery complete?" a question anything had to
+    ask. Now each file is its own arrival and is processed without
+    waiting for any other.
+
+    THE SHAPE IS KEPT AND ONLY THE CONTENTS NARROW. `files_by_dataset`
+    is still a mapping, carrying exactly one dataset, so every caller
+    that iterates it still works. Collapsing it to a scalar would have
+    made this a rewrite of every consumer rather than a change of
+    unit, for no gain.
+
+    RUN IDS ARE NO LONGER POSITIONAL, and the two changes had to land
+    together. `cp_run_007` meant "the seventh delivery recognised",
+    which REQ-PIPE-057 criterion 18 forbids - an id must not come from
+    a position recognition can reorder or shorten - and which had
+    already bitten once, leaving run_022 to run_027 each carrying a
+    neighbour's instant when two days were suppressed. Splitting one
+    delivery into six would have made that six times worse.
+
+    THE NEW ID ALREADY EXISTED. One arrival is one file, so one
+    dataset, so one supply - run identity and supply identity
+    converge. It takes the staged PHYSICAL TABLE's spelling,
+    `cp_clients__202305010100000000`, rather than the supply id's
+    `cp-clients@...`, because `run_schema()` uses a run id UNCHANGED
+    as a PostgreSQL schema name and `_ident()` refuses `-` and `@`.
+    That refusal is deliberate (Keith, 2026-09-27): hex-encoding was
+    dropped because `qa_run_run_5f_001` is what a person then reads in
+    psql, in a log and in every error message.
+
+    `run_id_prefix` IS NOW UNUSED FOR THE ID and is kept in the
+    signature on purpose, rather than removed in the same change: it
+    still says which collection a caller means, every call site passes
+    it, and retiring a parameter is a separate, mechanical change that
+    does not belong in one that moves the unit of work.
     """
     hierarchy.datasets_in_collection(collection_id)  # raises if unknown
     out: list[Arrival] = []
@@ -254,19 +280,33 @@ def arrivals_for(collection_id: str, run_id_prefix: str,
         found = recognise(d)
         by_dataset = {ds: names for ds, names in found.by_dataset.items()
                       if hierarchy.dataset(ds).collection_id == collection_id}
-        # ONE DELIVERY, POSSIBLY TWO RUNS. A delivery spanning
-        # collections contributes to each collection's own sequence:
-        # the DELIVERY is the transport unit and the RUN is the
-        # per-collection QA unit, and they were only ever the same
-        # thing by coincidence of this PoC's generated data.
+        # ONE DELIVERY, POSSIBLY TWO COLLECTIONS. A delivery spanning
+        # collections contributes to each: the DELIVERY is the
+        # transport unit and the RUN is the QA unit, and they were only
+        # ever the same thing by coincidence of this PoC's data.
         if not by_dataset:
             continue
-        index = len(out) + 1
-        out.append(Arrival(
-            run_id=f"{run_id_prefix}{index:03d}", run_index=index,
-            collection_id=collection_id, delivery_name=d.name, path=d.path,
-            received_at=d.received_at, sequence=d.sequence, files_by_dataset=by_dataset,
-            unmatched=found.unmatched, anomalies=d.anomalies))
+        key = asset_time.arrival_key(d.received_at)
+        for dataset_id in sorted(by_dataset):
+            names = by_dataset[dataset_id]
+            table = hierarchy.dataset(dataset_id).table
+            out.append(Arrival(
+                run_id=f"{table}__{key}",
+                # POSITION IS STILL REPORTED, and is no longer
+                # IDENTITY. Something has to order the processing -
+                # filing depends on what the arrival before it
+                # promoted - and a sequence number is the honest way
+                # to say "fourth of this batch" without anything
+                # keying on it.
+                run_index=len(out) + 1,
+                collection_id=collection_id, delivery_name=d.name, path=d.path,
+                received_at=d.received_at, sequence=d.sequence,
+                # SEVERAL FILES FOR ONE DATASET STAY TOGETHER in one
+                # arrival, which is the contested case rather than two
+                # arrivals: nobody has said which file is the supply,
+                # so splitting them would be choosing between them.
+                files_by_dataset={dataset_id: names},
+                unmatched=found.unmatched, anomalies=d.anomalies))
     return out
 
 

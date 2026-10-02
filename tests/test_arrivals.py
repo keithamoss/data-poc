@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import arrivals, delivery, hierarchy
+from qa_tools.common import arrivals, asset_time, delivery, hierarchy
 
 PERTH = timezone(timedelta(hours=8))
 WHEN = datetime(2026, 8, 24, 14, 36, 3, tzinfo=PERTH)
@@ -97,7 +97,10 @@ class TestADeliveryIsRecognisedNotLabelled:
 
     def test_the_collection_is_worked_out_from_the_files_not_declared(self, dirs):
         _cp(dirs, "2026-Q3")
-        assert [a.collection_id for a in _for(dirs, "child-protection", "cp_run_")] == ["child-protection"]
+        # SIX ARRIVALS SINCE REQ-PIPE-105, one per file - the
+        # attribution being tested is unchanged, only the count.
+        assert {a.collection_id for a in _for(dirs, "child-protection", "cp_run_")} \
+            == {"child-protection"}
         # And the same delivery is NOT claimed by the other collection.
         assert _for(dirs) == []
 
@@ -130,7 +133,8 @@ class TestADeliveryIsRecognisedNotLabelled:
 
         assert [a.delivery_name for a in bdm] == ["mixed"]
         assert [a.delivery_name for a in cp] == ["mixed"]
-        assert bdm[0].run_id == "run_001" and cp[0].run_id == "cp_run_001"
+        assert bdm[0].run_id.startswith("birth_registrations__")
+        assert cp[0].run_id.startswith("cp_clients__")
         # Each side sees only its OWN files - attribution is per file,
         # on its own dataset's terms.
         assert bdm[0].files_by_dataset == {"birth-registrations": (_BDM_FILE,)}
@@ -144,18 +148,46 @@ class TestADeliveryIsRecognisedNotLabelled:
             "child-protection", "civil-registration")
 
 
-class TestRunIdsComeFromReceiptOrder:
-    """Criterion 5, and the thing that permuted 23 real run_ids when
-    this landed - see tests/test_asset_time_semantics.py's own account.
-    Run identity is a real observable, which means it can legitimately
-    disagree with the order a generator produced things in."""
+class TestRunIdsComeFromWhatArrivedAndWhen:
+    """REQ-PIPE-057 criterion 18, met at last by REQ-PIPE-105 - and
+    this class asserted the opposite until 2026-10-02, so what it used
+    to say is worth keeping.
 
-    def test_the_first_delivery_we_received_is_run_001(self, dirs):
+    It read `TestRunIdsComeFromReceiptOrder` and pinned a POSITIONAL
+    scheme: `run_001` for the first delivery recognised, `run_002` for
+    the second. That is exactly what criterion 18 forbids - an id must
+    not come from a position recognition can reorder or shorten - and
+    the class docstring recorded the damage in passing, "the thing
+    that permuted 23 real run_ids when this landed". It was a pin on a
+    known defect.
+
+    The id now says WHAT arrived and WHEN, in the staged physical
+    table's own spelling. Receipt ORDER still decides processing order
+    and `run_index` still reports it; what changed is that nothing
+    keys on it.
+    """
+
+    def test_the_id_names_the_table_and_the_arrival(self, dirs):
+        _bdm(dirs, "first", when=WHEN)
+        got = _for(dirs)[0]
+        assert got.run_id == f"birth_registrations__{asset_time.arrival_key(WHEN)}"
+
+    def test_receipt_order_still_decides_PROCESSING_order(self, dirs):
+        """The half that did not change, and must not: filing depends
+        on what the arrival before it promoted."""
         _bdm(dirs, "second", when=WHEN + timedelta(days=1))
         _bdm(dirs, "first", when=WHEN, filename="birth_registrations_2026-08-23.csv")
-        found = _for(dirs)
-        assert [a.run_id for a in found] == ["run_001", "run_002"]
-        assert [a.delivery_name for a in found] == ["first", "second"]
+        assert [a.delivery_name for a in _for(dirs)] == ["first", "second"]
+
+    def test_but_nothing_renumbers_when_an_earlier_one_appears(self, dirs):
+        """The property criterion 18 is actually about. Under the old
+        scheme inserting an earlier delivery renamed every later run;
+        here the ids are untouched."""
+        _bdm(dirs, "second", when=WHEN + timedelta(days=1))
+        before = {a.run_id for a in _for(dirs)}
+        _bdm(dirs, "first", when=WHEN, filename="birth_registrations_2026-08-23.csv")
+        after = {a.run_id for a in _for(dirs)}
+        assert before < after, "an earlier delivery re-keyed the later one"
 
     def test_the_directory_name_never_decides_the_order(self, dirs):
         """Named so that alphabetical order is the exact reverse of
@@ -166,21 +198,29 @@ class TestRunIdsComeFromReceiptOrder:
              filename="birth_registrations_2026-08-25.csv")
         assert [a.delivery_name for a in _for(dirs)] == ["zzz-earliest", "aaa-latest"]
 
-    def test_run_ids_carry_no_date(self, dirs):
-        """A dateless id is what REQ-GEN-042 settled on, and a run_id
-        with a date in it goes stale the moment the anchor moves."""
+    def test_the_id_carries_OUR_receipt_instant_not_the_suppliers_date(self, dirs):
+        """REQ-GEN-042 settled that a run id must not carry a date the
+        anchor can move. Our own receipt instant is not that: it is a
+        fact about when the file reached us, and it never moves."""
         _bdm(dirs, "drop")
-        assert [a.run_id for a in _for(dirs)] == ["run_001"]
+        got = _for(dirs)[0]
+        assert got.run_id.endswith(asset_time.arrival_key(got.received_at))
 
-    def test_the_prefix_is_the_callers_not_the_deliverys(self, dirs):
+    def test_the_prefix_no_longer_decides_anything(self, dirs):
+        """`run_id_prefix` is kept in the signature - every call site
+        passes it and it still says which collection is meant - but it
+        is no longer part of the id, so a caller cannot change
+        identity by passing a different one."""
         _cp(dirs, "whatever")
-        assert [a.run_id for a in _for(dirs, "child-protection", "cp_run_")] == ["cp_run_001"]
+        one = _for(dirs, "child-protection", "cp_run_")[0].run_id
+        other = _for(dirs, "child-protection", "anything_")[0].run_id
+        assert one == other
 
-    def test_run_index_agrees_with_the_id(self, dirs):
+    def test_run_index_reports_position_without_being_identity(self, dirs):
         _bdm(dirs, "one", when=WHEN)
         _bdm(dirs, "two", when=WHEN + timedelta(days=1),
              filename="birth_registrations_2026-08-25.csv")
-        assert [(a.run_index, a.run_id) for a in _for(dirs)] == [(1, "run_001"), (2, "run_002")]
+        assert [a.run_index for a in _for(dirs)] == [1, 2]
 
 
 class TestWhatAnArrivalHandsToThePipeline:
@@ -234,13 +274,22 @@ class TestWhatAnArrivalHandsToThePipeline:
         assert found.unmatched == ("covering_note.pdf",)
         assert found.files_by_dataset == {"birth-registrations": (_BDM_FILE,)}
 
-    def test_files_for_several_datasets_are_one_arrival(self, dirs):
-        """Criterion 11 - six CP tables landing together are one
-        delivery, not six."""
+    def test_files_for_several_datasets_are_one_arrival_EACH(self, dirs):
+        """REVERSED BY REQ-PIPE-105 criterion 1, and the old assertion
+        is worth stating because it was the whole model until
+        2026-10-02: six CP tables landing together were ONE arrival
+        carrying six datasets, which is what made "is the delivery
+        complete?" a question anything had to ask.
+
+        They are now six arrivals of one dataset each, processed
+        without waiting for one another. The DELIVERY is still one
+        thing - every arrival here names it - and it is no longer the
+        unit of work."""
         _cp(dirs, "2026-Q3")
         found = _for(dirs, "child-protection", "cp_run_")
-        assert len(found) == 1
-        assert len(found[0].files_by_dataset) == 6
+        assert len(found) == 6
+        assert all(len(a.files_by_dataset) == 1 for a in found)
+        assert {a.delivery_name for a in found} == {"2026-Q3"}
 
 
 class TestTheGeneratorsBookkeepingIsWalledOff:
