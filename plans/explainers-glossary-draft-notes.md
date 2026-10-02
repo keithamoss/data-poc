@@ -152,3 +152,21 @@ when the glossary moves out of plans:
   as aliases.
 - stale (alias of no data) and timeliness (alias of recency, the ODCS
   name) - under review.
+
+## Categories, approved by Keith 2026-10-02
+
+1. The data: data asset, dataset, scheduled data asset, one-off data,
+   sample data, delivery, arrival, supply, permanent reporting
+2. Checking it: QA run, one-off check, recency, blocked
+3. Deciding what happens to a supply: staging, filing decision, promote,
+   reject, demote, re-file, acknowledge, resupply, substitute,
+   de-substitute, inherit, un-inherit, waiting on a person, ticket
+4. Reading the dashboard: early, on time, late, overdue, filled, closed
+   unfilled, no data, freshness, schedule ended, in place on
+5. The supply calendar (at the back): delivery agreement, supply
+   calendar, authored dates, cadence rule, calendar version, delivery
+   month, period, not-expected period, slot, due time, grace allowance,
+   claim window, runway
+
+Needs a `category` field in the glossary schema and a render ordered by
+category (REQ-DOCS-119 tooling). "timeliness" kept as recency's alias.

@@ -369,7 +369,7 @@ entries:
   # ---------------------------------------------------------------- group 5, filling the gaps
 
   - term: substitute
-    definition: "A person's decision that a period nobody supplied will use an earlier period's promoted supply instead. The period then shows as substituted. For example, a supplier misses the second quarter entirely, so a person decides the second quarter will use the first quarter's supply."
+    definition: "A person's decision that a period nobody supplied will use an earlier period's promoted supply instead. The period then shows as substituted. For example, a supplier misses the second quarter entirely, so we decide the second quarter will use the first quarter's supply."
     aliases: [standing in, last good one]
     forms: [substitutes, substituted, substituting, substitution, carried forward, carrying forward]
     defined_by: [REQ-PIPE-084, REQ-DASH-085]
@@ -425,7 +425,7 @@ entries:
     idea: false
 
   - term: blocked
-    definition: "Said of a table whose check cannot run because another table it compares against is missing or held. For example, a check that every notification names a client in the clients table cannot run while this quarter's clients table is missing, so notifications shows as blocked, even though nothing is wrong with the notifications table itself. It is not the same as waiting on a person."
+    definition: "Said of a table whose check cannot run because another table it compares against is missing or held. For example, a check that matches each notification's client identifier to a client in the clients table cannot run while this quarter's clients table is missing, so notifications shows as blocked, even though nothing is wrong with the notifications table itself. It is not the same as waiting on a person."
     aliases: []
     forms: []
     defined_by: [REQ-PIPE-079]
