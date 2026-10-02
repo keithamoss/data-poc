@@ -3350,10 +3350,16 @@ requirements:
         THE SYSTEM SHALL execute one QA run per period, each reading
         that period's schema alone, and SHALL NOT compose tables from
         different periods into a single run.
-      - THE SYSTEM SHALL overlay the staged delivery's own tables on
-        that period's promoted state, so that a check reads the
-        candidate under test alongside the tables already promoted into
-        that period.
+      - >
+        THE SYSTEM SHALL overlay on that period's promoted state the
+        tables staged for that period: the arriving file's own table
+        from its own arrival, and every other table from the one version
+        staged for the period. WHERE several versions of a table are
+        staged for the period, THE SYSTEM SHALL read none of them,
+        because they are in contention, and SHALL read that table from
+        the period's promoted state instead - so that a check reads the
+        supply under test alongside what the period holds. AMENDED
+        2026-10-02 (Keith) under REQ-PIPE-105 criterion 9.
       - WHERE a period's schema holds more than one version of a table,
         a supply and its resupplies, THE SYSTEM SHALL read the newest.
       - THE SYSTEM SHALL hold every dataset in the data asset for a
@@ -3460,36 +3466,6 @@ requirements:
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     unmet_criteria:
       - criterion: >
-          Criteria 1, 2 and 3 are BUILT BUT NOT WIRED. The period
-          schema, the overlay, the newest-within-period rule and the
-          per-period fan-out all exist and are tested against the real
-          rule; no orchestrator calls them, so today's QA runs still
-          read staging alone through REQ-PIPE-068's view schema.
-        why: >
-          A run cannot be scoped to a period until a supply HAS one, and
-          REQ-PIPE-062's filings are deliberately not recorded until
-          promotion exists (Keith, 2026-09-25). With nothing filed,
-          fan_out() correctly produces zero runs and wiring it in would
-          stop the pipeline. The alternative - inventing a placeholder
-          period so something runs - is the plausible-looking default
-          this project keeps deleting, and it would put a fabricated
-          period into committed QA history. Turning it on is one call
-          at the top of each orchestrator once filings are recorded.
-
-          AMENDED 2026-10-02: filings ARE recorded now, so the original
-          blocker is gone - and a second one took its place. The
-          overlay needs a per-run PERIOD, and nine real arrivals have
-          none, because they file five datasets to one quarter and
-          cp-case-workers to another. fan_out() is what would supply
-          one; REQ-PIPE-105 removes the need for it entirely by making
-          every arrival one file, one dataset, one period. Keith's call
-          that day was to wait for 105 rather than build fan-out for a
-          shape 105 deletes - see REQ-PIPE-079's own decisions.
-        owner: REQ-PIPE-105, which makes every arrival single-period
-        blocked_by:
-          sprints: [11]
-          requirements: [REQ-PIPE-105]
-      - criterion: >
           Criteria 6, 7 and 8 - red-for-unrun - are built as a decision
           function with its own tests, but no check's verdict is
           currently produced through it.
@@ -3508,11 +3484,27 @@ requirements:
           tell a reader WHY a table is absent while what the check
           reads is still assembled the old way, which is two accounts
           of one run from two mechanisms.
-        owner: REQ-PIPE-105, which makes every arrival single-period
+
+          AMENDED AGAIN 2026-10-02 evening: REQ-PIPE-105 gave every run
+          a period, so that blocker is gone. What is left is wiring the
+          decision layer itself, which is REQ-PIPE-079's.
+        owner: REQ-PIPE-079, wiring its decision layer
         blocked_by:
-          sprints: [11]
-          requirements: [REQ-PIPE-105]
+          requirements: [REQ-PIPE-079]
     decisions:
+      - >
+        CRITERIA 1 TO 3 WIRED AND CRITERION 3 AMENDED, 2026-10-02 (Keith,
+        wording approved after one revision). REQ-PIPE-105 made every
+        arrival one file and therefore one period, and its overlay is now
+        called straight after filing, so a run reads a single period's
+        schema (criterion 1). Criterion 2's multi-period case can no
+        longer arise - one file never spans periods - so `fan_out()`
+        stays uncalled by design rather than by omission. Criterion 3 was
+        phrased on "the staged delivery's own tables", a unit that no
+        longer exists; it now names the period's staged tables, and the
+        revision Keith asked for makes the contested case explicit: two
+        staged versions of a table are BOTH left out, never picked
+        between, and the promoted version is read instead.
       - >
         CRITERION 9 IS MET, BY A DIFFERENT ROUTE THAN THE ONE PLANNED,
         and its deferral was deleted rather than left to go stale
@@ -3768,12 +3760,19 @@ requirements:
       by: Keith
       date: "2026-09-23"
     acceptance_criteria:
-      - WHEN a delivery has been loaded into staging, THE SYSTEM SHALL
-        run QA once over that delivery, per period that delivery's
-        tables claim slots in - which for an ordinary delivery is
-        exactly one.
-      - THE SYSTEM SHALL NOT trigger a separate QA run per table within
-        a delivery.
+      - >
+        WHEN an arrival has been loaded into staging, THE SYSTEM SHALL
+        run QA once over that arrival, against the one period its supply
+        is filed to. AMENDED 2026-10-02 (Keith) under REQ-PIPE-105
+        criterion 10.
+      - >
+        THE SYSTEM SHALL NOT QA one supply twice for the same reason: a
+        run SHALL record its own dataset's checks and the cross-table
+        checks that read its table, and SHALL NOT record another
+        dataset's own checks. REPLACES 2026-10-02 (Keith) the struck
+        "SHALL NOT trigger a separate QA run per table within a
+        delivery", carrying forward what it protected (REQ-PIPE-105
+        criteria 10 and 11).
       - THE SYSTEM SHALL NOT trigger a QA run on a clock, and SHALL NOT
         require a periodic sweep to resolve a table that never arrived.
       - THE SYSTEM SHALL store each tool invocation's raw output exactly
@@ -3787,8 +3786,11 @@ requirements:
         still stage and QA the rest of the delivery, and SHALL report
         the failed table as a red finding rather than refusing the
         delivery.
-      - WHEN a table missing from an earlier delivery arrives later, THE
-        SYSTEM SHALL treat it as its own delivery and run QA over it.
+      - >
+        WHEN a table arrives - including one an earlier delivery did not
+        carry - THE SYSTEM SHALL run QA over it as its own arrival.
+        AMENDED 2026-10-02 (Keith) under REQ-PIPE-105 criterion 10: the
+        later-arriving table is the ordinary case now, not an exception.
       - WHEN a table arrives, THE SYSTEM SHALL evaluate that table's own
         checks together with every check in the same period that
         declares a dependency on it, and SHALL NOT re-evaluate a check
@@ -3907,24 +3909,25 @@ requirements:
         72.38 MB, and that is with two collections rather than the
         thirty this is a PoC for.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
-    unmet_criteria:
-      - criterion: >
-          Criterion 1, in part - QA runs once per DELIVERY, which is
-          what it does today, but not yet "per period that delivery's
-          tables claim slots in". Criteria 8 and 9, the period-scoped
-          re-evaluation rules, are unmet for the same reason.
-        why: >
-          REQ-PIPE-035 built the per-period fan-out and it is not wired,
-          because a supply has no period until filings are recorded and
-          REQ-PIPE-062 defers that until promotion exists. An ordinary
-          delivery claims one period, so today's one-run-per-delivery
-          is the correct behaviour for every delivery that currently
-          exists - what is missing is the mixed-period case, which
-          cannot arise until something files.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
     decisions:
+      - >
+        CRITERIA 1, 2 AND 7 AMENDED AND THE LAST UNMET ITEM CLOSED,
+        2026-10-02 (Keith, wording approved as put). Every file is its own
+        arrival under REQ-PIPE-105, so QA runs once per ARRIVAL against
+        its one filed period (criterion 1), and criterion 7's late table
+        is simply an arrival. Criterion 2 forbade a run per table, which
+        is now the rule, so it is struck - and replaced, not deleted, by
+        what it was protecting: a supply is never QA'd twice for the same
+        reason. That is enforced where results are recorded
+        (`qa_results_writer._scope_to_run`, "own + readers"), which also
+        meets criteria 8 and 9: an arriving table's own checks and the
+        same-period checks that read it are recorded, nothing else, and
+        nothing from another period because the overlay reads one. THE
+        HONEST LIMIT: the tools still EVALUATE everything the overlay can
+        read, and the scope discards the rest - so "not re-evaluated"
+        holds for what is recorded, not yet for what is computed. Narrowing
+        the tools themselves is deferred, and is the obvious place to win
+        back pipeline time.
       - >
         Rejected scoping each TOOL INVOCATION to one dataset (Keith,
         2026-09-26), which is what criterion 4 originally asked for -
@@ -23947,10 +23950,14 @@ requirements:
         dataset in one arrival are filed and CONTESTED - the hold KIND is
         gone from `supply_holds` (a stored one is now refused as unknown),
         and Birth Registrations' batch runs such an arrival instead of
-        skipping it. Still NOT DONE: criteria 9 and 10's amendments to
-        REQ-PIPE-035 and REQ-PIPE-036, criterion 13, and renaming the
-        delivery log's recognition-time `held` field, which still records
-        "these files all claim one dataset" under the retired word. Criterion 13 is SMALLER than
+        skipping it. Criteria 9 to 11 done later that evening: REQ-PIPE-035
+        criterion 3 and REQ-PIPE-036 criteria 1, 2 and 7 amended with
+        wording Keith approved (035's after one revision, to say plainly
+        that contested staged versions are BOTH left out), and 036's
+        struck criterion 2 replaced by the guard it protected. Still NOT
+        DONE: criterion 13, and renaming the delivery log's
+        recognition-time `held` field, which still records "these files
+        all claim one dataset" under the retired word. Criterion 13 is SMALLER than
         it was: a check that cannot read a table is now left out rather
         than recorded red by every tool, so what remains is saying WHY
         it was left out.

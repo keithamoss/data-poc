@@ -1992,9 +1992,14 @@ comparisons against the expected-supply sequence.
 
     **Owns:** `REQ-PIPE-038`
 
-15. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Delivery-
-    triggered QA.** `REQ-PIPE-036` - QA runs once per DELIVERY, per
-    period touched, rather than per table arrival.
+15. **[done, 2026-10-02]** **[Pipeline & publishing]** **Arrival-
+    triggered QA.** `REQ-PIPE-036` - QA runs once per ARRIVAL, against
+    its one filed period. *Reversed 2026-10-02 by REQ-PIPE-105*: one
+    file is one arrival, so the per-table run this sprint was written
+    to prevent is now the rule, and the flicker it feared is handled
+    by reading the period's other tables (the overlay) and by recording
+    each supply's checks once ("own + readers") - see REQ-PIPE-036's
+    amended criteria 1, 2 and 7.
 
     **Owns:** `REQ-PIPE-036`
 
