@@ -480,7 +480,7 @@ one when this line suggests it matters.
   - *touches:* `contract/data-asset.yaml`, `qa_tools/common/validate_agents.py`
 - **#4** `todo` 2026-09-29 - The concept map: which groups and concepts the explainers cover, in what order, and what a group page holds.
   - *touches:* `qa_tools/common/check_lifecycle.py`, `contract/data-asset.yaml`, `contract/people.yaml`
-- **#5** `investigate` 2026-10-02 - The critic never runs out of findings, so the clean-page eval cannot pass. Found running REQ-DOCS-123's negative...
+- **#5** `in-progress` 2026-10-02 - The critic never runs out of findings, so the clean-page eval cannot pass. Found running REQ-DOCS-123's negative...
 
 ## plans/post-build-review.md
 

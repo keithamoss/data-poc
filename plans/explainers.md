@@ -2180,7 +2180,7 @@ survives context compaction. Tick items off here as they land.
    the dashboard tab. This temporarily softens round 7's "rendered from
    day one".
 
-5. **[investigate, 2026-10-02]** **[Docs & process]** **The critic never
+5. **[in-progress, 2026-10-02]** **[Docs & process]** **The critic never
    runs out of findings, so the clean-page eval cannot pass.** Found
    running REQ-DOCS-123's negative control; Keith, 2026-10-02: "we need
    to go back to the drawing board... how have other people solved
@@ -2312,5 +2312,17 @@ survives context compaction. Tick items off here as they land.
      rhetorical tics. Preloaded by docs-critic, docs-writer,
      docs-illustrator, docs-fact-checker, and docs-finding-checker."
 
-   Next: the scoper revises the drafts against the architect's review
-   and these answers, then they go to Keith for sign-off.
+   **Signed off by Keith, 2026-10-02, and written into
+   requirements.yaml:** a new REQ-DOCS-133 (docs-finding-checker) and
+   REQ-DOCS-134 (`mothman docs check-findings`), with amendments to
+   REQ-DOCS-123, -124, -125, -127, -129 and -131. Each carries the
+   decisions above, so this entry comes out whole once the last of them
+   is built. REQ-DOCS-124 went back to in progress until the fifth agent
+   is tested. The eval sweep stays paused until they are built.
+
+   **Follow-up, not scoped:** calibrate the critic against Keith's own
+   triage decisions over time (research section 10, mechanism 7:
+   Greptile's acted-on rate rose from 19% to over 55% by suppressing the
+   comment shapes developers dismissed). There is no triage history yet;
+   the `triage-round-N.yaml` files REQ-DOCS-129 now saves are the data it
+   will need.
