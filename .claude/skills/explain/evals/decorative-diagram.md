@@ -103,7 +103,7 @@ Build state: partly built.
 
 Periods come from the calendar. Slots come from periods, one for each table taking part. A slot fills only when a supply is promoted into it.
 
-Next, read the [glossary](../../../../docs/explainers/glossary.md) entry for claim window, to see what happens to a supply that arrives early or late.
+Next, read the [glossary](../../../../docs/explainers/glossary.md) entry for claim window.
 
 ## Where this comes from
 
