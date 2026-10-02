@@ -109,6 +109,29 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-02"
+    summary: >
+      Only the supply that turned up unexpectedly waits for you now - the
+      tables that arrived on time go through as they always did.
+    changes:
+      - category: Improved
+        items:
+          - headline: An early table no longer holds up the rest
+            components: ["Pipeline & publishing"]
+            description: >
+              A dataset that only delivers twice a year sometimes arrives in
+              a quarter it is not due in. That supply is still checked and
+              still comes to you for a decision, but the five tables that
+              arrived alongside it are promoted normally. Across the whole
+              synthetic history that is 45 supplies you no longer have to
+              wave through.
+          - headline: The reason says what actually happened
+            components: ["Pipeline & publishing"]
+            description: >
+              The queue used to tell you a delivery's tables were "filed to
+              more than one period", which left you working out which one
+              was odd. It now names the dataset, the quarter it arrived in
+              and the quarter it was filed to.
   - date: "2026-09-30"
     summary: >
       A supply nothing could place now waits for you until you deal with

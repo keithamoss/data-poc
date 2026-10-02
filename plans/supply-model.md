@@ -436,8 +436,9 @@ deliberately from Keith's operational system); the overlay is an
 ephemeral per-run view schema, needed for logical-to-physical name
 resolution rather than for cross-schema reads - dbt and Soda were
 verified by real experiment to read across schemas perfectly well; a
-mixed-period delivery fans out into one QA run per period and never
-auto-promotes; a late table re-evaluates its own checks plus those that
+mixed-period delivery fans out into one QA run per period (the "never
+auto-promotes" half of this was replaced 2026-10-02 - see
+`REQ-PIPE-077`); a late table re-evaluates its own checks plus those that
 depend on it, within the same period only; cross-table checks record the
 physical table names they read; and the delivery log is one immutable
 file per delivery, queried in place by DuckDB with no second copy.
@@ -1863,17 +1864,18 @@ comparisons against the expected-supply sequence.
 
 11. **[in-progress, 2026-09-28]** **[Pipeline & publishing]** **Promotion and
     rejection.** Auto on green/amber into an EMPTY slot; red never;
-    landing in a filled slot never (Thread B). Plus the **mixed-period
-    delivery gate** - a delivery whose tables land in different PERIODS
-    runs QA but never auto-promotes (Thread H, TS-33).
+    landing in a filled slot never (Thread B). Plus the **off-cycle
+    arrival gate** - a supply arriving in a period its dataset does not
+    deliver in runs QA but never auto-promotes (Thread H, TS-33, as
+    amended 2026-10-02).
 
     **Owns:** `REQ-PIPE-075`, `REQ-PIPE-076`, `REQ-PIPE-077`, `REQ-PIPE-079`,
     `REQ-PIPE-080`, `REQ-PIPE-081`, `REQ-GHUB-082`, `REQ-PIPE-086`
 
-    *Scope grew 2026-09-22*: the mixed-period gate is a promotion rule
-    rather than an assignment one, so it lives here. Note its condition
-    is different PERIODS, not different SLOTS - per-table slots mean an
-    ordinary six-table delivery already spans six slots.
+    *Scope grew 2026-09-22*: the gate is a promotion rule rather than
+    an assignment one, so it lives here. *Amended 2026-10-02*: its
+    condition is now one supply arriving off-cycle rather than one
+    delivery spanning periods - see `REQ-PIPE-077`'s own decisions.
 
     **BATCH 4 SCOPING INPUTS, Keith 2026-09-26** - given to
     `delivery-scoper` alongside Threads B, G and H rather than left in
@@ -3390,29 +3392,34 @@ written only AFTER the load is durable. Kill the process between load
 and record, and the table is re-loaded - wasteful and safe. The opposite
 order would skip a table that never loaded.
 
-### The mixed-period delivery gate
+### The off-cycle arrival gate
 
-**TS-33a `[unit]` A delivery whose tables land in DIFFERENT PERIODS.**
-A catch-up drop carrying August's `cp_clients` alongside November's
-`cp_notifications`. Different tables, so the two-files-match-one-dataset
-hold never fires, and each is assigned independently with no ambiguity.
-**Expect**: QA **runs**, and **nothing auto-promotes** - a human review
-gate. Rare, and most real instances would trip the duplicate-file hold
-first, but cheap protection against a shape nobody expects.
+*Amended 2026-10-02 with REQ-PIPE-077. Both scenarios used to be about
+a DELIVERY whose tables landed in different periods; the requirement's
+own decisions record why that condition was replaced, and these follow
+it.*
 
-**TS-33b `[unit]` A normal delivery must NOT trip that gate.**
-Child Protection's ordinary six-table August delivery. All six land in
-the SAME period, but in six DIFFERENT slots, because slots are
-per-table.
-**Expect**: normal auto-promotion on green/amber. The gate does not
-fire.
+**TS-33a `[unit]` A supply arriving in a period its dataset does not
+deliver in.** `cp-case-workers` carries `delivery_months: [February,
+August]`, so a May arrival of it is off-cycle - it will be FILED to its
+oldest claimable slot, which is perfectly ordinary, but it ARRIVED in a
+quarter it is not due in.
+**Expect**: QA **runs**, and that supply **does not auto-promote** - a
+human review gate, whatever its verdict.
 
-**TS-33b is the important half.** The gate's condition is tables landing
-in different **PERIODS**, not different **SLOTS** - and an
-implementation keyed on slots passes 33a while failing 33b, blocking
-auto-promotion on every healthy multi-table delivery. Without the
-negative case the bug ships, because the positive case alone looks like
-it works.
+**TS-33b `[unit]` Its siblings must NOT be withheld with it.** The same
+arrival carrying the other five Child Protection tables, all of them
+due this quarter.
+**Expect**: normal auto-promotion on green/amber for all five. The gate
+fires on one supply only.
+
+**TS-33b is the important half**, and it is the half the first
+implementation got wrong rather than a hypothetical: the old gate
+withheld the whole delivery, which cost 45 healthy supplies a person's
+attention across the real corpus. The condition is a fact about ONE
+dataset's participation on ONE date - so a sibling can neither earn it
+nor escape it. Without the negative case the bug ships, because the
+positive case alone looks like it works.
 
 ### The activity feed
 

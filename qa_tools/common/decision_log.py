@@ -104,7 +104,7 @@ INHERIT_REFUSED = "inherit-refused"
 #: obstacle that exists to make somebody look.
 UN_INHERIT = "un-inherit"
 
-#: A delivery the mixed-period gate withheld from automatic promotion
+#: A supply the off-cycle gate withheld from automatic promotion
 #: (REQ-PIPE-077 criterion 6). ALWAYS A RULE'S, and it is the only
 #: action here that records something NOT happening to a supply - the
 #: same shape as `inherit-refused`, and for the same reason: a refusal

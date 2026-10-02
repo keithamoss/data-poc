@@ -435,8 +435,17 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
     **So there are two separate pieces of work here**, and they should
     not be conflated: teaching the generator to honour
     `delivery_months` so the corpus is honest, and giving the gate a
-    clearer reason for the off-cycle case. The first is this item. The
-    second belongs with REQ-PIPE-077 and is smaller than it looks.
+    clearer reason for the off-cycle case. The first is this item.
+
+    **The second is DONE, 2026-10-02** - and turned out to be the
+    condition rather than the wording. `REQ-PIPE-077` was amended and
+    retitled: the gate now fires on a supply ARRIVING in a period its
+    dataset does not participate in, says exactly that, and withholds
+    only that supply rather than its whole delivery. It still fires on
+    the same nine arrivals here, which is the right answer for as long
+    as this item is open - the corpus really does deliver case-workers
+    off-cycle. What changed is that the other 45 supplies in those
+    deliveries no longer wait with it.
 
     Likely relevant to `REQ-GEN-044`, whose whole point is that the
     generated history contains the shapes the model needs - a history

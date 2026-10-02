@@ -13836,14 +13836,15 @@ requirements:
         wording changes; what changes is that its operations can now be
         refused for a reason that lives elsewhere.
   - id: REQ-PIPE-077
-    title: A delivery whose tables land in different periods runs QA and never auto-promotes
+    title: A supply arriving off-cycle is checked and waits for a person
     date_written: "2026-09-26"
     story: >
-      As a data engineer operating this pipeline, I want a catch-up drop
-      carrying two periods' tables to be checked and then stopped short
-      of promotion, so that a shape the filing rules were never designed
-      for comes to me with its QA results in hand, rather than being
-      filed automatically and found later.
+      As a data engineer operating this pipeline, I want a supply that
+      turns up in a period its dataset does not deliver in to be checked
+      and then stopped short of promotion, so that an arrival nobody was
+      expecting comes to me with its QA results in hand rather than
+      filing itself quietly - and so that the tables which arrived when
+      they were due are not made to wait alongside it.
     moscow: should
     status: built
     source: >
@@ -13851,40 +13852,51 @@ requirements:
       scenarios TS-33a/TS-33b, settled with Keith 2026-09-22. Assigned
       to delivery sprint 11 because it is a promotion rule rather than
       an assignment one. Scoped by delivery-scoper, batch 4, 2026-09-26.
+      AMENDED AND RETITLED 2026-10-02 with Keith's approval, after
+      REQ-PIPE-105 settled that every file is its own arrival: the
+      condition moved from "this delivery's tables span periods" to
+      "this supply arrived off-cycle", and the effect from withholding
+      the whole delivery to withholding only the odd supply. The reason
+      a person is wanted did not change.
     signed_off:
       by: Keith
-      date: "2026-09-26"
+      date: "2026-10-02"
     acceptance_criteria:
       - >
-        WHERE one delivery's attributed supplies are filed to slots in
-        MORE THAN ONE PERIOD, THE SYSTEM SHALL run QA on that delivery
-        and SHALL NOT promote any of its supplies automatically.
+        WHERE a supply ARRIVES in a period its dataset does not
+        participate in, THE SYSTEM SHALL run QA on it and SHALL NOT
+        promote it automatically whatever its verdict, and SHALL NOT
+        withhold any other supply on account of it.
       - >
-        THE SYSTEM SHALL determine that condition from the set of
-        PERIODS its supplies are filed to, and SHALL NOT determine it
-        from the number of distinct slots.
+        THE SYSTEM SHALL determine that condition from the dataset's own
+        declared participation and the period containing the arrival
+        instant, and SHALL NOT determine it from the delivery the supply
+        arrived in or from any other supply.
       - >
-        WHERE one delivery's supplies are filed to several slots within
-        ONE period, THE SYSTEM SHALL promote automatically on the
-        ordinary green-or-amber rule.
+        WHERE a supply arrives in a period its dataset does participate
+        in, THE SYSTEM SHALL promote automatically on the ordinary
+        green-or-amber rule, whatever periods its siblings were filed
+        to.
       - >
-        WHEN this gate withholds a delivery, THE SYSTEM SHALL present it
-        among the items awaiting a person, naming the periods involved.
+        WHEN this gate withholds a supply, THE SYSTEM SHALL present it
+        among the items awaiting a person, naming both the period it
+        arrived in and the period it was filed to.
       - >
-        THE SYSTEM SHALL NOT prevent a person from promoting any of
-        those supplies.
+        THE SYSTEM SHALL NOT prevent a person from promoting that
+        supply.
       - >
         THE SYSTEM SHALL record the gate's action in the decision log
         with the rule as the actor.
     non_functional_requirements:
       - >
-        TS-33b is the important half and must be tested explicitly. An
-        implementation keyed on SLOTS passes the positive case and fails
-        the negative one, blocking auto-promotion on every healthy
-        multi-table delivery, because per-table slots mean an ordinary
-        six-table Child Protection delivery already spans six slots.
-        Without the negative case the bug ships, since the positive case
-        alone looks like it works.
+        THE NEGATIVE CASE IS THE IMPORTANT HALF and must be tested
+        explicitly - the amendment inherits this NFR from TS-33b and
+        changes what it points at. It used to warn that an
+        implementation keyed on SLOTS would block every healthy
+        multi-table delivery; now the risk is collateral, an
+        implementation that still withholds a supply's siblings because
+        one of them was off-cycle. Both fail only on the negative case,
+        which is why it ships without one.
       - >
           At 30 datasets a gate that fires on healthy traffic is a gate that
           gets disabled. This one should fire on genuinely rare shapes only, and
@@ -13895,8 +13907,9 @@ requirements:
           from the same corpus whichever store holds it.
       - >
         Cheap layer, rare shape - so it should cost nothing to evaluate.
-        It is a set comparison over a delivery's own filings, needing no
-        data access.
+        It reads the calendar and the dataset's own declared
+        participation, both configuration, and needs no data access and
+        no knowledge of any other supply.
     dependencies: [REQ-PIPE-075, REQ-PIPE-035]
     decisions:
       - >
@@ -14034,32 +14047,97 @@ requirements:
         what evidence could distinguish a catch-up from a resupply
         without reading the file, and that is Keith's question to
         settle, not one to answer by inference.
+      - >
+        AMENDED AND RETITLED 2026-10-02, Keith's own call, and the
+        condition changed rather than the words around it. The
+        preceding decisions had established three things that together
+        left the original condition with nothing to stand on: it fired
+        on nine of sixty deliveries and every one was partial
+        participation, a resupply cannot make a same-cadence delivery
+        span periods at all, and the catch-up drop the gate was written
+        for slips past it in the commoner case. What actually deserves
+        a person is the OFF-CYCLE ARRIVAL - "this dataset is not due
+        this quarter" - which the decision above had already identified
+        as the right explanation while still treating it as a wording
+        problem. It was the condition.
+      - >
+        REQ-PIPE-105 IS WHY THE DELIVERY HAD TO GO, rather than merely
+        being a poor proxy. Once every file is its own arrival there is
+        no delivery unit left to withhold, so a condition phrased on
+        one would become permanently inert - which the first decision
+        in this list already predicted under a boundary-less transport
+        and accepted as a limitation. The amendment makes it moot: an
+        off-cycle arrival is a fact about one dataset and one instant,
+        so it survives 105 unchanged and needs no delivery to exist.
+      - >
+        THE OLD CONDITION COULD NOT NAME ITS OWN TARGET, which is the
+        argument that settled it independently of the measurement.
+        Given five supplies filed to Q2 and one to Q1, nothing said
+        which was the odd one out except counting - and counting has no
+        answer on a three-three split. So it withheld all six. The new
+        condition names the supply directly, from configuration, before
+        any sibling is consulted.
+      - >
+        REJECTED keeping the old condition alongside the new one as a
+        backstop for the genuine catch-up drop. It would reintroduce
+        exactly the collateral the amendment removes, to catch a shape
+        the preceding decision has already shown it mostly misses, and
+        under 105 it would never fire anyway. The catch-up drop remains
+        unaddressed and is recorded as such rather than half-covered.
+      - >
+        ARRIVED, NOT FILED, and the implementation turns on it. A May
+        arrival of cp-case-workers FILES to 2023-Q1, its oldest
+        claimable slot, so comparing a supply's filed period with its
+        own participation would find Q1 perfectly ordinary and catch
+        nothing. The gate reads the period containing the ARRIVAL
+        instant. This also means the two periods in a withheld entry
+        always differ, which is why criterion 4 names both.
+      - >
+        EVERY UNANSWERABLE CASE READS "NOT OFF-CYCLE", deliberately: a
+        dataset the hierarchy does not know, one with no agreed
+        calendar (REQ-PIPE-106), a calendar misconfiguration, and an
+        arrival before the calendar's first period opens. None is
+        evidence that a supply is early or late, and a gate that
+        withheld on them would take a run down over an id it could not
+        place - the blast-radius rule this area applies everywhere.
     linked_tests:
-      - tests/test_mixed_period_gate.py
+      - tests/test_off_cycle_arrival.py
     implemented_by:
-      - qa_tools/common/promotion.py::spans_periods
+      - qa_tools/common/promotion.py::arrived_off_cycle
       - qa_tools/common/promotion.py::should_promote
+      - qa_tools/common/promotion.py::after_run
       - qa_tools/common/promotion.py::_record_withheld
       - qa_tools/common/promotion.py::withheld
       - qa_tools/common/decision_log.py::PROMOTION_WITHHELD
       - qa_tools/common/outstanding.py::_from_withheld_promotions
     evidence:
       - >
-        26 tests in tests/test_mixed_period_gate.py, all passing. The
-        negative case (TS-33b) is first in the file on purpose and was
-        confirmed failing against the pre-implementation code along
-        with the other thirteen.
+        18 tests in tests/test_off_cycle_arrival.py, all passing,
+        confirmed failing against the pre-amendment code first (18
+        failed, including the two negative cases and the one asserting
+        `spans_periods` is gone). The file replaces
+        tests/test_mixed_period_gate.py, moved with git mv so the
+        history follows it.
       - >
-        The gate's firing rate on the real recorded corpus: 9 of 60
-        deliveries (15%), every one of them caused by cp-case-workers'
-        partial participation rather than by a catch-up drop. Measured
-        by grouping qa.filing on the arrival key and counting distinct
-        slots, then checking which dataset held the minority period in
-        each, 2026-09-30.
+        THE COLLATERAL MEASURED, which is what the amendment is for.
+        Against the same real corpus the gate fires on the same nine
+        arrivals as before - cp-case-workers in a Q2 or Q4 drop, every
+        time - but withholds 9 supplies of 150 rather than the 54 the
+        old condition withheld in those same nine deliveries. 45
+        healthy supplies that used to wait on a person now promote
+        themselves. Measured 2026-10-02 by walking
+        arrivals.arrivals_for() for both collections and evaluating the
+        predicate per supply.
+      - >
+        The structural guarantee behind criterion 1's "SHALL NOT
+        withhold any other supply" is asserted rather than described:
+        the predicate's signature is (dataset_id, at), so a delivery
+        cannot be passed to it and a sibling cannot influence it.
       - >
         Schema version 12 adds 'promotion-withheld' to the decision
         table's named action constraint, with its own shape constraint
-        requiring to_slot.
+        requiring to_slot. Unchanged by the amendment - what the entry
+        records is the same act for a different reason.
 
   - id: REQ-PIPE-078
     title: A hold is a recorded state that survives the run that raised it
@@ -14354,10 +14432,10 @@ requirements:
         IF a supply has no filing, THEN THE SYSTEM SHALL NOT invent a
         period for it and SHALL NOT include it in any period-scoped run.
       - >
-        THE SYSTEM SHALL overlay only the tables of the delivery under
-        test, and SHALL NOT draw a staged supply belonging to any other
-        delivery into the run, even for the same dataset and the same
-        period.
+        THE SYSTEM SHALL overlay, for each table, the one version
+        staged for that PERIOD - whichever delivery staged it - and
+        SHALL fall back to the period's promoted state where none is
+        staged. WHERE several are staged, criteria 11 to 13 apply.
       - >
         WHERE a logical table resolves to more than one staged
         candidate, THE SYSTEM SHALL treat the staged candidates as
@@ -14463,6 +14541,18 @@ requirements:
         is a consequence nobody wrote down. Flagged rather than edited,
         because amending a signed criterion on my own reading is what the
         sign-off gate exists to prevent.
+
+        SETTLED BY KEITH 2026-10-02: REQ-PIPE-105 TAKES PRECEDENCE, and
+        criterion 10 is replaced above rather than carrying a carve-out.
+        His reasoning was that the delivery is the unit that is going
+        away, so a criterion phrased on it is not a rule 105 happens to
+        contradict - it is a rule with no subject left. What criterion
+        10 was protecting survives in the replacement: a run must not
+        silently compose two versions of one table, which is now
+        criteria 11 to 13's ambiguity rule rather than a ban on
+        crossing a delivery boundary. REQ-PIPE-105 criterion 9 is
+        amended in the same change to name this requirement, so the
+        consequence is written down where the next reader will look.
       - >
         Decided a mixed-period delivery FANS OUT, one QA run per period,
         rather than composing tables from different periods into one
@@ -22887,12 +22977,14 @@ requirements:
         the period's promoted state rather than choosing between
         them.
       - >
-        THE SYSTEM SHALL amend REQ-PIPE-035 criterion 3 in the same
-        change, so that what is overlaid on a period's promoted state
-        is THE TABLES STAGED FOR THAT PERIOD - one version of each,
-        with a contested table absent per criteria 6 and 8 - rather
-        than "the staged delivery's own tables", which names a unit
-        that stops existing once every file is its own arrival.
+        THE SYSTEM SHALL amend REQ-PIPE-035 criterion 3 AND REQ-PIPE-079
+        criterion 10 in the same change, so that what is overlaid on a
+        period's promoted state is THE TABLES STAGED FOR THAT PERIOD -
+        one version of each, with a contested table absent per criteria
+        6 and 8 - rather than "the staged delivery's own tables" or
+        "only the tables of the delivery under test", both of which
+        name a unit that stops existing once every file is its own
+        arrival.
       - >
         THE SYSTEM SHALL amend REQ-PIPE-036 criteria 1, 2 and 7 in the
         same change: criterion 1 to run QA once per ARRIVAL rather than
@@ -23096,6 +23188,11 @@ requirements:
         unit. Flagged rather than edited, because amending a signed
         criterion on my own reading is the thing the sign-off gate exists
         to prevent.
+
+        SETTLED BY KEITH 2026-10-02: this requirement takes precedence,
+        REQ-PIPE-079 criterion 10 is replaced with the period-scoped
+        wording, and criterion 9 above is amended to name REQ-PIPE-079
+        so the consequence is no longer one nobody wrote down.
 
       - >
         CRITERION 6 NARROWED 2026-09-28, SAME DAY IT WAS WRITTEN, because

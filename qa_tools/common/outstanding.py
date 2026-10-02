@@ -106,10 +106,10 @@ CLOSED_UNFILLED_SLOT = "closed-unfilled-slot"
 #: ours rather than the supplier's, which is exactly what somebody
 #: looking at an empty period needs told.
 INHERITANCE_REFUSED = "inheritance-refused"
-#: A delivery the mixed-period gate withheld (REQ-PIPE-077 criterion 4).
-#: NEEDS-ACTION and BLOCKING: the supplies are checked and sitting
-#: there, and only a person can move them - which is the definition of
-#: work in somebody's queue rather than something to know about.
+#: A supply the off-cycle gate withheld (REQ-PIPE-077 criterion 4).
+#: NEEDS-ACTION and BLOCKING: the supply is checked and sitting there,
+#: and only a person can move it - which is the definition of work in
+#: somebody's queue rather than something to know about.
 WITHHELD_PROMOTION = "withheld-promotion"
 
 
@@ -542,17 +542,17 @@ def _from_inheritance_refusals() -> list[Item]:
 
 
 def _from_withheld_promotions() -> list[Item]:
-    """REQ-PIPE-077 criterion 4 - a delivery whose tables landed in more
-    than one period, waiting for somebody to look.
+    """REQ-PIPE-077 criterion 4 - a supply that arrived in a period its
+    dataset does not deliver in, waiting for somebody to look.
 
-    NAMING THE PERIODS IS THE CRITERION, not a nicety: "this delivery
-    was odd" sends a person to reassemble the delivery themselves,
-    where "August and November" is the whole of what they need to know
-    before deciding.
+    NAMING BOTH PERIODS IS THE CRITERION, not a nicety: this gate only
+    ever fires where the period a supply ARRIVED in differs from the
+    one it was FILED to, and an item naming one of them invites the
+    reader to assume they are the same.
 
-    ONE ITEM PER SUPPLY, matching the log. They aggregate in the queue's
-    own totals the way every other kind does, so a catch-up drop of six
-    tables is six rows in one queue rather than six banners.
+    ONE ITEM PER SUPPLY, matching the log, and only ever the odd supply
+    itself - its siblings in the same delivery go through the ordinary
+    gate and have nothing in this queue.
     """
     from qa_tools.common import display_time, promotion
 
@@ -576,8 +576,8 @@ def _from_withheld_promotions() -> list[Item]:
                        f"on a review"),
             detail=(f"{display_time.format_periods_in(entry.reason)} The supply "
                      f"is filed and checked - what is waiting is the decision "
-                     f"about whether the delivery was filed the way it should "
-                     f"have been."),
+                     f"about whether an off-cycle supply should fill this "
+                     f"period at all."),
             agency_id=dataset.agency_id, collection_id=dataset.collection_id,
             dataset_id=dataset.dataset_id,
             responses=("promote it if the filing looks right",

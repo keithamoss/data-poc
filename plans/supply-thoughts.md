@@ -35,12 +35,14 @@ done, with ONE carve-out he named himself: where a decision recorded
 here genuinely CHANGES one of those requirements, it lands with that
 requirement rather than waiting.
 
-Two such carve-outs exist as of 2026-10-01, both settled by him and
+Two such carve-outs existed as of 2026-10-01, both settled by him and
 both listed in #0: `REQ-PIPE-077`'s criterion 1 (only the off-cycle
 supply is withheld) and `REQ-PIPE-079`'s revision (105 takes
-precedence). Neither is optional - leaving them would mean building
-the rest of the queue against a register that records a decision he
-has already reversed.
+precedence). **Both LANDED 2026-10-02** - 077 is amended, retitled and
+rebuilt, 079's criterion 10 is replaced and 105's criterion 9 now
+names it. Neither was optional: leaving them would have meant building
+the rest of the queue against a register that recorded a decision he
+had already reversed.
 
 Worth knowing before picking work off that queue, because it is not
 obvious from the outside: THREE of the six signed-and-unbuilt
@@ -62,11 +64,14 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
    several of these are decisions only Keith can make and they were
    accumulating in chat.
 
-   **SETTLED BY KEITH, 2026-10-01 - two of these are now answers
-   rather than questions, and both need the register changed to
-   match:**
+   **SETTLED BY KEITH, 2026-10-01, and BOTH LANDED IN THE REGISTER
+   2026-10-02:**
    - **`REQ-PIPE-077`: only the OFF-CYCLE SUPPLY is withheld, never
-     the whole delivery.** His reasoning is the one that dissolves the
+     the whole delivery.** *(Done 2026-10-02: amended, retitled "A
+     supply arriving off-cycle is checked and waits for a person",
+     rebuilt against `tests/test_off_cycle_arrival.py`. The same nine
+     arrivals still fire it; 45 healthy siblings no longer wait with
+     them.)* His reasoning is the one that dissolves the
      gate rather than tuning it: once every file is its own arrival,
      there is no delivery unit to withhold - case-workers' Q1 is
      assessed on its merits and the other five on theirs. So there is
@@ -83,13 +88,16 @@ research; and `REQ-GEN-044`'s criteria 8-11 are repointed at
      delivery it arrived in. 079 needs revising to say so - either
      directly, or by the route criterion 9 already uses for
      `REQ-PIPE-035` and `036`, naming it for amendment with the new
-     wording stated rather than implied.
+     wording stated rather than implied. *(Done 2026-10-02: BOTH
+     routes, since one without the other leaves the next reader to
+     re-derive it. 079's criterion 10 now reads "overlay, for each
+     table, the one version staged for that PERIOD - whichever
+     delivery staged it", and 105's criterion 9 names 079 alongside
+     035.)*
 
    **Still waiting on Keith:**
-   - **`REQ-PIPE-079` risk call.** Swapping `borrow_views()` for
-     `create_overlay_views()` changes what every CP cross-table check
-     reads, so recorded verdicts will move. Happy for them to shift,
-     or want a before/after comparison first?
+   - ~~**`REQ-PIPE-079` risk call.**~~ *Answered 2026-10-01: go ahead
+     without a before/after comparison.*
    - **`REQ-PIPE-110`-`113`** remain unsigned, 64 criteria, and
      `REQ-GEN-044` criteria 8-11 wait on them.
 

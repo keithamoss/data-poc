@@ -388,17 +388,17 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 
 *unit test - no generated data, nothing to navigate to*
 
-## The mixed-period delivery gate
+## The off-cycle arrival gate
 
-### TS-33a - A delivery whose tables land in DIFFERENT PERIODS
+### TS-33a - A supply arriving in a period its dataset does not deliver in
 
-**What it demonstrates.** QA **runs**, and **nothing auto-promotes** - a human review gate. Rare, and most real instances would trip the duplicate-file hold first, but cheap protection against a shape nobody expects.
+**What it demonstrates.** QA **runs**, and that supply **does not auto-promote** - a human review gate, whatever its verdict.
 
 *unit test - no generated data, nothing to navigate to*
 
-### TS-33b - A normal delivery must NOT trip that gate
+### TS-33b - Its siblings must NOT be withheld with it
 
-**What it demonstrates.** Normal auto-promotion on green/amber. The gate does not fire.
+**What it demonstrates.** Normal auto-promotion on green/amber for all five. The gate fires on one supply only.
 
 *unit test - no generated data, nothing to navigate to*
 
@@ -824,9 +824,9 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
   {
    "id": "TS-33a",
    "mode": "unit",
-   "title": "A delivery whose tables land in DIFFERENT PERIODS",
-   "section": "The mixed-period delivery gate",
-   "demonstrates": "QA **runs**, and **nothing auto-promotes** - a human review gate. Rare, and most real instances would trip the duplicate-file hold first, but cheap protection against a shape nobody expects.",
+   "title": "A supply arriving in a period its dataset does not deliver in",
+   "section": "The off-cycle arrival gate",
+   "demonstrates": "QA **runs**, and that supply **does not auto-promote** - a human review gate, whatever its verdict.",
    "breaksAs": null,
    "config": null,
    "coordinates": null
@@ -834,9 +834,9 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
   {
    "id": "TS-33b",
    "mode": "unit",
-   "title": "A normal delivery must NOT trip that gate",
-   "section": "The mixed-period delivery gate",
-   "demonstrates": "Normal auto-promotion on green/amber. The gate does not fire.",
+   "title": "Its siblings must NOT be withheld with it",
+   "section": "The off-cycle arrival gate",
+   "demonstrates": "Normal auto-promotion on green/amber for all five. The gate fires on one supply only.",
    "breaksAs": null,
    "config": null,
    "coordinates": null
