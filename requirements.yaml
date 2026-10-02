@@ -23362,12 +23362,16 @@ requirements:
         NOT restrict a run to the tables of the single arrival that
         triggered it.
       - >
-        THE SYSTEM SHALL hold, never choose between, several files
-        claiming one dataset within ONE arrival, on REQ-PIPE-059's
-        rule - the case where nothing says which file is the supply.
-        A supply arriving separately is NOT that case: it SHALL be
-        checked against its own data, and held at PROMOTION instead,
-        under REQ-PIPE-075 criterion 4.
+        THE SYSTEM SHALL RETIRE REQ-PIPE-059's delivery-level hold,
+        and SHALL treat several files claiming one dataset for one
+        PERIOD as a CONTESTED table under criterion 8 - however they
+        arrived, and never deciding between them. AMENDED 2026-10-02
+        (Keith). It required the hold where the files shared ONE
+        arrival, which criterion 1 makes impossible: once every file is
+        its own arrival, two files can never share one, so the hold had
+        no producer left. Scoping the same situation by PERIOD rather
+        than by transport is already built and needs no notion of a
+        delivery at all.
       - >
         THE SYSTEM SHALL apply "newest wins" only to PROMOTED
         supplies, and SHALL decide which is newest by PROMOTION time
@@ -23483,6 +23487,54 @@ requirements:
         now carries a `delivery-level` kind that would go quiet without
         anybody noticing.
     decisions:
+      - >
+        REQ-PIPE-059'S DELIVERY-LEVEL HOLD IS RETIRED, AND CONTESTED
+        SUBSUMES IT (Keith, 2026-10-02), settling the open question
+        this requirement had carried since 2026-09-30 and with it the
+        last thing blocking REQ-PIPE-079.
+
+        WHY IT COULD NOT SIMPLY BE KEPT. The hold fires where two files
+        claim one dataset and nothing says which is the supply. It was
+        scoped to ONE arrival, and criterion 1 makes an arrival one
+        file - so two files can never share one and the hold has no
+        producer. Criterion 6 tried to preserve it with the words
+        "within ONE arrival", which produces a rule that would puzzle
+        an operator: the same two files are held if something bundled
+        them and not held if they arrive ten minutes apart. Identical
+        bytes, different treatment, decided by the transport.
+
+        AND A ZIP DOES NOT RESCUE IT, checked rather than assumed on
+        2026-09-30: nothing in this system understands an archive -
+        not docs/delivery-format.md, contract/data-asset.yaml,
+        delivery.py nor arrival_patterns.py - so a zip arriving today
+        matches no pattern and is reported as an unrecognised artefact.
+        "A zip is one arrival holding several files" was an inference
+        stated to Keith as though settled, and it was not.
+
+        WHAT REPLACES IT IS ALREADY BUILT. Criterion 8 and
+        REQ-PIPE-079 criteria 11-13 make such a table CONTESTED: it
+        offers nothing of its own, its own checks do not run, it is not
+        promoted, and readers fall back to the period's promoted
+        version. Scoped by PERIOD rather than by arrival, so no
+        packaging decides the outcome and no transport knowledge is
+        needed.
+
+        THE ONE REAL COST, put to Keith rather than glossed: a HOLD
+        makes the table unreadable where CONTESTED lets other checks
+        read the period's promoted version. That difference was
+        deliberate, so retiring the hold means accepting the contested
+        behaviour for this case too. He accepted it on those terms, and
+        it is consistent with REQ-PIPE-079's decision 14 - "ambiguity
+        blocks the table, not its readers" - which revised exactly this
+        behaviour once already.
+
+        REJECTED re-scoping the hold by period instead of retiring it:
+        it keeps the stricter unreadable-table behaviour at the price
+        of two overlapping mechanisms for one situation, and a rule to
+        keep in step with contested for ever. REJECTED building
+        criterion 6 as signed, which would leave REQ-PIPE-078's
+        delivery-level hold kind alive and unable to fire - the shape
+        this project otherwise flags as a defect.
       - >
         AN OBSERVATION FOR KEITH, noticed 2026-09-28 and deliberately
         not acted on. `qa_tools/cp/build_cp_warehouses.py`'s

@@ -103,11 +103,18 @@ in `REQ-PIPE-079`'s own decisions. That leaves
      035.)*
 
    **Still waiting on Keith:**
-   - **`REQ-PIPE-105`'s three open questions, which are really ONE
-     decision - PARKED by Keith 2026-10-02 for later that day or the
-     next, deliberately, so `REQ-PIPE-080` could go first.** The
-     question: **does REQ-PIPE-059's delivery-level hold survive
-     criterion 1, and if so what raises it?**
+   - ~~**`REQ-PIPE-105`'s three open questions, which are really ONE
+     decision.**~~ **ANSWERED 2026-10-02: retire the delivery-level
+     hold; CONTESTED subsumes it.** The full account, including the one
+     cost he accepted (a hold makes a table unreadable where contested
+     lets other checks read the period's promoted version) and the two
+     alternatives rejected, is now in `REQ-PIPE-105`'s own decisions
+     and criterion 6 is amended to match. The reasoning below is kept
+     because it is what the question WAS, and because items 1-6 of this
+     file still own the transport layer underneath it.
+
+     The question had been: **does REQ-PIPE-059's delivery-level hold
+     survive criterion 1, and if so what raises it?**
 
      Two of the three are settled FACTS rather than questions, both
      checked 2026-09-30: under one-file-one-arrival `Arrival.held` can
