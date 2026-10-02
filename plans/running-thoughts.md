@@ -4603,3 +4603,26 @@ Belongs with batch 5's check work.
     acknowledgement entry type is built.
 
     REQ-PIPE-091 now carries a SUPERSEDED note (Keith approved, 2026-10-02).
+
+63. **[investigate, 2026-10-02]** **[Documentation]** Explainer prose
+    reads clunky in places, and no agent is looking for that. Keith,
+    reading the finished "Periods and slots" page: "mostly good. Some of
+    the language is a bit clunky though. Do any of the agents apply a
+    clear communication lens?"
+
+    The answer is no, and partly by design. The critic judges whether a
+    reader gets the right answer, and how much effort it costs them. It
+    is told not to report "a wording you would have chosen differently
+    when the existing text is already clear", and every serious finding
+    must name a criterion, which keeps it from looping forever
+    (`docs/explainer-agents-research.md` section 10). The validator
+    checks mechanical rules only. So a sentence that is understandable
+    but awkward passes everything.
+
+    Some of the clunk may come from the house standard itself (digits
+    for every number, "2 things", "the 6 share one contract"; the
+    25-word cap forcing splits). Needs Keith: the sentences he found
+    clunky, then which fix - a fluency rule in the reader-judgement
+    skill, a separate copy-edit pass, or adjusting the house standard.
+    Any change to either skill is an authoring-standard change, so the
+    exact wording goes to Keith first.
