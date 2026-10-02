@@ -4045,3 +4045,16 @@ twice. It deliberately did not re-find the `TypeError`.
     full evals. Note the eval runner pattern that does NOT work:
     subagents have no Agent tool, so the main session launches every
     run itself.
+
+    **Progress, 2026-10-02 (the next session).** (1) DONE: with the
+    folder trusted by Keith's setup-script line, docs-critic was refused
+    the CLAUDE.md read on 3 of 3 runs, and REQ-DOCS-124 is built again.
+    (2) DONE, then reopened: the clean page was fixed for all four
+    named faults and the defect pages rebuilt, but four rounds of real
+    runs showed the critic never settles on a clean page - see
+    `plans/explainers.md` #5. Along the way: a `story` verdict for the
+    fact-checker (Keith approved the wording), quote-check made to read
+    the source forms the fact-checker really writes, and a recall-check
+    bug fixed. (3) NOT STARTED: the full sweep waits on #5's research
+    and Keith's decision on the critic.
+

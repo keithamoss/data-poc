@@ -2179,3 +2179,41 @@ survives context compaction. Tick items off here as they land.
    2 exists, the critic reviews the page as GitHub renders it, not in
    the dashboard tab. This temporarily softens round 7's "rendered from
    day one".
+
+5. **[investigate, 2026-10-02]** **[Docs & process]** **The critic never
+   runs out of findings, so the clean-page eval cannot pass.** Found
+   running REQ-DOCS-123's negative control; Keith, 2026-10-02: "we need
+   to go back to the drawing board... how have other people solved
+   this?"
+
+   **What was measured.** The clean page was revised four times against
+   real runs. docs-critic (Opus) returned 9, 6, 9 and 9 "should fix"
+   findings, never a blocker, and each round's findings were mostly NEW.
+   Fixing a gap made the page longer, and the critic found gaps around
+   the new material. Many findings were omissions judged against the
+   glossary, which is far wider than any one page; some asked for
+   content the sources do not support (the inheritance a skipped period
+   uses, what amber means); some reversed an earlier round's advice. The
+   fact-checker, on the same pages, CONVERGED: round 1 had six
+   contradicted rows, round 4 had none and one not-found.
+
+   **What the rounds were still worth.** The early findings were real:
+   an empty slot is not always a missing supply, "accepted" collides
+   with the /accept acknowledgement, a period has no due date. The
+   fact-checker caught three false claims added in round three. So the
+   reviewers find real faults; what fails is the critic's STOPPING
+   behaviour, not its eye.
+
+   **Why it is structural, as currently understood.** The critic is told
+   to return every finding with no confidence filter, to answer reader
+   questions AND add anything else it wondered, and has the whole
+   glossary as a yardstick for what the page "should" cover. That is an
+   open-ended search with no notion of "enough", so polish-only on a
+   realistic page is probably unreachable by revising the page.
+
+   **Next.** Research on how others keep reviewer agents finite (three
+   tracks: papers, practitioner systems, human editorial practice such
+   as GOV.UK's 2i), written up in `docs/explainer-agents-research.md`
+   and brought to Keith as options. The full eval sweep waits on this.
+   Nothing about the critic's prompt or the control's bar changes
+   without his approval.
