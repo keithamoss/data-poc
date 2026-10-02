@@ -111,12 +111,19 @@ intro: >
 releases:
   - date: "2026-10-02"
     summary: >
-      Only the supply that turned up unexpectedly waits for you now - the
-      tables that arrived on time go through as they always did, and a
-      file sent ahead of its deadline is credited to the right quarter.
+      Every file is now checked the moment it lands, only the supply that
+      turned up unexpectedly waits for you, and a file sent early is
+      credited to the right quarter.
     changes:
       - category: Fixed
         items:
+          - headline: A missing table is not a failure
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              When a check needs a table that has not arrived yet, it is now
+              left out rather than reported as failed - or, worse, taking
+              every other check in the run down with it. Red means something
+              is wrong with the data, not with our timing.
           - headline: An early file counts for the quarter it was sent for
             components: ["Pipeline & publishing"]
             description: >
@@ -128,6 +135,13 @@ releases:
               none has ever arrived that far ahead.
       - category: Improved
         items:
+          - headline: Each file is checked as it lands
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Nothing waits for a delivery to be complete any more. Each file
+              is checked on arrival against the rest of its quarter - whatever
+              else has arrived, or what you have already accepted - and its
+              results are recorded once, against its own table.
           - headline: An early table no longer holds up the rest
             components: ["Pipeline & publishing"]
             description: >

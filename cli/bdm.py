@@ -231,6 +231,23 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     filed = common.file_or_trial([csv_path], "civil-registration", "run_", keep=keep)
     if run_id is not None and not filed.delivery_name:
         filed = dataclasses.replace(filed, run_id=run_id)
+    if filed.delivery_name:
+        # KEPT: AN ARRIVAL LIKE ANY OTHER, processed as the batch would -
+        # staged, filed, overlaid on its period, checked, promoted - with
+        # its drift reference from the recorded history (REQ-PIPE-105;
+        # Keith, 2026-10-02). --reference-file applies to a trial only.
+        found = hand_filing.arrivals_of(filed, "civil-registration", "run_")
+        for arrival in found:
+            for ordinal, name in enumerate(sorted(arrival.files_by_dataset[
+                    build_per_run_warehouses.DATASET_ID]), start=1):
+                build_per_run_warehouses.build_one(
+                    arrival.run_id, str(arrival.path / name),
+                    asset_time.local_date(arrival.received_at).isoformat(),
+                    ordinal=ordinal if len(arrival.files_by_dataset[
+                        build_per_run_warehouses.DATASET_ID]) > 1 else 0,
+                    received_at=arrival.received_at,
+                    delivery_name=arrival.delivery_name)
+        return orchestrate_bdm.run_arrivals(found, run_by, on_step=on_step), filed
     run_id = filed.run_id
     csv_path = filed.paths[0]
     reference_run_id = common.reference_run_id()

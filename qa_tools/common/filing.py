@@ -636,10 +636,22 @@ def supplies_of(conn, arrival) -> list[dict]:
         staged = supply_db.candidates_in(
             conn, supply_db.STAGING_SCHEMA, [logical], arrival=key).get(logical) or []
         record = filing_for(dataset_id, supply_id)
+        period = (record or {}).get("slot")
+        # CONTESTED AT PERIOD SCOPE, not just within this arrival
+        # (REQ-PIPE-105 criterion 6, as amended 2026-10-02): another
+        # supply of this dataset still staged for the same period means
+        # nobody has said which is the supply, however they arrived.
+        rivals: list[str] = []
+        if period:
+            from qa_tools.common import period_overlay
+
+            rivals = [p for p in period_overlay.staged_for_period(
+                conn, period, [logical], staging=supply_db.STAGING_SCHEMA,
+                loaded=None).get(logical) or [] if p not in staged]
         out.append({
             "dataset_id": dataset_id,
             "supply": supply_id,
-            "period": (record or {}).get("slot"),
+            "period": period,
             "physical_tables": sorted(staged),
             "held": dataset_id in arrival.held,
             # SEVERAL STAGED TABLES FOR ONE NAME is REQ-PIPE-059's case
@@ -647,6 +659,6 @@ def supplies_of(conn, arrival) -> list[dict]:
             # Both are reported because they can disagree - a file that
             # matched but failed to load leaves one without the other -
             # and either is a reason not to choose.
-            "contested": len(staged) > 1,
+            "contested": len(staged) > 1 or bool(rivals),
         })
     return out

@@ -163,3 +163,32 @@ def test_cp_compute_dataset_stats_shape():
     assert stats["value_counts"]["concern_type"] == [["Neglect", 1], ["(invalid code)", 1]]
     assert stats["check_aggregates"]["cp_clients.postcode"]["total_invalid"] == 1  # the '9999' row
     assert set(stats["arrival"].keys()) == set(cp_stats.TABLES)
+
+
+def test_cp_stats_leave_out_a_table_the_run_cannot_read():
+    """REAL DEFECT, 2026-10-02. One file is one arrival (REQ-PIPE-105),
+    so a run reads its siblings from its period and one can be absent -
+    Case Workers' April file belongs to a different period from its
+    siblings. compute_dataset_stats() counted all six unconditionally,
+    raised UndefinedTable, and took the run down after every tool had
+    recorded its results. Not measured is the honest answer."""
+    from qa_tools.common import supply_db
+
+    conn = duckdb.connect(":memory:")
+    schema = supply_db.run_schema("cp_placements__202604010600000000")
+    conn.execute(f'CREATE SCHEMA "{schema}"')
+    conn.execute(f"SET search_path = '{schema}'")
+    present = [t for t in cp_stats.TABLES if t not in ("cp_case_workers", "cp_notifications")]
+    for table in present:
+        conn.execute(f'CREATE TABLE "{schema}".{table} (postcode VARCHAR, date_of_birth DATE, '
+                     f'concern_type VARCHAR, extract_timestamp TIMESTAMP)')
+    arrival = {"run_id": "r", "run_index": 1, "delivery": "d",
+               "received_at": "2026-04-01T06:00:00+00:00"}
+
+    stats = cp_stats.compute_dataset_stats(conn, arrival)
+
+    assert set(stats["row_counts"]) == set(present)
+    assert set(stats["arrival"]) == set(present)
+    assert stats["value_counts"] == {}
+    assert not any(k.startswith(("cp_case_workers.", "cp_notifications."))
+                   for k in stats["check_aggregates"])

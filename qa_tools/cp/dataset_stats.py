@@ -64,10 +64,28 @@ AGGREGATE_SPEC = {
 }
 
 
-def _check_aggregates(conn: duckdb.DuckDBPyConnection) -> dict[str, dict]:
+def _readable(conn) -> frozenset[str]:
+    """The tables this run's view schema actually holds.
+
+    NOT ALL SIX, since REQ-PIPE-105: one file is one arrival, and a run
+    reads its siblings from its period - so a sibling held, contested
+    with nothing promoted, or filed to a different period (Case Workers'
+    off-quarter files) has no view. Counting it raised UndefinedTable
+    and took the whole run's QA down after every tool had already
+    recorded its results. A table that is not there is left out of the
+    statistics, which is what "not measured" honestly looks like.
+    """
+    return frozenset(row[0] for row in conn.execute(
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_schema = current_schema()").fetchall())
+
+
+def _check_aggregates(conn: duckdb.DuckDBPyConnection, readable=None) -> dict[str, dict]:
     """Keyed by "table.column" (a string, not a tuple - this becomes JSON)."""
     out = {}
     for (table, col), spec in AGGREGATE_SPEC.items():
+        if readable is not None and table not in readable:
+            continue
         full_table = f"{table}"
         if spec["kind"] == "categorical":
             value = categorical_aggregate(conn, full_table, col, spec["invalid_condition"], spec["classification"])
@@ -96,7 +114,8 @@ def _concern_type_value_counts(conn: duckdb.DuckDBPyConnection) -> list[list]:
     return out
 
 
-def _arrival(conn: duckdb.DuckDBPyConnection, run_date: str) -> dict[str, dict]:
+def _arrival(conn: duckdb.DuckDBPyConnection, run_date: str,
+             readable=None) -> dict[str, dict]:
     """Per table, not one dataset-level stat - build_cp_dashboard_data.py
     computes "extracted within 24h of the snapshot date" independently
     for each of the 6 tables (its own build_one_table() call), a real
@@ -108,6 +127,8 @@ def _arrival(conn: duckdb.DuckDBPyConnection, run_date: str) -> dict[str, dict]:
     # paths, and rendered nowhere at all.
     out = {}
     for table in TABLES:
+        if readable is not None and table not in readable:
+            continue
         earliest_extract = conn.execute(f"SELECT MIN(extract_timestamp) FROM {table}").fetchone()[0]
         out[table] = {"earliest_extract": asset_time.record_source_instant(
             earliest_extract, f"earliest_extract for table {table}")}
@@ -134,13 +155,16 @@ def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, arrival: dict) -> dic
     rest is in data/generator_bookkeeping.json, which nothing here may
     read.
     """
+    readable = _readable(conn)
     return {
         "arrival_record": bdm_stats._arrival_record(arrival),
         # Measured per table, for the reason BDM's own counterpart
         # gives - the generator's row_counts were bookkeeping.
         "row_counts": {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-                        for t in TABLES},
-        "value_counts": {"concern_type": _concern_type_value_counts(conn)},
-        "check_aggregates": _check_aggregates(conn),
-        "arrival": _arrival(conn, asset_time.local_date(arrival["received_at"]).isoformat()),
+                        for t in TABLES if t in readable},
+        "value_counts": ({"concern_type": _concern_type_value_counts(conn)}
+                          if "cp_notifications" in readable else {}),
+        "check_aggregates": _check_aggregates(conn, readable),
+        "arrival": _arrival(conn, asset_time.local_date(arrival["received_at"]).isoformat(),
+                            readable),
     }

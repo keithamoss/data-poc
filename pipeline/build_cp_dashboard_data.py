@@ -217,6 +217,27 @@ def _cross_table_check_ids() -> set[str]:
     return set(tables_read.declared_by_check_id(collect_checks(None)))
 
 
+def _value_counts(dataset_stats: dict, run_id: str):
+    """concern_type's recorded distribution for a run, or None where that
+    run could not read cp_notifications (REQ-PIPE-105)."""
+    return ((dataset_stats.get(run_id) or {}).get("value_counts") or {}).get("concern_type")
+
+
+def own_runs(manifest: list[dict], table: str) -> list[dict]:
+    """The runs that are FOR this table (REQ-PIPE-105).
+
+    One file is one arrival and a run id is its staged table's spelling,
+    so a Child Protection delivery is six runs and each belongs to one
+    table. A dataset's page shows its own arrivals - which is also what
+    its arrival history always meant. A run whose id names no table (a
+    fixture's, a trial's) belongs to every table, as every run did before.
+    """
+    from qa_tools.common.qa_results_writer import run_owner
+
+    return [m for m in manifest
+            if (owner := run_owner(m["run_id"])) is None or owner[1] == table]
+
+
 def build_one_table(table: str, results: list[dict], manifest: list[dict], dataset_stats: dict,
                      lifecycle_by_id: dict) -> dict:
     dataset_id = hierarchy.dataset_for_table(table).dataset_id
@@ -264,11 +285,22 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
 
     run_ids_in_order = [m["run_id"] for m in manifest]
-    latest_run, prev_run = run_ids_in_order[-1], run_ids_in_order[-2]
+    # THE NEWEST RUNS THAT MEASURED THIS TABLE, not simply the newest
+    # runs (REQ-PIPE-105). A run whose own table was contested or held
+    # has nothing of its own to show, and stats it could not take are
+    # absent rather than zero - so "current" is the newest run that has
+    # a number, which is what a reader means by it.
+    measured = [r for r in run_ids_in_order
+                if (dataset_stats.get(r) or {}).get("row_counts", {}).get(table) is not None]
+    measured = measured or run_ids_in_order
+    latest_run, prev_run = measured[-1], (measured[-2] if len(measured) > 1 else measured[-1])
     # run_date alone can't key a run uniquely (see build_dashboard_data.
     # py's identical comment) - byRun below keys on run_id via each
     # history entry's own "run_id" field.
-    row_count_by_run = {run_id: st["row_counts"][table] for run_id, st in dataset_stats.items()}
+    # A run measures only what it could read (REQ-PIPE-105), so a table
+    # can be missing from a run's counts - absent here, never zero.
+    row_count_by_run = {run_id: st.get("row_counts", {}).get(table)
+                        for run_id, st in dataset_stats.items()}
 
     columns_out = []
     for col in all_columns:
@@ -285,7 +317,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                     run_date = next(_run_date(m) for m in manifest if m["run_id"] == run_id)
                     aggregate_values = None
                     if attach_aggregate:
-                        aggregate_values = dataset_stats[run_id]["check_aggregates"].get(f"{table}.{col}")
+                        aggregate_values = (dataset_stats.get(run_id) or {}).get(
+                            "check_aggregates", {}).get(f"{table}.{col}")
                     history.append({
                         "run_id": run_id, "run_date": run_date, "value": slot["by_run"][run_id],
                         "row_count_total": slot["row_count_total"].get(run_id),
@@ -395,8 +428,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
 
         rank_for_headline(checks_out)
 
-        total_latest = dataset_stats[latest_run]["row_counts"][table]
-        total_prev = dataset_stats[prev_run]["row_counts"][table]
+        total_latest = row_count_by_run.get(latest_run) or 0
+        total_prev = row_count_by_run.get(prev_run) or 0
 
         stats = {
             "current": {"total": total_latest, "invalid": 0, "valid": total_latest, "valueCounts": None},
@@ -411,8 +444,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 stats[label]["valid"] = max(0, total - stats[label]["invalid"])
 
         if col == "concern_type":
-            stats["current"]["valueCounts"] = dataset_stats[latest_run]["value_counts"]["concern_type"]
-            stats["previous"]["valueCounts"] = dataset_stats[prev_run]["value_counts"]["concern_type"]
+            stats["current"]["valueCounts"] = _value_counts(dataset_stats, latest_run)
+            stats["previous"]["valueCounts"] = _value_counts(dataset_stats, prev_run)
 
         # Full per-run fidelity, keyed by run_id - see build_dashboard_
         # data.py's identical comment on stats["byRun"] for the full
@@ -422,12 +455,17 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         stats_by_run = {}
         for h in checks_out[0]["history"]:
             run_id = h["run_id"]
-            total = row_count_by_run[run_id]
+            total = row_count_by_run.get(run_id)
+            if total is None:
+                # A run that did not measure this table - a sibling's run
+                # whose cross-table result is shared here - has no count
+                # of it to divide by.
+                continue
             n_invalid = int(round(total * h["value"] / 100)) if primary_unit == "%" else int(round(h["value"]))
             n_invalid = max(0, n_invalid)
             stats_by_run[run_id] = {
                 "total": total, "invalid": n_invalid, "valid": max(0, total - n_invalid),
-                "valueCounts": dataset_stats[run_id]["value_counts"]["concern_type"] if col == "concern_type" else None,
+                "valueCounts": _value_counts(dataset_stats, run_id) if col == "concern_type" else None,
             }
         stats["byRun"] = stats_by_run
 
@@ -498,8 +536,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         "promotionState": promotion_state.state_for(dataset_id).as_record(),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
-        "rowCount": dataset_stats[latest_run]["row_counts"][table],
-        "prevRowCount": dataset_stats[prev_run]["row_counts"][table],
+        "rowCount": row_count_by_run.get(latest_run),
+        "prevRowCount": row_count_by_run.get(prev_run),
         # Per-run row counts aren't duplicated into their own dict here -
         # "runs" (below) already carries each arrival record per
         # entry, same as build_dashboard_data.py's identical comment.
@@ -601,7 +639,8 @@ def build() -> dict:
     by_table = {t: [r for r in results if r["dataset_id"] == hierarchy.dataset_for_table(t).dataset_id]
                 for t in cp_common.TABLES}
     share_cross_table_results(results, by_table)
-    datasets = [build_one_table(t, by_table[t], manifest, dataset_stats, lifecycle_by_id) for t in cp_common.TABLES]
+    datasets = [build_one_table(t, by_table[t], own_runs(manifest, t), dataset_stats, lifecycle_by_id)
+                for t in cp_common.TABLES]
     return {"datasets": datasets}
 
 

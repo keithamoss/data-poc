@@ -39,10 +39,13 @@ class TestFilingGivesARealArrival:
             [path], "civil-registration", "run_",
             deliveries_dir=deliveries, receipts_dir=receipts)
 
-        assert filed.run_id == "run_001", filed.run_id
+        # The staged table's spelling at our receipt instant
+        # (REQ-PIPE-105), never a position in a list.
         found = arrivals.arrivals_for("civil-registration", "run_",
                                        deliveries_dir=deliveries, receipts_dir=receipts)
-        assert [a.run_id for a in found] == ["run_001"]
+        assert [a.run_id for a in found] == [filed.run_id]
+        assert filed.run_id == (
+            f"birth_registrations__{asset_time.arrival_key(filed.received_at)}")
         assert found[0].delivery_name == filed.delivery_name
 
     def test_the_receipt_is_our_clock_and_is_written_outside_the_delivery(
@@ -99,8 +102,9 @@ class TestFilingGivesARealArrival:
 
     def test_a_folder_of_files_is_ONE_delivery(self, tmp_path, tree):
         """They arrived together, and a delivery is the transport unit.
-        One delivery per file would invent arrivals that never
-        happened."""
+        One delivery per file would invent DELIVERIES that never
+        happened - but each file is its own ARRIVAL (REQ-PIPE-105
+        criterion 1), and arrivals_of() gives back all of them."""
         deliveries, receipts = tree
         paths = [_csv(tmp_path, n) for n in ("cp_clients.csv", "cp_case_workers.csv")]
 
@@ -108,26 +112,36 @@ class TestFilingGivesARealArrival:
             paths, "child-protection", "cp_run_",
             deliveries_dir=deliveries, receipts_dir=receipts)
 
-        assert filed.run_id == "cp_run_001"
+        key = asset_time.arrival_key(filed.received_at)
+        found = hand_filing.arrivals_of(filed, "child-protection", "cp_run_",
+                                        deliveries_dir=deliveries, receipts_dir=receipts)
+        assert [a.run_id for a in found] == [f"cp_case_workers__{key}", f"cp_clients__{key}"]
+        assert filed.run_id == found[0].run_id
         assert len(list((deliveries / filed.delivery_name).iterdir())) == 2
         assert len(list(deliveries.iterdir())) == 1
 
     def test_a_filed_supply_sorts_after_everything_already_recorded(self, tmp_path, tree):
-        """This requirement's second non-functional constraint - run ids
-        are positional over receipt order, so filing must never
-        renumber committed history."""
+        """This requirement's second non-functional constraint - filing
+        must never renumber committed history. Run ids stopped being
+        positional on 2026-10-02 (REQ-PIPE-105), which makes this hold
+        by construction; the test now proves the earlier arrival's id is
+        untouched rather than that the new one counted past it."""
         deliveries, receipts = tree
         delivery.write_delivery(
             "already-here", {"birth_registrations_2026-01-01.csv": "registration_id\nR0\n"},
             received_at=asset_time.parse_instant("2026-01-01T00:00:00+08:00", "test"),
             deliveries_dir=deliveries, receipts_dir=receipts)
 
+        before = [a.run_id for a in arrivals.arrivals_for(
+            "civil-registration", "run_", deliveries_dir=deliveries, receipts_dir=receipts)]
         filed = hand_filing.file_supply(
             [_csv(tmp_path, "birth_registrations_2026-09-20.csv")],
             "civil-registration", "run_",
             deliveries_dir=deliveries, receipts_dir=receipts)
+        after = [a.run_id for a in arrivals.arrivals_for(
+            "civil-registration", "run_", deliveries_dir=deliveries, receipts_dir=receipts)]
 
-        assert filed.run_id == "run_002", "filing renumbered an arrival already recorded"
+        assert after == before + [filed.run_id], "filing renumbered an arrival already recorded"
 
 
 class TestAnUnplaceableFileIsRefused:

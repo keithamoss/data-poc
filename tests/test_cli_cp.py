@@ -212,16 +212,23 @@ def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypat
 # now).
 
 def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
-        monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
+        monkeypatch, tmp_path, cp_raw_dir, private_supply_dsn):
     """REQ-PIPE-103 criteria 1, 7 and 8 for the folder route.
 
-    ONE DELIVERY, SIX FILES. They arrived together and a delivery is
-    the transport unit; one delivery per file would invent six
-    arrivals out of one. The run id comes back from recognition -
-    `cp_run_001`, because this test's tree is empty - and not from the
-    folder's name.
+    ONE DELIVERY, SIX FILES - AND SIX RUNS. They arrived together and
+    a delivery is the transport unit, so ONE delivery is filed; but
+    every file is its own arrival (REQ-PIPE-105 criterion 1), so it is
+    checked as six, exactly as the batch would (Keith, 2026-10-02). Each
+    run id comes back from recognition - the staged table's spelling at
+    our receipt instant - and not from the folder's name.
+
+    A DATABASE OF ITS OWN, because a kept supply is now FILED and
+    PROMOTED like any arrival: in the shared fixture database it would
+    file into the period the fixture's dirty delivery is still staged
+    for, and come out contested (criterion 6) - the model working, and
+    not what this test is about.
     """
-    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir,
+    _patch_cp_dirs(monkeypatch, cp_raw_dir, private_supply_dsn,
                     (tmp_path / "deliveries", tmp_path / "receipts"))
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
 
@@ -232,12 +239,20 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
     ])
 
     assert result.exit_code == 0, result.output
-    assert "recognised as cp_run_001" in _flat(result.output)
     assert "is a real arrival" in _flat(result.output)
     filed = list((tmp_path / "deliveries").iterdir())
     assert len(filed) == 1, f"expected ONE delivery, got {[d.name for d in filed]}"
     assert len(list(filed[0].iterdir())) == len(cp.TABLES)
     assert len(list((tmp_path / "receipts").glob("*.json"))) == 1
+
+    # SIX RUNS RECORDED, one per table, all at the filed delivery's one
+    # receipt instant - the newest key among this worker's runs.
+    from qa_tools.common import qa_results_reader as reader
+    recorded = [r.split("__", 1) for r in reader.list_run_ids(
+        cp.cp_common.AGENCY_ID, cp.cp_common.COLLECTION_ID) if "__" in r]
+    newest = max(key for _table, key in recorded)
+    six = [f"{table}__{key}" for table, key in recorded if key == newest]
+    assert sorted(r.split("__", 1)[0] for r in six) == sorted(cp.TABLES), recorded
 
 
 def test_qa_command_local_folder_reports_real_cp_failures(monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
@@ -258,7 +273,7 @@ def test_qa_command_local_folder_reports_real_cp_failures(monkeypatch, tmp_path,
 
 
 def test_qa_command_local_folder_commit_records_the_run(
-        monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir, clean_qa_history):
+        monkeypatch, tmp_path, cp_raw_dir, private_supply_dsn):
     from qa_tools.common import qa_results_reader as reader
 
     # THE DELIVERY DIRECTORIES ARE REDIRECTED, and this test is why the
@@ -270,7 +285,7 @@ def test_qa_command_local_folder_commit_records_the_run(
     # bootstrap from 151 staged tables to 275, and they got themselves
     # PINNED into tests/fixtures/arrival_semantics_golden.json as two extra
     # Child Protection runs that no clean checkout has.
-    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir,
+    _patch_cp_dirs(monkeypatch, cp_raw_dir, private_supply_dsn,
                     (tmp_path / "deliveries", tmp_path / "receipts"))
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
 
@@ -281,10 +296,12 @@ def test_qa_command_local_folder_commit_records_the_run(
     ])
 
     assert result.exit_code == 0, result.output
+    # ONE RUN PER FILE (REQ-PIPE-105 criterion 1), each attributed.
     recorded = reader.list_run_ids(cp.AGENCY_ID, cp.COLLECTION_ID)
-    assert len(recorded) == 1, recorded
-    assert reader.read_run_provenance(cp.AGENCY_ID, cp.COLLECTION_ID,
-                                       recorded[0])["run_by"] == "test@example.com"
+    assert len(recorded) == len(cp.TABLES), recorded
+    for run_id in recorded:
+        assert reader.read_run_provenance(cp.AGENCY_ID, cp.COLLECTION_ID,
+                                           run_id)["run_by"] == "test@example.com"
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")

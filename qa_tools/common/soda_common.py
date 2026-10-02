@@ -233,3 +233,56 @@ def close_scan_connections(scan) -> int:
             # if this starts happening.
             pass
     return closed
+
+
+def readable_checks_yaml(path: str, unreadable) -> str:
+    """The SodaCL file at `path`, less every check this run cannot read.
+
+    THE SODA HALF OF dbt_common.exclude_unreadable(), and the same
+    latent defect one tool over (found 2026-10-02). A run's view schema
+    can lack a table - held, contested with nothing promoted, or filed
+    to another period, which REQ-PIPE-105 makes ordinary: one file is
+    one arrival, and Case Workers' April file is not its siblings'
+    period's to read. Handed checks over a relation that does not exist,
+    Soda errors them, and the scan's caller fails the whole run - every
+    readable table losing its QA for one that was never there.
+
+    TWO THINGS GO: a `checks for <table>` section whose table is
+    unreadable, and any check elsewhere whose `check_id` DECLARES that
+    it reads one (a reference check, a cross-table failed-rows query).
+    The declaration is the same one the promotion gate and the results
+    writer use, so the three cannot disagree about what a check reads.
+    Nothing is recorded for a check left out: it was not run, which is
+    different from failing.
+    """
+    import yaml
+
+    from qa_tools.common.qa_results_writer import _declared_reads_tables
+
+    gone = set(unreadable)
+    with open(path) as f:
+        text = f.read()
+    if not gone:
+        # VERBATIM in the ordinary case, so a run that can read every
+        # table is handed exactly the authored file and no round-trip.
+        return text
+    doc = yaml.safe_load(text)
+    declared = _declared_reads_tables()
+    out = {}
+    for key, checks in doc.items():
+        if key.startswith("checks for ") and key[len("checks for "):].strip() in gone:
+            continue
+        if isinstance(checks, list):
+            kept = []
+            for item in checks:
+                check_id = None
+                if isinstance(item, dict) and len(item) == 1:
+                    body = next(iter(item.values()))
+                    if isinstance(body, dict):
+                        check_id = (body.get("attributes") or {}).get("check_id")
+                if check_id and gone & set(declared.get(check_id, ())):
+                    continue
+                kept.append(item)
+            checks = kept
+        out[key] = checks
+    return yaml.safe_dump(out, sort_keys=False)

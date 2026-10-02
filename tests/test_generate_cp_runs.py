@@ -432,9 +432,16 @@ def test_a_partial_resupply_survives_as_a_real_delivery_on_disk(tmp_path, monkey
             arrivals_written.append(arrival)
 
     found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries_dir, receipts_dir)
-    assert len(found) == len(arrivals_written), "every arrival must be recognised as its own delivery"
+    # ONE ARRIVAL PER FILE since REQ-PIPE-105 criterion 1, so what a
+    # DELIVERY carried is read by grouping its arrivals - the delivery
+    # is still the transport unit this test is about.
+    per_delivery: dict[str, int] = {}
+    for a in found:
+        assert len(a.files_by_dataset) == 1, (a.run_id, a.files_by_dataset)
+        per_delivery[a.delivery_name] = per_delivery.get(a.delivery_name, 0) + 1
+    assert len(per_delivery) == len(arrivals_written), "every delivery must be recognised"
 
-    sizes = [len(a.files_by_dataset) for a in found]
+    sizes = list(per_delivery.values())
     assert 6 in sizes, "criterion 3 - a whole-collection delivery is still ONE delivery"
     assert any(0 < n < 6 for n in sizes), \
         "criterion 2 - some of a collection's tables resupplied and the rest not"

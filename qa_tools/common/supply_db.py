@@ -1037,6 +1037,22 @@ def create_run_views(conn, run_id: str, candidates: Mapping[str, Sequence[str]],
     return res
 
 
+def readable_in(conn, run_id: str) -> frozenset[str]:
+    """The logical tables this run's view schema actually holds.
+
+    THE GROUND TRUTH OF WHAT A TOOL CAN QUERY, asked of the catalogue
+    rather than of the recorded resolution - which says WHY a table is
+    missing, but a record that disagreed with the schema would make a
+    tool raise the very UndefinedTable this exists to prevent. Since
+    REQ-PIPE-105 a missing table is ordinary rather than exceptional: one
+    file is one arrival, and a sibling can be not yet arrived, contested
+    with nothing promoted, or filed to another period.
+    """
+    return frozenset(row[0] for row in conn.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
+        [run_schema(run_id)]).fetchall())
+
+
 def add_run_views(conn, run_id: str, candidates: Mapping[str, Sequence[str]],
                   source_schema: str, base: Resolution) -> Resolution:
     """Add views from a SECOND source schema to a run's existing schema.

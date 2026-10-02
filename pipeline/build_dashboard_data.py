@@ -210,12 +210,19 @@ def build() -> dict:
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
 
     run_ids_in_order = [m["run_id"] for m in manifest]
-    latest_run, prev_run = run_ids_in_order[-1], run_ids_in_order[-2]
+    # THE NEWEST RUNS THAT MEASURED THE TABLE - see the Child Protection
+    # builder's identical block. A same-day resupply beside an unpromoted
+    # red supply is contested (REQ-PIPE-105 criterion 6), measures
+    # nothing, and is not what "current" means.
+    measured = [r for r in run_ids_in_order
+                if (dataset_stats.get(r) or {}).get("row_count") is not None]
+    measured = measured or run_ids_in_order
+    latest_run, prev_run = measured[-1], (measured[-2] if len(measured) > 1 else measured[-1])
     # run_date alone can't key a run uniquely - a resupply run shares its
     # base run's run_date (e.g. run_54_2026-09-10 and
     # run_54_2026-09-10_resupply1) - so byRun below keys directly on
     # run_id via each history entry's own "run_id" field, not run_date.
-    row_count_by_run = {run_id: st["row_count"] for run_id, st in dataset_stats.items()}
+    row_count_by_run = {run_id: st.get("row_count") for run_id, st in dataset_stats.items()}
 
     columns_out = []
     for col in ALL_COLUMNS:
@@ -234,7 +241,8 @@ def build() -> dict:
                     run_date = next(_run_date(m) for m in manifest if m["run_id"] == run_id)
                     aggregate_values = None
                     if attach_aggregate:
-                        aggregate_values = dataset_stats[run_id]["check_aggregates"].get(col)
+                        aggregate_values = (dataset_stats.get(run_id) or {}).get(
+                            "check_aggregates", {}).get(col)
                     history.append({
                         "run_id": run_id, "run_date": run_date, "value": slot["by_run"][run_id],
                         "row_count_total": slot["row_count_total"].get(run_id),
@@ -354,8 +362,8 @@ def build() -> dict:
         # generated row count for that run (every column shares one table,
         # so this is the same for all of them - what differs per column is
         # how many of those rows the *primary* check, checks[0], flagged).
-        total_latest_manifest = dataset_stats[latest_run]["row_count"]
-        total_prev_manifest = dataset_stats[prev_run]["row_count"]
+        total_latest_manifest = row_count_by_run.get(latest_run) or 0
+        total_prev_manifest = row_count_by_run.get(prev_run) or 0
 
         stats = {
             "current": {"total": total_latest_manifest, "invalid": 0, "valid": total_latest_manifest, "valueCounts": None},
@@ -371,8 +379,8 @@ def build() -> dict:
                 stats[label]["valid"] = max(0, total - stats[label]["invalid"])
 
         if col == "sex":
-            stats["current"]["valueCounts"] = dataset_stats[latest_run]["value_counts"]["sex"]
-            stats["previous"]["valueCounts"] = dataset_stats[prev_run]["value_counts"]["sex"]
+            stats["current"]["valueCounts"] = (dataset_stats[latest_run].get("value_counts") or {}).get("sex")
+            stats["previous"]["valueCounts"] = (dataset_stats[prev_run].get("value_counts") or {}).get("sex")
 
         # Full per-run fidelity, keyed by run_id (not an index-aligned
         # array like history - the as-of picker this serves needs direct
@@ -388,12 +396,15 @@ def build() -> dict:
         stats_by_run = {}
         for h in checks_out[0]["history"]:
             run_id = h["run_id"]
-            total = row_count_by_run[run_id]
+            total = row_count_by_run.get(run_id)
+            if total is None:
+                continue
             n_invalid = int(round(total * h["value"] / 100)) if primary_unit == "%" else int(round(h["value"]))
             n_invalid = max(0, n_invalid)
             stats_by_run[run_id] = {
                 "total": total, "invalid": n_invalid, "valid": max(0, total - n_invalid),
-                "valueCounts": dataset_stats[run_id]["value_counts"]["sex"] if col == "sex" else None,
+                "valueCounts": (dataset_stats[run_id].get("value_counts") or {}).get("sex")
+                               if col == "sex" else None,
             }
         stats["byRun"] = stats_by_run
 
@@ -477,8 +488,8 @@ def build() -> dict:
             "birth-registrations").as_record(),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
-        "rowCount": dataset_stats[latest_run]["row_count"],
-        "prevRowCount": dataset_stats[prev_run]["row_count"],
+        "rowCount": row_count_by_run.get(latest_run),
+        "prevRowCount": row_count_by_run.get(prev_run),
         # Per-run row counts aren't duplicated into their own dict here -
         # "runs" (below) already carries each arrival record per
         # entry, so Thread C's as-of UI can read it straight from there.

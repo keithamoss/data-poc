@@ -177,6 +177,15 @@ def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, run_id: str, arrival:
     rest is in data/generator_bookkeeping.json, which nothing here may
     read.
     """
+    # A RUN THAT COULD READ NOTHING still has an arrival worth recording -
+    # see orchestrate_bdm's own note on why its table can be unreadable
+    # (REQ-PIPE-105). What was measured is left empty rather than invented.
+    if not conn.execute(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = 'birth_registrations'"
+            ).fetchall():
+        return {"arrival_record": _arrival_record(arrival), "row_count": None,
+                "value_counts": {}, "arrival": {}, "check_aggregates": {}}
     return {
         "arrival_record": _arrival_record(arrival),
         # MEASURED, not declared. This used to reach the dashboard as

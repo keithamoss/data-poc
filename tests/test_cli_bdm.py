@@ -26,8 +26,8 @@ _DIRTY_RUN_ID = "pytest_bdm_dirty"
 # qa_tools.common.arrivals, which is what the Synthetic --run-id flow
 # picks from. The flat `pytest_bdm_*.csv` names above still matter for
 # the Local files mode, which takes a real path to a real file.
-_ARRIVAL_REF_RUN_ID = "run_001"
-_ARRIVAL_DIRTY_RUN_ID = "run_002"
+from fixture_ids import BDM_DIRTY_RUN_ID as _ARRIVAL_DIRTY_RUN_ID  # noqa: E402
+from fixture_ids import BDM_REF_RUN_ID as _ARRIVAL_REF_RUN_ID  # noqa: E402
 
 _runner = CliRunner()
 
@@ -327,16 +327,19 @@ def test_qa_command_local_file_commit_files_a_real_delivery_and_records_it(
 
     assert result.exit_code == 0, result.output
     # THE RUN IS AN ORDINARY ARRIVAL, first in an empty tree.
-    assert "recognised as run_001" in _flat(result.output)
+    # The id is the staged table's spelling at OUR receipt instant
+    # (REQ-PIPE-105), and the instant is now - so its shape is asserted.
+    assert re.search(r"recognised as birth_registrations__\d{18,}", _flat(result.output)), \
+        result.output
     assert "is a real arrival" in _flat(result.output)
     assert (raw_dir / "deliveries").exists(), "keeping filed no delivery"
 
     # AND ITS RESULTS ARE RECORDED, under the id recognition gave it -
     # which used to be checked by globbing for a dataset_stats.json.
     recorded = reader.list_run_ids(bdm.AGENCY_ID, bdm.COLLECTION_ID)
-    assert recorded == ["run_001"], recorded
+    assert len(recorded) == 1 and recorded[0].startswith("birth_registrations__"), recorded
     assert reader.read_run_provenance(bdm.AGENCY_ID, bdm.COLLECTION_ID,
-                                       "run_001")["run_by"] == "test@example.com"
+                                       recorded[0])["run_by"] == "test@example.com"
 
 
 def test_qa_command_local_file_commit_refuses_a_name_recognition_cannot_place(

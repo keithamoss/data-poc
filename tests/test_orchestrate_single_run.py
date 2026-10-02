@@ -141,3 +141,39 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     assert len(tables_seen) > 1, "results should span more than one of the 6 real CP tables"
     failing = [r for r in results if r["status"] == "fail"]
     assert failing, "the real red-severity dirty CP delivery produced no failures via run_single()"
+
+
+class TestABirthRegistrationsRunWithNothingItMayRead:
+    """REAL DEFECT, 2026-10-02, found by the first bootstrap after
+    REQ-PIPE-105's overlay landed - which it crashed after two minutes.
+
+    A same-day resupply beside an unpromoted red supply makes the run's
+    OWN table contested (criterion 6, Keith's call that day), and with
+    nothing promoted for that day the view falls through to nothing.
+    Birth Registrations has one table, so the run had nothing it was
+    allowed to read - and Soda raised UndefinedTable, taking the whole
+    batch down. A run with nothing it may check checks nothing, says
+    why in its tables_read, and finishes.
+    """
+
+    def test_it_records_no_results_and_does_not_raise(self, monkeypatch, bdm_duckdb_dir):
+        import uuid
+
+        from conftest import clone_run_views
+        from fixture_ids import BDM_REF_RUN_ID
+        from qa_tools.common import supply_db
+
+        written = []
+        monkeypatch.setattr(orchestrate_bdm, "write_qa_result",
+                            lambda *a, **k: written.append(a[4]))
+        mine = f"bdm_held_{uuid.uuid4().hex[:8]}"
+        with supply_db.connect(label="test-bdm-unreadable") as conn:
+            clone_run_views(conn, BDM_REF_RUN_ID, mine, held={"birth_registrations"})
+        entry = {"run_id": mine, "run_index": 1, "csv_path": "unused.csv",
+                 "received_at": "2026-01-01T06:00:00+00:00", "delivery": "d"}
+
+        results = orchestrate_bdm._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+                                           reference_run_id=None)
+
+        assert results == []
+        assert "tables_read" in written and "dataset_stats" in written

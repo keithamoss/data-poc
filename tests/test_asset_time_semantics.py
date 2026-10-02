@@ -166,6 +166,16 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         `earliest_extract` this used to carry (criterion 4). The other
         116 were already equal, which is why the diff is smaller than
         the change sounds.
+
+    RE-CAPTURED AGAIN 2026-10-02 FOR REQ-PIPE-105, which moved ONLY the
+    keys. One file is one arrival and a run id is its staged table's
+    spelling, so `cp_run_007` became `cp_clients__2023...` and its five
+    siblings. Procedure followed first: 60 deliveries, zero
+    `handfiled-*`. Then verified the claim that nothing ELSE moved rather
+    than assuming it, by matching old and new entries per dataset on
+    their arrival INSTANT: all 150 matched, none only on one side, and
+    zero verdicts moved. Still 18 arrivals per Child Protection dataset -
+    108 runs in all, six per delivery, each dataset seeing its own.
     """
 
     def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):

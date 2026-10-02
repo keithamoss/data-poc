@@ -107,3 +107,15 @@ def test_the_suppliers_own_timestamp_no_longer_decides_punctuality():
     assert ({r: v["arrivalStatus"] for r, v in before["arrivalByRun"].items()}
             == {r: v["arrivalStatus"] for r, v in after["arrivalByRun"].items()}), (
         "the supplier's own extract timestamp still moves the verdict")
+
+
+def test_each_dataset_shows_its_own_runs():
+    """One file is one arrival (REQ-PIPE-105), so a delivery is six runs
+    and each belongs to one table. Without this every Child Protection
+    page listed all 108 runs as its own arrival history."""
+    from pipeline import build_cp_dashboard_data as b
+
+    manifest = [{"run_id": "cp_clients__1"}, {"run_id": "cp_placements__1"},
+                {"run_id": "cp_clients__2"}, {"run_id": "cp_run_001"}]
+    assert [m["run_id"] for m in b.own_runs(manifest, "cp_clients")] == [
+        "cp_clients__1", "cp_clients__2", "cp_run_001"]

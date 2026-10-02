@@ -130,10 +130,13 @@ def file_supply(paths, collection_id: str, run_id_prefix: str,
 
     `received_at` IS OUR OWN CLOCK and defaults to now, which is the
     only honest reading: we know when WE received it, never when it
-    was sent. That also satisfies this requirement's second
-    non-functional constraint without doing anything special - run ids
-    are positional over receipt order, so a supply received now sorts
-    after everything already recorded and renumbers nothing.
+    was sent. Filing renumbers nothing already recorded - this
+    requirement's second non-functional constraint - because a run id
+    is the staged table's spelling at its receipt instant rather than a
+    position (REQ-PIPE-105, 2026-10-02).
+
+    ONE DELIVERY IS STILL SEVERAL ARRIVALS where it holds several files;
+    `Filed.run_id` is the first, and arrivals_of() gives all of them.
     """
     check(paths)
     received_at = received_at or asset_time.now()
@@ -184,3 +187,18 @@ def file_supply(paths, collection_id: str, run_id_prefix: str,
         f"filed delivery {name!r} but recognition did not place it in "
         f"collection {collection_id!r} - nothing in it belongs to that "
         f"collection. The delivery is on disk; no run was started.")
+
+
+def arrivals_of(filed: Filed, collection_id: str, run_id_prefix: str,
+                deliveries_dir=None, receipts_dir=None) -> list:
+    """Every arrival a filed delivery became, in processing order.
+
+    ONE DELIVERY, SEVERAL ARRIVALS (REQ-PIPE-105 criterion 1): the
+    delivery is the transport unit and a FILE is the arrival, so a
+    six-file folder is six runs. `Filed.run_id` names the first of them
+    and is kept for the one-file case, where it is the whole answer.
+    """
+    return [a for a in arrivals.arrivals_for(collection_id, run_id_prefix,
+                                              deliveries_dir=deliveries_dir,
+                                              receipts_dir=receipts_dir)
+            if a.delivery_name == filed.delivery_name]

@@ -52,10 +52,17 @@ def _call_lines(module_name: str, func_name: str, dotted: str) -> list[int]:
 
 
 class TestTheFilingCallComesBeforeTheToolRuns:
+    """THE CALL MOVED, 2026-10-02 (REQ-PIPE-105). Filing now lives in each
+    orchestrator's file_and_overlay(), which the batch's before-each hook
+    calls and `mothman bdm/cp qa --commit` calls too - so a hand-filed
+    supply and a batch one cannot be filed differently. What is pinned
+    is the same order, one function further in: the batch reaches
+    file_and_overlay before the manifest runs, and file_and_overlay files
+    BEFORE it builds the period overlay, which needs the filing."""
 
     def test_cp_files_before_it_runs_the_manifest(self):
         filed = _call_lines("qa_tools.cp.orchestrate_cp", "run_pipeline_cp",
-                            "filing.file_arrivals")
+                            "file_and_overlay")
         ran = _call_lines("qa_tools.cp.orchestrate_cp", "run_pipeline_cp",
                           "parallel_orchestrate.run_manifest")
         assert filed, "filing is never actually called - a comment mentioning it is not a call"
@@ -65,13 +72,22 @@ class TestTheFilingCallComesBeforeTheToolRuns:
 
     def test_bdm_files_before_it_runs_the_manifest(self):
         filed = _call_lines("qa_tools.bdm.orchestrate_bdm", "run_pipeline",
-                            "filing.file_arrivals")
+                            "file_and_overlay")
         ran = _call_lines("qa_tools.bdm.orchestrate_bdm", "run_pipeline",
                           "parallel_orchestrate.run_manifest")
         assert filed, "filing is never actually called - a comment mentioning it is not a call"
         assert ran, "the manifest run could not be found, so the order cannot be judged"
         assert filed[0] < ran[0], \
             "a check running before the slot is recorded has nothing to classify against"
+
+    def test_both_file_before_they_build_the_overlay(self):
+        for module in ("qa_tools.cp.orchestrate_cp", "qa_tools.bdm.orchestrate_bdm"):
+            filed = _call_lines(module, "file_and_overlay", "filing.file_arrivals")
+            overlaid = _call_lines(module, "file_and_overlay",
+                                   "period_overlay.rebuild_for_arrival")
+            assert filed and overlaid, module
+            assert filed[0] < overlaid[0], \
+                f"{module}: the overlay reads the period the filing decides"
 
 
 def _run_manifest_keywords(module_name: str, func_name: str) -> set[str]:
@@ -120,15 +136,15 @@ class TestFilingIsInterleavedRatherThanDoneUpFront:
             "qa_tools.bdm.orchestrate_bdm", "run_pipeline")
 
     def test_cp_does_not_file_the_whole_batch_at_once(self):
-        args = _file_arrivals_arguments("qa_tools.cp.orchestrate_cp", "run_pipeline_cp")
+        args = _file_arrivals_arguments("qa_tools.cp.orchestrate_cp", "file_and_overlay")
         assert args, "filing is never actually called"
         for arg in args:
-            assert not (isinstance(arg, ast.Name) and arg.id == "found_arrivals"), \
+            assert isinstance(arg, ast.List) and len(arg.elts) == 1, \
                 "filing the whole batch up front puts every supply in the first slot"
 
     def test_bdm_does_not_file_the_whole_batch_at_once(self):
-        args = _file_arrivals_arguments("qa_tools.bdm.orchestrate_bdm", "run_pipeline")
+        args = _file_arrivals_arguments("qa_tools.bdm.orchestrate_bdm", "file_and_overlay")
         assert args, "filing is never actually called"
         for arg in args:
-            assert not (isinstance(arg, ast.Name) and arg.id == "found_arrivals"), \
+            assert isinstance(arg, ast.List) and len(arg.elts) == 1, \
                 "filing the whole batch up front puts every supply in the first slot"

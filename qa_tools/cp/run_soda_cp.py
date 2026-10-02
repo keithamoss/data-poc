@@ -20,7 +20,7 @@ from qa_tools.common import supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
-    execute_scan,
+    execute_scan, readable_checks_yaml,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
@@ -65,7 +65,14 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # every exception - and a Soda scan raising is exactly the case nobody is watching.
     try:
         conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
-        n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in cp_common.TABLES}
+        # ONLY WHAT THIS RUN CAN READ - see soda_common.readable_checks_yaml()
+        # for the defect this closes. Asked of the run's OWN SCHEMA rather
+        # than of the recorded resolution: what Soda can query is exactly
+        # what has a view, and a resolution record that disagreed with
+        # the schema would make this raise the very error it prevents.
+        unreadable = set(cp_common.TABLES) - supply_db.readable_in(conn, run_id)
+        n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                            for t in cp_common.TABLES if t not in unreadable}
 
         scan = Scan()
         scan.set_data_source_name("cp_collection")
@@ -76,7 +83,7 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
         # what the SET search_path above was doing for the shared connection.
         scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
             "cp_collection", supply_db.run_schema(run_id)))
-        scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
+        scan.add_sodacl_yaml_str(readable_checks_yaml(SODA_CHECKS_PATH, unreadable))
         sampler = CaptureSampler()
         scan.sampler = sampler
         scan.disable_telemetry()

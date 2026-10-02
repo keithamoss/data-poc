@@ -310,9 +310,10 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
 def resolve_run_ids(placements: Sequence[Placement], recognised) -> None:
     """Fill in each injected arrival's REAL run id, from recognition.
 
-    WHY NOT THE GENERATOR'S OWN. Run identity comes from RECEIPT ORDER
-    over the deliveries recognition finds (REQ-GEN-043), not from the
-    generator's manifest numbering, and the two diverge the moment a
+    WHY NOT THE GENERATOR'S OWN. Run identity comes from RECOGNITION
+    (REQ-GEN-043) - since REQ-PIPE-105 the staged table's spelling at
+    our receipt instant, and before that a position in receipt order -
+    not from the generator's manifest numbering, and the two diverged the moment a
     scenario SUPPRESSES a period: the manifest is short by however many
     slots were left empty and every later id shifts. Measured on the
     first real run of this code - the placement claimed run_036 and the
@@ -323,12 +324,26 @@ def resolve_run_ids(placements: Sequence[Placement], recognised) -> None:
     written. Observed rather than predicted, which is the same rule this
     project applies to every other derived identity.
     """
-    by_name = {arrival.delivery_name: arrival.run_id for arrival in recognised}
+    # BY (DELIVERY, DATASET), NOT BY DELIVERY ALONE (2026-10-02). One
+    # file is one arrival since REQ-PIPE-105, so a six-file delivery is
+    # six runs sharing one name, and a name-keyed map kept whichever was
+    # recognised LAST - a cp-clients scenario pointing at the
+    # cp_placements run. The scenario's own dataset picks its run; a
+    # delivery that did not carry that dataset falls back to its only
+    # run where there is exactly one, and to nothing otherwise rather
+    # than to a guess.
+    by_name: dict[str, dict[str, str]] = {}
+    for arrival in recognised:
+        datasets = tuple(getattr(arrival, "files_by_dataset", None) or ()) or ("",)
+        for dataset_id in datasets:
+            by_name.setdefault(arrival.delivery_name, {})[dataset_id] = arrival.run_id
     for placement in placements:
         for arrival in placement.arrivals:
-            name = arrival.get("delivery")
-            if name and name in by_name:
-                arrival["run_id"] = by_name[name]
+            runs = by_name.get(arrival.get("delivery") or "") or {}
+            run_id = runs.get(placement.dataset) or (
+                next(iter(runs.values())) if len(runs) == 1 else None)
+            if run_id:
+                arrival["run_id"] = run_id
 
 
 def check_suppressed_days_are_empty(placements: Sequence[Placement], recognised) -> None:

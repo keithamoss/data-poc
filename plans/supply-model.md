@@ -240,8 +240,15 @@ unblocked by it. `gh` is still absent here, which is what makes criterion
 so in one line, and finishes normally.
 
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
-`REQ-PIPE-079` (decision layer done, wiring not), `REQ-PIPE-105`
-(criteria 3, 4, 7, 8 and 12 done; the arrival UNIT is not).
+`REQ-PIPE-079` (decision layer written but uncalled; the overlay WIRED
+2026-10-02), `REQ-PIPE-105` (criteria 1-5, 7, 8, 11's guard and 12 done
+as of 2026-10-02; 6's hold retirement, 9, 10 and 13 not - see its first
+decision).
+
+**THE SWITCH-OVER BELOW LANDED 2026-10-02** as one piece, as this
+paragraph asked: `period_overlay.py` calls `create_overlay_views()` right
+after filing, and `fan_out()` stays uncalled because one file never spans
+periods. Kept below as the account of why they were one piece.
 
 **AND THE TWO ARE THE SAME SWITCH-OVER, found 2026-09-29 while answering
 Keith's "what do you need from me" on each.** `079` criterion 2 ("evaluate

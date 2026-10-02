@@ -28,7 +28,7 @@ from rich.table import Table
 from qa_tools.cp import build_cp_warehouses, cp_common, orchestrate_cp
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
-from qa_tools.common import hand_filing
+from qa_tools.common import hand_filing, hierarchy
 from qa_tools.common import supply_db
 from qa_tools.common import trial as trial_mod
 from qa_tools.common.qa_results_reader import list_run_ids
@@ -239,6 +239,24 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
     return results, recorded_run_id
 
 
+def _check_filed_delivery(filed, run_by: str, on_step=None) -> list[dict]:
+    """Stage, file, check and promote every arrival of a filed delivery,
+    one at a time in the batch's own order - see
+    orchestrate_cp.run_arrivals(). The arrivals come back from
+    recognition, never from the folder's own listing."""
+    found = hand_filing.arrivals_of(filed, "child-protection", "cp_run_")
+    for arrival in found:
+        (dataset_id, names), = arrival.files_by_dataset.items()
+        table = hierarchy.dataset(dataset_id).table
+        for ordinal, name in enumerate(sorted(names), start=1):
+            build_cp_warehouses.add_table_to_run(
+                arrival.run_id, table, str(arrival.path / name),
+                ordinal=ordinal if len(names) > 1 else 0,
+                received_at=arrival.received_at, dataset_id=dataset_id,
+                delivery_name=arrival.delivery_name)
+    return orchestrate_cp.run_arrivals(found, run_by, on_step=on_step)
+
+
 def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
                             run_id: str | None = None, run_date: str | None = None,
                             on_step=None, keep: bool | None = None
@@ -261,6 +279,14 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
         "child-protection", "cp_run_", keep=keep)
     if run_id is not None and not filed.delivery_name:
         filed = dataclasses.replace(filed, run_id=run_id)
+    if filed.delivery_name:
+        # KEPT: SIX ARRIVALS, SIX RUNS, exactly as the batch would process
+        # them (REQ-PIPE-105 criterion 1; Keith, 2026-10-02). Each is
+        # staged under its own id, filed, overlaid on its period, checked
+        # and promoted - and the drift reference comes from the recorded
+        # history the way it does for any arrival, so --reference-folder
+        # applies to a trial only.
+        return _check_filed_delivery(filed, run_by, on_step), filed
     run_id = filed.run_id
     folder = os.path.dirname(filed.paths[0])
     reference_run_id = common.reference_run_id()

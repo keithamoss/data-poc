@@ -94,26 +94,13 @@ class TestAnUnreadableTableDoesNotTakeTheRunDown:
     def test_the_other_five_tables_are_still_checked(self, _dbt_cp, supply_dsn):
         import uuid
 
-        from qa_tools.common import load_log, supply_db
-        from qa_tools.cp import cp_common
+        from qa_tools.common import supply_db
+
+        from conftest import clone_run_views
 
         mine = f"cp_held_{uuid.uuid4().hex[:8]}"
-        staging = supply_db.staging_schema_for(_REF_RUN_ID)
-        arrival = supply_db.resolution_for(
-            supply_db.connect(read_only=True), _REF_RUN_ID)
-        key = next((supply_db.split_staged(p)[1]
-                     for p in arrival.resolved.values()
-                     if supply_db.split_staged(p)), None)
-        assert key, "test precondition - the reference run must have staged tables"
-
         with supply_db.connect(label="test-held-dbt") as conn:
-            res = supply_db.create_run_views(
-                conn, mine,
-                supply_db.candidates_in(conn, staging, cp_common.TABLES,
-                                         arrival=key,
-                                         loaded=load_log.loaded_tables(None)),
-                source_schema=staging, held=["cp_clients"])
-            supply_db.record_resolution(conn, res)
+            res = clone_run_views(conn, _REF_RUN_ID, mine, held={"cp_clients"})
         assert "cp_clients" in res.held, "the held table must not have resolved"
 
         try:

@@ -36,6 +36,7 @@ from qa_tools.common import filing
 from qa_tools.common import held_blast_radius
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common import period_overlay
 from qa_tools.common import promotion
 from qa_tools.common import ticket_reconciler
 from qa_tools.common import trial
@@ -43,7 +44,7 @@ from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_reader import canonical_order
 from qa_tools.common.qa_results_writer import (
-    finish_run, open_run, write_qa_result)
+    finish_run, open_run, run_owner, write_qa_result)
 from . import build_cp_warehouses
 from . import cp_common
 from . import dataset_stats
@@ -168,8 +169,16 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # orchestrate_bdm.py's identical block for the full account, and
     # why None here means "no reference" rather than "use a default".
     if reference_run_id is None:
+        # THIS RUN'S OWN DATASET, not cp-notifications' (REQ-PIPE-105).
+        # A run is one file now, and the volume check it records is about
+        # its own table - so its reference is the run that checked its
+        # own dataset's last promoted supply, which is also the only run
+        # sure to have recorded that table's numbers. Asking about
+        # cp-notifications instead found nothing for any run filed before
+        # the notifications file of its delivery.
+        owner = run_owner(run_id)
         reference_run_id = drift_reference.reference_run_for_arrival(
-            run_evidently_cp.DATASET_ID, entry["received_at"])
+            owner[0] if owner else run_evidently_cp.DATASET_ID, entry["received_at"])
     _announce(on_step, RUN_STEPS[3])
     results.extend(_run_step(cp_common.COLLECTION_ID, "Evidently", run_id,
         lambda: run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id)))
@@ -261,6 +270,75 @@ def run_single(entry: dict, reference_run_id: str | None = None, run_by: str | N
     return _run_one(entry, run_timestamp, run_by, reference_run_id, on_step=on_step)
 
 
+def file_and_overlay(arrival) -> None:
+    """Everything between staging an arrival and checking it.
+
+    WHERE EACH SUPPLY BELONGS, RECORDED BEFORE ANY CHECK RUNS OVER IT
+    (REQ-PIPE-075 criterion 7). filing.filled_slots() reads the decision
+    log, so this sees what the arrivals before it filled. VERIFIED BEFORE
+    FLIPPING IT, on a scratch database, because a filing is WRITE-ONCE and
+    the artefact that kept this off was real: with every slot unfilled,
+    102 of 108 supplies landed on 2023-Q1.
+
+    AND THEN THE RUN CAN READ ITS PERIOD (REQ-PIPE-105 criterion 5). One
+    file is one arrival, so the views staging gave this run hold ONE
+    table and every cross-table check would ask it for six. Once filing
+    has said which period this supply claims, the run's schema is rebuilt
+    over that period: its own table from this arrival, every sibling from
+    the one version staged for the period, else the period's promoted
+    state. An unfiled supply keeps what staging gave it.
+
+    A FUNCTION RATHER THAN A CLOSURE IN THE BATCH, because `mothman cp qa
+    --commit` processes a hand-filed delivery's arrivals the same way
+    (Keith, 2026-10-02) - two copies of these steps is how a hand-filed
+    supply would come to differ from one that arrived on its own.
+    """
+    filing.file_arrivals([arrival])
+    period_overlay.rebuild_for_arrival(arrival, tables=build_cp_warehouses.TABLES)
+
+
+def promote_after(arrival, got: list[dict], run_by: str) -> None:
+    """PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13), and is
+    deliberately not inside it: a promotion that fails must be retryable
+    without re-running QA, which it is only while the two are separable.
+    tests/test_promotion_after_run.py asserts that against
+    _run_one_inner's own AST rather than trusting this comment.
+
+    WHEN THE DECISION TOOK EFFECT, not when this replay ran
+    (REQ-PIPE-081). A bootstrap walks four years of arrivals under one
+    wall clock, and stamping every promotion with it left as-at-T with one
+    day of history to answer over. See promotion.effective_at_for for why
+    this is the same expression in production, where it still returns
+    now.
+    """
+    promotion.report(promotion.after_runs(
+        [arrival], got,
+        agency_id=cp_common.AGENCY_ID, collection_id=cp_common.COLLECTION_ID,
+        actor=run_by, actor_kind=decision_log.RULE,
+        effective_at=promotion.effective_at_for(
+            arrival.received_at, seed=arrival.run_id).isoformat()))
+
+
+def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
+    """Check these arrivals one at a time, exactly as the batch does: file
+    and overlay, check, promote, then the next - in receipt order, because
+    each filing depends on what the one before it promoted.
+
+    THE HAND-FILED PATH (REQ-PIPE-103 criterion 1, under REQ-PIPE-105
+    criterion 1). A folder handed to `mothman cp qa --commit` is one
+    delivery and SIX arrivals, so it is six runs, and each records only
+    what its own file is responsible for.
+    """
+    results: list[dict] = []
+    for arrival in sorted(found_arrivals, key=lambda a: (a.sequence, a.run_index, a.run_id)):
+        file_and_overlay(arrival)
+        got = _run_one(arrival.as_entry(), asset_time.now().isoformat(), run_by,
+                        on_step=on_step)
+        promote_after(arrival, got, run_by)
+        results.extend(got)
+    return results
+
+
 def run_pipeline_cp(sequential: bool = False) -> dict:
     build_cp_warehouses.build_all()
 
@@ -334,36 +412,10 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     by_run_id = {a.run_id: a for a in found_arrivals}
 
     def _file(entry: dict) -> None:
-        # WHERE EACH SUPPLY BELONGS, RECORDED BEFORE ANY CHECK RUNS OVER
-        # IT (REQ-PIPE-075 criterion 7). filing.filled_slots() reads the
-        # decision log, so this sees what the arrivals before it filled.
-        #
-        # VERIFIED BEFORE FLIPPING IT, on a scratch database, because a
-        # filing is WRITE-ONCE and the artefact that kept this off was
-        # real: with every slot unfilled, 102 of 108 supplies landed on
-        # 2023-Q1.
-        filing.file_arrivals([by_run_id[entry["run_id"]]])
+        file_and_overlay(by_run_id[entry["run_id"]])
 
     def _promote(entry: dict, got: list[dict]) -> None:
-        # PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13),
-        # and is deliberately not inside it: a promotion that fails must
-        # be retryable without re-running QA, which it is only while the
-        # two are separable. tests/test_promotion_after_run.py asserts
-        # that against _run_one_inner's own AST rather than trusting
-        # this comment.
-        promotion.report(promotion.after_runs(
-            [by_run_id[entry["run_id"]]], got,
-            agency_id=cp_common.AGENCY_ID, collection_id=cp_common.COLLECTION_ID,
-            actor=run_by, actor_kind=decision_log.RULE,
-            # WHEN THE DECISION TOOK EFFECT, not when this replay ran
-            # (REQ-PIPE-081). A bootstrap walks four years of arrivals
-            # under one wall clock, and stamping every promotion with
-            # it left as-at-T with one day of history to answer over.
-            # See promotion.effective_at_for for why this is the same
-            # expression in production, where it still returns now.
-            effective_at=promotion.effective_at_for(
-                by_run_id[entry["run_id"]].received_at,
-                seed=entry["run_id"]).isoformat()))
+        promote_after(by_run_id[entry["run_id"]], got, run_by)
 
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, run_by, None,

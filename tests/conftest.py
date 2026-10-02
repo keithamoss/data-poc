@@ -679,7 +679,71 @@ def cp_duckdb_dir(supply_dsn, cp_raw_dir):
     build_all(
                deliveries_dir=Path(cp_raw_dir) / "deliveries",
                receipts_dir=Path(cp_raw_dir) / "receipts")
+    _file_and_overlay_cp(Path(cp_raw_dir) / "deliveries", Path(cp_raw_dir) / "receipts")
     return supply_dsn
+
+
+def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
+    """What the batch does between staging and checking, for the two
+    fixture deliveries (REQ-PIPE-105 criterion 5).
+
+    ONE FILE IS ONE ARRIVAL, so staging alone gives each run a view of
+    ONE table. A run sees its siblings only once filing has given it a
+    period, so each arrival is filed and its overlay rebuilt in receipt
+    order - the last file of a delivery then reads all six, which is
+    what fixture_ids.CP_REF_RUN_ID names.
+
+    FILED TO FIXED PERIODS, NOT THROUGH THE ASSIGNMENT RULE - and that is
+    a hermeticity fix found the hard way, 2026-10-02. The rule files to
+    the oldest slot no PROMOTION has filled, and the decision log it
+    reads is append-only and shared by every module on this worker - so
+    any module that promoted cp-clients somewhere moved where the
+    reference delivery filed, and two of its six tables silently left
+    its period. It passed alone and failed in the full suite. The rule
+    has its own tests; this fixture's job is a known period per
+    delivery: 2026-Q1 for the reference, 2026-Q2 for the dirty one.
+
+    THE REFERENCE DELIVERY IS ACCEPTED before the dirty one is overlaid,
+    directly rather than through the gate, because no QA has run yet -
+    the dirty runs then read their period, and the reference run keeps
+    reading its own.
+    """
+    import json
+
+    from qa_tools.common import arrivals, decision_log, filing, period_overlay, promotion
+    from qa_tools.common import asset_time, qa_store, supply_db
+    from qa_tools.cp.build_cp_warehouses import TABLES
+
+    found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries_dir, receipts_dir)
+    first = min(a.received_at for a in found)
+
+    def file_to(arrival, period: str) -> None:
+        (dataset_id,) = tuple(arrival.files_by_dataset)
+        supply_id = f"{dataset_id}@{asset_time.arrival_key(arrival.received_at)}"
+        with supply_db.connect(label="pytest:file-fixture") as conn:
+            qa_store.ensure_schema(conn)
+            conn.execute(
+                f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, record) "
+                "VALUES (?, ?, ?, 'pytest-fixture', ?) ON CONFLICT (dataset_id, supply_id) "
+                "DO UPDATE SET slot = EXCLUDED.slot, record = EXCLUDED.record",
+                [dataset_id, supply_id, period,
+                 json.dumps({"supply_id": supply_id, "slot": period})])
+
+    for arrival in [a for a in found if a.received_at == first]:
+        file_to(arrival, "2026-Q1")
+        period_overlay.rebuild_for_arrival(arrival, tables=TABLES)
+    with supply_db.connect(label="pytest:accept-reference") as conn:
+        for arrival in [a for a in found if a.received_at == first]:
+            (supply,) = filing.supplies_of(conn, arrival)
+            promotion.promote(
+                conn, agency_id="child-protection-family-support",
+                collection_id="child-protection", dataset_id=supply["dataset_id"],
+                supply=supply["supply"], period=supply["period"],
+                physical_tables=supply["physical_tables"], actor="pytest-fixture",
+                actor_kind=decision_log.RULE, effective_at=first.isoformat())
+    for arrival in [a for a in found if a.received_at != first]:
+        file_to(arrival, "2026-Q2")
+        period_overlay.rebuild_for_arrival(arrival, tables=TABLES)
 
 
 # ---------------------------------------------------------------------------
@@ -721,3 +785,30 @@ def pytest_collection_modifyitems(items):
     for item in items:
         if DEPLOYMENT_FIXTURE in getattr(item, "fixturenames", ()):
             item.add_marker(getattr(pytest.mark, NEEDS_DEPLOYMENT))
+
+
+def clone_run_views(conn, source_run: str, new_run: str, *, held=()):
+    """A run of a test's own that reads exactly what `source_run` reads,
+    with the `held` tables withheld - recorded as a real resolution.
+
+    Over the source run's VIEWS rather than its staged tables, because
+    since REQ-PIPE-105 a run's tables come from wherever its period
+    overlay found them - staging, or a period schema once promoted - and
+    a test that re-derived them from staging would find nothing for a
+    promoted delivery.
+    """
+    from qa_tools.common import supply_db
+
+    src, dst = supply_db.run_schema(source_run), supply_db.run_schema(new_run)
+    conn.execute(f'DROP SCHEMA IF EXISTS "{dst}" CASCADE')
+    conn.execute(f'CREATE SCHEMA "{dst}"')
+    source = supply_db.resolution_for(conn, source_run)
+    res = supply_db.Resolution(run_id=new_run, schema=dst)
+    for logical, physical in sorted(source.resolved.items()):
+        if logical in held:
+            res.held[logical] = physical
+            continue
+        conn.execute(f'CREATE VIEW "{dst}"."{logical}" AS SELECT * FROM "{src}"."{logical}"')
+        res.resolved[logical] = physical
+    supply_db.record_resolution(conn, res)
+    return res

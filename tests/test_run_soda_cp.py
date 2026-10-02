@@ -32,3 +32,40 @@ def test_dirty_run_produces_a_real_failure(monkeypatch, cp_duckdb_dir):
     assert all(r["check_id"] for r in results)
     failing = [r for r in results if r["status"] == "fail"]
     assert failing, "a real red-severity dirty CP run produced no Soda failures at all"
+
+
+class TestAnUnreadableTableDoesNotTakeTheScanDown:
+    """The Soda counterpart of test_run_dbt_cp.py's identically named
+    class, and the same latent defect one tool over - found 2026-10-02
+    when REQ-PIPE-105 made an absent table ORDINARY rather than
+    hypothetical.
+
+    One file is one arrival, so a run reads its siblings from its
+    period, and a sibling filed to a DIFFERENT period - Case Workers,
+    delivered only in February and August - is legitimately absent. The
+    scan counted every table's rows up front and handed Soda checks for
+    all six, so one absent table raised UndefinedTable and the run lost
+    its QA for all five readable ones.
+    """
+
+    def test_the_other_tables_are_still_checked(self, monkeypatch, cp_duckdb_dir):
+        import uuid
+
+        from conftest import clone_run_views
+        from qa_tools.common import supply_db
+
+        mine = f"cp_held_{uuid.uuid4().hex[:8]}"
+        with supply_db.connect(label="test-held-soda") as conn:
+            clone_run_views(conn, _REF_RUN_ID, mine, held={"cp_clients"})
+        try:
+            results = _run(monkeypatch, cp_duckdb_dir, mine, "2026-01-01T09:00:00Z")
+            seen = {r["dataset_id"] for r in results}
+            assert len(seen) > 1, f"expected several tables still checked, got {seen}"
+            assert "cp-clients" not in seen, \
+                "nothing may be recorded against the table that could not be read"
+            assert not [r for r in results if r["status"] == "error"], \
+                "a check reading the absent table must be left out, not errored"
+        finally:
+            with supply_db.connect(label="test-held-soda") as conn:
+                conn.execute(
+                    f'DROP SCHEMA IF EXISTS "{supply_db.run_schema(mine)}" CASCADE')

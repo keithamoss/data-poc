@@ -61,6 +61,12 @@ reasoning, and the nine real arrivals that have no single period, are
 in `REQ-PIPE-079`'s own decisions. That leaves
 `REQ-PIPE-080` and `REQ-PIPE-081` as the genuinely clean ones.
 
+**UPDATED 2026-10-02 evening: `REQ-PIPE-105`'s arrival unit and its
+period overlay are BUILT** (criteria 1 and 5 together, with 079's
+overlay wired by the same change), so that door is open. What remains of
+105 - retiring the delivery-level hold in code, the 035/036 amendments,
+criterion 13 - is listed in its own first decision.
+
 ---
 
 0. **[todo, 2026-10-01]** **[Docs & process]** The open threads from

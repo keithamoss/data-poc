@@ -46,6 +46,7 @@ from qa_tools.common import drift_reference
 from qa_tools.common import held_blast_radius
 from qa_tools.common import filing
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common import period_overlay
 from qa_tools.common import promotion
 from qa_tools.common import ticket_reconciler
 from qa_tools.common import trial
@@ -149,15 +150,32 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     # the last writer win.
     open_run(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, run_by)
 
+    # NOTHING IT MAY READ, NOTHING IT MAY CHECK (2026-10-02). Birth
+    # Registrations has one table, and since REQ-PIPE-105 a run's own
+    # table can be unreadable as an ordinary matter: a same-day resupply
+    # beside an unpromoted red supply is CONTESTED (criterion 6), and
+    # with nothing promoted for the day its view falls through to
+    # nothing. Every check here is about that table, so the four tools
+    # have nothing to do - and running them anyway raised UndefinedTable
+    # and took the whole batch down on the first bootstrap after the
+    # overlay landed. The run still records its stats and what it read,
+    # which is where the reason lives.
+    with supply_db.connect(read_only=True, label="mothman:bdm-readable") as conn:
+        readable = build_per_run_warehouses.TABLE in supply_db.readable_in(conn, run_id)
+    if not readable:
+        print(f"note: {run_id}: {build_per_run_warehouses.TABLE} cannot be read in this run "
+              f"(see its tables_read for why), so there is nothing to check.")
+    run_step = _run_step if readable else (lambda collection, tool, rid, call: [])
+
     results: list[dict] = []
     _announce(on_step, RUN_STEPS[0])
-    results.extend(_run_step(COLLECTION_ID, "dbt-core", run_id,
+    results.extend(run_step(COLLECTION_ID, "dbt-core", run_id,
         lambda: run_dbt_bdm.evaluate_dbt_bdm(run_id, run_timestamp)))
     _announce(on_step, RUN_STEPS[1])
-    results.extend(_run_step(COLLECTION_ID, "Soda Core", run_id,
+    results.extend(run_step(COLLECTION_ID, "Soda Core", run_id,
         lambda: run_soda_bdm.evaluate_soda_bdm(run_id, run_timestamp)))
     _announce(on_step, RUN_STEPS[2])
-    results.extend(_run_step(COLLECTION_ID, "datacontract-cli", run_id,
+    results.extend(run_step(COLLECTION_ID, "datacontract-cli", run_id,
         lambda: run_datacontract_bdm.evaluate_datacontract_bdm(run_id, run_timestamp)))
     # THE REFERENCE IS RESOLVED PER SUPPLY, HERE (REQ-QAC-108 criteria
     # 2 and 4). It used to be one run chosen for the whole batch -
@@ -181,7 +199,7 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
         reference_run_id = drift_reference.reference_run_for_arrival(
             DATASET_ID, entry["received_at"])
     _announce(on_step, RUN_STEPS[3])
-    results.extend(_run_step(COLLECTION_ID, "Evidently", run_id,
+    results.extend(run_step(COLLECTION_ID, "Evidently", run_id,
         lambda: run_evidently_bdm.evaluate_evidently_bdm(
             run_id, run_timestamp, reference_run_id=reference_run_id)))
 
@@ -388,6 +406,41 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
 
 
 
+def file_and_overlay(arrival) -> None:
+    """Everything between staging an arrival and checking it - see
+    orchestrate_cp.file_and_overlay() for the account of both steps.
+
+    Birth Registrations has one table, so what the overlay adds here is
+    REQ-PIPE-105 criterion 6: another version staged for the same day
+    makes this one contested.
+    """
+    filing.file_arrivals([arrival])
+    period_overlay.rebuild_for_arrival(arrival, tables=[build_per_run_warehouses.TABLE])
+
+
+def promote_after(arrival, got: list[dict], run_by: str) -> None:
+    """Promotion follows the run - see orchestrate_cp.promote_after()."""
+    promotion.report(promotion.after_runs(
+        [arrival], got,
+        agency_id=AGENCY_ID, collection_id=COLLECTION_ID,
+        actor=run_by, actor_kind=decision_log.RULE,
+        effective_at=promotion.effective_at_for(
+            arrival.received_at, seed=arrival.run_id).isoformat()))
+
+
+def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
+    """The hand-filed path, one arrival at a time exactly as the batch
+    does it - see orchestrate_cp.run_arrivals()."""
+    results: list[dict] = []
+    for arrival in sorted(found_arrivals, key=lambda a: (a.sequence, a.run_index, a.run_id)):
+        file_and_overlay(arrival)
+        got = _run_one(arrival.as_entry() | {"csv_path": str(arrival.path_for(DATASET_ID))},
+                        asset_time.now().isoformat(), run_by, on_step=on_step)
+        promote_after(arrival, got, run_by)
+        results.extend(got)
+    return results
+
+
 def run_pipeline(sequential: bool = False) -> dict:
     build_per_run_warehouses.build_all()
 
@@ -460,28 +513,10 @@ def run_pipeline(sequential: bool = False) -> dict:
     by_run_id = {a.run_id: a for a in found_arrivals}
 
     def _file(entry: dict) -> None:
-        # BEFORE ANY CHECK RUNS OVER IT (REQ-PIPE-075 criterion 7) - see
-        # orchestrate_cp.py's identical call for the verification that
-        # preceded turning this on.
-        filing.file_arrivals([by_run_id[entry["run_id"]]])
+        file_and_overlay(by_run_id[entry["run_id"]])
 
     def _promote(entry: dict, got: list[dict]) -> None:
-        # PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13) -
-        # see orchestrate_cp.py's identical block for why it is outside
-        # the run rather than inside it.
-        promotion.report(promotion.after_runs(
-            [by_run_id[entry["run_id"]]], got,
-            agency_id=AGENCY_ID, collection_id=COLLECTION_ID,
-            actor=run_by, actor_kind=decision_log.RULE,
-            # WHEN THE DECISION TOOK EFFECT, not when this replay ran
-            # (REQ-PIPE-081). A bootstrap walks four years of arrivals
-            # under one wall clock, and stamping every promotion with
-            # it left as-at-T with one day of history to answer over.
-            # See promotion.effective_at_for for why this is the same
-            # expression in production, where it still returns now.
-            effective_at=promotion.effective_at_for(
-                by_run_id[entry["run_id"]].received_at,
-                seed=entry["run_id"]).isoformat()))
+        promote_after(by_run_id[entry["run_id"]], got, run_by)
 
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, run_by, None,

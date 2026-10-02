@@ -88,3 +88,42 @@ def test_a_range_check_is_not_labelled_referential_integrity(monkeypatch, cp_duc
                    if r["label"] == "Referential integrity"
                    and not r["check_id"].endswith("relationships_datacontract")]
     assert not mislabelled, f"non-FK checks labelled Referential integrity: {mislabelled}"
+
+
+class TestAnUnreadableTableIsNotReportedRed:
+    """REAL DEFECT, 2026-10-02, the same class as dbt's
+    (post-build-review #72), Soda's and Evidently's - and the WORST of
+    them, because it fails in the false-red direction rather than by
+    raising. datacontract-cli runs every rule in the contract whatever
+    the schema holds, so a rule over a table the run cannot read came
+    back `failed`: red for a reason about our own timing - a sibling not
+    yet arrived, or filed to another period (REQ-PIPE-105) - rather than
+    about the data. That is how people learn to ignore red.
+    """
+
+    def test_nothing_is_recorded_for_or_through_the_missing_table(
+            self, monkeypatch, cp_duckdb_dir):
+        import uuid
+
+        from conftest import clone_run_views
+        from qa_tools.common import supply_db
+        from qa_tools.common.qa_results_writer import _declared_reads_tables
+
+        monkeypatch.setattr(run_datacontract_cp, "write_qa_result", lambda *a, **k: None)
+        mine = f"cp_held_{uuid.uuid4().hex[:8]}"
+        with supply_db.connect(label="test-held-datacontract") as conn:
+            clone_run_views(conn, _REF_RUN_ID, mine, held={"cp_clients"})
+        try:
+            results = run_datacontract_cp.evaluate_datacontract_cp(mine, "2026-01-01T09:00:00Z")
+            assert {r["dataset_id"] for r in results} - {"cp-clients"}, \
+                "the readable tables must still be checked"
+            assert not [r for r in results if r["dataset_id"] == "cp-clients"]
+            declared = _declared_reads_tables()
+            assert not [r for r in results
+                        if "cp_clients" in declared.get(r["check_id"], ())], \
+                "a rule READING the missing table must be left out, not failed"
+            assert not [r for r in results if r["status"] == "fail"], \
+                "the clean reference data must not go red because a table is missing"
+        finally:
+            with supply_db.connect(label="test-held-datacontract") as conn:
+                conn.execute(f'DROP SCHEMA IF EXISTS "{supply_db.run_schema(mine)}" CASCADE')

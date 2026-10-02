@@ -405,7 +405,19 @@ class TestDarkModeToggle:
         assert after_click in ("light", "dark")
 
         clean_page.reload()
-        clean_page.wait_for_timeout(300)
+        # WAITED FOR, NOT SLEPT FOR (2026-10-02). A fixed 300ms read the
+        # attribute before the reloaded ~8MB page had applied the stored
+        # theme when the full gate had every core busy - 'light' where
+        # 'dark' was stored, green alone and red under load. Waiting for
+        # the condition keeps the assertion exactly as strict: if the
+        # theme never comes back, this times out and the assert below
+        # reports what it found.
+        try:
+            clean_page.wait_for_function(
+                "t => document.documentElement.getAttribute('data-theme') === t",
+                arg=after_click, timeout=10_000)
+        except Exception:  # noqa: BLE001 - the assert below says what was found
+            pass
         after_reload = clean_page.evaluate("document.documentElement.getAttribute('data-theme')")
 
         assert after_reload == after_click

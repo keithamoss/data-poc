@@ -10,7 +10,7 @@ and no test can stand in for it.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 import pytest
@@ -38,6 +38,9 @@ class _Recognised:
     run_id: str
     delivery_name: str
     received_at: str | None = None
+    #: One dataset per arrival since REQ-PIPE-105; empty where a test
+    #: does not care which.
+    files_by_dataset: dict = field(default_factory=dict)
 
 
 class TestAScenarioLandsWhereItsAnchorSays:
@@ -166,6 +169,24 @@ class TestTheRunIdsComeFromRecognition:
         placed.arrivals[0]["delivery"] = "some-supplier-folder"
         si.resolve_run_ids([placed], [_Recognised("run_034", "some-supplier-folder")])
         assert placed.as_record()["supplies"] == ["run_034"]
+
+    def test_a_delivery_of_several_files_resolves_to_the_scenarios_own_dataset(self):
+        """REAL DEFECT, 2026-10-02. One file is one arrival
+        (REQ-PIPE-105), so a six-file delivery is recognised as six runs
+        sharing a delivery name - and keying on the name alone gave
+        whichever file was recognised LAST. A cp-clients scenario then
+        pointed at the cp_placements run: a coordinate leading to
+        somebody else's data, which is the failure this class exists
+        for, arriving by a new route."""
+        placed = si.resolve(si.Injection(
+            "TS-x", "cp-clients", -5, "cfg", arrivals=(si.ExtraArrival(0, "14:00"),)),
+            _daily(30))
+        placed.arrivals[0]["delivery"] = "six-files"
+        si.resolve_run_ids([placed], [
+            _Recognised("cp_clients__1", "six-files", files_by_dataset={"cp-clients": ["a"]}),
+            _Recognised("cp_placements__1", "six-files",
+                        files_by_dataset={"cp-placements": ["b"]})])
+        assert placed.as_record()["supplies"] == ["cp_clients__1"]
 
     def test_an_unrecognised_delivery_contributes_no_supply(self):
         """Better an incomplete coordinate than one pointing at

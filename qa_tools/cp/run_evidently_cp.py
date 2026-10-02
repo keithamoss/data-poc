@@ -223,6 +223,56 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
     check is then reported as having no reference, and specifically NOT
     as passing - see evidently_common.NO_REFERENCE.
     """
+    results = []
+    if _psi_applies(run_id):
+        results.append(_psi_result(run_id, run_timestamp, reference_run_id))
+    results.extend(_volume_results(run_id, run_timestamp, reference_run_id))
+
+    # Written under the COLLECTION id, not this module's own table-scoped
+    # DATASET_ID - 2026-09-16 fix, Keith's call: qa_results/ output stays
+    # dataset(collection)-level for every tool, matching run_dbt_cp.py/
+    # run_soda_cp.py/run_datacontract_cp.py/dataset_stats.py, which all
+    # already write there. Evidently was the one real outlier (it only
+    # ever checks cp_notifications, so it resolves that table directly
+    # as its write path too) - each result record's own "dataset_id"
+    # field above still correctly says "cp-notifications" for dashboard
+    # per-table grouping; only the FILE location changes here.
+    psi_snapshot = results[0].pop("_snapshot", None) if results and \
+        results[0].get("check_id") == PSI_CHECK_ID else None
+    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "evidently",
+                     {"psi": psi_snapshot}, verified=results)
+    return results
+
+
+def _psi_applies(run_id: str) -> bool:
+    """Whether this run should evaluate the cp_notifications PSI check.
+
+    ONLY A RUN THAT CAN READ cp_notifications (2026-10-02). One file is
+    one arrival (REQ-PIPE-105), so a run reads its siblings from its
+    period and cp_notifications can be absent - held, contested with
+    nothing promoted, or in a different period from a Case Workers file.
+    Reading it raised and failed the run after three tools had recorded
+    their results. Not run is the honest outcome, as for dbt and Soda.
+
+    AND ONLY A RUN THAT IS FOR cp_notifications, where the run names a
+    table at all. The check is about that table, its reference is that
+    table's last promoted supply, and the results writer would discard
+    it from any other table's run anyway - so evaluating it there costs
+    a reference lookup that can fail for a result nobody keeps. A run
+    whose id names no table (a trial, a fixture) evaluates it as before.
+    """
+    from qa_tools.common import supply_db
+    from qa_tools.common.qa_results_writer import run_owner
+
+    owner = run_owner(run_id)
+    if owner is not None and owner[1] != "cp_notifications":
+        return False
+    with supply_db.connect(read_only=True, label="mothman:evidently-cp") as conn:
+        return "cp_notifications" not in supply_db.resolution_for(conn, run_id).unreadable
+
+
+def _psi_result(run_id: str, run_timestamp: str, reference_run_id: str | None) -> dict:
+    """The one PSI result over cp_notifications.concern_type."""
     current = _current_frame(run_id)
     n_total = len(current)
 
@@ -233,7 +283,7 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
         psi, psi_snapshot = compute_psi(current, reference, "concern_type")
         status = status_for_psi(psi)
 
-    results = [{
+    return {
         "agency_id": cp_common.AGENCY_ID,
         "collection_id": cp_common.COLLECTION_ID,
         "dataset_id": DATASET_ID,
@@ -254,21 +304,10 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
         "row_count_invalid": None,
         "engine": ENGINE_TAG,
         "reference_run_id": reference_run_id,
-    }]
-    results.extend(_volume_results(run_id, run_timestamp, reference_run_id))
-
-    # Written under the COLLECTION id, not this module's own table-scoped
-    # DATASET_ID - 2026-09-16 fix, Keith's call: qa_results/ output stays
-    # dataset(collection)-level for every tool, matching run_dbt_cp.py/
-    # run_soda_cp.py/run_datacontract_cp.py/dataset_stats.py, which all
-    # already write there. Evidently was the one real outlier (it only
-    # ever checks cp_notifications, so it resolves that table directly
-    # as its write path too) - each result record's own "dataset_id"
-    # field above still correctly says "cp-notifications" for dashboard
-    # per-table grouping; only the FILE location changes here.
-    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "evidently",
-                     {"psi": psi_snapshot}, verified=results)
-    return results
+        # Popped by the caller before anything is recorded: the raw
+        # snapshot goes into the tool's raw output, not into a result.
+        "_snapshot": psi_snapshot,
+    }
 
 
 if __name__ == "__main__":

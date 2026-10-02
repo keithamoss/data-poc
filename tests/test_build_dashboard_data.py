@@ -525,3 +525,31 @@ def test_a_table_level_check_lands_in_a_pseudo_column(tmp_path, monkeypatch):
     table = by_name[bdd.TABLE_LEVEL_PSEUDO_COLUMN]
     assert [c["check_id"] for c in supply["checks"]] == ["a.b.c.d.rowCount_datacontract"]
     assert [c["check_id"] for c in table["checks"]] == ["a.b.c.d.escalation_completeness_dbt"]
+
+
+def test_a_run_that_measured_nothing_is_not_current(tmp_path, monkeypatch):
+    """REAL DEFECT, 2026-10-02, found by the first dashboard build after
+    REQ-PIPE-105's overlay landed - it raised TypeError.
+
+    A same-day resupply beside an unpromoted red supply is CONTESTED
+    (criterion 6), so its run reads nothing, checks nothing and records
+    `row_count: None`. The builder took the newest arrival as "current"
+    and did arithmetic on that None. "Current" is the newest run that
+    actually measured the table; the contested arrival still appears in
+    the arrival history, because it did arrive."""
+    _no_retired_checks(monkeypatch)
+    contested = {"run_id": "run_003", "run_index": 3, "delivery": "resupply",
+                 "received_at": "2026-09-02T14:00:00+00:00"}
+    path = tmp_path / "results_bdm.json"
+    path.write_text(json.dumps({
+        "runs": [*FIXTURE_RUNS, contested], "results": FIXTURE_RESULTS,
+        "dataset_stats": {**FIXTURE_DATASET_STATS, "run_003": {
+            "arrival_record": contested, "row_count": None, "value_counts": {},
+            "arrival": {}, "check_aggregates": {}}},
+    }))
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(path))
+
+    data = bdd.build()
+
+    assert data["rowCount"] == 4 and data["prevRowCount"] == 3
+    assert "run_003" in {a["run_id"] for a in data["arrivalHistory"]}

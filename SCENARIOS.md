@@ -45,7 +45,7 @@ for injection and has not been placed yet.
 | Where to look | |
 |---|---|
 | Dataset | birth-registrations |
-| Supplies | `run_026`, `run_027`, `run_028` |
+| Supplies | `birth_registrations__202609151400000800`, `birth_registrations__202609151600000800`, `birth_registrations__202609152000000800` |
 | Period | 2026-09-15 |
 | Set the as-of date to | 2026-09-15 |
 
@@ -60,7 +60,7 @@ for injection and has not been placed yet.
 | Where to look | |
 |---|---|
 | Dataset | birth-registrations |
-| Supplies | `run_022` |
+| Supplies | `birth_registrations__202609111400000800` |
 | Period | 2026-09-11 |
 | Set the as-of date to | 2026-09-11 |
 
@@ -105,7 +105,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Where to look | |
 |---|---|
 | Dataset | birth-registrations |
-| Supplies | `run_026`, `run_027`, `run_028` |
+| Supplies | `birth_registrations__202609151400000800`, `birth_registrations__202609151600000800`, `birth_registrations__202609152000000800` |
 | Period | 2026-09-15 |
 | Set the as-of date to | 2026-09-15 |
 
@@ -372,7 +372,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 | Where to look | |
 |---|---|
 | Dataset | cp-clients |
-| Supplies | `cp_run_014` |
+| Supplies | `cp_clients__202602010900000800` |
 | Period | 2026-Q1 |
 | Set the as-of date to | 2026-02-01 |
 
@@ -417,9 +417,9 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "coordinates": {
     "dataset": "birth-registrations",
     "supplies": [
-     "run_026",
-     "run_027",
-     "run_028"
+     "birth_registrations__202609151400000800",
+     "birth_registrations__202609151600000800",
+     "birth_registrations__202609152000000800"
     ],
     "period": "2026-09-15",
     "asOf": "2026-09-15"
@@ -436,7 +436,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "coordinates": {
     "dataset": "birth-registrations",
     "supplies": [
-     "run_022"
+     "birth_registrations__202609111400000800"
     ],
     "period": "2026-09-11",
     "asOf": "2026-09-11"
@@ -503,9 +503,9 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "coordinates": {
     "dataset": "birth-registrations",
     "supplies": [
-     "run_026",
-     "run_027",
-     "run_028"
+     "birth_registrations__202609151400000800",
+     "birth_registrations__202609151600000800",
+     "birth_registrations__202609152000000800"
     ],
     "period": "2026-09-15",
     "asOf": "2026-09-15"
@@ -922,7 +922,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "coordinates": {
     "dataset": "cp-clients",
     "supplies": [
-     "cp_run_014"
+     "cp_clients__202602010900000800"
     ],
     "period": "2026-Q1",
     "asOf": "2026-02-01"

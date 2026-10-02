@@ -14603,6 +14603,25 @@ requirements:
     dependencies: [REQ-PIPE-075, REQ-PIPE-035, REQ-PIPE-036, REQ-QAC-037]
     decisions:
       - >
+        THE OVERLAY IS WIRED, 2026-10-02, by REQ-PIPE-105 criterion 5 -
+        the dependency the "PAUSED" decision below named.
+        `create_overlay_views()` now has a production caller,
+        `period_overlay.build()`, reached from each orchestrator's
+        `file_and_overlay()` straight after filing, and a run's period is
+        simply `filing.period_of()` because an arrival is one file and so
+        one dataset. Criteria 2 and 10 are therefore observable in the
+        running system; criterion 9 holds by construction, since an
+        unfiled supply gets no overlay. `fan_out()` remains uncalled, as
+        that decision predicted it would: one file never spans periods.
+
+        STILL UNWIRED, so this is not overclaimed: the decision layer -
+        `check_readiness()`, `_why_missing()`, `reevaluation.plan()` and
+        `mark()` - has no production caller. What changed underneath it
+        is that a check over a table the run cannot read is now LEFT OUT
+        by every tool rather than errored or failed (REQ-PIPE-105's four
+        latent defects), so criteria 4 and 14-16 are about saying why a
+        check is absent, not about suppressing a false red.
+      - >
         BUILT IN TWO HALVES, and this records which is which on
         2026-09-28 so nobody has to infer it from the code.
         `in_progress` rather than `built` because the register's gate
@@ -23482,6 +23501,115 @@ requirements:
         prevent, one field over.
     decisions:
       - >
+        CRITERION 5 BUILT 2026-10-02, together with criterion 11's guard
+        and the three answers below, so criteria 1 and 5 are whole
+        together as the decision after this one requires.
+        `qa_tools/common/period_overlay.py` rebuilds a run's view schema
+        RIGHT AFTER FILING, in each orchestrator's `file_and_overlay()`:
+        its own table from its own arrival, every sibling from the one
+        version staged for its period (filed to it and still in staging),
+        else the period's promoted state, through the previously uncalled
+        `period_schema.create_overlay_views()`. A supply with no filing
+        keeps what staging gave it (REQ-PIPE-079 criterion 9).
+
+        WHY AFTER FILING AND NOT AT STAGING: the batch stages every
+        arrival up front, but files them one at a time in receipt order,
+        because a filing depends on what the arrival before it promoted.
+        The period exists only once filing has run, so the staging-time
+        views stay as the unfiled answer and are replaced once it has.
+
+        ANSWERED BY KEITH 2026-10-02, three forks found while building:
+
+        (1) AN ARRIVAL'S OWN TABLE WITH ANOTHER VERSION STAGED FOR THE
+        SAME PERIOD IS CONTESTED - criterion 6 wins over criterion 5's
+        "read from that arrival". A correction landing beside an
+        unpromoted red supply is contested (own checks withheld, not
+        promoted) until a person rejects the earlier one; nothing re-runs
+        it automatically yet. `filing.supplies_of()` now reports that
+        contest to the promotion gate at PERIOD scope, not only for two
+        files in one arrival.
+
+        (2) A RUN RECORDS "OWN + READERS" - checks filed against its own
+        dataset, plus cross-table checks that DECLARE they read its table,
+        and only the second where its own table is contested. This is
+        criterion 11's guard, built as a filter at the one place results
+        are recorded (`qa_results_writer._scope_to_run()`, in place on the
+        caller's list so the live run and a rebuild agree), using the same
+        declarations the promotion gate reads. REJECTED recording
+        everything the overlay can read, which QA'd every supply once per
+        sibling - six copies per CP delivery - and showed ~108 CP runs per
+        dataset where there were 18. DEFERRED narrowing what the tools
+        themselves run: they still evaluate everything readable, so a CP
+        bootstrap pays roughly six times the tool invocations.
+
+        (3) `mothman bdm/cp qa --commit` PROCESSES A HAND-FILED DELIVERY
+        EXACTLY AS THE BATCH DOES - each file its own arrival, staged,
+        filed, overlaid, checked and promoted through the same
+        `file_and_overlay()`/`promote_after()`/`run_arrivals()`, so a
+        hand-filed supply cannot come to differ from one that arrived on
+        its own. The drift reference comes from recorded history as for
+        any arrival, so --reference-file/--reference-folder now apply to
+        a TRIAL only. A trial is unchanged: never filed, one run over the
+        whole folder, and its id names no table, so nothing is scoped.
+
+        FOUR LATENT DEFECTS SURFACED, one class: every CP tool and
+        dataset_stats assumed all six tables are readable, which only
+        dbt had been fixed for (post-build-review #72). A missing table
+        is ordinary now - a sibling not yet arrived, contested with
+        nothing promoted, or Case Workers filed to a different period
+        from its siblings because it is delivered only in February and
+        August. Soda and dataset_stats raised UndefinedTable and failed
+        the run; Evidently's PSI read cp_notifications and failed the
+        run; and datacontract-cli, worst, reported every rule over a
+        missing table as FAILED - a false red about our own timing,
+        which is what criterion 13 exists to prevent. Each has a test
+        confirmed failing against the old code first. `supply_db.
+        readable_in()` asks the run's own schema what can be read rather
+        than the recorded resolution, because a record that disagreed
+        with the catalogue would raise the very error being prevented.
+
+        THREE MORE, found by the full regenerate rather than the suite,
+        each with a test confirmed failing first. A Birth Registrations
+        run whose own table is contested reads NOTHING - one table, no
+        promoted fall-back that day - and Soda crashed the bootstrap two
+        minutes in; such a run now skips its four tools, still records
+        its stats and tables_read, and finishes. Both dashboard builders
+        then took the newest arrival as "current" and did arithmetic on
+        its absent row count; "current" is now the newest run that
+        MEASURED the table, and each Child Protection page reads its own
+        dataset's runs rather than all 108. And the generator's scenario
+        placements resolved a delivery name to one run - whichever file
+        was recognised last - so TS-38, a cp-clients scenario, pointed at
+        the cp_placements run; it now resolves by delivery AND dataset.
+
+        THE REGENERATE CHANGED ONLY KEYS WHERE IT SHOULD. Re-capturing
+        tests/fixtures/arrival_semantics_golden.json, its 150 arrivals
+        were matched old-to-new on their arrival INSTANT: all matched,
+        zero verdicts moved. Bootstrap 22m27s (was 14m49s); Child
+        Protection 108 runs, 2,912 results; 73 supplies promoted where the
+        previous corpus promoted 84, and 28 refused as contested - the
+        cost answer (1) accepted, now measured. It also means TS-1 and
+        TS-4 no longer demonstrate what the register says: the 16:00
+        Birth Registrations correction is contested beside the 14:00 red
+        supply, so it is never accepted and the 20:00 arrival never meets
+        a filled slot. Put to Keith rather than resolved here.
+
+        CP'S DRIFT REFERENCE IS NOW THE RUN'S OWN DATASET'S, not
+        cp-notifications' for every run - which found nothing for any
+        run filed before the notifications file of its delivery. And the
+        PSI check is evaluated only in a cp_notifications run (or a run
+        naming no table, such as a trial).
+
+        KNOWN GAPS, recorded rather than fixed: the AWS CP and BDM
+        ingest handlers stage and check but never FILE, so they get the
+        staging-time views and not the overlay - unverifiable here, as
+        the rest of that path is. `tables_read` still records the
+        resolution's REQ-PIPE-068 shape without the period or which
+        source (staging or period) each view came from;
+        `PeriodResolution.as_record()` carries both and nothing persists
+        it yet. Synthetic-mode `mothman cp qa --run-id` still stages a
+        whole delivery under one run id.
+      - >
         CRITERION 1 CANNOT STAND WITHOUT CRITERION 5, found 2026-10-02
         by building 1 on its own and watching the suite go red. This
         is a BUILD-ORDER fact rather than a change to either
@@ -23696,6 +23824,17 @@ requirements:
         must carry forward, go with that change rather than ahead of it.
         Criterion 13's legible red for a table nothing has promoted is
         unbuilt.
+
+        UPDATED 2026-10-02: criteria 1 and 2 built at 1b10d1f, criterion
+        5 and criterion 11's guard built the same day (the first
+        decision above). Still NOT DONE: criterion 6's retirement of the
+        delivery-level hold in code (filing still raises one for two
+        files in one arrival, and Birth Registrations' batch still skips
+        such an arrival), criteria 9 and 10's amendments to REQ-PIPE-035
+        and REQ-PIPE-036, and criterion 13. Criterion 13 is SMALLER than
+        it was: a check that cannot read a table is now left out rather
+        than recorded red by every tool, so what remains is saying WHY
+        it was left out.
 
         THE NUMBERS IN THIS PARAGRAPH WERE RESTATED TWICE ON
         2026-09-28 - once when criteria 6 to 8 were inserted and

@@ -11,6 +11,8 @@ from __future__ import annotations
 import qa_tools.cp.run_evidently_cp as run_evidently_cp
 
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
+from fixture_ids import (CP_DIRTY_NOTIFICATIONS_RUN_ID as _DIRTY_NOTIFICATIONS,
+                         CP_REF_NOTIFICATIONS_RUN_ID as _REF_NOTIFICATIONS)
 
 
 def _run(monkeypatch, cp_duckdb_dir, run_id, run_timestamp, reference_run_id=_REF_RUN_ID):
@@ -18,6 +20,12 @@ def _run(monkeypatch, cp_duckdb_dir, run_id, run_timestamp, reference_run_id=_RE
     # cp_duckdb_dir is what staged the fixture's two arrivals into it.
     monkeypatch.setattr(run_evidently_cp, "write_qa_result", lambda *a, **k: None)
     return run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id)
+
+
+#: Every CP table: the dirty run is its delivery's last-filed file, and
+#: the fixture files the whole delivery to one period of its own - see
+#: tests/test_fixture_ids.py.
+_DIRTY_READS = 6
 
 
 def _psi(results):
@@ -33,12 +41,13 @@ def test_a_run_measured_against_itself_has_no_psi_drift(monkeypatch, cp_duckdb_d
     path it used to name is gone. Passing a run as its own reference is
     something a test can still do; the pipeline cannot, since
     REQ-QAC-108 made the reference an EARLIER period's supply."""
-    results = _run(monkeypatch, cp_duckdb_dir, _REF_RUN_ID, "2026-01-01T09:00:00Z")
+    results = _run(monkeypatch, cp_duckdb_dir, _REF_NOTIFICATIONS, "2026-01-01T09:00:00Z",
+                   reference_run_id=_REF_NOTIFICATIONS)
 
     psi = _psi(results)
     assert psi["status"] == "pass"
     assert psi["engine"] == run_evidently_cp.ENGINE_TAG
-    assert psi["reference_run_id"] == _REF_RUN_ID
+    assert psi["reference_run_id"] == _REF_NOTIFICATIONS
 
 
 def test_dirty_run_has_a_real_check_id_and_reference(monkeypatch, cp_duckdb_dir):
@@ -46,12 +55,21 @@ def test_dirty_run_has_a_real_check_id_and_reference(monkeypatch, cp_duckdb_dir)
     perturbs concern_type's own value distribution (the same column
     this check watches) - real evidence this is a genuine, non-trivial
     PSI computation against real data, not just a shape check."""
-    results = _run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
+    results = _run(monkeypatch, cp_duckdb_dir, _DIRTY_NOTIFICATIONS, "2026-04-01T09:00:00Z",
+                   reference_run_id=_REF_NOTIFICATIONS)
 
     psi = _psi(results)
     assert psi["check_id"] == run_evidently_cp.PSI_CHECK_ID
     assert psi["metric_value"] is not None
-    assert psi["reference_run_id"] == _REF_RUN_ID
+    assert psi["reference_run_id"] == _REF_NOTIFICATIONS
+
+
+def test_the_psi_check_belongs_to_the_notifications_run_alone(monkeypatch, cp_duckdb_dir):
+    """One file is one arrival (REQ-PIPE-105), and the PSI check is
+    about cp_notifications - so the run for any other table does not
+    evaluate it, even where its overlay can read cp_notifications."""
+    results = _run(monkeypatch, cp_duckdb_dir, _REF_RUN_ID, "2026-01-01T09:00:00Z")
+    assert not [r for r in results if r["check_name"] == "drift:PSI"]
 
 
 class TestARelativeVolumeCheckOnEveryDataset:
@@ -69,9 +87,12 @@ class TestARelativeVolumeCheckOnEveryDataset:
             self, monkeypatch, cp_duckdb_dir):
         """SIX, because the question is about a TABLE. A collection-wide
         count would tell a reader something shrank without saying
-        what."""
-        volume = _volume(_run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID,
-                               "2026-04-01T09:00:00Z"))
+        what.
+
+        AGAINST THE REFERENCE RUN, the last-filed file of its delivery,
+        which reads all six (REQ-PIPE-105 criterion 5)."""
+        volume = _volume(_run(monkeypatch, cp_duckdb_dir, _REF_RUN_ID,
+                               "2026-01-01T09:00:00Z"))
         assert len(volume) == 6
         assert len({r["dataset_id"] for r in volume}) == 6
         assert len({r["check_id"] for r in volume}) == 6
@@ -109,7 +130,7 @@ class TestARelativeVolumeCheckOnEveryDataset:
 
         volume = _volume(_run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID,
                                "2026-04-01T09:00:00Z"))
-        assert len(volume) == 6
+        assert len(volume) == _DIRTY_READS
         assert all(r["metric_value"] is not None for r in volume)
         assert all(r["row_count_total"] > 0 for r in volume)
         assert all(r["reference_run_id"] == _REF_RUN_ID for r in volume)
@@ -150,7 +171,7 @@ class TestARelativeVolumeCheckOnEveryDataset:
 
         volume = _volume(_run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID,
                                "2026-04-01T09:00:00Z"))
-        assert len(volume) == 6
+        assert len(volume) == _DIRTY_READS
         assert all(r["status"] == "fail" for r in volume), \
             [(r["dataset_id"], r["metric_value"], r["status"]) for r in volume]
 
@@ -163,7 +184,7 @@ class TestARelativeVolumeCheckOnEveryDataset:
 
         volume = _volume(_run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID,
                                "2026-04-01T09:00:00Z"))
-        assert len(volume) == 6
+        assert len(volume) == _DIRTY_READS
         assert all(r["status"] == "warn" for r in volume), \
             [(r["dataset_id"], r["metric_value"], r["status"]) for r in volume]
 
@@ -193,3 +214,35 @@ class TestARelativeVolumeCheckOnEveryDataset:
         # The measurement it COULD make is still reported - how many
         # rows arrived is a fact about this supply alone.
         assert all(r["row_count_total"] > 0 for r in volume)
+
+
+class TestAnUnreadableNotificationsDoesNotTakeTheRunDown:
+    """REAL DEFECT, 2026-10-02 - the same class as dbt's
+    (post-build-review #72) and Soda's, found by the hand-filing path
+    once one file became one arrival (REQ-PIPE-105).
+
+    The PSI check reads cp_notifications. A Case Workers run filed to a
+    different period from its siblings has no cp_notifications to read,
+    and _current_frame() raised - failing the run after dbt, Soda and
+    datacontract had recorded their results. A check whose table is not
+    there was not run; that is not the same as erroring.
+    """
+
+    def test_the_psi_check_is_left_out_and_the_volume_checks_still_run(
+            self, monkeypatch, cp_duckdb_dir):
+        import uuid
+
+        from conftest import clone_run_views
+        from qa_tools.common import supply_db
+
+        mine = f"cp_held_{uuid.uuid4().hex[:8]}"
+        with supply_db.connect(label="test-held-evidently") as conn:
+            clone_run_views(conn, _REF_RUN_ID, mine, held={"cp_notifications"})
+        try:
+            results = _run(monkeypatch, cp_duckdb_dir, mine, "2026-01-01T09:00:00Z",
+                           reference_run_id=None)
+            assert not [r for r in results if r["check_name"] == "drift:PSI"]
+            assert _volume(results), "the readable tables' volume checks must still run"
+        finally:
+            with supply_db.connect(label="test-held-evidently") as conn:
+                conn.execute(f'DROP SCHEMA IF EXISTS "{supply_db.run_schema(mine)}" CASCADE')

@@ -38,7 +38,7 @@ from qa_tools.common.check_lifecycle import (
     name_by_check_id, parse_contract_check_metadata,
 )
 from qa_tools.common import hierarchy
-from qa_tools.common.qa_results_writer import write_qa_result
+from qa_tools.common.qa_results_writer import _declared_reads_tables, write_qa_result
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -78,10 +78,22 @@ _FK_TAIL = "relationships_datacontract"
 CHECK_NAME_BY_ID = name_by_check_id(parse_contract_check_metadata(CONTRACT_PATH))
 
 
+def _unreadable_in(run_id: str) -> frozenset[str]:
+    """The logical tables this run has no view for - see
+    supply_db.readable_in() for why the schema rather than the record."""
+    conn = supply_db.connect(read_only=True, label="mothman:datacontract-readable")
+    try:
+        return frozenset(cp_common.TABLES) - supply_db.readable_in(conn, run_id)
+    finally:
+        conn.close()
+
+
 def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # The warehouse, not the six CSVs - see the BDM counterpart
     # (REQ-QAC-088).
     run = run_against_warehouse(CONTRACT_PATH, supply_db.run_schema(run_id))
+    unreadable = _unreadable_in(run_id)
+    declared = _declared_reads_tables()
 
     results = []
     for c in run.checks:
@@ -89,6 +101,17 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
             continue
         table = c.model
         if table not in cp_common.TABLES:
+            continue
+        # A RULE OVER A TABLE THIS RUN CANNOT READ WAS NOT RUN, and is
+        # left out rather than recorded (2026-10-02). datacontract-cli
+        # runs the whole contract whatever the schema holds, so such a
+        # rule comes back `failed` - a FALSE RED, about our own timing
+        # rather than the data, now that one file is one arrival and a
+        # sibling can be absent (REQ-PIPE-105). dbt and Soda leave the
+        # same checks out before running; this tool cannot be asked to,
+        # so it is done here, against the same declaration they use.
+        if table in unreadable or unreadable & set(
+                declared.get(check_id_from_quality_definition(c.qualityDefinition), ())):
             continue
 
         diag = c.diagnostics or {}

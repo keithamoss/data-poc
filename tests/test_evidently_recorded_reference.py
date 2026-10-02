@@ -90,20 +90,39 @@ class TestReadingTheRealCommittedHistory:
 
     AGENCY, COLLECTION = "registry-services", "civil-registration"
 
+    def _first_measured_run(self) -> str:
+        """The earliest recorded run that measured its table.
+
+        READ, NOT WRITTEN DOWN. This said `run_001` until 2026-10-02,
+        when REQ-PIPE-105 made a run id its staged table's spelling - and
+        a literal that encodes how ids are derived goes stale the moment
+        they are. A run that measured nothing (a contested resupply,
+        criterion 6) is skipped: it legitimately has no distribution.
+        """
+        from qa_tools.common import qa_results_reader as reader
+
+        for run_id in sorted(reader.list_run_ids(self.AGENCY, self.COLLECTION)):
+            if ec.recorded_row_count(self.AGENCY, self.COLLECTION, run_id):
+                return run_id
+        raise AssertionError("the deployment has no run that measured anything")
+
     def test_a_real_run_has_a_recorded_sex_distribution(self, deployment_history):
-        counts = ec.reference_value_counts(self.AGENCY, self.COLLECTION, "run_001", "sex")
-        assert counts, "run_001 has no recorded value_counts - the reference has nowhere to come from"
+        run_id = self._first_measured_run()
+        counts = ec.reference_value_counts(self.AGENCY, self.COLLECTION, run_id, "sex")
+        assert counts, f"{run_id} has no recorded value_counts - the reference has nowhere to come from"
         assert all(isinstance(c, int) and c >= 0 for _, c in counts)
 
     def test_a_real_run_has_a_recorded_row_count(self, deployment_history):
-        assert ec.recorded_row_count(self.AGENCY, self.COLLECTION, "run_001") > 0
+        run_id = self._first_measured_run()
+        assert ec.recorded_row_count(self.AGENCY, self.COLLECTION, run_id) > 0
 
     def test_the_recorded_count_and_distribution_agree(self, deployment_history):
+        run_id = self._first_measured_run()
         """If these ever disagree, one of them is being computed from
         something other than the rows that landed."""
-        counts = ec.reference_value_counts(self.AGENCY, self.COLLECTION, "run_001", "sex")
+        counts = ec.reference_value_counts(self.AGENCY, self.COLLECTION, run_id, "sex")
         assert sum(c for _, c in counts) == \
-            ec.recorded_row_count(self.AGENCY, self.COLLECTION, "run_001")
+            ec.recorded_row_count(self.AGENCY, self.COLLECTION, run_id)
 
     def test_an_unknown_run_reads_as_absent_rather_than_raising(self, deployment_history):
         """Absence is ordinary - a run checked as a trial and never staged

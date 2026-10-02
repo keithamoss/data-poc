@@ -97,6 +97,12 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     # the supply database through supply_db.connect() and set the
     # run's view schema on it (REQ-PIPE-068).
     monkeypatch.setattr(orchestrate_bdm.supply_db, "connect", lambda *a, **k: _FakeConn())
+    # THE TABLE IS READABLE, said outright (2026-10-02). A Birth
+    # Registrations run that cannot read its one table skips its tools
+    # (REQ-PIPE-105, a contested resupply), and the fake connection's
+    # empty catalogue would read as exactly that.
+    monkeypatch.setattr(orchestrate_bdm.supply_db, "readable_in",
+                        lambda conn, run_id: frozenset({"birth_registrations"}))
 
     # An arrival record's own shape (REQ-GEN-043) - `csv_path` is the
     # real file inside the delivery, not a name built from the run_id.

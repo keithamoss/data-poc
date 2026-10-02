@@ -162,6 +162,73 @@ def _declared_reads_tables() -> dict[str, list[str]]:
         return {}
 
 
+def run_owner(run_id: str) -> tuple[str, str] | None:
+    """(dataset id, logical table) a run checks, read off its id - or
+    None for an id that names no table (a fixture's, a trial's).
+
+    A RUN ID IS ITS STAGED TABLE'S SPELLING since REQ-PIPE-105 (Keith,
+    2026-10-02), so it says which table the run is for. Reading it from
+    the id rather than taking an argument is what lets all eight tool
+    callers stay as they are.
+    """
+    from qa_tools.common import hierarchy, supply_db
+
+    parts = supply_db.split_staged(run_id)
+    if parts is None:
+        return None
+    try:
+        return hierarchy.dataset_for_table(parts[0]).dataset_id, parts[0]
+    except Exception:  # noqa: BLE001 - not one of ours means not scoped
+        return None
+
+
+def _scope_to_run(verified: list[dict], run_id: str) -> None:
+    """Keep only what this run is FOR, in place (REQ-PIPE-105 criterion
+    11; Keith's call 2026-10-02, "own + readers").
+
+    One file is one arrival, and its run reads the whole period through
+    the overlay - so the tools evaluate every sibling's checks too. Those
+    are about supplies other runs already checked, and recording them
+    here would QA each supply once per sibling: six copies per Child
+    Protection delivery, under six run ids. What a run records is:
+
+      - checks filed against its OWN dataset, and
+      - cross-table checks that declare they READ its table - the
+        re-evaluation REQ-QAC-037 criterion 4 asks for when a table they
+        depend on arrives.
+
+    A CONTESTED OWN TABLE KEEPS ONLY THE SECOND (REQ-PIPE-079 criterion
+    13): its view fell through to the period's promoted version, so its
+    own checks would report on data this supplier did not send.
+
+    IN PLACE, because every caller returns the very list it passed here
+    and the orchestrator writes reports/results_*.json from that - a
+    filtered copy recorded here and an unfiltered one returned would be
+    the two-build-paths divergence this module already fixed once.
+    """
+    owner = run_owner(run_id)
+    if owner is None or not verified:
+        return
+    dataset_id, table = owner
+    contested = False
+    if any(r.get("dataset_id") == dataset_id for r in verified):
+        try:
+            from qa_tools.common import supply_db
+
+            conn = supply_db.connect(read_only=True, label="mothman:run-scope")
+            try:
+                contested = table in supply_db.resolution_for(conn, run_id).ambiguous
+            finally:
+                conn.close()
+        except Exception:  # noqa: BLE001 - no resolution means nothing contested
+            contested = False
+    declared = _declared_reads_tables()
+    verified[:] = [
+        r for r in verified
+        if (r.get("dataset_id") == dataset_id and not contested)
+        or table in declared.get(r.get("check_id"), ())]
+
+
 def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: str,
                      tool: str, raw_output: Any, verified: list[dict] | None = None,
                      run_by: str | None = None) -> None:
@@ -198,6 +265,8 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
     `verified` record goes to the dataset it names, the raw output is
     recorded once against `_raw`, and a spanning record goes to
     `_cross-table` (REQ-QAC-037)."""
+    if verified:
+        _scope_to_run(verified, run_id)
     records = _with_tables_read(verified or [], run_id)
     # THE CALLER'S OWN RECORDS ARE BROUGHT UP TO DATE, and that is not
     # tidiness. The orchestrator keeps the list it passed here and
