@@ -266,7 +266,7 @@ entries:
     idea: false
 
   - term: QA run
-    definition: "One pass of Mothman's checks over newly arrived data. It starts when the data arrives, not at a set time of day."
+    definition: "One pass of Mothman's checks over newly arrived data. For now, a person starts each one. Once it is automated, it will start by itself whenever data arrives."
     aliases: []
     forms: [QA runs]
     defined_by: [REQ-PIPE-036]
@@ -313,7 +313,7 @@ entries:
     idea: false
 
   - term: promote
-    definition: "To move a supply out of staging into its period, which fills its slot. Mothman promotes a green or amber supply automatically when its slot is empty. A person can also promote a supply, such as a red one they have decided to use anyway."
+    definition: "To move a supply out of staging into its period, which fills its slot. Mothman promotes a green or amber supply automatically when its slot is empty. A person can also promote a supply, such as a red one, where at least one check failed, that they have decided to use anyway."
     aliases: []
     forms: [promotes, promoted, promoting, promotion]
     defined_by: [REQ-PIPE-075, REQ-PIPE-062]
@@ -340,7 +340,7 @@ entries:
     idea: false
 
   - term: re-file
-    definition: "A person's decision to move a supply to a different slot from the one the rule chose. For example, a supplier sends their third-quarter file before the third quarter's claim window opens, so the rule files it to the second quarter. A person re-files it to the third quarter."
+    definition: "A person's decision to move a supply to a different slot from the one the rule chose. For example, a supplier sends their third-quarter file so early that it arrives before the third quarter's claim window opens, which is a set time before its due time. The rule files it to the second quarter, and a person re-files it to the third quarter."
     aliases: []
     forms: [re-files, re-filed, re-filing]
     defined_by: [REQ-GHUB-082]
@@ -349,10 +349,10 @@ entries:
     idea: false
 
   - term: acknowledge
-    definition: "A person's note that they have seen an amber supply and are content for it to stand. They make it by commenting /accept on the dataset's QA ticket in GitHub. The dashboard then shows an acknowledgement badge beside the supply's status, which stays amber. It changes nothing about where the supply is filed."
+    definition: "A person's note that they have seen an amber supply and are content for it to stand. They make it by commenting /accept on the dataset's QA ticket in GitHub. It is recorded in the decision log, and the dashboard shows an acknowledgement badge beside the supply's status, which stays amber. It changes nothing about where the supply is filed."
     aliases: []
     forms: [acknowledges, acknowledged, acknowledging]
-    defined_by: [REQ-QAC-017]
+    defined_by: [REQ-QAC-017, REQ-PIPE-092]
     page: null
     draft: false
     idea: false

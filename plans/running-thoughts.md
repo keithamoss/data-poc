@@ -4585,3 +4585,19 @@ Belongs with batch 5's check work.
       disabled, so it very likely does nothing today.
     Needs Keith: which of the two decisions stands, and whether
     acknowledging is meant to work right now.
+
+    **Keith's answer, 2026-10-02.** REQ-PIPE-092 stands: an amber
+    acknowledgement is recorded in the decision log as an entry of its
+    own. REQ-PIPE-091's contrary decision is superseded - its text in
+    `requirements.yaml` still says the opposite and needs correcting
+    (a change to a requirement's claims, so the exact wording goes to
+    Keith first). The broken `/accept` path is known and will be fixed;
+    not a concern for now.
+
+    **FOLLOW-UP, Keith unsure:** whether an acknowledgement should bar
+    the supply from automatic promotion. REQ-PIPE-092's decision says it
+    does, inherited from REQ-PIPE-076 criterion 7 ("any decision by a
+    person bars automation for that supply"), and records Keith as
+    "happy with that, signed off" on 2026-09-27. He now says "I don't
+    know that it bars it from automatic promotion." Revisit before the
+    acknowledgement entry type is built.
