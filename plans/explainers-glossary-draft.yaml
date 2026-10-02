@@ -221,7 +221,7 @@ entries:
     idea: false
 
   - term: arrival
-    definition: "One file we received, with its receipt time, which is the moment our own storage took it. One arrival can bring several supplies."
+    definition: "One file we received, with its receipt time, which is the moment our own storage took it. A delivery of several files is several arrivals."
     aliases: []
     forms: [arrivals]
     defined_by: [REQ-PIPE-105, REQ-PIPE-034]
@@ -230,7 +230,7 @@ entries:
     idea: false
 
   - term: supply
-    definition: "One version of one dataset's table, which is filed to a slot and judged by checks. One arrival can bring several supplies."
+    definition: "One version of one dataset's table, which is filed to a slot and judged by checks. Each supply comes from one arrival."
     aliases: []
     forms: [supplies]
     defined_by: [REQ-PIPE-034, REQ-PIPE-062]
