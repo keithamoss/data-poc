@@ -103,6 +103,50 @@ in `REQ-PIPE-079`'s own decisions. That leaves
      035.)*
 
    **Still waiting on Keith:**
+   - **`REQ-PIPE-105`'s three open questions, which are really ONE
+     decision - PARKED by Keith 2026-10-02 for later that day or the
+     next, deliberately, so `REQ-PIPE-080` could go first.** The
+     question: **does REQ-PIPE-059's delivery-level hold survive
+     criterion 1, and if so what raises it?**
+
+     Two of the three are settled FACTS rather than questions, both
+     checked 2026-09-30: under one-file-one-arrival `Arrival.held` can
+     never be non-empty, so the hold has no producer left; and nothing
+     in this system understands an archive, so a zip cannot be that
+     producer either.
+
+     **A proposed answer, for him to react to rather than a decision
+     taken: RETIRE the delivery-level hold, because CONTESTED subsumes
+     it.** The hold's subject was "two files claim this dataset and
+     nobody said which is the supply", scoped BY TRANSPORT - which is
+     what produces the surprising rule where identical bytes are
+     treated differently depending on whether something bundled them.
+     Scoped BY PERIOD the same situation is already handled:
+     `REQ-PIPE-105` criterion 8 and `REQ-PIPE-079` criteria 11-13 make
+     the table contested - it offers nothing of its own, its own
+     checks do not run, it is not promoted, and readers fall back to
+     the period's promoted version. No shared arrival needed, and no
+     transport knowledge at all. He has already moved this way once:
+     `REQ-PIPE-079` decision 14, "ambiguity blocks the table, not its
+     readers", revised `REQ-PIPE-068`'s flat refusal toward exactly
+     this treatment.
+
+     **The one consequence to weigh rather than wave past**: a hold
+     makes the table UNREADABLE, where contested lets readers see the
+     period's promoted version. That difference is deliberate, so
+     retiring the hold means accepting the contested behaviour
+     everywhere.
+
+     **And the premise of this file's own parking instruction has
+     INVERTED, which is why this sits here rather than among the
+     unscoped items.** It was parked 2026-10-01 so it would not hold
+     up finishing the signed sprints; what emerged 2026-10-02 is that
+     the sprints cannot finish without this one decision - roughly two
+     dozen criteria across `REQ-PIPE-105`, `REQ-PIPE-079` and
+     `REQ-PIPE-035` wait on it, and they are one story rather than an
+     assortment: what a QA run reads. This is still ONE question
+     answerable in conversation, NOT the transport design project
+     items 1-6 describe, so answering it is not unparking this file.
    - ~~**`REQ-PIPE-079` risk call.**~~ *Answered 2026-10-01: go ahead
      without a before/after comparison.*
    - **`REQ-PIPE-110`-`113`** remain unsigned, 64 criteria, and

@@ -116,6 +116,18 @@ class Assignment:
     #: tells a person nothing they can act on, and acting on it is the
     #: entire point - the resolution is a human assigning it.
     unavailable: tuple[tuple[str, str], ...] = ()
+    #: OUR RECEIPT INSTANT (REQ-PIPE-080 criterion 4) - when our own
+    #: storage recorded the object, never a timestamp inside the
+    #: supplier's file. It is carried here so the filing can record the
+    #: arrival classification at the moment it records the slot, which
+    #: is the only moment both are known together.
+    #:
+    #: OPTIONAL, because a caller that has no arrival instant is a real
+    #: case rather than a bug - a hand-filed supply, a test. The filing
+    #: then records no classification rather than inventing one from
+    #: the clock, which would make punctuality a property of when
+    #: somebody ran the tool.
+    received_at: "datetime | None" = None
 
     @property
     def is_resupply(self) -> bool:

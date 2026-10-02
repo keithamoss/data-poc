@@ -4232,3 +4232,55 @@ twice. It deliberately did not re-find the `TypeError`.
     078, and is bigger than the criterion that found it. Nothing is
     worse in the meantime: the same hold crashed at dbt before this
     change and crashes at Soda after it, and the corpus has no holds.
+
+73. **[investigate, 2026-10-02]** **[Pipeline & publishing]** `EARLY`
+    may be unreachable through the real assignment path, because the
+    slot list is capped at the arrival date.
+
+    **Found while building `REQ-PIPE-080`**, by writing a test against
+    a REAL dataset rather than a hand-built slot map - the fictional
+    fixture the sibling test file uses would have hidden it entirely.
+
+    **The mechanism.** `filing.file_arrivals()` builds its
+    candidate slots with `slots_mod.slots_for_dataset(dataset_id,
+    until=arrival.received_at.date())`, and `until` stops at the
+    period CONTAINING that date. So a slot whose CLAIM WINDOW has
+    already opened, but whose period has not yet begun, is not in the
+    list the rule chooses from. Measured directly:
+
+        cp-clients, arrival 2023-07-25 09:00 Perth
+        2023-Q3 claim opens 2023-07-18, due 2023-08-01
+        slots_for_dataset(until=2023-07-25) -> ['2023-Q1', '2023-Q2']
+        current_slot(...)                   -> 2023-Q2
+
+    A supply arriving a week inside Q3's claim window is therefore
+    filed to Q2 - already filled, so branch 3 records a resupply of
+    the CURRENT slot - and classified against Q2, which reads LATE.
+    The honest answer is EARLY for Q3. `arrival_classification` would
+    give that answer correctly; it never gets the chance, because the
+    slot it needs was removed before the rule saw it.
+
+    **Which makes the claim window do nothing.** Its whole purpose is
+    to let a supply arrive before its due date and still be recognised
+    as that period's. Capping the slot list at the arrival date
+    defeats it by construction.
+
+    **NOT EXERCISED TODAY, checked rather than assumed**: zero of the
+    150 supplies in the real corpus arrived inside a claim window that
+    the cap excluded. So this is latent, and the measured
+    0 early / 240 on time / 112 late is still explained by the
+    generator sending nothing early (`plans/running-thoughts.md` #27)
+    rather than by this. **But the two causes are indistinguishable
+    from the outside, and that is the part worth flagging**: teaching
+    the generator to send an early supply (`REQ-GEN-044`) would not
+    produce an `early` reading, it would produce a wrong `late` one,
+    and the obvious conclusion would be that the classifier is broken.
+
+    **Not fixed here.** It is in the assignment path
+    (`REQ-PIPE-057`/`REQ-PIPE-062`), not in `REQ-PIPE-080`, and
+    changing which slot a supply is filed to is a change to agreed
+    behaviour - Keith's sign-off, per this file's own standing rule.
+    `REQ-PIPE-080`'s own resolver deliberately does NOT inherit the
+    cap (`filing._slot_named()`), because a supply re-filed FORWARD by
+    a person would otherwise lose its verdict; that much is fixed and
+    covered.

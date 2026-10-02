@@ -14823,7 +14823,7 @@ requirements:
       supply that is on time for Q3 is never shown as late for Q2 just
       because something worked it out a different way.
     moscow: must
-    status: not_started
+    status: in_progress
     source: >
       REQ-PIPE-066's four unmet criteria (9, 10, 11 and 12) and REQ-PIPE-067's criterion 4, all deferred to the promotion sprint
       because the classifier had no filings to measure against. Scoped
@@ -14896,6 +14896,22 @@ requirements:
         not just at the data layer.
     dependencies: [REQ-PIPE-075, REQ-PIPE-066, REQ-PIPE-067]
     decisions:
+      - >
+        BUILT IN TWO PARTS, and this records which is which so the
+        order is not mistaken for an oversight. PART 1 (2026-10-02) is
+        the RECORDING: `qa.filing` gains `received_at` and
+        `classification` as real columns, written when the filing is
+        written and recomputed when a person re-files, plus
+        `filing.recorded_arrival()` giving the two instants and the
+        open interval. PART 2 is the RETIREMENTS and the presentation.
+
+        THAT ORDER IS CRITERION 7 RATHER THAN CONVENIENCE. It forbids
+        retiring the old derivation BEFORE the new one produces a real
+        answer - so recording-without-retirement is the safe
+        intermediate state and retirement-without-recording is the
+        forbidden one. Keith's own measured reason, carried in NFR 2:
+        retiring early would replace the dashboard's current answer
+        with 352 supplies reading "unfiled".
       - >
         Decided classification measures against the period the supply
         was FILED to rather than one inferred from its arrival date

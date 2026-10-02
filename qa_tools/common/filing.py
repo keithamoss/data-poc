@@ -44,6 +44,8 @@ pointed away from them.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from qa_tools.common import qa_store, supply_db
 from qa_tools.common.assignment import Assignment
@@ -72,13 +74,93 @@ def record(assignment: Assignment) -> bool:
     the database rather than by every caller remembering.
     """
     with _connect("mothman:filing-record") as conn:
+        record = assignment.as_record()
+        verdict = _classification_for(
+            assignment.dataset_id, assignment.slot, assignment.received_at)
+        if verdict is not None:
+            record["classification"] = verdict
         rows = conn.execute(
-            f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, record) "
-            "VALUES (?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO NOTHING "
+            f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, record, "
+            "received_at, classification) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO NOTHING "
             "RETURNING dataset_id",
             [assignment.dataset_id, assignment.supply_id, assignment.slot,
-             assignment.branch, json.dumps(assignment.as_record())]).fetchall()
+             assignment.branch, json.dumps(record),
+             assignment.received_at, verdict]).fetchall()
     return bool(rows)
+
+
+def _classification_for(dataset_id: str, slot_name: str | None,
+                         received_at: datetime | None) -> str | None:
+    """This supply's verdict against the slot it is filed to, or None
+    where there is no receipt instant to judge (REQ-PIPE-080
+    criterion 1).
+
+    OUR RECEIPT INSTANT, NEVER THE PROMOTION INSTANT (criterion 8), and
+    never an instant out of the supplier's file (criterion 4). A
+    verdict taken from when somebody got round to promoting would make
+    punctuality a property of OUR responsiveness; one taken from the
+    supplier's own extract timestamp lets them decide whether they were
+    late.
+
+    NONE IS NOT UNFILED. None means "nothing to judge with" and leaves
+    the column empty; UNFILED means "judged, and there is no slot to be
+    punctual against" (criterion 6). Collapsing them would make a
+    missing receipt look like a held supply.
+
+    IT NEVER RAISES. A dataset whose slots cannot be built - an unknown
+    id, no agreed calendar (REQ-PIPE-106) - still has a filing worth
+    recording, and a classifier that took the write down with it would
+    be the blast-radius rule broken for a presentational field.
+    """
+    from qa_tools.common import arrival_classification
+
+    if received_at is None:
+        return None
+    if not slot_name:
+        return arrival_classification.UNFILED
+    try:
+        return arrival_classification.classify(
+            received_at, _slot_named(dataset_id, slot_name, received_at))
+    except Exception:  # noqa: BLE001 - see the docstring
+        return None
+
+
+def _slot_named(dataset_id: str, slot_name: str, received_at: datetime):
+    """The Slot a filing names, or None where the schedule has no such
+    period.
+
+    NOT BOUNDED BY THE ARRIVAL DATE, and that is the whole of this
+    function. `slots_for_dataset(until=received_at.date())` is what the
+    assignment rule passes, and it stops at the period CONTAINING that
+    date - so a slot whose claim window has already opened, but whose
+    period has not yet begun, is not in the list. Resolve a filing that
+    way and a supply re-filed FORWARD loses its verdict entirely:
+    the named slot is simply absent, which reads as `unfiled`.
+
+    An authored calendar needs no bound at all. A cadence-rule calendar
+    requires one - "every day" has no end of its own - and there the
+    period name IS a date, so the slot names its own bound. Falling
+    back to the arrival date is for the case where it does not parse,
+    which costs the same answer the cap used to give rather than an
+    error.
+    """
+    from datetime import date as date_cls
+
+    from qa_tools.common import slots as slots_mod
+
+    def _find(slots):
+        return next((s for s in slots if s.period.name == slot_name), None)
+
+    try:
+        return _find(slots_mod.slots_for_dataset(dataset_id))
+    except Exception:  # noqa: BLE001 - a cadence rule needs an end; give it one
+        try:
+            named = date_cls.fromisoformat(slot_name)
+        except ValueError:
+            named = received_at.date()
+        return _find(slots_mod.slots_for_dataset(
+            dataset_id, until=max(received_at.date(), named)))
 
 
 def filing_for(dataset_id: str, supply_id: str) -> dict | None:
@@ -323,6 +405,18 @@ def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
     # longer describes where it sits: a person put it here.
     updated["branch"] = "refiled-by-a-person"
 
+    # THE VERDICT FOLLOWS, THE INSTANT DOES NOT (REQ-PIPE-080 criteria
+    # 5 and 8). Recomputed from the receipt instant already recorded
+    # against this supply - so a supply reported late purely because it
+    # was misfiled stops reading late the moment somebody moves it,
+    # without anything re-deriving when it turned up.
+    received_at = received_at_of(dataset_id, supply_id)
+    verdict = _classification_for(dataset_id, to_slot, received_at)
+    if verdict is not None:
+        updated["classification"] = verdict
+    else:
+        updated.pop("classification", None)
+
     # AN UPDATE, AND THE ONLY ONE THIS TABLE TAKES. Write-once
     # (REQ-PIPE-104 criterion 2) is about the RULE never re-deriving a
     # filing against a schedule that has moved on; a person moving a
@@ -331,10 +425,116 @@ def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
     # trigger while `qa.decision` does - see the DDL.
     with _connect("mothman:filing-refile") as conn:
         conn.execute(
-            f"UPDATE {TABLE} SET slot = ?, branch = ?, record = ? "
+            f"UPDATE {TABLE} SET slot = ?, branch = ?, record = ?, classification = ? "
             "WHERE dataset_id = ? AND supply_id = ?",
-            [to_slot, updated["branch"], json.dumps(updated), dataset_id, supply_id])
+            [to_slot, updated["branch"], json.dumps(updated), verdict,
+             dataset_id, supply_id])
     return updated
+
+
+@dataclass(frozen=True)
+class RecordedArrival:
+    """When a supply reached us, what that earned it, and how long it
+    then waited (REQ-PIPE-080 criteria 9, 10 and 11).
+
+    TWO INSTANTS, NEVER ONE IN PLACE OF THE OTHER (criterion 11).
+    `received_at` is when WE received the supply; `filled_at` is when a
+    decision promoted it into its slot. They answer different
+    questions - "did the supplier deliver on time" and "how quickly did
+    we act on it" - and a page showing one labelled as the other is the
+    specific confusion this requirement exists to end.
+    """
+
+    dataset_id: str
+    supply_id: str
+    slot: str | None
+    received_at: datetime | None
+    filled_at: datetime | None
+    classification: str | None
+
+    @property
+    def awaiting(self) -> bool:
+        """Whether the wait is still running (criterion 10)."""
+        return self.received_at is not None and self.filled_at is None
+
+    @property
+    def waited(self) -> timedelta | None:
+        """Receipt to promotion, or receipt to NOW where nothing has
+        promoted it yet (criterion 10).
+
+        OPEN RATHER THAN ABSENT OR ZERO, which is the criterion's whole
+        point: both of those read as "dealt with instantly", and a
+        supply nobody has decided on for three weeks is the opposite of
+        that. `awaiting` says which of the two this is, so a caller
+        never has to infer it from the number.
+        """
+        from qa_tools.common import asset_time
+
+        if self.received_at is None:
+            return None
+        return (self.filled_at or asset_time.now()) - self.received_at
+
+
+def received_at_of(dataset_id: str, supply_id: str) -> datetime | None:
+    """Our receipt instant for this supply, as recorded."""
+    with _connect("mothman:filing-read") as conn:
+        rows = conn.execute(
+            f"SELECT received_at FROM {TABLE} WHERE dataset_id = ? AND supply_id = ?",
+            [dataset_id, supply_id]).fetchall()
+    return rows[0][0] if rows else None
+
+
+def recorded_arrival(dataset_id: str, supply_id: str) -> RecordedArrival | None:
+    """This supply's recorded arrival facts, or None where it has no
+    filing at all.
+
+    READ RATHER THAN RECOMPUTED (criterion 1). Every consumer asks this
+    instead of deriving punctuality for itself, which is the whole
+    reason the classification is a column - three derivations of one
+    fact is what REQ-PIPE-080 exists to end.
+
+    `filled_at` COMES FROM THE DECISION LOG, not from this table, and
+    deliberately: a slot is filled by a PROMOTION, and the filing knows
+    only where a supply was filed. Reading it here would make a filing
+    look like a fill, which REQ-PIPE-062's own docstring spends a
+    paragraph warning against.
+    """
+    with _connect("mothman:filing-read") as conn:
+        rows = conn.execute(
+            f"SELECT slot, received_at, classification FROM {TABLE} "
+            "WHERE dataset_id = ? AND supply_id = ?",
+            [dataset_id, supply_id]).fetchall()
+        if not rows:
+            return None
+        slot, received_at, classification = rows[0]
+        filled_at = _filled_at(conn, dataset_id, supply_id, slot)
+    return RecordedArrival(dataset_id=dataset_id, supply_id=supply_id, slot=slot,
+                            received_at=received_at, filled_at=filled_at,
+                            classification=classification)
+
+
+def _filled_at(conn, dataset_id: str, supply_id: str, slot: str | None):
+    """When a decision promoted THIS supply into its slot, or None.
+
+    THIS SUPPLY, not whatever currently fills the slot. A slot filled
+    by a later substitution says nothing about how long this supply
+    waited, and reporting it would turn somebody else's promotion into
+    this supply's response time.
+    """
+    if not slot:
+        return None
+    from qa_tools.common import decision_log
+
+    # `effective_at` RATHER THAN `recorded_at` - when the decision took
+    # effect, not when the row reached the table. A bootstrap replays
+    # years of arrivals under one wall clock, so recorded_at would make
+    # every historical supply look as though it waited until today.
+    rows = conn.execute(
+        f"SELECT MIN(effective_at) FROM {decision_log.TABLE} "
+        "WHERE dataset_id = ? AND supply = ? AND to_slot = ? AND action IN (?, ?)",
+        [dataset_id, supply_id, slot,
+         decision_log.PROMOTE, decision_log.REFILE]).fetchall()
+    return rows[0][0] if rows else None
 
 
 def classification_of(dataset_id: str, supply_id: str, arrived_at,

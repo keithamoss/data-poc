@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -423,6 +423,27 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".filing (
     -- above are lifted out because they ARE queried: which slot, and why.
     record      jsonb NOT NULL,
     recorded_at timestamptz NOT NULL DEFAULT now(),
+    -- OUR RECEIPT INSTANT, AND THE VERDICT IT EARNS AGAINST THIS SLOT
+    -- (REQ-PIPE-080 criteria 1, 4 and 8). Two columns rather than a
+    -- field in `record`, on the same test the three above already
+    -- pass: these ARE queried - "how many supplies were late", "how
+    -- long did this one wait" - and a consumer should not unpack a
+    -- document per row to ask.
+    --
+    -- THEY SIT TOGETHER ON PURPOSE. The instant is a FACT and never
+    -- moves; the slot is a DECISION and can, so the verdict derived
+    -- from the two of them has to move with it. Keeping the verdict
+    -- in the filing row is what makes it recorded AND current: a
+    -- re-file rewrites this row, so it rewrites the verdict, and
+    -- REQ-PIPE-067 is satisfied by the shape rather than by every
+    -- caller remembering to recompute.
+    --
+    -- BOTH NULLABLE. A caller with no arrival instant - a hand-filed
+    -- supply, a test - records no verdict rather than inventing one
+    -- from the clock, which would make punctuality a property of when
+    -- somebody ran the tool.
+    received_at    timestamptz,
+    classification text,
     PRIMARY KEY (dataset_id, supply_id)
 );
 
@@ -436,6 +457,12 @@ CREATE INDEX IF NOT EXISTS filing_dataset
 --   contested supply is judged against.
 CREATE INDEX IF NOT EXISTS filing_slot
     ON "{SCHEMA}".filing (dataset_id, slot) WHERE slot IS NOT NULL;
+
+-- Same ADD COLUMN rule as load_outcome above: CREATE TABLE IF NOT
+-- EXISTS does nothing to a table that already exists, so a column
+-- added to the definition never reaches an older database.
+ALTER TABLE "{SCHEMA}".filing ADD COLUMN IF NOT EXISTS received_at timestamptz;
+ALTER TABLE "{SCHEMA}".filing ADD COLUMN IF NOT EXISTS classification text;
 
 -- WHO DECIDED WHAT (REQ-PIPE-091, carrying REQ-PIPE-074's content
 -- across). THE SINGLE SYSTEM OF RECORD for every filing decision -
