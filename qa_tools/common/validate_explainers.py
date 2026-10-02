@@ -719,9 +719,14 @@ class Validator:
         cited = set(self.page_sources(page))
         for u in page.units:
             for bold in BOLD.finditer(u.text):
-                for entry, pat in self.glossary_terms:
-                    if not pat.search(bold.group(1) or bold.group(2)):
-                        continue
+                text = bold.group(1) or bold.group(2)
+                hits = [(entry, m.span()) for entry, pat in self.glossary_terms
+                        for m in [pat.search(text)] if m]
+                # A term inside a longer one is not being defined: bold
+                # 'delivery months' defines delivery month, not delivery.
+                hits = [(e, (a, b)) for e, (a, b) in hits
+                        if not any(c <= a and b <= d and (c, d) != (a, b) for _, (c, d) in hits)]
+                for entry, _ in hits:
                     for rid in entry.defined_by:
                         if rid not in cited:
                             self.add(page.rel, u.line, "recall",

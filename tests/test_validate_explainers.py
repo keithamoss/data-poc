@@ -323,6 +323,21 @@ def test_regular_inflections_and_listed_forms_match(repo, word):
     assert recall(repo), word
 
 
+def test_a_longer_term_does_not_also_define_the_shorter_one_inside_it(repo):
+    """Found 2026-10-02: bolding 'delivery months' counted as defining
+    'delivery' too, demanding a citation for a concept the page never
+    explains. The longer term that covers the shorter one is the one
+    being defined."""
+    g = yaml.safe_load(yaml.safe_dump(GLOSSARY))
+    g["entries"].append({"term": "promotion queue", "definition": "What waits.", "aliases": [], "forms": [],
+                         "defined_by": ["REQ-DOCS-902"], "page": None, "draft": False, "idea": False,
+                         "category": "c"})
+    (repo / "docs/explainers/glossary.yaml").write_text(yaml.safe_dump(g, sort_keys=False))
+    write(repo, GOOD.replace("Sam wonders where it will land.", "Each period has one **promotion queue**."))
+    msgs = recall(repo)
+    assert len(msgs) == 1 and "REQ-DOCS-902" in msgs[0], msgs
+
+
 def test_bold_in_the_sources_list_does_not_count(repo):
     with_glossary(repo)
     write(repo, GOOD.replace("- [contract/data-asset.yaml]", "- **promotion** [contract/data-asset.yaml]"))
