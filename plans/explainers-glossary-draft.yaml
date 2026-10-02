@@ -313,7 +313,7 @@ entries:
     idea: false
 
   - term: promote
-    definition: "To move a supply out of staging into its period, which fills its slot. Mothman promotes a green or amber supply automatically when its slot is empty. A person can also promote a supply, such as a red one, where at least one check failed, that they have decided to use anyway."
+    definition: "To move a supply out of staging into its period, which fills its slot. Mothman promotes a green or amber supply automatically when its slot is empty. A person can also promote a supply that failed one or more of its checks, if they decide to use it anyway."
     aliases: []
     forms: [promotes, promoted, promoting, promotion]
     defined_by: [REQ-PIPE-075, REQ-PIPE-062]
@@ -340,7 +340,7 @@ entries:
     idea: false
 
   - term: re-file
-    definition: "A person's decision to move a supply to a different slot from the one the rule chose. For example, a supplier sends their third-quarter file so early that it arrives before the third quarter's claim window opens, which is a set time before its due time. The rule files it to the second quarter, and a person re-files it to the third quarter."
+    definition: "A person's decision to move a supply to a different slot from the one the rule chose. For example, a supplier sends their third-quarter file so early that it arrives before the third quarter's claim window opens. The rule files it to the second quarter, and a person re-files it to the third quarter."
     aliases: []
     forms: [re-files, re-filed, re-filing]
     defined_by: [REQ-GHUB-082]
