@@ -102,7 +102,7 @@ entries:
     idea: false
 
   - term: delivery month
-    definition: "One of the months in which a supply calendar's authored dates fall. A dataset can take part in only some of them, such as one month a year. A dataset that names none takes part in every month."
+    definition: "One of the months in which a supply calendar's authored dates fall. A dataset can take part in only some of them. For example, in a data asset where most datasets arrive quarterly, a dataset supplied once a year names just its one month, such as August, and has no slot in the other three quarters. A dataset that names none takes part in every month."
     aliases: []
     forms: [delivery months]
     defined_by: [REQ-PIPE-049]
@@ -120,7 +120,7 @@ entries:
     idea: false
 
   - term: not-expected period
-    definition: "A period in which a dataset owes no supply, declared beforehand with a reason. It still shows, and it has no slot."
+    definition: "A period in which a dataset owes no supply, declared beforehand with a reason. It still shows, marked as not expected, and it has no slot. For example, a supplier tells us there will be no third-quarter supply because they are moving to a new system."
     aliases: []
     forms: [not-expected periods, not expected]
     defined_by: [REQ-PIPE-049, REQ-PIPE-052]
@@ -156,7 +156,7 @@ entries:
     idea: false
 
   - term: claim window
-    definition: "The stretch of time in which a supply can be filed to a slot. It opens a set time before the slot's due time and never closes."
+    definition: "The stretch of time in which a supply can be filed to a slot. It opens a set time before the slot's due time and has no closing time, so a late supply can always be filed. In practice, a slot stops taking supplies once a later slot for the same dataset is filled."
     aliases: []
     forms: [claim windows]
     defined_by: [REQ-PIPE-052, REQ-PIPE-049]
