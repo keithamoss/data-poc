@@ -32,7 +32,7 @@ Build state, by section:
 > Each dataset, meaning one table, gets its own slot in every period it takes part in, so one late table shows up on its own.
 > A period is one agreed date on the supply calendar, and a slot is one table's expected supply for that period.
 > A slot stays empty until a supply is promoted into it, that is, moved out of staging, the waiting area, into the period.
-> So a slot still empty after its due time may have a red supply waiting in staging for a person to decide on.
+> So a slot still empty after its due time may have a supply that failed its checks waiting in staging for a person.
 
 On 3 August 2026, Sam, a data engineer new to the team that looks after this data, opens the dashboard. Child Protection is a collection of 6 tables from one supplying agency. Five of its tables show this quarter's supply, and the carers table shows nothing at all.
 
