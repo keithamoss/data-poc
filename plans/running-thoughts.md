@@ -4539,7 +4539,7 @@ Belongs with batch 5's check work.
     aliased "one-off dataset" and "one-off data collection" (read as
     keeping "one-off extraction" too - confirm). Sample data streamlined
     to "We check it with one-off checks: a new round for each...". Both
-    applied to `plans/explainers-glossary-draft.yaml`, with "in
+    applied to the glossary draft (now `docs/explainers/glossary.yaml`), with "in
     development" removed and both entries marked `idea: true` until
     this is scoped into a requirement.
 

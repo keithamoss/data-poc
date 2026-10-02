@@ -45,6 +45,9 @@ class GlossaryEntry(_Strict):
     page: str | None
     draft: bool
     idea: bool
+    # Which section of glossary.md the entry is listed under - one of
+    # the keys in Glossary.categories (Keith, 2026-10-02).
+    category: str
     # Optional: the entry this one sits inside, such as the supply
     # calendar inside the delivery agreement (criterion 12).
     part_of: str | None = None
@@ -57,7 +60,18 @@ class GlossaryEntry(_Strict):
         return v
 
 
+class Category(_Strict):
+    """One section of glossary.md. The ORDER of Glossary.categories is
+    the order the sections render in, which is how the supply calendar's
+    terms sit at the back (Keith, 2026-10-02) - a reader meets the data
+    and what happens to it before the scheduling machinery."""
+
+    key: str
+    title: str
+
+
 class Glossary(_Strict):
+    categories: list[Category]
     entries: list[GlossaryEntry]
     diagram: str
 
@@ -70,6 +84,13 @@ def load_glossary(repo: Path = REPO_ROOT) -> Glossary:
 def glossary_problems(glossary: Glossary, known_requirements: set[str]) -> list[str]:
     """Rules the schema alone cannot state (criteria 3 and 8)."""
     problems: list[str] = []
+    keys = [c.key for c in glossary.categories]
+    for key in sorted({k for k in keys if keys.count(k) > 1}):
+        problems.append(f"category '{key}' is listed more than once")
+    used = {e.category for e in glossary.entries}
+    for key in keys:
+        if key not in used:
+            problems.append(f"category '{key}' has no entries - remove it or file an entry under it")
     seen: dict[str, str] = {}
     terms = {e.term.lower() for e in glossary.entries}
     for e in glossary.entries:
@@ -89,6 +110,9 @@ def glossary_problems(glossary: Glossary, known_requirements: set[str]) -> list[
         for rid in e.defined_by:
             if rid not in known_requirements:
                 problems.append(f"'{e.term}' cites {rid}, which is not in requirements.yaml")
+        if e.category not in keys:
+            problems.append(f"'{e.term}' is filed under category '{e.category}', which is not "
+                            "in the categories list")
         if e.part_of and e.part_of.lower() not in terms:
             problems.append(f"'{e.term}' is part of '{e.part_of}', which is not an entry")
     return problems
@@ -100,8 +124,6 @@ def glossary_problems(glossary: Glossary, known_requirements: set[str]) -> list[
 def render_glossary_md(glossary: Glossary, req_states: dict[str, str]) -> str:
     """glossary.md, derived and never hand-edited. Badges come from
     requirements.yaml through the same derivation the validator uses."""
-    from qa_tools.common.validate_explainers import MARKER_TEXT, least_built
-
     lines = [
         "# Glossary",
         "",
@@ -111,8 +133,23 @@ def render_glossary_md(glossary: Glossary, req_states: dict[str, str]) -> str:
         glossary.diagram.rstrip(),
         "",
     ]
-    for e in sorted(glossary.entries, key=lambda x: x.term.lower()):
-        lines += [f"## {e.term[:1].upper()}{e.term[1:]}", ""]
+    by_category = {c.key: [] for c in glossary.categories}
+    for e in glossary.entries:
+        by_category.setdefault(e.category, []).append(e)
+    for c in glossary.categories:
+        if not by_category[c.key]:
+            continue
+        lines += [f"## {c.title}", ""]
+        lines += _render_entries(by_category[c.key], req_states)
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _render_entries(entries: list[GlossaryEntry], req_states: dict[str, str]) -> list[str]:
+    from qa_tools.common.validate_explainers import MARKER_TEXT, least_built
+
+    lines: list[str] = []
+    for e in sorted(entries, key=lambda x: x.term.lower()):
+        lines += [f"### {e.term[:1].upper()}{e.term[1:]}", ""]
         state = ("an idea, not designed yet" if e.idea
                  else least_built(req_states.get(r, "proposed") for r in e.defined_by))
         if state != "built":
@@ -128,7 +165,7 @@ def render_glossary_md(glossary: Glossary, req_states: dict[str, str]) -> str:
             lines += [f"Explained in: [{e.page}]({e.page}).", ""]
         else:
             lines += ["Not explained on a page of its own yet.", ""]
-    return "\n".join(lines).rstrip() + "\n"
+    return lines
 
 
 def expected_glossary_md(repo: Path = REPO_ROOT) -> str:
@@ -149,6 +186,6 @@ def glossary_is_current(repo: Path = REPO_ROOT) -> bool:
 
 
 __all__ = [
-    "Glossary", "GlossaryEntry", "ValidationError", "load_glossary", "glossary_problems",
+    "Category", "Glossary", "GlossaryEntry", "ValidationError", "load_glossary", "glossary_problems",
     "render_glossary_md", "write_glossary_md", "glossary_is_current",
 ]

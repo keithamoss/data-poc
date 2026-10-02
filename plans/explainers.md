@@ -924,10 +924,25 @@ survives context compaction. Tick items off here as they land.
    3. write the docs-writer agent's own prompt as positive prose that
       describes the voice (no standard change).
 
-   **Glossary seed drafted (2026-09-29 night):** 50 entries, in
-   `plans/explainers-glossary-draft.yaml` with notes beside it, until
-   Keith approves them. That file is deleted when the entries move to
-   `docs/explainers/glossary.yaml`.
+   **Glossary approved and moved (2026-10-02):** Keith reviewed all 50
+   entries in four chunks (2026-09-30 to 2026-10-02) and they now live
+   in `docs/explainers/glossary.yaml`, filed under five ordered
+   categories he approved, with the supply calendar's terms at the
+   back. The plans draft and its notes are deleted.
+
+   **Pending: REQ-DOCS-119's wording no longer matches the approved
+   glossary**, and the fix changes a signed requirement's claims, so the
+   exact text goes to Keith first. What drifted from the naming
+   session's canon: demote is only ever back to staging (a promoted
+   supply that will not be used is rejected); acknowledge lost its
+   "accept" alias; "in development" is gone and sample data is the term
+   (running-thoughts #60); the asset shapes are scheduled data asset,
+   one-off data and sample data, no longer draft placeholders; trial
+   became one-off check (trial and trial check kept as aliases); stale
+   was dropped from no data; timeliness kept as recency's alias;
+   deliver is a word form of delivery, not an entry; carry forward
+   retired. Criteria 2 (one-line definitions), 10 and 11 need amending,
+   and the categories need a criterion of their own.
 
    **Glossary forks settled (Keith, 2026-09-29 night):** asset and
    issue stay aliases (REQ-DOCS-119 c11 amended to "cover"); the recall
