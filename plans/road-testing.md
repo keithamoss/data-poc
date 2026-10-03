@@ -1047,3 +1047,39 @@ judgement about who reads the page rather than about the rule.
     checks; a promotion re-gates WAITING supplies only; nothing promoted
     is ever demoted by a re-check (the one exception being the resupply
     setting). Next: delivery-scoper drafts from this entry.
+
+    **SCOPED 2026-10-03 by delivery-scoper as option A: drafts
+    REQ-PIPE-118..124 and REQ-DASH-125..127** (unsigned; scratchpad
+    draft_option_a.yaml, validator OK). 118 one waiting version + the
+    superseded state; 119 identical-resend guard; 120 a person supersedes /
+    un-supersedes; 121 a promotion re-checks waiting readers; 122 amber
+    setting; 123 replacement setting; 124 overtaking promotions logged;
+    125 overtaking stands out; 126 red promoted supply shown clearly; 127
+    superseded supplies and repeats in supply history. VERIFIED while
+    relaying: it REVERSES two recorded Keith decisions - REQ-PIPE-076's
+    "there is NO SUPERSEDED state" (2026-09-23) and REQ-PIPE-075's
+    "auto-promotion is unconditional across both assets" (2026-09-26,
+    which rejected per-asset and per-dataset flags as "set once and
+    forgotten, and it fails quietly") - plus 105's "no arrival-time
+    decision against anything in staging". Also amends 105 crits 6/7/8,
+    079 crits 10/11, 075 crits 1/4, 076 crits 7/8, 082 crit 1, 074 crit 1;
+    082 crit 9 (re-file "supersedes what is there") to be flagged.
+    plans/supply-model.md ~3726 needs repointing when this lands. Four
+    questions put to Keith (automation vs a person's decision; un-supersede
+    beside a waiting version; whether setting-authorised replacements are
+    "overtaking"; how long overtaking stands out).
+    Keith's answers, same day:
+    - **The rule applies even where a person has touched a supply** - it
+      supersedes a supply a person returned to the queue, and the
+      replacement setting may replace a hand-promoted one. One waiting
+      version always holds; everything stays reversible. This also
+      reverses 076's "automation only acts on a supply no human has
+      touched" - a third reversal, to be read aloud at sign-off.
+    - **Un-supersede beside a waiting version is REFUSED until resolved**:
+      reject or supersede the waiting one first (his worked example).
+    - **Setting-authorised replacements ARE recorded as overtaking, but
+      as INFORMATIONAL** - present, not shouting. Only promotions the
+      setting did not authorise stand out.
+    - **How long overtaking stands out: FOREVER IN THE DECISION LOG; in
+      the reporting layer (dashboard) until the next period's slot is
+      filled.**
