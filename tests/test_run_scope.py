@@ -86,3 +86,15 @@ def test_the_owner_is_read_off_the_run_id():
     assert writer.run_owner("birth_registrations__202601010600000000") == (
         "birth-registrations", "birth_registrations")
     assert writer.run_owner("trial_20261002t010203") is None
+
+
+def test_a_sibling_check_kept_for_reading_this_table_names_this_arrival(scoped):
+    """REQ-PIPE-079 criteria 6 and 7: a re-evaluated result says which
+    arrival caused it; the run's own checks are not re-evaluations."""
+    from qa_tools.common import reevaluation
+
+    records = _records()
+    writer._scope_to_run(records, RUN)
+    by_id = {r["check_id"]: r for r in records}
+    assert by_id[PLACEMENTS_FK][reevaluation.CAUSED_BY] == RUN
+    assert reevaluation.CAUSED_BY not in by_id[CLIENTS_OWN]

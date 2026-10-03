@@ -227,6 +227,17 @@ def _scope_to_run(verified: list[dict], run_id: str) -> None:
         r for r in verified
         if (r.get("dataset_id") == dataset_id and not contested)
         or table in declared.get(r.get("check_id"), ())]
+    # A RE-EVALUATION NAMES ITS CAUSE (REQ-PIPE-079 criteria 6 and 7). A
+    # check belonging to ANOTHER dataset is here only because it reads
+    # this run's table, so this arrival is why it was evaluated again -
+    # "this went red when carers arrived" rather than a verdict that
+    # changed with nobody touching its dataset. Set in place, on the
+    # caller's own records, for the reason the filter above is.
+    from qa_tools.common import reevaluation
+
+    for record in verified:
+        if record.get("dataset_id") != dataset_id:
+            record[reevaluation.CAUSED_BY] = run_id
 
 
 def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: str,

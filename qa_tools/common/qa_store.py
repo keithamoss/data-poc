@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -351,10 +351,11 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery (
     collections jsonb NOT NULL DEFAULT '[]',
     -- Derivable from the files below - two carrying one dataset_id -
     -- and stated anyway, for the reason REQ-PIPE-059 criterion 4 gave:
-    -- the question a person opens this with is "what was held and what
-    -- could it not choose between", and making them compute it is how
-    -- a queue stops being drained.
-    held        jsonb NOT NULL DEFAULT '[]',
+    -- the question a person opens this with is "what was contested and
+    -- what could it not choose between", and making them compute it is
+    -- how a queue stops being drained. CONTESTED since 2026-10-02 (it
+    -- was `held`, REQ-PIPE-059's retired word - REQ-PIPE-105 criterion 6).
+    contested   jsonb NOT NULL DEFAULT '[]',
     -- Recorded, never read. A receipt lookalike or a supplier's own
     -- manifest is excluded from the files on purpose, so this is the
     -- only place their presence survives.
@@ -365,6 +366,16 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery (
 -- Self-healing for a database created before the column existed.
 ALTER TABLE "{SCHEMA}".delivery
     ADD COLUMN IF NOT EXISTS received_from text NOT NULL DEFAULT 'our-clock';
+-- THE `held` -> `contested` RENAME (2026-10-02), applied to a database
+-- created before it. Idempotent: a fresh database already has the new
+-- name and skips this.
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = '{SCHEMA}' AND table_name = 'delivery'
+                 AND column_name = 'held') THEN
+        ALTER TABLE "{SCHEMA}".delivery RENAME COLUMN held TO contested;
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS delivery_receipt_order
     ON "{SCHEMA}".delivery (received_instant);

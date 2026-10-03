@@ -22,7 +22,7 @@ def _two_files_one_arrival():
     return SimpleNamespace(
         run_id="cp_clients__202302010100000000", delivery_name="two-files",
         received_at=datetime(2023, 2, 1, 1, tzinfo=timezone.utc),
-        files_by_dataset=files, held=frozenset(files))
+        files_by_dataset=files, contested=frozenset(files))
 
 
 def test_no_delivery_level_kind_remains():
@@ -52,3 +52,22 @@ def test_the_promotion_gate_sees_it_as_contested(private_supply_dsn):
         (supply,) = filing.supplies_of(conn, arrival)
     assert supply["contested"] is True
     assert "held" not in supply
+
+
+def test_an_existing_delivery_log_column_is_renamed_to_contested(private_supply_dsn):
+    """The delivery log's `held` field is `contested` since 2026-10-02
+    (Keith's call), and a database created before that is migrated in
+    place rather than left reading a column that no longer exists."""
+    from qa_tools.common import qa_store
+
+    with supply_db.connect(label="test-rename") as conn:
+        qa_store.ensure_schema(conn)
+        conn.execute(f'ALTER TABLE "{qa_store.SCHEMA}".delivery RENAME COLUMN contested TO held')
+        # AN OLDER DATABASE, as far as the version check can tell.
+        conn.execute(f'UPDATE "{qa_store.SCHEMA}".schema_version SET version = ?',
+                     [qa_store.SCHEMA_VERSION - 1])
+        qa_store.ensure_schema(conn)
+        cols = {r[0] for r in conn.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = ? AND table_name = 'delivery'", [qa_store.SCHEMA]).fetchall()}
+    assert "contested" in cols and "held" not in cols

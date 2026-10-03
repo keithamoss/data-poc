@@ -189,7 +189,7 @@ class TestThePromotionGateSeesOnlyTheArrivalsOwnContest:
         red, fix = base, base + timedelta(hours=1)
         world.stage("cp_clients", asset_time.arrival_key(red))
         world.stage("cp_clients", asset_time.arrival_key(fix))
-        arrival = SimpleNamespace(received_at=fix, held=frozenset(),
+        arrival = SimpleNamespace(received_at=fix, contested=frozenset(),
                                   files_by_dataset={"cp-clients": ["cp_clients.csv"]})
 
         (supply,) = filing.supplies_of(conn, arrival)
@@ -207,7 +207,34 @@ class TestThePromotionGateSeesOnlyTheArrivalsOwnContest:
         at = datetime(2099, 6, 1, 1, tzinfo=timezone.utc) + timedelta(
             seconds=random.randint(0, 10**7))
         world.stage("cp_clients", asset_time.arrival_key(at))
-        arrival = SimpleNamespace(received_at=at, held=frozenset(),
+        arrival = SimpleNamespace(received_at=at, contested=frozenset(),
                                   files_by_dataset={"cp-clients": ["cp_clients.csv"]})
         (supply,) = filing.supplies_of(conn, arrival)
         assert supply["contested"] is False
+
+
+class TestAnInheritedTableIsRead:
+    """REAL DEFECT, 2026-10-02. A period that owes a dataset nothing
+    INHERITS it (REQ-PIPE-098): a view in the period's schema named just
+    the logical table, standing on an earlier period's promoted supply.
+    period_schema.newest() rightly refuses to order a name with no arrival
+    key - so the overlay found the inherited view and then read nothing,
+    and every check reading Case Workers in a quarter it is not delivered
+    in went red as missing."""
+
+    def test_the_overlay_reads_the_inherited_view(self, conn, world):
+        old, own = _key(), _key()
+        source = f"period_inherit_{uuid.uuid4().hex[:6]}"
+        conn.execute(f'CREATE SCHEMA "{source}"')
+        try:
+            conn.execute(f'CREATE TABLE "{source}"."cp_clients__{old}" (v int)')
+            conn.execute(f'INSERT INTO "{source}"."cp_clients__{old}" VALUES (9)')
+            schema = period_schema.ensure_period_schema(conn, world.period)
+            conn.execute(f'CREATE VIEW "{schema}"."cp_clients" AS '
+                         f'SELECT * FROM "{source}"."cp_clients__{old}"')
+            world.stage("cp_placements", own)
+            out = world.build("cp_placements", own)
+            assert out.source.get("cp_clients") == period_schema.FROM_PERIOD
+            assert world.read(f"cp_placements__{own}", "cp_clients") == 9
+        finally:
+            conn.execute(f'DROP SCHEMA IF EXISTS "{source}" CASCADE')

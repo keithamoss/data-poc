@@ -481,7 +481,7 @@ def run_pipeline(sequential: bool = False) -> dict:
     # path_for() still refuses to choose, so such a run is pointed at its
     # delivery directory, which is all `csv_path` is used for here.
     manifest = [a.as_entry() | {"csv_path": str(
-                    a.path_for("birth-registrations") if "birth-registrations" not in a.held
+                    a.path_for("birth-registrations") if "birth-registrations" not in a.contested
                     else a.path)}
                 for a in found_arrivals]
 

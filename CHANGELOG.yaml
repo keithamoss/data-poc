@@ -120,10 +120,12 @@ releases:
           - headline: A missing table is not a failure
             components: ["QA checks & contract", "Pipeline & publishing"]
             description: >
-              When a check needs a table that has not arrived yet, it is now
-              left out rather than reported as failed - or, worse, taking
-              every other check in the run down with it. Red means something
-              is wrong with the data, not with our timing.
+              When a check needs a table that is not available, it no longer
+              fails - or takes every other check in the run down with it. It
+              now says which table it was waiting for and why: not due yet
+              (no data, not red), overdue, or sent but awaiting your
+              decision. The last two stay red, because each needs someone to
+              act, and each says plainly that the data itself did not fail.
           - headline: An early file counts for the quarter it was sent for
             components: ["Pipeline & publishing"]
             description: >

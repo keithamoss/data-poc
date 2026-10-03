@@ -384,8 +384,15 @@ def create_overlay_views(conn, run_id: str, period_name: str,
             physical, source_schema, origin = (
                 candidates[0], supply_db.staging_schema_for(run_id), FROM_STAGING)
         else:
-            physical, source_schema, origin = (newest(promoted.get(logical) or ()),
-                                                period, FROM_PERIOD)
+            versions = promoted.get(logical) or ()
+            # AN INHERITED TABLE IS A VIEW NAMED JUST `logical` (REQ-PIPE-098),
+            # standing on an earlier period's supply - so it carries no
+            # arrival key and newest() rightly will not order it. It is
+            # the period's one answer for that table, and is read as such;
+            # missing it left every check reading a non-participating
+            # dataset red as "missing" (2026-10-02).
+            physical = newest(versions) or (logical if logical in versions else None)
+            source_schema, origin = period, FROM_PERIOD
             if physical is None:
                 res.absent.append(logical)
                 continue

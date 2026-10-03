@@ -710,3 +710,45 @@ class TestASupplyIdIsNotATableName:
         assert not outcome.inherited
         assert len(outcome.refused) == 1
         assert "no table called" in outcome.refused[0].reason
+
+
+class TestDeliveryMonthsAreNonParticipationToo:
+    """REAL DEFECT, 2026-10-02, found by Keith asking why Case Workers had
+    no inherited entry for the quarters it does not deliver in.
+
+    A dataset can say it owes nothing for a period two ways: an explicit
+    `not_expected` entry, or `delivery_months` subsetting its calendar -
+    Case Workers is delivered in February and August only. The slot
+    builder honoured both; inheritance read only the first. So Q2 and Q4
+    opened with no Case Workers at all, and every check reading it went
+    red as "missing" - a red about the model, not the data, which also
+    blocked cp-notifications and cp-investigations from promoting.
+    """
+
+    def test_a_quarter_outside_the_delivery_months_owes_nothing(self):
+        from qa_tools.common import inheritance
+
+        skipped, reason = inheritance._does_not_participate("cp-case-workers", "2023-Q2")
+        assert skipped
+        assert "February" in reason and "August" in reason
+
+    def test_a_quarter_inside_them_is_still_owed(self):
+        from qa_tools.common import inheritance
+
+        assert inheritance._does_not_participate("cp-case-workers", "2023-Q1") == (False, "")
+
+    def test_another_calendars_period_is_not_its_business(self):
+        """REAL DEFECT IN THE FIX ABOVE, found the same night by reading the
+        regenerate's decision log: Case Workers "did not participate" in
+        Birth Registrations' DAILY periods - `2026-08-24` is not one of its
+        slots either - so 17 inherit-refused rows landed against periods
+        that are not on its calendar at all. Non-participation is only
+        meaningful for a period of the dataset's OWN calendar."""
+        from qa_tools.common import inheritance
+
+        assert inheritance._does_not_participate("cp-case-workers", "2026-08-24") == (False, "")
+
+    def test_a_dataset_with_no_delivery_months_owes_every_period(self):
+        from qa_tools.common import inheritance
+
+        assert inheritance._does_not_participate("cp-clients", "2023-Q2") == (False, "")

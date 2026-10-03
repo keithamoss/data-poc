@@ -274,7 +274,7 @@ if __name__ == "__main__":
 
     from qa_tools.common import arrivals, drift_reference
     found = [a for a in arrivals.arrivals_for("civil-registration", "run_")
-             if "birth-registrations" not in a.held]
+             if "birth-registrations" not in a.contested]
     for arrival in found:
         entry = arrival.as_entry()
         res = evaluate_evidently_bdm(

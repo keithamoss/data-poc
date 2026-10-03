@@ -39,6 +39,7 @@ from qa_tools.common import parallel_orchestrate
 from qa_tools.common import period_overlay
 from qa_tools.common import promotion
 from qa_tools.common import ticket_reconciler
+from qa_tools.common import unrunnable
 from qa_tools.common import trial
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -214,6 +215,21 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
                          run_timestamp, held_blast_radius.TOOL,
                          {"held": resolution.held}, verified=blast)
         results.extend(blast)
+    # AND WHAT A MISSING TABLE COST THEM (REQ-PIPE-105 criterion 13,
+    # REQ-PIPE-079 criteria 4 and 14-16). Every tool now leaves a check
+    # over an unreadable table OUT, so without this it would simply not
+    # appear - indistinguishable from a pass. Each in-scope check gets a
+    # record saying it could not be evaluated, red or no-data by why the
+    # table is missing, and never as a verdict on the data. Only for a
+    # run with a period: an unfiled supply's run is scoped to nothing.
+    missing = _unrunnable_results(entry, run_id, run_timestamp, resolution)
+    if missing:
+        print(unrunnable.describe(missing))
+        write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id,
+                         run_timestamp, unrunnable.TOOL,
+                         {"unreadable": sorted(set(resolution.absent) | set(resolution.ambiguous))},
+                         verified=missing)
+        results.extend(missing)
     # run_by stamped only on this write - see orchestrate_bdm.py's
     # identical comment.
     write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dataset_stats", stats,
@@ -235,6 +251,24 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # finished one.
     finish_run(run_id)
     return results
+
+
+def _unrunnable_results(entry: dict, run_id: str, run_timestamp: str,
+                        resolution) -> list[dict]:
+    """The could-not-run records for this run - see unrunnable.py."""
+    owner = run_owner(run_id)
+    if owner is None:
+        return []
+    own_dataset, own_table = owner
+    as_at = asset_time.parse_instant(entry["received_at"], f"received_at for {run_id}")
+    period = filing.period_of(own_dataset, as_at)
+    if not period:
+        return []
+    with supply_db.connect(read_only=True, label="mothman:unrunnable") as conn:
+        return unrunnable.results_for(
+            conn, run_id=run_id, run_timestamp=run_timestamp, own_table=own_table,
+            own_dataset=own_dataset, period=period, resolution=resolution,
+            reads=promotion._declared_reads(), as_at=as_at)
 
 
 def run_single(entry: dict, reference_run_id: str | None = None, run_by: str | None = None,
@@ -270,7 +304,7 @@ def run_single(entry: dict, reference_run_id: str | None = None, run_by: str | N
     return _run_one(entry, run_timestamp, run_by, reference_run_id, on_step=on_step)
 
 
-def file_and_overlay(arrival) -> None:
+def file_and_overlay(arrival, among=None) -> None:
     """Everything between staging an arrival and checking it.
 
     WHERE EACH SUPPLY BELONGS, RECORDED BEFORE ANY CHECK RUNS OVER IT
@@ -292,9 +326,29 @@ def file_and_overlay(arrival) -> None:
     --commit` processes a hand-filed delivery's arrivals the same way
     (Keith, 2026-10-02) - two copies of these steps is how a hand-filed
     supply would come to differ from one that arrived on its own.
+
+    A ZIP IS FILED WHOLE (REQ-PIPE-105 criterion 5, Keith, 2026-10-03).
+    `among` is every arrival this pass knows of; the ones sharing THIS
+    arrival's receipt instant are filed with it, before any is checked.
+    The overlay reads only FILED siblings, so filing each file just before
+    its own run left the first file of a zip blind to the rest - all 90
+    "could not be evaluated" reds in the regenerate that found it were
+    about a table the supply's own arrival carried. Simultaneous files
+    are not waiting on each other (criterion 1), and filing a LATER one
+    early would be. Filing is per dataset and write-once, so filing a
+    sibling here and again at its own turn is the same filing.
     """
-    filing.file_arrivals([arrival])
+    filing.file_arrivals(simultaneous_with(arrival, among))
     period_overlay.rebuild_for_arrival(arrival, tables=build_cp_warehouses.TABLES)
+
+
+def simultaneous_with(arrival, among) -> list:
+    """This arrival and every other in `among` sharing its receipt
+    instant, in receipt order."""
+    same = [a for a in (among or ()) if a.received_at == arrival.received_at]
+    if not any(a is arrival for a in same):
+        same.append(arrival)
+    return sorted(same, key=lambda a: (a.sequence, a.run_index, a.run_id))
 
 
 def promote_after(arrival, got: list[dict], run_by: str) -> None:
@@ -330,8 +384,9 @@ def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
     what its own file is responsible for.
     """
     results: list[dict] = []
+    found_arrivals = list(found_arrivals)
     for arrival in sorted(found_arrivals, key=lambda a: (a.sequence, a.run_index, a.run_id)):
-        file_and_overlay(arrival)
+        file_and_overlay(arrival, among=found_arrivals)
         got = _run_one(arrival.as_entry(), asset_time.now().isoformat(), run_by,
                         on_step=on_step)
         promote_after(arrival, got, run_by)
@@ -412,7 +467,7 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     by_run_id = {a.run_id: a for a in found_arrivals}
 
     def _file(entry: dict) -> None:
-        file_and_overlay(by_run_id[entry["run_id"]])
+        file_and_overlay(by_run_id[entry["run_id"]], among=found_arrivals)
 
     def _promote(entry: dict, got: list[dict]) -> None:
         promote_after(by_run_id[entry["run_id"]], got, run_by)

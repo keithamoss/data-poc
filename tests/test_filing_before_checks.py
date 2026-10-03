@@ -135,16 +135,65 @@ class TestFilingIsInterleavedRatherThanDoneUpFront:
         assert {"before_each", "after_each"} <= _run_manifest_keywords(
             "qa_tools.bdm.orchestrate_bdm", "run_pipeline")
 
-    def test_cp_does_not_file_the_whole_batch_at_once(self):
-        args = _file_arrivals_arguments("qa_tools.cp.orchestrate_cp", "file_and_overlay")
-        assert args, "filing is never actually called"
-        for arg in args:
-            assert isinstance(arg, ast.List) and len(arg.elts) == 1, \
-                "filing the whole batch up front puts every supply in the first slot"
-
     def test_bdm_does_not_file_the_whole_batch_at_once(self):
         args = _file_arrivals_arguments("qa_tools.bdm.orchestrate_bdm", "file_and_overlay")
         assert args, "filing is never actually called"
         for arg in args:
             assert isinstance(arg, ast.List) and len(arg.elts) == 1, \
                 "filing the whole batch up front puts every supply in the first slot"
+
+
+class TestSimultaneousArrivalsAreFiledTogether:
+    """REQ-PIPE-105 criterion 5, 2026-10-03 (Keith): files sharing ONE
+    receipt instant - a zip - are all filed before any of them is checked.
+
+    REAL DEFECT, found by the first regenerate with criterion 13 wired.
+    Each file was filed just before its own run, and the overlay reads
+    only FILED siblings, so the first file of a zip saw none of the rest
+    and the last saw all of them. All 90 "could not be evaluated" reds in
+    that regenerate were about a table the supply's own arrival carried.
+
+    Still not the whole batch at once - the class above is why - and
+    never a LATER arrival, which would be waiting under criterion 1.
+    """
+
+    @staticmethod
+    def _arrivals():
+        from datetime import datetime, timedelta, timezone
+        from types import SimpleNamespace
+
+        t = datetime(2026, 5, 27, 1, tzinfo=timezone.utc)
+        mk = lambda name, at, seq: SimpleNamespace(  # noqa: E731
+            run_id=name, received_at=at, sequence=seq, run_index=0)
+        return [mk("cp_carers__a", t, 1), mk("cp_clients__a", t, 2),
+                mk("cp_placements__a", t, 3),
+                mk("cp_clients__b", t + timedelta(minutes=3), 4)]
+
+    def _filed_by(self, monkeypatch, target, among):
+        from qa_tools.common import filing, period_overlay
+
+        calls: list[list[str]] = []
+        monkeypatch.setattr(filing, "file_arrivals",
+                            lambda arrivals: calls.append([a.run_id for a in arrivals]))
+        monkeypatch.setattr(period_overlay, "rebuild_for_arrival", lambda *a, **k: None)
+        from qa_tools.cp import orchestrate_cp
+
+        orchestrate_cp.file_and_overlay(target, among=among)
+        return [r for call in calls for r in call]
+
+    def test_the_first_file_of_a_zip_files_its_siblings_too(self, monkeypatch):
+        arrivals = self._arrivals()
+        filed = self._filed_by(monkeypatch, arrivals[0], arrivals)
+        assert sorted(filed) == ["cp_carers__a", "cp_clients__a", "cp_placements__a"]
+
+    def test_a_later_arrival_is_never_filed_early(self, monkeypatch):
+        arrivals = self._arrivals()
+        assert "cp_clients__b" not in self._filed_by(monkeypatch, arrivals[0], arrivals)
+
+    def test_a_trickled_file_is_filed_alone(self, monkeypatch):
+        arrivals = self._arrivals()
+        assert self._filed_by(monkeypatch, arrivals[3], arrivals) == ["cp_clients__b"]
+
+    def test_with_nothing_to_compare_against_it_files_itself(self, monkeypatch):
+        arrivals = self._arrivals()
+        assert self._filed_by(monkeypatch, arrivals[1], None) == ["cp_clients__a"]

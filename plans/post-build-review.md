@@ -4321,3 +4321,51 @@ twice. It deliberately did not re-find the `TypeError`.
     `REQ-PIPE-080`'s own resolver already avoided the same cap
     (`filing._slot_named()`), because a supply re-filed FORWARD by a
     person would otherwise lose its verdict.
+
+74. **[done, 2026-10-02]** **[Pipeline & publishing]** `REQ-PIPE-098`:
+    **a dataset subsetting its calendar by `delivery_months` never
+    inherited, and an inherited view was invisible to the overlay.**
+
+    Found by Keith, not by a critic, asking why Case Workers had no
+    inherited entry for the quarters it does not deliver in - after
+    REQ-PIPE-105's new "could not be evaluated" records showed 19 reds
+    naming `cp_case_workers` as a missing table in Q2 and Q4. Two
+    defects, both against criteria already marked built:
+
+    - **Criterion 5** (non-participation "from the schedule alone"):
+      `inheritance._does_not_participate()` read only explicit
+      `not_expected` entries. A schedule also says it through
+      `delivery_months` - Case Workers is February and August only -
+      which the slot builder honoured and inheritance ignored. So Q2 and
+      Q4 opened with no Case Workers at all; the decision log held not
+      one `inherit` for it across the whole corpus.
+    - **Criterion 16** (the inherited view visible "by the table's
+      logical name"): it was visible to a query, but the period overlay
+      chose among a period's versions with `period_schema.newest()`,
+      which rightly refuses to order a name with no arrival key - and an
+      inherited view is named just `cp_case_workers`. The overlay found
+      it and read nothing.
+
+    Neither showed until now because nothing read a sibling table from a
+    period before today's overlay, and the false reds it produced were
+    about the model rather than the data - the class Keith keeps
+    flagging as how people learn to ignore red. They also refused
+    promotion to cp-notifications and cp-investigations, whose checks
+    read Case Workers.
+
+    Fixed in both places, each with a test confirmed failing on the old
+    code first: `tests/test_inheritance.py`'s
+    `TestDeliveryMonthsAreNonParticipationToo` (the reason recorded is
+    the schedule's own: "delivered in February and August only") and
+    `tests/test_period_overlay.py`'s `TestAnInheritedTableIsRead`.
+    Classed as a bug against agreed behaviour rather than a change to
+    it, so fixed without separate sign-off under the 2026-09-25 rule.
+
+    **And the first fix was itself wrong, caught by the regenerate that
+    measured it.** It asked "is this period one of my slots?" of EVERY
+    period in the asset, so each Birth Registrations daily period
+    (`2026-08-24` and sixteen more) read as Case Workers declining it,
+    and was recorded as a refused inheritance. Restricted to periods of
+    the dataset's own calendar, with
+    `test_another_calendars_period_is_not_its_business` confirmed failing
+    first.

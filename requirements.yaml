@@ -14681,6 +14681,28 @@ requirements:
     dependencies: [REQ-PIPE-075, REQ-PIPE-035, REQ-PIPE-036, REQ-QAC-037]
     decisions:
       - >
+        THE DECISION LAYER IS WIRED, 2026-10-02 NIGHT, through REQ-PIPE-105
+        criterion 13's `qa_tools/common/unrunnable.py`, called from
+        orchestrate_cp after the held blast radius. `check_readiness()` now
+        has its production caller, fed by slot_state as at the arrival
+        (NOT_YET_DUE -> criterion 14; OVERDUE/NEVER_SUPPLIED -> 15;
+        AWAITING_DECISION/RETURNED -> 16; anything else -> 4's catch-all).
+        Criteria 6 and 7 land in qa_results_writer._scope_to_run: a sibling
+        dataset's check kept for reading this run's table is the
+        re-evaluation, and carries `caused_by` naming this arrival's run; the
+        run's own checks do not.
+      - >
+        TWO DEFECTS IN REQ-PIPE-098 SURFACED BY THIS WIRING AND FIXED IN THE
+        SAME CHANGE (plans/post-build-review.md #74), because without them
+        criterion 4 reported Case Workers missing in every quarter it is not
+        delivered in. Inheritance read only `not_expected`, not
+        `delivery_months`, so Q2/Q4 opened without Case Workers; and the
+        overlay's fallback could not read an inherited (bare-name) view.
+        The first cut of the delivery_months fix then applied to every
+        period in the asset, recording Birth Registrations' daily periods as
+        Case Workers refusing to inherit - now restricted to periods of the
+        dataset's own calendar, each with a failing test first.
+      - >
         THE OVERLAY IS WIRED, 2026-10-02, by REQ-PIPE-105 criterion 5 -
         the dependency the "PAUSED" decision below named.
         `create_overlay_views()` now has a production caller,
@@ -23466,6 +23488,10 @@ requirements:
         back to the period's promoted state where none is - and SHALL
         NOT restrict a run to the tables of the single arrival that
         triggered it.
+        WHERE several arrivals share one receipt instant, THE SYSTEM SHALL
+        file every one of them before evaluating any, so that each reads
+        the others as staged for the period - this being simultaneity, not
+        waiting for another file under criterion 1.
       - >
         THE SYSTEM SHALL RETIRE REQ-PIPE-059's delivery-level hold.
         WHERE one arrival carries several files claiming one dataset,
@@ -23579,6 +23605,48 @@ requirements:
         answered is the stale-deferral problem REQ-DOCS-073 exists to
         prevent, one field over.
     decisions:
+      - >
+        CRITERION 5 EXTENDED, 2026-10-03 (Keith, wording approved): a ZIP IS
+        FILED WHOLE. REAL DEFECT, found by the first regenerate with
+        criterion 13 wired: each file was filed just before its own run,
+        and the overlay reads only FILED siblings, so the first file of a
+        zip saw none of the rest and the last saw all of them. ALL 90
+        "could not be evaluated" reds in that regenerate (15 supplies), and
+        354 of its 408 not-yet-due records, were about a table the supply's
+        OWN ARRIVAL carried - the "pile-up" first shown to Keith that
+        morning was mostly this. Fixed in orchestrate_cp.file_and_overlay()
+        via simultaneous_with(): every arrival sharing the receipt instant
+        is filed before any is checked. Never the whole batch (filing ahead
+        of promotions put 102 of 108 supplies in 2023-Q1) and never a LATER
+        arrival, which would be waiting under criterion 1. Rejected: an
+        overlay rule preferring the run's own arrival's siblings, filed or
+        not - the same effect for a zip, but a second resolution rule where
+        an ordering fix suffices. Birth Registrations is one table, so a
+        simultaneous pair there is the same dataset and criterion 6's
+        contest, and needs nothing.
+      - >
+        CRITERION 13 BUILT, 2026-10-02 NIGHT, as `qa_tools/common/unrunnable.py`,
+        and with it REQ-PIPE-079's decision layer (criteria 4 and 14-16).
+        Every in-scope check that could not read a table now gets one record
+        per missing table under the `unrunnable` pseudo-tool, naming the
+        table and saying why - not yet due (nodata, not red), overdue, a
+        supply staged awaiting a decision, or the named catch-all - and every
+        one of those reasons ends "This check did not fail - it could not be
+        evaluated". BEFORE THIS the tools left such a check OUT, which reads
+        to the dashboard and the promotion gate exactly like a pass. The
+        state is taken AS AT THE ARRIVAL, not now: a bootstrap replays four
+        years, and today's clock would call every 2023 table overdue. A HELD
+        table is left to held_blast_radius, so one cause is never two reds.
+        Scope is exactly qa_results_writer._scope_to_run's ("own + readers"),
+        so nothing is recorded here that the writer would discard.
+      - >
+        `held` RENAMED `contested` THROUGHOUT (Keith, 2026-10-02), in code
+        (`Arrival.contested`), the delivery log's payload and its column
+        (qa_store SCHEMA_VERSION 14 renames an existing `held` column in
+        place). Criterion 6 retired the delivery-level hold, so the one
+        surviving case - two files for one dataset in one arrival - is a
+        contest, and naming it after the retired mechanism invited somebody
+        to reinstate it.
       - >
         CRITERION 6 NARROWED AGAIN, 2026-10-02 EVENING (Keith), on the
         evidence of the first regenerate under the overlay. Answer (1) in

@@ -81,14 +81,14 @@ class Arrival:
                 "delivery": self.delivery_name, "path": str(self.path)}
 
     @property
-    def held(self) -> frozenset[str]:
-        """Datasets in this arrival whose supply cannot be chosen -
-        more than one file matched (REQ-PIPE-059).
+    def contested(self) -> frozenset[str]:
+        """Datasets in this arrival that several files claim, so nothing
+        may choose which is the supply - CONTESTED (REQ-PIPE-105
+        criterion 6). It was `held`, REQ-PIPE-059's word, until that hold
+        was retired on 2026-10-02 (renamed by Keith's call).
 
         A CALLER MUST CHECK THIS BEFORE path_for(), which still refuses
-        rather than guessing. The refusal is right and was always
-        right; what was wrong is that it arrived as an exception and
-        took every other dataset in the delivery with it.
+        rather than guessing.
         """
         return frozenset(ds for ds, names in self.files_by_dataset.items()
                           if len(names) > 1)

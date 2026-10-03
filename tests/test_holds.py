@@ -80,7 +80,7 @@ class TestItRefusesToChoose:
                                   "birth_registrations_2026-08-02.csv": "a\n2\n"})
         with pytest.warns(UserWarning):
             [arrival] = arrivals.arrivals_for("civil-registration", "run_", *dirs)
-        assert arrival.held == frozenset({"birth-registrations"})
+        assert arrival.contested == frozenset({"birth-registrations"})
 
     def test_path_for_still_refuses_rather_than_guessing(self, dirs):
         """The refusal was always right; what was wrong is that it
@@ -112,7 +112,7 @@ class TestOneHoldDoesNotStopTheRest:
         with pytest.warns(UserWarning):
             found = arrivals.arrivals_for("civil-registration", "run_", *dirs)
         assert [a.delivery_name for a in found] == ["healthy", "held"]
-        assert found[0].held == frozenset()
+        assert found[0].contested == frozenset()
 
 
 class TestBothFilesAreStagedAndNeitherIsReadable:
@@ -177,7 +177,7 @@ class TestTheHoldIsRecorded:
                                   "birth_registrations_2026-08-02.csv": "a\n2\n"})
         d, found = _recognise(dirs, "catch-up")
         record = delivery_log.record(d, found, conn=clean_delivery_log)
-        assert record["held"] == [{
+        assert record["contested"] == [{
             "dataset_id": "birth-registrations",
             "files": ["birth_registrations_2026-08-01.csv",
                        "birth_registrations_2026-08-02.csv"]}]
@@ -187,7 +187,7 @@ class TestTheHoldIsRecorded:
         _drop(dirs, "fine", {"birth_registrations_2026-08-01.csv": "a\n1\n"})
         [d] = delivery.list_deliveries(*dirs)
         record = delivery_log.record(d, arrivals.recognise(d), conn=clean_delivery_log)
-        assert record["held"] == []
+        assert record["contested"] == []
 
 
 class TestALaterDeliveryIsUnaffected:
@@ -200,7 +200,7 @@ class TestALaterDeliveryIsUnaffected:
         with pytest.warns(UserWarning):
             found = arrivals.arrivals_for("civil-registration", "run_", *dirs)
         held, later = found
-        assert held.held == frozenset({"birth-registrations"})
-        assert later.held == frozenset()
+        assert held.contested == frozenset({"birth-registrations"})
+        assert later.contested == frozenset()
         assert later.path_for("birth-registrations").name \
             == "birth_registrations_2026-09-03.csv"

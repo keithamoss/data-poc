@@ -143,7 +143,7 @@ def record(delivery, recognition,
         # "what was held and what could it not choose between", and
         # making them compute it from a file list is how a queue stops
         # being drained.
-        "held": [{"dataset_id": h.dataset_id, "files": list(h.files)}
+        "contested": [{"dataset_id": h.dataset_id, "files": list(h.files)}
                  for h in holds.holds_in(recognition)],
         # Recorded, never read. A receipt lookalike or a supplier's own
         # manifest is excluded from `files` on purpose, so this is the
@@ -154,12 +154,12 @@ def record(delivery, recognition,
     with _db(conn) as db:
         written = db.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".delivery '
-            "(name, received_at, received_instant, received_from, collections, held, "
+            "(name, received_at, received_instant, received_from, collections, contested, "
             "anomalies) "
             "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
             [payload["delivery"], payload["received_at"], delivery.received_at,
              payload["received_from"],
-             json.dumps(payload["collections"]), json.dumps(payload["held"]),
+             json.dumps(payload["collections"]), json.dumps(payload["contested"]),
              json.dumps(payload["anomalies"])]).fetchall()
         if not written:
             return None
@@ -224,7 +224,7 @@ def records(conn: supply_db.SupplyConnection | None = None) -> list[dict]:
     """
     with _db(conn) as db:
         deliveries = db.execute(
-            f'SELECT name, received_at, collections, held, anomalies, received_from '
+            f'SELECT name, received_at, collections, contested, anomalies, received_from '
             f'FROM "{qa_store.SCHEMA}".delivery ORDER BY received_instant, name'
         ).fetchall()
         files: dict[str, list[dict]] = {}
@@ -238,8 +238,8 @@ def records(conn: supply_db.SupplyConnection | None = None) -> list[dict]:
     return [{"delivery": name, "received_at": received_at,
              "received_from": received_from,
              "collections": collections, "files": files.get(name, []),
-             "held": held, "anomalies": anomalies}
-            for name, received_at, collections, held, anomalies, received_from
+             "contested": contested, "anomalies": anomalies}
+            for name, received_at, collections, contested, anomalies, received_from
             in deliveries]
 
 
@@ -260,7 +260,7 @@ def records_carrying(dataset_id: str, limit: int | None = None,
     "deliveries since this dataset last supplied", and this one does
     not depend on how long ago that was.
     """
-    sql_text = (f'SELECT d.name, d.received_at, d.collections, d.held, d.anomalies, '
+    sql_text = (f'SELECT d.name, d.received_at, d.collections, d.contested, d.anomalies, '
                 f'd.received_from '
                 f'FROM "{qa_store.SCHEMA}".delivery d '
                 f'WHERE EXISTS (SELECT 1 FROM "{qa_store.SCHEMA}".delivery_file f '
@@ -284,8 +284,8 @@ def records_carrying(dataset_id: str, limit: int | None = None,
                 {"filename": filename, "dataset_id": ds_id, "contested_by": contested})
     return [{"delivery": name, "received_at": received_at, "collections": collections,
              "received_from": received_from,
-             "files": files.get(name, []), "held": held, "anomalies": anomalies}
-            for name, received_at, collections, held, anomalies, received_from in found]
+             "files": files.get(name, []), "contested": contested, "anomalies": anomalies}
+            for name, received_at, collections, contested, anomalies, received_from in found]
 
 
 def sql() -> str:

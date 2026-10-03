@@ -106,7 +106,7 @@ def load_manifest() -> list[dict]:
     return [a.as_entry()
                 | {"csv_path": str(a.path_for("birth-registrations"))}
             for a in arrivals.arrivals_for("civil-registration", "run_")
-            if "birth-registrations" not in a.held]
+            if "birth-registrations" not in a.contested]
 
 
 def manifest_exists() -> bool:

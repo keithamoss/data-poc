@@ -76,17 +76,17 @@ def _delivery(conn, name="monday", **overrides):
     from qa_tools.common import qa_store, supply_holds
 
     record = {"delivery": name, "received_at": "2026-09-01T09:00:00+08:00",
-              "collections": ["child-protection"], "files": [], "held": [],
+              "collections": ["child-protection"], "files": [], "contested": [],
               "anomalies": []}
     record.update(overrides)
     conn.execute(
         f'INSERT INTO "{qa_store.SCHEMA}".delivery '
-        "(name, received_at, received_instant, collections, held, anomalies) "
+        "(name, received_at, received_instant, collections, contested, anomalies) "
         "VALUES (?, ?, ?, ?, ?, ?)",
         [record["delivery"], record["received_at"], record["received_at"],
-         json.dumps(record["collections"]), json.dumps(record["held"]),
+         json.dumps(record["collections"]), json.dumps(record["contested"]),
          json.dumps(record["anomalies"])])
-    for entry in record["held"]:
+    for entry in record["contested"]:
         supply_holds.raise_hold(
             conn, dataset_id=entry["dataset_id"],
             supply_id=f"{entry['dataset_id']}@{record['delivery']}",
@@ -145,7 +145,7 @@ class TestOneQueueNotOnePerRule:
 
     def test_items_from_four_different_producers_land_in_one_total(self, tmp_path, clean_delivery_log):
         _delivery(clean_delivery_log, "monday",
-                   held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}],
+                   contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}],
                    files=[{"filename": "note.pdf", "dataset_id": None, "contested_by": None},
                           {"filename": "both.csv", "dataset_id": None,
                            "contested_by": ["cp-carers", "cp-clients"]}])
@@ -177,7 +177,7 @@ class TestBlockingIsASecondAxis:
 
     def test_a_held_supply_blocks_and_an_unrecognised_file_does_not(self, tmp_path, clean_delivery_log):
         _delivery(clean_delivery_log, "monday",
-                   held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}],
+                   contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}],
                    files=[{"filename": "note.pdf", "dataset_id": None,
                            "contested_by": None}])
 
@@ -206,7 +206,7 @@ class TestBlockingIsASecondAxis:
         """A queue ordered by when things happened puts the thing
         somebody has to do today below six things they have seen."""
         _delivery(clean_delivery_log, "monday",
-                   held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}],
+                   contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}],
                    files=[{"filename": "note.pdf", "dataset_id": None,
                            "contested_by": None}])
 
@@ -246,7 +246,7 @@ class TestPerScopeCounts:
 
     def test_a_dataset_item_counts_against_its_agency_and_collection(self, tmp_path, clean_delivery_log):
         _delivery(clean_delivery_log, "monday",
-                   held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
+                   contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
 
         found = _survey(tmp_path)
 
@@ -260,7 +260,7 @@ class TestPerScopeCounts:
         nothing at all, which is strictly worse than showing them the
         item unscoped."""
         _delivery(clean_delivery_log, "monday",
-                   held=[{"dataset_id": "a-dataset-that-never-existed",
+                   contested=[{"dataset_id": "a-dataset-that-never-existed",
                           "files": ["a.csv", "b.csv"]}])
 
         item, = _survey(tmp_path).items
@@ -275,7 +275,7 @@ class TestResponsesAreNamedNeverOffered:
 
     def test_every_item_names_what_would_resolve_it(self, tmp_path, clean_delivery_log):
         _delivery(clean_delivery_log, "monday",
-                   held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}],
+                   contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}],
                    files=[{"filename": "note.pdf", "dataset_id": None,
                            "contested_by": None}])
 
@@ -287,7 +287,7 @@ class TestResponsesAreNamedNeverOffered:
         12. A hold nobody can clear is indistinguishable from a bug, so
         the item says which it is rather than offering a dead control."""
         _delivery(clean_delivery_log, "monday",
-                   held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
+                   contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
 
         item, = _survey(tmp_path).items
 
@@ -303,7 +303,7 @@ class TestItFaultsNobody:
 
     def test_no_item_blames_the_reader(self, tmp_path, clean_delivery_log):
         _delivery(clean_delivery_log, "monday",
-                   held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}],
+                   contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}],
                    files=[{"filename": "note.pdf", "dataset_id": None,
                            "contested_by": None},
                           {"filename": "both.csv", "dataset_id": None,
@@ -375,7 +375,7 @@ class TestItReadsRecordsAndNeverSupplyRows:
 class TestTheRecordTheDashboardReads:
     def test_as_record_carries_the_total_and_the_per_scope_counts(self, tmp_path, clean_delivery_log):
         _delivery(clean_delivery_log, "monday",
-                   held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
+                   contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
 
         record = _survey(tmp_path).as_record()
 
@@ -390,7 +390,7 @@ class TestTheRecordTheDashboardReads:
         cannot round-trip through json breaks the build rather than
         one panel."""
         _delivery(clean_delivery_log, "monday",
-                   held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
+                   contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
         record = _survey(tmp_path).as_record()
         assert json.loads(json.dumps(record)) == record
 
@@ -479,7 +479,7 @@ class TestAHoldLeavesTheQueueWhenItIsResolved:
     def test_an_outstanding_hold_is_in_the_queue(self, tmp_path, clean_delivery_log):
         with clean_delivery_log as conn:
             _delivery(conn, "monday",
-                       held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
+                       contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
         found = outstanding.survey(observations_dir=tmp_path)
         assert [i.kind for i in found.items] == ["held-supply"]
 
@@ -489,7 +489,7 @@ class TestAHoldLeavesTheQueueWhenItIsResolved:
 
         with clean_delivery_log as conn:
             _delivery(conn, "monday",
-                       held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
+                       contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
             with dl.apply_decision(conn, dl.Decision(
                     agency_id="child-protection-family-support",
                     collection_id="child-protection", dataset_id="cp-clients",
@@ -512,6 +512,6 @@ class TestAHoldLeavesTheQueueWhenItIsResolved:
         bug, so the record carries the resolution path."""
         with clean_delivery_log as conn:
             _delivery(conn, "monday",
-                       held=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
+                       contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
         [item] = outstanding.survey(observations_dir=tmp_path).items
         assert item.responses and any("file" in r for r in item.responses)

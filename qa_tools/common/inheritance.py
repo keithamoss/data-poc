@@ -93,7 +93,47 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
     second source that could disagree with it.
     """
     reason = schedule.not_expected_periods(dataset_id).get(period_name)
-    return (True, reason) if reason else (False, "")
+    if reason:
+        return True, reason
+    # AND THE OTHER WAY A SCHEDULE SAYS IT (2026-10-02): `delivery_months`
+    # subsetting the calendar. Case Workers is delivered in February and
+    # August only, and the slot builder has always honoured that - but
+    # this read only `not_expected`, so Q2 and Q4 opened without Case
+    # Workers and every check reading it went red as "missing". A period
+    # the dataset's own slots leave out, under delivery_months, is owed
+    # nothing; the reason is the schedule's own words.
+    #
+    # ONLY FOR A PERIOD OF ITS OWN CALENDAR: the first cut of this asked
+    # "is it one of my slots?" of every period in the asset, so Birth
+    # Registrations' daily periods read as Case Workers declining them
+    # and were each recorded as a refused inheritance.
+    months = schedule.delivery_months(dataset_id)
+    if (months and period_name in _calendar_period_names(dataset_id)
+            and period_name not in _slot_names(dataset_id)):
+        import calendar
+
+        names = [calendar.month_name[m] for m in months]
+        return True, (f"{dataset_id} is delivered in {' and '.join(names)} only "
+                      f"(delivery_months), so nothing is owed for {period_name}")
+    return False, ""
+
+
+def _calendar_period_names(dataset_id: str) -> frozenset[str]:
+    """Every period of this dataset's own calendar, owed or not."""
+    try:
+        name = schedule.calendar_for_dataset(dataset_id).name
+        return frozenset(p.name for p in schedule.periods_for_calendar(name))
+    except schedule.ScheduleConfigError:
+        # A cadence rule has no end to enumerate to, and a daily calendar
+        # thinned by month is not a shape anything declares today.
+        return frozenset()
+
+
+def _slot_names(dataset_id: str) -> frozenset[str]:
+    """The periods this dataset's own schedule owes a supply for."""
+    from qa_tools.common import slots as slots_mod
+
+    return frozenset(s.name for s in slots_mod.slots_for_dataset(dataset_id))
 
 
 def _most_recent_promoted(conn, dataset_id: str,

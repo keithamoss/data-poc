@@ -814,3 +814,83 @@ judgement about who reads the page rather than about the rule.
     is a call about how destructive a dev command may be, so it is
     Keith's rather than fixed in passing. CI is unaffected: every runner
     starts from an empty database.
+
+16. **[investigate, 2026-10-03]** **[Pipeline & publishing]** **A clean
+    resupply cannot get through once a quarter has two undecided
+    versions of anything.**
+
+    Seen in the first regenerate with REQ-PIPE-105 criterion 13 wired, in
+    Child Protection 2026-Q2. The 05-01 delivery had real failures in
+    Clients (25), Investigations (17), Notifications (9) and Placements
+    (3), and was refused. Refused supplies STAY IN STAGING awaiting a
+    person. The 05-20 resupply's Investigations and Placements were clean,
+    but they read Clients, which now had two undecided versions for Q2;
+    criterion 8 makes that contested and unreadable, so both went red as
+    "a supply is staged awaiting a decision" and were refused too. The
+    05-27 resupply was clean in all six files - and all five that read a
+    sibling went red the same way, because every sibling now had two or
+    three undecided versions.
+
+    So it is a pile-up rather than a deadlock: each resupply adds a
+    staged version, and once any dataset has two undecided supplies in a
+    period, nothing that reads it can be checked until a person rejects
+    the stale ones. 12 supplies across the corpus were refused with no
+    data failure at all, 9 of them this way.
+
+    Put to Keith 2026-10-03 morning with one candidate - read a sibling
+    from the run's OWN ARRIVAL first where that arrival carried it, which
+    pairs files that came together without choosing by arrival time - and
+    he chose to talk it through first. Whether an "unrunnable" red should
+    gate promotion at all is deferred until this is settled, since it may
+    remove most of the cases.
+
+    **MOSTLY NOT WHAT IT LOOKED LIKE, found an hour later.** All 90 of
+    that regenerate's "could not be evaluated" reds were about a table
+    the supply's OWN ARRIVAL carried: each file of a zip was filed just
+    before its own run, and the overlay reads only filed siblings, so the
+    first file saw none of the rest. Fixed under REQ-PIPE-105 criterion 5
+    (a zip is filed whole, Keith 2026-10-03). What remains of this entry
+    is whatever the next regenerate still shows - two undecided versions
+    of a dataset in one period, where a red supply sits awaiting a person
+    beside its correction - and the gate question waits on that number.
+
+    **DIRECTION, Keith 2026-10-03: option 2, plus a re-run on acceptance.**
+    A supply that has been checked and refused stops being a candidate for
+    its period (it stays in staging for a person), so a clean correction
+    reads its own fresh siblings and promotes on its own. Because that is
+    the system choosing by verdict, ACCEPTING a refused supply must
+    trigger a re-run of every check that reads it. Being worked through
+    as a scenario before any wording is drafted; it amends REQ-PIPE-079
+    criterion 11 ("SHALL NOT choose between them for any purpose") and
+    adds a decision-time trigger beside 079's arrival-time re-evaluation.
+
+    **SETTLED IN THE SCENARIO WALK-THROUGH, Keith 2026-10-03** - not yet
+    requirement wording, which still needs drafting and sign-off:
+    - **Own arrival always visible.** Option 2 sets aside refused supplies
+      from EARLIER arrivals only. A sibling carried by the run's own
+      arrival is read whatever its verdict, or the order files happen to
+      run in would decide what a check sees.
+    - **Acceptance reopens.** When accepting a supply re-runs the checks
+      reading it, a sibling whose EVERY red was "could not read a table",
+      and all of which are now resolved, promotes automatically. One real
+      data failure keeps it refused. This settles the deferred gate
+      question: "could not read" reds DO block promotion, because
+      acceptance is what unblocks them.
+    - **Displacing a promoted supply: preview, then allow.** Accepting a
+      red supply that replaces a promoted one (newest-by-promotion wins,
+      REQ-PIPE-105 criterion 7) shows first how many promoted supplies
+      read it and will be re-checked, then proceeds. No automatic
+      demotion afterwards - a re-check that fails is shown on the
+      dashboard against the promoted supply, naming the acceptance that
+      caused it.
+    Re-run results carry `caused_by` naming the DECISION, the same field
+    arrival-time re-evaluation uses (REQ-PIPE-079 criterion 7).
+
+    **REFINED BY KEITH, same conversation:** acceptance does not need a
+    rule of its own. It re-checks what was waiting and applies EXACTLY THE
+    SAME GATE as a first arrival - all green across own and cross-table
+    checks and it promotes, anything else and it does not. The "every red
+    was could-not-read" condition above is just what that gate already
+    implies, so draft the requirement as "re-evaluate and re-apply the
+    promotion gate", not as a separate reopen rule. Path B confirmed as
+    written.
