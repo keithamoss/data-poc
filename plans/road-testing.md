@@ -967,3 +967,52 @@ judgement about who reads the page rather than about the rule.
     5. **COST IS AN NFR, measured once built**: the wait on `supply
        decide` and the bootstrap's extra runs; Q6 (queueing) is revisited
        if decide exceeds a threshold Keith sets.
+
+    **CHANGE OF DIRECTION, Keith 2026-10-03 afternoon: OPTION A replaces
+    everything above from "DIRECTION" on.** Keith stepped back from the
+    set-aside / re-gate design as "heading towards complicated territory
+    with deadlocks and rerunning and uncertainty" - each rule had closed a
+    hole the previous one opened, all from keeping "never choose between
+    two waiting versions". Option A drops that assumption instead. The
+    REQ-PIPE-118..121 drafts (scratchpad only, never committed) are
+    SHELVED, not revised. Option A as settled in conversation:
+    1. ONE WAITING VERSION PER TABLE PER PERIOD. A new file for a table
+       moves every earlier UNACCEPTED version for the same period to
+       SUPERSEDED; the new file is then checked as normal.
+    2. SUPERSEDED IS ITS OWN STATE, likely its own schema. Never deleted,
+       never "rejected"; the file and its recorded results are kept.
+    3. FULLY REVERSIBLE BY A PERSON: a person can supersede or
+       un-supersede. Un-superseding returns the file to staging, re-runs
+       its QA, and the normal gate promotes it if green. Keith's worked
+       case: reject the bad newer file, pull the earlier good one out of
+       superseded, re-run, promote.
+    4. GUARDS: a byte-for-byte identical resend supersedes nothing; an
+       accept made on a supply superseded since it was shown is refused,
+       saying so.
+    5. UNCHANGED: two files for one table in ONE arrival are still
+       contested, for a person. A resend into a period already holding a
+       promoted supply still waits for a person.
+    6. NOISY WHEN IT MATTERS: a promotion into a slot where another supply
+       was waiting or was superseded gets a prominent decision-log entry,
+       so a mis-filed (e.g. early next-period) supply is noticed and
+       re-filed by a person. Keith judged the wrong-period case rare -
+       quarterly gaps get a substitution long before the next quarter;
+       daily supplies are scheduled extracts, and the calendar's early
+       allowance covers quarterly - so noise, not a special rule.
+    7. ONE SIMPLE RE-CHECK: when a supply is promoted, waiting supplies in
+       that period whose cross-table checks read it are re-checked and the
+       normal gate applied - covers a first correction arriving before
+       its partner.
+    8. MIXED RESENDS ACCEPTED: a single-table resend checked against the
+       other tables of an earlier send may fail cross-table checks; the
+       supplier resends both, and RAG thresholds on cross-table checks
+       absorb expected churn.
+    What Keith told us about real suppliers (for drafting): the period in
+    a file name/content varies by supplier (daily likely just a date
+    stamp); resends are the whole delivery for systemic issues, else
+    individual tables, sometimes with cross-table effects; suppliers say
+    a file replaces another only by email; an early next-period file
+    overlapping an unresolved current one is rare.
+    Residual narrow case noted: a not-yet-promoted (e.g. amber) fix can
+    be superseded by a later non-identical resend - visible and
+    reversible under 2-3.
