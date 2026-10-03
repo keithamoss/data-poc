@@ -1744,6 +1744,18 @@ Rough layout:
     Worth allow-listing anyway: this project's own standing rule is that
     a real CI result has to be checked after every push, and a plain
     `curl` of the log is the cheapest way to do it.
+
+    **THE NUMBER VARIES, AND ARTIFACTS GO THERE TOO** (2026-10-03).
+    Downloading a workflow ARTIFACT (`.../actions/artifacts/<id>/zip`)
+    redirects to `productionresultssa9.blob.core.windows.net` - a real
+    `curl: (56) CONNECT tunnel failed, response 403`, confirmed in the
+    proxy's own `recentRelayFailures`. The API step itself works, even
+    anonymously for this public repo; only the storage host is refused.
+    So an allow-list entry for one numbered host will not hold - it needs
+    the pattern `productionresultssa*.blob.core.windows.net`. Hit testing
+    whether a cloud session could restore CI's cached bootstrap instead of
+    spending ~30 minutes regenerating it (REQ-TEST-117's extension, Keith's
+    ask): with the host blocked, it cannot.
   - **`skills.lc`** - a design-review skill writeup, wanted for the
     UX-reviewer-agent precedent research.
   - **`patch-diff.githubusercontent.com`** - `cfisch3r/estimate` PR
