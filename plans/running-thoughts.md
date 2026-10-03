@@ -4420,3 +4420,27 @@ Belongs with batch 5's check work.
     explicitly NOT a promotion-safety measure - see the reasoning in
     this item's own opening paragraph for why I stopped claiming it
     was one.
+
+58. **[todo, 2026-10-03]** **[Testing & dev tooling]** **A bootstrap
+    takes ~28 minutes; two kinds of parallelism are free to take.**
+    Keith asked why regeneration is sequential. Measured 2026-10-02:
+    ~150 runs (42 Birth Registrations, 108 Child Protection) at ~11s
+    each, the 108 because REQ-PIPE-105 made every file its own arrival.
+    WITHIN a collection the order is load-bearing - a filing depends on
+    the promotion before it (filing up front put 102 of 108 supplies in
+    2023-Q1). But `qa_tools/common/bootstrap.py` also runs the two
+    COLLECTIONS one after the other, and they share nothing; and each run
+    evaluates its four tools one after another though they are
+    independent reads. Estimate, not measured: 28m -> 10-12m with both.
+
+59. **[todo, 2026-10-03]** **[Testing & dev tooling]** **Make CI's
+    deployment half faster without committing state.** Keith asked about
+    committing the generated data so CI need not bootstrap. That collides
+    with his own standing rule (the repository holds configuration, not
+    state) and with the golden-capture incident of 2026-09-28 (results
+    from older code passing as current). The compatible version is a CI
+    CACHE of a `pg_dump`, keyed on a hash of everything that shapes the
+    output - generator/, pipeline/, qa_tools/, contract/, dbt_project/ -
+    so any change to those bootstraps afresh. Caveat: most pushes on an
+    active pipeline branch touch those paths and would miss; it pays for
+    dashboard-, docs- and plans-only pushes.
