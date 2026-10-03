@@ -305,3 +305,14 @@ def sql() -> str:
             f'd.anomalies, f.filename, f.dataset_id, f.contested_by '
             f'FROM "{qa_store.SCHEMA}".delivery d '
             f'LEFT JOIN "{qa_store.SCHEMA}".delivery_file f ON f.delivery = d.name')
+
+
+def record_all() -> None:
+    """Record every delivery on disk, each with what recognition made of
+    it - the one loop both orchestrators used to carry a copy of, and
+    what a bootstrap runs ONCE before running both collections side by
+    side (REQ-TEST-116)."""
+    from qa_tools.common import arrivals, delivery
+
+    for d in delivery.list_deliveries():
+        record(d, arrivals.recognise(d))

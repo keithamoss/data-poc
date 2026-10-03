@@ -167,16 +167,6 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
               f"(see its tables_read for why), so there is nothing to check.")
     run_step = _run_step if readable else (lambda collection, tool, rid, call: [])
 
-    results: list[dict] = []
-    _announce(on_step, RUN_STEPS[0])
-    results.extend(run_step(COLLECTION_ID, "dbt-core", run_id,
-        lambda: run_dbt_bdm.evaluate_dbt_bdm(run_id, run_timestamp)))
-    _announce(on_step, RUN_STEPS[1])
-    results.extend(run_step(COLLECTION_ID, "Soda Core", run_id,
-        lambda: run_soda_bdm.evaluate_soda_bdm(run_id, run_timestamp)))
-    _announce(on_step, RUN_STEPS[2])
-    results.extend(run_step(COLLECTION_ID, "datacontract-cli", run_id,
-        lambda: run_datacontract_bdm.evaluate_datacontract_bdm(run_id, run_timestamp)))
     # THE REFERENCE IS RESOLVED PER SUPPLY, HERE (REQ-QAC-108 criteria
     # 2 and 4). It used to be one run chosen for the whole batch -
     # `manifest[0]["run_id"]` - which measures every supply against the
@@ -198,10 +188,30 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     if reference_run_id is None:
         reference_run_id = drift_reference.reference_run_for_arrival(
             DATASET_ID, entry["received_at"])
-    _announce(on_step, RUN_STEPS[3])
-    results.extend(run_step(COLLECTION_ID, "Evidently", run_id,
-        lambda: run_evidently_bdm.evaluate_evidently_bdm(
-            run_id, run_timestamp, reference_run_id=reference_run_id)))
+
+    def _dbt() -> list[dict]:
+        return run_step(COLLECTION_ID, "dbt-core", run_id,
+            lambda: run_dbt_bdm.evaluate_dbt_bdm(run_id, run_timestamp))
+
+    def _the_rest() -> list[dict]:
+        got: list[dict] = []
+        _announce(on_step, RUN_STEPS[1])
+        got.extend(run_step(COLLECTION_ID, "Soda Core", run_id,
+            lambda: run_soda_bdm.evaluate_soda_bdm(run_id, run_timestamp)))
+        _announce(on_step, RUN_STEPS[2])
+        got.extend(run_step(COLLECTION_ID, "datacontract-cli", run_id,
+            lambda: run_datacontract_bdm.evaluate_datacontract_bdm(run_id, run_timestamp)))
+        _announce(on_step, RUN_STEPS[3])
+        got.extend(run_step(COLLECTION_ID, "Evidently", run_id,
+            lambda: run_evidently_bdm.evaluate_evidently_bdm(
+                run_id, run_timestamp, reference_run_id=reference_run_id)))
+        return got
+
+    # dbt BESIDE THE OTHER THREE (REQ-TEST-116 criterion 3) - see
+    # parallel_orchestrate.beside(). Results keep tool order either way.
+    _announce(on_step, RUN_STEPS[0])
+    from_dbt, from_the_rest = parallel_orchestrate.beside(_dbt, _the_rest)
+    results: list[dict] = [*from_dbt, *from_the_rest]
 
     # Computed and committed here, not by the dashboard-building layer -
     # this is the one point in the whole pipeline with a legitimate,
@@ -441,7 +451,10 @@ def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
     return results
 
 
-def run_pipeline(sequential: bool = False) -> dict:
+def run_pipeline(sequential: bool = False,
+                 record_deliveries: bool = True) -> dict:
+    # A RUN'S TOOLS OVERLAP unless told not to (REQ-TEST-116 criteria 3, 5).
+    parallel_orchestrate.TOOLS_CONCURRENTLY = not sequential
     build_per_run_warehouses.build_all()
 
     # RECOGNISED FROM DISK, never read from a declaration
@@ -455,8 +468,13 @@ def run_pipeline(sequential: bool = False) -> dict:
     # A delivery spanning collections is recognised by both
     # orchestrators, so the second write being a no-op is the ordinary
     # case rather than a guard against a bug.
-    for d in delivery.list_deliveries():
-        delivery_log.record(d, arrivals.recognise(d))
+    #
+    # UNLESS THE CALLER ALREADY DID (REQ-TEST-116): a bootstrap running
+    # both collections side by side records every delivery once before
+    # either starts, because "the second write is a no-op" is a race
+    # when the two writes are simultaneous.
+    if record_deliveries:
+        delivery_log.record_all()
 
     # WHAT THIS RUN SAW IN FLIGHT (REQ-PIPE-057 criteria 5 and 7).
     # Reported on EVERY run, with no interval and no threshold -

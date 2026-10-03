@@ -156,16 +156,6 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # Before any tool writes - see orchestrate_bdm.py's identical block.
     open_run(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, run_by)
 
-    results: list[dict] = []
-    _announce(on_step, RUN_STEPS[0])
-    results.extend(_run_step(cp_common.COLLECTION_ID, "dbt-core", run_id,
-        lambda: run_dbt_cp.evaluate_dbt_cp(run_id, run_timestamp)))
-    _announce(on_step, RUN_STEPS[1])
-    results.extend(_run_step(cp_common.COLLECTION_ID, "Soda Core", run_id,
-        lambda: run_soda_cp.evaluate_soda_cp(run_id, run_timestamp)))
-    _announce(on_step, RUN_STEPS[2])
-    results.extend(_run_step(cp_common.COLLECTION_ID, "datacontract-cli", run_id,
-        lambda: run_datacontract_cp.evaluate_datacontract_cp(run_id, run_timestamp)))
     # PER SUPPLY, NOT PER BATCH (REQ-QAC-108 criteria 2 and 4) - see
     # orchestrate_bdm.py's identical block for the full account, and
     # why None here means "no reference" rather than "use a default".
@@ -180,9 +170,30 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
         owner = run_owner(run_id)
         reference_run_id = drift_reference.reference_run_for_arrival(
             owner[0] if owner else run_evidently_cp.DATASET_ID, entry["received_at"])
-    _announce(on_step, RUN_STEPS[3])
-    results.extend(_run_step(cp_common.COLLECTION_ID, "Evidently", run_id,
-        lambda: run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id)))
+
+    def _dbt() -> list[dict]:
+        return _run_step(cp_common.COLLECTION_ID, "dbt-core", run_id,
+            lambda: run_dbt_cp.evaluate_dbt_cp(run_id, run_timestamp))
+
+    def _the_rest() -> list[dict]:
+        got: list[dict] = []
+        _announce(on_step, RUN_STEPS[1])
+        got.extend(_run_step(cp_common.COLLECTION_ID, "Soda Core", run_id,
+            lambda: run_soda_cp.evaluate_soda_cp(run_id, run_timestamp)))
+        _announce(on_step, RUN_STEPS[2])
+        got.extend(_run_step(cp_common.COLLECTION_ID, "datacontract-cli", run_id,
+            lambda: run_datacontract_cp.evaluate_datacontract_cp(run_id, run_timestamp)))
+        _announce(on_step, RUN_STEPS[3])
+        got.extend(_run_step(cp_common.COLLECTION_ID, "Evidently", run_id,
+            lambda: run_evidently_cp.evaluate_evidently_cp(
+                run_id, run_timestamp, reference_run_id=reference_run_id)))
+        return got
+
+    # dbt BESIDE THE OTHER THREE (REQ-TEST-116 criterion 3) - see
+    # parallel_orchestrate.beside(). Results keep tool order either way.
+    _announce(on_step, RUN_STEPS[0])
+    from_dbt, from_the_rest = parallel_orchestrate.beside(_dbt, _the_rest)
+    results: list[dict] = [*from_dbt, *from_the_rest]
 
     # Same rationale as orchestrate_bdm.py's identical block - see
     # qa_tools/bdm/dataset_stats.py's own docstring.
@@ -394,7 +405,10 @@ def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
     return results
 
 
-def run_pipeline_cp(sequential: bool = False) -> dict:
+def run_pipeline_cp(sequential: bool = False,
+                    record_deliveries: bool = True) -> dict:
+    # A RUN'S TOOLS OVERLAP unless told not to (REQ-TEST-116 criteria 3, 5).
+    parallel_orchestrate.TOOLS_CONCURRENTLY = not sequential
     build_cp_warehouses.build_all()
 
     # RECOGNISED FROM DISK, never read from a declaration
@@ -406,8 +420,13 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # A delivery spanning collections is recognised by both
     # orchestrators, so the second write being a no-op is the ordinary
     # case rather than a guard against a bug.
-    for d in delivery.list_deliveries():
-        delivery_log.record(d, arrivals.recognise(d))
+    #
+    # UNLESS THE CALLER ALREADY DID (REQ-TEST-116): a bootstrap running
+    # both collections side by side records every delivery once before
+    # either starts, because "the second write is a no-op" is a race
+    # when the two writes are simultaneous.
+    if record_deliveries:
+        delivery_log.record_all()
 
     # WHAT THIS RUN SAW IN FLIGHT (REQ-PIPE-057 criteria 5 and 7).
     # Reported on EVERY run, with no interval and no threshold -

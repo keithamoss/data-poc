@@ -31,7 +31,8 @@ data would be the one confidently doing nothing.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from typing import Callable
 
 from qa_tools.common import supply_db
@@ -49,6 +50,9 @@ class BootstrapResult:
     staged_after: int
     #: Why it did nothing, for the skip case.
     reason: str = ""
+    #: Seconds per collection checked, and "total" (REQ-TEST-116
+    #: criterion 6) - measured, so a speed-up is a number, not a feeling.
+    timings: dict[str, float] = field(default_factory=dict)
 
 
 def staged_table_count(conn) -> int:
@@ -90,24 +94,89 @@ def bootstrap(collection: str = "all", force: bool = False,
                    f"(use --force to rebuild anyway)")
 
     # IMPORTED HERE, NOT AT MODULE LEVEL. cli/ imports this module, and
-    # these import the orchestrators, which pull in all four QA tools -
-    # several seconds of import time that a caller only checking
-    # `already_populated()` should not pay.
+    # the orchestrators pull in all four QA tools - several seconds of
+    # import time that a caller only checking `already_populated()`
+    # should not pay.
     from cli import bdm, cp
-    from qa_tools.bdm.orchestrate_bdm import run_pipeline
-    from qa_tools.cp.orchestrate_cp import run_pipeline_cp
 
-    if collection in ("all", "bdm"):
-        say("Generating synthetic data (Birth Registrations)")
-        bdm.generate_synthetic_data()
-        say("Running the real checks against every Birth Registrations supply")
-        run_pipeline(sequential=sequential)
-    if collection in ("all", "cp"):
-        say("Generating synthetic data (Child Protection)")
-        cp.generate_synthetic_data()
-        say("Running the real checks against every Child Protection supply")
-        run_pipeline_cp(sequential=sequential)
+    started = time.monotonic()
+    names = [n for n in ("bdm", "cp") if collection in ("all", n)]
+    generate = {"bdm": bdm.generate_synthetic_data, "cp": cp.generate_synthetic_data}
+
+    if sequential or len(names) < 2:
+        # ONE AFTER THE OTHER - the reference REQ-TEST-116 criterion 4
+        # compares a parallel bootstrap against, and what a single
+        # collection always was.
+        timings = {}
+        for name in names:
+            say(f"Generating synthetic data ({_LABEL[name]})")
+            generate[name]()
+            say(f"Running the real checks against every {_LABEL[name]} supply")
+            timings[name] = _run_collection(name, sequential, record_deliveries=True)
+    else:
+        # SIDE BY SIDE (REQ-TEST-116 criterion 1). The two collections
+        # share no dataset, slot or promotion, so neither's order depends
+        # on the other's. GENERATION FIRST, both of it - 4.6s measured, not
+        # worth overlapping - so neither pipeline recognises a delivery
+        # tree the other generator is still writing. THEN THE DELIVERY LOG,
+        # once, for the reason run_pipeline's own comment gives.
+        for name in names:
+            say(f"Generating synthetic data ({_LABEL[name]})")
+            generate[name]()
+        _record_deliveries()
+        say("Running the real checks against every supply - "
+            + " and ".join(_LABEL[n] for n in names) + " side by side")
+        timings = _run_concurrently(names, sequential)
+    timings["total"] = time.monotonic() - started
+    say("Took " + ", ".join(f"{_LABEL.get(k, k)} {v:.0f}s" for k, v in timings.items()))
 
     with supply_db.connect(label="mothman:bootstrap") as conn:
         after = staged_table_count(conn)
-    return BootstrapResult(populated=True, staged_before=before, staged_after=after)
+    return BootstrapResult(populated=True, staged_before=before, staged_after=after,
+                           timings=timings)
+
+
+_LABEL = {"bdm": "Birth Registrations", "cp": "Child Protection", "total": "in total"}
+
+
+def _record_deliveries() -> None:
+    from qa_tools.common import delivery_log
+
+    delivery_log.record_all()
+
+
+def _run_collection(name: str, sequential: bool, record_deliveries: bool = False) -> float:
+    """Run one collection's whole pipeline; return how long it took.
+
+    TOP LEVEL, so a spawned process can import it by name.
+    """
+    started = time.monotonic()
+    if name == "bdm":
+        from qa_tools.bdm.orchestrate_bdm import run_pipeline
+        run_pipeline(sequential=sequential, record_deliveries=record_deliveries)
+    else:
+        from qa_tools.cp.orchestrate_cp import run_pipeline_cp
+        run_pipeline_cp(sequential=sequential, record_deliveries=record_deliveries)
+    return time.monotonic() - started
+
+
+def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:
+    """Each collection in a process of its own.
+
+    PROCESSES, NOT THREADS. The four QA tools run in-process and keep
+    process-wide state - Soda Core reloads `.env` into os.environ on its
+    first scan (plans/tooling.md #26), and dbt and datacontract-cli were
+    never written to share an interpreter. A process each is the
+    isolation the two pipelines already had when run one after the
+    other. SPAWNED rather than forked, so neither inherits the other's
+    half-initialised connections or imported tool state.
+
+    A failure in either fails the bootstrap: `.result()` re-raises it.
+    """
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor
+
+    context = multiprocessing.get_context("spawn")
+    with ProcessPoolExecutor(max_workers=len(names), mp_context=context) as pool:
+        futures = {n: pool.submit(_run_collection, n, sequential) for n in names}
+        return {n: f.result() for n, f in futures.items()}

@@ -103,3 +103,43 @@ def run_manifest(
             raise
 
     return [item for run_results in ordered_results for item in run_results]
+
+
+#: Whether a run's tools overlap (REQ-TEST-116 criterion 3). Set once per
+#: process by the batch entry points from their `sequential` flag; a
+#: process runs one collection, so one value per process is the right
+#: granularity.
+TOOLS_CONCURRENTLY = True
+
+
+def beside(background, foreground, *, concurrent: bool | None = None):
+    """Run `background` in a thread while `foreground` runs here; return
+    `(background(), foreground())`.
+
+    FOR dbt AND THE OTHER THREE TOOLS (REQ-TEST-116 criterion 3,
+    plans/performance.md #5). dbt is a subprocess, so its thread only
+    waits; Soda Core, datacontract-cli and Evidently run in-process and
+    stay one after another in the foreground, never sharing the
+    interpreter concurrently - which none of them was written for.
+
+    FAILURE IS REPORTED IN TOOL ORDER: the background failure wins when
+    both fail, as it would have run - and failed - first. Nothing is left
+    running behind an exception; the background is always waited for.
+    """
+    if concurrent is None:
+        concurrent = TOOLS_CONCURRENTLY
+    if not concurrent:
+        return background(), foreground()
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(background)
+        try:
+            ahead = foreground()
+        except BaseException:
+            try:
+                pending.result()
+            except BaseException as first:  # noqa: BLE001 - re-raised as the one that ran first
+                raise first from None
+            raise
+        return pending.result(), ahead

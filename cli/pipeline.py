@@ -59,7 +59,7 @@ def pipeline_group() -> None:
 @click.option("--collection", type=click.Choice(["bdm", "cp", "all"]), default="all",
               help="Which collection's full manifest to regenerate and run - bdm = civil-registration, cp = child-protection. Default: both.")
 @click.option("--sequential", is_flag=True,
-              help="No longer changes anything: the batch path runs one arrival at a time whatever this says, because each arrival's filing depends on what the one before it promoted. Kept so scripts passing it do not break.")
+              help="Run each supply's four QA tools one after another rather than dbt beside the other three - slower, and easier to read when debugging. Arrivals always run one at a time, because each filing depends on what the one before it promoted.")
 @click.option("--snapshot", is_flag=True,
               help="Also archive a dashboard snapshot afterward (same as SNAPSHOT_DASHBOARD=1).")
 @click.option("--publish", "do_publish", is_flag=True,
@@ -135,7 +135,7 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
 @click.option("--collection", type=click.Choice(["bdm", "cp", "all"]), default="all",
               help="Which collection's recorded history to delete and rebuild. Default: both.")
 @click.option("--sequential", is_flag=True,
-              help="No longer changes anything: the batch path runs one arrival at a time whatever this says, because each arrival's filing depends on what the one before it promoted. Kept so scripts passing it do not break.")
+              help="Run each supply's four QA tools one after another rather than dbt beside the other three - slower, and easier to read when debugging. Arrivals always run one at a time, because each filing depends on what the one before it promoted.")
 @click.option("--yes", is_flag=True,
               help="Skip the confirmation prompt. For a scripted or unattended run.")
 def regenerate_history_command(collection: str, sequential: bool, yes: bool) -> None:
@@ -226,7 +226,7 @@ def regenerate_history_command(collection: str, sequential: bool, yes: bool) -> 
               help="Rebuild even if this environment already holds staged supplies. "
                    "Safe - the pipeline is seeded and deterministic - just not free.")
 @click.option("--sequential", is_flag=True,
-              help="No longer changes anything: the batch path runs one arrival at a time whatever this says, because each arrival's filing depends on what the one before it promoted. Kept so scripts passing it do not break.")
+              help="Check one collection after the other instead of side by side - slower, and the reference a parallel bootstrap should match. Arrivals within a collection always run one at a time, because each filing depends on what the one before it promoted.")
 def bootstrap_command(collection: str, force: bool, sequential: bool) -> None:
     """Take an empty environment to one with data and QA results in it.
 

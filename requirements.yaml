@@ -26051,10 +26051,10 @@ requirements:
       database takes minutes rather than half an hour - without changing a
       single result.
     moscow: should
-    status: in_progress
+    status: built
     source: >
       Keith, 2026-10-03, asking why regeneration is sequential
-      (plans/running-thoughts.md #58). Drafted in the main session, NOT
+      (plans/running-thoughts.md #58, deleted once this carried it). Drafted in the main session, NOT
       through delivery-scoper - flagged to Keith at sign-off.
     acceptance_criteria:
       - >
@@ -26085,7 +26085,88 @@ requirements:
         write once - the delivery log, schema migrations, shared period
         schemas - is made safe to run together, not merely usually fine.
     dependencies: []
+    linked_tests:
+      - tests/test_bootstrap.py
+      - tests/test_tools_beside.py
+    implemented_by:
+      - qa_tools/common/bootstrap.py::bootstrap
+      - qa_tools/common/bootstrap.py::_run_concurrently
+      - qa_tools/common/parallel_orchestrate.py::beside
+      - qa_tools/common/delivery_log.py::record_all
+      - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
+      - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
+    evidence:
+      - >
+        2026-10-03: tests/test_bootstrap.py (both collections dispatched
+        together, the delivery log recorded once before either, generation
+        first, one collection not dispatched to a pool, wall clock
+        reported, --sequential the old order) and tests/test_tools_beside.py
+        (overlap, order, failure reporting in tool order, both
+        orchestrators wired) pass - 130 passed across those and the real
+        tool-run modules they touch (cli_cp, cli_bdm, orchestrate_single_run,
+        run_schema_lifecycle, parallel_orchestrate, filing_before_checks).
+      - >
+        2026-10-03: two real bootstraps into empty scratch databases,
+        sequential and parallel, compared IDENTICAL on decision log,
+        filings, check results, runs and tables - criterion 4. Timings in
+        decisions, and provisional.
+    unmet_criteria:
+      - criterion: >
+          Criterion 4, in part - "kept as a test". The equivalence was
+          VERIFIED once (see decisions) by a comparison script, not by
+          anything in the suite.
+        why: >
+          A faithful test is two full bootstraps - ~70 minutes - which no
+          suite run can carry. Keith chose to commit and stop here
+          (2026-10-03) rather than design a cheaper one now.
+        owner: >
+          Nobody yet - a reduced-corpus equivalence test is the likely
+          shape, and needs scoping.
+        blocked_by:
+          unowned: true
+      - criterion: >
+          Criterion 6's purpose, in part - the gain is measured but not
+          trustworthy: see the timing decision.
+        why: >
+          The sequential reference ran beside other work on a 4-core
+          sandbox, and whether criterion 3's tool overlap helps or fights
+          collection parallelism there is unknown. Keith chose not to
+          re-measure now.
+        owner: >
+          Nobody yet - a clean re-measure (parallel with and without the
+          tool overlap, idle machine), then keep the overlap on by default
+          only if it measurably helps.
+        blocked_by:
+          unowned: true
     decisions:
+      - >
+        CRITERION 4 VERIFIED, 2026-10-03: a sequential and a parallel
+        bootstrap from the same seed, each into its own empty database,
+        compared on the decision log (84), filings (150), check results
+        (7,210), runs (150) and tables (154) with ids and wall-clock
+        stamps left out - IDENTICAL on all five. Effective-at times are
+        compared and also matched, being derived from receipt instants.
+      - >
+        TIMING, PROVISIONAL (Keith chose to stop here rather than
+        re-measure). Sequential 41m46s (BDM 520s, CP 1,978s); parallel
+        29m07s (BDM 452s, CP 1,735s) - the total is now CP's alone, so the
+        collection split works. But the sequential reference ran beside a
+        subagent and the validators, and took 42 minutes against 27 for
+        the previous night's old-code bootstrap; and CP averaged ~16s a
+        run against ~11s. On 4 cores, dbt and datacontract-cli overlapping
+        in BOTH collections plus PostgreSQL may be contending rather than
+        adding. Not concluded either way.
+      - >
+        dbt BESIDE THE REST, NOT ALL FOUR AT ONCE - plans/performance.md
+        #5's own 2026-09-14 design, revived because running ARRIVALS in
+        parallel (which superseded it) was removed on 2026-09-28. dbt is a
+        subprocess; Soda Core, datacontract-cli and Evidently are
+        in-process and stay sequential in one thread, never sharing the
+        interpreter concurrently.
+      - >
+        COLLECTIONS IN PROCESSES, SPAWNED - the tools keep process-wide
+        state, and spawning means neither inherits the other's connections
+        or imported tool state.
       - >
         THE DELIVERY LOG IS RECORDED ONCE, BEFORE BOTH PIPELINES START
         (Keith, 2026-10-03). Both orchestrators record every delivery and
@@ -26118,7 +26199,7 @@ requirements:
     status: not_started
     source: >
       Keith, 2026-10-03, asking whether the generated data could be stashed
-      so CI runs faster (plans/running-thoughts.md #59). Drafted in the
+      so CI runs faster (plans/running-thoughts.md #59, deleted once this carried it). Drafted in the
       main session, NOT through delivery-scoper - flagged to Keith at
       sign-off.
     acceptance_criteria:

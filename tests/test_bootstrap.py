@@ -88,11 +88,12 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
                             lambda **k: called.append(("bdm", k)))
         monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",
                             lambda **k: called.append(("cp", k)))
+        _in_process(monkeypatch)
 
         result = boot.bootstrap(force=True)
         assert result.populated is True
-        assert ("bdm", {"sequential": False}) in called
-        assert ("cp", {"sequential": False}) in called
+        assert ("bdm", {"sequential": False, "record_deliveries": False}) in called
+        assert ("cp", {"sequential": False, "record_deliveries": False}) in called
 
 
 class TestWhatItRuns:
@@ -105,10 +106,18 @@ class TestWhatItRuns:
                             lambda **k: called.append("bdm"))
         monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",
                             lambda **k: called.append("cp"))
+        monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
+        _in_process(monkeypatch, called)
         return called
 
     def test_all_does_both_collections(self, spy):
         boot.bootstrap(collection="all")
+        assert spy == ["gen-bdm", "gen-cp", "record", "concurrently", "bdm", "cp"]
+
+    def test_sequential_does_one_collection_then_the_other(self, spy):
+        """REQ-TEST-116 criterion 5 - the reference a parallel bootstrap
+        is compared against, so it has to be the old behaviour exactly."""
+        boot.bootstrap(collection="all", sequential=True)
         assert spy == ["gen-bdm", "bdm", "gen-cp", "cp"]
 
     def test_one_collection_leaves_the_other_alone(self, spy):
@@ -132,3 +141,70 @@ class TestWhatItRuns:
 
     def test_it_works_with_no_progress_callback(self, spy):
         boot.bootstrap(collection="bdm")
+
+
+def _in_process(monkeypatch, called=None):
+    """Stand in for the process pool: a monkeypatched orchestrator does
+    not exist in a spawned process, so the dispatch runs here instead.
+    What is under test is WHAT is dispatched and in what order around it;
+    that two processes really run side by side is the pool's own job."""
+    def run(names, sequential):
+        if called is not None:
+            called.append("concurrently")
+        return {n: boot._run_collection(n, sequential) for n in names}
+    monkeypatch.setattr(boot, "_run_concurrently", run)
+
+
+class TestCollectionsRunSideBySide:
+    """REQ-TEST-116 criteria 1, 2 and 6."""
+
+    @pytest.fixture
+    def spy(self, empty_db, monkeypatch):
+        called = []
+        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda: called.append("gen-bdm"))
+        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda: called.append("gen-cp"))
+        monkeypatch.setattr("qa_tools.bdm.orchestrate_bdm.run_pipeline",
+                            lambda **k: called.append(("bdm", k)))
+        monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",
+                            lambda **k: called.append(("cp", k)))
+        monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
+        dispatched = []
+
+        def run(names, sequential):
+            dispatched.append(list(names))
+            return {n: boot._run_collection(n, sequential) for n in names}
+        monkeypatch.setattr(boot, "_run_concurrently", run)
+        return called, dispatched
+
+    def test_both_collections_are_dispatched_together(self, spy):
+        _called, dispatched = spy
+        boot.bootstrap(collection="all")
+        assert dispatched == [["bdm", "cp"]]
+
+    def test_the_delivery_log_is_recorded_once_before_either_runs(self, spy):
+        """Both orchestrators record every delivery and relied on the
+        second write being a no-op - a race once they run together."""
+        called, _ = spy
+        boot.bootstrap(collection="all")
+        assert called.count("record") == 1
+        assert called.index("record") < min(
+            i for i, c in enumerate(called) if isinstance(c, tuple))
+        assert all(c[1]["record_deliveries"] is False for c in called if isinstance(c, tuple))
+
+    def test_generation_finishes_before_any_checking_starts(self, spy):
+        called, _ = spy
+        boot.bootstrap(collection="all")
+        assert called[:2] == ["gen-bdm", "gen-cp"]
+
+    def test_one_collection_is_not_dispatched_to_a_pool(self, spy):
+        called, dispatched = spy
+        boot.bootstrap(collection="cp")
+        assert dispatched == []
+        assert ("cp", {"sequential": False, "record_deliveries": True}) in called, \
+            "alone, a collection records its own deliveries as it always did"
+
+    def test_the_wall_clock_is_reported(self, spy):
+        """Criterion 6: the gain is measured rather than estimated."""
+        result = boot.bootstrap(collection="all")
+        assert set(result.timings) == {"bdm", "cp", "total"}
+        assert all(isinstance(v, float) for v in result.timings.values())

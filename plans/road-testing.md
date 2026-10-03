@@ -941,3 +941,29 @@ judgement about who reads the page rather than about the rule.
     - **Q8: a gate refusal is recorded in the DECISION LOG as a
       rule-actor entry**, the promotion-withheld pattern; nothing may read
       it as a person's decision.
+
+    **SCENARIO RE-WALKED UNDER ALL OF THE ABOVE, 2026-10-03 - four issues
+    found and decided (Keith):**
+    1. **A supply that read a REFUSED own-arrival sibling is HELD**, not
+       promoted. Without it the 05-20 resupply's clean Placements promoted
+       against a refused Clients (its FK check can pass - Clients' 39
+       failures were elsewhere), filled Q2's slot, and the fully clean
+       05-27 set then met a filled slot: a quarter holding a combination
+       the supplier never sent. Narrow - only the supplies that read the
+       refused sibling, never the delivery (the retired hold stays
+       retired). Keith's framing: it should read red anyway.
+    2. **When EVERY version of a sibling is refused, a run reads the
+       NEWEST-ARRIVED one** (extends Q1's "read the only one"). Found as a
+       real deadlock: Investigations and Notifications read EACH OTHER
+       (the only mutual pair today), so two clean single-file corrections
+       after a bad zip each judged the other's set-aside predecessor and
+       both stuck with nothing promoted to trigger a re-check.
+    3. **Re-checks triggered during a zip wait until every file sharing
+       its receipt instant has run** - otherwise Clients 05-27's promotion
+       re-gated Placements 05-20 into Q2 before Placements 05-27 had run.
+    4. **A decision that does not change what the period RESOLVES a table
+       to triggers no re-check** - stops rule-rejections (Q5) and no-op
+       rejects starting a second wave.
+    5. **COST IS AN NFR, measured once built**: the wait on `supply
+       decide` and the bootstrap's extra runs; Q6 (queueing) is revisited
+       if decide exceeds a threshold Keith sets.
