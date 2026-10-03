@@ -1033,3 +1033,17 @@ judgement about who reads the page rather than about the rule.
       way would move to SUPERSEDED like any other, so it stays reversible.
     - Asked: whether item 7's re-check also runs QA for already-promoted
       datasets (answered in conversation - see the next entry).
+
+    **OPTION A CONFIRMED, Keith 2026-10-03** - the two settings (amber
+    auto-promotion; resupply replacing a promoted supply), the byte-for-
+    byte guard (an exact repeat of a file already held for the table and
+    period is recorded as received but supersedes nothing and is not
+    re-checked) and item 6 all agreed, with two emphases: item 6's
+    "promoted while something else was waiting" must REALLY STAND OUT on
+    the dashboard and in the decision log; and a promoted supply whose
+    refreshed cross-table result has gone red must be shown, very
+    clearly, as a RED PROMOTED supply. Item 7 confirmed as: arrival-time
+    re-evaluation already refreshes promoted siblings' cross-table
+    checks; a promotion re-gates WAITING supplies only; nothing promoted
+    is ever demoted by a re-check (the one exception being the resupply
+    setting). Next: delivery-scoper drafts from this entry.
