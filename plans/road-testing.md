@@ -1016,3 +1016,20 @@ judgement about who reads the page rather than about the rule.
     Residual narrow case noted: a not-yet-promoted (e.g. amber) fix can
     be superseded by a later non-identical resend - visible and
     reversible under 2-3.
+
+    **OPTION A, ROUND TWO (Keith, 2026-10-03):**
+    - **AMBER AUTO-PROMOTION BECOMES A SETTING** at data asset, collection
+      and dataset level (nearest wins). Keith expects the quarterly asset
+      to hold amber for a person at asset level, and the daily asset to
+      let some collections/datasets auto-promote amber. NOTE: today amber
+      ALREADY promotes itself into an empty slot (REQ-PIPE-075 criterion
+      1; promotion.PROMOTES_ITSELF, whose comment gives the reason - holding
+      every amber "is how a queue becomes noise nobody reads"). So this
+      amends 075 criterion 1 rather than adding an option.
+    - **A SECOND SETTING, same levels: whether a resupply into an
+      already-promoted slot may replace it automatically** - never (today's
+      behaviour, item 5 above), when green, or when green or amber. Keith
+      expects the daily asset to opt in. A promoted supply replaced this
+      way would move to SUPERSEDED like any other, so it stays reversible.
+    - Asked: whether item 7's re-check also runs QA for already-promoted
+      datasets (answered in conversation - see the next entry).
