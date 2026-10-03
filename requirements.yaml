@@ -26039,3 +26039,134 @@ requirements:
         requirement covers a great deal more than holds - which is an
         argument for it existing separately, and possibly for it being
         more valuable than the requirement that found it.
+  - id: REQ-TEST-116
+    title: A bootstrap does in parallel what does not depend on order, and produces the same history either way
+    date_written: "2026-10-03"
+    signed_off:
+      by: Keith
+      date: "2026-10-03"
+    story: >
+      As someone regenerating the QA history, I want the bootstrap to run
+      work in parallel wherever order does not matter, so that a fresh
+      database takes minutes rather than half an hour - without changing a
+      single result.
+    moscow: should
+    status: in_progress
+    source: >
+      Keith, 2026-10-03, asking why regeneration is sequential
+      (plans/running-thoughts.md #58). Drafted in the main session, NOT
+      through delivery-scoper - flagged to Keith at sign-off.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL run the Birth Registrations and Child Protection
+        pipelines concurrently, since they share no datasets, slots or
+        promotions.
+      - >
+        WITHIN a collection, THE SYSTEM SHALL still process arrivals one at
+        a time in receipt order, because each filing depends on the
+        promotion before it.
+      - >
+        WITHIN one run, THE SYSTEM SHALL evaluate the four QA tools
+        concurrently.
+      - >
+        A parallel bootstrap SHALL produce the same decision log, filings
+        and check results as a sequential one from the same seed,
+        timestamps and ids aside - verified by comparing the two, and kept
+        as a test.
+      - >
+        `--sequential` SHALL restore fully sequential behaviour, for
+        debugging and as criterion 4's reference.
+      - >
+        THE SYSTEM SHALL report the bootstrap's wall-clock time, so that
+        the gain is measured rather than estimated.
+    non_functional_requirements:
+      - >
+        NO NEW FAILURE MODE UNDER CONCURRENCY. Anything both collections
+        write once - the delivery log, schema migrations, shared period
+        schemas - is made safe to run together, not merely usually fine.
+    dependencies: []
+    decisions:
+      - >
+        THE DELIVERY LOG IS RECORDED ONCE, BEFORE BOTH PIPELINES START
+        (Keith, 2026-10-03). Both orchestrators record every delivery and
+        rely on "the second write is a no-op", which is a race once they
+        run at the same time.
+      - >
+        ARRIVAL ORDER WITHIN A COLLECTION STAYS SEQUENTIAL ON PURPOSE.
+        Filing every arrival up front put 102 of 108 Child Protection
+        supplies in 2023-Q1, because no slot was filled while the filings
+        were made (tests/test_filing_before_checks.py). The parallelism
+        this requirement takes is only what that chain does not cover.
+      - >
+        WHY NOW: a bootstrap was measured at 27m02s on 2026-10-02, ~150
+        runs at ~11s each - 42 Birth Registrations and 108 Child
+        Protection, the 108 because REQ-PIPE-105 made every file its own
+        arrival. Its companion for CI is REQ-TEST-117's cache, which covers
+        the pushes that touch no pipeline input; this covers the rest.
+  - id: REQ-TEST-117
+    title: CI reuses a bootstrapped database whose inputs have not changed, and never one whose inputs have
+    date_written: "2026-10-03"
+    signed_off:
+      by: Keith
+      date: "2026-10-03"
+    story: >
+      As someone pushing a change that does not touch the pipeline, I want
+      CI to reuse the database from the last bootstrap with identical
+      inputs, so that the deployment half does not spend ~8.5 minutes
+      regenerating something it already has.
+    moscow: should
+    status: not_started
+    source: >
+      Keith, 2026-10-03, asking whether the generated data could be stashed
+      so CI runs faster (plans/running-thoughts.md #59). Drafted in the
+      main session, NOT through delivery-scoper - flagged to Keith at
+      sign-off.
+    acceptance_criteria:
+      - >
+        CI SHALL cache a dump of the bootstrapped database, keyed on a hash
+        of every input that shapes it - generator/,
+        synthetic_data_generator/, pipeline/, qa_tools/, contract/,
+        dbt_project/, pyproject.toml, uv.lock and the workflow file itself.
+      - >
+        ON a key match, THE SYSTEM SHALL restore the dump instead of
+        bootstrapping; on a miss it SHALL bootstrap as today and save the
+        result.
+      - >
+        THE SYSTEM SHALL NOT restore a dump made from different inputs - no
+        partial-key fallback.
+      - >
+        THE job log SHALL say plainly whether the database was restored or
+        rebuilt, and from which key.
+      - >
+        THE cache SHALL hold generated synthetic data only, and SHALL live
+        in GitHub's cache, never in the repository.
+    non_functional_requirements:
+      - >
+        A RESTORE IS ONLY WORTH HAVING IF IT IS FAST: measured against the
+        ~8.5-minute bootstrap it replaces, on the runner, once built.
+    dependencies: [REQ-TEST-116]
+    decisions:
+      - >
+        A CACHE, NOT A COMMIT (Keith, 2026-10-03). Committing the data was
+        the first suggestion and collides with the standing rule that the
+        repository holds configuration, not state.
+      - >
+        EXACT KEY ONLY. A partial-key restore is stale by construction, and
+        the incident it would repeat is real: on 2026-09-28 results produced
+        by an earlier tree got captured into
+        tests/fixtures/arrival_semantics_golden.json and then disagreed with
+        every clean checkout. A NEW CHECK MUST MISS: it can turn a supply
+        red, which changes what promotes and so every filing after it.
+      - >
+        ONE CACHE, NOT TWO (Keith, 2026-10-03). Considered caching the
+        generated synthetic data (keyed on generator/ alone) separately from
+        the post-QA database. Rejected on measurement: generation is 4.6s
+        (Birth Registrations 3.1s, Child Protection 1.5s) of a ~27-minute
+        bootstrap. And the database cannot be split from QA anyway -
+        promotion MOVES a supply into its period's schema, so the shape of
+        the data is itself a product of the checks.
+      - >
+        MEASURED BASIS: 125 of the 200 commits before 2026-10-03 touched none
+        of criterion 1's inputs and would have restored. Adding checks to an
+        existing dataset is the case that must miss - only 1 of the 200 was
+        contract-only.

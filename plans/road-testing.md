@@ -894,3 +894,50 @@ judgement about who reads the page rather than about the rule.
     implies, so draft the requirement as "re-evaluate and re-apply the
     promotion gate", not as a separate reopen rule. Path B confirmed as
     written.
+
+    **SCOPED 2026-10-03 by delivery-scoper as drafts REQ-PIPE-118 (set
+    aside), REQ-PIPE-119 (accepting re-checks and re-gates), REQ-GHUB-120
+    (displacement preview) and REQ-DASH-121 (decision-caused re-check on
+    the dashboard) - unsigned; draft held in the session scratchpad, to be
+    revised with the answers below. "Path B" above = accepting a red
+    supply that DISPLACES a promoted one. Verified while relaying: the
+    gate records a refusal durably only for off-cycle supplies
+    (promotion._record_withheld), so 118 needs a refusal record.
+    Keith's answers to the scoper's questions, 2026-10-03:
+    - **Q1, a lone refused sibling: READ IT.** Set-aside only breaks a
+      tie; where a refused supply is the only staged version of a table,
+      a run reads it, so a single-file correction after a refused zip is
+      judged on its own checks.
+    - **Q3, what re-gates waiting siblings: ANY PROMOTION**, automatic as
+      well as a person's - the same first-arrival logic. Terminates
+      because a supply promotes at most once.
+    - **Q4, which decisions trigger the re-check: EVERY DECISION THAT
+      CHANGES WHAT A PERIOD RESOLVES A TABLE TO** - promote, reject,
+      demote, re-file, substitute, de-substitute, inherit, un-inherit.
+      Note REQ-PIPE-075 criterion 17 (re-file re-runs QA) is unmet and
+      adjacent.
+    - **Q2, which refusals set a supply aside: ANY RED VERDICT**, "could
+      not read a table" included ("a pretty good reason to set a file
+      aside too"). Refusals that are not about the data - slot already
+      filled, off-cycle, inherited - do not. Safe against the mutual
+      deadlock because Q1 reads a lone refused sibling and Q3 re-gates on
+      every promotion. "Set aside" defined for the record: skipped when
+      another run resolves the period's version of that table; left in
+      staging, its own verdict standing, still a person's to decide.
+    - **Q5, two staged versions of a sibling both re-gate green: RE-CHECK
+      BOTH, PROMOTE THE ONE THAT ARRIVED MOST RECENTLY** (Keith). Note
+      for drafting: this chooses by ARRIVAL time, which REQ-PIPE-105
+      criterion 7 currently reserves to promoted supplies by PROMOTION
+      time. CONFIRMED by Keith as a deliberate amendment of 105 criterion
+      7 for this case only (two GREEN staged versions after a re-check),
+      and the OLDER GREEN VERSION IS REJECTED BY RULE as superseded - an
+      automatic rejection of a clean supply, which REQ-PIPE-076 (rejection
+      is a person's decision) will need to allow for, naming the rule as
+      actor and the newer supply as the reason.
+    - **Q6: `mothman supply decide` WAITS** for the re-checks and shows
+      the outcome. A queue can come later.
+    - **Q7: the as-of view shows the window AS RECORDED, ANNOTATED** with
+      the decision that later resolved it.
+    - **Q8: a gate refusal is recorded in the DECISION LOG as a
+      rule-actor entry**, the promotion-withheld pattern; nothing may read
+      it as a person's decision.
