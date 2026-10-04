@@ -26435,15 +26435,18 @@ requirements:
     status: not_started
     source: "Keith, 2026-10-03, option A item 7, confirmed in the 'OPTION A CONFIRMED' paragraph (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
-      - "WHEN a table arrives in or leaves a period schema - promoted by a rule or a person, re-filed in or out, superseded, demoted or rejected - THE SYSTEM SHALL re-evaluate, within that period only, every cross-table check that declares it reads the promoted table and belongs to a supply still WAITING in that period."
+      - "WHEN a table arrives in or leaves a period schema - promoted by a rule or a person, re-filed in or out, superseded, demoted or rejected - THE SYSTEM SHALL re-evaluate, within that period only, every cross-table check that declares it reads the moved table, whether it belongs to a supply WAITING in that period or one PROMOTED there, and SHALL NOT re-evaluate any check that does not read a moved table."
       - "THE SYSTEM SHALL NOT re-run a waiting supply's own table-level and column-level checks for this re-evaluation."
-      - "WHEN that re-evaluation completes, THE SYSTEM SHALL apply the promotion gate to each waiting supply it touched, exactly as for a first arrival, reading the supply's whole status (REQ-PIPE-075 criterion 2)."
+      - "WHEN that re-evaluation completes, THE SYSTEM SHALL apply the promotion gate to each WAITING supply it touched, exactly as for a first arrival, reading the supply's whole status (REQ-PIPE-075 criterion 2)."
       - "THE SYSTEM SHALL NOT re-evaluate, under this requirement, a supply whose own first QA run has not yet happened."
       - "THE SYSTEM SHALL name, on every result this re-evaluation records, the decision that caused it, distinguishably from a re-evaluation caused by an arrival (REQ-PIPE-079 criterion 7)."
       - "THE SYSTEM SHALL NOT demote, supersede or reject a PROMOTED supply as a consequence of any re-evaluation."
+      - "WHERE a re-evaluation leaves a PROMOTED supply red, THE SYSTEM SHALL show it as red promoted (REQ-DASH-126) and SHALL take no other action on it."
       - "THE SYSTEM SHALL handle the knock-on effects of every table arriving in or leaving a period schema through one mechanism, whatever decision moved it, and SHALL NOT have a separate path for any one decision."
+      - "THE SYSTEM SHALL run one re-evaluation per decision, over every table that decision moved into or out of a period schema, after the decision commits, and SHALL NOT run one per table moved."
+      - "WHERE re-evaluations caused by different decisions overlap, THE SYSTEM SHALL treat as current the result caused by the decision that took effect latest, and SHALL NOT treat as current whichever re-evaluation finished last."
       - "WHERE a supply promoted by this re-gating is itself read by another waiting supply's cross-table checks, THE SYSTEM SHALL apply this requirement to that promotion too."
-      - "WHEN a re-evaluation leaves a waiting supply failing the automatic-promotion rules as resolved for its dataset - red, or amber where the resolved amber setting (REQ-PIPE-122) is 'hold' - THE SYSTEM SHALL record that in the decision log at its highest prominence, with the rule as actor, naming the supply, the promotion that caused the re-check and the reason it still cannot promote, so that a person sees it and acts."
+      - "WHEN a re-evaluation leaves a waiting supply failing the automatic-promotion rules as resolved for its dataset - red, or amber where the resolved amber setting (REQ-PIPE-122) is 'hold' - THE SYSTEM SHALL record that, grouped as ONE record per causing decision naming every such supply (for example 'Rejecting Q2 Clients left 3 waiting supplies failing: Placements, Notifications, Investigations'), in the decision log at its highest prominence, with the rule as actor, naming the supply, the promotion that caused the re-check and the reason it still cannot promote, so that a person sees it and acts."
       - "THE SYSTEM SHALL show that record at full prominence in the terminal, and SHALL NOT dim it as the terminal dims other entries whose actor is the rule."
       - "IF the re-evaluation fails to run, THEN THE SYSTEM SHALL leave the promotion that triggered it in place, leave the waiting supply waiting on its earlier verdict, and report the failure."
       - "THE SYSTEM SHALL record, in the same transaction as the promotion, that a re-evaluation is owed, and SHALL clear that record only when the re-evaluation completes."
@@ -26463,6 +26466,10 @@ requirements:
       - "AN ARRIVAL-TIME RE-EVALUATION OF PROMOTED SIBLINGS IS TAKEN AS ALREADY BUILT on Keith's confirmation; this draft verified only that qa_results_writer marks re-evaluated records with qa_tools/common/reevaluation.py's CAUSED_BY key. Worth confirming against a real run before building on it."
       - "AN INTERRUPTED WAIT LEAVES A RE-CHECK OWED, NEVER LOST (Keith, 2026-10-04). If the person's terminal is interrupted after a promotion commits, the promotion stands and the owed record survives for the next run. REJECTED one transaction around promotion and re-check: the QA tools run on their own connections and cannot see an uncommitted promotion, the move's exclusive lock would block the period for the length of a QA run, and a failed re-check would undo the person's promotion, which criterion 9 forbids. REJECTED relying on a person to notice and re-run by hand."
       - "EVERY ARRIVAL AND DEPARTURE, ONE MECHANISM (Keith, 2026-10-04, at re-file's sign-off): 'there should be one bit of the code that handles the knock-on effects of something arriving in or leaving a period schema'. This WIDENS the earlier 'ONLY PROMOTION TRIGGERS IT' decision above: a departure (reject, demote, supersede, re-file out) cannot promote a waiting reader, but re-checking it keeps every reader's shown verdict true to what the period actually holds. REJECTED one shared path that still fired only on arrivals and re-file."
+      - "EVERY READER OF A MOVED TABLE, WAITING OR PROMOTED - AND NOTHING ELSE (Keith, 2026-10-04): 'otherwise we're not telling the real truth' - a promoted reader whose partner left would keep green results it no longer earns. Only checks that read a moved table are re-evaluated; unrelated tables never. A promoted reader that goes red is shown, never demoted."
+      - "ONE RUN PER DECISION; NEWEST CAUSE WINS; SHOUTS GROUPED PER DECISION (Keith, 2026-10-04). A displacing promotion moves two tables and must not re-check readers twice; a slower, older re-check must never overwrite a newer one's verdict; and one rejection must not raise a shout per reader."
+      - "A FILE LANDING IN STAGING STAYS OUTSIDE THIS MECHANISM (Keith, 2026-10-04): it is not a period movement, and its own first run already evaluates it and refreshes its readers (REQ-PIPE-079). Both share reevaluation.plan() as the one answer to 'which checks read this table'. REJECTED folding a first run into this handler, which would mix a QA run from scratch with a knock-on re-check."
+      - "CASCADES ARE BOUNDED (Keith, 2026-10-04): a re-evaluation can only lead to promotions, never a rejection, demotion or supersession; a supply promotes at most once; nothing automatically restores a superseded supply. A departure can lead to a promotion - a reader that failed only against the departed table may pass against a waiting version of it - which is the same rule arrivals follow."
     open_questions: []
 
   - id: REQ-PIPE-122
@@ -26628,6 +26635,7 @@ requirements:
       - "IF a person promotes a supply into a slot resolved by INHERITANCE, THEN THE SYSTEM SHALL refuse it, SHALL say that nothing was expected for that period, and SHALL name un-inherit as the separate action that must come first."
       - "WHERE a decision has consequences beyond the slot it names, THE SYSTEM SHALL show them in one warning panel above that decision's single confirmation, and SHALL NOT ask a second yes or no; WHERE it has none, THE SYSTEM SHALL show no warning panel."
       - "THE SYSTEM SHALL say, in every such warning, how each consequence is undone - for example that a displaced supply moves to superseded and can be restored with un-supersede - and what each affected period will read until then."
+      - "THE SYSTEM SHALL say, in the warning for a person's decision, which other supplies' checks read a table the decision moves and will be re-checked, and that they may go red."
       - "IF the consequences of a decision change between the warning being shown and the person confirming, THEN THE SYSTEM SHALL refuse the decision and show the new warning, on the terminal and on GitHub alike, where confirming then takes a second comment."
       - "THE SYSTEM SHALL NOT, by any automatic rule, promote into a slot resolved by substitution or inheritance (REQ-PIPE-084 criterion 8, REQ-PIPE-098 criterion 17)."
       - "THE SYSTEM SHALL resolve a table in a period to the one object that period holds, and SHALL NOT rank versions of a table within a period by arrival time or by promotion time."
@@ -27184,6 +27192,9 @@ requirements:
   - id: REQ-DOCS-143
     title: "A requirement can be retired - kept readable in the register, naming what replaced it, and left out of sprint counting"
     date_written: "2026-10-04"
+    signed_off:
+      by: Keith
+      date: "2026-10-04"
     story: "As someone reading the register a year from now, I want a requirement that a later one replaced to still be there, marked retired and pointing at its successor, so that I can see what was once agreed and why it changed without digging through git."
     moscow: must
     status: not_started
@@ -27201,5 +27212,5 @@ requirements:
     dependencies: []
     decisions:
       - "A RETIRED STATUS, NOT DELETION (Keith, 2026-10-04). REJECTED deleting retired entries and moving their decisions into the successors: the register is the permanent artifact, and a reader should not need to know to look in git."
-    open_questions:
-      - "Should a retired criterion be marked in place on its requirement (this draft), or should the whole requirement be split so only whole requirements retire?"
+      - "BOTH GRAINS ARE ALLOWED (Keith, 2026-10-04): a whole requirement or a single criterion can be retired, whichever fits the case."
+    open_questions: []

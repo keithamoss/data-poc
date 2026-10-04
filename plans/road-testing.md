@@ -1502,3 +1502,15 @@ judgement about who reads the page rather than about the rule.
       views; a platform without event triggers runs on two guards and
       says so. Technical findings written into 118/121/128/129/130/131/
       132/133 as amendments.
+    - **ONE KNOCK-ON HANDLER, SETTLED 2026-10-04 (Keith):** every table
+      arriving in or leaving a period re-checks the checks that READ it -
+      waiting AND promoted readers, nothing unrelated ("otherwise we're
+      not telling the real truth"); a promoted reader going red is shown,
+      never demoted. One run per decision; the newest CAUSE wins, not the
+      last run to finish; shouts grouped per decision; a person's warning
+      says which readers will be re-checked and may go red. Staging
+      arrivals stay in their own first run (079). REQ-DOCS-143 signed,
+      either grain of retirement allowed. Correction recorded in passing:
+      the RULE does supersede in two places (118's newer-file supersession,
+      123's opt-in replacement) - it is re-checks that never reject,
+      demote or supersede.

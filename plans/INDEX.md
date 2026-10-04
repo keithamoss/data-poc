@@ -580,7 +580,6 @@ one when this line suggests it matters.
 - **#74** `done` 2026-10-02 - REQ-PIPE-098: a dataset subsetting its calendar by delivery_months never inherited, and an inherited view was invisible...
   - *touches:* `tests/test_inheritance.py`, `tests/test_period_overlay.py`
 - **#75** `investigate` 2026-10-04 - A promotion-withheld note makes a filled slot read as empty. Found by delivery-architect's pre-build review of the...
-  - *touches:* `tests/test_withheld_does_not_empty_a_slot.py`
 
 ## plans/road-testing.md
 
