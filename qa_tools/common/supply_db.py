@@ -581,7 +581,22 @@ def _redact(dsn: str) -> str:
     credential, and the failure that prints one is the failure nobody
     notices until it is indexed.
     """
-    return re.sub(r"://([^:/@]+):[^@]*@", r"://\1:***@", dsn)
+    # PARSED, NOT PATTERN-MATCHED (post-build-review #86). The regex this
+    # replaced knew only the URL form, so `host=... password=secret` - the
+    # keyword form libpq accepts just as readily - went through untouched.
+    # libpq's own parser understands every form it will connect with, so
+    # asking it which part is the password cannot miss one; a string it
+    # cannot parse may hold the password anywhere, so none of it is shown.
+    from psycopg.conninfo import conninfo_to_dict
+    try:
+        fields = conninfo_to_dict(dsn)
+    except Exception:  # noqa: BLE001 - any parse failure gets the same answer
+        return "<a connection string that could not be parsed>"
+    shown = {k: v for k, v in fields.items()
+             if k in ("host", "hostaddr", "port", "dbname", "user")}
+    if "password" in fields:
+        shown["password"] = "***"
+    return " ".join(f"{k}={v}" for k, v in shown.items()) or "<no host given>"
 
 
 def _ident(name: str, what: str) -> str:

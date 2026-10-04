@@ -4680,6 +4680,12 @@ twice. It deliberately did not re-find the `TypeError`.
     check. A defect against built code, so a failing test comes first;
     the obvious fix is to ask `promoted_into`, which #84 corrected.
 
+    **DECIDED 2026-10-04 (Keith): wait for REQ-PIPE-130's slot view**
+    (build step 2), which replaces every reader of "what a slot holds"
+    with one. It must cover this reader, and the REQ-QAC-108 amendment
+    must not be built before it - otherwise its false red ships. Not
+    fixed.
+
 86. **[investigate, 2026-10-04]** **[Pipeline & publishing]**
     **`supply_db._redact` misses a keyword-form DSN.** Found by
     delivery-architect's review of REQ-PIPE-093, confirmed by reading: the
@@ -4691,6 +4697,14 @@ twice. It deliberately did not re-find the `TypeError`.
     (a keyword-form DSN and a malformed one); REQ-PIPE-093 criterion 3
     leans on it.
 
+    **FIXED 2026-10-04 (Keith: "redact both forms").** `_redact` now asks
+    libpq's own parser (`psycopg.conninfo.conninfo_to_dict`) which part is
+    the password, so no form can be missed, and shows nothing of a string
+    it cannot parse. `tests/test_redact_dsn.py` - URL, keyword, quoted,
+    spaced, query-string, malformed, and end to end through `connect()` -
+    6 of 8 confirmed failing first. The message now reads
+    `host=... port=... dbname=... user=... password=***` rather than a URL.
+
 87. **[investigate, 2026-10-04]** **[Testing & dev tooling]**
     **The dev-container/CI PostgreSQL pin test checks only the first CI
     service.** Found by the same review, confirmed by reading:
@@ -4699,3 +4713,10 @@ twice. It deliberately did not re-find the `TypeError`.
     (both `postgres:16` today), so the second could drift unchecked.
     Minor; REQ-PIPE-146 criterion 5 replaces this comparison with "every
     image tag equals the declaration", so fold it in there.
+
+    **FIXED 2026-10-04 (Keith: "fix now").** `_ci_postgres_images` returns
+    every job's image and the pin test compares each one;
+    `test_every_ci_job_is_compared_not_only_the_first` pins it against a
+    workflow where only the second job drifted, which the old first-match
+    lookup was shown to miss. REQ-PIPE-146 still replaces the comparison
+    with "equals the declared major".

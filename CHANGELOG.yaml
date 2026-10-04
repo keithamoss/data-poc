@@ -144,6 +144,13 @@ releases:
               sent for it, the quarter read as empty and the queue asked for
               a resupply. It now keeps showing the supply that fills it. The
               same applied when an off-cycle resupply was held back.
+          - headline: Database passwords stay out of error messages
+            components: ["Pipeline & publishing"]
+            description: >
+              A connection error only hid the password when the connection
+              string was written as a web-style address. It now hides it
+              however the string is written, and shows nothing of one it
+              cannot read.
       - category: Improved
         items:
           - headline: Requirements can be retired, and filtered by status

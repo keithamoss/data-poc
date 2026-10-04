@@ -37,13 +37,22 @@ def _compose() -> dict:
     return yaml.safe_load((DEVCONTAINER / "docker-compose.yml").read_text())
 
 
-def _ci_postgres_image() -> str:
-    workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "test.yml").read_text())
-    for job in workflow["jobs"].values():
-        services = job.get("services") or {}
-        if "postgres" in services:
-            return services["postgres"]["image"]
-    pytest.fail("no postgres service container found in .github/workflows/test.yml")
+def _ci_postgres_images(workflow_text: str | None = None) -> dict[str, str]:
+    """`{job: image}` for EVERY job with a postgres service.
+
+    EVERY, not the first (post-build-review #87): test.yml runs two jobs
+    with their own service containers, and returning the first one found
+    left the second free to drift with nothing noticing.
+    """
+    text = workflow_text if workflow_text is not None else \
+        (ROOT / ".github" / "workflows" / "test.yml").read_text()
+    workflow = yaml.safe_load(text)
+    found = {name: (job.get("services") or {})["postgres"]["image"]
+             for name, job in workflow["jobs"].items()
+             if "postgres" in (job.get("services") or {})}
+    if not found:
+        pytest.fail("no postgres service container found in .github/workflows/test.yml")
+    return found
 
 
 def test_a_development_container_exists():
@@ -68,11 +77,32 @@ def test_the_dev_container_and_ci_pin_the_same_postgres_major():
     """The whole point of pinning. A green suite in one place means what
     a green suite in the other means only while these agree."""
     dev = _compose()["services"]["db"]["image"]
-    ci = _ci_postgres_image()
-    major = lambda image: image.split(":")[1].split(".")[0]  # noqa: E731 - one line, read once
-    assert major(dev) == major(ci), (
-        f"the dev container runs {dev} and CI runs {ci} - a suite green in one "
-        f"says nothing about the other. REQ-PIPE-093 makes this one declared value.")
+    for job, ci in _ci_postgres_images().items():
+        assert _major(dev) == _major(ci), (
+            f"the dev container runs {dev} and CI's {job} job runs {ci} - a suite "
+            f"green in one says nothing about the other. REQ-PIPE-146 makes this "
+            f"one declared value.")
+
+
+def _major(image: str) -> str:
+    return image.split(":")[1].split(".")[0]
+
+
+def test_every_ci_job_is_compared_not_only_the_first():
+    """post-build-review #87, pinned against a workflow where only the
+    SECOND job has drifted - the case the first-match lookup missed."""
+    workflow = """
+jobs:
+  fast:
+    services:
+      postgres: {image: "postgres:16"}
+  slow:
+    services:
+      postgres: {image: "postgres:17"}
+"""
+    images = _ci_postgres_images(workflow)
+    assert images == {"fast": "postgres:16", "slow": "postgres:17"}
+    assert {_major(i) for i in images.values()} == {"16", "17"}
 
 
 def test_something_waits_for_the_database_to_accept_connections():

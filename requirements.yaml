@@ -18754,6 +18754,7 @@ requirements:
       - tests/test_period_schema.py
       - tests/test_run_schema_lifecycle.py
       - tests/test_soda_leaves_the_environment_alone.py
+      - tests/test_redact_dsn.py
     implemented_by:
       - qa_tools/common/supply_db.py::connect
       - qa_tools/common/supply_db.py::supply_db_dsn
