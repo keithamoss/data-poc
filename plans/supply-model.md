@@ -2361,7 +2361,7 @@ exist.
     check ids, lifecycle metadata and authored prose, reaching the dashboard
     as its own scope and never folded into the data checks' status.
 
-    **Owns:** `REQ-QAC-096`, `REQ-DASH-097`, `REQ-DASH-148`
+    **Owns:** `REQ-QAC-096`, `REQ-DASH-097`, `REQ-DASH-148`, `REQ-PIPE-153`
 
     Exists because the load-first decision in sprint 26 would otherwise
     silently drop a whole class of QA: those questions are answered or

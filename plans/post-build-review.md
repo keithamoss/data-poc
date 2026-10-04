@@ -4567,6 +4567,13 @@ twice. It deliberately did not re-find the `TypeError`.
     what clears the item. Drafting via delivery-scoper; Keith signs the
     wording.
 
+    **SIGNED 2026-10-04:** split out as REQ-PIPE-153 (15 criteria), with
+    REQ-DASH-148 criterion 3, NFR 5 and decision 8 amended to match, an
+    unmet entry on REQ-PIPE-060 criterion 18, and a sentence added to
+    REQ-GHUB-082 criterion 16. Not built. Two more defects found while
+    drafting it are covered there: promoting a failed load records a
+    promotion of nothing (153 criterion 6), and #84 below, fixed first.
+
 81. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An
     automatic promotion records the git identity that ran the pipeline as
     its actor, not the rule.** Found by delivery-scoper refreshing
