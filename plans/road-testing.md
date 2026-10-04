@@ -1310,3 +1310,6 @@ judgement about who reads the page rather than about the rule.
       decision-log entries, a de-substitute and then the promotion, in one
       transaction. **INTO AN INHERITED SLOT: REFUSED** until a person takes
       a separate un-inherit action (inheritance means nothing was expected).
+    - **GROUP 2 SIGNED OFF by Keith, 2026-10-04: REQ-PIPE-122, 123, 128,
+      129, 130** (with the points above). Group 3: 126 and 127 agreed, 124
+      and 125 dropped. Next: superseded retention, then period closing.
