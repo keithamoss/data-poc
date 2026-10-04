@@ -4477,7 +4477,13 @@ twice. It deliberately did not re-find the `TypeError`.
     table and tooltip, and a GAP in the trend line - it used to plot the
     run at ZERO, the "nothing wrong" end of the axis.
     NOT COVERED by this fix, and left to the rewritten REQ-PIPE-115:
-    gaps 2-4. Birth Registrations' builder needs no change yet because it
+    gaps 2-4. **REQ-PIPE-115 REDRAFTED by delivery-scoper and SIGNED 2026-10-04**:
+    one dataset-level red (held reuses REQ-DASH-070's held-supply item; a
+    contested dataset gets a new 'Two files, choose one' item) that rolls
+    up; sibling checks reading the table say held/contested in their own
+    run; 078 criterion 9 narrowed to tool verdicts; the narrow
+    reconciliation stops the batch. Its CI sibling, REQ-QAC-145, is
+    registered PARKED until the tool set is settled. Birth Registrations' builder needs no change yet because it
     emits no such record (gap 4). No real-browser test exercises one,
     because the bootstrapped history contains none until a scenario
     plants one - REQ-GEN-136's planted shapes are the natural place.

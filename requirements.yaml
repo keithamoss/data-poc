@@ -26006,149 +26006,89 @@ requirements:
       - "STALE DECISION FLAGGED FOR THE SCOPER (2026-10-04): the decision above that the claim window 'opens before due and NEVER CLOSES' (REQ-PIPE-052) is reversed by REQ-PIPE-131, signed 2026-10-04 - a period now closes when its calendar's next period's claim window opens. To be rewritten on the scoper pass, not deleted, since its reasoning is history."
     open_questions: []
   - id: REQ-PIPE-115
-    title: A table the run cannot read is red and says so, and never stops the run
-    date_written: "2026-09-30"
-    story: >
-      As a data engineer operating this pipeline, I want a dataset whose
-      table is not there to come out RED and labelled as absent, while
-      every other dataset in the same run is checked as usual, so that a
-      supply nobody could place costs me one red row rather than a whole
-      collection's QA.
+    title: A table a run cannot read never stops the run - its own dataset reads red through its existing outstanding item, saying why, and every other check reading it is recorded once as not evaluated, in its own run
+    date_written: '2026-10-04'
+    signed_off:
+      by: Keith
+      date: "2026-10-04"
+    story: As a data engineer operating this pipeline, I want a dataset whose own table cannot be read - held or contested - to read clearly red for that period, saying why through the outstanding item it already raises, and every other dataset's check that reads that table to be recorded once as not evaluated, while everything else in the run is checked as usual, so that a supply nobody could place costs me one honest, explained red rather than a whole collection's QA or a silent gap that reads as green.
     moscow: must
     status: not_started
-    source: >
-      NOT SCOPED BY delivery-scoper - hand-drafted 2026-09-30, and said
-      here rather than left to be discovered, because this project's own
-      rule is to flag an unscopered requirement BEFORE presenting it. It
-      should get a scoper pass alongside the research below, before
-      sign-off.
-
-      Split out of REQ-PIPE-078 criteria 9 and 10 at Keith's own ask
-      ("scope this up as its own requirement"), after building those
-      criteria uncovered a defect that predates them and is wider than
-      they are. The defect is written up in full as
-      plans/post-build-review.md #72.
-    signed_off: null
+    source: 'Keith, 2026-09-30 (split out of REQ-PIPE-078 criteria 9 and 10, plans/post-build-review.md #72); hand-drafted that day without a scoper pass. REDRAFTED by delivery-scoper 2026-10-04 from the verification probe Keith approved that day (plans/post-build-review.md #77), his decisions on its gaps, and his answers to the scoper''s four questions, all given the same day, plus his correction that the dataset-level signal reuses REQ-DASH-070''s outstanding items.'
     acceptance_criteria:
-      - "WHERE a run cannot read a table, THE SYSTEM SHALL still evaluate and record every check that does not read it."
-      - "WHERE a run cannot read a table, THE SYSTEM SHALL record every check that does read it as RED, naming the table and why it could not be read."
-      - "THE SYSTEM SHALL distinguish a table that could not be READ from a check that FAILED, in the recorded result and wherever it is displayed, so that neither is mistaken for the other."
-      - "THE SYSTEM SHALL NOT record a passing result for any check that was not evaluated."
-      - "THE SYSTEM SHALL apply this to all four tools and both collections, and SHALL fail loudly where a tool cannot be made to behave this way rather than silently omitting its checks."
-      - "WHERE a tool's own failure cannot be attributed to a known unreadable table, THE SYSTEM SHALL continue to treat it as a failed run rather than absorbing it."
-      - "THE SYSTEM SHALL reconcile what it withheld against what it reddened, and SHALL refuse the run where the two disagree."
+    - WHERE a run cannot read a table, THE SYSTEM SHALL evaluate and record every check in that run's scope that does not read the table, exactly as it would had the table been readable.
+    - WHERE a check in a run's scope reads a table, other than the run's own, that the run cannot read, THE SYSTEM SHALL record that check as NOT EVALUATED - one record per unreadable table it reads - naming the table and the reason it could not be read, and SHALL NOT record a tool verdict for it.
+    - THE SYSTEM SHALL record every per-check not-evaluated result under the existing pseudo-tools 'unrunnable' or 'held', each carrying its own label, reason code and reason text, so that in the recorded result a check that was not evaluated is distinguishable from a check that failed.
+    - THE SYSTEM SHALL NOT record a passing result for any check that was not evaluated.
+    - WHILE a supply is held, THE SYSTEM SHALL NOT run any tool over its table and SHALL NOT record any tool verdict against it, whatever views were built for its run before filing raised the hold.
+    - WHERE a run's OWN table cannot be read, THE SYSTEM SHALL NOT run any tool for that run, and SHALL NOT record any per-check result for that dataset's own checks in that run.
+    - WHERE a run's own table cannot be read because its supply is held, THE SYSTEM SHALL use the existing REQ-DASH-070 'held-supply' outstanding item as that dataset's signal, worded to say the supply is held, waiting for a person to place it.
+    - WHERE a run's own table cannot be read because two files claim it (REQ-PIPE-105 criterion 6), THE SYSTEM SHALL raise a REQ-DASH-070 outstanding item scoped to that dataset, blocking, worded to say the table is contested, waiting for a person to choose a file, and naming both files - from recorded qa metadata only.
+    - IF a run's own table cannot be read for any reason other than a hold or a contest, THEN THE SYSTEM SHALL treat it as a failed run naming the table, rather than recording nothing.
+    - WHILE a 'held-supply' or contested outstanding item is open for a dataset as at the instant on show, THE SYSTEM SHALL count that dataset's status as RED for the period on show, stating the item's reason in words, and SHALL roll that red up to the collection and the agency like any other red, as REQ-DASH-133 criterion 4 does for a closed period with no supply.
+    - WHILE criterion 10 applies, THE SYSTEM SHALL show each of that dataset's own checks as not run for that period, and SHALL NOT show any of them as passing or carry an earlier run's verdict forward as that period's result.
+    - THE SYSTEM SHALL judge whether such an item is open as at the instant on show, so that the as-of view reproduces what a reader saw then.
+    - THE SYSTEM SHALL have a real-browser test, against the built dashboard, in which one dataset has a held supply and another a contested table, asserting that each dataset reads red with its reason, that the red rolls up to its collection and agency, and that none of its own checks reads as passing for that period.
+    - WHERE a cross-table check reads a table whose supply is held or contested, and the run reading it is of an arrival received with that supply (same delivery or same receipt instant) or finds that table contested for its own period, THE SYSTEM SHALL record that check as not evaluated, red, in the run of the dataset the check belongs to, giving held or contested as the reason and naming the supply.
+    - WHERE criterion 14 applies, THE SYSTEM SHALL give held or contested as the reason, ahead of not yet due, overdue, awaiting a decision and the catch-all.
+    - THE SYSTEM SHALL record each (check, unreadable table) pair at most once in any one run, and SHALL NOT record a cross-table check under the run of the held or contested supply it reads.
+    - WHEN a run's results are recorded, THE SYSTEM SHALL reconcile, for each tool, the checks it left out of that run's scope against the not-evaluated records written for that run, and IF the two disagree, THEN THE SYSTEM SHALL refuse the run, naming every check left out but not recorded or recorded but not left out, and SHALL stop the batch as it does for any failed run.
+    - IF a tool fails for any reason during a run, THEN THE SYSTEM SHALL treat it as a failed run and SHALL NOT absorb the failure as a not-evaluated result.
+    - THE SYSTEM SHALL apply criteria 1 to 18 to all four tools and both collections.
+    - THE SYSTEM SHALL have a test that drives the real Child Protection orchestrator with an unreadable sibling whose slot for the run's period is, in turn, not yet due, overdue, and holding a supply awaiting a decision, and asserts at qa.check_result that each records its own reason code - nodata for not yet due, red for the other two - rather than the catch-all.
+    - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-078 criterion 9 to read that no check runs over a held supply until it is filed and that no TOOL VERDICT is recorded against a supply with no period, a not-evaluated record being allowed; and SHALL record that REQ-PIPE-078 criteria 9 and 10 are delivered by this requirement's criteria 5 to 8 and 14 to 16.
+    - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-079 criterion 13 so that a contested table's own checks are not run, its dataset is signalled by the outstanding item of this requirement's criterion 8 and reads red under criterion 10, and the table is not promoted.
+    - THE SYSTEM SHALL change, in the same change, tests/test_orchestrate_single_run.py's TestABirthRegistrationsRunWithNothingItMayRead to cover a held table and a contested table, each finishing without raising, recording no per-check results, and leaving its outstanding item open.
     non_functional_requirements:
-      - "THE COMMITTED CONFIGURATION IS NEVER REWRITTEN. Keith, 2026-09-30, on being shown the filtering option: he does not want the Soda checks YAML edited. Whatever mechanism is chosen, contract/*.yml and contract/*.yaml are read-only to the pipeline, and anything per-run happens in memory."
-      - "A FALSE GREEN IS THE FAILURE THIS EXISTS TO PREVENT, so every mechanism has to be judged against it first. A check that silently does not appear is indistinguishable from one that passed, to the dashboard, the promotion gate and the tickets alike."
-      - "It must hold at ~30 datasets: one absent table among thirty must not produce thirty banners, and the reds it does produce have to aggregate the way REQ-PIPE-064's holds already do."
+    - A FALSE GREEN IS THE FAILURE THIS EXISTS TO PREVENT, and every mechanism is judged against it first. A check that silently does not appear - or a card still showing the last run's pass - is indistinguishable from a check that passed, to the dashboard, the promotion gate and the tickets alike.
+    - THE COMMITTED CONFIGURATION IS NEVER REWRITTEN (Keith, 2026-09-30). contract/*.yml and contract/*.yaml are read-only to the pipeline; any per-run narrowing of what a tool runs happens in memory, as soda_common.readable_checks_yaml already does.
+    - NO MATCHING ON A TOOL'S OWN ERROR TEXT. Unreadable tables are left out before a tool runs, so nothing is sensitive to a tool's message wording; any tool error stays a failed run (criterion 15).
+    - A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING ELSE (Keith, 2026-09-27). The dataset-level signal is an outstanding item built from recorded qa metadata - qa.hold for a hold, the delivery file records for a contest - exactly as REQ-DASH-070's other items are.
+    - ASSERT AT THE LAYER THAT RECORDS, AND AT THE LAYER A PERSON SEES. Tests assert on qa rows written by the real orchestrator - the probe showed the helpers right and the recording wrong (37 ordinary verdicts against a held supply) - and the status rule (criteria 10 to 12) are asserted in the built dashboard, in a real browser, as gap 1's fix was (criterion 13).
+    - 'THE MINIMAL ALL-FOUR-TOOLS TEST the probe sketched: real dbt, Soda, datacontract-cli and Evidently on a scratch database, one table made unreadable in each way (absent, held, contested) for both collections, asserting that every check in each run''s baseline scope has exactly one of a tool verdict, its not-evaluated records, or its dataset''s open outstanding item - never two, never none. Against MOTHMAN_TEST_DSN, never the real supply database.'
+    - FAILING FIRST. Each of gaps 2, 3 and 4 is reproduced by a test confirmed red against the current code before the fix (CLAUDE.md's bug rule; these are logic defects, not wiring).
+    - 'IT HOLDS AT ~30 DATASETS: a dataset whose own table cannot be read is ONE red, not one per check; one unreadable table reddens only the checks that read it; terminal output stays one aggregated line per run (as held_blast_radius.describe and unrunnable.describe already do); and the reconciliation is one set comparison per tool per run.'
+    - A REASON NAMES TABLES AND SUPPLIES, NEVER ROW VALUES - it must stay safe to show on a dashboard that, in a real deployment, sits over child protection data.
+    - 'AUDITABLE AFTER THE RUN (scoper''s proposal, not yet put to Keith): each tool''s left-out set is recorded with the run, beside tables_read, so a later reader can see what the reconciliation compared rather than only that it passed.'
+    - 'NO NEW DEPENDENCY, NO NEW COMMAND AND NO NEW DISPLAY ELEMENT: the work is inside the orchestrators, qa_tools/common (outstanding.py among them), the status rule in both dashboard-data builders and the template, reached through mothman as today.'
+    - 'NOT BY COLOUR ALONE: the red carries the item''s reason in words, as REQ-DASH-133 criterion 11 requires of its own red.'
     dependencies:
-      - REQ-PIPE-078
-      - REQ-PIPE-059
+    - REQ-PIPE-078
+    - REQ-PIPE-079
+    - REQ-PIPE-105
+    - REQ-PIPE-064
+    - REQ-PIPE-131
+    - REQ-PIPE-144
+    - REQ-PIPE-118
     decisions:
-      - >
-        THE ABORT IS OURS, NOT dbt's - established 2026-09-30 by reading
-        `dbt_common._refuse_a_build_that_did_not_run`, and it corrects
-        the account given earlier the same day. dbt does NOT stop when a
-        model errors: it runs the rest of the DAG and writes
-        `run_results.json` with a per-node status, successes included.
-        Our code then finds any node with `status == "error"` and raises
-        `DbtRunFailed`, discarding every good result in the file. So the
-        healthy datasets' verdicts were computed and thrown away, which
-        is a much cheaper thing to fix than a tool that refuses to run.
-      - >
-        WHICH MAKES KEITH'S REFRAMING THE LIKELY ANSWER (his own,
-        2026-09-30): "I don't want to filter out the checks per se. I
-        just kind of want to say, hey, the entire table is red because
-        there's nothing there." Rather than preventing the tools from
-        seeing the missing table, let them report it and CLASSIFY what
-        comes back - keep the results that are real, turn the
-        table-does-not-exist errors into reds naming the table. It
-        needs no configuration manipulation at all, which is the part
-        he objected to.
-      - >
-        THE COST OF THAT ROUTE, stated so it is weighed rather than
-        discovered: it means matching on a tool's own error text, which
-        is version-sensitive and differs per tool. The mitigation is
-        that we never have to GUESS - the run already records which
-        tables it withheld and why (`Resolution.held`, REQ-PIPE-078), so
-        an error is only absorbed when it names a table we already know
-        is unreadable. Anything else stays a failed run, which is
-        criterion 6.
-      - >
-        THE EXCLUDE ROUTE IS BUILT FOR dbt ALREADY and should probably
-        stay whichever way this goes: `--exclude stg_<table>+`, where
-        the `+` is load-bearing because `dbt build` runs every test
-        DEPENDING on a selected node - three relationships tests
-        declared on readable models plus a cross-table singular test
-        still errored without it. It is graceful for dbt precisely
-        because dbt has a real selector; Soda, datacontract-cli and
-        Evidently have nothing equivalent, which is what made the same
-        approach ugly for them.
-      - >
-        REJECTED, PROVISIONALLY - THE EMPTY-VIEW IDEA (Keith's own,
-        2026-09-30, raised as a creative alternative worth considering:
-        "just having an empty view sitting there, maybe, so there's at
-        least something for it to point to"). It is attractive because
-        it needs no per-tool work at all. It is rejected pending the
-        research below because of what it does to the verdicts: over
-        zero rows a not-null check, a uniqueness check and a
-        referential check ALL PASS vacuously. That is a green table for
-        a supply nobody could place - precisely the false green NFR 2
-        exists to prevent, and worse than the crash because nobody
-        would look. A row-count check would go red, so the outcome is a
-        mostly-green table with one red on it, which reads as a minor
-        problem rather than an absent supply. Recorded rather than
-        dismissed, because a variant might survive - an empty view plus
-        a rule that a zero-row table is red whatever its checks say.
-      - >
-        WHAT A PERSON SEES IS PART OF THIS, and Keith named the
-        consequence himself: an absent table cannot be drilled into,
-        because there are no real column-level results underneath it.
-        So the dashboard needs a red row that is honest about being a
-        dead end, with a qualifier saying the table was not there -
-        rather than a red row that invites a click leading nowhere.
-        Whether that is this requirement's or a REQ-DASH sibling's is
-        open.
-    open_questions:
-      - >
-        RESEARCH FIRST, BEFORE ANY MORE BUILDING - Keith's explicit
-        instruction, 2026-09-30: "it might be worth some research online
-        and a bit of a deep dive before we do any further work". His
-        instinct is that this should be a solved problem: data not
-        arriving is the most ordinary thing that happens to a pipeline,
-        and every mature data-quality tool must have a position on it.
-        The question to answer is what dbt, Soda, datacontract-cli,
-        Evidently and the wider field (Great Expectations, Monte Carlo,
-        the freshness/volume-anomaly vendors) actually DO when an
-        expected table is absent - is it an error, a distinguished
-        "cannot evaluate" state, or a failure? Worth knowing before
-        inventing a fourth answer. NOTE the egress position: docs.soda.io
-        and docs.getdbt.com are reachable, datacontract.com is reachable,
-        and docs.evidentlyai.com is BLOCKED (CLAUDE.md's own list) - so
-        Evidently will need real experiment against the installed
-        package, which this project's own standing lesson says outranks
-        the docs anyway.
-      - >
-        DOES SODA SURVIVE A MISSING TABLE AT ALL? Unverified, and it
-        decides whether the intercept route works there. What actually
-        crashed in the probe was OUR OWN pre-flight `SELECT COUNT(*)`
-        over every CP table, before the scan started - which is a
-        one-line skip whatever else is decided. Whether the Soda scan
-        itself then reports a per-check error and completes, the way
-        dbt does, has not been tested.
-      - >
-        datacontract-cli AND Evidently ARE UNEXAMINED. Evidently is
-        likely the easiest - it reads one named table into a dataframe
-        rather than a whole schema, so the question is only whether the
-        tool is skipped for that run.
-      - >
-        IS THE HELD CASE THE SAME AS THE NEVER-ARRIVED CASE? Keith
-        raised it directly, and the answer shapes the scope: a table
-        with nothing promoted and nothing held is also absent, and the
-        checks blow up identically. If the two are one problem, this
-        requirement covers a great deal more than holds - which is an
-        argument for it existing separately, and possibly for it being
-        more valuable than the requirement that found it.
+      - "A CONTESTED TABLE IS A NEW, DATASET-SCOPED OUTSTANDING ITEM - 'Two files, choose one' (Keith, sign-off 2026-10-04, taking the recommendation). REJECTED widening the existing 'contested-file' item, which means the OPPOSITE case (one file claimed by several datasets, attributed to neither); one label for both would be the confusion REQ-PIPE-144 took care to avoid. Also accepted at sign-off as proposed: any other reason a run cannot read its own table is a failed run; held and contested outrank the slot reasons; each tool's left-out set is recorded with the run so the reconciliation can be audited."
+    - 'REDRAFTED 2026-10-04 BY delivery-scoper from the hand-drafted 2026-09-30 entry. The 2026-09-30 crash itself is SOLVED - in Child Protection an absent sibling no longer takes a run down, every tool leaves out exactly the checks over it, and each reappears as an ''unrunnable'' red naming the table - by REQ-PIPE-105 criterion 5''s tool filtering and REQ-PIPE-079''s unrunnable wiring. What is left is post-build-review #77''s gaps 2, 3 and 4, a dataset-level state, and the reconciliation.'
+    - 'GAP 1 IS BUILT, AND NOT THIS REQUIREMENT (commit 4559a75, 2026-10-04, a defect fix against REQ-PIPE-105 criterion 13 that Keith signed): qa_results_reader.RESULT_TOOLS reads ''unrunnable'' and ''held'' records, pipeline/build_cp_dashboard_data.py joins each to its real check''s card by check_id carrying not_evaluated, and the template shows ''not evaluated'' with the reason and a gap in the trend line. This requirement records per-check results ONLY under those two pseudo-tools (criterion 3) so that fix covers them. REJECTED a new pseudo-tool per reason, which would need another reader change.'
+    - 'ONE CLEAR DATASET-LEVEL RED, NOT A RED PER CHECK (Keith, 2026-10-04, REVERSING his choice earlier the same day). His words: ''where there''s a contested hold, all I really want to see is ... a data set level quite clearly that it''s red because it''s contested. I don''t necessarily need to see red on every single check.'' Applied alike to held, contested and Birth Registrations'' unreadable own table. REJECTED one not-evaluated red per own check - chosen earlier for honest counts, but forty identical reds on one dataset say one thing forty times and bury the reason.'
+    - 'THE SIGNAL REUSES REQ-DASH-070''s OUTSTANDING ITEM (Keith, 2026-10-04), plus ONE rule: while a ''held-supply'' or contested item is open, the dataset''s status for the period is RED and rolls up like any other red - the treatment REQ-DASH-133 gives a closed period with no supply. REJECTED a new dataset-level state recorded per run (the scoper''s first proposal): it would be a second record of what the hold store already says, and a new display element beside a marker that already exists. REJECTED leaving it as the existing ''Blocks a supply'' marker only: that marker sits BESIDE the status rather than being it, so the dataset could still read green - Keith wants it clearly red.'
+    - 'HOW THE COUNTS READ NOW, since honest counts were the reason for the rejected alternative: that dataset''s own checks read as NOT RUN for the period - never as passing, never the last run''s verdict carried forward (criterion 11) - and the dataset itself is one red, with its reason, rolling up to collection and agency. Nothing is counted as passing that was not evaluated, which was the point of the per-check reds; it is said once instead of per check.'
+    - 'OTHER DATASETS'' CROSS-TABLE CHECKS ARE UNCHANGED BY THAT REVERSAL (Keith, 2026-10-04): each check that READS a held or contested table still gets its own not-evaluated record, in its own dataset''s run, naming the table and saying held or contested (criteria 14 to 16). Those are other datasets'' checks, so a dataset-level red on the held or contested dataset would not tell their readers anything.'
+    - 'CONTESTED HAS NO OUTSTANDING ITEM TODAY, found checking Keith''s correction against the code. REQ-DASH-070''s ''contested-file'' kind is the OPPOSITE case: ONE FILE matching several datasets, attributed to neither and scoped to the collection with no dataset (outstanding._from_deliveries, from contested_by). Two files for ONE dataset - REQ-PIPE-105 criterion 6''s contest - raises nothing since that criterion retired the delivery-level hold kind on 2026-10-02, and REQ-PIPE-144''s own decisions call the two ''opposite cases''. ''held-supply'' does exist, dataset-scoped, from qa.hold, and covers held in both collections. So criterion 8 adds a dataset-scoped item for the contest - see open question 1 for whether it is a new kind or a widened ''contested-file''.'
+    - 'A HELD SUPPLY HAS NO PERIOD, so ''red for that period'' is judged by the item being open AS AT THE INSTANT ON SHOW (criterion 12), the same rule REQ-DASH-133 criterion 9 uses: the dataset reads red for whichever period is on show while the item is open. WORTH KNOWING: outstanding.survey() today reads only what is open NOW, so an as-of view of a past instant needs each item''s raised and resolved instants carried into the build - qa.hold has both (raised_at, resolved_by); the contest item will need the same.'
+    - 'REQ-PIPE-078 CRITERION 9 IS REWORDED, NOT BROKEN (Keith, 2026-10-04, option b of the scoper''s question): it forbids a TOOL VERDICT against a supply with no period, and allows a not-evaluated record. Needed because REQ-PIPE-144 criterion 13 (signed 2026-10-04) files a held contested pair to no period, and under the old wording the contested and Birth Registrations reds would have been forbidden the moment 144 landed. The original concern survives intact: a green, or any verdict that would have to be thrown away once the slot is known, never sits against no period.'
+    - 'THE ROUTE IS FILTER-BEFORE-RUN, IN MEMORY, and it is built: dbt --exclude stg_<table>+ (the + takes dependants with it), Soda via readable_checks_yaml, datacontract-cli by skipping on the shared tables_read declaration, Evidently by not evaluating. REJECTED Keith''s 2026-09-30 reframing of letting the tools error and classifying the errors - it needed per-tool, version-sensitive text matching, and filtering made it unnecessary. Old criterion 6 survives as criterion 18: any tool error is a failed run.'
+    - 'NO TOOL RUNS FOR A RUN WHOSE OWN TABLE IS UNREADABLE (criterion 6): every check in such a run''s scope is either the dataset''s own or reads its table, so nothing in it is evaluable. Birth Registrations already does this; Child Protection''s contested case currently runs all four tools to leave everything out. A run''s own table can be unreadable only through a hold or a contest - its own arrival carries it - so any other cause is a failed run (criterion 9, the scoper''s proposal) rather than a silent one.'
+    - REJECTED THE EMPTY-VIEW IDEA (Keith's own, 2026-09-30). Over zero rows a not-null, uniqueness or referential check passes vacuously, giving a mostly-green table for a supply nobody could place.
+    - THE RESEARCH-FIRST INSTRUCTION (Keith, 2026-09-30) IS SATISFIED FOR OUR FOUR TOOLS by the 2026-10-04 probe against the installed packages, which this project's standing lesson ranks above documentation. The wider-field survey (Great Expectations, Monte Carlo, the freshness and volume vendors) was judged unnecessary unless a real gap appears (Keith, 2026-10-04).
+    - 'THE OLD OPEN QUESTIONS, ANSWERED: Soda survives a missing table (after filtering), datacontract-cli and Evidently were examined and survive, and held versus never-arrived reach a sibling the SAME way today - both as ''absent'', because period_overlay.build applies a hold only to the run''s own table and a held supply has no filing, so it is never staged for a period. Keith, 2026-10-04: held must be named as held.'
+    - 'GAP 2, CAUSE, from the probe: run_pipeline_cp calls build_all(), which builds every run''s staging-time views before filing raises the hold, and rebuild_for_arrival returns None for an unfiled supply, so the held run keeps its own table readable and recorded 37 ordinary verdicts against a supply with no period. Its 12 held reds then landed under that period-less run while the three sibling runs reported the same 12 checks as ''unrunnable'' with ''no filled slot'' - two reds, two reasons, none saying held.'
+    - 'WHICH SIBLING RUNS SAY HELD (Keith, 2026-10-04, option B): only runs of arrivals received with the held supply - same delivery or same receipt instant. Under REQ-PIPE-131 that is the realistic case. REJECTED every run while any hold for the table is outstanding, which would redden another quarter''s checks for a file meant elsewhere; REJECTED only runs whose period the hold considered, which under 131 would rarely fire. A contested table is also found by any run whose own period overlay sees it contested, since until REQ-PIPE-144 lands a contested pair has a period.'
+    - 'HELD AND CONTESTED WIN THE REASON (criterion 15) - proposed by the scoper, following REQ-PIPE-079''s own most-specific-first rule: ''overdue'' would send somebody to chase a supplier who has already sent the file, and ''no filled slot'' hides that a file is waiting for a person.'
+    - 'THE RECONCILIATION COMPARES EACH TOOL''S LEFT-OUT SET against the not-evaluated records (Keith, 2026-10-04, option A). The probe found the two in agreement ONLY BY COINCIDENCE - dbt''s DAG exclusion happened to equal the declared reads; a dbt test downstream of an unreadable model with no tables_read declaration would be excluded and reddened by nobody. Scoped to the run''s scope, because a tool leaves checks out across the whole collection and qa_results_writer._scope_to_run discards those belonging to other runs. REJECTED FOR NOW, flagged as a maybe-later in plans/running-thoughts.md: comparing every active check in scope from the committed definitions against verdicts plus not-evaluated records - it would also catch a check silently producing nothing for some other reason, but is unproven on a clean run today and could refuse runs on day one.'
+    - 'A MISMATCH STOPS THE BATCH (Keith, 2026-10-04, option A), as any failed run does today: a mismatch is a configuration defect, not a data condition. REJECTED failing only that run and continuing, which needs a refused-run path the batch does not have. The cost - it fires only on the day a table happens to be unreadable - is what REQ-QAC-145''s configuration gate exists to remove.'
+    - 'GAP 4: Birth Registrations replaces all four tools with a function returning nothing when its one table is unreadable (orchestrate_bdm.py, the readable_in guard), leaving the reason only in tables_read. Held: the ''held-supply'' item already exists and becomes red under criterion 10. Contested: nothing exists today, and criterion 8''s item covers it. WORTH KNOWING: TestABirthRegistrationsRunWithNothingItMayRead''s fixture withholds the table as HELD (clone_run_views held=...) while its docstring describes the CONTESTED case; criterion 23 has it cover both.'
+    - 'NOT-EVALUATED STAYS DISTINGUISHABLE IN THE RECORD (Keith, 2026-10-04) as it is today - pseudo-tool, label, reason code, reason text. Status stays ''fail'' (red) or ''nodata'' (not yet due, REQ-PIPE-079 criterion 14), not a new status: the promotion gate already treats red as waiting for a person.'
+    - 'THE PROBE DID NOT EXERCISE the not-yet-due, overdue and awaiting-decision branches: its fixture''s period was not among the dataset''s slots, so unrunnable.supply_state returned None and every red took the catch-all. test_unrunnable.py covers the branches with stubbed states only. Criterion 20 requires the end-to-end version (Keith, 2026-10-04).'
+    - 'INTERACTION, REQ-PIPE-131 (signed 2026-10-04): a hold''s trigger becomes ''no slot of the dataset is open at the receipt instant'', so a held table is typically one whose dataset has no open slot in the siblings'' period, where unrunnable falls through to the catch-all today - precisely what criteria 14 and 15 correct.'
+    - 'INTERACTION, REQ-PIPE-144 (signed 2026-10-04): the held reason''s detail - slots considered, why each was unavailable - comes from qa.hold.reason (144 criterion 6), never from qa.filing; and 144 criterion 13''s period-less contested pair is why REQ-PIPE-078 criterion 9 is reworded (criterion 21).'
+    - 'INTERACTION, REQ-PIPE-118 (signed 2026-10-04): a newer file supersedes every earlier unaccepted version, so a contested table can arise only from ONE arrival carrying several files (118 criterion 13), and the 2026-10-02 Birth Registrations case of a same-day resupply beside an unpromoted red supply stops being contested. A superseded supply is not a candidate at all, so it is never ''unreadable'' under this requirement.'
+    open_questions: []
+    - 1. WHAT KIND OF OUTSTANDING ITEM IS A CONTESTED TABLE? (A) A NEW dataset-scoped kind (e.g. 'contested-supply', labelled something like 'Two files, choose one'), built from REQ-PIPE-144's per-delivery contested view - keeps 'Contested file' meaning what it means today. (B) WIDEN 'contested-file' to cover both cases - no new kind, but one label would then mean two opposite things (one file claimed by two datasets, attributed to neither; two files claiming one dataset), which REQ-PIPE-144 already took care to keep apart. RECOMMENDED (A). Criterion 8's wording follows the answer.
   - id: REQ-TEST-116
     title: A bootstrap does in parallel what does not depend on order, and produces the same history either way
     date_written: "2026-10-03"
@@ -27336,3 +27276,31 @@ requirements:
       - "_MANIFEST BUILD ORDER SETTLED (Keith, 2026-10-04): only REQ-PIPE-130's slot view is built early in the batch; the rest of 130, including _manifest, is built after REQ-PIPE-141 and therefore after this requirement, so _manifest is written once against the receipt view and never repointed."
       - "_manifest's received_at is a timestamptz instant, not the recorded text (Keith: 'an actual date time timestamp rather than a string of text'). The text with the writer's offset stays in our own records on qa.delivery_file, where REQ-PIPE-069 criterion 5 protects it."
     open_questions: []
+
+  - id: REQ-QAC-145
+    title: Every dbt test that would be dropped with a table declares that it reads it - checked from configuration, before any run
+    date_written: '2026-10-04'
+    story: As whoever maintains the QA checks, I want a configuration gate to refuse any dbt test that dbt would drop along with a table it does not declare reading, so that an undeclared cross-table read is caught when the check is written rather than by stopping a whole batch on the day that table first happens to be unreadable.
+    moscow: should
+    status: not_started
+    source: delivery-scoper's suggestion while redrafting REQ-PIPE-115, 2026-10-04; Keith asked for it as its own small requirement the same day.
+    acceptance_criteria:
+    - THE SYSTEM SHALL, for every staging model, list the dbt tests that dbt's own downstream selector (stg_<table>+) selects, using dbt itself rather than a copy of its graph.
+    - IF a test so listed neither belongs to that table's own dataset nor declares that table in its reads_tables, THEN THE SYSTEM SHALL fail the gate, naming the test and the table it would be dropped with.
+    - THE SYSTEM SHALL run the gate from committed configuration alone, with no reachable database and no supply data.
+    - THE SYSTEM SHALL run the gate in .github/workflows/validate-config.yml, through a mothman command.
+    - THE SYSTEM SHALL have a test showing that the gate fails for a dbt test that reads a second model without declaring it, and passes for the repository's own dbt project.
+    non_functional_requirements:
+    - 'MOTHMAN IS THE ONLY ACCESS POINT: the gate is a mothman subcommand (or part of an existing validate-* command), added in the same change, never a bare script in the workflow.'
+    - 'NO DATABASE, NO DATA: verified 2026-10-04 by experiment - ''dbt ls --select stg_cp_clients+ --resource-type test'' ran with placeholder connection variables and an unreachable host, and listed 15 tests (11 own, 3 relationships tests from other models, 1 cross-table singular test) in about ten seconds. DBT_RUN_SCHEMA and the DBT_PG_* variables must be set to placeholders; validate-config.yml must also run the one-time dbt deps step, since dbt_utils macros are needed to parse.'
+    - 'COST: one dbt parse per gate run, about ten seconds; one dbt ls per staging model (seven today, ~30 at target scale) should reuse that parse rather than re-parsing.'
+    - A FAILURE NAMES THE TEST AND THE TABLE, so the fix - add the reads_tables declaration - is obvious from the message alone.
+    dependencies:
+    - REQ-PIPE-115
+    decisions:
+    - dbt ONLY. dbt is the one tool that leaves checks out by its OWN graph (--exclude stg_<table>+), so it is the one place what is left out can differ from what is declared. Soda, datacontract-cli and Evidently leave checks out BY the reads_tables declaration itself, so they cannot disagree with it.
+    - 'DERIVED FROM dbt, NOT FROM SHAPES. tables_read.undeclared_cross_table() already flags five SHAPES of cross-table check by pattern and says of itself that a clean result is not a proof - six real joins once hid beneath it. This gate asks dbt what it would actually drop, which is exactly what REQ-PIPE-115''s reconciliation compares at run time. Kept ALONGSIDE the shape gate, not instead of it: that one also covers Soda and the contracts.'
+    - 'WHY IT EXISTS (REQ-PIPE-115''s decisions): a run-time mismatch stops the whole batch, and it fires only on the day a table happens to be unreadable. Catching it from configuration moves the failure to when the check is written, in front of the person writing it.'
+    - REJECTED putting it inside REQ-PIPE-115 - Keith asked for small, self-contained requirements, and this is independently useful and independently testable.
+    open_questions:
+      - "PARKED (Keith, 2026-10-04): 'we may or may not decide to keep dbt, but I would like to keep the shape of this check in place for when we have settled the tools.' Not to be signed or built until the tool set is settled; then restate it for whichever tools survive. The shape to keep: for every check a tool would drop when a table is unreadable, the check must belong to that table's dataset or declare the table it reads - verified from configuration alone, in CI."

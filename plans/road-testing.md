@@ -1616,3 +1616,12 @@ judgement about who reads the page rather than about the rule.
       `slaProperties` deleted entirely including `frequency`. 112 - the
       timezone stays in data-asset.yaml and is versioned now. 113 -
       deduplicated against REQ-PIPE-134.
+    - **REQ-PIPE-115 SIGNED, REQ-QAC-145 PARKED, 2026-10-04 (Keith).** 115:
+      a dataset whose own table cannot be read shows ONE red for the period
+      that rolls up (REVERSING the earlier per-check choice - "all I really
+      want to see is ... a data set level quite clearly that it's red
+      because it's contested"); held reuses REQ-DASH-070's item, contested
+      gets a new 'Two files, choose one' kind. 145 (CI: every dbt test
+      dropped with a table declares it reads it): "we may or may not decide
+      to keep dbt, but I would like to keep the shape of this check" -
+      registered unsigned with a PARKED open question.
