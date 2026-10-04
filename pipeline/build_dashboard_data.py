@@ -35,7 +35,7 @@ from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import parse_cadence_from_contract
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
-from pipeline import closed_slots, recorded_arrival, slot_timeline
+from pipeline import acknowledgements, closed_slots, recorded_arrival, slot_timeline
 from qa_tools.common import promotion_state
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
@@ -504,6 +504,9 @@ def build() -> dict:
         # 10) - see pipeline/closed_slots.py. The page compares instants;
         # it never re-derives closing.
         "closedSlots": closed_slots.for_dataset("birth-registrations"),
+        # WHICH PROMOTED AMBER SUPPLIES WERE ACKNOWLEDGED (REQ-PIPE-122
+        # criterion 21), keyed by run - see pipeline/acknowledgements.py.
+        "acknowledgements": acknowledgements.for_dataset("birth-registrations"),
         "promotionState": promotion_state.state_for(
             "birth-registrations").as_record(),
         "arrivalHistory": arrival_history,

@@ -93,7 +93,7 @@ class TestMarkingIt:
                 action=dl.PROMOTE, supply="cp-placements@k1", actor=REAL_PERSON,
                 actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2024-Q2")):
             pass
-        with pytest.raises(dl.DecisionRefused, match="so it was supplied"):
+        with pytest.raises(dl.DecisionRefused, match="so it is answered.*demote"):
             _mark(conn, "cp-placements", "2024-Q2")
 
     def test_only_a_person_with_a_reason_may_mark(self, conn):
@@ -177,8 +177,8 @@ class TestWhatTheBuildEmbeds:
 
         _mark(conn, "cp-notifications", "2025-Q1", reason="nothing that quarter")
         got = {s["period"]: s for s in closed_slots.for_dataset("cp-notifications", conn, now=LATER)}
-        assert got["2025-Q1"]["mark"]["reason"] == "nothing that quarter"
-        assert got["2025-Q1"]["markedAt"] and got["2025-Q1"]["closesAt"]
+        assert got["2025-Q1"]["marks"][-1]["reason"] == "nothing that quarter"
+        assert got["2025-Q1"]["marks"][-1]["at"] and got["2025-Q1"]["closesAt"]
         assert [s["index"] for s in got.values()] == sorted(s["index"] for s in got.values())
 
     def test_a_slot_filled_after_it_closed_was_still_a_gap_and_says_when(self, conn):
@@ -190,7 +190,7 @@ class TestWhatTheBuildEmbeds:
                 actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2025-Q2")):
             pass
         got = {s["period"]: s for s in closed_slots.for_dataset("cp-placements", conn, now=LATER)}
-        assert got["2025-Q2"]["filledAt"], "a late fill ends the gap from that instant on"
+        assert got["2025-Q2"]["changes"][-1]["held"], "a late fill ends the gap from that instant on"
 
     def test_a_slot_not_yet_closed_is_not_listed(self, conn):
         from pipeline import closed_slots
@@ -255,3 +255,77 @@ class TestARejectedSupplyLeavesItsPeriodEmpty:
         assert got["2025-Q1"]["rejected"]["reason"] == "supplier is resending"
         assert got["2025-Q1"]["rejected"]["actor"] == REAL_PERSON
         assert got["2025-Q1"]["filedAt"] is None
+
+
+class TestAnEmptiedPeriodIsAGapAgain:
+    """delivery-critic, 2026-10-05 (#105), HIGH: closed_slots recorded only
+    the FIRST fill, so a closed period filled and then emptied again -
+    substituted then de-substituted, or promoted then demoted - read as
+    filled on the page for ever while the queue said it needed a person."""
+
+    def test_a_de_substitution_after_the_close_reopens_the_gap(self, conn):
+        from pipeline import closed_slots
+
+        with dl.apply_decision(conn, dl.Decision(
+                agency_id="a", collection_id="c", dataset_id="cp-clients",
+                action=dl.SUBSTITUTE, supply="cp-clients@kx", actor=REAL_PERSON,
+                actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2025-Q2",
+                stands_on="2025-Q1", reason="stand on Q1")):
+            pass
+        undone = (LATER + timedelta(days=2)).isoformat()
+        with dl.apply_decision(conn, dl.Decision(
+                agency_id="a", collection_id="c", dataset_id="cp-clients",
+                action=dl.DE_SUBSTITUTE, supply="cp-clients@kx", actor=REAL_PERSON,
+                actor_kind=dl.PERSON, effective_at=undone, from_slot="2025-Q2",
+                reason="undo")):
+            pass
+        got = {s["period"]: s for s in closed_slots.for_dataset(
+            "cp-clients", conn, now=LATER + timedelta(days=5))}
+        changes = got["2025-Q2"]["changes"]
+        assert [c["held"] for c in changes][-2:] == [True, False]
+
+
+class TestASupplyWaitingInAClosedPeriodIsNotAGap:
+    """delivery-critic, 2026-10-05 (#105), MEDIUM-HIGH: after a rejection, a
+    resupply filed to the same period still read REJECTED and closed, so it
+    was listed as 'no supply' and could be marked not supplied
+    (REQ-PIPE-132 criteria 3 and 6)."""
+
+    def test_the_resupply_reads_awaiting_and_the_mark_is_refused(self, conn):
+        from qa_tools.common import filing
+
+        with dl.apply_decision(conn, dl.Decision(
+                agency_id="a", collection_id="c", dataset_id="cp-investigations",
+                action=dl.REJECT, supply="cp-investigations@s1", actor=REAL_PERSON,
+                actor_kind=dl.PERSON, effective_at=LATER.isoformat(),
+                from_slot="2024-Q3", reason="bad file")):
+            pass
+        conn.execute("INSERT INTO qa.delivery (name, received_at, received_instant) VALUES "
+                     "('pytest-resupply-s2', '2024-09-05T01:00:00+00:00', "
+                     "'2024-09-05T01:00:00+00:00') ON CONFLICT DO NOTHING")
+        conn.execute(
+            f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, delivery) "
+            "VALUES ('cp-investigations', 'cp-investigations@s2', '2024-Q3', 'pytest', "
+            "'pytest-resupply-s2') "
+            "ON CONFLICT (dataset_id, supply_id) DO UPDATE SET slot = EXCLUDED.slot")
+        filings = {"2024-Q3": {"supply_id": "cp-investigations@s2"}}
+        got = _state(conn, "cp-investigations", "2024-Q3", filings=filings)
+        assert got.state == slot_state.AWAITING_DECISION and not got.closed
+        with pytest.raises(dl.DecisionRefused, match="waiting for a decision"):
+            _mark(conn, "cp-investigations", "2024-Q3")
+
+
+class TestTheRefusalNamesTheRightUndo:
+    """delivery-critic #105: marking a substituted period named `demote` of
+    the supply it stands on, which is itself refused - the undo is
+    de-substitute."""
+
+    def test_a_substituted_period_names_de_substitute(self, conn):
+        with dl.apply_decision(conn, dl.Decision(
+                agency_id="a", collection_id="c", dataset_id="cp-notifications",
+                action=dl.SUBSTITUTE, supply="cp-notifications@k0", actor=REAL_PERSON,
+                actor_kind=dl.PERSON, effective_at=LATER.isoformat(), to_slot="2025-Q2",
+                stands_on="2025-Q1", reason="stand on Q1")):
+            pass
+        with pytest.raises(dl.DecisionRefused, match="--operation de-substitute"):
+            _mark(conn, "cp-notifications", "2025-Q2")

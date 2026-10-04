@@ -7,16 +7,18 @@ is REQ-PIPE-131's rule (the next calendar period's claim window opening),
 and the page must never re-derive it: this embeds each slot's closing
 instant, and the page only compares it with the instant on show.
 
-ONLY SLOTS THAT WERE A GAP WHEN THEY CLOSED: unfilled, with nothing filed
-to them, at their closing instant. A slot filled or filed before it closed
-was never a gap, and a daily feed's thousand ordinary slots would
-otherwise ride along to say so.
+ONLY SLOTS THAT WERE A GAP WHEN THEY CLOSED, OR HAVE CHANGED SINCE: a
+slot held or filed at its close and untouched since was never a gap, and a
+daily feed's thousand ordinary slots would otherwise ride along to say so.
+A slot emptied AFTER its close - de-substituted, demoted, re-filed out -
+is included, because it is a gap from that instant on.
 
 For each, the page reads, as at a date D:
   - not yet closed (closesAt > D)            -> not a gap yet
-  - filled or filed by D                    -> not a gap any more
+  - held at D (its last change by D)         -> not a gap
+  - a supply filed by D that nobody rejected -> not a gap (it is waiting)
   - a filed supply rejected after D          -> not a gap yet (waiting)
-  - marked as not supplied by D             -> not supplied (accepted)
+  - a mark by D, after the last change by D -> not supplied (accepted)
   - otherwise                               -> closed, no supply (red)
 
 RECORDED QA METADATA ONLY: the schedule (configuration), qa.decision
@@ -38,12 +40,22 @@ def _iso(value) -> str | None:
 
 def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
                 now: datetime | None = None) -> list[dict]:
-    """[{period, index, closesAt, filledAt, filedAt, markedAt, mark}] for
-    every slot of this dataset that was a gap when it closed, oldest first.
-    `index` is the slot's position in the dataset's own schedule, so the
-    page can group CONSECUTIVE gaps (criterion 7) without the calendar."""
-    from qa_tools.common import asset_time
+    """[{period, index, closesAt, changes, filedAt, marks, rejected}] for
+    every closed slot of this dataset that was a gap at its close OR has
+    changed since - oldest first. `index` is the slot's position in the
+    dataset's own schedule, so the page can group CONSECUTIVE gaps
+    (criterion 7) without the calendar.
+
+    `changes` is every change to what the slot HOLDS, [{at, held}], from
+    qa.slot_holds via pipeline/slot_timeline.py - the one statement of
+    which decisions fill and which empty. The first cut recorded only the
+    first fill, so a period filled and then emptied again read as filled
+    for ever (delivery-critic #105). `marks` is every mark that it was
+    not supplied; one stands only until the slot next changes."""
+    from qa_tools.common import asset_time, supply_holds
     from qa_tools.common import slots as slots_mod
+
+    from pipeline import slot_timeline
 
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:closed-slots") as opened:
@@ -55,8 +67,7 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     except (ValueError, KeyError, FileNotFoundError):
         return []
     # WHAT WAS FILED TO EACH SLOT, by each supply's own receipt
-    # (qa.supply_receipt, REQ-PIPE-144) - a file received before the slot
-    # closed means the slot was not a gap then.
+    # (qa.supply_receipt, REQ-PIPE-144).
     filed: dict[str, list[tuple[str, str]]] = {}
     for slot, supply, at in conn.execute(
             "SELECT f.slot, f.supply_id, min(r.received_instant) FROM qa.filing f "
@@ -65,54 +76,50 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
             "WHERE f.dataset_id = ? AND f.slot IS NOT NULL "
             "GROUP BY f.slot, f.supply_id ORDER BY 3", [dataset_id]).fetchall():
         filed.setdefault(slot, []).append((supply, _iso(at)))
-    decisions = conn.execute(
-        f"SELECT action, to_slot, effective_at, actor, reason, supply FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? ORDER BY effective_at, id", [dataset_id]).fetchall()
-    filled_at: dict[str, str] = {}
-    marks: dict[str, dict] = {}
     # A REJECTED SUPPLY LEAVES ITS PERIOD EMPTY (REQ-DASH-133 criterion 1's
     # exception, REQ-PIPE-153 criterion 9): from the rejection on, its
-    # filing no longer counts, and the period says what happened to it
-    # rather than that nothing came.
+    # filing no longer counts, and the period says what happened to it.
     rejected: dict[str, dict] = {}
-    for action, to_slot, effective_at, actor, reason, supply in decisions:
+    marks: dict[str, list[dict]] = {}
+    for action, to_slot, effective_at, actor, reason, supply in conn.execute(
+            f"SELECT action, to_slot, effective_at, actor, reason, supply "
+            f"FROM {decision_log.TABLE} WHERE dataset_id = ? AND action IN (?, ?) "
+            "ORDER BY effective_at, id",
+            [dataset_id, decision_log.REJECT, decision_log.MARK_NOT_SUPPLIED]).fetchall():
         if action == decision_log.REJECT and supply:
             rejected.setdefault(supply, {"at": _iso(effective_at), "actor": actor,
                                          "reason": reason or ""})
-        if not to_slot:
-            continue
-        if action in (decision_log.PROMOTE, decision_log.REFILE, decision_log.SUBSTITUTE,
-                      decision_log.INHERIT):
-            filled_at.setdefault(to_slot, _iso(effective_at))
-        elif action == decision_log.MARK_NOT_SUPPLIED:
-            marks.setdefault(to_slot, {"at": _iso(effective_at), "actor": actor,
-                                       "reason": reason or ""})
+        elif action == decision_log.MARK_NOT_SUPPLIED and to_slot:
+            marks.setdefault(to_slot, []).append(
+                {"at": _iso(effective_at), "actor": actor, "reason": reason or ""})
+    changes: dict[str, list[dict]] = {}
+    for entry in slot_timeline.for_dataset(dataset_id, conn):
+        changes.setdefault(entry["slot"], []).append(
+            {"at": entry["at"], "held": entry["supply"] is not None})
     failed_keys = _failed_load_keys(conn, dataset_id)
     out = []
     for index, slot in enumerate(own):
         if slot.closes_at is None or slot.closes_at > now:
             continue
         closes = slot.closes_at
-        filled = filled_at.get(slot.name)
+        own_changes = changes.get(slot.name, [])
         live = [at for supply, at in filed.get(slot.name, []) if supply not in rejected]
         gone = [(supply, at) for supply, at in filed.get(slot.name, []) if supply in rejected]
         filed_first = min(live) if live else None
-        if filled and datetime.fromisoformat(filled) <= closes:
-            continue
-        if filed_first and datetime.fromisoformat(filed_first) <= closes:
+        at_close = [c for c in own_changes if datetime.fromisoformat(c["at"]) <= closes]
+        held_at_close = bool(at_close) and at_close[-1]["held"]
+        changed_since = any(datetime.fromisoformat(c["at"]) > closes for c in own_changes)
+        filed_by_close = filed_first and datetime.fromisoformat(filed_first) <= closes
+        if (held_at_close or filed_by_close) and not changed_since and not gone:
             continue
         rej = None
         if gone and not live:
             supply, received = gone[-1]
-            from qa_tools.common import supply_holds
-
             rej = {**rejected[supply], "supply": supply, "receivedAt": received,
                    "failedLoad": supply_holds.arrival_key_of(supply) in failed_keys}
-        mark = marks.get(slot.name)
         out.append({"period": slot.name, "index": index, "closesAt": closes.isoformat(),
-                    "filledAt": filled, "filedAt": filed_first,
-                    "markedAt": mark["at"] if mark else None, "mark": mark,
-                    "rejected": rej})
+                    "changes": own_changes, "filedAt": filed_first,
+                    "marks": marks.get(slot.name, []), "rejected": rej})
     return out
 
 

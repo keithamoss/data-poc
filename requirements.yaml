@@ -1609,7 +1609,12 @@ requirements:
       as effectively red), so that "amber" doesn't sit ambiguous
       forever.
     moscow: should
-    status: built
+    status: retired
+    retired:
+      date: "2026-10-05"
+      by: Keith
+      replaced_by: [REQ-PIPE-122]
+      reason: "Retired by REQ-PIPE-122 criterion 23, signed by Keith 2026-10-04: the per-run /accept and /reject-on-amber on the old per-dataset ticket, matched to a run by comment timestamp, predates supplies, slot tickets and the decision log, and two acknowledgement mechanisms would disagree. ACKNOWLEDGE - a filing decision on both routes - replaces it, and its one criterion (a decision on amber recorded and shown on the dashboard) is carried by REQ-PIPE-122 criterion 21. A rejection of an amber supply remains the ordinary reject decision. qa_tools/common/acceptance_sync.py, its tests, `mothman github sync-acceptances` and the dashboard's AMBER_DECISIONS badge were removed 2026-10-05."
     signed_off:
       by: Keith
       date: "2026-09-20"
@@ -12470,12 +12475,7 @@ requirements:
       by: Keith
       date: "2026-09-26"
     acceptance_criteria:
-      - >
-        THE SYSTEM SHALL record every filing decision - promote, reject,
-        demote, re-file and mark as not supplied - as an entry in one
-        append-only log, and SHALL NOT keep a second record of any of
-        them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion
-        13.
+      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied and acknowledge - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 and REQ-PIPE-122 criterion 22.
       - >
         THE SYSTEM SHALL record, with each entry, the actor, the instant
         the decision took effect, the instant the entry was written, the
@@ -12878,10 +12878,7 @@ requirements:
       by: Keith
       date: "2026-09-26"
     acceptance_criteria:
-      - >
-        WHEN a delivery's QA has completed and a supply's status is
-        green or amber and its assigned slot is unfilled, THE SYSTEM
-        SHALL promote that supply into its period's schema.
+      - 'WHEN a delivery''s QA has completed and a supply''s status is green, or amber where its amber setting resolves to promote-and-acknowledge or promote (REQ-PIPE-122), and its assigned slot is unfilled, THE SYSTEM SHALL promote that supply into its period''s schema. AMENDED 2026-10-05 by REQ-PIPE-122 criterion 22: under hold an amber supply waits for a person.'
       - >
         THE SYSTEM SHALL take the status this gate reads from EVERY
         check that contributes to that dataset's status - its own table-level and column-level checks, the cross-table checks it
@@ -15433,16 +15430,7 @@ requirements:
       the write path 2026-09-22. Scoped by delivery-scoper, batch 4,
       2026-09-26.
     acceptance_criteria:
-      - >
-        THE SYSTEM SHALL accept promote, reject, demote, re-file,
-        substitute, de-substitute, inherit, un-inherit and mark as not
-        supplied as structured filing decisions raised on the GitHub
-        ticket for the SLOT they concern - one dataset in one period,
-        per REQ-PIPE-083 - so that the period a decision applies to
-        comes from the ticket's own identity rather than from anything
-        stated in the body. Every criterion below that says "a filing
-        decision" SHALL mean any one of those nine. AMENDED 2026-10-05
-        by REQ-PIPE-132 criterion 13 (mark as not supplied).
+      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied and acknowledge as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those ten. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied) and REQ-PIPE-122 criterion 22 (acknowledge).
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
@@ -25244,7 +25232,51 @@ requirements:
       date: "2026-10-04"
     story: "As manager of a data team, I want to choose for the whole asset, and for particular collections or datasets, whether an amber supply waits for a person, promotes and asks a person to acknowledge it, or simply promotes, so that problematic collections on the quarterly asset get a person's eyes on every amber while routine amber elsewhere goes through without becoming a queue nobody reads."
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05: tests/test_amber_setting.py (30 tests) green - the three values
+      strictest first in the schema and the asset file''s own comment; an unknown
+      value, a missing asset level and an agency-level setting all refused by
+      the schema gate; nearest level wins; the version in effect at the decision''s
+      own instant, a level with only future versions falling through, and no default;
+      a past version altered (whatever its changelog) or removed refused, a new
+      version dated before today refused except on a synthetic asset, today and
+      the future accepted; hold refuses amber in words that never say ''held'';
+      an amber promotion records value, level and version with acknowledgement_owed
+      derived; acknowledge recorded with a reason and changing nothing a period
+      resolves to, refused when not owed, twice, for a supply not promoted, without
+      a reason, and lapsed once the supply is demoted; both new states need a
+      person and are in the queue, acknowledge offered first on a promotion owing
+      one; the hold''s withheld note recorded once with the setting it acted under.'
+    - '2026-10-05: tests/test_dashboard_e2e.py::TestAcknowledgementBadge - in
+      a real browser the badge reads nothing before the promotion, ''awaiting
+      acknowledgement'' after it and ''Acknowledged by'' after the acknowledgement,
+      as at the date on show.'
+    - '2026-10-05: REQ-QAC-017 retired; acceptance_sync.py, its 236-line test
+      module, `mothman github sync-acceptances` and the AMBER_DECISIONS embed
+      removed; the one helper the leaderboard used moved into it.'
+    implemented_by:
+    - qa_tools/common/amber_setting.py::resolve
+    - qa_tools/common/amber_setting.py::past_change_problems
+    - qa_tools/common/schemas.py::AmberSetting
+    - qa_tools/common/validate_schedule.py::_amber_setting_errors
+    - qa_tools/common/promotion.py::should_promote
+    - qa_tools/common/promotion.py::after_run
+    - qa_tools/common/promotion.py::_record_amber_waiting
+    - qa_tools/common/acknowledgement.py::why_not_owed
+    - qa_tools/common/acknowledgement.py::owed
+    - qa_tools/common/decision_log.py::_judge
+    - qa_tools/common/filing_decisions.py::_apply_one
+    - qa_tools/common/slot_state.py::state_of
+    - qa_tools/common/filing_queue.py::operations_for
+    - pipeline/acknowledgements.py::for_dataset
+    - dashboard/qa-reporting-dashboard.template.html::acknowledgementBadge
+    linked_tests:
+    - tests/test_amber_setting.py
+    - tests/test_dashboard_e2e.py::TestAcknowledgementBadge
+    - tests/test_filing_decisions.py
+    - tests/test_filing_queue.py
+    - tests/test_cli_filing_tui.py
     source: "Keith, 2026-10-03 ('OPTION A, ROUND TWO') and the group 2 sign-off round 2026-10-04 (plans/road-testing.md #16 - 'Amber acknowledgement', 'AMBER: ONE SETTING, THREE VALUES', 'AMBER VALUE ORDER'). Redrafted by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL read one amber setting from contract/data-asset.yaml, taking exactly one of three values - hold, promote-and-acknowledge, promote - at data asset level and optionally at collection and dataset level."
@@ -25290,6 +25322,31 @@ requirements:
       - "EFFECTIVE-DATED, VERSIONED LIKE CALENDARS (Keith, 2026-10-04, amendment wording approved). A setting change must never repaint history: past states are read from what each decision recorded, and past versions are frozen outright - see the 'A SETTING'S PAST IS FROZEN OUTRIGHT' decision, which replaced this sentence's original 'protected by the calendars' own retrospective-edit guard'. The version is picked by the instant the decision takes effect - what the rule actually knew when it acted."
       - "A SETTING'S PAST IS FROZEN OUTRIGHT, WITH ONE SYNTHETIC EXCEPTION (Keith, 2026-10-04 afternoon), REPLACING the morning's 'match calendars' guard and 'no synthetic exception'. Those two answers rested on a framing - offered by the main session - that described REQ-PIPE-050's say-what-you-did guard as 'how calendars work' without saying REQ-PIPE-111 recorded Keith's 2026-09-28 decision to drop it; the calendar question is parked (plans/road-testing.md #16). Settings are separable from it because a setting's past is RECORDED, not computed: every automatic decision records the setting, level and version it was taken under, and the past is read from that record, so a past setting version is inert - changing it would re-judge nothing, and a wrongly-set past version genuinely was the setting at the time. So there is nothing to correct, and freezing costs nothing: no change or removal of a past version, no past-dated new version. The synthetic asset alone may add past-dated versions, because its whole history is regenerated from configuration on every bootstrap - which is how REQ-GEN-136's eras are written. REJECTED a changelog-line correction route for settings (nothing ever needs correcting) and REJECTED waiting on the calendar decision (settings do not share calendars' re-judging problem)."
       - "'HELD' IS TAKEN (pre-build UX review, accepted by Keith, 2026-10-04): it already means a supply filed to no slot, so an amber supply waiting under hold needs a different word."
+      - 'THE ASSET STATES promote (PROVISIONAL, 2026-10-05): unchanged from before
+        the setting existed, so the demo corpus behaves as it did. Setting a collection
+        to promote-and-acknowledge is one version in contract/data-asset.yaml; it
+        was not done unasked because it would put an acknowledgement item on every
+        amber supply of that collection in the queue.'
+      - 'HOLD IS A WITHHELD NOTE, NOT A NEW ACTION (2026-10-05): the rule records
+        promotion-withheld - the action that already existed for automation standing
+        back and had no writer left - carrying the setting, level and version it
+        stood back under. slot_state reads that record to say AMBER_WAITING rather
+        than AWAITING_DECISION, so the past is read from what was recorded (criterion
+        5). Recorded once per supply; a retry finds it.'
+      - 'ACKNOWLEDGEMENT_OWED IS DERIVED IN THE TABLE (2026-10-05): a generated
+        column, true exactly for a promote recorded under promote-and-acknowledge,
+        so the debt and the setting it came from can never disagree. Lapse is not
+        recorded at all: owed() asks qa.slot_holds whether the supply is still what
+        its period holds.'
+      - 'A SECOND ACKNOWLEDGEMENT IS REFUSED, NOT ''ALREADY SO'' (2026-10-05): REQ-GHUB-082
+        criterion 26 treats a repeat that changes nothing as success, but criterion
+        14 here names ''already acknowledged'' among the refusals, and the more
+        specific criterion wins.'
+      - 'THE FROZEN-PAST GUARD READS THE PREVIOUS FILE ONCE (2026-10-05): it shares
+        validate_schedule''s diff_base() and git show with the calendar guard, cached
+        per validation run, so the gate still makes one read. Synthetic must be
+        declared BEFORE and AFTER the change, so the declaration cannot be added
+        in the same edit that uses it.'
     open_questions: []
 
 
@@ -25733,6 +25790,12 @@ requirements:
       - 'REQ-QAC-108 CRITERION 17''s OTHER HALF lands here: drift_reference treats
         a period marked as not supplied as dealt with - said in the reason, never
         counted as a gap.'
+      - 'A FILED SUPPLY NOBODY REJECTED OUTRANKS THE DECISION THAT EMPTIED ITS SLOT
+        (delivery-critic #105, 2026-10-05). After a rejection, a resupply filed
+        to the same period read REJECTED and closed, so it was listed as ''no supply''
+        and could be marked not supplied - against criteria 3 and 6. state_of now
+        reads it AWAITING_DECISION and not closed, and mark() refuses any filing
+        nobody rejected, with each remedy a command that pastes.'
     open_questions: []
 
   - id: REQ-DASH-133
@@ -25828,6 +25891,23 @@ requirements:
       came. Between receipt and rejection it was waiting, not a gap. This is criterion
       1''s exception carried past the failed load''s own blocker, which closes
       on the rejection.'
+    - 'THE BUILD EMBEDS EVERY CHANGE TO WHAT A SLOT HOLDS, NOT ITS FIRST FILL
+      (delivery-critic #105, 2026-10-05). The first cut recorded a slot''s first
+      fill and first mark and re-stated which decisions fill, so a closed period
+      substituted then de-substituted - or promoted then demoted - read as filled
+      for ever: a false green. closed_slots now takes the slot''s changes from
+      qa.slot_holds via slot_timeline, the one statement of that rule, and the
+      page reads the last change by the date on show; a mark stands only until
+      the slot next changes, as not_supplied.marked() already said.'
+    - 'A SUPPLY WAITING FOR A DECISION IS NOT A GAP, closed or not (2026-10-05):
+      a filing nobody rejected means a supply is here, whether it is a resupply
+      after a rejection or a supply a person put back. The page and the queue
+      now agree on that.'
+    - 'THE QUEUE ON THE PAGE IS READ AS AT THE DATE ON SHOW (UX critic #104, 2026-10-05):
+      closed periods come from the page''s own as-of reading, never the build''s
+      list, and anything else the build observed after the date is left out. Such
+      an item is pilled ''Makes its dataset red'' - the queue''s copy used to
+      say everything but holds, contests and failed loads changes no status.'
     open_questions: []
 
   - id: REQ-PIPE-134

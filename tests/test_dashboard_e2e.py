@@ -679,196 +679,44 @@ class TestTicketBadge:
         assert clean_page.locator("a.pill.tag[href*='github.com'][href*='issues']").count() == 0
 
 
-def _real_amber_bdm_runs() -> list[tuple[str, str]]:
-    """(run_id, run_date) for every BDM run the dashboard currently
-    renders AMBER, oldest first, and that a decision comment can
-    actually resolve to.
+class TestAcknowledgementBadge:
+    """REQ-PIPE-122 criterion 21, which replaced REQ-QAC-017's per-run
+    /accept badge (retired by criterion 23): a promoted amber supply reads
+    "awaiting acknowledgement" from its promotion and "acknowledged by"
+    from the acknowledgement, judged as at the date on show. Injected onto
+    a real supply-history row, so it does not depend on which supplies a
+    bootstrap happened to promote under promote-and-acknowledge."""
 
-    Two things here were got wrong first time and are worth stating.
+    PROMOTED = "2026-09-10T02:00:00+00:00"
+    ACKNOWLEDGED = "2026-09-15T02:00:00+00:00"
 
-    It computes status with `status_by_run()` - the same rollup the
-    page itself applies - NOT from the generator's own `dirty_severity`
-    in the manifest. Those genuinely disagree: dirty_severity is what
-    the generator INTENDED to inject, while the badge gates on what the
-    real tools actually reported. On the regenerated history they
-    produce different sets of runs, and the proxy is the wrong one.
+    def _page(self, built, tmp_path):
+        html = built.read_text()
+        start = html.index("const REAL_BIRTH_REG_DATA = ") + len("const REAL_BIRTH_REG_DATA = ")
+        end = html.index(";\n", start)
+        record = json.loads(html[start:end])
+        run_id = record["runs"][-1]["run_id"]
+        record["acknowledgements"] = {run_id: {
+            "supply": "birth-registrations@k", "period": "p", "promotedAt": self.PROMOTED,
+            "acknowledged": {"actor": "Keith Moss", "reason": "looked", "at": self.ACKNOWLEDGED},
+            "lapsedAt": None}}
+        out = tmp_path / "ack.html"
+        root = Path(__file__).resolve().parent.parent / "dashboard"
+        for name in ("fonts", "vendor"):
+            if not (tmp_path / name).exists():
+                (tmp_path / name).symlink_to((root / name).resolve())
+        out.write_text(html[:start] + json.dumps(record, separators=(",", ":")) + html[end:])
+        return out, run_id
 
-    It also drops any run whose acceptance window is zero-width. Two
-    runs sharing a receipt date leave the first with
-    window_start == window_end, which `created >= start and created <
-    end` can never match - see TestRunWindowsWithTiedArrivedDates. A
-    run like that renders amber but no comment can ever attach to it,
-    so it is useless to these tests.
+    def _badge(self, page, run_id, as_of):
+        return page.evaluate(f"() => acknowledgementBadge('birth-registrations', '{run_id}', '{as_of}')")
 
-    Reads committed qa_results/ via the built dashboard JSON, never
-    data/.
-    """
-    import json as _json
-
-    from qa_tools.common import acceptance_sync as _acc
-    from qa_tools.common.dataset_status import status_by_run
-
-    reports = Path(__file__).resolve().parent.parent / "reports"
-    with open(reports / "birth_registrations_dashboard.json") as f:
-        dataset = _json.load(f)
-
-    # THE DEPLOYMENT'S HISTORY, SET HERE rather than inherited from the
-    # autouse fixture above. This runs under a CLASS-scoped fixture,
-    # which pytest builds before any function-scoped one - so the env
-    # var that fixture sets is not in place yet, and these reads would
-    # go to the worker's empty database and find no amber run at all.
-    dsn = _deployment_dsn()
-    previous = os.environ.get("MOTHMAN_SUPPLY_DSN")
-    if dsn:
-        os.environ["MOTHMAN_SUPPLY_DSN"] = dsn
-    # A GAP RED IS READ AT ITS MEASURED VERDICT here (REQ-QAC-108, 2026-10-05):
-    # once one owed day has no accepted supply, every later Birth
-    # Registrations supply is red for the gap, and these tests are about
-    # amber badges, not about the gap rule - which has its own tests.
-    for column in dataset.get("columns", []):
-        for check in column.get("checks", []):
-            for h in check.get("history", []):
-                measured = (h.get("reference") or {}).get("measuredStatus")
-                if measured:
-                    h["status"] = measured
-    try:
-        amber = {run_id for run_id, status in status_by_run(dataset).items()
-                 if status == "amber"}
-        windows = list(_acc._run_windows_for_dataset("birth-registrations"))
-    finally:
-        if dsn:
-            if previous is None:
-                os.environ.pop("MOTHMAN_SUPPLY_DSN", None)
-            else:
-                os.environ["MOTHMAN_SUPPLY_DSN"] = previous
-
-    usable: list[tuple[str, str]] = []
-    for run_id, start, end in windows:
-        if run_id in amber and start != end:
-            usable.append((run_id, start.isoformat()))
-    return usable
-
-
-@pytest.fixture(scope="class")
-def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path_factory) -> Path:
-    """running-thoughts.md #6 ("read-only tension: accepting/rejecting
-    amber supplies") - same real-fake-injection shape as dashboard_html_
-    with_ticket above (a real gh call only deploy-pages.yml can make
-    locally), via QA_COMMENTS_JSON instead of OPEN_TICKETS_JSON. Targets
-    3 REAL, currently-amber committed runs, so the decision badge's own
-    real gating condition (status==="amber") has genuine amber rows to
-    attach to: one gets a real /accept, one gets a real /reject, one
-    gets neither.
-
-    Those three runs are COMPUTED HERE, not written down. The original
-    version did the right investigation - its docstring said the dates
-    were "found by actually computing this dataset's own per-run status
-    ... not assumed" - and then froze the answer as three literals
-    (2026-05-22/23/24, later run_044/run_062/run_066). Cutting BDM's
-    history to 30 deliveries on 2026-09-23 deleted all three, and these
-    three tests failed for a reason that had nothing to do with what
-    they test. Deriving them means any future regeneration is free.
-
-    Yields the built HTML plus the three run ids it chose, since the
-    tests locate rows by data-run-id and can no longer hardcode them.
-    """
-    from dashboard import embed_dashboard_data as edd
-
-    tmp_path = tmp_path_factory.mktemp("amber")
-    (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
-    (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
-
-    amber = _real_amber_bdm_runs()
-    assert len(amber) >= 3, (
-        f"need 3 real amber BDM runs to attach decisions to, found {len(amber)}. "
-        "generate_runs.py's RUN_PLAN controls the clean/amber/red mix."
-    )
-    (accept_id, accept_date), (reject_id, reject_date), (neither_id, _) = amber[:3]
-
-    comments_path = tmp_path / "qa_comments.json"
-    comments_path.write_text(json.dumps([{
-        "number": 998, "labels": [{"name": "qa-ticket"}, {"name": "dataset:birth-registrations"}],
-        "comments": [
-            {
-                "author": {"login": "keithamoss"}, "body": "/accept",
-                "createdAt": f"{accept_date}T10:00:00Z",
-                "url": "https://github.com/keithamoss/data-poc/issues/998#issuecomment-1",
-            },
-            {
-                "author": {"login": "keithamoss"}, "body": "/reject",
-                "createdAt": f"{reject_date}T10:00:00Z",
-                "url": "https://github.com/keithamoss/data-poc/issues/998#issuecomment-2",
-            },
-        ],
-    }]))
-    out_html = tmp_path / "dashboard_with_amber_decisions.html"
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(edd, "QA_COMMENTS_JSON", comments_path)
-        mp.setattr(edd, "DASHBOARD_HTML", out_html)
-        # The deployment's history again, for the same reason as
-        # `_real_amber_bdm_runs` above: `embed()` runs IN PROCESS here
-        # rather than as a subprocess, and matching a comment to the
-        # amber run it was left against is a read of recorded QA
-        # results. Against the worker's empty database every comment
-        # matches nothing and no badge renders.
-        if _deployment_dsn():
-            mp.setenv("MOTHMAN_SUPPLY_DSN", _deployment_dsn())
-        edd.embed()
-    return {"html": out_html, "accept": accept_id, "reject": reject_id, "neither": neither_id}
-
-
-class TestAmberDecisionBadge:
-    def test_a_real_accept_comment_shows_a_linked_badge_on_its_matching_amber_run(self, clean_page, dashboard_html_with_amber_decisions):
-        _goto(
-            clean_page, dashboard_html_with_amber_decisions["html"],
-            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
-        )
-        toggle = clean_page.locator("#supply-history-toggle")
-        if toggle.count():
-            toggle.click()
-
-        row = clean_page.locator(f'tr[data-run-id="{dashboard_html_with_amber_decisions["accept"]}"]')
-        assert row.count() > 0, "the real amber run this test targets isn't in the rendered supply history"
-        badge = row.locator("a.pill.tag[href*='issuecomment-1']")
-        assert badge.count() > 0, "no decision badge rendered on the real amber run it was accepted against"
-        assert "keithamoss" in badge.first.inner_text()
-        assert "Accepted" in badge.first.inner_text()
-
-    def test_a_real_reject_comment_shows_a_linked_rejection_badge_on_its_matching_amber_run(self, clean_page, dashboard_html_with_amber_decisions):
-        """Keith's own explicit call, 2026-09-19 (resolving plans/
-        conceptual-design.md Thread A's own parked amber-governance
-        question): a rejected run's pill still stays amber - only the
-        badge differs from accept's."""
-        _goto(
-            clean_page, dashboard_html_with_amber_decisions["html"],
-            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
-        )
-        toggle = clean_page.locator("#supply-history-toggle")
-        if toggle.count():
-            toggle.click()
-
-        row = clean_page.locator(f'tr[data-run-id="{dashboard_html_with_amber_decisions["reject"]}"]')
-        assert row.count() > 0, "the real amber run this test targets isn't in the rendered supply history"
-        status_pill_class = row.locator("td").nth(1).locator(".pill").first.get_attribute("class")
-        assert "amber" in status_pill_class, "reject must never repaint the pill away from amber"
-        badge = row.locator("a.pill.tag[href*='issuecomment-2']")
-        assert badge.count() > 0, "no rejection badge rendered on the real amber run it was rejected against"
-        assert "keithamoss" in badge.first.inner_text()
-        assert "Rejected" in badge.first.inner_text()
-
-    def test_a_different_amber_run_with_no_decision_comment_shows_no_badge(self, clean_page, dashboard_html_with_amber_decisions):
-        _goto(
-            clean_page, dashboard_html_with_amber_decisions["html"],
-            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
-        )
-        toggle = clean_page.locator("#supply-history-toggle")
-        if toggle.count():
-            toggle.click()
-
-        # a different real amber run, no comment against it
-        row = clean_page.locator(f'tr[data-run-id="{dashboard_html_with_amber_decisions["neither"]}"]')
-        assert row.count() > 0
-        assert row.locator("a.pill.tag[href*='issuecomment']").count() == 0
+    def test_it_reads_as_at_the_date_on_show(self, page, tmp_path, built_dashboard_html):
+        out, run_id = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out)
+        assert self._badge(page, run_id, "2026-09-05") == ""
+        assert "awaiting acknowledgement" in self._badge(page, run_id, "2026-09-12")
+        assert "Acknowledged by Keith Moss" in self._badge(page, run_id, "2026-09-20")
 
 
 class TestDemoTab:
@@ -3682,15 +3530,15 @@ class TestClosedWithNoSupply:
     MARKED = "2026-09-10T02:00:00+00:00"
 
     def _slot(self, period, index, closes, **extra):
-        return {"period": period, "index": index, "closesAt": closes, "filledAt": None,
-                "filedAt": None, "markedAt": None, "mark": None, **extra}
+        return {"period": period, "index": index, "closesAt": closes, "changes": [],
+                "filedAt": None, "marks": [], "rejected": None, **extra}
 
     def _page(self, built, tmp_path):
         slots = [self._slot("2025-Q2", 5, "2025-08-15T16:00:00+00:00"),
                  self._slot("2025-Q3", 6, "2025-11-15T16:00:00+00:00"),
-                 self._slot("2024-Q4", 2, "2025-02-15T16:00:00+00:00", markedAt=self.MARKED,
-                            mark={"at": self.MARKED, "actor": "Keith Moss",
-                                  "reason": "supplier had a system outage"})]
+                 self._slot("2024-Q4", 2, "2025-02-15T16:00:00+00:00",
+                            marks=[{"at": self.MARKED, "actor": "Keith Moss",
+                                    "reason": "supplier had a system outage"}])]
         return _with_blockers(built, tmp_path / "gaps.html", [],
                               closed_slots={"cp-clients": slots})
 
@@ -3742,3 +3590,20 @@ class TestClosedWithNoSupply:
         assert got["accepted"] is None, "not marked yet on this date"
         assert [g["periods"] for g in got["noSupply"]] == [["2024-Q4"]], \
             "and Q2/Q3 had not closed yet"
+
+    def test_a_daily_feed_awaiting_todays_file_keeps_its_row(self, page, tmp_path,
+                                                            built_dashboard_html):
+        """UX critic, 2026-10-05: the reason row is for a dataset with
+        nothing current at all. A daily feed whose file for the day on
+        show has not arrived (23 September has no Birth Registrations
+        run in the seeded corpus) keeps its arrival columns, with the old
+        gap beneath its pill - the period actually late and still open
+        must not be hidden behind it."""
+        slot = self._slot("2026-09-09", 250, "2026-09-09T16:00:00+00:00")
+        out = _with_blockers(built_dashboard_html, tmp_path / "daily.html", [],
+                             closed_slots={"birth-registrations": [slot]})
+        _goto(page, out, state={"tier": "agency", "agencyId": "registry-services"},
+              as_of="2026-09-23")
+        assert page.locator("tr[data-no-supply]").count() == 0
+        note = page.locator(".no-supply-note")
+        assert note.count() == 1 and "9 September 2026" in note.inner_text()

@@ -133,9 +133,17 @@ PROMOTION_WITHHELD = "promotion-withheld"
 #: supply that never came.
 MARK_NOT_SUPPLIED = "mark-not-supplied"
 
+#: A PERSON'S ACKNOWLEDGEMENT THAT THEY LOOKED AT AN AMBER SUPPLY PROMOTED
+#: UNDER promote-and-acknowledge (REQ-PIPE-122 criteria 13 to 16). It
+#: ANNOTATES - it changes no data, re-runs nothing and changes nothing a
+#: period resolves to (criterion 15), so qa.slot_holds ignores it by
+#: construction, like a mark. A reason is required: the reason is what
+#: makes it more than a click.
+ACKNOWLEDGE = "acknowledge"
+
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
            INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
-           MARK_NOT_SUPPLIED)
+           MARK_NOT_SUPPLIED, ACKNOWLEDGE)
 
 #: Actions that name no supply - each is about one that is not there.
 NO_SUPPLY = (INHERIT_REFUSED, MARK_NOT_SUPPLIED)
@@ -206,6 +214,14 @@ class Decision:
     #: go browsing: the caller has the verdict in hand, and REQ-PIPE-074
     #: criterion 6 needs it to know whether a reason is required.
     supply_is_red: bool = False
+    #: THE AMBER SETTING A RULE ACTED UNDER (REQ-PIPE-122 criterion 19):
+    #: the resolved value, the level it came from and the version in
+    #: effect. Recorded on every automatic promotion of an amber supply,
+    #: and on the withheld note when the setting was hold, so the past is
+    #: read from what was recorded and never recomputed (criterion 5).
+    amber_setting: str | None = None
+    amber_level: str | None = None
+    amber_version: str | None = None
 
     @property
     def slots(self) -> tuple[str, ...]:
@@ -252,6 +268,18 @@ def _check_shape(decision: Decision) -> None:
             raise DecisionRefused(
                 "marking a period as not supplied needs a reason - somebody will "
                 "ask a year from now why nobody chased it.")
+    if decision.action == ACKNOWLEDGE:
+        if decision.actor_kind != PERSON:
+            raise DecisionRefused(
+                "only a person acknowledges an amber supply - it records that "
+                "somebody looked, which a rule cannot do.")
+        if not decision.to_slot:
+            raise DecisionRefused(
+                "an acknowledgement names the period the supply is promoted into.")
+        if not (decision.reason or "").strip():
+            raise DecisionRefused(
+                "an acknowledgement needs a reason - what you looked at and why "
+                "the amber is acceptable. That is what makes it more than a click.")
     if decision.action == INHERIT_REFUSED and (decision.supply or "").strip():
         raise DecisionRefused(
             "a refused inheritance names no supply - that is what it could not "
@@ -445,6 +473,16 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
             f"{needs_reason} needs a reason. Somebody will ask why a year from "
             "now, and this log is where they will look.")
 
+    if decision.action == ACKNOWLEDGE:
+        # REQ-PIPE-122 criterion 14: only a supply that OWES one, and the
+        # refusal says which of the four reasons it is.
+        from qa_tools.common import acknowledgement
+
+        why = acknowledgement.why_not_owed(conn, decision.dataset_id, decision.supply,
+                                           decision.to_slot)
+        if why:
+            raise DecisionRefused(f"{decision.supply} owes no acknowledgement: {why}.")
+
     # A SUPPLY SOMETHING STANDS ON DOES NOT MOVE (REQ-PIPE-084 criterion
     # 11). Judged here rather than in substitution.py because it
     # constrains decisions substitution.py does not own: the person
@@ -494,13 +532,15 @@ def _lock(conn: supply_db.SupplyConnection, decision: Decision) -> None:
 def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
     rows = conn.execute(
         f"INSERT INTO {TABLE} (agency_id, collection_id, dataset_id, action, supply, "
-        "from_slot, to_slot, actor, actor_kind, reason, effective_at, stands_on) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "from_slot, to_slot, actor, actor_kind, reason, effective_at, stands_on, "
+        "amber_setting, amber_level, amber_version) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         [decision.agency_id, decision.collection_id, decision.dataset_id,
          decision.action, decision.supply or None, decision.from_slot, decision.to_slot,
          decision.actor.strip(), decision.actor_kind,
          (decision.reason or "").strip() or None, decision.effective_at,
-         decision.stands_on]).fetchall()
+         decision.stands_on, decision.amber_setting, decision.amber_level,
+         decision.amber_version]).fetchall()
     return int(rows[0][0])
 
 

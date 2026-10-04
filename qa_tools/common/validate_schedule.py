@@ -39,6 +39,7 @@ WHAT THIS DELIBERATELY DOES NOT DO:
 """
 from __future__ import annotations
 
+import functools
 import os
 import subprocess
 import sys
@@ -726,6 +727,7 @@ def _grace_errors(declared: dict[str, str], src: Source) -> list[ConfigError]:
 
 # ---- a past date cannot move quietly --------------------------------
 
+@functools.lru_cache(maxsize=8)
 def _content_at(rel_path: str, ref: str) -> str | None:
     """The file's content at `ref`, or None if it was not there.
 
@@ -862,10 +864,54 @@ def _retrospective_edit_errors(raw: dict, src: Source, today: date | None = None
     return out
 
 
+# ---- the amber setting's past is frozen (REQ-PIPE-122) --------------
+
+def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
+                          ref: str | None = None) -> list[ConfigError]:
+    """Criteria 6 to 8: a version of the amber setting whose date has
+    passed may not be altered or removed, WHATEVER CHANGELOG ACCOMPANIES
+    IT - unlike a calendar date, there is no correction route, because a
+    past setting re-judges nothing (every automatic promotion recorded the
+    setting it acted under). A new version may not be dated before the
+    day it is added, unless the asset declares itself synthetic - before
+    AND after the change, so the declaration cannot be added in the same
+    edit that uses it.
+
+    Compared against `diff_base()`, the same previous commit the calendar
+    guard above reads, and silent where there is none.
+    """
+    from qa_tools.common import amber_setting
+
+    today = today or asset_time.local_date(asset_time.now())
+    ref = ref or diff_base()
+    previous = _content_at(str(src.asset_path.relative_to(ROOT)), ref) \
+        if src.asset_path.is_relative_to(ROOT) else None
+    if previous is None:
+        return []
+    try:
+        old_doc = yaml.safe_load(previous) or {}
+    except yaml.YAMLError:
+        return []
+    if not isinstance(old_doc, dict):
+        return []
+    synthetic = bool(old_doc.get("synthetic")) and bool(raw.get("synthetic"))
+    return [ConfigError(
+        src.name, f"amber_setting ({where})", f"{problem}.",
+        "A setting's past is frozen - add a NEW version, dated today or later, with the "
+        "value you want from then on. Nothing judged under the old version changes, "
+        "because each promotion recorded the setting it acted under.")
+        for where, problem in amber_setting.past_change_problems(
+            old_doc, raw, today, synthetic=synthetic)]
+
+
 # ---- the gate -------------------------------------------------------
 
 def validate(src: Source | None = None) -> list[ConfigError]:
     src = src or Source.default()
+    # ONE READ OF THE PREVIOUS FILE PER RUN, shared by the calendar guard
+    # and the amber setting's (REQ-PIPE-122) - cleared here so a later run
+    # in the same process never sees an earlier run's answer.
+    _content_at.cache_clear()
     if not src.asset_path.exists():
         return [ConfigError(src.name, None,
                              "does not exist.",
@@ -894,6 +940,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _expects_nothing_errors(raw, src)
     errors += _contract_errors(raw, src)
     errors += _retrospective_edit_errors(raw, src)
+    errors += _amber_setting_errors(raw, src)
     if src.asset_path == DATA_ASSET_YAML and not errors:
         errors += _overlap_errors(src)
     return _attribute(errors, raw)

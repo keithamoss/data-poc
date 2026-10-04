@@ -53,14 +53,18 @@ UN_INHERIT = decision_log.UN_INHERIT
 #: The ninth (REQ-PIPE-132 criterion 4): accept that a closed period was
 #: not supplied. Period-scoped, person only, changes no data.
 MARK_NOT_SUPPLIED = decision_log.MARK_NOT_SUPPLIED
+#: The tenth (REQ-PIPE-122 criterion 13): acknowledge an amber supply
+#: promoted under promote-and-acknowledge. Supply-scoped, person only,
+#: reason required, changes no data.
+ACKNOWLEDGE = decision_log.ACKNOWLEDGE
 
 OPERATIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
-              INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED)
+              INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED, ACKNOWLEDGE)
 
 #: The four that act on a SUPPLY - "what do I do with this thing that
 #: arrived" - and so belong in the queue of supplies awaiting a decision
 #: (criterion 16).
-SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE)
+SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE)
 
 #: The four that act on a PERIOD - how it is filled when a supply for it
 #: never came. None of them answers a question about an arriving supply,
@@ -284,6 +288,17 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> Non
             conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
             dataset_id=request.dataset_id, period=request.period,
             actor=request.actor_name, reason=reason, effective_at=effective_at)
+    elif request.operation == ACKNOWLEDGE:
+        # CHANGES NO DATA (REQ-PIPE-122 criterion 15): one entry, nothing
+        # moved. Whether it is owed is the log's to judge, inside the
+        # transaction (criterion 14).
+        with decision_log.apply_decision(conn, decision_log.Decision(
+                agency_id=entry.agency_id, collection_id=entry.collection_id,
+                dataset_id=request.dataset_id, action=decision_log.ACKNOWLEDGE,
+                supply=request.supply, actor=request.actor_name,
+                actor_kind=decision_log.PERSON, effective_at=effective_at,
+                to_slot=request.period, reason=reason)):
+            pass
     elif request.operation == UN_INHERIT:
         inheritance.un_inherit(
             conn, dataset_id=request.dataset_id, period=request.period,

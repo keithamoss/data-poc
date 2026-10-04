@@ -5113,3 +5113,85 @@ twice. It deliberately did not re-find the `TypeError`.
     nodata (every corpus dataset has an unmarked gap by 2027); and a
     sprint-6 check-panel test compared against `innerText`, which carries
     the heading's CSS upper-casing.
+
+104. **[in-progress, 2026-10-05]** **[Dashboard UI]** **delivery-dashboard-ux-critic
+    on REQ-DASH-133 (commit 0f96148).** Driven in a real browser against the
+    built page plus an injected-gaps variant. Verified against the code
+    before acting.
+    FIXED (2026-10-05, tests in `tests-js/closed-no-supply.test.js` and
+    `TestClosedWithNoSupply`):
+    - HIGH: the queue was judged as at the BUILD, so at a past date it
+      listed periods that had not closed yet beside a banner that
+      correctly did not (criterion 9). Closed periods now come from the
+      page's own as-of reading, and any other item observed after the date
+      on show is left out (`asOfQueueItems`). What was open then and
+      resolved since still cannot be shown - REQ-DASH-070 criterion 14.
+    - HIGH: the queue's lede said everything but holds, contests and
+      failed loads "change no status", directly under a red caused by a
+      missing-supply item (REQ-DASH-070 criterion 1). Reworded; such an
+      item is now pilled "Makes its dataset red" and counted separately
+      rather than as "needing review".
+    - HIGH: a daily feed's row flipped to the reason row whenever the day
+      on show had no file yet, hiding the period actually late and open
+      and the arrivals before it. The reason row is now only for a dataset
+      with nothing ever arrived; otherwise the row keeps its columns with
+      the gap beneath its pill.
+    - LOW: the queue called the kind "Missing supply" where everything
+      else says "no supply" - renamed.
+    - HIGH (partly): "no supply", held, contested and unloadable banners
+      now draw in the red tokens rather than the all-clear grey.
+    - MEDIUM: the banner's command omitted the required `--reason` and
+      did not say how a day is named; the accepted row's pill read "No
+      data" (now "Accepted"); the accepted line's contrast (now the muted
+      ink rather than faint); "The period has closed" for several groups.
+    FOR KEITH (forks, not taken): which route the banner should name -
+    mark-not-supplied alone, all three, the wizard, or "chase the
+    supplier" first; and whether a daily feed's late-open period should be
+    named on the row beside an old gap.
+    LOGGED, NOT FIXED: at 390px the agency table scrolls and the gap note
+    wraps to eight lines in the status column; the Birth Registrations page
+    can show a red dataset, green supply-level checks and grey column
+    cards at once (may predate this); the accepted line does not name
+    which datasets; ordering (banner oldest first, history newest
+    first), a tight " - " in queue text, and dark-mode red-pill contrast
+    (shared pill styles).
+
+105. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **delivery-critic
+    on REQ-PIPE-132 and REQ-DASH-133 (commit 0f96148).** Reviewed against a
+    `git archive` of the commit, with reproductions on a scratch database.
+    Verified against the code before acting.
+    FIXED, failing tests first (`tests/test_not_supplied.py`
+    `TestAnEmptiedPeriodIsAGapAgain`, `TestASupplyWaitingInAClosedPeriodIsNotAGap`,
+    and the JS pair in `tests-js/closed-no-supply.test.js`):
+    - HIGH, a false green: `pipeline/closed_slots.py` recorded only a
+      slot's FIRST fill and first mark, and skipped any slot filled before
+      it closed - so a closed period substituted then de-substituted, or
+      promoted then demoted, read as filled on the page for ever while the
+      queue said it needed a person. The build now embeds every change to
+      what the slot holds, from `qa.slot_holds` via `slot_timeline` (the
+      one statement of which decisions fill and which empty - the first
+      cut had re-stated it, which is the root cause), and every mark; the
+      page reads the slot's last change by the date on show, and a mark
+      stands only until the slot next changes.
+    - MEDIUM-HIGH: after a rejection, a resupply filed to the same closed
+      period still read REJECTED and closed - listed as "no supply" and
+      markable as not supplied (REQ-PIPE-132 criteria 3 and 6). A supply
+      filed and not rejected now outranks the decision that emptied the
+      slot, and the mark refuses it.
+    - MEDIUM: the queue panels ignored the as-of date and said gaps change
+      no status - fixed with #104's `asOfQueueItems`.
+    - LOW: the awaiting-supply refusal's `--operation promote|reject` was
+      not pasteable (now two commands, each with `--reason`); the banner's
+      command lacked `--reason` (#104); marking a substituted or inherited
+      period named `demote` of the supply it stands on as the undo (now
+      de-substitute / un-inherit, `TestTheRefusalNamesTheRightUndo`).
+    LOGGED, NOT FIXED: an accepted gap on a dataset with no runs as at the
+    date shows neither its note nor its history (the no-runs branch); a
+    future real period is refused as "not a
+    period it owes" (bounded by claimable_until); CLOSED is not shown in
+    `mothman supply slots` or the TUI period label; `slot_state._accepted`
+    and `mark()` read marks and holds without `as_at`; OVERDUE's responses
+    still offer marking a period that is open; a grouped accepted note
+    shows only the last mark's reason; the card mixes units (datasets for
+    gaps, items for the rest). The critic also noted my REQ-PIPE-122 work
+    in progress had upgraded `supply7` to schema 21 mid-review.

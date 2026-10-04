@@ -88,10 +88,12 @@ class TestWhatASlotOffers:
     """Criterion 2 read against criterion 31 - all eight are reachable,
     and the four period-scoped ones are never reached from the queue."""
 
-    def test_every_one_of_the_nine_is_offered_by_some_slot(self):
-        """Mark as not supplied is offered on a CLOSED period (REQ-PIPE-132)."""
+    def test_every_one_of_the_ten_is_offered_by_some_slot(self):
+        """Mark as not supplied is offered on a CLOSED period (REQ-PIPE-132),
+        acknowledge on a promotion owing one (REQ-PIPE-122)."""
         offered = set()
         for state, closed in ((slot_state.AWAITING_DECISION, False),
+                              (slot_state.AWAITING_ACKNOWLEDGEMENT, False),
                               (slot_state.PROMOTED, False), (slot_state.REJECTED, False),
                               (slot_state.SUBSTITUTED, False), (slot_state.INHERITED, False),
                               (slot_state.OVERDUE, False), (slot_state.OVERDUE, True)):
@@ -244,7 +246,8 @@ class TestOnlyTheStatesADecisionProducedSayARuleDecidedThem:
         for state in filing_queue.FROM_A_DECISION:
             assert state in (slot_state.PROMOTED, slot_state.REJECTED,
                               slot_state.SUBSTITUTED, slot_state.INHERITED,
-                              slot_state.RETURNED, slot_state.NOT_SUPPLIED_ACCEPTED)
+                              slot_state.RETURNED, slot_state.NOT_SUPPLIED_ACCEPTED,
+                              slot_state.AWAITING_ACKNOWLEDGEMENT)
 
     def test_a_supply_merely_filed_is_not_one_of_them(self):
         assert slot_state.AWAITING_DECISION not in filing_queue.FROM_A_DECISION

@@ -92,27 +92,12 @@ branch, so it always shows exactly what a check looked like when this
 dashboard was published, same reproducibility stance as everything else
 this script embeds.
 
-And `const AMBER_DECISIONS` (running-thoughts.md #6, "read-only tension:
-accepting/rejecting amber supplies" - `/accept` built 2026-09-18, scoped
-via two AskUserQuestion rounds; `/reject` added 2026-09-19, once Keith
-resolved the amber-GOVERNANCE question itself - plans/conceptual-
-design.md Thread A - via a further AskUserQuestion round: option 3,
-amber requires an explicit human decision, per run) -
-`{dataset_id: {run_id: {decision: "accept"|"reject", decided_by,
-decided_at, comment_url}}}`, a real human's `/accept` or `/reject`
-comment on that dataset's own QA ticket, matched to the real run it
-applies to purely by comment timestamp against that run's own real
-arrival window (qa_tools/common/acceptance_sync.py - no run_id ever
-typed by anyone; most-recent-comment-wins if a run somehow gets both).
-Same real-source-not-a-file-this-script-reads-directly treatment as
-TICKET_STATUS above, for the same reason (a real `gh` call needs a real
-token this script doesn't have): `.github/workflows/deploy-pages.yml`
-writes the raw `gh issue view` output for every real qa-ticket issue to
-QA_COMMENTS_JSON below (via `python3 -m qa_tools.common.acceptance_sync`,
-the one real `gh`-calling boundary), and this script calls
-acceptance_sync.build_decisions() (pure, no `gh`/network here either)
-to turn it into the final embed. Empty {} locally with no such file,
-same graceful degradation as TICKET_STATUS.
+`const AMBER_DECISIONS` - REQ-QAC-017's per-run `/accept` and `/reject`
+on an amber supply, matched to a run by comment timestamp - is GONE
+(retired by REQ-PIPE-122 criterion 23, 2026-10-05). An acknowledgement
+is a decision-log entry now, embedded per dataset by the dashboard
+builders (pipeline/acknowledgements.py), so there is nothing for this
+script to fetch or match.
 
 And `const ASSIGNMENTS` (running-thoughts.md #2, "data-asset-level
 people/roles config", 2026-09-18, scoped via AskUserQuestion) -
@@ -196,7 +181,6 @@ from qa_tools.common import outstanding
 from qa_tools.common import scenario_map
 from qa_tools.common import runway
 from qa_tools.common import schedule
-from qa_tools.common.acceptance_sync import build_decisions
 from qa_tools.common.changelog import build_changelog
 from qa_tools.common.github_links import build_check_source_links, build_folder_links, current_commit_sha
 from qa_tools.common.leaderboard import build_leaderboard
@@ -212,7 +196,6 @@ PLANS_DIR = os.path.join(ROOT, "plans")
 DEMO_CAST_PATH = os.path.join(os.path.dirname(__file__), "demos", "qa_wizard.cast")
 REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
 OPEN_TICKETS_JSON = os.path.join(ROOT, "reports", "open_tickets.json")
-QA_COMMENTS_JSON = os.path.join(ROOT, "reports", "qa_comments.json")
 TICKET_RESOLUTIONS_JSON = os.path.join(ROOT, "reports", "ticket_resolutions.json")
 
 TARGETS = [
@@ -527,18 +510,6 @@ def embed() -> None:
     github_links = {"checks": build_check_source_links(sha=sha), **build_folder_links(sha=sha)}
     html = _replace_const(html, "GITHUB_LINKS", json.dumps(github_links, separators=(",", ":")))
     print(f"Re-embedded GITHUB_LINKS = {len(github_links['checks'])} check link(s) at commit {sha[:12]}")
-
-    if os.path.exists(QA_COMMENTS_JSON):
-        with open(QA_COMMENTS_JSON) as f:
-            raw_tickets = json.load(f)
-    else:
-        raw_tickets = []
-    decisions = build_decisions(raw_tickets)
-    total_decisions = sum(len(v) for v in decisions.values())
-    total_rejected = sum(1 for runs in decisions.values() for r in runs.values() if r["decision"] == "reject")
-    html = _replace_const(html, "AMBER_DECISIONS", json.dumps(decisions, separators=(",", ":")))
-    print(f"Re-embedded AMBER_DECISIONS = {total_decisions} decision(s) ({total_rejected} reject/{total_decisions - total_rejected} accept) across {len(decisions)} dataset(s)"
-          + ("" if os.path.exists(QA_COMMENTS_JSON) else " (no reports/qa_comments.json - local build, embedding empty)"))
 
     def _public(record: dict) -> dict:
         return {k: v for k, v in record.items() if k != "email"}

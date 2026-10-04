@@ -43,7 +43,8 @@ from qa_tools.common import filing_decisions, qa_store, slot_state, supply_db
 #: of them is in `slot_state.NEEDS_ACTION` - this is a filter of that
 #: set, asserted below rather than trusted.
 WITH_A_SUPPLY = (slot_state.AWAITING_DECISION, slot_state.RETURNED,
-                 slot_state.HELD, slot_state.REJECTED)
+                 slot_state.HELD, slot_state.REJECTED,
+                 slot_state.AMBER_WAITING, slot_state.AWAITING_ACKNOWLEDGEMENT)
 
 #: The needs-action states where nothing arrived, and so the ones the
 #: period path answers rather than the supply queue.
@@ -61,7 +62,8 @@ assert set(WITH_A_SUPPLY) | set(WITHOUT_A_SUPPLY) == set(slot_state.NEEDS_ACTION
 #: automatic inheritance and something a person chose.
 FROM_A_DECISION = (slot_state.PROMOTED, slot_state.REJECTED,
                    slot_state.SUBSTITUTED, slot_state.INHERITED,
-                   slot_state.RETURNED, slot_state.NOT_SUPPLIED_ACCEPTED)
+                   slot_state.RETURNED, slot_state.NOT_SUPPLIED_ACCEPTED,
+                   slot_state.AWAITING_ACKNOWLEDGEMENT)
 
 
 class LogUnreachable(Exception):
@@ -288,7 +290,12 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
         # reprocess - is a thing a person does, named beside it.
         return (filing_decisions.REJECT,), ()
     if state.supply:
-        if state.state == slot_state.PROMOTED:
+        if state.state == slot_state.AWAITING_ACKNOWLEDGEMENT:
+            # REQ-PIPE-122 criterion 13: answered, and owed a look - so
+            # acknowledging comes first, beside taking it back out.
+            supply_scoped = (filing_decisions.ACKNOWLEDGE, filing_decisions.DEMOTE,
+                             filing_decisions.REFILE)
+        elif state.state == slot_state.PROMOTED:
             # Already answered. The only supply-shaped things left are
             # taking it back out and moving it somewhere else.
             supply_scoped = (filing_decisions.DEMOTE, filing_decisions.REFILE)

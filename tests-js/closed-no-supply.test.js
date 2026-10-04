@@ -8,8 +8,8 @@ import { loadDashboard } from "./support/loadDashboard.js";
 const load = () => loadDashboard().window;
 
 const slot = (period, index, extra) => ({period, index,
-  closesAt: `${period}T16:00:00+00:00`, filledAt: null, filedAt: null,
-  markedAt: null, mark: null, ...extra});
+  closesAt: `${period}T16:00:00+00:00`, changes: [], filedAt: null,
+  marks: [], rejected: null, ...extra});
 const DAYS = ["2026-03-01", "2026-03-02", "2026-03-03"].map((d, i) => slot(d, 10 + i));
 const LATER_DAY = slot("2026-03-09", 18);
 
@@ -27,10 +27,30 @@ describe("what a closed slot reads as, as at the date on show", () => {
     expect(w.closedGapsAsOf([late], "2026-03-05").open).toHaveLength(0);
   });
 
+  it("is a gap again once the slot is emptied after being filled (#105)", () => {
+    const w = load();
+    const refilled = {...DAYS[0], changes: [
+      {at: "2026-03-04T02:00:00+00:00", held: true},
+      {at: "2026-03-08T02:00:00+00:00", held: false}]};
+    expect(w.closedGapsAsOf([refilled], "2026-03-05").open).toHaveLength(0);
+    expect(w.closedGapsAsOf([refilled], "2026-03-09").open).toHaveLength(1);
+  });
+
+  it("drops a mark once the slot has changed after it", () => {
+    const w = load();
+    const s = {...DAYS[0],
+      marks: [{at: "2026-03-05T02:00:00+00:00", actor: "k", reason: "r"}],
+      changes: [{at: "2026-03-06T02:00:00+00:00", held: true},
+                {at: "2026-03-07T02:00:00+00:00", held: false}]};
+    const got = w.closedGapsAsOf([s], "2026-03-08");
+    expect(got.accepted).toHaveLength(0);
+    expect(got.open).toHaveLength(1);
+  });
+
   it("is accepted, not open, from the day a person marks it", () => {
     const w = load();
-    const marked = {...DAYS[0], markedAt: "2026-03-07T02:00:00+00:00",
-                    mark: {at: "2026-03-07T02:00:00+00:00", actor: "k@x", reason: "supplier outage"}};
+    const marked = {...DAYS[0],
+                    marks: [{at: "2026-03-07T02:00:00+00:00", actor: "k@x", reason: "supplier outage"}]};
     expect(w.closedGapsAsOf([marked], "2026-03-06").open).toHaveLength(1);
     const after = w.closedGapsAsOf([marked], "2026-03-08");
     expect(after.open).toHaveLength(0);
@@ -107,5 +127,29 @@ describe("a period whose supply was rejected (REQ-PIPE-153 criterion 9)", () => 
     const text = w.gapText(group);
     expect(text).toContain("a supply arrived, could not be loaded and was rejected by Keith Moss");
     expect(text).toContain("supplier is resending");
+  });
+});
+
+describe("the queue is read as at the date on show (UX critic, 2026-10-05)", () => {
+  const BUILD_GAP = {kind: "closed-unfilled-slot", datasetId: "d", headline: "build's own"};
+  const LATER = {kind: "held-supply", datasetId: "d", observedAt: "2030-01-01T02:00:00+00:00"};
+  const EARLIER = {kind: "held-supply", datasetId: "d", observedAt: "2020-01-01T02:00:00+00:00"};
+  const data = {agencies: [{id: "a", collections: [{id: "c", datasets: [
+    {id: "d", name: "Dataset D", noSupply: [{periods: ["2025-Q2", "2025-Q3"], lastIndex: 6, marks: []}]},
+    {id: "e", name: "Dataset E", noSupply: null}]}]}]};
+
+  it("replaces the build's closed periods with the page's own, as at the date", () => {
+    const w = load();
+    const items = w.asOfQueueItems([BUILD_GAP], data);
+    expect(items.map(i => i.headline)).toEqual(["Dataset D: 2 periods with no supply, 2025-Q2 to 2025-Q3"]);
+    expect(items[0].redsDataset).toBe(true);
+  });
+
+  it("leaves out what was observed after the date on show", () => {
+    const w = load();
+    w.eval("CURRENT_AS_OF = '2026-01-01'");
+    const kinds = w.asOfQueueItems([LATER, EARLIER], data).map(i => i.observedAt || "gap");
+    expect(kinds).toContain(EARLIER.observedAt);
+    expect(kinds).not.toContain(LATER.observedAt);
   });
 });

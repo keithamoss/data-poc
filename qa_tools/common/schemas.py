@@ -480,6 +480,25 @@ class CalendarConfig(_Strict):
     runway_warning_slots: int | None = Field(default=None, ge=1)
 
 
+#: THE AMBER SETTING'S THREE VALUES, STRICTEST FIRST (REQ-PIPE-122
+#: criteria 1 and 2). This tuple is the one order; every list of them -
+#: an error message, a comment, the documentation - takes it from here.
+AMBER_SETTINGS = ("hold", "promote-and-acknowledge", "promote")
+
+
+class AmberSettingVersion(_Strict):
+    """One effective-dated value of the amber setting (REQ-PIPE-122
+    criterion 4) - the same shape as a calendar's versions, so a setting
+    change is authored as a new version rather than an edit."""
+    effective_from: str = Field(pattern=_DATE_PATTERN)
+    value: Literal[*AMBER_SETTINGS]  # type: ignore[valid-type]
+    changelog: list[NonEmptyStr] = Field(min_length=1)
+
+
+class AmberSetting(_Strict):
+    versions: list[AmberSettingVersion] = Field(min_length=1)
+
+
 class NotExpectedPeriod(_Strict):
     """A reason is REQUIRED, not decoration: "no November file" with
     nothing beside it is indistinguishable, six months later, from
@@ -526,6 +545,7 @@ class DatasetConfig(_Strict):
     delivery_months: list[NonEmptyStr] | None = None
     dates: list[CalendarDate] | None = None
     not_expected: list[NotExpectedPeriod] | None = None
+    amber_setting: AmberSetting | None = None
 
 
 class CollectionConfig(_Strict):
@@ -538,6 +558,7 @@ class CollectionConfig(_Strict):
     #: while its transport is being described, and nothing may READ a
     #: delivery from a source that has not said what one is.
     delivery_boundary: NonEmptyStr | None = None
+    amber_setting: AmberSetting | None = None
     datasets: list[DatasetConfig] = Field(min_length=1)
 
 
@@ -566,3 +587,7 @@ class DataAsset(_Strict):
     #: criterion 8). Defaults to False: an asset that never said it was
     #: synthetic is treated as real, which is the direction that refuses.
     synthetic: bool = False
+    #: REQUIRED, with no default (REQ-PIPE-122 criterion 9): an asset
+    #: that says nothing about amber is a configuration error, never a
+    #: quiet "promote".
+    amber_setting: AmberSetting

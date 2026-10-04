@@ -56,6 +56,15 @@ INHERITED = "inherited"
 #: unmarked closed period stays OVERDUE or NEVER-SUPPLIED, qualified by
 #: SlotState.closed (criterion 1).
 NOT_SUPPLIED_ACCEPTED = "not-supplied-accepted"
+#: AN AMBER SUPPLY THE RULE DID NOT PROMOTE BECAUSE ITS AMBER SETTING IS
+#: hold (REQ-PIPE-122 criteria 10, 17 and 18). Its own state and its own
+#: words, never "held" - that means a supply filed to no slot - and never
+#: folded into AWAITING_DECISION, which is a red supply's.
+AMBER_WAITING = "amber-waiting"
+#: A PROMOTED amber supply whose promotion asked for an acknowledgement
+#: that nobody has given (REQ-PIPE-122 criteria 11 and 17). The slot is
+#: answered; a person still owes a look.
+AWAITING_ACKNOWLEDGEMENT = "awaiting-acknowledgement"
 
 #: The states that need a person, and so the ones the default
 #: `needs-action` ticket policy opens a ticket for (criterion 21).
@@ -63,6 +72,7 @@ NOT_SUPPLIED_ACCEPTED = "not-supplied-accepted"
 #: the other has not started.
 NEEDS_ACTION = frozenset({
     OVERDUE, NEVER_SUPPLIED, AWAITING_DECISION, RETURNED, HELD, REJECTED,
+    AMBER_WAITING, AWAITING_ACKNOWLEDGEMENT,
 })
 
 #: What a person can do about each. Criterion 9 asks for the responses
@@ -79,6 +89,8 @@ CLOSED_NOTE = "a file arriving now is filed to the open period, not to this one"
 
 RESPONSES = {
     NOT_SUPPLIED_ACCEPTED: (),
+    AMBER_WAITING: ("promote this supply", "reject it", "ask for a resupply"),
+    AWAITING_ACKNOWLEDGEMENT: ("acknowledge it, with a reason",),
     OVERDUE: ("chase the supplier", "record the period as not supplied",
                "substitute an earlier period's supply"),
     NEVER_SUPPLIED: ("chase the supplier",
@@ -156,6 +168,25 @@ def _state_from(h) -> tuple[str, str | None]:
     return RETURNED, None
 
 
+def _rejected(conn, dataset_id: str, supply: str) -> bool:
+    """Whether a person or the rule has rejected this supply."""
+    return bool(conn.execute(
+        f"SELECT 1 FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
+        "AND action = ? LIMIT 1", [dataset_id, supply, decision_log.REJECT]).fetchall())
+
+
+def _amber_waiting(conn, dataset_id: str, supply: str | None) -> bool:
+    """Whether the rule stood back from this supply because it is amber
+    and its setting was hold - read from what the rule RECORDED
+    (REQ-PIPE-122 criterion 5), never from the setting in force now."""
+    if not supply:
+        return False
+    return bool(conn.execute(
+        f"SELECT 1 FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
+        "AND action = ? AND amber_setting = 'hold' LIMIT 1",
+        [dataset_id, supply, decision_log.PROMOTION_WITHHELD]).fetchall())
+
+
 def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
              now: datetime, filings: dict, ever_delivered: bool,
              held: bool = False) -> SlotState:
@@ -189,6 +220,25 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
                 f"SELECT supply FROM {decision_log.TABLE} WHERE id = ?",
                 [h.decision_id]).fetchall()[0][0]
         unfilled = h.held_as is None
+        # A SUPPLY WAITING IN AN EMPTIED SLOT outranks the decision that
+        # emptied it (REQ-PIPE-132 criterion 3; delivery-critic #105): a
+        # resupply filed after a rejection is a supply awaiting a decision,
+        # not a period with nothing in it, closed or not. A supply that was
+        # itself demoted back out stays RETURNED, but is not a gap either -
+        # it is still here, waiting on the person who put it back.
+        waiting = filings.get(slot.name)
+        waiting_supply = (waiting or {}).get("supply_id")
+        if unfilled and waiting_supply and not _rejected(conn, dataset_id, waiting_supply):
+            return SlotState(
+                dataset_id=dataset_id, period=slot.name,
+                state=AWAITING_DECISION if waiting_supply != supply else state,
+                supply=waiting_supply, decided_by=_decider(conn, h.decision_id),
+                reason=_reason(conn, h.decision_id), closed=False)
+        if state == PROMOTED:
+            from qa_tools.common import acknowledgement
+
+            if acknowledgement.owed(conn, dataset_id, slot.name) == supply:
+                state = AWAITING_ACKNOWLEDGEMENT
         if unfilled and closed:
             accepted = _accepted(conn, dataset_id, slot.name)
             if accepted:
@@ -206,8 +256,10 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
     if filed:
         # AWAITING A DECISION, closed or not (REQ-PIPE-132 criterion 3): a
         # supply is here, so the period is not unsupplied.
+        supply = filed.get("supply_id")
         return SlotState(dataset_id=dataset_id, period=slot.name,
-                          state=AWAITING_DECISION, supply=filed.get("supply_id"))
+                          state=AMBER_WAITING if _amber_waiting(conn, dataset_id, supply)
+                          else AWAITING_DECISION, supply=supply)
 
     if slots_mod.is_overdue(slot, now, filled=False):
         if closed:

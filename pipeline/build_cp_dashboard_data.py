@@ -29,7 +29,7 @@ import json
 import os
 from datetime import datetime
 
-from pipeline import closed_slots, recorded_arrival, slot_timeline
+from pipeline import acknowledgements, closed_slots, recorded_arrival, slot_timeline
 from qa_tools.common import drift_reference
 from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
@@ -607,6 +607,9 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # 10) - see pipeline/closed_slots.py. The page compares instants;
         # it never re-derives closing.
         "closedSlots": closed_slots.for_dataset(dataset_id),
+        # WHICH PROMOTED AMBER SUPPLIES WERE ACKNOWLEDGED (REQ-PIPE-122
+        # criterion 21), keyed by run - see pipeline/acknowledgements.py.
+        "acknowledgements": acknowledgements.for_dataset(dataset_id),
         "promotionState": promotion_state.state_for(dataset_id).as_record(),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,

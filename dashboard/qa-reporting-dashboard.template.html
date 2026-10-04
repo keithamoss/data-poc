@@ -318,6 +318,12 @@ button{font:inherit; color:inherit;}
 .notice-exhausted{max-width:80ch; border:2px solid var(--ink-muted); background:var(--surface-alt);
   border-radius:10px; padding:12px 14px; margin-bottom:14px;}
 .notice-exhausted b{display:block; margin-bottom:4px;}
+/* A RED STATE IN A RED BOX (UX critic, 2026-10-05): a period with no
+   supply and a held, contested or unloadable supply each make their
+   dataset red, and drawn in the same grey as an all-clear they did not
+   stand out below the status pill. The words still carry the meaning. */
+.notice-exhausted[data-no-supply], .notice-exhausted[data-blocked]{
+  border-color:var(--bad); background:var(--bad-soft);}
 /* CODE CHIPS ARE NOT SCOPED TO ONE NOTICE any more
    (post-build-review #53). This rule used to sit on .notice-exhausted
    alone, so the SAME two strings - a config path and a mothman command
@@ -1852,7 +1858,6 @@ const RELEASE_NOTES = {intro:[], entries:[]};
 const REQUIREMENTS = [];
 const TICKET_STATUS = {};
 const GITHUB_LINKS = {checks:{}, agencies:{}, datasets:{}};
-const AMBER_DECISIONS = {};
 const ASSIGNMENTS = {agencies:{}, datasets:{}};
 const LEADERBOARD = [];
 // PLANS — running-thoughts.md #10's "Plans" tab: the project's own
@@ -4052,7 +4057,7 @@ const OUTSTANDING_KIND_LABEL = {
   "held-supply":"Held supply", "failed-load":"Could not be loaded",
   "contested-file":"Contested file", "contested-table":"Two files, choose one", "unrecognised-file":"Unrecognised file",
   "in-flight-delivery":"Still arriving",
-  "closed-unfilled-slot":"Missing supply"};
+  "closed-unfilled-slot":"No supply"};
 function outstandingKindLabel(kind){ return OUTSTANDING_KIND_LABEL[kind] || kind; }
 
 // A SUPPLY NOBODY COULD PLACE, OR A TABLE TWO FILES CLAIM, MAKES ITS
@@ -4113,14 +4118,23 @@ function blockerReasonText(b){
 // re-derives closing, which is REQ-PIPE-131's rule and lives in Python.
 function closedGapsAsOf(slots, asOfDateStr){
   const open = [], accepted = [];
+  const by = v => v && assetDateStrOf(v) <= asOfDateStr;
   (slots || []).forEach(s=>{
-    if(assetDateStrOf(s.closesAt) > asOfDateStr) return;          // not closed yet
-    if(s.filledAt && assetDateStrOf(s.filledAt) <= asOfDateStr) return;
-    if(s.filedAt && assetDateStrOf(s.filedAt) <= asOfDateStr) return;
+    if(!by(s.closesAt)) return;                                   // not closed yet
+    // WHAT THE SLOT HELD ON THE DATE: its last change by then, from the
+    // build's reading of qa.slot_holds - so a period filled and emptied
+    // again is a gap again from that instant (delivery-critic #105).
+    const changes = (s.changes || []).filter(c=> by(c.at));
+    const last = changes[changes.length-1];
+    if(last && last.held) return;
+    if(by(s.filedAt)) return;                     // a supply is here, waiting
     // A supply filed here and rejected LATER was still waiting on this date.
-    if(s.rejected && assetDateStrOf(s.rejected.receivedAt) <= asOfDateStr
-       && assetDateStrOf(s.rejected.at) > asOfDateStr) return;
-    if(s.markedAt && assetDateStrOf(s.markedAt) <= asOfDateStr) accepted.push(s);
+    if(s.rejected && by(s.rejected.receivedAt) && !by(s.rejected.at)) return;
+    // A MARK STANDS ONLY UNTIL THE SLOT NEXT CHANGES.
+    const marks = (s.marks || []).filter(m=> by(m.at)
+      && (!last || new Date(m.at) >= new Date(last.at)));
+    const mark = marks[marks.length-1];
+    if(mark) accepted.push({...s, mark});
     else open.push(s);
   });
   return {open, accepted};
@@ -4174,10 +4188,45 @@ function outstandingSource(source){
 // "dataset", or anything falsy for the whole asset.
 function outstandingItems(scope, id, source){
   const src = outstandingSource(source);
-  const items = (src && src.items) || [];
+  let items = (src && src.items) || [];
+  if(source === undefined){
+    // DATA is a `let`, so reading it before buildData() has returned
+    // throws rather than giving undefined.
+    let data = null;
+    try{ data = DATA; }catch(e){ data = null; }
+    if(data && data.agencies) items = asOfQueueItems(items, data);
+  }
   if(!scope || !id) return items;
   const key = scope==="agency" ? "agencyId" : scope==="collection" ? "collectionId" : "datasetId";
   return items.filter(i=> i[key] === id);
+}
+
+// THE QUEUE AS AT THE DATE ON SHOW (REQ-DASH-133 criterion 9, and the
+// delivery critic's first finding, 2026-10-05): the build's queue is
+// judged as at the build, so on a past date it listed periods that had
+// not closed yet, beside a banner that correctly did not. Two changes:
+//   - a closed, unfilled period comes from the page's own as-of reading
+//     (ds.noSupply, from the instants the build embeds), never from the
+//     build's list - one item per run of consecutive periods;
+//   - anything else the build observed AFTER the date on show is left
+//     out, since a reader on that date could not have seen it. What was
+//     open then and resolved since cannot be put back from a queue
+//     judged now; REQ-DASH-070 criterion 14 owns that.
+function asOfQueueItems(items, data){
+  const kept = items.filter(i=> i.kind !== "closed-unfilled-slot"
+    && !(i.observedAt && typeof CURRENT_AS_OF !== "undefined"
+         && assetDateStrOf(i.observedAt) > CURRENT_AS_OF));
+  const gaps = [];
+  data.agencies.forEach(ag=> ag.collections.forEach(col=> col.datasets.forEach(ds=>{
+    (ds.noSupply || []).forEach(g=> gaps.push({
+      kind: "closed-unfilled-slot", severity: "needs-action", blocking: false,
+      redsDataset: true, agencyId: ag.id, collectionId: col.id, datasetId: ds.id,
+      headline: `${ds.name}: ${gapText(g)}`,
+      detail: "Closed with nothing in it - a file arriving now is filed to the open period, not to this one.",
+      responses: ["substitute an earlier period's supply", "mark it as not supplied",
+                  "re-file a late file into it"]}));
+  })));
+  return [...gaps, ...kept];
 }
 
 // CRITERION 2: a per-scope count on each affected agency and
@@ -4222,7 +4271,7 @@ function outstandingMarker(scope, id, source, noSupply){
 // criterion 5): out of the roll-up, still on the card, in words.
 function acceptedGapsMarker(n){
   if(!n) return "";
-  return `<div class="accepted-gaps-marker" style="margin-top:4px; font-size:11.5px; color:var(--ink-faint);">
+  return `<div class="accepted-gaps-marker" style="margin-top:4px; font-size:11.5px; color:var(--ink-muted);">
     ${n} ${pluralize(n,"dataset")} with a period accepted as not supplied</div>`;
 }
 
@@ -4264,7 +4313,7 @@ function outstandingItemHtml(item){
       ${eventSeverityPill(item.severity,"sm")}
       <b style="font-weight:650;">${escHtml(outstandingKindLabel(item.kind))}</b>
       <span>${escHtml(item.headline||"")}</span>
-      <span class="pill ${item.blocking?"ev ev-action":"ev ev-info"} sm"><span class="ico"></span>${item.blocking?"Blocks a supply":"Needs review"}</span>
+      <span class="pill ${(item.blocking||item.redsDataset)?"ev ev-action":"ev ev-info"} sm"><span class="ico"></span>${item.blocking?"Blocks a supply":item.redsDataset?"Makes its dataset red":"Needs review"}</span>
       ${when}
     </div>
     <div class="queue-detail">${escHtml(item.detail||"")}</div>
@@ -4293,17 +4342,19 @@ function outstandingQueue(scope, id, source){
     </div>`;
   }
   const blocking = items.filter(i=>i.blocking).length;
-  const review = items.length - blocking;
+  const reds = items.filter(i=>!i.blocking && i.redsDataset).length;
+  const review = items.length - blocking - reds;
   const parts = [];
   if(blocking) parts.push(`<b style="display:inline">${blocking}</b> blocking a supply`);
+  if(reds) parts.push(`<b style="display:inline">${reds}</b> ${reds===1?"period":"runs of periods"} with no supply`);
   if(review) parts.push(`<b style="display:inline">${review}</b> needing review`);
   return `<div class="notice-queue" role="status">
     <b>${items.length} ${pluralize(items.length,"thing")} waiting for a person${where} — ${parts.join(", ")}</b>
     <div style="color:var(--ink-muted); font-size:13px; margin-bottom:2px;">
-      A held supply, two files for one table, and a supply that could not be loaded each
-      turn their dataset red until someone resolves them (REQ-PIPE-115, REQ-DASH-148). The
-      rest are events in our own processing of a supply, not verdicts on anybody's data,
-      and change no status.
+      A held supply, two files for one table, a supply that could not be loaded, and a
+      period that closed with no supply each turn their dataset red until someone resolves
+      them (REQ-PIPE-115, REQ-DASH-148, REQ-DASH-133). The rest are events in our own
+      processing of a supply, not verdicts on anybody's data, and change no status.
     </div>
     ${items.map(outstandingItemHtml).join("")}
   </div>`;
@@ -4499,12 +4550,16 @@ function renderAgency(view, agencyId){
           // run" row - a period cannot read both as nothing-yet and as
           // missing. A dataset WITH a current run keeps its row, and says
           // the gap beneath its name instead (below).
-          if(ds.noSupply && ds.noDataAsOf){
+          // ONLY WHERE NOTHING HAS EVER ARRIVED (UX critic, 2026-10-05):
+          // keying this on noDataAsOf flipped a daily feed's row to the
+          // reason row whenever today's file was not in yet, hiding the
+          // period actually late and still open, and the arrivals before it.
+          if(ds.noSupply && !ds.lastArrival){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}' data-no-supply="${ds.noSupply.length}">
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
               <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">No supply — ${escHtml(ds.noSupply.map(gapText).join("; "))}.
-                The period has closed, so a person decides: substitute an earlier supply, re-file a late one, or accept it as not supplied</td>
+                Closed with nothing in it, so a person decides: substitute an earlier supply, re-file a late one, or accept it as not supplied</td>
             </tr>`;
           }
           if(ds.scheduleExhausted){
@@ -4515,7 +4570,7 @@ function renderAgency(view, agencyId){
                 ${ds.scheduleExhausted.lastPeriod} — no supply expected, and QA cannot run until dates are added</td>
             </tr>`;
           }
-          if(ds.noDataAsOf){
+          if(ds.noDataAsOf && !ds.noSupply){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
               <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
@@ -4579,31 +4634,26 @@ function renderAgency(view, agencyId){
 // second drill-down mechanism, since setting as-of to a specific real
 // run_date already makes clipDatasetToAsOf() pick that exact run as the
 // effective one everywhere else on this same page.
-// running-thoughts.md #6 ("read-only tension: accepting/rejecting amber
-// supplies") - AMBER_DECISIONS is keyed by dataset_id then run_id
-// (qa_tools/common/acceptance_sync.py, matched purely by comment
-// timestamp against that run's own real arrival window - no run_id
-// ever typed by anyone; most-recent-comment-wins if a run somehow gets
-// both a /accept and a /reject). Deliberately gated on
-// `status==="amber"` here, not just "does a record exist": a decision
-// comment's timestamp could in principle fall inside a run that was
-// actually red or green (e.g. someone commented early or the check
-// history hasn't been rebuilt yet) - this badge is specifically an
-// AMBER acknowledgment, so it only ever renders on a row this page ALSO
-// independently computed as amber, never silently relabelling a red or
-// green row. The pill itself never changes color either way - Keith's
-// own explicit call, AskUserQuestion, both for accept (2026-09-18) and
-// again for reject (2026-09-19, resolving plans/conceptual-design.md
-// Thread A's own parked amber-governance question: option 3, an
-// explicit per-run human decision, but the smaller/safer "badge only"
-// treatment rather than repainting the pill red).
-function amberDecisionBadge(datasetId, runId, status){
-  if(status!=="amber") return "";
-  const d = AMBER_DECISIONS[datasetId] && AMBER_DECISIONS[datasetId][runId];
-  if(!d) return "";
-  const icon = d.decision==="reject" ? "✗" : "✓";
-  const verb = d.decision==="reject" ? "Rejected" : "Accepted";
-  return `<a href="${d.comment_url}" target="_blank" rel="noopener" class="pill tag sm" title="${verb} ${fmtDate(new Date(d.decided_at))} - click to view the real comment" onclick="event.stopPropagation()"><span class="ico"></span>${icon} ${verb} by ${d.decided_by}</a>`;
+// WHETHER A PROMOTED AMBER SUPPLY WAS ACKNOWLEDGED (REQ-PIPE-122
+// criterion 21), which replaced REQ-QAC-017's per-run /accept. The build
+// embeds, per run, the instants that decide it (pipeline/
+// acknowledgements.py) and the page compares them with the date on show:
+// awaiting from the promotion, acknowledged from the acknowledgement, and
+// nothing once the supply left its period - the debt lapsed rather than
+// stayed outstanding (criterion 16). The pill's own colour never changes;
+// this is a badge beside it, in words.
+function acknowledgementBadge(datasetId, runId, asOfDateStr){
+  const raw = rawRealDatasetById(datasetId);
+  const a = raw && raw.acknowledgements && raw.acknowledgements[runId];
+  if(!a) return "";
+  const on = asOfDateStr || (typeof CURRENT_AS_OF !== "undefined" ? CURRENT_AS_OF : null);
+  const by = v => !on || (v && assetDateStrOf(v) <= on);
+  if(!by(a.promotedAt)) return "";
+  if(a.acknowledged && by(a.acknowledged.at)){
+    return `<span class="pill tag sm" data-acknowledged title="${escHtml(a.acknowledged.reason)}"><span class="ico"></span>✓ Acknowledged by ${escHtml(a.acknowledged.actor)}, ${fmtInstant(a.acknowledged.at)}</span>`;
+  }
+  if(a.lapsedAt && by(a.lapsedAt)) return "";
+  return `<span class="pill tag sm" data-awaiting-acknowledgement><span class="ico"></span>Amber, promoted - awaiting acknowledgement</span>`;
 }
 function renderSupplyCycleRows(entries, datasetId){
   return entries.map(e => {
@@ -4615,7 +4665,7 @@ function renderSupplyCycleRows(entries, datasetId){
     // chain), so it's shown directly rather than the old, dropped
     // dirtySeverity pill (a synthetic-generation-only concept no real
     // production dashboard would have - item 72).
-    const statusBadge = pill(e.status, "sm") + " " + amberDecisionBadge(datasetId, e.run_id, e.status);
+    const statusBadge = pill(e.status, "sm") + " " + acknowledgementBadge(datasetId, e.run_id);
     // A resupply (any entry after the first in its chain) has no real
     // arrivalStatus (item 69's own reasoning, now keyed off real chain
     // position) - shows how long it's been since the previous supply/
@@ -4698,7 +4748,7 @@ function gapHistoryRows(ds, asOfDateStr){
           const mark = g.marks[g.marks.length-1];
           return `<tr data-gap="${g.accepted ? "accepted" : "open"}">
             <td class="mono">${escHtml(g.periods.length === 1 ? fmtPeriodOrDay(g.periods[0]) : `${fmtPeriodOrDay(g.periods[0])} to ${fmtPeriodOrDay(g.periods[g.periods.length-1])}`)}</td>
-            <td>${g.accepted ? pill("nodata","sm") : pill("red","sm")}</td>
+            <td>${g.accepted ? `<span class="pill tag sm"><span class="ico"></span>Accepted</span>` : pill("red","sm")}</td>
             <td>${g.accepted
               ? `<b>Not supplied (accepted)</b>${mark ? ` <span style="color:var(--ink-faint);">— ${escHtml(mark.actor)}, ${fmtInstant(mark.at)}</span><div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(mark.reason)}</div>` : ""}`
               : `<b>No supply</b> <span style="color:var(--ink-faint);">— ${escHtml(gapText(g))}; waiting for a person</span>`}</td>
@@ -4865,7 +4915,8 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           closed with nothing in ${ds.noSupply.length === 1 && ds.noSupply[0].periods.length === 1 ? "it" : "them"}, so a file arriving
           now is filed to the open period instead. A person decides: substitute an earlier
           period's supply, re-file a late file into it, or accept it as not supplied
-          (<code>mothman supply decide --operation mark-not-supplied --dataset ${escHtml(ds.id)} --period &lt;period&gt;</code>).
+          (<code>mothman supply decide --operation mark-not-supplied --dataset ${escHtml(ds.id)} --period &lt;period&gt; --reason '&lt;why&gt;'</code>,
+          with the period as the schedule names it${/^\d{4}-\d{2}-\d{2}$/.test(ds.noSupply[0].periods[0]) ? " - a day is written year, month, day, with hyphens" : ""}).
         </div>
       </div>` : "";
   const acceptedGapsNote = ds.acceptedGaps ? `

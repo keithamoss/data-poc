@@ -48,7 +48,8 @@ def promote(conn: supply_db.SupplyConnection, *,
             effective_at: str,
             reason: str | None = None,
             supply_is_red: bool = False,
-            from_schema: str | None = None) -> bool:
+            from_schema: str | None = None,
+            amber=None) -> bool:
     """Move this supply's tables into `period` and record the decision.
 
     Returns True where it promoted, False where the supply was already
@@ -85,6 +86,11 @@ def promote(conn: supply_db.SupplyConnection, *,
         to_slot=period,
         reason=reason,
         supply_is_red=supply_is_red,
+        # REQ-PIPE-122 criterion 19: the setting an automatic amber
+        # promotion acted under. None for everything else.
+        amber_setting=amber.value if amber else None,
+        amber_level=amber.level if amber else None,
+        amber_version=amber.version if amber else None,
     )
 
     # A supply usually comes from staging, but a rejection being
@@ -143,6 +149,13 @@ def filled_slots(conn: supply_db.SupplyConnection, dataset_id: str) -> frozenset
 # `supply_is_red`. A gate that went browsing for its own inputs could not
 # be asked a hypothetical, which is most of what its tests do.
 # ---------------------------------------------------------------------------
+
+#: REQ-PIPE-122: the amber setting's strictest value, and what the gate
+#: says when it applies. The words "amber, waiting for a person" are this
+#: state's own label - deliberately not "held" (criterion 18).
+AMBER_HOLD = "hold"
+AMBER_WAITING_REASON = ("this supply is amber and its amber setting is hold, so it "
+                        "is not promoted automatically - amber, waiting for a person")
 
 #: Statuses that promote themselves into an empty slot (criterion 1).
 #: Amber is included on purpose: an amber supply is usable data with
@@ -209,7 +222,8 @@ def should_promote(*, status: str,
                    has_active_checks: bool,
                    decided_by_a_person: bool = False,
                    contested: bool = False,
-                   inherited: bool = False) -> tuple[bool, str | None]:
+                   inherited: bool = False,
+                   amber_setting: str | None = None) -> tuple[bool, str | None]:
     """Whether automation may promote this supply, and why not if not.
 
     The reason is not decoration: "not promoted" with no explanation is
@@ -258,6 +272,10 @@ def should_promote(*, status: str,
         # Criterion 3.
         return False, (f"this supply's status is {status} rather than green or "
                        "amber, so it waits for a person")
+    if status == "amber" and amber_setting == AMBER_HOLD:
+        # REQ-PIPE-122 criterion 10. Never "held" (criterion 18) - that
+        # word means a supply filed to no slot.
+        return False, AMBER_WAITING_REASON
     if slot_filled:
         # Criterion 4, whatever the status.
         return False, ("this supply's slot is already filled by a promoted "
@@ -324,7 +342,8 @@ def promote_each(conn: supply_db.SupplyConnection,
                           actor=actor, actor_kind=actor_kind,
                           effective_at=effective_at,
                           reason=item.get("reason", reason),
-                          supply_is_red=item.get("supply_is_red", False))
+                          supply_is_red=item.get("supply_is_red", False),
+                          amber=item.get("amber"))
         except Exception as exc:
             # DELIBERATELY BROAD. Anything one dataset's promotion can
             # raise - a missing table, a refused decision, a lock timeout
@@ -584,7 +603,7 @@ def after_run(conn: supply_db.SupplyConnection, *,
     the thirtieth was odd is a step somebody turns off, which is the
     same blast-radius rule this batch applies everywhere.
     """
-    from qa_tools.common import inheritance, rejection
+    from qa_tools.common import amber_setting, inheritance, rejection
 
     work: list[dict] = []
     refused: dict[str, str] = {}
@@ -599,6 +618,16 @@ def after_run(conn: supply_db.SupplyConnection, *,
             # verdict readable, so this is a supply waiting for a person.
             refused[dataset_id] = str(exc)
             continue
+        # THE AMBER SETTING, resolved only for an amber supply and as at
+        # the instant this decision takes effect (REQ-PIPE-122 criterion 4).
+        # A configuration that cannot answer is a refusal, never a default.
+        amber = None
+        if status == "amber":
+            try:
+                amber = amber_setting.resolve(dataset_id, effective_at)
+            except amber_setting.AmberSettingError as exc:
+                refused[dataset_id] = str(exc)
+                continue
         ok, why = should_promote(
             # NO PERIOD IS THE SAME REFUSAL AS A HELD SUPPLY, and saying
             # so here rather than inventing a fourth reason keeps the
@@ -615,14 +644,20 @@ def after_run(conn: supply_db.SupplyConnection, *,
                        and inheritance.inherited(conn, dataset_id, period) is not None),
             decided_by_a_person=rejection.decided_by_a_person(
                 conn, dataset_id, item["supply"]),
+            amber_setting=amber.value if amber else None,
         )
         if not ok:
             refused[dataset_id] = why or "refused"
+            if why == AMBER_WAITING_REASON:
+                _record_amber_waiting(conn, agency_id=agency_id,
+                                      collection_id=collection_id, dataset_id=dataset_id,
+                                      supply=item["supply"], period=period, amber=amber,
+                                      effective_at=effective_at)
             continue
         work.append({"dataset_id": dataset_id, "supply": item["supply"],
                      "period": period,
                      "physical_tables": item["physical_tables"],
-                     "reason": AUTOMATIC_REASON})
+                     "reason": AUTOMATIC_REASON, "amber": amber})
 
     promoted, failed = promote_each(
         conn, work, agency_id=agency_id, collection_id=collection_id,
@@ -632,6 +667,27 @@ def after_run(conn: supply_db.SupplyConnection, *,
         period="", actor=actor, actor_kind=actor_kind,
         effective_at=effective_at)
     return AfterRun(promoted=tuple(promoted), refused=refused, failed=failed)
+
+
+def _record_amber_waiting(conn, *, agency_id: str, collection_id: str, dataset_id: str,
+                          supply: str, period: str, amber, effective_at: str) -> None:
+    """REQ-PIPE-122 criteria 10 and 19: under hold, the rule records that
+    it stood back and the setting it stood back under - a promotion-
+    withheld note, which changes nothing a slot holds. Recorded once per
+    supply: a retry finds it and records nothing more."""
+    already = conn.execute(
+        f"SELECT 1 FROM {decision_log.TABLE} WHERE dataset_id = ? AND action = ? "
+        "AND supply = ? AND amber_setting = ?",
+        [dataset_id, decision_log.PROMOTION_WITHHELD, supply, AMBER_HOLD]).fetchall()
+    if already:
+        return
+    with decision_log.apply_decision(conn, decision_log.Decision(
+            agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
+            action=decision_log.PROMOTION_WITHHELD, supply=supply, actor=RULE_ACTOR,
+            actor_kind=decision_log.RULE, effective_at=effective_at, to_slot=period,
+            reason=AMBER_WAITING_REASON, amber_setting=amber.value,
+            amber_level=amber.level, amber_version=amber.version)):
+        pass
 
 
 def after_runs(found_arrivals, results: Sequence[dict], *,

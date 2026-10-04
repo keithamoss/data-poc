@@ -503,11 +503,13 @@ class TestEveryOperationIsReachableFromSomeDoor:
         assert not offered & set(fd.PERIOD_SCOPED)
         assert fd.PROMOTE in offered
 
-    def test_between_the_two_doors_all_nine_are_reachable(self, monkeypatch):
-        """Eight, and mark as not supplied on a CLOSED period (REQ-PIPE-132)."""
+    def test_between_the_two_doors_all_ten_are_reachable(self, monkeypatch):
+        """Eight, mark as not supplied on a CLOSED period (REQ-PIPE-132),
+        and acknowledge on a promotion owing one (REQ-PIPE-122)."""
         reachable = set()
         for flow, states in (
                 (filing_tui.queue_flow, [(slot_state.AWAITING_DECISION, False),
+                                          (slot_state.AWAITING_ACKNOWLEDGEMENT, False),
                                           (slot_state.REJECTED, False)]),
                 (filing_tui.period_flow, [(slot_state.PROMOTED, False),
                                            (slot_state.OVERDUE, False),

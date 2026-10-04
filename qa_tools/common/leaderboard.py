@@ -70,8 +70,21 @@ import json
 import os
 import subprocess
 
-from qa_tools.common.acceptance_sync import list_ticket_numbers
+from qa_tools.common.ticket_sync import TICKET_LABEL
 from qa_tools.common.people import assignees_for
+
+
+def list_ticket_numbers(owner: str, repo: str) -> list[int]:
+    """Every qa-ticket issue this project has ever opened, open or closed.
+
+    MOVED HERE from acceptance_sync.py when REQ-PIPE-122 criterion 23
+    retired that module with REQ-QAC-017's per-run /accept - this was the
+    one piece of it anything else still used."""
+    out = subprocess.run(
+        ["gh", "issue", "list", "--repo", f"{owner}/{repo}", "--label", TICKET_LABEL,
+         "--state", "all", "--json", "number", "--limit", "100"],
+        capture_output=True, text=True, check=True).stdout
+    return [issue["number"] for issue in json.loads(out)]
 
 
 def _run_gh(args: list[str]) -> str:

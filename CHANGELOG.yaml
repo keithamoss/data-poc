@@ -146,6 +146,13 @@ releases:
               red and says "no supply", naming the periods. Each agency card
               counts what is waiting for you in one line, by kind. Periods
               you accepted show quietly with your reason.
+          - headline: You choose what happens to an amber supply
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              One setting - hold, promote-and-acknowledge or promote - for the
+              whole asset, a collection or a dataset. Under hold an amber supply
+              waits for you; under promote-and-acknowledge it is promoted and you
+              are asked to acknowledge it, with a reason, from the queue.
           - headline: You can reject a supply that could not be loaded
             components: ["Pipeline & publishing"]
             description: >
@@ -154,6 +161,18 @@ releases:
               promoting it is refused, since there is nothing to promote.
       - category: Fixed
         items:
+          - headline: A period emptied after it closed reads as having no supply again
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              A closed period that was filled and later emptied - say by
+              undoing a substitution - stayed green on the dashboard. It now
+              reads red again from the moment it was emptied.
+          - headline: The dashboard's to-do panel follows the date you are viewing
+            components: ["Dashboard UI"]
+            description: >
+              Looking at a past date no longer lists periods that had not
+              closed yet. A resupply waiting for your decision is no longer
+              counted as a period with no supply.
           - headline: A supply nobody could place is no longer checked anyway
             components: ["Pipeline & publishing"]
             description: >

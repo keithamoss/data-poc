@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 20
+SCHEMA_VERSION = 21
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -627,7 +627,25 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
     CHECK (action IN ('promote', 'reject', 'demote', 'refile',
                       'substitute', 'de-substitute',
                       'inherit', 'inherit-refused', 'un-inherit',
-                      'promotion-withheld', 'mark-not-supplied'));
+                      'promotion-withheld', 'mark-not-supplied', 'acknowledge'));
+-- THE AMBER SETTING A RULE ACTED UNDER (REQ-PIPE-122 criteria 5, 11 and
+-- 19) - value, level and version - on every automatic promotion of an
+-- amber supply and on the withheld note under hold. Schema 21, additive.
+-- acknowledgement_owed is DERIVED from the value rather than stored beside
+-- it, so the two can never disagree.
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS amber_setting text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS amber_level text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS amber_version text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS acknowledgement_owed boolean
+    GENERATED ALWAYS AS (action = 'promote' AND amber_setting = 'promote-and-acknowledge') STORED;
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_amber_setting_known;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_amber_setting_known
+    CHECK (amber_setting IS NULL
+           OR amber_setting IN ('hold', 'promote-and-acknowledge', 'promote'));
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_acknowledge_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_acknowledge_shape
+    CHECK (action <> 'acknowledge'
+           OR (actor_kind = 'person' AND to_slot IS NOT NULL AND reason IS NOT NULL));
 -- A MARK AS NOT SUPPLIED names the period it accepts as missed and no
 -- supply (REQ-PIPE-132, version 20).
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_mark_not_supplied_shape;

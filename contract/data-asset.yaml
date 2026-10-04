@@ -115,6 +115,29 @@ ticket_policy: needs-action
 # never sets it.
 synthetic: true
 
+# WHAT HAPPENS TO AN AMBER SUPPLY (REQ-PIPE-122). One setting, three
+# values, strictest first:
+#   hold                     - never promoted automatically; it waits,
+#                              staged, for a person to promote or reject
+#   promote-and-acknowledge  - promoted into an unfilled slot, and a
+#                              person is asked to acknowledge they looked
+#   promote                  - promoted into an unfilled slot, nothing asked
+# Stated here for the whole asset and, optionally, on a collection or a
+# dataset in the hierarchy below - the nearest level that states one
+# wins. NO DEFAULT: an asset that says nothing is refused.
+#
+# EFFECTIVE-DATED VERSIONS, like a calendar's. A version whose date has
+# passed is FROZEN - change the setting by adding a new version dated
+# today or later. Every automatic promotion records the value, the level
+# and the version it acted under, so the past is read from that record
+# and never recomputed from this file.
+amber_setting:
+  versions:
+    - effective_from: "2023-01-01"
+      value: promote
+      changelog:
+        - "2023-01-01: amber promotes itself into an unfilled slot - unchanged from before the setting existed (REQ-PIPE-075)."
+
 
 calendars:
   - name: quarterly

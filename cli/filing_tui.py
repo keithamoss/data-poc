@@ -82,6 +82,8 @@ _WHAT_IT_DOES = {
     filing_decisions.UN_INHERIT: "un-inherit - remove the inheritance",
     filing_decisions.MARK_NOT_SUPPLIED: ("mark as not supplied - accept that this closed "
                                          "period was missed, with a reason"),
+    filing_decisions.ACKNOWLEDGE: ("acknowledge - say you have looked at this amber "
+                                   "supply and why it is acceptable"),
 }
 
 _HOW_IT_READS = {
@@ -96,6 +98,10 @@ _HOW_IT_READS = {
     slot_state.SUBSTITUTED: "[blue]substituted[/blue]",
     slot_state.INHERITED: "[blue]inherited[/blue]",
     slot_state.NOT_SUPPLIED_ACCEPTED: "[dim]not supplied (accepted)[/dim]",
+    # REQ-PIPE-122 criteria 17 and 18: each distinguishable from a red
+    # supply awaiting a decision, and the first never called "held".
+    slot_state.AMBER_WAITING: "[yellow]amber, waiting for a person (amber setting: hold)[/yellow]",
+    slot_state.AWAITING_ACKNOWLEDGEMENT: "[yellow]promoted, awaiting acknowledgement[/yellow]",
     filing_queue.COULD_NOT_LOAD: "[red]could not be loaded[/red]",
 }
 

@@ -2083,6 +2083,37 @@ judgement about who reads the page rather than about the rule.
         the gap cascade first. Recommendation: (c) then (b). Left unbuilt
         rather than taken on my recommendation because either answer
         changes what every dataset page shows.
+      - SPRINT 7 CLOSED (0f96148) AND ITS CRITICS (post-build-review #104
+        UX, #105 delivery). The delivery critic found a HIGH FALSE GREEN, now
+        FIXED: a closed period filled and then emptied again (substituted then
+        de-substituted, promoted then demoted) read as filled on the page for
+        ever - the build had recorded only the first fill. It now embeds every
+        change to what the slot holds, from qa.slot_holds. Also fixed: a
+        resupply waiting in a closed period was listed as "no supply" and could
+        be marked not supplied; the page's to-do queue was judged as at the
+        build (past dates listed periods not yet closed) and said those items
+        change no status; a daily feed's row hid the late-but-open day behind
+        an old gap; red notices were drawn in the all-clear grey; the banner's
+        command lacked --reason; marking a substituted period named the wrong
+        undo. FOR KEITH (#104): which route the no-supply banner should name
+        (mark-not-supplied alone, all three, the wizard, or "chase the
+        supplier" first), and whether a daily feed's late-but-open day should
+        be named on the row beside an old gap.
+      - SPRINT 8 (in progress): REQ-PIPE-122 BUILT - one amber setting, three
+        values (hold / promote-and-acknowledge / promote), at asset,
+        collection or dataset level, effective-dated and frozen in the past
+        (schema gate refuses altering or removing a past version, or adding
+        one dated before today unless the asset is synthetic). Hold records a
+        withheld note and the supply reads "amber, waiting for a person";
+        promote-and-acknowledge promotes and asks for ACKNOWLEDGE - the tenth
+        filing decision, person and reason, both routes - which lapses if the
+        supply leaves its period. Every amber promotion records the setting,
+        level and version (schema 21, additive). REQ-QAC-017 RETIRED: the
+        per-run /accept, acceptance_sync.py and `mothman github
+        sync-acceptances` are gone; the dashboard shows "awaiting
+        acknowledgement" / "Acknowledged by" instead. PROVISIONAL: the asset
+        states promote (unchanged behaviour); a second acknowledgement is
+        refused rather than "already so" (criterion 14 over 082 c26).
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

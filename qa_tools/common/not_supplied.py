@@ -104,18 +104,34 @@ def mark(conn: supply_db.SupplyConnection, *, agency_id: str, collection_id: str
             f"substitute --dataset {dataset_id} --period {period} --stands-on <period>`.")
     h = decision_log.held(conn, dataset_id, period)
     if h and h.held_as is not None:
+        # THE UNDO THAT MATCHES HOW IT IS HELD (delivery-critic #105): a
+        # substituted or inherited period is undone by removing the
+        # indirection, never by demoting the supply it stands on.
+        undo = {decision_log.SUBSTITUTED: "de-substitute",
+                decision_log.INHERITED: "un-inherit"}.get(h.held_as)
+        command = (f"`mothman supply decide --operation {undo} --dataset {dataset_id} "
+                   f"--period {period} --reason '<why>'`" if undo else
+                   f"`mothman supply decide --operation demote --dataset {dataset_id} "
+                   f"--period {period} --supply {h.holder} --reason '<why>'`")
         raise decision_log.DecisionRefused(
-            f"{period} is {h.held_as} for {dataset_id}, so it was supplied. To take "
-            f"that back out: `mothman supply decide --operation demote --dataset "
-            f"{dataset_id} --period {period} --supply {h.holder}`.")
-    awaiting = [f for f in filing.filings_of(dataset_id) if f.get("slot") == period]
-    if awaiting and not h:
+            f"{period} is {h.held_as} for {dataset_id}, so it is answered. To take "
+            f"that back out: {command}.")
+    # ANY SUPPLY FILED HERE THAT NOBODY REJECTED is waiting for a decision
+    # (criteria 3 and 6) - including a resupply filed after an earlier
+    # supply was rejected, which the first cut let through because a
+    # decision existed (delivery-critic #105). Each command is pasteable.
+    from qa_tools.common import slot_state
+
+    awaiting = [f for f in filing.filings_of(dataset_id) if f.get("slot") == period
+                and not slot_state._rejected(conn, dataset_id, f.get("supply_id"))]
+    if awaiting:
         supply = awaiting[-1].get("supply_id")
         raise decision_log.DecisionRefused(
             f"{period} has a supply waiting for a decision ({supply}), so it is not "
             f"unsupplied - decide that supply instead: `mothman supply decide "
-            f"--operation promote|reject --dataset {dataset_id} --period {period} "
-            f"--supply {supply}`.")
+            f"--operation promote --dataset {dataset_id} --period {period} "
+            f"--supply {supply} --reason '<why>'`, or the same with `--operation "
+            f"reject`.")
     decision = decision_log.Decision(
         agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
         action=decision_log.MARK_NOT_SUPPLIED, supply="", actor=actor,
