@@ -1932,6 +1932,28 @@ judgement about who reads the page rather than about the rule.
         plainly: bd2f9d0 went out with that module's distribution backstop
         still red - its commit was gated on the gate's exit code, not the
         test run's. Fixed in 0a9ac43; commits are gated on both from here.
+      - SPRINT 4 DONE: REQ-PIPE-144 BUILT (+ REQ-PIPE-107 c13-14). Schema v18:
+        a filing links to its delivery and keeps no receipt; each delivered
+        file keeps its own; ONE view gives a supply's receipt, another a
+        delivery's contested files. ensure_schema refuses an older reshaped
+        schema and a newer one (the 99 -> 17 downgrade reproduced first).
+        Delivery records are permanent (prune gone); `pipeline run` and
+        `bootstrap --force` refuse over existing history; `mothman env
+        reset-synthetic` is the one deletion path; regenerate-history and
+        delete_history retired; arrival history fixed (#76). PROOF: two
+        bootstraps from empty, before/after, compared field by field
+        (dashboard data, queue, supply filings/deliveries, 125 ticket
+        bodies) - ZERO content differences. 276 deployed-database tests and
+        2,906 others green. PROVISIONAL (five, on 144's decisions): the
+        `synthetic: true` key; reset also drops supply schemas; what counts
+        as "history"; plain bootstrap refused over history too; reset
+        refuses non-synthetic AND production. **NEEDS KEITH: 144 c14/c42
+        are UNOWNED** - nothing lets a person choose a file of a contested
+        pair yet. **AND THE REAL `supply` DATABASE IS NOW REFUSED** (v17):
+        `mothman env reset-synthetic` then `mothman pipeline bootstrap`
+        rebuilds it - I have not run the reset on it. Scratch databases to
+        drop: supply131, supply131b, equiv144_before, equiv144_after,
+        gate144, equiv_after.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

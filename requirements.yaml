@@ -25859,7 +25859,68 @@ requirements:
       date: '2026-10-04'
     story: As whoever maintains the pipeline, I want every fact in the qa metadata schema recorded in exactly one place, and delivery records kept as permanent history, so that two copies of a fact can never disagree and a filing can always say which delivery it came from.
     moscow: should
-    status: not_started
+    status: built
+    linked_tests:
+    - tests/test_schema_version_refusal.py
+    - tests/test_reset_synthetic.py
+    - tests/test_filing.py
+    - tests/test_refiling.py
+    - tests/test_delivery_log.py
+    - tests/test_delivery_hold_retired.py
+    - tests/test_cli_pipeline.py
+    - tests/test_history_rekey.py
+    - tests/test_arrival_history.py
+    implemented_by:
+    - qa_tools/common/qa_store.py::ensure_schema
+    - qa_tools/common/qa_store.py::_refuse_another_version
+    - qa_tools/common/filing.py::record
+    - qa_tools/common/filing.py::filing_for
+    - qa_tools/common/filing.py::filings_of
+    - qa_tools/common/filing.py::received_at_of
+    - qa_tools/common/filing.py::recorded_arrival
+    - qa_tools/common/delivery_log.py::record
+    - qa_tools/common/delivery_log.py::records
+    - qa_tools/common/delivery_log.py::supply_ids
+    - qa_tools/common/arrival_history.py::arrivals_of
+    - qa_tools/common/bootstrap.py::holds_history
+    - qa_tools/common/bootstrap.py::bootstrap
+    - qa_tools/common/synthetic_reset.py::reset
+    - cli/env.py::reset_synthetic_command
+    - cli/pipeline.py::run_command
+    unmet_criteria:
+    - criterion: >-
+        Criteria 14 and 42 - when a person chooses which file of a contested
+        pair is the supply, take that file's own receipt and write a new
+        filing where it differs.
+      why: >-
+        Nothing lets a person choose a file of a contested pair yet: no
+        filing decision offers it, on either route. The receipt view already
+        reads per-file receipts from qa.delivery_file, so the choice has what
+        it needs to read once it exists; the decision itself is not this
+        requirement's to invent.
+      owner: >-
+        Keith - no requirement owns the contested-pair choice today
+        (REQ-GHUB-082's decisions do not list it), so it needs placing.
+      blocked_by:
+        unowned: true
+    evidence:
+    - >-
+      2026-10-04 (overnight sprint 4): the criterion 30 comparison. Two
+      bootstraps from EMPTY databases, the same Perth day, the same server
+      - `equiv144_before` on 0a9ac43, `equiv144_after` on this change - then
+      both built dashboard data files, the outstanding queue, `mothman supply
+      deliveries`, `mothman supply filings` for all seven datasets and 125
+      composed ticket bodies compared field by field: ZERO differences in
+      content. What differed: `observedAt` on the nine held supplies (when
+      each hold was raised - clock), a decision_id interleave between the two
+      collections writing in parallel (surrogate), and the checkout's path
+      inside a Python warning. arrivedAt byte-identical (criterion 32).
+    - >-
+      2026-10-04: against equiv144_after, the 276 tests that need a deployed
+      database passed; the other 2,906 passed against per-worker databases.
+      The newer-schema downgrade was reproduced before the fix - a database
+      recorded at version 99 came back recorded at 17
+      (tests/test_schema_version_refusal.py, failing first).
     source: Keith, asked 2026-10-04 after an audit of the live qa schema; drafted by delivery-scoper the same day, reviewed by delivery-architect, and revised with Keith's answers of 2026-10-04 (receipt option A, pruning option E, considered slots kept as a column, placement straight after REQ-PIPE-131).
     acceptance_criteria:
     - THE SYSTEM SHALL NOT store a JSON document of the assignment on a qa.filing row; the record column SHALL be removed.
@@ -25958,6 +26019,9 @@ requirements:
     - 'CHOOSING A FILE RE-FILES IT WHERE ITS OWN RECEIPT DIFFERS (Keith, 2026-10-04). Example: A at 11:58pm on the deadline, B at 12:03am; the pair is filed on time from A; choosing B writes a new filing saying late. REJECTED leaving the filing as made, which would leave the filing and the chosen file''s receipt disagreeing about the same supply.'
     - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
     - regenerate-history IS RETIRED (Keith, 2026-10-04), rather than kept beside reset-synthetic as a second deletion path; and reset-synthetic's refusal keys off the asset's synthetic declaration, the same lock regenerate-history was given, rather than the environment name production.
+    - "BUILT 2026-10-04 (overnight sprint 4). PROVISIONAL, each listed in the morning report: (1) the synthetic declaration is a top-level `synthetic: true` in contract/data-asset.yaml (schemas.DataAsset.synthetic, default False) - REQ-GEN-135 criterion 8 can reuse it; (2) reset-synthetic drops the qa schema AND every supply-row schema (staging, periods, rejected, run views, trials), because rebuild-from-empty means the warehouse too; (3) 'already holds QA history' means any row in qa.run, qa.delivery, qa.filing or qa.decision; (4) bootstrap without --force over history that has emptied staging is refused too, not only --force; (5) reset refuses BOTH a non-synthetic asset (criterion 43) AND a production checkout (criterion 22), rather than reading 43 as replacing 22."
+    - "ALSO RETIRED IN THIS CHANGE: qa_store.delete_history(), the per-collection delete regenerate-history used - a second deletion path is what criterion 23 rules out. REQ-PIPE-067 criterion 5's trace of what caused a re-file now waits on REQ-PIPE-141's decision-log entry (criterion 8 took it off the filing; refile() has no production caller)."
+    - "CONSEQUENCE FOR EXISTING DATABASES, stated rather than discovered: every database built before this (the real `supply`, the scratch `supply131`/`supply131b`) is at version 17 and is now REFUSED by ensure_schema, with the reset-synthetic remedy named - which is criterion 29 working."
     open_questions: []
 
   - id: REQ-QAC-145
