@@ -379,7 +379,7 @@ def promote_after(arrival, got: list[dict], run_by: str) -> None:
     promotion.report(promotion.after_runs(
         [arrival], got,
         agency_id=cp_common.AGENCY_ID, collection_id=cp_common.COLLECTION_ID,
-        actor=run_by, actor_kind=decision_log.RULE,
+        actor=promotion.RULE_ACTOR, actor_kind=decision_log.RULE,
         effective_at=promotion.effective_at_for(
             arrival.received_at, seed=arrival.run_id).isoformat()))
 

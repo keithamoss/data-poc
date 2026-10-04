@@ -601,6 +601,13 @@ def newest_promoted(conn: supply_db.SupplyConnection,
 #: What an automatic promotion records as its reason. A rule does not
 #: have to justify itself the way a person does, but an entry that says
 #: nothing is one a reader has to reconstruct the gate to understand.
+#: What the promotion rule records as its own name in the decision log
+#: (REQ-PIPE-074: an automatic decision's actor is the rule, by name).
+#: Never the identity that ran the pipeline - post-build-review #81 found
+#: both orchestrators passing that, so a person-shaped address was named
+#: as the decider of entries that also said a rule decided them.
+RULE_ACTOR = "promotion rule"
+
 AUTOMATIC_REASON = ("every check contributing to this dataset passed or warned, "
                     "and its slot for this period was unfilled")
 

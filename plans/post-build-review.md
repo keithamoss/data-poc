@@ -4562,6 +4562,11 @@ twice. It deliberately did not re-find the `TypeError`.
     never loaded may never have been filed. Both belong next to
     REQ-DASH-148, which now owns how a failed load is shown.
 
+    **DECIDED 2026-10-04 (Keith):** amend REQ-DASH-148 to own how a
+    failed load is rejected and cleared - the period, the route, and
+    what clears the item. Drafting via delivery-scoper; Keith signs the
+    wording.
+
 81. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An
     automatic promotion records the git identity that ran the pipeline as
     its actor, not the rule.** Found by delivery-scoper refreshing
@@ -4577,6 +4582,13 @@ twice. It deliberately did not re-find the `TypeError`.
     reader is told decided. Touches a built requirement's claim, so it is
     Keith's to sign off; a failing test comes first.
 
+    **FIXED 2026-10-04 (Keith: fix now).** `promotion.RULE_ACTOR =
+    "promotion rule"`, passed by both orchestrators' `promote_after()`
+    in place of the operator's identity. `tests/test_promotion_actor.py`,
+    confirmed failing first, linked to REQ-PIPE-074. Rows already in a
+    database keep the old actor until the next bootstrap regenerates
+    them - synthetic history, so nothing to migrate.
+
 82. **[investigate, 2026-10-04]** **[GitHub workflow & people]**
     **REQ-GHUB-082 criterion 17 is only half wired.** Found by
     delivery-scoper refreshing REQ-PIPE-086, verified here: the offer to
@@ -4585,6 +4597,11 @@ twice. It deliberately did not re-find the `TypeError`.
     after `report_recorded`). The real hand-filed routes end in
     `_finish_supply` and never offer it. Touches a built requirement's
     claim, so it is Keith's; a failing test comes first.
+
+    **FIXED 2026-10-04 (Keith: fix now).** Both `_finish_supply`
+    functions now call `filing_tui.offer_after_run` for a KEPT run, never
+    a trial. `tests/test_offer_after_hand_filed_run.py`, confirmed failing
+    first for the kept case, linked to REQ-GHUB-082.
 
 83. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **The
     Birth Registrations Lambda handler would crash on its first file.**
@@ -4597,3 +4614,7 @@ twice. It deliberately did not re-find the `TypeError`.
     unnoticed. Owned by the Lambda requirement split out of REQ-PIPE-086
     (REQ-PIPE-152, drafting), whose criteria move both handlers onto the
     shared lifecycle; a failing test comes first.
+
+    **DECIDED 2026-10-04 (Keith):** left to REQ-PIPE-152 (its last
+    criterion), which rewrites the handler anyway - a one-argument patch
+    now would be thrown away.

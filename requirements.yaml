@@ -12946,6 +12946,7 @@ requirements:
       - tests/test_decision_log.py
       - tests/test_cli_supply.py::TestReadingTheDecisionLog
       - tests/test_promotion.py
+      - tests/test_promotion_actor.py
     implemented_by:
       - qa_tools/common/decision_log.py::apply_decision
       - qa_tools/common/decision_log.py::Decision
@@ -16891,6 +16892,7 @@ requirements:
       - tests/test_cli_filing_tui.py::TestItCallsNoGitHub
       - tests/test_cli_filing_tui.py::TestTheCommandReallyWritesTheLog
       - tests/test_validate_people.py
+      - tests/test_offer_after_hand_filed_run.py
     evidence:
       - >
         2026-09-29. The TUI adapter, 32 tests. The ones that matter are

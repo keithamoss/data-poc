@@ -125,6 +125,18 @@ releases:
               marked "not evaluated", with the reason in its detail panel,
               and its trend chart leaves a gap rather than drawing a zero
               that looked like nothing was wrong.
+          - headline: Automatic promotions name the rule that made them
+            components: ["Pipeline & publishing"]
+            description: >
+              The decision log said an automatic promotion was made by
+              whoever ran the pipeline. It now names the promotion rule, so
+              you can tell at a glance which decisions a person made.
+          - headline: Keeping a file from the terminal offers the next decision
+            components: ["Testing & dev tooling"]
+            description: >
+              When you keep a local file, folder or S3 supply and it is left
+              waiting on a decision, the terminal now offers that decision
+              straight away, as the synthetic route already did.
       - category: Improved
         items:
           - headline: Requirements can be retired, and filtered by status

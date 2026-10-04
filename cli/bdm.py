@@ -391,6 +391,12 @@ def _finish_supply(results: list[dict], filed) -> None:
     """
     console.print(report_table(results, filed.run_id))
     common.say_what_it_did(filed.run_id, filed.delivery_name)
+    # A KEPT run that left its supply waiting offers the decision here
+    # (REQ-GHUB-082 criterion 17), as the synthetic route always did -
+    # post-build-review #82 found the hand-filed routes never asking. A
+    # trial filed nothing, so there is nothing of its own to decide.
+    if filed.delivery_name:
+        filing_tui.offer_after_run(COLLECTION_ID, filed.run_id)
 
 
 def run_qa_interactive(commit_default: bool = False) -> None:
