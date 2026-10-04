@@ -177,6 +177,16 @@ releases:
               cannot read.
       - category: Improved
         items:
+          - headline: A supply filed by hand says who filed it and when it really arrived
+            components: ["Pipeline & publishing", "Dashboard UI", "Testing & dev tooling"]
+            description: >
+              Keeping a supply you received by hand now asks when it was
+              originally received - the email's arrival, or each S3 object's
+              own time, offered for you to confirm - and records your answer
+              beside our receipt without ever using it to file or judge the
+              supply. Every delivery also records whether a person filed it,
+              how and who, shown in `mothman supply deliveries` and on the
+              dashboard. Scripts pass `--originally-received`.
           - headline: Starting the synthetic history from empty is one deliberate command
             components: ["Testing & dev tooling", "Pipeline & publishing"]
             description: >

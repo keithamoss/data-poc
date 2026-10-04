@@ -51,7 +51,8 @@ def for_run(dataset_id: str, received_at) -> dict:
     record = filing.recorded_arrival_at(dataset_id, received_at)
     if record is None:
         return {"arrivedAt": None, "arrivalStatus": UNKNOWN,
-                "filledAt": None, "waitedSeconds": None, "awaiting": False}
+                "filledAt": None, "waitedSeconds": None, "awaiting": False,
+                "statedOriginal": None, "filedBy": None}
     waited = record.waited
     return {
         "arrivedAt": record.received_at.isoformat() if record.received_at else None,
@@ -63,4 +64,20 @@ def for_run(dataset_id: str, received_at) -> dict:
         "filledAt": record.filled_at.isoformat() if record.filled_at else None,
         "waitedSeconds": waited.total_seconds() if waited is not None else None,
         "awaiting": record.awaiting,
+        # REQ-PIPE-103 criterion 19 and REQ-PIPE-147 criterion 7: shown
+        # BESIDE the receipt, labelled as the filer's statement, and who
+        # filed it with the person resolved through contract/people.yaml.
+        "statedOriginal": record.stated_original,
+        "filedBy": _filed_by(record.filed_by),
     }
+
+
+def _filed_by(filed_by: dict | None) -> dict | None:
+    from qa_tools.common import people
+
+    if not filed_by:
+        return None
+    if filed_by.get("kind") != "person":
+        return {"kind": "automated"}
+    return {"kind": "person", "route": filed_by.get("route"),
+            "who": people.display_name(filed_by.get("who"))}

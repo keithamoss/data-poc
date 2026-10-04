@@ -64,13 +64,49 @@ def confirmation_phrase() -> str:
     return f"delete all QA history for {asset_id()}"
 
 
+#: Our schemas with fixed names - matched EXACTLY, never as a prefix
+#: (delivery-critic on REQ-PIPE-144: `staging_someone_elses` was dropped).
+_FIXED = (qa_store.SCHEMA, supply_db.STAGING_SCHEMA, supply_db.REJECTED_SCHEMA,
+          supply_db.SAMPLE_SCHEMA, "promoted")
+
+
+class WouldReachOutside(Exception):
+    """Something outside what the reset deletes depends on what it deletes,
+    so CASCADE would take it too - refused, naming it."""
+
+
 def schemas_to_drop(conn: supply_db.SupplyConnection) -> list[str]:
-    """The qa schema and every supply-row schema present, sorted."""
-    names = [row[0] for row in conn.execute(
-        "SELECT nspname FROM pg_namespace").fetchall()]
-    keep = [n for n in names
-            if n == qa_store.SCHEMA or n.startswith(qa_store.SUPPLY_SCHEMA_PREFIXES)]
-    return sorted(keep)
+    """This asset's own schemas: the fixed names exactly, and the
+    per-period, per-run, per-run dbt and trial schemas through the
+    modules that name them."""
+    from qa_tools.common import period_schema
+
+    present = {row[0] for row in conn.execute("SELECT nspname FROM pg_namespace").fetchall()}
+    ours = {n for n in _FIXED if n in present}
+    ours |= set(period_schema.period_schemas(conn))
+    ours |= set(supply_db.run_schemas(conn))
+    ours |= set(supply_db.dbt_schemas(conn))
+    ours |= set(supply_db.schemas_with_prefix(conn, supply_db.TRIAL_SCHEMA_PREFIX))
+    return sorted(ours)
+
+
+def _dependents_outside(conn, schemas: list[str]) -> list[str]:
+    """Objects in OTHER schemas that depend on something in `schemas` -
+    what `DROP SCHEMA ... CASCADE` would silently take with it."""
+    if not schemas:
+        return []
+    rows = conn.execute(
+        """
+        SELECT DISTINCT dn.nspname || '.' || dc.relname
+        FROM pg_depend d
+        JOIN pg_rewrite r ON r.oid = d.objid AND d.classid = 'pg_rewrite'::regclass
+        JOIN pg_class dc ON dc.oid = r.ev_class
+        JOIN pg_namespace dn ON dn.oid = dc.relnamespace
+        JOIN pg_class rc ON rc.oid = d.refobjid AND d.refclassid = 'pg_class'::regclass
+        JOIN pg_namespace rn ON rn.oid = rc.relnamespace
+        WHERE rn.nspname = ANY(?) AND NOT (dn.nspname = ANY(?))
+        ORDER BY 1""", [list(schemas), list(schemas)]).fetchall()
+    return [r[0] for r in rows]
 
 
 def what_it_deletes(conn: supply_db.SupplyConnection) -> dict[str, int]:
@@ -87,7 +123,8 @@ def what_it_deletes(conn: supply_db.SupplyConnection) -> dict[str, int]:
     return out
 
 
-def reset(conn: supply_db.SupplyConnection, typed: str) -> list[str]:
+def reset(conn: supply_db.SupplyConnection, typed: str,
+          schemas: list[str] | None = None) -> list[str]:
     """Drop the whole QA history; return the schemas dropped.
 
     Raises NotSynthetic before touching anything for an asset not
@@ -104,7 +141,12 @@ def reset(conn: supply_db.SupplyConnection, typed: str) -> list[str]:
     if typed.strip() != confirmation_phrase():
         raise ValueError(f"the confirmation did not read {confirmation_phrase()!r}, "
                          f"so nothing was deleted.")
-    dropped = schemas_to_drop(conn)
+    dropped = schemas_to_drop(conn) if schemas is None else list(schemas)
+    outside = _dependents_outside(conn, dropped)
+    if outside:
+        raise WouldReachOutside(
+            f"{', '.join(outside)} depend(s) on what the reset would delete, so dropping it "
+            f"would take them too. Nothing was deleted - remove or move them first.")
     for name in dropped:
         conn.execute(f'DROP SCHEMA "{name}" CASCADE')
     return dropped

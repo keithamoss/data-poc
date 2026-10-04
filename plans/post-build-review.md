@@ -4842,3 +4842,44 @@ twice. It deliberately did not re-find the `TypeError`.
     - LEFT: **TS-4a**, which REQ-PIPE-131 criterion 15 names, does not
       exist anywhere - the criterion may mean TS-3a. Keith's or the
       scoper's.
+
+95. **[done, 2026-10-04]** **[Pipeline & publishing]** **REQ-PIPE-144
+    delivery-critic - storage change confirmed (all 150 filings, holds,
+    delivery records and file identities identical between the two
+    empty-database bootstraps); findings fixed overnight**, each with a
+    failing test first where it was a defect:
+    - SECURITY-ADJACENT: `reset-synthetic` matched schemas by NAME PREFIX
+      (it reused the publisher's deny-list), so `staging_someone_elses`,
+      `sample_reports` and the like were dropped too, and its CASCADE took
+      views in OTHER schemas the prompt never listed. Now the fixed names
+      match exactly, the per-period/run/dbt/trial schemas come from the
+      modules that name them, and the reset REFUSES, naming them, if
+      anything outside its drop set depends on what it would drop. It also
+      resets exactly the list it showed. `tests/test_reset_synthetic.py::
+      TestItTouchesOnlyWhatIsOurs`.
+    - The hand-filing closing panel pointed at `mothman pipeline run
+      --publish`, which now always refuses at that moment - it names
+      `mothman dashboard publish`. CLAUDE.md's "regenerate via `pipeline
+      run`" line updated.
+    - An old-schema database gave a raw `SchemaVersionError` traceback from
+      any command; the CLI root now turns it into the clean refusal it is.
+    - A reset silently drops a publisher role's grants with the schema; it
+      now says to re-run `mothman supply grant-publisher`.
+    - Criterion 33 gaps closed: the two no-delivery refusals, a hand-filed
+      filing's delivery link, and a trial writing no filing
+      (`tests/test_filing_delivery_link.py`).
+    - REQ-PIPE-038 criteria 4-5 and REQ-QAC-039 still named
+      `regenerate-history` as current: re-worded, 038 c5's PROVISIONAL
+      (its explicit stray-scope assertion went with the command; a rebuild
+      from empty cannot carry one forward - a change to a built claim, for
+      Keith).
+    - LEFT FOR KEITH: criterion 16 says the ARRIVAL CLASSIFICATION reads
+      the one receipt view, while filing.record() classifies from the
+      arrival's in-memory instant, which arrivals.py derives with its own
+      copy of the contested-pair earlier-file rule. The two agree today
+      (verified for a contested pair at one instant and at two); they are
+      two definitions. Also, until REQ-PIPE-151, no batch command
+      processes new arrivals in a populated database (consequence of
+      criteria 38-39). And the criterion 30 proof's CLI capture was 80
+      columns wide, and the synthetic corpus has no contested delivery, so
+      the contested view is covered by tests rather than by the proof.

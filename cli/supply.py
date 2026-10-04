@@ -137,7 +137,7 @@ def deliveries_command(wanted: str | None) -> None:
         from qa_tools.common import load_log, supply_db
         done = load_log.latest_by_table()
 
-        table = Table("Delivery", "Received", "Attributed to", "Loaded", "Notes",
+        table = Table("Delivery", "Received", "Filed", "Attributed to", "Loaded", "Notes",
                        box=None, pad_edge=False)
         for d in received:
             placed, notes, _collections = _describe(d, seen[d.name],
@@ -155,8 +155,8 @@ def deliveries_command(wanted: str | None) -> None:
                 # dataset has a load record, so anything short of that
                 # is a delivery the next run must process again.
                 state = f"[yellow]{loaded}/{len(expected)}[/yellow]"
-            table.add_row(d.name, display_time.format_instant(d.received_at), placed,
-                           state, notes)
+            table.add_row(d.name, display_time.format_instant(d.received_at),
+                           _filed_by_text(d), placed, state, notes)
         console.print(table)
 
     if in_flight:
@@ -175,6 +175,14 @@ def deliveries_command(wanted: str | None) -> None:
 
     if wanted is not None:
         for d in received:
+            if d.stated_original:
+                # BESIDE THE RECEIPT, LABELLED AS THE FILER'S STATEMENT
+                # (REQ-PIPE-103 criterion 19) - never presented as it.
+                console.print("\n[bold]originally received[/bold] "
+                              "[dim](stated by the person who filed it; recorded, "
+                              "never used)[/dim]")
+                for name, value in sorted(d.stated_original.items()):
+                    console.print(f"  {name}  {_stated_text(value)}")
             found = seen[d.name]
             for label, names in (("unrecognised", found.unmatched),
                                   ("anomalies", d.anomalies)):
@@ -188,6 +196,26 @@ def deliveries_command(wanted: str | None) -> None:
         console.print(f"\n[dim]{len(spanning)} deliver{'y' if len(spanning) == 1 else 'ies'} "
                        f"span more than one collection, which is legitimate - each file is "
                        f"attributed on its own dataset's terms.[/dim]")
+
+
+def _filed_by_text(d) -> str:
+    """Whether a person filed it, by which route and who (REQ-PIPE-147
+    criterion 7) - the person resolved through contract/people.yaml."""
+    from qa_tools.common import people
+
+    filed_by = getattr(d, "filed_by", None) or {}
+    if filed_by.get("kind") != "person":
+        return "[dim]automatically[/dim]"
+    stated = sorted({_stated_text(v) for v in (d.stated_original or {}).values()})
+    note = f"; originally {', '.join(stated)} (stated)" if stated else ""
+    return f"by hand ({filed_by.get('route')}) - {people.display_name(filed_by.get('who'))}{note}"
+
+
+def _stated_text(value: str) -> str:
+    from qa_tools.common import delivery as delivery_mod
+    from qa_tools.common import display_time
+
+    return "not known" if value == delivery_mod.NOT_KNOWN else display_time.format_instant(value)
 
 
 @supply_group.command("unplaceable")

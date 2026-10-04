@@ -320,7 +320,7 @@ def test_qa_command_local_file_commit_files_a_real_delivery_and_records_it(
     result = _runner.invoke(bdm.qa_command, [
         "--file", str(supplied),
         "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
-        "--commit",
+        "--commit", "--originally-received", "not-known",
     ])
 
     from qa_tools.common import qa_results_reader as reader
@@ -355,7 +355,7 @@ def test_qa_command_local_file_commit_refuses_a_name_recognition_cannot_place(
     result = _runner.invoke(bdm.qa_command, [
         "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
         "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
-        "--commit",
+        "--commit", "--originally-received", "not-known",
     ])
 
     assert result.exit_code != 0
@@ -442,7 +442,7 @@ def test_run_check_local_file_default_path_never_requires_a_real_git_identity(
     result_commit = _runner.invoke(bdm.qa_command, [
         "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
         "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
-        "--commit",
+        "--commit", "--originally-received", "not-known",
     ])
     assert isinstance(result_commit.exception, MissingGitIdentityError), \
         "a --commit run must still fail loudly without a real git identity - that guarantee must not regress"

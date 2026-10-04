@@ -4384,8 +4384,9 @@ requirements:
           DELETE-AND-RE-RUN RATHER THAN MIGRATE is Keith's own call and survives
           unchanged: the data is synthetic and the pipeline is seeded, so
           re-running is honest where reshaping recorded results in place would
-          not be. `mothman pipeline regenerate-history` still does exactly this,
-          against rows rather than directories.
+          not be. `mothman env reset-synthetic` followed by `mothman pipeline
+          bootstrap` does exactly this since REQ-PIPE-144 retired
+          `regenerate-history` (wording amended 2026-10-04, PROVISIONAL).
       - >
           WHEN regeneration has completed, THE SYSTEM SHALL leave no results in
           the old shape. AMENDED 2026-09-28 (REQ-DOCS-101 criterion 10): "no
@@ -4395,8 +4396,11 @@ requirements:
           rather than dropped. A scope that is neither a dataset nor a reserved
           name reads as a dataset nobody configured, and every reader that walks
           a collection picks it up as one. It was a stray `run_014` directory at
-          collection level; it is a stray value in the `dataset_id` column now,
-          and `regenerate-history` asserts against exactly that.
+          collection level; it is a stray value in the `dataset_id` column now.
+          Since REQ-PIPE-144 the rebuild starts from an EMPTY database, so no
+          old-shape result can survive it; the explicit assertion went with
+          `regenerate-history` (wording amended 2026-10-04, PROVISIONAL - a
+          change to what this criterion claims, listed for Keith).
       - >
           THE SYSTEM SHALL perform regeneration where the data is, and SHALL NOT
           let the publisher regenerate, open or query supply rows. AMENDED
@@ -4843,8 +4847,9 @@ requirements:
 
           WHAT IT PROTECTS IS UNTOUCHED: two id shapes for one check mean its
           history breaks in half, and every reader of that history silently gets
-          the shorter answer. The rebuild is `mothman pipeline
-          regenerate-history`, which deletes and re-runs rather than migrating -
+          the shorter answer. The rebuild is `mothman env reset-synthetic` then
+          `mothman pipeline bootstrap` (REQ-PIPE-144 retired `regenerate-history`;
+          wording amended 2026-10-04), which deletes and re-runs rather than migrating -
           so "exactly once, in the same change" is what stops a half-rebuilt
           corpus existing at all.
       - THE SYSTEM SHALL resolve every reference to a dataset made by
@@ -22119,13 +22124,6 @@ requirements:
     - REQ-PIPE-102
     - REQ-PIPE-144
     open_questions: []
-    unmet_criteria:
-    - criterion: Criteria 9 to 19 - asking for, validating, recording and showing a stated original arrival. Added 2026-10-04 on Keith's sign-off of this amendment and not yet built.
-      why: The statement is recorded beside each file's own receipt, and per-file receipts only reach the qa metadata schema with REQ-PIPE-144 (signed 2026-10-04, not started). Building it before 144 would put it on qa.delivery and move it a second time.
-      owner: REQ-PIPE-103 itself, built straight after REQ-PIPE-144.
-      blocked_by:
-        requirements:
-        - REQ-PIPE-144
     decisions:
     - 'THE TRIAL''S LOAD RECORDS MOVED FROM A DIRECTORY TO A COLUMN (2026-09-27, while building REQ-PIPE-089), and criterion 2 is met more strongly than when this was signed. `trial.log_dir()` put a trial''s load records in a disposable directory outside the committed tree, and `discard()` removed them with an `rmtree` AFTER the transaction that dropped the schemas. Two acts: a crash between them left a trial half-discarded, with its schemas gone and its records still claiming tables that no longer existed.
   
@@ -22197,13 +22195,24 @@ requirements:
     - AN S3 PREFIX OFFERS EACH OBJECT'S OWN LastModified, CONFIRMED AS A SET IN ONE STEP (Keith, 2026-10-04). AMENDS decision 16's 'for a folder or an S3 prefix the person states once and it is recorded on every file', for an S3 prefix only - a folder still takes one statement. The objects of one prefix can carry different times and storage already knows each one; one statement for all would throw that away. REJECTED asking per object, which is thirty prompts at thirty datasets.
     - A SCRIPTED S3 KEEP ACCEPTS EACH OBJECT'S OWN TIME WITH `--originally-received storage` (Keith, 2026-10-04). REJECTED requiring scripts to give one value for every file, which would make per-object times TUI-only.
     - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
+    - 'CRITERIA 9-20 BUILT 2026-10-04 (overnight sprint 5). PROVISIONAL, each in the morning report: (1) `not known`, `not-known`, `notknown` and `unknown` are all accepted as the answer and recorded as `not-known`; (2) in flag mode with a TTY but no --originally-received, the prompt appears after the decision to keep and before the check runs, inside the check''s progress display; (3) the S3 offer is one confirm for the whole set, and declining asks ONE answer for every file (never per object).'
+
     linked_tests:
+    - tests/test_stated_original_arrival.py
+    - tests/test_filing_delivery_link.py
     - tests/test_trial_runs.py
     - tests/test_hand_filing.py
     - tests/test_cli_bdm.py
     - tests/test_cli_cp.py
     - tests/test_run_schema_lifecycle.py
     implemented_by:
+    - qa_tools/common/hand_filing.py::resolve_original
+    - qa_tools/common/hand_filing.py::file_supply
+    - qa_tools/common/delivery.py::write_receipts
+    - cli/common.py::file_or_trial
+    - cli/common.py::describe_original
+    - qa_tools/common/s3_source.py::last_modified
+    - pipeline/recorded_arrival.py::for_run
     - qa_tools/common/trial.py::trial_run_id
     - qa_tools/common/trial.py::discard
     - qa_tools/common/trial.py::schemas_of
@@ -22227,6 +22236,18 @@ requirements:
     - qa_tools/bdm/build_per_run_warehouses.py::build_one
     - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
     evidence:
+    - >-
+      2026-10-04 (overnight sprint 5): criteria 9 to 20 built and tested in
+      tests/test_stated_original_arrival.py (21 tests). The statement is
+      written into each file's receipt under its own key, marked as a
+      person's, and onto qa.delivery_file.originally_received_stated
+      (schema 19); the receipt stays the moment the command ran. Refusals
+      tested: a time later than our receipt, `storage` for a supply not from
+      S3, nonsense, a kept supply with no answer, and a script keeping a
+      supply with no --originally-received (the flag named, nothing filed).
+      Shown beside the receipt in `mothman supply deliveries`, the
+      hand-filing command's closing message and the dashboard's arrival
+      detail (tests-js/filed-note.test.js).
     - '2026-09-27: tests/test_trial_runs.py drives the REAL loader - a trial stages real rows into `trial_<stamp>`, its views resolve through `qa_trial_<stamp>`, shared staging is unchanged throughout, and after discard() no schema of the trial''s remains and orphan_schemas() is empty.
   
       '
@@ -26060,7 +26081,31 @@ requirements:
       date: '2026-10-04'
     story: As whoever reads the delivery log later, I want every delivery to say whether a person filed it by hand or it arrived on its own - and, for a person, which route they used and who they were - so that I can tell real delivery times from whenever somebody got around to running the tool without having to know a naming convention.
     moscow: should
-    status: not_started
+    status: built
+    linked_tests:
+    - tests/test_stated_original_arrival.py
+    - tests-js/filed-note.test.js
+    implemented_by:
+    - qa_tools/common/delivery.py::filed_by_person
+    - qa_tools/common/delivery.py::write_receipts
+    - qa_tools/common/delivery.py::read_delivery
+    - qa_tools/common/delivery_log.py::record
+    - qa_tools/common/hand_filing.py::file_supply
+    - qa_tools/common/people.py::display_name
+    - cli/supply.py::deliveries_command
+    - pipeline/recorded_arrival.py::for_run
+    evidence:
+    - >-
+      2026-10-04 (overnight sprint 5): every delivery record now says
+      `automated`, or `person` with the route (one of file, folder, table,
+      s3 - a CHECK constraint on qa.delivery refuses anything else, and an
+      automated row carrying a person) and who (git_identity.get_run_by, the
+      identity qa.run.run_by carries). Written into each file's on-disk
+      receipt too, so a rebuild from disk restores it. Filing is refused
+      with no identity, saying how to set one. `mothman supply deliveries`
+      gains a Filed column; the dashboard's arrival detail shows 'by hand ·
+      <name>' for a person, resolved through contract/people.yaml, and
+      'Received automatically' on hover otherwise.
     source: 'Keith, 2026-09-27, plans/running-thoughts.md #52''s first gap ("does it show in the log that it came from a human and not the automated system?") and his decision 2 there; split out of the REQ-PIPE-103 amendment on 2026-10-04 at his choice (question A3). Drafted by delivery-scoper the same day.'
     acceptance_criteria:
     - THE SYSTEM SHALL record on every delivery record whether a person filed it or it was received automatically, as data, and SHALL NOT leave a reader to infer it from the delivery's name or its receipt clock.
@@ -26084,6 +26129,7 @@ requirements:
     - 'WHAT EXISTS TODAY IS INCIDENTAL, checked 2026-10-04: the `handfiled-` directory prefix (hand_filing.HAND_FILED_PREFIX) is a naming convention nothing parses; received_from `our-clock` coincides with hand-filing only because no automated path writes a receipt yet, and REQ-PIPE-105 criterion 4 makes it the fallback for any automated path whose storage gives no instant; qa.run.run_by names who ran the QA run, is recorded for automated runs too, and is not on the delivery. REQ-PIPE-103''s stated original arrival would also be an incidental marker. None of them is a record of who filed what.'
     - 'THE ROUTE IS A CLOSED SET OF FOUR - the four routes REQ-PIPE-103 criterion 7 names - plus automated. REJECTED a free-text note from the person (Keith, 2026-09-27): nothing can aggregate it.'
     - 'THE 2026-09-27 PLAN TO REGENERATE THE EXISTING RECORDS STANDS in its current form: regenerate rather than migrate, and every synthetic delivery is truthfully automated.'
+    - 'BUILT 2026-10-04 (overnight sprint 5). PROVISIONAL: (1) "resolved through contract/people.yaml as the dashboard already resolves run_by" - the dashboard showed run_by RAW, so this shows the person''s people.yaml `name` where they have an entry and the identity otherwise, never refusing; (2) an automated delivery adds nothing visible to a dashboard row, only a tooltip, so the common case stays quiet at thirty datasets.'
     open_questions: []
 
   - id: REQ-PIPE-146

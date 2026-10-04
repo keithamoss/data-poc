@@ -71,6 +71,20 @@ def list_delivery_prefixes(bucket: str, prefix: str, s3_client=None) -> list[str
     return sorted(cp["Prefix"] for cp in response.get("CommonPrefixes", []))
 
 
+def last_modified(bucket: str, keys, s3_client=None) -> dict:
+    """{basename: LastModified} for these keys - S3's own record of when
+    each object was written, offered as the default answer to "when was
+    this originally received" for a kept supply (REQ-PIPE-103 criterion
+    17). Recorded only; never a receipt (that decision is on the
+    requirement)."""
+    client = _client(s3_client)
+    out = {}
+    for key in keys:
+        head = client.head_object(Bucket=bucket, Key=key)
+        out[os.path.basename(key.rstrip("/"))] = head["LastModified"]
+    return out
+
+
 def download_key(bucket: str, key: str, dest_dir: str, s3_client=None) -> str:
     """Downloads one object to dest_dir/<basename of key>, returns the
     local path. dest_dir is created if it doesn't exist yet (a fresh

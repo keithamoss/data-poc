@@ -137,3 +137,29 @@ class TestNothingElseDeletes:
             assert {"received_at", "received_instant", "received_from",
                     "receipt_sequence"} <= cols("delivery_file")
 
+
+
+class TestItTouchesOnlyWhatIsOurs:
+    """delivery-critic on REQ-PIPE-144: the reset matched schema NAMES by
+    prefix, so `staging_someone_elses` went too, and its CASCADE reached a
+    view in `public` that the prompt never listed."""
+
+    def test_a_schema_that_only_shares_a_prefix_is_left_alone(self, private_supply_dsn):
+        with supply_db.connect(label="test-reset") as conn:
+            qa_store.ensure_schema(conn)
+            conn.execute('CREATE SCHEMA "staging_someone_elses"')
+            conn.execute('CREATE SCHEMA "sample_reports"')
+            assert "staging_someone_elses" not in synthetic_reset.schemas_to_drop(conn)
+            assert "sample_reports" not in synthetic_reset.schemas_to_drop(conn)
+            synthetic_reset.reset(conn, synthetic_reset.confirmation_phrase())
+            names = {r[0] for r in conn.execute("SELECT nspname FROM pg_namespace").fetchall()}
+            assert {"staging_someone_elses", "sample_reports"} <= names
+
+    def test_it_refuses_rather_than_cascade_into_something_else(self, private_supply_dsn):
+        with supply_db.connect(label="test-reset") as conn:
+            qa_store.ensure_schema(conn)
+            conn.execute(f'CREATE VIEW public.depends_on_qa AS SELECT * FROM "{qa_store.SCHEMA}".filing')
+            with pytest.raises(synthetic_reset.WouldReachOutside) as caught:
+                synthetic_reset.reset(conn, synthetic_reset.confirmation_phrase())
+            assert "public.depends_on_qa" in str(caught.value)
+            assert conn.execute(f"SELECT to_regclass('{qa_store.SCHEMA}.filing')").fetchall()[0][0]

@@ -146,6 +146,21 @@ def person_by_github(username: str, config: dict | None = None) -> dict:
         f"comment on the repository is not the same as being allowed to file.")
 
 
+def display_name(identity: str | None, config: dict | None = None) -> str:
+    """How an identity is SHOWN to a reader (REQ-PIPE-147 criterion 7):
+    the person's name from contract/people.yaml where they have an entry,
+    otherwise the identity as recorded - never a refusal, because showing
+    who filed something must not fail for want of a config entry."""
+    if not identity:
+        return ""
+    try:
+        config = parse_people_config() if config is None else config
+    except Exception:  # noqa: BLE001 - a display falls back, it never fails
+        return identity
+    person = (config.get("people") or {}).get(identity.strip())
+    return (person or {}).get("name") or identity
+
+
 def actor_name(person: dict) -> str:
     """How a person is written into the decision log.
 

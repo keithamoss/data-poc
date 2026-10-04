@@ -474,6 +474,12 @@ class RecordedArrival:
     received_at: datetime | None
     filled_at: datetime | None
     classification: str | None
+    #: A person's statement of when it was ORIGINALLY received, or
+    #: NOT_KNOWN, or None where nobody was asked (REQ-PIPE-103 criterion
+    #: 19) - shown beside `received_at`, never as it.
+    stated_original: str | None = None
+    #: Whether a person filed it, by which route, and who (REQ-PIPE-147).
+    filed_by: dict | None = None
 
     @property
     def awaiting(self) -> bool:
@@ -526,17 +532,22 @@ def recorded_arrival(dataset_id: str, supply_id: str) -> RecordedArrival | None:
     with _connect("mothman:filing-read") as conn:
         # THE RECEIPT FROM THE ONE VIEW (REQ-PIPE-144 criterion 16).
         rows = conn.execute(
-            f"SELECT f.slot, r.received_instant, f.classification FROM {TABLE} f "
+            f"SELECT f.slot, r.received_instant, f.classification, "
+            f"r.originally_received_stated, d.filed_by_kind, d.filing_route, d.filed_by "
+            f"FROM {TABLE} f "
             f"LEFT JOIN {RECEIPT} r USING (dataset_id, supply_id) "
+            f'JOIN "{qa_store.SCHEMA}".delivery d ON d.name = f.delivery '
             "WHERE f.dataset_id = ? AND f.supply_id = ?",
             [dataset_id, supply_id]).fetchall()
         if not rows:
             return None
-        slot, received_at, classification = rows[0]
+        slot, received_at, classification, stated, kind, route, who = rows[0]
         filled_at = _filled_at(conn, dataset_id, supply_id, slot)
     return RecordedArrival(dataset_id=dataset_id, supply_id=supply_id, slot=slot,
                             received_at=received_at, filled_at=filled_at,
-                            classification=classification)
+                            classification=classification, stated_original=stated,
+                            filed_by=({"kind": kind} if kind != "person"
+                                      else {"kind": kind, "route": route, "who": who}))
 
 
 def recorded_arrival_at(dataset_id: str, received_at) -> "RecordedArrival | None":
@@ -554,8 +565,9 @@ def recorded_arrival_at(dataset_id: str, received_at) -> "RecordedArrival | None
     instead would be a second naming scheme to keep in step, which is
     the thing _supply_id_for()'s docstring exists to prevent.
 
-    RECORDED METADATA, NEVER SUPPLY ROWS. This reads `qa.filing` and
-    `qa.decision` and nothing else - the same access
+    RECORDED METADATA, NEVER SUPPLY ROWS. This reads `qa.filing`,
+    `qa.decision`, the `qa.supply_receipt` view and `qa.delivery` and nothing
+    else - the same access
     `promotion_state.state_for()` already has from this build path, and
     well inside Keith's rule that a build may read recorded results and
     never the extract itself.

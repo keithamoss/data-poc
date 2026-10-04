@@ -12,6 +12,8 @@ completes, so asking afterwards would offer a choice already made. The
 word "promote" went with it (REQ-GHUB-082 criterion 15) and now means
 the supply operation in this tool and nothing else."""
 from __future__ import annotations
+
+from pathlib import Path
 import os
 import sys
 
@@ -165,7 +167,7 @@ def report_recorded(run_id: str, count: int) -> None:
                  style="bold green")
     body.append("in this environment's QA history.\n\n", style="green")
     body.append("Nothing has been published yet - publishing is a separate step\n"
-                 "(mothman pipeline run --publish).", style="dim")
+                 "(mothman dashboard publish).", style="dim")
     console.print(Panel(body, title="Recorded", border_style="green", expand=False))
 
     if sys.stdin.isatty() and sys.stdout.isatty():
@@ -380,7 +382,8 @@ def decide_record(run_id: str, *, keep: bool | None) -> bool:
 
 
 def file_or_trial(paths, collection_id: str, run_id_prefix: str,
-                   *, keep: bool | None) -> hand_filing.Filed:
+                   *, keep: bool | None, route: str, originally: str | None = None,
+                   storage_times: dict | None = None) -> hand_filing.Filed:
     """Turn a decision into a run. Returns what to check and under what
     identity - a hand_filing.Filed either way, with an empty
     `delivery_name` and `received_at` of None for a trial.
@@ -402,8 +405,30 @@ def file_or_trial(paths, collection_id: str, run_id_prefix: str,
     """
     if not decide_keep(paths, keep=keep):
         return _as_trial(paths)
+    # WHO, AND WHEN IT WAS ORIGINALLY RECEIVED - both settled before
+    # anything is written (REQ-PIPE-147 criterion 4, REQ-PIPE-103 criteria
+    # 9-17). A refusal here files nothing and offers no trial: the supply
+    # is placeable, the operator only has to answer.
+    from qa_tools.common import asset_time, git_identity
+
+    received_at = asset_time.now()
     try:
-        filed = hand_filing.file_supply(paths, collection_id, run_id_prefix)
+        who = git_identity.get_run_by()
+    except git_identity.MissingGitIdentityError as exc:
+        raise click.ClickException(
+            f"nothing says who is filing this supply ({exc}). Set it with `git config "
+            f"user.email you@example.org`. Nothing was filed.") from None
+    names = [Path(p).name for p in paths]
+    answer = originally if originally is not None else _ask_original(names, storage_times)
+    try:
+        stated = hand_filing.resolve_original(answer, files=names, received_at=received_at,
+                                              storage_times=storage_times)
+    except hand_filing.CannotFile as exc:
+        raise click.ClickException(str(exc)) from None
+    try:
+        filed = hand_filing.file_supply(paths, collection_id, run_id_prefix,
+                                        received_at=received_at, stated_original=stated,
+                                        route=route, filed_by=who)
     except hand_filing.CannotFile as exc:
         console.print(str(exc), style="yellow")
         interactive = sys.stdin.isatty() and sys.stdout.isatty()
@@ -415,7 +440,49 @@ def file_or_trial(paths, collection_id: str, run_id_prefix: str,
         return _as_trial(paths)
     console.print(f"Filed as delivery {filed.delivery_name}, "
                    f"recognised as {filed.run_id}.", style="green")
+    # SHOWN BESIDE THE RECEIPT, NEVER AS IT (REQ-PIPE-103 criterion 19).
+    console.print(describe_original(stated, received_at), style="dim")
     return filed
+
+
+def describe_original(stated: dict[str, str], received_at) -> str:
+    """The stated original arrival, labelled as the filer's statement and
+    set beside our receipt rather than presented as it."""
+    from qa_tools.common import delivery as delivery_mod
+    from qa_tools.common import display_time
+
+    shown = sorted({("not known" if v == delivery_mod.NOT_KNOWN
+                     else display_time.format_instant(v)) for v in stated.values()})
+    return (f"Received by us {display_time.format_instant(received_at)}; originally "
+            f"received {', '.join(shown)} (stated by you - recorded, never used to "
+            f"file or judge the supply).")
+
+
+def _ask_original(names, storage_times: dict | None) -> str:
+    """Ask when this supply was originally received (REQ-PIPE-103 criterion
+    9), or refuse where nobody can be asked (criterion 14).
+
+    FROM S3, each object's own LastModified is offered as one set,
+    confirmed in one step (criterion 17) - the time is already in hand
+    from the download, and making the person look it up invites a typo.
+    """
+    from qa_tools.common import display_time
+
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        raise click.ClickException(
+            "keeping a supply needs to know when it was originally received, and there is "
+            "no terminal to ask - pass --originally-received <time>, `not-known`"
+            + (", or `storage` for each S3 object's own time" if storage_times else "")
+            + ". Nothing was filed.")
+    if storage_times:
+        console.print("S3 says each object was last written:", style="bold")
+        for name in names:
+            console.print(f"  {name}  {display_time.format_instant(storage_times[name])}")
+        if confirm("Record these as when each was originally received?", yes=False,
+                   default=True):
+            return hand_filing.STORAGE
+    return click.prompt("When was this supply originally received? (e.g. 2026-09-20 14:30 "
+                        "on the asset's own clock, or `not known`)")
 
 
 def _as_trial(paths) -> hand_filing.Filed:

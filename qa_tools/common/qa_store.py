@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -378,6 +378,21 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery (
 CREATE INDEX IF NOT EXISTS delivery_receipt_order
     ON "{SCHEMA}".delivery (received_instant);
 
+-- WHO FILED IT (REQ-PIPE-147), version 19 - added, so ADD COLUMN rather
+-- than a reshape. As DATA, never inferred from a `handfiled-` name or a
+-- receipt clock (criterion 1): `automated`, or `person` with the route
+-- (criterion 2, a closed set of four) and who (criterion 3, the same
+-- identity qa.run.run_by carries).
+ALTER TABLE "{SCHEMA}".delivery
+    ADD COLUMN IF NOT EXISTS filed_by_kind text NOT NULL DEFAULT 'automated';
+ALTER TABLE "{SCHEMA}".delivery ADD COLUMN IF NOT EXISTS filing_route text;
+ALTER TABLE "{SCHEMA}".delivery ADD COLUMN IF NOT EXISTS filed_by text;
+ALTER TABLE "{SCHEMA}".delivery DROP CONSTRAINT IF EXISTS delivery_filed_by_shape;
+ALTER TABLE "{SCHEMA}".delivery ADD CONSTRAINT delivery_filed_by_shape CHECK (
+    (filed_by_kind = 'automated' AND filing_route IS NULL AND filed_by IS NULL)
+    OR (filed_by_kind = 'person'
+        AND filing_route IN ('file', 'folder', 'table', 's3') AND filed_by IS NOT NULL));
+
 CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery_file (
     delivery     text NOT NULL REFERENCES "{SCHEMA}".delivery ON DELETE CASCADE,
     filename     text NOT NULL,
@@ -401,6 +416,13 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery_file (
     receipt_sequence integer NOT NULL,
     PRIMARY KEY (delivery, filename)
 );
+
+-- A PERSON'S STATEMENT OF WHEN THIS FILE WAS ORIGINALLY RECEIVED
+-- (REQ-PIPE-103 criteria 9-18), version 19. Beside the receipt, NEVER the
+-- receipt: an ISO instant with its offset, or 'not-known'; NULL means
+-- nobody was asked (criterion 18). Nothing orders, names, files, judges
+-- or promotes on it (criterion 11) - it is a note, not a fact we hold.
+ALTER TABLE "{SCHEMA}".delivery_file ADD COLUMN IF NOT EXISTS originally_received_stated text;
 
 --   "when did this dataset last arrive", across all deliveries. Real
 --   columns rather than a JSONB document for the same reason
@@ -484,7 +506,9 @@ CREATE INDEX IF NOT EXISTS filing_slot
 CREATE OR REPLACE VIEW "{SCHEMA}".supply_receipt AS
 SELECT DISTINCT ON (f.dataset_id, f.supply_id)
        f.dataset_id, f.supply_id, f.delivery, df.filename,
-       df.received_at, df.received_instant, df.received_from, df.receipt_sequence
+       df.received_at, df.received_instant, df.received_from, df.receipt_sequence,
+       -- BESIDE the receipt, never it (REQ-PIPE-103 criterion 19).
+       df.originally_received_stated
 FROM "{SCHEMA}".filing f
 JOIN "{SCHEMA}".delivery_file df
   ON df.delivery = f.delivery AND df.dataset_id = f.dataset_id

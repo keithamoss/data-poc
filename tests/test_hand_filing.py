@@ -14,6 +14,12 @@ import pytest
 
 from qa_tools.common import arrivals, asset_time, delivery, hand_filing
 
+#: What every kept supply now states (REQ-PIPE-103 criterion 13, REQ-PIPE-147
+#: criteria 2-4) - these tests are about the filing, not the statement,
+#: which tests/test_stated_original_arrival.py covers.
+KEPT = {"stated_original": {"*": "not-known"}, "route": "file",
+        "filed_by": "pytest@example.org"}
+
 
 @pytest.fixture
 def tree(tmp_path):
@@ -37,7 +43,7 @@ class TestFilingGivesARealArrival:
 
         filed = hand_filing.file_supply(
             [path], "civil-registration", "run_",
-            deliveries_dir=deliveries, receipts_dir=receipts)
+            deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
 
         # The staged table's spelling at our receipt instant
         # (REQ-PIPE-105), never a position in a list.
@@ -58,7 +64,7 @@ class TestFilingGivesARealArrival:
         filed = hand_filing.file_supply(
             [_csv(tmp_path, "birth_registrations_2099-04-05.csv")],
             "civil-registration", "run_", received_at=when,
-            deliveries_dir=deliveries, receipts_dir=receipts)
+            deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
 
         assert delivery.read_receipt(filed.delivery_name, receipts_dir=receipts) == when
         assert not list((deliveries / filed.delivery_name).glob("*.json"))
@@ -77,7 +83,7 @@ class TestFilingGivesARealArrival:
         filed = hand_filing.file_supply(
             [_csv(tmp_path, "birth_registrations_2026-09-20.csv")],
             "civil-registration", "run_",
-            deliveries_dir=deliveries, receipts_dir=receipts)
+            deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
 
         logged = [r["delivery"] for r in delivery_log.records()]
         assert filed.delivery_name in logged, logged
@@ -93,7 +99,7 @@ class TestFilingGivesARealArrival:
 
         filed = hand_filing.file_supply(
             [str(path)], "civil-registration", "run_",
-            deliveries_dir=deliveries, receipts_dir=receipts)
+            deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
 
         assert (deliveries / filed.delivery_name / path.name).read_bytes() == original
         # AND `paths` POINTS AT THAT COPY, not at what the operator
@@ -110,7 +116,7 @@ class TestFilingGivesARealArrival:
 
         filed = hand_filing.file_supply(
             paths, "child-protection", "cp_run_",
-            deliveries_dir=deliveries, receipts_dir=receipts)
+            deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
 
         key = asset_time.arrival_key(filed.received_at)
         found = hand_filing.arrivals_of(filed, "child-protection", "cp_run_",
@@ -137,7 +143,7 @@ class TestFilingGivesARealArrival:
         filed = hand_filing.file_supply(
             [_csv(tmp_path, "birth_registrations_2026-09-20.csv")],
             "civil-registration", "run_",
-            deliveries_dir=deliveries, receipts_dir=receipts)
+            deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
         after = [a.run_id for a in arrivals.arrivals_for(
             "civil-registration", "run_", deliveries_dir=deliveries, receipts_dir=receipts)]
 
@@ -154,7 +160,7 @@ class TestAnUnplaceableFileIsRefused:
         with pytest.raises(hand_filing.CannotFile) as exc:
             hand_filing.file_supply(
                 [_csv(tmp_path, "Births Jan.csv")], "civil-registration", "run_",
-                deliveries_dir=deliveries, receipts_dir=receipts)
+                deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
         assert "Births Jan.csv" in str(exc.value)
         assert "TRIAL" in str(exc.value), \
             "the refusal must name the way forward, not just the problem"
@@ -167,7 +173,7 @@ class TestAnUnplaceableFileIsRefused:
         with pytest.raises(hand_filing.CannotFile):
             hand_filing.file_supply(
                 [_csv(tmp_path, "extract (3).csv")], "civil-registration", "run_",
-                deliveries_dir=deliveries, receipts_dir=receipts)
+                deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
         assert not deliveries.exists() or not list(deliveries.iterdir())
         assert not receipts.exists() or not list(receipts.iterdir())
 
@@ -179,7 +185,7 @@ class TestAnUnplaceableFileIsRefused:
         paths = [_csv(tmp_path, "cp_clients.csv"), _csv(tmp_path, "notes.txt")]
         with pytest.raises(hand_filing.CannotFile) as exc:
             hand_filing.file_supply(paths, "child-protection", "cp_run_",
-                                     deliveries_dir=deliveries, receipts_dir=receipts)
+                                     deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
         assert "notes.txt" in str(exc.value)
         assert not deliveries.exists() or not list(deliveries.iterdir())
 
@@ -194,11 +200,11 @@ class TestTheDeliveryNameIsOurs:
         first = hand_filing.file_supply(
             [path], "civil-registration", "run_",
             received_at=asset_time.parse_instant("2099-01-01T01:00:00+08:00", "t"),
-            deliveries_dir=deliveries, receipts_dir=receipts)
+            deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
         second = hand_filing.file_supply(
             [path], "civil-registration", "run_",
             received_at=asset_time.parse_instant("2099-01-01T01:00:01+08:00", "t"),
-            deliveries_dir=deliveries, receipts_dir=receipts)
+            deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
         assert first.delivery_name != second.delivery_name
 
     def test_it_is_recognisable_in_a_listing_as_hand_filed(self, tmp_path, tree):
@@ -206,5 +212,5 @@ class TestTheDeliveryNameIsOurs:
         filed = hand_filing.file_supply(
             [_csv(tmp_path, "birth_registrations_2026-09-20.csv")],
             "civil-registration", "run_",
-            deliveries_dir=deliveries, receipts_dir=receipts)
+            deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
         assert filed.delivery_name.startswith(hand_filing.HAND_FILED_PREFIX)

@@ -402,9 +402,11 @@ Rough layout:
   run's recorded results because they look like generated cruft is the
   thing that sentence always forbade, and the database is where it
   applies now.
-  Regenerate via `mothman pipeline run` (the whole pipeline end to end
-  for both datasets by default - `--collection bdm`/`--collection cp`
-  to scope to one). **`--sequential` NO LONGER CHANGES ANYTHING, since
+  Regenerate via `mothman env reset-synthetic` then `mothman pipeline
+  bootstrap` (since REQ-PIPE-144 `mothman pipeline run` refuses over a
+  database that already holds QA history, rather than stacking on top of
+  it; on an empty one it runs the whole pipeline for both collections -
+  `--collection bdm`/`--collection cp` to scope to one). **`--sequential` NO LONGER CHANGES ANYTHING, since
   2026-09-28**: the batch path runs ONE ARRIVAL AT A TIME whatever the
   flag says, because whether an arrival FILLS its open slot or is a
   resupply of it (REQ-PIPE-131) depends on what the arrival before it

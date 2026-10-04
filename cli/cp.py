@@ -259,7 +259,9 @@ def _check_filed_delivery(filed, run_by: str, on_step=None) -> list[dict]:
 
 def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
                             run_id: str | None = None, run_date: str | None = None,
-                            on_step=None, keep: bool | None = None
+                            on_step=None, keep: bool | None = None,
+                            originally: str | None = None, route: str = "folder",
+                            storage_times: dict | None = None
                             ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """The Local files QA source mode's real check-running body (plans/
     tooling.md #1 Phase 2) - folds in qa_tools/cp/check_delivery.py's own
@@ -276,7 +278,8 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
     _require_all_six(folder)
     filed = common.file_or_trial(
         [os.path.join(folder, f"{t}.csv") for t in TABLES],
-        "child-protection", "cp_run_", keep=keep)
+        "child-protection", "cp_run_", keep=keep, route=route, originally=originally,
+        storage_times=storage_times)
     if run_id is not None and not filed.delivery_name:
         filed = dataclasses.replace(filed, run_id=run_id)
     if filed.delivery_name:
@@ -309,7 +312,8 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
 def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_prefix: str, run_by: str,
                            run_id: str | None = None, run_date: str | None = None,
                            s3_client=None,
-                                on_step=None, keep: bool | None = None
+                                on_step=None, keep: bool | None = None,
+                                originally: str | None = None
                                 ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """The S3 QA source mode's real check-running body for Child
     Protection (plans/tooling.md #1 Phase 3) - a delivery here is all 6
@@ -326,13 +330,19 @@ def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_
     reference_staging_dir = tempfile.mkdtemp(prefix="mothman-s3-ref-")
     s3_source.download_prefix(bucket, delivery_prefix, staging_dir, s3_client=s3_client)
     s3_source.download_prefix(bucket, reference_delivery_prefix, reference_staging_dir, s3_client=s3_client)
+    times = s3_source.last_modified(
+        bucket, s3_source.list_keys(bucket, delivery_prefix, s3_client=s3_client),
+        s3_client=s3_client)
     return run_check_local_folder(staging_dir, reference_staging_dir, run_by, run_id=run_id, run_date=run_date,
-                                   on_step=on_step, keep=keep)
+                                   on_step=on_step, keep=keep, originally=originally, route="s3",
+                                   storage_times=times)
 
 
 def run_check_single_table(table: str, file_path: str, run_by: str,
                             run_id: str | None = None, run_date: str | None = None,
-                            on_step=None, keep: bool | None = None
+                            on_step=None, keep: bool | None = None,
+                            originally: str | None = None, route: str = "table",
+                            storage_times: dict | None = None
                             ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """Single-table Child Protection QA (plans/tooling.md #1's own
     "Single-table Child Protection QA" design, Phase 3.5) - a real
@@ -369,7 +379,9 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
     # ONE FILE IS A ONE-FILE DELIVERY (REQ-PIPE-103 criterion 7), which
     # is what a partial resupply actually is: the supplier re-sent one
     # table and nothing else.
-    filed = common.file_or_trial([file_path], "child-protection", "cp_run_", keep=keep)
+    filed = common.file_or_trial([file_path], "child-protection", "cp_run_", keep=keep,
+                                 route=route, originally=originally,
+                                 storage_times=storage_times)
     if run_id is not None and not filed.delivery_name:
         filed = dataclasses.replace(filed, run_id=run_id)
     run_id = filed.run_id
@@ -414,7 +426,8 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
 def run_check_s3_single_table(bucket: str, table: str, key: str, run_by: str,
                                run_id: str | None = None, run_date: str | None = None,
                                s3_client=None,
-                                on_step=None, keep: bool | None = None
+                                on_step=None, keep: bool | None = None,
+                                originally: str | None = None
                                 ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """Single-table Child Protection QA's S3 source mode (Phase 3.5) -
     downloads the one real table object (real boto3, via
@@ -425,7 +438,9 @@ def run_check_s3_single_table(bucket: str, table: str, key: str, run_by: str,
     staging_dir = tempfile.mkdtemp(prefix="mothman-s3-")
     local_path = s3_source.download_key(bucket, key, staging_dir, s3_client=s3_client)
     return run_check_single_table(table, local_path, run_by, run_id=run_id, run_date=run_date,
-                                   on_step=on_step, keep=keep)
+                                   on_step=on_step, keep=keep, originally=originally, route="s3",
+                                   storage_times=s3_source.last_modified(
+                                       bucket, [key], s3_client=s3_client))
 
 
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
@@ -728,6 +743,11 @@ def generate_synthetic_data_command(yes: bool) -> None:
 @click.option("--commit", is_flag=True,
               help="Keep it: file the supply as a real delivery received now, and record "
                    "this run in the dataset's QA history.")
+@click.option("--originally-received", "originally_received", default=None,
+              help="Keeping a supply: when it was ORIGINALLY received - the email's arrival, "
+                   "say - as a time (read on the asset's own clock unless it carries an "
+                   "offset), `not-known`, or `storage` for each S3 object's own time. "
+                   "Recorded beside our receipt; never used to file or judge the supply.")
 @click.option("--trial", is_flag=True,
               help="Run it as a TRIAL: the same four tools against the same rows, filed "
                    "nowhere and recorded nowhere. The opposite of --commit, stated so a "
@@ -735,7 +755,7 @@ def generate_synthetic_data_command(yes: bool) -> None:
 def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: str | None,
                reference_folder: str | None, s3_delivery: str | None, s3_reference_delivery: str | None,
                table: str | None, table_file: str | None, s3_key: str | None, commit: bool,
-               trial: bool) -> None:
+               originally_received: str | None, trial: bool) -> None:
     """Run the real QA check chain against a Child Protection run - Synthetic (--run-id),
     Local files (--folder/--reference-folder), S3 (--s3-delivery/--s3-reference-delivery), or
     single-table (--table plus --file or --s3-key) source mode."""
@@ -755,12 +775,14 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         if table_file is not None:
             with common.chain_progress(os.path.basename(table_file)) as on_step:
                 results, filed = run_check_single_table(
-                    table, table_file, run_by, on_step=on_step, keep=keep)
+                    table, table_file, run_by, on_step=on_step, keep=keep,
+                    originally=originally_received)
         else:
             bucket = common.raw_bucket_name()
             with common.chain_progress(s3_key.rsplit("/", 1)[-1]) as on_step:
                 results, filed = run_check_s3_single_table(
-                    bucket, table, s3_key, run_by, on_step=on_step, keep=keep)
+                    bucket, table, s3_key, run_by, on_step=on_step, keep=keep,
+                    originally=originally_received)
         _finish_supply(results, filed)
         sys.exit(1 if has_failures(results) else 0)
 
@@ -777,7 +799,7 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         with common.chain_progress(s3_delivery.rstrip("/").rsplit("/", 1)[-1]) as on_step:
             results, filed = run_check_s3_delivery(
                 bucket, s3_delivery, s3_reference_delivery, run_by, on_step=on_step,
-                keep=common.keep_from_flags(commit, trial))
+                keep=common.keep_from_flags(commit, trial), originally=originally_received)
         _finish_supply(results, filed)
         sys.exit(1 if has_failures(results) else 0)
 
@@ -792,7 +814,7 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         with common.chain_progress(os.path.basename(folder_path.rstrip("/"))) as on_step:
             results, filed = run_check_local_folder(
                 folder_path, reference_folder, run_by, on_step=on_step,
-                keep=common.keep_from_flags(commit, trial))
+                keep=common.keep_from_flags(commit, trial), originally=originally_received)
         _finish_supply(results, filed)
         sys.exit(1 if has_failures(results) else 0)
 

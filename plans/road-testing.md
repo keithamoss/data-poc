@@ -1954,6 +1954,28 @@ judgement about who reads the page rather than about the rule.
         rebuilds it - I have not run the reset on it. Scratch databases to
         drop: supply131, supply131b, equiv144_before, equiv144_after,
         gate144, equiv_after.
+      - SPRINT 4 CRITIC (post-build-review #95): the storage change held for
+        every filing, hold and delivery record. FIXED: reset-synthetic's
+        schema matching (it dropped any schema sharing a prefix, and CASCADE
+        reached views elsewhere - now exact names, the modules' own listers,
+        and a refusal if anything outside depends on it); a publish hint
+        pointing at a command that now refuses; a raw traceback on an old
+        schema; the publisher grant lost on reset (now said); three missing
+        tests. Requirement wording for the retired command updated (038 c5
+        PROVISIONAL). FOR KEITH: criterion 16's classification still has two
+        definitions of the contested-pair rule (they agree today).
+      - SPRINT 5 DONE: REQ-PIPE-103 criteria 9-20 and REQ-PIPE-147 BUILT.
+        A kept hand-filed supply asks when it was ORIGINALLY received (S3
+        offers each object's LastModified as one set to confirm), records
+        the answer beside each file's receipt - marked as a person's,
+        never used - and every delivery records automated, or person + route
+        + who (schema 19, additive). Shown in `supply deliveries`, the
+        closing message and the dashboard's arrival detail. Refusals: a time
+        after our receipt, `storage` off S3, no answer from a script (the
+        flag named), no identity. PROVISIONAL (on the requirements): the
+        accepted spellings of "not known"; where the prompt appears in flag
+        mode; one-answer-for-all when the S3 set is declined; people.yaml
+        name shown where one exists, else the identity.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

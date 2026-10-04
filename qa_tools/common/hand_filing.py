@@ -100,6 +100,60 @@ def check(paths) -> None:
               "the same four tools against the same rows, recorded nowhere.")
 
 
+#: How a person answers "when was this originally received" with nothing
+#: to go on (REQ-PIPE-103 criterion 13). Both spellings are accepted;
+#: delivery.NOT_KNOWN is what is recorded.
+_NOT_KNOWN_ANSWERS = {"not known", "not-known", "notknown", "unknown"}
+#: "Each S3 object's own LastModified" (criterion 20).
+STORAGE = "storage"
+
+
+def resolve_original(answer: str, *, files, received_at: datetime,
+                     storage_times: dict | None = None) -> dict[str, str]:
+    """A person's answer to "when was this originally received", turned
+    into what is recorded per file (REQ-PIPE-103 criteria 13, 15-17, 20).
+
+    RECORDED, NEVER USED (criterion 11) - so this validates and normalises
+    and decides nothing about the supply. Refuses with CannotFile, which
+    every caller already turns into "nothing filed" with the reason.
+
+    - `not known` -> recorded as such, never as a time (criterion 13);
+    - `storage` -> each S3 object's own LastModified, and refused for a
+      supply not fetched from S3 (criteria 17, 20);
+    - a time -> kept with its offset, or read on the asset's own clock
+      where it has none (criterion 16), and refused if it is later than
+      our own receipt (criterion 15).
+    """
+    files = list(files)
+    text = (answer or "").strip()
+    if text.lower() in _NOT_KNOWN_ANSWERS:
+        return {f: delivery.NOT_KNOWN for f in files}
+    if text.lower() == STORAGE:
+        if not storage_times or any(f not in storage_times for f in files):
+            raise CannotFile(
+                "`storage` means each S3 object's own LastModified, and this supply was "
+                "not fetched from S3 - give a time, or `not-known`. Nothing was filed.")
+        stated = {f: storage_times[f] for f in files}
+    else:
+        try:
+            when = datetime.fromisoformat(text.replace(" ", "T"))
+        except ValueError:
+            raise CannotFile(
+                f"{text!r} is not a time. Give when this supply was originally received "
+                f"as e.g. 2026-09-20 14:30 (read on the asset's own clock), with an "
+                f"offset if it was another, or `not-known`. Nothing was filed.") from None
+        if when.tzinfo is None or when.utcoffset() is None:
+            when = when.replace(tzinfo=asset_time.asset_timezone())
+        stated = {f: when for f in files}
+    for f, when in stated.items():
+        if when > received_at:
+            raise CannotFile(
+                f"the stated original arrival of {f} ({asset_time.isoformat(when)}) is "
+                f"later than our own receipt of it ({asset_time.isoformat(received_at)}), "
+                f"which cannot be - nothing was filed.")
+    return {f: asset_time.isoformat(when) for f, when in stated.items()}
+
+
 @dataclass(frozen=True)
 class Filed:
     """What a filed supply is, once it is one.
@@ -120,7 +174,9 @@ class Filed:
 
 def file_supply(paths, collection_id: str, run_id_prefix: str,
                  received_at: datetime | None = None,
-                 deliveries_dir=None, receipts_dir=None) -> Filed:
+                 deliveries_dir=None, receipts_dir=None, *,
+                 stated_original: dict[str, str] | None,
+                 route: str, filed_by: str) -> Filed:
     """File these files as one real delivery.
 
     ONE DELIVERY, however many files - a folder the operator handed us
@@ -140,6 +196,17 @@ def file_supply(paths, collection_id: str, run_id_prefix: str,
     """
     check(paths)
     received_at = received_at or asset_time.now()
+    # BOTH REQUIRED BEFORE ANYTHING IS WRITTEN - an answer to "when was it
+    # originally received" (REQ-PIPE-103 criterion 13; `not known` is an
+    # answer) and who is filing it (REQ-PIPE-147 criterion 4).
+    if not stated_original:
+        raise CannotFile("a kept supply needs an answer to when it was originally "
+                         "received - a time, or `not-known`. Nothing was filed.")
+    if not filed_by:
+        raise CannotFile("nothing says who is filing this supply. Set your identity with "
+                         "`git config user.email you@example.org` and try again. Nothing "
+                         "was filed.")
+    who = delivery.filed_by_person(route, filed_by)
     name = delivery_name(received_at)
     files = {}
     for path in paths:
@@ -153,10 +220,16 @@ def file_supply(paths, collection_id: str, run_id_prefix: str,
     # storage did not take it - we did. The alternative available here is
     # the files' own mtimes, which is exactly what criterion 3 rules out:
     # an mtime survives a copy, so it can be a timestamp the SUPPLIER set.
+    # `stated_original` keyed by file name, or "*" for one answer that
+    # applies to every file of the delivery.
+    stated = {f: stated_original.get(f, stated_original.get("*")) for f in files}
+    if any(v is None for v in stated.values()):
+        raise CannotFile("a kept supply needs an answer for every file. Nothing was filed.")
     directory = delivery.write_delivery(
         name, files, received_at=received_at,
         deliveries_dir=deliveries_dir, receipts_dir=receipts_dir,
-        received_from=delivery.RECEIVED_FROM_OUR_CLOCK)
+        received_from=delivery.RECEIVED_FROM_OUR_CLOCK,
+        stated_original=stated, filed_by=who)
 
     # THE RUN ID COMES BACK FROM RECOGNITION, never from the caller
     # (criterion 1). Asking for it rather than computing it is what

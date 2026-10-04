@@ -119,7 +119,21 @@ def _bootstrap_menu() -> None:
                    f"environment.", style="green")
 
 
-@click.group(invoke_without_command=True)
+class _MothmanGroup(click.RichGroup):
+    """Turns a qa schema from another version into the clean one-paragraph
+    refusal it already is, not a traceback (REQ-PIPE-144 criterion 29;
+    delivery-critic, overnight sprint 4). The message names the remedy."""
+
+    def invoke(self, ctx):
+        from qa_tools.common import qa_store
+
+        try:
+            return super().invoke(ctx)
+        except qa_store.SchemaVersionError as exc:
+            raise click.ClickException(str(exc)) from None
+
+
+@click.group(cls=_MothmanGroup, invoke_without_command=True)
 @click.pass_context
 def cli(ctx: click.Context) -> None:
     """mothman - the unified CLI/TUI for this PoC's real pipeline."""

@@ -206,7 +206,9 @@ def _run_single_preserving_manifest(*args, **kwargs) -> list[dict]:
 
 def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
                           run_id: str | None = None, run_date: str | None = None,
-                          on_step=None, keep: bool | None = None
+                          on_step=None, keep: bool | None = None,
+                          originally: str | None = None, route: str = "file",
+                          storage_times: dict | None = None
                           ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """The Local files QA source mode's real check-running body (plans/
     tooling.md #1 Phase 2) - folds in qa_tools/bdm/check_file.py's own
@@ -229,7 +231,9 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     record an arrival that never happened.
     """
     run_date = run_date or asset_time.now().date().isoformat()
-    filed = common.file_or_trial([csv_path], "civil-registration", "run_", keep=keep)
+    filed = common.file_or_trial([csv_path], "civil-registration", "run_", keep=keep,
+                                 route=route, originally=originally,
+                                 storage_times=storage_times)
     if run_id is not None and not filed.delivery_name:
         filed = dataclasses.replace(filed, run_id=run_id)
     if filed.delivery_name:
@@ -274,7 +278,7 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
 
 def run_check_s3(bucket: str, key: str, reference_key: str, run_by: str,
                   run_id: str | None = None, run_date: str | None = None, s3_client=None,
-                  on_step=None, keep: bool | None = None
+                  on_step=None, keep: bool | None = None, originally: str | None = None
                   ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """The S3 QA source mode's real check-running body (plans/tooling.md
     #1 Phase 3) - downloads key/reference_key (real boto3, via
@@ -288,7 +292,9 @@ def run_check_s3(bucket: str, key: str, reference_key: str, run_by: str,
     local_path = s3_source.download_key(bucket, key, staging_dir, s3_client=s3_client)
     local_reference_path = s3_source.download_key(bucket, reference_key, staging_dir, s3_client=s3_client)
     return run_check_local_file(local_path, local_reference_path, run_by, run_id=run_id, run_date=run_date,
-                                 on_step=on_step, keep=keep)
+                                 on_step=on_step, keep=keep, originally=originally, route="s3",
+                                 storage_times=s3_source.last_modified(bucket, [key],
+                                                                       s3_client=s3_client))
 
 
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
@@ -552,13 +558,18 @@ def generate_synthetic_data_command(yes: bool) -> None:
 @click.option("--commit", is_flag=True,
               help="Keep it: file the supply as a real delivery received now, and record "
                    "this run in the dataset's QA history.")
+@click.option("--originally-received", "originally_received", default=None,
+              help="Keeping a supply: when it was ORIGINALLY received - the email's arrival, "
+                   "say - as a time (read on the asset's own clock unless it carries an "
+                   "offset), `not-known`, or `storage` for each S3 object's own time. "
+                   "Recorded beside our receipt; never used to file or judge the supply.")
 @click.option("--trial", is_flag=True,
               help="Run it as a TRIAL: the same four tools against the same rows, filed "
                    "nowhere and recorded nowhere. The opposite of --commit, stated so a "
                    "script never relies on a default it cannot see.")
 def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str | None,
                reference_file: str | None, s3_key: str | None, s3_reference_key: str | None,
-               commit: bool, trial: bool) -> None:
+               commit: bool, originally_received: str | None, trial: bool) -> None:
     """Run the real QA check chain against a Birth Registrations run - Synthetic (--run-id),
     Local files (--file/--reference-file), or S3 (--s3-key/--s3-reference-key) source mode."""
     if s3_key is not None:
@@ -574,7 +585,8 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
         with common.chain_progress(os.path.basename(s3_key)) as on_step:
             results, filed = run_check_s3(bucket, s3_key, s3_reference_key, run_by,
                                                     on_step=on_step,
-                                                    keep=common.keep_from_flags(commit, trial))
+                                                    keep=common.keep_from_flags(commit, trial),
+                                                    originally=originally_received)
         _finish_supply(results, filed)
         sys.exit(1 if has_failures(results) else 0)
 
@@ -587,7 +599,8 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
         with common.chain_progress(os.path.basename(file_path)) as on_step:
             results, filed = run_check_local_file(file_path, reference_file, run_by,
                                                             on_step=on_step,
-                                                            keep=common.keep_from_flags(commit, trial))
+                                                            keep=common.keep_from_flags(commit, trial),
+                                                            originally=originally_received)
         _finish_supply(results, filed)
         sys.exit(1 if has_failures(results) else 0)
 

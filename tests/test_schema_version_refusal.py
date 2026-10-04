@@ -71,3 +71,18 @@ class TestAnOlderReshapedSchemaIsRefused:
             assert _version(conn) == qa_store.SCHEMA_VERSION
             qa_store.ensure_schema(conn)   # and again, a no-op
             assert _version(conn) == qa_store.SCHEMA_VERSION
+
+
+def test_a_command_on_an_old_schema_says_so_cleanly(private_supply_dsn):
+    """delivery-critic, overnight sprint 4: it surfaced as a traceback."""
+    from click.testing import CliRunner
+    from cli.app import cli
+
+    with supply_db.connect(label="test-old-schema-cli") as conn:
+        qa_store.ensure_schema(conn)
+        _set_version(conn, qa_store.RESHAPED_AT - 1)
+    result = CliRunner().invoke(cli, ["supply", "filings", "--dataset", "birth-registrations"])
+    assert result.exit_code != 0
+    assert "reset-synthetic" in result.output
+    assert not isinstance(result.exception, qa_store.SchemaVersionError), \
+        "it escaped as an exception rather than a clean refusal"

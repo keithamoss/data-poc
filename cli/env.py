@@ -91,8 +91,15 @@ def reset_synthetic_command() -> None:
     typed = click.prompt(f'Type "{phrase}" to delete it', default="", show_default=False)
     with supply_db.connect(label="mothman:reset-synthetic") as conn:
         try:
-            dropped = synthetic_reset.reset(conn, typed)
-        except (synthetic_reset.NotSynthetic, ValueError) as exc:
+            # EXACTLY THE SCHEMAS SHOWN, not a list read again afterwards -
+            # a schema created in between must not be dropped unseen.
+            dropped = synthetic_reset.reset(conn, typed, schemas=schemas)
+        except (synthetic_reset.NotSynthetic, synthetic_reset.WouldReachOutside,
+                ValueError) as exc:
             raise click.ClickException(str(exc)) from None
     console.print(f"Deleted {len(dropped)} schema(s). Run `mothman pipeline bootstrap` "
                   f"to regenerate.", style="green")
+    # A DROPPED SCHEMA TAKES ITS GRANTS WITH IT, so a least-privilege
+    # publisher role set up on it can no longer read anything.
+    console.print("If a publisher role was set up, grant it again afterwards: "
+                  "`mothman supply grant-publisher`.", style="dim")

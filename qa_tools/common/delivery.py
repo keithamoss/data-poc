@@ -146,6 +146,16 @@ class Delivery:
     #: file's, which is what a delivery-level reader means by "when it
     #: arrived"; an ARRIVAL - one file since REQ-PIPE-105 - reads its own.
     file_receipts: Mapping[str, tuple[datetime, int, str]] = field(default_factory=dict)
+    #: A STATED ORIGINAL ARRIVAL per file (REQ-PIPE-103 criteria 9-10):
+    #: filename -> an ISO instant with its offset, or NOT_KNOWN. Only ever
+    #: present for a supply a person filed by hand and answered for; a file
+    #: absent here was never asked about (criterion 18). RECORDED, NEVER
+    #: USED - nothing orders, names, files, judges or promotes on it
+    #: (criterion 11).
+    stated_original: Mapping[str, str] = field(default_factory=dict)
+    #: WHO FILED IT (REQ-PIPE-147): {"kind": "automated"} or {"kind":
+    #: "person", "route": one of HAND_FILING_ROUTES, "who": an identity}.
+    filed_by: Mapping[str, str] = field(default_factory=lambda: dict(AUTOMATED))
 
     @property
     def file_paths(self) -> tuple[Path, ...]:
@@ -160,6 +170,27 @@ class Delivery:
         """Where this file's receipt fell in the order receipts were written."""
         return self.file_receipts[filename][1] if filename in self.file_receipts \
             else self.sequence
+
+
+#: A stated original arrival a person said they do not know
+#: (REQ-PIPE-103 criterion 13) - recorded as such, never as a time.
+NOT_KNOWN = "not-known"
+
+#: The four routes by which a person supplies a file (REQ-PIPE-103
+#: criterion 7, REQ-PIPE-147 criterion 2) - a closed set.
+HAND_FILING_ROUTES = ("file", "folder", "table", "s3")
+
+#: What a delivery nobody filed by hand records (REQ-PIPE-147 criterion 5).
+AUTOMATED = {"kind": "automated"}
+
+
+def filed_by_person(route: str, who: str) -> dict:
+    if route not in HAND_FILING_ROUTES:
+        raise DeliveryFormatError(f"{route!r} is not a hand-filing route - one of "
+                                  f"{', '.join(HAND_FILING_ROUTES)}.")
+    if not who:
+        raise DeliveryFormatError("a delivery a person filed must say who filed it.")
+    return {"kind": "person", "route": route, "who": who}
 
 
 def remove_deliveries(names, deliveries_dir: Path | None = None,
@@ -245,9 +276,17 @@ def write_delivery(name: str, files: dict[str, str | bytes],
                     received_at: "datetime | Mapping[str, datetime] | None" = None,
                     deliveries_dir: Path | None = None,
                     receipts_dir: Path | None = None,
-                    received_from: str | None = None) -> Path:
+                    received_from: str | None = None,
+                    stated_original: Mapping[str, str] | None = None,
+                    filed_by: Mapping[str, str] | None = None) -> Path:
     """Writes one delivery and its receipt record, and returns the
     delivery's own directory.
+
+    `stated_original` and `filed_by` are the two facts a hand-filed
+    supply adds (REQ-PIPE-103 criterion 10, REQ-PIPE-147 criterion 6),
+    written into each file's receipt so a rebuild from disk restores
+    them. Omitted, the receipt says the delivery arrived automatically
+    and records no stated original arrival.
 
     `received_at` IS WHEN OUR STORAGE TOOK THE OBJECT where storage
     reports that (REQ-PIPE-105 criterion 3) - S3's own `LastModified`,
@@ -328,14 +367,17 @@ def write_delivery(name: str, files: dict[str, str | bytes],
         with open(path / filename, mode) as f:
             f.write(payload)
 
-    write_receipts(name, instants, receipts_dir, received_from=received_from)
+    write_receipts(name, instants, receipts_dir, received_from=received_from,
+                   stated_original=stated_original, filed_by=filed_by)
     return path
 
 
 def write_receipts(name: str, received_at: "datetime | Mapping[str, datetime]",
                    receipts_dir: Path | None = None, *,
                    files=None, received_from: str = RECEIVED_FROM_STORAGE,
-                   sequence: int | None = None) -> None:
+                   sequence: int | None = None,
+                   stated_original: Mapping[str, str] | None = None,
+                   filed_by: Mapping[str, str] | None = None) -> None:
     """Write one receipt per FILE for a delivery (REQ-GEN-044 criterion
     12), and nothing else - the one writer of the receipt format.
 
@@ -358,18 +400,27 @@ def write_receipts(name: str, received_at: "datetime | Mapping[str, datetime]",
     # same instant, where the sequence is still total (REQ-PIPE-061).
     parsed = {f: asset_time.parse_instant(when, f"received_at for {name}/{f}")
               for f, when in instants.items()}
+    stated_original = dict(stated_original or {})
+    filed_by = dict(filed_by or AUTOMATED)
     for filename in sorted(parsed, key=lambda f: (parsed[f], f)):
+        record = {"delivery": name, "file": filename,
+                  "received_at": asset_time.isoformat(parsed[filename]),
+                  # WHICH CLOCK STAMPED IT (REQ-PIPE-105 criterion 4).
+                  "received_from": received_from,
+                  # THE ORDER THIS RECORD WAS WRITTEN (REQ-PIPE-061
+                  # criterion 3), and the only fact available for
+                  # breaking a tie between two arrivals sharing a
+                  # receipt instant. Ours, like the instant beside it.
+                  "sequence": sequence,
+                  # WHO FILED IT (REQ-PIPE-147 criterion 6).
+                  "filed_by": filed_by}
+        if filename in stated_original:
+            # UNDER ITS OWN KEY, MARKED AS A PERSON'S STATEMENT
+            # (REQ-PIPE-103 criterion 10) - never in `received_at`.
+            record["originally_received"] = {"value": stated_original[filename],
+                                             "stated_by": "person"}
         with open(receipt_dir / f"{filename}.json", "w") as f:
-            json.dump({"delivery": name, "file": filename,
-                       "received_at": asset_time.isoformat(parsed[filename]),
-                       # WHICH CLOCK STAMPED IT (REQ-PIPE-105 criterion 4).
-                       "received_from": received_from,
-                       # THE ORDER THIS RECORD WAS WRITTEN (REQ-PIPE-061
-                       # criterion 3), and the only fact available for
-                       # breaking a tie between two arrivals sharing a
-                       # receipt instant. Ours, like the instant beside it.
-                       "sequence": sequence},
-                      f, indent=2)
+            json.dump(record, f, indent=2)
         sequence += 1
 
 
@@ -543,10 +594,34 @@ def read_delivery(name: str, deliveries_dir: Path | None = None,
     received_at, sequence, received_from = min(
         (receipts[f] for f in files if f in receipts),
         key=lambda r: (r[0], r[1]), default=read_receipt_record(name, receipts_dir))
+    stated, filed_by = _receipt_extras(name, receipts_dir, files)
     return Delivery(name=name, path=path, received_at=received_at, sequence=sequence,
                      received_from=received_from,
                      files=tuple(files), anomalies=tuple(anomalies),
-                     file_receipts={f: receipts[f] for f in files})
+                     file_receipts={f: receipts[f] for f in files},
+                     stated_original=stated, filed_by=filed_by)
+
+
+def _receipt_extras(name: str, receipts_dir, files) -> tuple[dict[str, str], dict]:
+    """The stated original arrivals and who filed it, from the receipts.
+
+    A receipt written before these keys existed reads as automated with
+    nothing stated - true of every delivery the generators wrote.
+    """
+    receipt_dir = Path(receipts_dir or RECEIPTS_DIR) / name
+    stated: dict[str, str] = {}
+    filed_by: dict = dict(AUTOMATED)
+    for filename in files:
+        path = receipt_dir / f"{filename}.json"
+        if not path.is_file():
+            continue
+        record = json.loads(path.read_text())
+        if isinstance(record.get("filed_by"), dict) and record["filed_by"].get("kind"):
+            filed_by = record["filed_by"]
+        original = record.get("originally_received")
+        if isinstance(original, dict) and original.get("value"):
+            stated[filename] = original["value"]
+    return stated, filed_by
 
 
 @dataclass(frozen=True)

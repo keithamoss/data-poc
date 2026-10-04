@@ -1362,6 +1362,25 @@ function waitedTitle(e){
       ", promoted " + (e.filledAt ? fmtInstant(e.filledAt) : "") +
       ". When the supplier delivered and when we acted are different facts.";
 }
+// WHO FILED IT, AND WHEN THEY SAY IT ORIGINALLY ARRIVED (REQ-PIPE-147
+// criterion 7, REQ-PIPE-103 criterion 19). The stated arrival sits BESIDE
+// our receipt, labelled as the filer's statement - never in its place, and
+// never as a verdict. An automated delivery says so in the tooltip only,
+// so the common case adds nothing to the row.
+const FILING_ROUTE_LABEL = {file:"one file", folder:"a folder", table:"one table", s3:"S3"};
+function filedNote(e){
+  const by = e && e.filedBy;
+  if (!by || by.kind !== "person") return "";
+  const stated = e.statedOriginal == null ? ""
+    : e.statedOriginal === "not-known" ? " · originally: not known (stated)"
+    : " · originally " + fmtInstant(e.statedOriginal) + " (stated)";
+  const title = "Filed by hand (" + (FILING_ROUTE_LABEL[by.route] || by.route) + ") by " + by.who +
+    (e.statedOriginal == null ? "" : ". The original arrival is their statement - recorded, never used to file or judge this supply.");
+  return `<span class="filed-note" title="${escHtml(title)}" style="color:var(--ink-muted); font-size:11.5px;">by hand · ${escHtml(by.who)}${escHtml(stated)}</span>`;
+}
+function receivedTitle(e){
+  return e && e.filedBy && e.filedBy.kind === "automated" ? "Received automatically" : "When we received this supply";
+}
 function waitedChip(e){
   const text = fmtWaited(e.waitedSeconds, e.awaiting);
   if (!text) return "";
@@ -2222,6 +2241,11 @@ function buildSupplyHistory(d){
       filledAt: arrival.filledAt,
       waitedSeconds: arrival.waitedSeconds,
       awaiting: arrival.awaiting,
+      // WHO FILED IT AND THE STATED ORIGINAL ARRIVAL (REQ-PIPE-147,
+      // REQ-PIPE-103 criterion 19) - carried, or filedNote() has nothing
+      // to show; this list is hand-maintained, so a new field is added here.
+      statedOriginal: arrival.statedOriginal,
+      filedBy: arrival.filedBy,
       // "how long since the previous supply or resupply" (Keith's own
       // framing) - now just the previous entry in this SAME chain,
       // walked in chronological order, rather than a separate
@@ -4383,7 +4407,7 @@ function renderSupplyCycleRows(entries, datasetId){
       // e.arrivedAt used to be emitted RAW here - offset, microseconds
       // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
       // one column. REQ-DASH-071.
-      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPill(e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt) : ""}</span> ${waitedChip(e)}`;
+      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPill(e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" title="${receivedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt) : ""}</span> ${waitedChip(e)} ${filedNote(e)}`;
     // data-run-id alongside data-run-date: run_date is NOT unique (a
     // resupply shares its base run's date - plans/conceptual-design.md
     // Thread A found 352 real BDM runs across only 123 distinct dates),

@@ -233,7 +233,7 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(cp.qa_command, [
-        "--commit",
+        "--commit", "--originally-received", "not-known",
         "--folder", os.path.join(cp_raw_dir, _REF_RUN_ID),
         "--reference-folder", os.path.join(cp_raw_dir, _REF_RUN_ID),
     ])
@@ -295,7 +295,7 @@ def test_qa_command_local_folder_commit_records_the_run(
     result = _runner.invoke(cp.qa_command, [
         "--folder", os.path.join(cp_raw_dir, _REF_RUN_ID),
         "--reference-folder", os.path.join(cp_raw_dir, _REF_RUN_ID),
-        "--commit",
+        "--commit", "--originally-received", "not-known",
     ])
 
     assert result.exit_code == 0, result.output
@@ -608,6 +608,7 @@ def test_run_check_s3_single_table_downloads_then_delegates_to_single_table_mode
                 hand_filing.Filed("", "trial_x", (file_path,), None))
 
     monkeypatch.setattr(cp, "run_check_single_table", _fake_run_check_single_table)
+    monkeypatch.setattr(cp.s3_source, "last_modified", lambda bucket, keys, s3_client=None: {})
 
     results, _filed = cp.run_check_s3_single_table(
         "my-bucket", "cp_clients", "cp/delivery_005/cp_clients.csv", "test@example.com",

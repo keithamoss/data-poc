@@ -142,7 +142,9 @@ def record(delivery, recognition,
              "received_at": delivery.received_at_of(name).isoformat(),
              "received_instant": delivery.received_at_of(name),
              "received_from": _file_source(delivery, name),
-             "receipt_sequence": delivery.sequence_of(name)}
+             "receipt_sequence": delivery.sequence_of(name),
+             # REQ-PIPE-103 criterion 10 - absent unless a person stated it.
+             "originally_received_stated": _stated(delivery, name)}
             for name in sorted(delivery.files)
         ],
         # WHAT WAS CONTESTED (REQ-PIPE-059 criterion 4) is NOT written:
@@ -153,35 +155,44 @@ def record(delivery, recognition,
         # manifest is excluded from `files` on purpose, so this is the
         # only place their presence survives.
         "anomalies": list(delivery.anomalies),
+        # WHO FILED IT (REQ-PIPE-147), as data.
+        "filed_by": dict(getattr(delivery, "filed_by", None) or {"kind": "automated"}),
     }
 
     with _db(conn) as db:
         written = db.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".delivery '
             "(name, received_at, received_instant, received_from, collections, "
-            "anomalies) "
-            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
+            "anomalies, filed_by_kind, filing_route, filed_by) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
             [payload["delivery"], payload["received_at"], delivery.received_at,
              payload["received_from"],
              json.dumps(payload["collections"]),
-             json.dumps(payload["anomalies"])]).fetchall()
+             json.dumps(payload["anomalies"]),
+             payload["filed_by"]["kind"], payload["filed_by"].get("route"),
+             payload["filed_by"].get("who")]).fetchall()
         if not written:
             return None
         for entry in payload["files"]:
             db.execute(
                 f'INSERT INTO "{qa_store.SCHEMA}".delivery_file '
                 "(delivery, filename, dataset_id, contested_by, received_at, "
-                "received_instant, received_from, receipt_sequence) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "received_instant, received_from, receipt_sequence, "
+                "originally_received_stated) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [payload["delivery"], entry["filename"], entry["dataset_id"],
                  json.dumps(entry["contested_by"]) if entry["contested_by"] else None,
                  entry["received_at"], entry["received_instant"], entry["received_from"],
-                 entry["receipt_sequence"]])
+                 entry["receipt_sequence"], entry["originally_received_stated"]])
     payload["contested"] = [{"dataset_id": h.dataset_id, "files": list(h.files)}
                             for h in holds.holds_in(recognition)]
     for entry in payload["files"]:
         entry.pop("received_instant")
     return payload
+
+
+def _stated(delivery, name: str) -> str | None:
+    return (getattr(delivery, "stated_original", None) or {}).get(name)
 
 
 def _file_source(delivery, name: str) -> str:
@@ -206,26 +217,33 @@ def records(conn: supply_db.SupplyConnection | None = None) -> list[dict]:
     """
     with _db(conn) as db:
         deliveries = db.execute(
-            f'SELECT name, received_at, collections, anomalies, received_from '
+            f'SELECT name, received_at, collections, anomalies, received_from, '
+            f'filed_by_kind, filing_route, filed_by '
             f'FROM "{qa_store.SCHEMA}".delivery ORDER BY received_instant, name'
         ).fetchall()
         contested_lists = _contested(db, None)
         files: dict[str, list[dict]] = {}
-        for delivery, filename, dataset_id, contested, received_at, sequence, source in db.execute(
+        for delivery, filename, dataset_id, contested, received_at, sequence, source, stated in db.execute(
                 f'SELECT delivery, filename, dataset_id, contested_by, received_at, '
-                f'receipt_sequence, received_from '
+                f'receipt_sequence, received_from, originally_received_stated '
                 f'FROM "{qa_store.SCHEMA}".delivery_file ORDER BY delivery, filename'
         ).fetchall():
             files.setdefault(delivery, []).append(
                 {"filename": filename, "dataset_id": dataset_id,
                  "contested_by": contested, "received_at": received_at,
-                 "receipt_sequence": sequence, "received_from": source})
+                 "receipt_sequence": sequence, "received_from": source,
+                 "originally_received_stated": stated})
     return [{"delivery": name, "received_at": received_at,
              "received_from": received_from,
              "collections": collections, "files": files.get(name, []),
-             "contested": contested_lists.get(name, []), "anomalies": anomalies}
-            for name, received_at, collections, anomalies, received_from
+             "contested": contested_lists.get(name, []), "anomalies": anomalies,
+             "filed_by": _filed_by(kind, route, who)}
+            for name, received_at, collections, anomalies, received_from, kind, route, who
             in deliveries]
+
+
+def _filed_by(kind, route, who) -> dict:
+    return {"kind": kind} if kind != "person" else {"kind": kind, "route": route, "who": who}
 
 
 def _contested(db, names: list[str] | None) -> dict[str, list[dict]]:
@@ -260,7 +278,7 @@ def records_carrying(dataset_id: str, limit: int | None = None,
     not depend on how long ago that was.
     """
     sql_text = (f'SELECT d.name, d.received_at, d.collections, d.anomalies, '
-                f'd.received_from '
+                f'd.received_from, d.filed_by_kind, d.filing_route, d.filed_by '
                 f'FROM "{qa_store.SCHEMA}".delivery d '
                 f'WHERE EXISTS (SELECT 1 FROM "{qa_store.SCHEMA}".delivery_file f '
                 f'              WHERE f.delivery = d.name AND f.dataset_id = ?) '
@@ -275,21 +293,22 @@ def records_carrying(dataset_id: str, limit: int | None = None,
             return []
         names = [row[0] for row in found]
         files: dict[str, list[dict]] = {}
-        for delivery, filename, ds_id, contested, received_at, sequence, source in db.execute(
+        for delivery, filename, ds_id, contested, received_at, sequence, source, stated in db.execute(
                 f'SELECT delivery, filename, dataset_id, contested_by, received_at, '
-                f'receipt_sequence, received_from '
+                f'receipt_sequence, received_from, originally_received_stated '
                 f'FROM "{qa_store.SCHEMA}".delivery_file WHERE delivery = ANY(?) '
                 "ORDER BY delivery, filename", [names]).fetchall():
             files.setdefault(delivery, []).append(
                 {"filename": filename, "dataset_id": ds_id, "contested_by": contested,
                  "received_at": received_at, "receipt_sequence": sequence,
-                 "received_from": source})
+                 "received_from": source, "originally_received_stated": stated})
         contested_by_delivery = _contested(db, names)
     return [{"delivery": name, "received_at": received_at, "collections": collections,
              "received_from": received_from,
              "files": files.get(name, []), "contested": contested_by_delivery.get(name, []),
-             "anomalies": anomalies}
-            for name, received_at, collections, anomalies, received_from in found]
+             "anomalies": anomalies, "filed_by": _filed_by(kind, route, who)}
+            for name, received_at, collections, anomalies, received_from, kind, route, who
+            in found]
 
 
 def supply_ids(deliveries: list[str],
