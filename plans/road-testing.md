@@ -1690,6 +1690,77 @@ judgement about who reads the page rather than about the rule.
         on it is refused naming `--trial`; `pipeline process` is on the
         TUI menu and a PERSON starting it in production types the id
         (Keith chose this over the reviewer's "no typed id").
+      - ROUND 2 (Keith): the single per-arrival function (086 criterion 2)
+        is extracted FIRST, before the batch, as a behaviour-preserving
+        refactor proven by regenerate-and-diff, so every later rule lands
+        once; a recorded failed-load reason is OUR OWN WORDS ONLY (kind,
+        line, field count, column) - the library's message goes to the
+        operator's terminal and is never recorded; the Lambda handler only
+        RECORDS the delivery rows and then runs the processing pass, so one
+        processor keeps global receipt order; 107's newer-schema refusal
+        (criteria 13-14) is built INSIDE 144's change, and 093/107 go
+        before 151/152, with 114 alongside 150.
+      - ROUND 3 (Keith): a failed arrival in a processing pass skips the
+        REST OF ITS COLLECTION for that pass (other collections continue,
+        exit non-zero, retried next pass); ONE pass lock taken by
+        `pipeline process`, `run`, `bootstrap` and `regenerate-history`,
+        each refusing while another holds it and saying which and since
+        when; `pipeline run` on a database with history REFUSES, pointing
+        at `mothman env reset-synthetic`; a supply with no slot counts as
+        gated by its OPEN ASSIGNMENT HOLD (REQ-PIPE-064), and 144
+        criterion 13 is to be reworded to match built 105 criterion 6
+        (contested pairs ARE filed, under #1) - wording to Keith to sign.
+      - ROUND 4 (Keith): an S3-only delivery stores its object's
+        STORAGE URI on qa.delivery_file (152, bump coordinated with 144)
+        and the processing pass gets READ-ONLY access to the arriving
+        bucket (151's security NFR corrected); test databases are marked
+        with a new `test` ENVIRONMENT that only fixtures set (publishes,
+        confirmation and ticketing off); the ticket REPOSITORY lives in
+        data-asset.yaml, with ticketing a yes/no per environment and
+        refused loudly when on with no repository; and 128's "one prompt"
+        holds - in a confirming environment the warning panel sits above
+        the typed id, which is the only confirmation.
+      - ROUND 5 (Keith): `regenerate-history` is refused wherever the
+        asset is not declared synthetic, and is a candidate to retire into
+        144's `reset-synthetic` plus a bootstrap; 093 and 107 cover the DEV
+        CONTAINER (MOTHMAN_ENVIRONMENT=local in devcontainer.json, a mark
+        in post-create.sh); the TUI keeps the environment visible with a
+        PERSISTENT BOTTOM TOOLBAR (Keith's pick over prefixing prompts -
+        the reviewer flagged it as unverified with questionary and the
+        cast recorder, so it needs a quick spike before 114's criterion is
+        reworded); and a Child Protection S3 prefix offers EACH OBJECT'S
+        OWN LastModified, confirmed as a set in one step - an amendment to
+        103's "state once" decision, wording to Keith to sign.
+      - ROUND 6 (Keith): file-check results keep EVERY ATTEMPT, tagged with
+        the load attempt (096 criterion 7 amended); a failed-load item and a
+        hold OPEN AT THE SUPPLY'S RECEIPT INSTANT, not the wall clock (148
+        criterion 3, 115 criterion 12, 153 criterion 2); 108's "no earlier
+        accepted supply" record is written by EVIDENTLY itself, not under
+        `unrunnable`; and REQ-DASH-070 criteria 5 and 7 get AMENDED wording
+        for Keith to sign.
+      - ROUND 7 (Keith): exit codes are DISTINCT - 0 ok, 1 red checks, 2 a
+        stage or arrival failed, 75 another pass is running; a kept
+        multi-arrival run shows failing and warning checks in full and
+        passes as a count per dataset (`--all-checks` for everything),
+        ending on the lifecycle summary; a fixed and RELOADED failed file
+        becomes OWED and the next processing pass checks it THROUGH
+        REQ-PIPE-140's re-check, as a new run that keeps the first; a
+        contested pair where one file is refused STAYS CONTESTED; the
+        synthetic history IS INJECTED with a refused file and a
+        column-order warning (Keith's pick over test-only fixtures - it
+        changes every bootstrap's output and 144's before/after proof, so
+        it needs its own REQ-GEN amendment and its own regenerate); 151's
+        refusal reasons gain "could not be loaded"; and 148/115 gain the
+        dashboard reviewer's three must-fixes (the queue copy that says
+        items never change status; a reason row instead of the previous
+        supply's figures; a supply-history row for a refused or failed
+        supply).
+      NEXT: draft every resulting amendment as exact before/after wording
+      for Keith to sign - a large batch touching roughly 086, 093, 096,
+      097, 103, 107, 108, 114, 115, 128, 144, 147, 148, 151, 152, 153,
+      REQ-DASH-070 and a REQ-GEN item - via delivery-scoper, then place
+      the extraction of 086's per-arrival function FIRST in the build
+      order.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt
