@@ -4399,6 +4399,12 @@ twice. It deliberately did not re-find the `TypeError`.
     REQ-DOCS-143 and ahead of the rest of the batch, with this entry's
     test going in alongside it, failing first.
 
+    **CLOSED 2026-10-04 overnight (sprint 2).** The test went in
+    (`tests/test_withheld_does_not_empty_a_slot.py`). It no longer failed
+    by the time it landed - #84's fix had already made `promoted_into`
+    skip refusals - and the fix by construction is in: `qa.slot_holds`
+    (REQ-PIPE-130 criterion 8) reads no refusal at all.
+
 76. **[blocked, 2026-10-04]** **[Dashboard UI]** **The arrival history labels
     an arrival with its DELIVERY's receipt time, not the file's own.**
     Spotted by `delivery-architect` reviewing REQ-PIPE-144:
@@ -4686,6 +4692,15 @@ twice. It deliberately did not re-find the `TypeError`.
     must not be built before it - otherwise its false red ships. Not
     fixed.
 
+    **FIXED 2026-10-04 overnight (sprint 2), by the slot view as Keith
+    chose.** `latest_for_slot` now returns the last decision that
+    CHANGED the slot, from `qa.slot_holds`, so the drift walk reads it
+    and stops skipping. `tests/test_drift_reference.py::TestAnEntryAboutAnotherSupplyDoesNotHideTheReference`
+    - a reject of another supply and a withheld note - both confirmed
+    failing against the pre-view code first. Every other
+    `latest_for_slot` reader (substitution, inheritance, promotion_state,
+    `_standing_on`, filing_decisions, slot_state) reads the same answer.
+
 86. **[investigate, 2026-10-04]** **[Pipeline & publishing]**
     **`supply_db._redact` misses a keyword-form DSN.** Found by
     delivery-architect's review of REQ-PIPE-093, confirmed by reading: the
@@ -4720,3 +4735,31 @@ twice. It deliberately did not re-find the `TypeError`.
     workflow where only the second job drifted, which the old first-match
     lookup was shown to miss. REQ-PIPE-146 still replaces the comparison
     with "equals the declared major".
+
+88. **[done, 2026-10-04]** **[Dashboard UI]** **Two different cross-table
+    checks sharing a name were drawn as one card.** Found overnight by the
+    full suite (`tests/test_cross_table_scope.py::TestPooledChecksKeepSeparateIdentities`
+    failing), and partly MY regression: this morning's gap-1 fix
+    (post-build-review #77) let a can't-run record for cp-placements'
+    `cp_client_id.relationships_dbt` open a card of its own under the
+    same URL key as cp-investigations' check, so the section had a
+    duplicate key. Underneath it was an older defect: the CP builder
+    keyed a section's cards by (engine, check_name), so cp-placements'
+    REAL verdicts for that check had always been merged into
+    cp-investigations' card on cp-clients' cross-table section - silent
+    wrong information. FIXED (minor bug and Keith's overnight permission):
+    cards are keyed by check_id, and where two pooled cards share a URL
+    key each is prefixed with its declaring dataset - only colliding keys
+    change, so no other URL moves. `tests/test_build_cp_dashboard_data.py::TestTwoChecksThatShareANameStayTwoCards`,
+    confirmed failing first.
+
+89. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **A withheld
+    supply used to read as RETURNED in a slot's state; it now reads as
+    awaiting a decision.** Noted overnight (sprint 2), not a defect report
+    so much as a behaviour change worth a look: `slot_state` mapped any
+    unrecognised latest action - `promotion-withheld` included - to
+    RETURNED ("a person returned it"). With refusals no longer read as a
+    slot's decision (REQ-PIPE-130), a withheld supply's slot falls through
+    to its filing and reads AWAITING_DECISION, which is what REQ-PIPE-077
+    meant ("a person decides whether it fills this period"). No test
+    pinned the old reading. Flagged rather than assumed right.

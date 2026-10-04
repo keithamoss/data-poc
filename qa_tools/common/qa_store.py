@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -772,6 +772,77 @@ CREATE OR REPLACE VIEW "{SCHEMA}".dataset_stats_visible AS
     SELECT d.* FROM "{SCHEMA}".dataset_stats d
     JOIN "{SCHEMA}".run ON run.run_key = d.run_key
     WHERE run.completed_at IS NOT NULL;
+
+-- WHAT EACH SLOT HOLDS, DEFINED ONCE (REQ-PIPE-130 criteria 8 and 9).
+-- Every question of what a slot holds or held - the gate's filled-slot
+-- check, slot states, the stood-on guard, the newest promoted supply, the
+-- drift reference - is answered from here, and from nowhere else. Five
+-- Python readers used to take "the latest decision naming the slot",
+-- and that rule was wrong three ways (post-build-review #75, #84, #85):
+-- a refusal (promotion-withheld, inherit-refused) names a period without
+-- changing it, and a reject, demote or re-file names ITS OWN supply's
+-- slot whichever supply that is - rejecting an unpromoted resupply of a
+-- filled period is not a decision about what fills it.
+--
+-- So the slot's decisions are WALKED in effective order: an entry INTO
+-- the slot sets what fills it (a promote, re-file or substitution fills
+-- it; anything else - an inheritance - leaves it holding no supply,
+-- because an inherited period is one the dataset does not take part in,
+-- so there is no slot to fill (REQ-PIPE-084 criteria 4 and 7)); an
+-- entry OUT OF it empties it only where it names the supply filling it;
+-- refusals are not read at all. `decision_id` is the last entry that
+-- CHANGED the slot, which is what a slot's state and its "decided by"
+-- are read from. `as_at` filters on effective_at (what the warehouse
+-- held then), never on recorded_at.
+--
+-- A FUNCTION RATHER THAN A PLAIN VIEW so the as-at form and the
+-- one-dataset form are the same definition; slot_holds_now is the view
+-- for a reader that wants the present over every dataset.
+CREATE OR REPLACE FUNCTION "{SCHEMA}".slot_holds(for_dataset text, as_at timestamptz)
+RETURNS TABLE (dataset_id text, slot text, decision_id bigint, fills text)
+LANGUAGE sql STABLE AS $fn$
+WITH RECURSIVE named AS (
+    SELECT d.id, d.dataset_id, s.slot, d.action, d.supply, d.to_slot,
+           row_number() OVER (PARTITION BY d.dataset_id, s.slot
+                              ORDER BY d.effective_at, d.id) AS rn
+    FROM "{SCHEMA}".decision d
+    CROSS JOIN LATERAL (SELECT d.to_slot AS slot UNION SELECT d.from_slot) s
+    WHERE s.slot IS NOT NULL
+      AND (for_dataset IS NULL OR d.dataset_id = for_dataset)
+      AND (as_at IS NULL OR d.effective_at <= as_at)
+      AND d.action NOT IN ('promotion-withheld', 'inherit-refused')
+), walk AS (
+    SELECT n.dataset_id, n.slot, n.rn, n.id AS last_id,
+           CASE WHEN n.to_slot = n.slot
+                     AND n.action IN ('promote', 'refile', 'substitute')
+                THEN n.supply END AS fills
+    FROM named n WHERE n.rn = 1
+    UNION ALL
+    SELECT n.dataset_id, n.slot, n.rn,
+           CASE WHEN n.to_slot IS DISTINCT FROM n.slot
+                     AND n.action IN ('reject', 'demote', 'refile')
+                     AND n.supply IS NOT NULL AND w.fills IS NOT NULL
+                     AND n.supply <> w.fills
+                THEN w.last_id ELSE n.id END,
+           CASE WHEN n.to_slot = n.slot
+                THEN CASE WHEN n.action IN ('promote', 'refile', 'substitute')
+                          THEN n.supply END
+                WHEN n.action IN ('reject', 'demote', 'refile')
+                     AND n.supply IS NOT NULL AND w.fills IS NOT NULL
+                     AND n.supply <> w.fills
+                THEN w.fills
+                ELSE NULL END
+    FROM walk w
+    JOIN named n ON n.dataset_id = w.dataset_id AND n.slot = w.slot
+                AND n.rn = w.rn + 1
+)
+SELECT DISTINCT ON (w.dataset_id, w.slot) w.dataset_id, w.slot, w.last_id, w.fills
+FROM walk w
+ORDER BY w.dataset_id, w.slot, w.rn DESC
+$fn$;
+
+CREATE OR REPLACE VIEW "{SCHEMA}".slot_holds_now AS
+SELECT * FROM "{SCHEMA}".slot_holds(NULL, NULL);
 """
 
 

@@ -216,3 +216,22 @@ class TestEachEntryCanBeTiedToItsRun:
                 at="2026-02-01T09:00:00+08:00", to_slot="2026-Q1")
         got = st.with_runs(st.for_dataset(dataset, conn=clean), dataset, conn=clean)
         assert got[0]["supply"] == "never-checked" and got[0]["run_id"] is None
+
+
+class TestTheTimelineIsTheViewsAnswers:
+    """REQ-PIPE-130 criterion 9: what a slot held comes from qa.slot_holds,
+    not from a rule restated here. The restatement read a withheld note as
+    emptying the slot it names (post-build-review #84's shape, a fourth
+    copy), so the page's "in place on" would have shown a filled period
+    as empty from the moment automation stood back from a resupply."""
+
+    def test_a_withheld_note_does_not_empty_the_slot(self, clean, dataset):
+        _decide(clean, dataset, decision_log.PROMOTE, supply="s1",
+                at="2026-01-01T00:00:00+08:00", to_slot="2026-Q1")
+        _decide(clean, dataset, decision_log.PROMOTION_WITHHELD, supply="s2",
+                at="2026-02-01T00:00:00+08:00", to_slot="2026-Q1",
+                actor="promotion rule", kind=decision_log.RULE)
+        timeline = slot_timeline.for_dataset(dataset, conn=clean)
+        assert slot_timeline.in_place_on(
+            timeline, "2026-Q1", "2026-03-01T00:00:00+08:00") == "s1"
+        assert [e["supply"] for e in timeline] == ["s1"]

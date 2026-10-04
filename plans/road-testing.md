@@ -1839,6 +1839,19 @@ judgement about who reads the page rather than about the rule.
         the hand-filed BDM path now checks a contested file as the batch
         does instead of refusing it. Post-build-review #75's test added -
         it passes since #84's fix.
+      - SPRINT 2 DONE: REQ-PIPE-130 criterion 8 and criterion 9 for every
+        reader but _manifest. `qa.slot_holds(dataset, as_at)` (schema v15)
+        is the one definition of what a slot holds; promoted_into,
+        latest_for_slot, promoted_supply, slot_state, the drift reference
+        and the dashboard's slot timeline all read it. Fixes #85 (drift
+        reference) and closes #75. Parity test: 40 random decision
+        sequences, every instant, against the Python rule it replaced.
+        ALSO FIXED: #88 - two different cross-table checks sharing a name
+        were merged into one dashboard card (an older defect my gap-1 fix
+        surfaced as a duplicate key). PROVISIONAL: the view is a SQL
+        function (needed for the as-at parameter). NOTED for Keith: #89 -
+        a withheld supply's slot now reads "awaiting a decision" instead
+        of "returned".
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

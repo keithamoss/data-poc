@@ -29,12 +29,7 @@ answer "now" whatever instant was asked for.
 """
 from __future__ import annotations
 
-from qa_tools.common import decision_log, supply_db
-
-#: Actions that put a supply INTO a slot. A substitution counts: the
-#: period answers, which is what a reader of it needs to know.
-FILLS = (decision_log.PROMOTE, decision_log.REFILE, decision_log.SUBSTITUTE)
-
+from qa_tools.common import decision_log, qa_store, supply_db
 
 def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None) -> list[dict]:
     """Every change to what one dataset's slots held, oldest first.
@@ -58,27 +53,37 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None)
         with supply_db.connect(read_only=True, label="mothman:slot-timeline") as opened:
             return for_dataset(dataset_id, conn=opened)
 
-    rows = conn.execute(
-        f"SELECT id, action, supply, from_slot, to_slot, effective_at, actor, "
-        f"actor_kind, reason FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND (to_slot IS NOT NULL OR from_slot IS NOT NULL) "
-        "ORDER BY effective_at, id", [dataset_id]).fetchall()
-
+    # THE ANSWERS COME FROM qa.slot_holds (REQ-PIPE-130 criterion 9),
+    # asked as at each instant a decision took effect - never from a rule
+    # re-stated here. This module used to work out for itself which
+    # actions fill and which empty, and so read a withheld note, or a
+    # reject of some other supply filed to the period, as emptying a slot
+    # that still held its supply (post-build-review #84). An entry is
+    # written where the decision that last CHANGED a slot moves on.
+    instants = [r[0] for r in conn.execute(
+        f"SELECT DISTINCT effective_at FROM {decision_log.TABLE} "
+        "WHERE dataset_id = ? ORDER BY effective_at", [dataset_id]).fetchall()]
     out: list[dict] = []
-    for (ident, action, supply, from_slot, to_slot, effective_at,
-         actor, actor_kind, reason) in rows:
-        at = effective_at.isoformat() if hasattr(effective_at, "isoformat") else str(effective_at)
-        common = {"at": at, "action": action, "actor": actor,
-                   "actor_kind": actor_kind, "reason": reason or "",
-                   "decision_id": ident}
-        # EMPTIED FIRST, then filled - so a re-file's two entries land
-        # in an order a reader can follow, and so a lookup at the same
+    seen: dict[str, int] = {}
+    for instant in instants:
+        changed = []
+        for slot, decision_id, fills in conn.execute(
+                f'SELECT slot, decision_id, fills FROM "{qa_store.SCHEMA}".slot_holds(?, ?)',
+                [dataset_id, instant]).fetchall():
+            if seen.get(slot) != decision_id:
+                seen[slot] = decision_id
+                changed.append((slot, decision_id, fills))
+        at = instant.isoformat() if hasattr(instant, "isoformat") else str(instant)
+        # EMPTIED FIRST, then filled - so a re-file's two entries land in
+        # an order a reader can follow, and so a lookup at the same
         # instant sees the destination rather than the origin.
-        if from_slot and from_slot != to_slot:
-            out.append({**common, "slot": from_slot, "supply": None})
-        if to_slot:
-            out.append({**common, "slot": to_slot,
-                         "supply": supply if action in FILLS else None})
+        for slot, decision_id, fills in sorted(changed, key=lambda c: (c[2] is not None, c[0])):
+            action, actor, actor_kind, reason = conn.execute(
+                f"SELECT action, actor, actor_kind, reason FROM {decision_log.TABLE} "
+                "WHERE id = ?", [decision_id]).fetchall()[0]
+            out.append({"at": at, "action": action, "actor": actor,
+                        "actor_kind": actor_kind, "reason": reason or "",
+                        "decision_id": decision_id, "slot": slot, "supply": fills})
     return out
 
 

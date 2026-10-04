@@ -204,6 +204,28 @@ for _table_meta in COLUMN_META.values():
     _table_meta[CROSS_TABLE_PSEUDO_COLUMN] = CROSS_TABLE_META
 
 
+def _disambiguate_pooled_keys(cards: list[dict]) -> None:
+    """Where two cards in one section share a URL key, prefix each with
+    the dataset that DECLARES it (post-build-review #88).
+
+    A pooled section gathers checks declared by several datasets, so
+    `cp_client_id.relationships_dbt` arrives once from cp-investigations
+    and once from cp-placements - two checks, one key, and the template
+    resolves a key to its first match. Only colliding keys change, so
+    every URL that was unambiguous yesterday still works today.
+    """
+    from qa_tools.common.check_id import try_parse
+
+    counts: dict[str, int] = {}
+    for card in cards:
+        counts[card["key"]] = counts.get(card["key"], 0) + 1
+    for card in cards:
+        if counts[card["key"]] > 1:
+            parsed = try_parse(card["check_id"])
+            if parsed:
+                card["key"] = f"{parsed.dataset}.{card['key']}"
+
+
 def _cross_table_check_ids() -> set[str]:
     """Every check that reads a table other than its own.
 
@@ -286,11 +308,16 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             col = r["column_name"]
         if col not in column_meta:
             continue
-        key = (r["engine"], r["check_name"])
-        if _not_evaluated_reason(r):
-            key = next((k for k, s in by_column.get(col, {}).items()
-                        if s["check_id"] == r["check_id"]), key)
-        slot = by_column.setdefault(col, {}).setdefault(key, {
+        # KEYED BY check_id - a check's identity (post-build-review #88).
+        # It was (engine, check_name), which merged two DIFFERENT checks
+        # sharing a name into one card: cp-clients' cross-table section
+        # drew cp-placements' relationship verdicts on cp-investigations'
+        # check. It also gives a can't-run record (REQ-PIPE-105 criterion
+        # 13) its real check's card without a lookup, since it carries the
+        # same check_id under a pseudo-tool and a prose name of its own;
+        # real records come first, so the card keeps the real name.
+        slot = by_column.setdefault(col, {}).setdefault(r["check_id"], {
+            "engine": r["engine"], "check_name": r["check_name"],
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
@@ -330,7 +357,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         agg_spec = AGGREGATE_SPEC.get((table, col))
 
         checks_out = []
-        for (engine, check_name), slot in checks_for_col.items():
+        for slot in checks_for_col.values():
+            engine, check_name = slot["engine"], slot["check_name"]
             attach_aggregate = agg_spec is not None and check_name in agg_spec["check_names"]
             history = []
             for run_id in run_ids_in_order:
@@ -407,6 +435,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 "changelog": lifecycle.changelog if lifecycle else [],
             })
 
+        _disambiguate_pooled_keys(checks_out)
         if not checks_out:
             checks_out = [{
                 # A REAL KEY, because everything downstream assumes one

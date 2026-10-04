@@ -144,6 +144,13 @@ releases:
               sent for it, the quarter read as empty and the queue asked for
               a resupply. It now keeps showing the supply that fills it. The
               same applied when an off-cycle resupply was held back.
+          - headline: Two checks with the same name are no longer drawn as one
+            components: ["Dashboard UI"]
+            description: >
+              On a table other datasets check against, two of their checks
+              that shared a name were merged into a single card, so one
+              dataset's results were shown under the other's check. Each
+              now has its own card and its own link.
           - headline: Database passwords stay out of error messages
             components: ["Pipeline & publishing"]
             description: >

@@ -278,3 +278,37 @@ class TestTheOrchestratorsEntryPoint:
         monkeypatch.setattr(filing, "period_of", lambda ds, at: a)
         assert drift_reference.reference_run_for_arrival(
             dataset, "2026-09-29T09:00:00+08:00") is None
+
+
+class TestAnEntryAboutAnotherSupplyDoesNotHideTheReference:
+    """post-build-review #85 - the third copy of #84's rule. The walk
+    accepted a period only if the LAST entry naming it was a promotion,
+    so a reject of a different supply filed there, or a withheld note,
+    made it skip a period that still holds a promoted supply - and under
+    REQ-QAC-108's amendment that skip is a false red ("no accepted
+    earlier supply"). Now read from qa.slot_holds (REQ-PIPE-130)."""
+
+    def test_rejecting_an_unpromoted_resupply_of_the_reference_period(
+            self, conn, dataset, calendar):
+        a, _b, c, _d, _e = calendar
+        real = _promote(conn, dataset, a)
+        rejection.reject(
+            conn, agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
+            supply=f"{dataset}@resupply", physical_tables=[], actor="Keith",
+            reason="a bad file", effective_at="2026-09-29T10:00:00+08:00",
+            from_slot=a)
+        got = drift_reference.reference_for(conn, dataset, c)
+        assert (got.period, got.supply) == (a, real)
+
+    def test_a_withheld_note_on_the_reference_period(self, conn, dataset, calendar):
+        a, _b, c, _d, _e = calendar
+        real = _promote(conn, dataset, a)
+        with dl.apply_decision(conn, dl.Decision(
+                agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
+                action=dl.PROMOTION_WITHHELD, supply=f"{dataset}@offcycle",
+                actor="promotion rule", actor_kind=dl.RULE,
+                effective_at="2026-09-29T10:00:00+08:00", to_slot=a,
+                reason="arrived off-cycle")):
+            pass
+        got = drift_reference.reference_for(conn, dataset, c)
+        assert (got.period, got.supply) == (a, real)

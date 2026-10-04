@@ -258,72 +258,34 @@ def promoted_into(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
                    as_at: str | None = None) -> str | None:
     """The supply this slot resolves to, as at an instant (criterion 9).
 
-    From this table alone, which is what makes it an answer rather than a
-    reconstruction. The rule is "the last decision affecting this slot
-    wins": a promote or a re-file INTO it fills it, a reject, a demote or
-    a re-file OUT OF it empties it.
+    READ FROM `qa.slot_holds`, THE ONE DEFINITION OF WHAT A SLOT HOLDS
+    (REQ-PIPE-130 criteria 8 and 9) - the rule and why it is the rule are
+    written there, beside the SQL, and nowhere else. This used to walk the
+    log here in Python, and before that took the latest entry naming the
+    slot, which was wrong three ways (post-build-review #75, #84, #85);
+    the walk moved into the database so that every reader shares it.
 
-    `as_at` IS ABOUT `effective_at`, NEVER `recorded_at`. The question is
-    what the warehouse held at that moment, and a decision taken on
-    Tuesday and recorded on Friday took effect on Tuesday. Using the
-    recorded instant would answer a different question - what we knew -
-    which is also worth asking and is not this.
-
-    ORDERED BY (effective_at, id), because two decisions can share an
-    instant and `id` is the only total order there is. Without it the
-    answer is whichever row the planner returned first, which is stable
-    right up until it is not.
+    `as_at` IS ABOUT `effective_at`, NEVER `recorded_at`: what the
+    warehouse held at that moment, not what we knew then.
     """
-    window = "AND effective_at <= ?" if as_at else ""
-    params: list = [dataset_id, slot, slot]
-    if as_at:
-        params.append(as_at)
+    row = _held(conn, dataset_id, slot, as_at)
+    return row[1] if row else None
+
+
+def _held(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
+          as_at: str | None = None) -> tuple[int, str | None] | None:
+    """`(decision_id, fills)` from qa.slot_holds for one slot, or None
+    where nothing has ever changed it."""
     rows = conn.execute(
-        f"SELECT action, supply, from_slot, to_slot FROM {TABLE} "
-        f"WHERE dataset_id = ? AND (to_slot = ? OR from_slot = ?) {window} "
-        "ORDER BY effective_at, id", params).fetchall()
-    # WALKED OLDEST FIRST rather than "the last entry naming the slot",
-    # because a reject, demote or re-file names its supply's slot as
-    # `from_slot` WHICHEVER SUPPLY IT IS. Rejecting an unpromoted resupply
-    # filed to a promoted period is not a decision about what fills that
-    # period, and reading it as one made a filled period read as empty
-    # while its supply's tables still sat in the period schema
-    # (post-build-review #84). So such an entry empties the slot only
-    # where it names the supply that fills it.
-    # A REFUSAL IS NOT A CHANGE EITHER. `promotion-withheld` and
-    # `inherit-refused` name the period as `to_slot` to say which period
-    # automation stood back from; neither changes what fills it.
-    fills: str | None = None
-    for action, supply, _from_slot, to_slot in rows:
-        if action in RECORDS_A_REFUSAL:
-            continue
-        if to_slot == slot:
-            fills = _fills(action, supply)
-        elif (action in (REJECT, DEMOTE, REFILE) and supply and fills
-              and supply != fills):
-            continue
-        else:
-            fills = None
-    return fills
-
-
-def _fills(action: str, supply: str | None) -> str | None:
-    """What an entry INTO a slot leaves it resolving to."""
-    # A SUBSTITUTED SLOT COUNTS AS FILLED (REQ-PIPE-084 criterion 4).
-    # That is the point of it: the period answers, so nothing should
-    # treat it as owed, and the next arrival for it is a supply landing
-    # on a filled slot rather than the one that was missing.
-    # AN INHERITED PERIOD IS NOT A FILLED SLOT, and that is the whole of
-    # criterion 7: the dataset does not participate, so nothing was owed
-    # and there is no slot to fill. Counting it would make "filled"
-    # mean two different things - a supply arrived, and no supply was
-    # ever due - which is the distinction the dashboard exists to show.
-    return supply if action in (PROMOTE, REFILE, SUBSTITUTE) else None
+        f'SELECT decision_id, fills FROM "{qa_store.SCHEMA}".slot_holds(?, ?) '
+        "WHERE slot = ?", [dataset_id, as_at, slot]).fetchall()
+    return (rows[0][0], rows[0][1]) if rows else None
 
 
 def latest_for_slot(conn: supply_db.SupplyConnection, dataset_id: str,
                      slot: str) -> tuple[str, str, str | None] | None:
-    """`(action, supply, stands_on)` of the last decision on this slot.
+    """`(action, supply, stands_on)` of the last decision that CHANGED
+    this slot.
 
     promoted_into() answers "what does this period resolve to" and
     deliberately flattens a substitution into the supply it stands on,
@@ -331,13 +293,19 @@ def latest_for_slot(conn: supply_db.SupplyConnection, dataset_id: str,
     narrower question a DECISION has to ask: HOW does it resolve, so
     that substituting into a period that already holds a real promoted
     supply can be refused with the right words (criterion 15).
+
+    THE LAST DECISION THAT CHANGED IT, from qa.slot_holds - not the last
+    entry naming it. A refusal, or a reject of a different supply filed
+    to the same period, names the slot without changing it, and reading
+    either as the slot's latest decision is the defect #84 and #85 found.
     """
-    rows = conn.execute(
-        f"SELECT action, supply, stands_on FROM {TABLE} "
-        "WHERE dataset_id = ? AND (to_slot = ? OR from_slot = ?) "
-        "ORDER BY effective_at DESC, id DESC LIMIT 1",
-        [dataset_id, slot, slot]).fetchall()
-    return (rows[0][0], rows[0][1], rows[0][2]) if rows else None
+    row = _held(conn, dataset_id, slot)
+    if row is None:
+        return None
+    found = conn.execute(
+        f"SELECT action, supply, stands_on FROM {TABLE} WHERE id = ?",
+        [row[0]]).fetchall()
+    return (found[0][0], found[0][1], found[0][2]) if found else None
 
 
 def periods_standing_on(conn: supply_db.SupplyConnection, dataset_id: str,
@@ -603,25 +571,16 @@ def promoted_supply(conn: supply_db.SupplyConnection, dataset_id: str,
     same row, and handing back a bare string would send the caller
     looking it up again.
     """
-    window = "AND effective_at <= ?" if as_at else ""
-    params: list = [dataset_id] + ([as_at] if as_at else [])
-    candidates = _rows(conn.execute(
-        f"SELECT {', '.join(FIELDS)} FROM {TABLE} WHERE dataset_id = ? {window} "
-        "ORDER BY effective_at DESC, id DESC", params))
-    # WALKED RATHER THAN FILTERED IN SQL, because "most recently
-    # promoted" means the newest promotion THAT HAS NOT SINCE BEEN
-    # UNDONE - a supply promoted in March and demoted in April is not
-    # the answer, and `WHERE action = 'promote'` would say it was.
-    undone: set[str] = set()
-    for entry in candidates:
-        if entry["action"] in (REJECT, DEMOTE):
-            undone.add(entry["supply"])
-            continue
-        if entry["action"] == REFILE:
-            # A re-file moves a supply; it stays promoted, elsewhere.
-            if entry["supply"] not in undone:
-                return entry
-            continue
-        if entry["action"] == PROMOTE and entry["supply"] not in undone:
-            return entry
-    return None
+    # FROM qa.slot_holds (REQ-PIPE-130 criterion 9): the newest supply
+    # that a slot still holds by a promotion or a re-file. It used to walk
+    # the whole log here with its own idea of "undone", a second statement
+    # of what a slot holds - so a reject of an unpromoted resupply named
+    # "undone" a supply still filling its period. A substitution is not a
+    # promoted supply, so it is not counted.
+    rows = _rows(conn.execute(
+        f"SELECT {', '.join('d.' + f for f in FIELDS)} "
+        f'FROM "{qa_store.SCHEMA}".slot_holds(?, ?) h JOIN {TABLE} d ON d.id = h.decision_id '
+        "WHERE h.fills IS NOT NULL AND d.action IN (?, ?) "
+        "ORDER BY d.effective_at DESC, d.id DESC LIMIT 1",
+        [dataset_id, as_at, PROMOTE, REFILE]))
+    return rows[0] if rows else None

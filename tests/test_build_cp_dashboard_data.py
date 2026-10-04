@@ -157,3 +157,45 @@ class TestACheckThatCouldNotRunStaysOnItsOwnCard:
         assert by_run["cp_run_002"]["status"] == "red"
         assert by_run["cp_run_002"]["not_evaluated"] == "cp_case_workers is held"
         assert by_run["cp_run_001"]["not_evaluated"] is None
+
+
+class TestTwoChecksThatShareANameStayTwoCards:
+    """post-build-review #88 (found 2026-10-04 overnight, by the full
+    suite). cp-clients' cross-table section carries checks DECLARED by
+    other datasets that read it - cp-investigations' and cp-placements'
+    `cp_client_id.relationships_dbt` among them. The builder keyed a
+    section's cards by (engine, check_name), so those two different
+    checks merged into ONE card: cp-placements' verdicts drawn on
+    cp-investigations' check. Silent wrong information. A check's
+    identity is its check_id, so cards are keyed by it, and where two
+    pooled checks share a column and tail their URL key names the
+    dataset that declares each."""
+
+    _INV = ("data-asset-1.child-protection-family-support.child-protection."
+            "cp-investigations.cp_client_id.relationships_dbt")
+    _PLA = ("data-asset-1.child-protection-family-support.child-protection."
+            "cp-placements.cp_client_id.relationships_dbt")
+
+    def _cards(self, monkeypatch):
+        monkeypatch.setattr(bcd, "_cross_table_check_ids", lambda: {self._INV, self._PLA})
+        results = [
+            _check("cp_run_001", "cp_client_id", 0, check_id=self._INV,
+                   check_name="relationships_cp_investigations_cp_client_id"),
+            _check("cp_run_001", "cp_client_id", 3, status="fail", check_id=self._PLA,
+                   check_name="relationships_cp_investigations_cp_client_id"),
+        ]
+        table = bcd.build_one_table("cp_clients", results, FIXTURE_RUNS,
+                                    FIXTURE_DATASET_STATS, {})
+        return [c for col in table["columns"] if col.get("scope") == "cross-table"
+                for c in col["checks"]]
+
+    def test_each_check_keeps_its_own_card_and_verdicts(self, monkeypatch):
+        cards = {c["check_id"]: c for c in self._cards(monkeypatch)}
+        assert set(cards) == {self._INV, self._PLA}
+        assert cards[self._PLA]["history"][0]["value"] == 3
+        assert cards[self._INV]["history"][0]["value"] == 0
+
+    def test_their_keys_differ_and_name_the_declaring_dataset(self, monkeypatch):
+        keys = {c["check_id"]: c["key"] for c in self._cards(monkeypatch)}
+        assert len(set(keys.values())) == 2
+        assert "cp-placements" in keys[self._PLA]
