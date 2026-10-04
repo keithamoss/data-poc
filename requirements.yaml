@@ -10927,9 +10927,13 @@ requirements:
           and this is no closer to met, because what it actually waits
           on is a filing to present, and REQ-PIPE-062's filings are not
           recorded until promotion exists. The dashboard was never the
-          blocker.
+          blocker. Re-pointed 2026-10-04: REQ-DASH-148 (signed that day)
+          owns this red outright, and its decisions say why sprint 11 was
+          never really the blocker - a failed supply is judged as at the
+          instant on show, as REQ-PIPE-115 decision 9 does for a held
+          one, so it needs no filing to present.
         blocked_by:
-          sprints: [11]
+          requirements: [REQ-DASH-148]
     decisions:
       - "Decided staging is a SCHEMA IN THE WAREHOUSE (Keith, 2026-09-23). Thread B said 'everything lands in staging on arrival' without saying where staging physically is, and the natural reading of 'promotion moves it into a period schema' is that staging sits somewhere else. It does not. Data is loaded as soon as it can be, checks run on it there, and the only thing not loaded is a file that cannot be read at all."
       - "Decided ONE GLOBAL staging schema rather than one mirroring slots or periods, and the REASON is recorded here because REQ-PIPE-034 records the departure from Keith's operational system without it - which is the worst combination, since a later session sees the difference, finds no argument, and corrects it back. A supply's slot is not known when it lands, and deferring that is the whole point of staging. A slot-mirrored staging schema forces the slot to be named at LOAD time. Three cases have no slot to name at all: an early supply not yet inside its claim window, a supply held because nothing is confidently claimable, and a mixed-period delivery. A mirror would need an unassigned schema alongside it, ending up with global AND mirrors. Keith's own summary on agreeing: we don't know where it should go, or indeed we need a human to make a decision."

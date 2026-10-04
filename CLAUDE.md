@@ -362,8 +362,7 @@ Rough layout:
   committed file on purpose, so a later sweep for "committed state" does
   not delete it.
 
-  **What still breaks the rule, so nobody has to re-derive the list.**
-  **`qa_results/` WAS the big one, and it is gone** - REQ-PIPE-089 is
+  **What USED to break it: `qa_results/` WAS the big one, and it is gone** - REQ-PIPE-089 is
   built as of 2026-09-27, and the whole per-run QA history, once committed, is
   rows in the `qa` metadata schema (`qa_tools/common/qa_store.py`). There
   was no migration and there will not be one: Keith chose to regenerate
@@ -385,14 +384,12 @@ Rough layout:
   `data/deliveries/` and `data/receipts/` are the supplier's own files and
   our receipts, which are arguably state; `data/generator_bookkeeping.json`
   looks like state on disk and is unexamined. REQ-PIPE-104 and
-  REQ-PIPE-105 own the filing and receipt records. The one deliberate
-  exception remains `dashboard/snapshots/*.html.gz`, whose whole purpose is
-  to be openable years later with nothing but a browser - which a row in a
-  database it cannot reach is not.
-
-  `dashboard/snapshots/*.html.gz` is the deliberate exception and stays:
-  a snapshot's whole purpose is to be openable years later with nothing
-  but a browser, which a row in a database it cannot reach is not.
+  REQ-PIPE-105 own the filing and receipt records, and REQ-PIPE-144
+  (signed 2026-10-04, not built) moves each file's receipt onto
+  `qa.delivery_file`. The one deliberate exception remains
+  `dashboard/snapshots/*.html.gz`, whose whole purpose is to be openable
+  years later with nothing but a browser - which a row in a database it
+  cannot reach is not.
 
 - `data/raw/`, `reports/*.json` etc. are
   gitignored and fully regenerated - never hand-edit or try to commit

@@ -4545,3 +4545,19 @@ twice. It deliberately did not re-find the `TypeError`.
     2026-10-04) every file refused by a file check takes this same path.
     A defect claim, so a failing test comes first; whether the fix is a
     sign-off item depends on what the probe shows.
+
+    **REPRODUCED 2026-10-04**, failing test kept in the session scratchpad
+    (`test_reject_failed_load.py`, a class for
+    `tests/test_filing_decisions.py`): a FAILED load record for a real
+    dataset, then `filing_decisions.apply(REJECT)` naming a period. The
+    rejection IS ACCEPTED - `changed=True`, a decision-log entry, no table
+    moved because there is none - and the failed load is STILL in
+    `load_log.failures()`, so the item stays open and the person is
+    offered the same decision again. `failures()` reads only load records
+    and never consults the decision log. TWO THINGS STILL OPEN, which is
+    why this is Keith's rather than a minor fix: which period a rejection
+    of a never-filed supply names (the log refuses a decision with no
+    slot), and whether the terminal's queue even reaches a failed load -
+    `filing_queue.awaiting` is built from slot states, and a supply that
+    never loaded may never have been filed. Both belong next to
+    REQ-DASH-148, which now owns how a failed load is shown.
