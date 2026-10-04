@@ -240,8 +240,8 @@ unblocked by it. `gh` is still absent here, which is what makes criterion
 so in one line, and finishes normally.
 
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
-`REQ-PIPE-079` (decision layer written but uncalled; the overlay WIRED
-2026-10-02). `REQ-PIPE-105` is BUILT as of 2026-10-04, criterion 7 left
+`REQ-PIPE-079` is BUILT as of 2026-10-04 (see its decisions).
+`REQ-PIPE-105` is BUILT as of 2026-10-04, criterion 7 left
 unmet for `REQ-PIPE-128` to retire (one version per table per period) -
 see its decisions.
 

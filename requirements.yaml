@@ -3410,7 +3410,7 @@ requirements:
     implemented_by:
       - qa_tools/common/period_schema.py::create_overlay_views
       - qa_tools/common/period_schema.py::check_readiness
-      - qa_tools/common/period_schema.py::fan_out
+      - qa_tools/common/period_overlay.py::rebuild_for_arrival
       - qa_tools/common/period_schema.py::newest
       - qa_tools/common/drift_reference.py::reference_for
       - qa_tools/common/period_schema.py::period_schema
@@ -3492,6 +3492,15 @@ requirements:
         blocked_by:
           requirements: [REQ-PIPE-079]
     decisions:
+      - >
+        fan_out() DELETED 2026-10-04 with REQ-PIPE-079's close-out: it had
+        stayed uncalled by design since the 2026-10-02 decision below, because
+        one file never spans periods. The single-period guarantee criterion 1
+        rests on now lives in period_overlay.rebuild_for_arrival (one arrival,
+        one dataset, one period), which replaces it in implemented_by and is
+        asserted by tests/test_period_overlay.py's
+        TestARunReadsExactlyOnePeriod. The 2026-09-23 fan-out decision is kept
+        below as the record of why a mixed-period run was never composed.
       - >
         CRITERIA 1 TO 3 WIRED AND CRITERION 3 AMENDED, 2026-10-02 (Keith,
         wording approved after one revision). REQ-PIPE-105 made every
@@ -14575,7 +14584,7 @@ requirements:
       that actually belong together rather than whatever happens to be
       sitting in staging.
     moscow: must
-    status: in_progress
+    status: built
     source: >
       The wiring REQ-PIPE-035, REQ-PIPE-036 and REQ-QAC-037 each
       deferred to the promotion sprint - ten unmet acceptance criteria
@@ -14679,7 +14688,58 @@ requirements:
         grow noticeably; a pytest --durations profile after wiring is
         the diagnostic, per CLAUDE.md's standing practice.
     dependencies: [REQ-PIPE-075, REQ-PIPE-035, REQ-PIPE-036, REQ-QAC-037]
+    linked_tests:
+      - tests/test_period_overlay.py
+      - tests/test_period_schema.py
+      - tests/test_unrunnable.py
+      - tests/test_run_scope.py
+      - tests/test_reevaluation.py
+    implemented_by:
+      - qa_tools/common/period_overlay.py::rebuild_for_arrival
+      - qa_tools/common/period_schema.py::create_overlay_views
+      - qa_tools/common/period_schema.py::check_readiness
+      - qa_tools/common/unrunnable.py::results_for
+      - qa_tools/common/reevaluation.py::plan
+      - qa_tools/common/reevaluation.py::mark
+      - qa_tools/common/qa_results_writer.py::_scope_to_run
+    evidence:
+      - >
+        2026-10-04: every function this requirement names now has a
+        production caller - the test its own 2026-10-02 decision applied
+        ("grep for a production caller of every function") - with fan_out()
+        deleted rather than called. 186 tests pass across the overlay, run
+        scope, re-evaluation, period schema and filing modules, run after
+        the last change.
+      - >
+        2026-10-04: in a real bootstrap from an empty database (scratch
+        database boot_par), 540 recorded results across 90 runs carry
+        `reevaluated_after_arrival_of` - criteria 6 and 7 observable in the
+        running system, not just in tests.
     decisions:
+      - >
+        BUILT 2026-10-04 (Keith: finish 079 before re-file, and re-file
+        before the option A / period-closing batch). Criteria 1 and 2 hold
+        BY CONSTRUCTION under REQ-PIPE-105: an arrival is one file, so one
+        dataset, so one period - period_overlay.rebuild_for_arrival unpacks
+        exactly one dataset and builds over exactly one period, which
+        tests/test_period_overlay.py's TestARunReadsExactlyOnePeriod now
+        asserts. period_schema.fan_out() and PeriodRun, which demonstrated
+        those criteria for a multi-period delivery, had no caller left and
+        were DELETED with their tests.
+      - >
+        reevaluation.plan() and mark() WIRED RATHER THAN DELETED: the run
+        scope (qa_results_writer._scope_to_run) carried its own copy of
+        "which checks read this table" and of naming the cause while those
+        two sat uncalled - the "fourth implementation" plan()'s own
+        docstring warns is how they come to disagree. The scope now calls
+        both; a test asserts it. The period the plan carries comes from the
+        run's own filing (filing.period_for_key, sharing period_of()'s
+        matching rule) and is informational - the overlay already confines
+        a run to one period.
+      - >
+        Criteria 10 and 11 stand as written today and are AMENDED by
+        REQ-PIPE-118 when it is built (one waiting version per table per
+        period), as that signed requirement already records.
       - >
         THE DECISION LAYER IS WIRED, 2026-10-02 NIGHT, through REQ-PIPE-105
         criterion 13's `qa_tools/common/unrunnable.py`, called from

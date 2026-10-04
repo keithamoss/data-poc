@@ -202,7 +202,13 @@ def period_of(dataset_id: str, received_at) -> str | None:
     """
     from qa_tools.common import asset_time
 
-    key = asset_time.arrival_key(received_at)
+    return period_for_key(dataset_id, asset_time.arrival_key(received_at))
+
+
+def period_for_key(dataset_id: str, key: str) -> str | None:
+    """period_of(), for a caller holding the ARRIVAL KEY - a run id's own
+    suffix - rather than the instant. One matching rule for both, so the
+    `#1` suffix a contested supply carries is handled in one place."""
     for record in filings_of(dataset_id):
         supply = record.get("supply_id") or ""
         if "@" not in supply:

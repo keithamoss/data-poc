@@ -98,3 +98,19 @@ def test_a_sibling_check_kept_for_reading_this_table_names_this_arrival(scoped):
     by_id = {r["check_id"]: r for r in records}
     assert by_id[PLACEMENTS_FK][reevaluation.CAUSED_BY] == RUN
     assert reevaluation.CAUSED_BY not in by_id[CLIENTS_OWN]
+
+
+def test_the_scope_uses_reevaluations_own_plan_and_mark():
+    """REQ-PIPE-079 criteria 6 and 7 have ONE implementation each:
+    reevaluation.plan() decides which checks an arriving table sets off,
+    reevaluation.mark() names the cause. The run scope used to carry its
+    own copy of both while those two sat uncalled - the "fourth
+    implementation of which checks touch this table" plan()'s own
+    docstring warns is how they come to disagree."""
+    import ast
+    import inspect
+
+    tree = ast.parse(inspect.getsource(writer._scope_to_run))
+    called = {n.func.attr for n in ast.walk(tree)
+              if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
+    assert {"plan", "mark"} <= called

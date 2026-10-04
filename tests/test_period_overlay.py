@@ -238,3 +238,58 @@ class TestAnInheritedTableIsRead:
             assert world.read(f"cp_placements__{own}", "cp_clients") == 9
         finally:
             conn.execute(f'DROP SCHEMA IF EXISTS "{source}" CASCADE')
+
+
+class TestARunReadsExactlyOnePeriod:
+    """REQ-PIPE-079 criteria 1 and 2, as they now hold: by construction.
+
+    They were demonstrated by period_schema.fan_out() - one run per period
+    a multi-period delivery claimed. Under REQ-PIPE-105 an arrival is one
+    file, so one dataset, so one period, and fan_out() had no caller left;
+    it was deleted 2026-10-04. These tests carry the criteria instead, at
+    the point where a run's period is actually chosen.
+    """
+
+    @staticmethod
+    def _calls(monkeypatch, files_by_dataset):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+
+        from qa_tools.common import filing, load_log, supply_holds, trial
+
+        built: list[str] = []
+        monkeypatch.setattr(filing, "period_of", lambda dataset_id, at: "2026-Q2")
+        monkeypatch.setattr(trial, "scope_for", lambda run_id: None)
+        monkeypatch.setattr(load_log, "loaded_tables", lambda scope: frozenset())
+        monkeypatch.setattr(supply_holds, "held_tables", lambda conn: ())
+        monkeypatch.setattr(supply_db, "connect", lambda **kw: type(
+            "C", (), {"close": lambda self: None})())
+        monkeypatch.setattr(period_overlay, "build",
+                            lambda conn, run_id, *, period, **kw: built.append(period))
+        arrival = SimpleNamespace(
+            run_id="cp_clients__202605010100000000",
+            received_at=datetime(2026, 5, 1, 1, tzinfo=timezone.utc),
+            files_by_dataset=files_by_dataset)
+        try:
+            period_overlay.rebuild_for_arrival(arrival, tables=["cp_clients"])
+        except Exception:  # noqa: BLE001 - recording/sample steps are not under test
+            pass
+        return built
+
+    def test_a_run_is_built_over_exactly_one_period(self, monkeypatch):
+        assert self._calls(monkeypatch, {"cp-clients": ["cp_clients.csv"]}) == ["2026-Q2"]
+
+    def test_an_arrival_spanning_two_datasets_is_refused_rather_than_split(self, monkeypatch):
+        """No arrival can span periods, because none can carry two
+        datasets - so there is nothing left to fan out."""
+        with pytest.raises(ValueError):
+            from datetime import datetime, timezone
+            from types import SimpleNamespace
+
+            period_overlay.rebuild_for_arrival(SimpleNamespace(
+                run_id="x", received_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+                files_by_dataset={"cp-clients": ["a.csv"], "cp-carers": ["b.csv"]}),
+                tables=["cp_clients"])
+
+    def test_nothing_fans_out_any_more(self):
+        assert not hasattr(period_schema, "fan_out")

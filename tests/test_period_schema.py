@@ -328,63 +328,6 @@ class TestRedForUnrun:
         assert verdict.reason == ps.MISSING_TABLE
 
 
-class TestAMixedPeriodDeliveryFansOut:
-    """Criteria 1 and 2: one QA run per period, never a warehouse
-    spanning more than one."""
-
-    TABLES = {"cp-clients": "cp_clients", "cp-carers": "cp_carers",
-               "cp-placements": "cp_placements",
-               "birth-registrations": "birth_registrations"}
-
-    def test_two_periods_produce_two_runs_each_reading_its_own(self):
-        runs = ps.fan_out("run_07",
-                           {"cp-clients": "2026-Q3", "cp-carers": "2026-Q2"},
-                           self.TABLES)
-        assert [r.period for r in runs] == ["2026-Q2", "2026-Q3"]
-        assert [r.tables for r in runs] == [("cp_carers",), ("cp_clients",)]
-
-    def test_an_ordinary_multi_table_delivery_in_ONE_period_is_ONE_run(self):
-        """Thread H's TS-33b trap, one layer up: per-table slots mean an
-        ordinary six-table delivery already spans six SLOTS in one
-        period, so anything keyed on slots rather than periods splits
-        every healthy delivery."""
-        runs = ps.fan_out("run_07",
-                           {"cp-clients": "2026-Q3", "cp-carers": "2026-Q3",
-                            "cp-placements": "2026-Q3"},
-                           self.TABLES)
-        assert len(runs) == 1
-        assert runs[0].tables == ("cp_carers", "cp_clients", "cp_placements")
-
-    def test_a_dataset_with_no_period_is_in_no_run_at_all(self):
-        """A held or unfiled supply. Folding it into the commonest
-        period is the forward cascade wearing a different hat."""
-        runs = ps.fan_out("run_07",
-                           {"cp-clients": "2026-Q3", "cp-carers": None},
-                           self.TABLES)
-        assert len(runs) == 1
-        assert runs[0].datasets == ("cp-clients",)
-
-    def test_nothing_filed_produces_no_runs(self):
-        assert ps.fan_out("run_07", {}, self.TABLES) == []
-
-    def test_a_runs_identity_comes_from_its_PERIOD_not_its_position(self):
-        """A positional number is what REQ-PIPE-057 criterion 18 forbids
-        for a run's identity, and the same argument applies here: adding
-        a dataset would otherwise renumber the other periods' runs."""
-        one = ps.fan_out("run_07", {"cp-clients": "2026-Q3"}, self.TABLES)
-        two = ps.fan_out("run_07",
-                          {"cp-carers": "2026-Q1", "cp-clients": "2026-Q3"},
-                          self.TABLES)
-        by_period = {r.period: r.run_id for r in two}
-        assert one[0].run_id == by_period["2026-Q3"]
-
-    def test_every_fanned_out_run_id_is_a_usable_schema_name(self):
-        for run in ps.fan_out("run_07",
-                               {"cp-clients": "Nov-Jan window",
-                                "cp-carers": "FY26/27"}, self.TABLES):
-            assert supply_db.run_schema(run.run_id)
-
-
 class TestLoadingCompletesBeforeQARuns:
     """Criterion 10, asserted structurally rather than by timing.
 

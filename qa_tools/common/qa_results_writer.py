@@ -222,22 +222,44 @@ def _scope_to_run(verified: list[dict], run_id: str) -> None:
                 conn.close()
         except Exception:  # noqa: BLE001 - no resolution means nothing contested
             contested = False
-    declared = _declared_reads_tables()
+    # WHICH CHECKS THIS ARRIVAL SETS OFF is reevaluation.plan()'s answer
+    # (REQ-PIPE-079 criterion 6), not a second copy of it here - plan()'s
+    # own docstring names a fourth implementation of "which checks touch
+    # this table" as how they come to disagree. Within THIS run's period
+    # only, which the overlay already guarantees; the period is carried on
+    # the plan for the record.
+    from qa_tools.common import reevaluation
+
+    readers = reevaluation.plan(table=table, period=_period_of_run(dataset_id, run_id),
+                                reads=_declared_reads_tables()).check_ids
     verified[:] = [
         r for r in verified
         if (r.get("dataset_id") == dataset_id and not contested)
-        or table in declared.get(r.get("check_id"), ())]
-    # A RE-EVALUATION NAMES ITS CAUSE (REQ-PIPE-079 criteria 6 and 7). A
-    # check belonging to ANOTHER dataset is here only because it reads
-    # this run's table, so this arrival is why it was evaluated again -
-    # "this went red when carers arrived" rather than a verdict that
-    # changed with nobody touching its dataset. Set in place, on the
-    # caller's own records, for the reason the filter above is.
-    from qa_tools.common import reevaluation
-
-    for record in verified:
+        or r.get("check_id") in readers]
+    # A RE-EVALUATION NAMES ITS CAUSE (criterion 7). A check belonging to
+    # ANOTHER dataset is here only because it reads this run's table, so
+    # this arrival is why it was evaluated again - "this went red when
+    # carers arrived" rather than a verdict that changed with nobody
+    # touching its dataset. reevaluation.mark() names it; each record is
+    # replaced IN THE CALLER'S OWN LIST, for the reason the filter above is.
+    for i, record in enumerate(verified):
         if record.get("dataset_id") != dataset_id:
-            record[reevaluation.CAUSED_BY] = run_id
+            verified[i] = reevaluation.mark(record, caused_by=run_id)
+
+
+def _period_of_run(dataset_id: str, run_id: str) -> str:
+    """The period this run's supply was filed to, or "" where that cannot
+    be read - it is carried on the plan for the record, and never decides
+    what is kept (the run's overlay is already one period)."""
+    from qa_tools.common import filing, supply_db
+
+    parts = supply_db.split_staged(run_id)
+    if parts is None:
+        return ""
+    try:
+        return filing.period_for_key(dataset_id, parts[1]) or ""
+    except Exception:  # noqa: BLE001 - informational only, see above
+        return ""
 
 
 def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: str,
