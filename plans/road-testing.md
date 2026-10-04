@@ -1532,3 +1532,11 @@ judgement about who reads the page rather than about the rule.
       Order now: REQ-DOCS-143 -> slot view + withheld fix -> 134, 131,
       **144**, 132, 133, 122, 118, 120, 128+129, re-file (140-142), the
       rest of 130, 123, 121, 126, 127.
+    - **079 LEFTOVERS RE-POINTED, 2026-10-04.** Five built requirements
+      still named REQ-PIPE-079 as their blocker. Re-tested, not cleared:
+      REQ-PIPE-035 criterion 6 is now MET (red-for-unrun produced in a real
+      run); its criteria 7-8 (temporal reference) were never 079's and are
+      now UNOWNED, the drift reference REQ-QAC-108 the likely home.
+      REQ-PIPE-075 crit 17 -> 140/141; REQ-GHUB-082 crit 2 -> 141;
+      REQ-PIPE-084 crits 6/14 and REQ-PIPE-099 crit 11 -> 121/140. Sprint
+      tags moved to match: 11 blocked, 13 and 18 in-progress.

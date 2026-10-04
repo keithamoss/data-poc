@@ -1869,7 +1869,7 @@ comparisons against the expected-supply sequence.
    (the verdict follows the filing). Both signed 2026-09-23 and BUILT
    2026-09-25.
 
-11. **[in-progress, 2026-09-28]** **[Pipeline & publishing]** **Promotion and
+11. **[blocked, 2026-10-04]** **[Pipeline & publishing]** **Promotion and
     rejection.** Auto on green/amber into an EMPTY slot; red never;
     landing in a filled slot never (Thread B). Plus the **off-cycle
     arrival gate** - a supply arriving in a period its dataset does not
@@ -1955,7 +1955,7 @@ comparisons against the expected-supply sequence.
     the triggering event, so a cancelled run costs nothing. Settled
     2026-09-22, see Thread H.
 
-13. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **SPLIT
+13. **[in-progress, 2026-10-04]** **[Pipeline & publishing]** **SPLIT
     2026-09-24 (Keith). What remains here is SCHEMA-PER-PERIOD**; the
     single-database half - retiring the per-run warehouses, one database
     per test worker (Thread J) - **moved to sprint 8**, because staging
@@ -2041,7 +2041,7 @@ comparisons against the expected-supply sequence.
 
     **Owns:** nothing yet - this sprint is unscoped.
 
-18. **[blocked, 2026-09-26]** **[QA checks & contract]** **Drift and trend
+18. **[in-progress, 2026-10-04]** **[QA checks & contract]** **Drift and trend
     dependencies.** A declared temporal reference; missing-but-expected
     is red, no-prior-period is `nodata`. `REQ-PIPE-035` was rewritten
     2026-09-22 and now carries both cases as acceptance criteria, so

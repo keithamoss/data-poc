@@ -3466,9 +3466,12 @@ requirements:
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     unmet_criteria:
       - criterion: >
-          Criteria 6, 7 and 8 - red-for-unrun - are built as a decision
-          function with its own tests, but no check's verdict is
-          currently produced through it.
+          Criteria 7 and 8 - red-for-unrun for a check's TEMPORAL
+          REFERENCE (red where the referenced period was owed and is
+          unfilled, nodata where no prior period was ever owed). The
+          decision function supports both, but no production caller
+          passes a reference period, so no verdict is produced through
+          them.
         why: >
           The same dependency: red-for-unrun is asked of a run scoped to
           a period, and no run is. Built now rather than later because
@@ -3488,9 +3491,23 @@ requirements:
           AMENDED AGAIN 2026-10-02 evening: REQ-PIPE-105 gave every run
           a period, so that blocker is gone. What is left is wiring the
           decision layer itself, which is REQ-PIPE-079's.
-        owner: REQ-PIPE-079, wiring its decision layer
+
+          RE-TESTED 2026-10-04, after REQ-PIPE-079 was built. CRITERION 6
+          IS NOW MET and comes off this entry: a check whose table has no
+          filled slot and is not staged gets a red (or, not yet due, a
+          nodata) record naming the table in a real run -
+          orchestrate_cp._unrunnable_results -> unrunnable.results_for ->
+          period_schema.check_readiness, covered by tests/test_unrunnable.py.
+          CRITERIA 7 AND 8 ARE NOT MET and 079 never owned them: nothing
+          passes check_readiness a reference_period, so the temporal-
+          reference cases are never asked. They need an owner - the drift
+          reference (REQ-QAC-108) is the natural home - and are marked
+          unowned rather than left pointing at a requirement that is done.
+        owner: >
+          Nobody yet - the temporal-reference half of red-for-unrun needs
+          a home; REQ-QAC-108's drift reference is the likely one.
         blocked_by:
-          requirements: [REQ-PIPE-079]
+          unowned: true
     decisions:
       - >
         fan_out() DELETED 2026-10-04 with REQ-PIPE-079's close-out: it had
@@ -13557,12 +13574,16 @@ requirements:
           same thing a second time, in the place nobody would look for
           it.
         owner: >
-          REQ-PIPE-079's wiring. It was REQ-GHUB-082 and REQ-PIPE-099
-          until 2026-09-29; both are built now, and re-testing the
-          criterion rather than clearing it is what found that they were
-          never what it actually waited on.
+          REQ-PIPE-141 (re-file) and REQ-PIPE-140 (a decision-triggered
+          QA run). It was REQ-GHUB-082 and REQ-PIPE-099 until 2026-09-29,
+          then REQ-PIPE-079's wiring until 2026-10-04 - re-tested when 079
+          was built: 079 wired arrival-time re-evaluation only, and the
+          run a DECISION starts is 140's. REQ-PIPE-141 states this
+          criterion is met by re-file plus, for a person's promotion, by
+          construction (a supply is only promoted into the period it was
+          checked against).
         blocked_by:
-          requirements: [REQ-PIPE-079]
+          requirements: [REQ-PIPE-140, REQ-PIPE-141]
     dependencies: [REQ-PIPE-074, REQ-PIPE-062, REQ-PIPE-035, REQ-PIPE-064]
     decisions:
       - >
@@ -16971,10 +16992,13 @@ requirements:
           by name, saying so, rather than half-doing it. The other seven
           work.
         owner: >
-          REQ-PIPE-079's unbuilt half.
+          REQ-PIPE-141, re-file's effect (signed 2026-10-04), which
+          clears this criterion. It pointed at REQ-PIPE-079's unbuilt half
+          until 079 was built on 2026-10-04; re-tested then, re-file's
+          effect was never 079's and is now scoped on its own.
         blocked_by:
           requirements:
-            - REQ-PIPE-079
+            - REQ-PIPE-141
 
   - id: REQ-PIPE-083
     title: >
@@ -17863,10 +17887,13 @@ requirements:
           there is no period-scoped evaluation to re-trigger. That is
           REQ-PIPE-079's wiring, which is its own unfinished half.
         owner: >
-          REQ-PIPE-079, whose decision layer is built and whose wiring
-          is not.
+          REQ-PIPE-121's one knock-on handler for every table or view
+          arriving in or leaving a period schema, run through REQ-PIPE-140's
+          decision-triggered QA run. Pointed at REQ-PIPE-079 until 079 was
+          built on 2026-10-04; re-tested then, 079 wired arrival-time
+          re-evaluation only.
         blocked_by:
-          requirements: [REQ-PIPE-079]
+          requirements: [REQ-PIPE-121, REQ-PIPE-140]
     decisions:
       - >
         [MET 2026-09-29] CRITERIA 9, 10, 13 AND 17 CAME OFF THE DEFERRED
@@ -22115,9 +22142,11 @@ requirements:
           designs - and the second one would be the one nobody
           maintained.
         owner: >
-          REQ-PIPE-079's wiring.
+          REQ-PIPE-121's one knock-on handler, run through REQ-PIPE-140.
+          Pointed at REQ-PIPE-079 until 079 was built on 2026-10-04;
+          re-tested then, 079 wired arrival-time re-evaluation only.
         blocked_by:
-          requirements: [REQ-PIPE-079]
+          requirements: [REQ-PIPE-121, REQ-PIPE-140]
     decisions:
       - >
         RE-INHERITING IS NOT A SEPARATE OPERATION (Keith, 2026-09-28,
