@@ -2159,7 +2159,9 @@ judgement about who reads the page rather than about the rule.
         and 1798c63's deployment half died in CI's bootstrap on a REAL,
         INTERMITTENT DDL race between the two collections' parallel
         processes (post-build-review #108), reproduced with threads and
-        fixed in ba70fcb. Re-check the newest run.
+        fixed in ba70fcb. CI GREEN ON e09390f (run 37233111156, the
+        first full run since): all four jobs - fast half, JS, deployment
+        half (bootstrap 22m36s, no race) and the coverage threshold.
       - REQ-PIPE-118/120 CRITIC (post-build-review #109): a PERSON'S
         SUPERSESSION WAS INVISIBLE as first committed - every one unseen,
         promotable and stranded - and five readers did not know about
