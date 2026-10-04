@@ -4618,3 +4618,20 @@ twice. It deliberately did not re-find the `TypeError`.
     **DECIDED 2026-10-04 (Keith):** left to REQ-PIPE-152 (its last
     criterion), which rewrites the handler anyway - a one-argument patch
     now would be thrown away.
+
+84. **[investigate, 2026-10-04]** **[Pipeline & publishing]**
+    **Rejecting a supply filed as a resupply of a filled period empties
+    that period.** Found by delivery-scoper drafting the failed-load
+    rejection (#80), confirmed here by reading the code but not yet
+    reproduced: `decision_log.promoted_into` takes the LAST decision naming
+    a slot (`to_slot` or `from_slot`), and a reject names its supply's
+    filed slot as `from_slot`, so it returns None whichever supply it
+    names. Rejecting an unpromoted resupply of a promoted period would
+    therefore make the period read as unfilled while the promoted
+    supply's tables still sit in the period schema; `slot_state` shows
+    it REJECTED too. It touches a built requirement's claim (REQ-PIPE-074
+    criterion 9, REQ-PIPE-076).
+
+    **DECIDED 2026-10-04 (Keith):** fix FIRST, failing test first, ahead
+    of the failed-load rejection requirement that depends on it. Not yet
+    built.
