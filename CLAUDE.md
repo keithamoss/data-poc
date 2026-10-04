@@ -406,8 +406,8 @@ Rough layout:
   for both datasets by default - `--collection bdm`/`--collection cp`
   to scope to one). **`--sequential` NO LONGER CHANGES ANYTHING, since
   2026-09-28**: the batch path runs ONE ARRIVAL AT A TIME whatever the
-  flag says, because each arrival's filing goes to the oldest slot no
-  PROMOTION has filled and so depends on what the arrival before it
+  flag says, because whether an arrival FILLS its open slot or is a
+  resupply of it (REQ-PIPE-131) depends on what the arrival before it
   promoted. Measured the day it changed, on this 4-core sandbox: Child
   Protection's 18 arrivals go 2m35s parallel -> 6m14s in receipt
   order. What that buys is the whole model working - filing the batch

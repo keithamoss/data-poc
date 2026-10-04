@@ -72,7 +72,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-3a - Quarterly, prior slot FILLED
 
-**What it demonstrates.** August is not claimable, May and Feb are filled, so no claimable unfilled slot exists -> **resupply of May**. Being a filled slot it does **not auto-promote**; it holds and warns (TS-4).
+**What it demonstrates.** August's window has not opened, so May is still the OPEN period (REQ-PIPE-131), and it is filled -> **resupply of May**. Being a filled slot it does **not auto-promote**; it holds and warns (TS-4).
 
 *Config: quarterly, calendar Feb 2 / May 1 / Aug 3 / Nov 2, early window 14 days. Feb and May filled. Supply arrives 19 July - one day outside August's window, which opens 20 July.*
 
@@ -80,13 +80,13 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-3b - Quarterly, prior slot UNFILLED
 
-**What it demonstrates.** May is claimable -> fills **May, ~79 days late**.
+**What it demonstrates.** May is still the open period -> fills **May, ~79 days late**.
 
 **not injected - nothing to look at yet**
 
 ### TS-3c - Daily, prior slot FILLED
 
-**What it demonstrates.** Tuesday not claimable, Monday filled -> **resupply of Monday**, no auto-promotion, holds and warns.
+**What it demonstrates.** Tuesday's window has not opened, so Monday is the open period, and it is filled -> **resupply of Monday**, no auto-promotion, holds and warns.
 
 *Config: daily evening-before - the supply for day D is due 22:00 on D-1 - early window 4 hours, so Tuesday's window opens 18:00 Monday. Monday's slot filled. Arrival 17:00 Monday, one hour outside.*
 
@@ -94,7 +94,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-3d - Daily, prior slot UNFILLED
 
-**What it demonstrates.** Monday is claimable -> fills **Monday, 19 hours late**.
+**What it demonstrates.** Monday is still the open period -> fills **Monday, 19 hours late**.
 
 **not injected - nothing to look at yet**
 
@@ -155,11 +155,9 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-9 - A genuinely early quarterly supply
 
-**What it demonstrates.** Assigned **August** by elimination (Feb and May are filled, August is the next thing owed and its window is open), classified **early by 21 days**. Note nothing measures how early it is in order to assign it - earliness is a reported consequence of the assignment.
+**What it demonstrates.** Assigned **August**, the period open when it arrived (REQ-PIPE-131), classified **early by 9 days**. Note nothing measures how early it is in order to assign it - earliness is a reported consequence of the assignment.
 
 **What it would look like if the rule were wrong.** `cycle_start()` only looks backwards, so it resolves to the 1 May anchor and reports the supply ~12 weeks LATE for a quarter that was filled months ago.
-
-*Config: quarterly, Feb 2 / May 1 / Aug 3 / Nov 2, early window 14 days. Feb and May filled. Supply arrives 13 July - 21 days early, inside August's window.*
 
 **not injected - nothing to look at yet**
 
@@ -457,7 +455,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "INJECT",
    "title": "Quarterly, prior slot FILLED",
    "section": "Slot assignment",
-   "demonstrates": "August is not claimable, May and Feb are filled, so no claimable unfilled slot exists -> **resupply of May**. Being a filled slot it does **not auto-promote**; it holds and warns (TS-4).",
+   "demonstrates": "August's window has not opened, so May is still the OPEN period (REQ-PIPE-131), and it is filled -> **resupply of May**. Being a filled slot it does **not auto-promote**; it holds and warns (TS-4).",
    "breaksAs": null,
    "config": "Config: quarterly, calendar Feb 2 / May 1 / Aug 3 / Nov 2, early window 14 days. Feb and May filled. Supply arrives 19 July - one day outside August's window, which opens 20 July.",
    "coordinates": null
@@ -467,7 +465,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "INJECT",
    "title": "Quarterly, prior slot UNFILLED",
    "section": "Slot assignment",
-   "demonstrates": "May is claimable -> fills **May, ~79 days late**.",
+   "demonstrates": "May is still the open period -> fills **May, ~79 days late**.",
    "breaksAs": null,
    "config": null,
    "coordinates": null
@@ -477,7 +475,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "INJECT",
    "title": "Daily, prior slot FILLED",
    "section": "Slot assignment",
-   "demonstrates": "Tuesday not claimable, Monday filled -> **resupply of Monday**, no auto-promotion, holds and warns.",
+   "demonstrates": "Tuesday's window has not opened, so Monday is the open period, and it is filled -> **resupply of Monday**, no auto-promotion, holds and warns.",
    "breaksAs": null,
    "config": "Config: daily evening-before - the supply for day D is due 22:00 on D-1 - early window 4 hours, so Tuesday's window opens 18:00 Monday. Monday's slot filled. Arrival 17:00 Monday, one hour outside.",
    "coordinates": null
@@ -487,7 +485,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "INJECT",
    "title": "Daily, prior slot UNFILLED",
    "section": "Slot assignment",
-   "demonstrates": "Monday is claimable -> fills **Monday, 19 hours late**.",
+   "demonstrates": "Monday is still the open period -> fills **Monday, 19 hours late**.",
    "breaksAs": null,
    "config": null,
    "coordinates": null
@@ -576,9 +574,9 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "INJECT",
    "title": "A genuinely early quarterly supply",
    "section": "Arrival classification",
-   "demonstrates": "Assigned **August** by elimination (Feb and May are filled, August is the next thing owed and its window is open), classified **early by 21 days**. Note nothing measures how early it is in order to assign it - earliness is a reported consequence of the assignment.",
+   "demonstrates": "Assigned **August**, the period open when it arrived (REQ-PIPE-131), classified **early by 9 days**. Note nothing measures how early it is in order to assign it - earliness is a reported consequence of the assignment.",
    "breaksAs": "`cycle_start()` only looks backwards, so it resolves to the 1 May anchor and reports the supply ~12 weeks LATE for a quarter that was filled months ago.",
-   "config": "Config: quarterly, Feb 2 / May 1 / Aug 3 / Nov 2, early window 14 days. Feb and May filled. Supply arrives 13 July - 21 days early, inside August's window.",
+   "config": null,
    "coordinates": null
   },
   {

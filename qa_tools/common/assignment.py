@@ -139,9 +139,15 @@ def current_slot(slots: Sequence[slots_mod.Slot], at: datetime) -> slots_mod.Slo
     claim instants are sorted.
     """
     asset_time.parse_instant(at, "current_slot(at)")
-    opens = [s.claim_opens_at for s in slots]
-    index = bisect.bisect_right(opens, at) - 1
+    index = _opened_by(slots, at) - 1
     return slots[index] if index >= 0 else None
+
+
+def _opened_by(slots: Sequence[slots_mod.Slot], at: datetime) -> int:
+    """How many slots' claim windows have opened by `at` - a bisection
+    that reads O(log n) slots, never a key list built from all of them
+    (which is O(n) per arrival, and what the first version did)."""
+    return bisect.bisect_right(slots, at, key=lambda s: s.claim_opens_at)
 
 
 def open_slot(slots: Sequence[slots_mod.Slot], at: datetime) -> slots_mod.Slot | None:
@@ -200,7 +206,7 @@ def _why_unavailable(slots: Sequence[slots_mod.Slot], at: datetime,
     the rule itself.
     """
     out: list[tuple[str, str]] = []
-    index = bisect.bisect_right([s.claim_opens_at for s in slots], at)
+    index = _opened_by(slots, at)
     if index > 0:
         before = slots[index - 1]
         state = ("filled by a promoted supply, and " if before.name in filled else "")

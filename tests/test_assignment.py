@@ -216,9 +216,30 @@ class TestItIsDeterministic:
 class TestItDoesNotScanEverySlot:
     """Criterion 11 and NFR 1: a bisection per arrival."""
 
-    def test_finding_the_open_slot_is_a_bisection(self):
-        import inspect
-        assert "bisect" in inspect.getsource(assignment.open_slot)
+    def test_finding_the_open_slot_reads_only_log_n_slots(self):
+        """Counted, not grepped: the first version asserted the word
+        "bisect" appeared in a docstring, and a linear walk passed it
+        (delivery-critic, overnight sprint 3b)."""
+        reads = []
+
+        class Counting(list):
+            def __getitem__(self, i):
+                reads.append(i)
+                return super().__getitem__(i)
+
+            def __iter__(self):
+                raise AssertionError("the whole slot sequence was walked")
+
+        base = _at(1, 12)
+        slots = Counting(_chain([
+            Slot(dataset_id="d", period=Period(name=f"x{i}", date=base.date()),
+                 due_at=base + timedelta(days=i), grace=timedelta(minutes=60),
+                 claim_opens_at=base + timedelta(days=i) - timedelta(hours=6))
+            for i in range(4096)]))
+        for at in (base + timedelta(days=2000, hours=1), base - timedelta(days=1)):
+            reads.clear()
+            assignment.assign("d", "s", at, slots, frozenset())
+            assert len(reads) <= 40, f"{len(reads)} slot reads for one arrival"
 
     def test_it_is_unaffected_by_thousands_of_slots(self):
         import time

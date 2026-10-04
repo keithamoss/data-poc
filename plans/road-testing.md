@@ -1914,6 +1914,16 @@ judgement about who reads the page rather than about the rule.
         (post-build-review #91 duplicate held+unrunnable records, #92 a
         raw ISO instant in a hold's reason). Scratch databases `supply131`
         and `supply131b` are left behind for you to drop.
+      - SPRINT 3b CRITIC: core rule CORRECT - the critic re-derived all 150
+        real filings with the new rule at their receipt instants, 0
+        mismatches. FIXED (post-build-review #94): a latent slot cache in
+        file_arrivals, a bisection test that could not tell a linear scan,
+        an authored-to-daily calendar edge, and stale rule wording in the
+        scenario register, plans, CLAUDE.md and three requirements
+        (REQ-PIPE-151 c3's amendment is PROVISIONAL). **NEEDS KEITH (#93):
+        an authored calendar's last period never closes** - a 2030 file is
+        filed to 2027-Q4. Keep, or hold such arrivals? Also: TS-4a, named by
+        131 c15, does not exist.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

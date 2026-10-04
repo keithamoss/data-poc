@@ -265,7 +265,7 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
     from qa_tools.common import assignment as assign_mod
     from qa_tools.common import slots as slots_mod
 
-    slots_by_dataset: dict[str, list] = {}
+    slots_by_dataset: dict[tuple, list] = {}
     written: list[Assignment] = []
 
     for arrival in found_arrivals:
@@ -278,14 +278,24 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
             # choose between its two staged tables and the promotion gate
             # sees `contested`. Choosing between them is still nobody's
             # job but a person's; it simply needs no second mechanism.
-            if dataset_id not in slots_by_dataset:
+            # KEYED ON THE ARRIVAL'S OWN HORIZON, not built once per
+            # dataset (delivery-critic, overnight sprint 3b): under
+            # REQ-PIPE-131 a list built for an earlier arrival ends in a
+            # slot that CLOSES, so a later arrival in the same call fell
+            # past it and was held rather than filed to its own open day.
+            try:
+                horizon = (dataset_id, slots_mod.claimable_until(
+                    dataset_id, arrival.received_at.date()))
+            except (ValueError, KeyError, FileNotFoundError):
+                horizon = (dataset_id, None)   # no slots - see below
+            if horizon not in slots_by_dataset:
                 try:
                     # THE CLAIM WINDOW'S REACH, NOT THE ARRIVAL DATE
                     # (post-build-review #73). Capping here at the
                     # arrival date withheld the very slot a supply
                     # arriving early is early FOR - see
                     # slots.claimable_until() for the worked example.
-                    slots_by_dataset[dataset_id] = slots_mod.slots_for_dataset(
+                    slots_by_dataset[horizon] = slots_mod.slots_for_dataset(
                         dataset_id, until=slots_mod.claimable_until(
                             dataset_id, arrival.received_at.date()))
                 except (ValueError, KeyError, FileNotFoundError) as exc:
@@ -296,13 +306,13 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                     # fail the other 29 datasets.
                     print(f"note: {dataset_id} has no slots to file against ({exc}) - "
                           f"its supplies are still recorded as arrived.")
-                    slots_by_dataset[dataset_id] = []
+                    slots_by_dataset[horizon] = []
             supply_id = _supply_id_for(arrival, dataset_id)
             if filing_for(dataset_id, supply_id) is not None:
                 continue
             decided = assign_mod.assign(
                 dataset_id=dataset_id, supply_id=supply_id,
-                at=arrival.received_at, slots=slots_by_dataset[dataset_id],
+                at=arrival.received_at, slots=slots_by_dataset[horizon],
                 filled=filled_slots(dataset_id))
             record(decided)
             # AN ASSIGNMENT-RULE HOLD IS RECORDED TOO (criterion 3). Its

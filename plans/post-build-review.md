@@ -4802,3 +4802,43 @@ twice. It deliberately did not re-find the `TypeError`.
     (REQ-DASH-071). FIXED: the reason carries no instant.
     `tests/test_assignment.py::TestAHoldsReasonIsWrittenForAPerson`,
     confirmed failing first.
+
+93. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An
+    authored calendar's LAST period never closes, so a file arriving after
+    the calendar runs out is filed backward into it without limit.**
+    delivery-critic on REQ-PIPE-131, reproduced against the real config:
+    a 2030 cp-clients file is filed `open-slot-unfilled` to 2027-Q4.
+    `Slot.closes_at` is None where the calendar has no next period, and
+    `is_open` reads None as open for ever. Criterion 1 is silent on it and
+    no decision records the choice. **NEEDS KEITH**: keep it (the runway
+    warning already says when dates run out), or hold such an arrival for
+    a person (criterion 10's shape) - a product decision, so not changed
+    overnight.
+
+94. **[done, 2026-10-04]** **[Pipeline & publishing]** **REQ-PIPE-131
+    delivery-critic, the findings fixed overnight** (each with a failing
+    test first where it was a defect):
+    - `file_arrivals` built each dataset's slots once per call, for the
+      FIRST arrival's horizon; under REQ-PIPE-131 a later arrival in the
+      same call fell past the list's last (now closing) slot and was HELD.
+      Latent - every production caller passes one receipt instant. Keyed
+      on each arrival's horizon now. `tests/test_file_arrivals_slot_horizon.py`.
+    - The bisection test grepped for the word "bisect" in a docstring and
+      a linear walk passed it; the code itself rebuilt an O(n) key list
+      per arrival. Now `bisect(..., key=)`, and the test COUNTS slot reads
+      (<= 40 of 4,096). `test_assignment.py::...reads_only_log_n_slots`.
+    - An authored period just before a switch to a cadence rule had no
+      closing instant when generated with `until` before the switch.
+      `_calendar_periods` now reaches the next version's start.
+      `tests/test_slot_closes_across_versions.py` (which also pins the
+      window-version change and a dataset's own dates).
+    - Wording that still stated the retired rule: TS-3a-d and TS-9 in the
+      scenario register (TS-9's config was also self-contradictory - 21
+      days early inside a 14-day window; corrected to 25 July, 9 days
+      early); Thread H and sprint 9 in plans/supply-model.md; CLAUDE.md's
+      `--sequential` note; REQ-PIPE-062 NFRs 1 and 4, REQ-PIPE-123 c10
+      (routine amendments) and REQ-PIPE-151 c3 (PROVISIONAL - it kept
+      `promotion-withheld` for off-cycle arrivals).
+    - LEFT: **TS-4a**, which REQ-PIPE-131 criterion 15 names, does not
+      exist anywhere - the criterion may mean TS-3a. Keith's or the
+      scoper's.

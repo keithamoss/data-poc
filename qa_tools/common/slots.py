@@ -221,8 +221,23 @@ def _calendar_periods(dataset_id: str, until: date | None) -> list[Period]:
     cal = schedule.calendar_for_dataset(dataset_id)
     if until is None:
         return schedule.periods_for_calendar(cal.name)
+    # FAR ENOUGH TO REACH THE NEXT PERIOD: a day for a cadence rule, or -
+    # where `until` sits in an authored stretch - the start of the next
+    # calendar version, which is where a following cadence rule's first
+    # period is (delivery-critic, overnight sprint 3b: generated with
+    # `until` just before such a switch, the last authored slot had no
+    # closing instant at all).
+    # Tried with a day FIRST, so a daily calendar with a far-future version
+    # never generates the years in between.
     periods = schedule.periods_for_calendar(cal.name, until=until + timedelta(days=1))
-    if (not periods or periods[-1].date <= until) and not cal.current.is_cadence_rule:
+    if periods and periods[-1].date > until:
+        return periods
+    later = [v.effective_from for v in cal.versions if v.effective_from > until]
+    if later:
+        periods = schedule.periods_for_calendar(cal.name, until=min(later))
+        if periods and periods[-1].date > until:
+            return periods
+    if not cal.current.is_cadence_rule:
         periods = schedule.periods_for_calendar(cal.name)
     return periods
 

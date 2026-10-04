@@ -1203,13 +1203,16 @@ the window opening" trigger, because X is a magic number. Resupply after
 REJECTION is routine, after ACCEPTANCE is odd. **Punctuality is evidence
 of which slot a supply is for** - the backward-cascade fix. X closing a
 slot's window when the next opens, and X a finite lateness tolerance.
+*(Both REVERSED 2026-10-04 by REQ-PIPE-131: a slot now closes when the
+next calendar period's window opens.)*
 `not_expected` versus MARKED MISSED, and why the distinction stops
 supplier reliability becoming whatever people were willing to excuse.
 
 **Thread H - chaos findings.** Assign in ARRIVAL-TIMESTAMP order, never
 discovery order, with a defined tiebreak - `REQ-PIPE-053` already
-depends on this by name. **Monotonic filling** - a slot stops being
-claimable once a later slot is filled - plus its named limit, hold for a
+depends on this by name. **Monotonic filling** *(RETIRED 2026-10-04 -
+REQ-PIPE-063 is replaced by REQ-PIPE-131's closing by time)* - a slot
+stopped being claimable once a later slot was filled - plus its named limit, hold for a
 human when nothing is confidently claimable; without it a missed
 delivery is recorded as MET, which the thread rates worse than a cascade
 because it manufactures a delivery that never happened. Two files in one
@@ -1847,7 +1850,8 @@ comparisons against the expected-supply sequence.
 9. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Slot
    assignment.** Claim windows, on-time-wins-for-the-current-slot,
    monotonic filling, and hold-for-a-human when nothing is confidently
-   claimable (Threads E and H).
+   claimable (Threads E and H). *(The rule was REPLACED 2026-10-04 by
+   REQ-PIPE-131 - file only to the open period; REQ-PIPE-063 retired.)*
 
    **Owns:** `REQ-PIPE-062`, `REQ-PIPE-063`, `REQ-PIPE-064`, `REQ-PIPE-065`
 
@@ -2857,25 +2861,27 @@ the only thing that varies.
 *Config: quarterly, calendar Feb 2 / May 1 / Aug 3 / Nov 2, early window
 14 days. Feb and May filled. Supply arrives 19 July - one day outside
 August's window, which opens 20 July.*
-**Expect**: August is not claimable, May and Feb are filled, so no
-claimable unfilled slot exists -> **resupply of May**. Being a filled
-slot it does **not auto-promote**; it holds and warns (TS-4).
+**Expect**: August's window has not opened, so May is still the OPEN
+period (REQ-PIPE-131), and it is filled -> **resupply of May**. Being a
+filled slot it does **not auto-promote**; it holds and warns (TS-4).
 
 **TS-3b `[INJECT]` Quarterly, prior slot UNFILLED.**
 *Same config, but May's slot was never filled.*
-**Expect**: May is claimable -> fills **May, ~79 days late**.
+**Expect**: May is still the open period -> fills **May, ~79 days late**.
 
 **TS-3c `[INJECT]` Daily, prior slot FILLED.**
 *Config: daily evening-before - the supply for day D is due 22:00 on
 D-1 - early window 4 hours, so Tuesday's window opens 18:00 Monday.
 Monday's slot filled. Arrival 17:00 Monday, one hour outside.*
-**Expect**: Tuesday not claimable, Monday filled -> **resupply of
-Monday**, no auto-promotion, holds and warns.
+**Expect**: Tuesday's window has not opened, so Monday is the open
+period, and it is filled -> **resupply of Monday**, no auto-promotion,
+holds and warns.
 
 **TS-3d `[INJECT]` Daily, prior slot UNFILLED.**
 *Same config, but Monday's slot was never filled (Monday's supply was
 due 22:00 Sunday).*
-**Expect**: Monday is claimable -> fills **Monday, 19 hours late**.
+**Expect**: Monday is still the open period -> fills **Monday, 19 hours
+late**.
 
 **What this family is FOR, and it is a different kind from the rest.**
 Most scenarios here assert the system gets the right answer. These
@@ -2970,12 +2976,15 @@ pick up first - non-determinism nothing would ever flag.
 
 **TS-9 `[INJECT]` A genuinely early quarterly supply.**
 *Config: quarterly, Feb 2 / May 1 / Aug 3 / Nov 2, early window 14 days.
-Feb and May filled. Supply arrives 13 July - 21 days early, inside
-August's window.*
-**Expect**: assigned **August** by elimination (Feb and May are filled,
-August is the next thing owed and its window is open), classified
-**early by 21 days**. Note nothing measures how early it is in order to
-assign it - earliness is a reported consequence of the assignment.
+Feb and May filled. Supply arrives 25 July - 9 days early, inside
+August's window, which opened 20 July.* (Corrected 2026-10-04: this used
+to say 13 July and "21 days early, inside August's window", which a
+14-day window cannot be - and under REQ-PIPE-131 a 13 July arrival is
+in MAY's open interval, a resupply of May.)
+**Expect**: assigned **August**, the period open when it arrived
+(REQ-PIPE-131), classified **early by 9 days**. Note nothing measures how
+early it is in order to assign it - earliness is a reported consequence
+of the assignment.
 **Breaks as**: `cycle_start()` only looks backwards, so it resolves to
 the 1 May anchor and reports the supply ~12 weeks LATE for a quarter
 that was filled months ago.
