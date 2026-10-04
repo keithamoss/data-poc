@@ -1177,3 +1177,21 @@ judgement about who reads the page rather than about the rule.
       consumers, who list the schema's tables at start-up and strip the
       stamp to find each base table. supply_db.split_staged already
       implements the parse.
+    - **AMBER VALUE ORDER** (Keith): wherever the options are listed - docs,
+      comments, schema, errors - in logical order, strictest first: hold,
+      promote-and-acknowledge, promote.
+    - **newest() FIX DROPPED** (Keith): with exactly one version per table
+      per period there is nothing to rank, and he is happy to regenerate,
+      so the multi-version code path goes away rather than being fixed.
+    - **INHERITED AND SUBSTITUTED TABLES TAKE FULL STAMPED NAMES TOO**, and
+      the chain check (inherit only from a period holding a real supply)
+      asks the DATABASE whether an object is a table or a view rather than
+      reading its name (Keith: "a very reasonable fix"). Amends REQ-PIPE-098
+      and REQ-PIPE-084's "visible by its logical name" criteria.
+    - **NEW IDEA, Keith: A MANIFEST IN EVERY PERIOD SCHEMA** - one row per
+      table in the schema: its current name, its base name (the dataset's
+      table), its TYPE (promoted / inherited / substituted), and the facts
+      the name encodes today (supply, arrival stamp, the period an
+      inherited or substituted table came from). External tools query it
+      instead of parsing names, e.g. a downstream tool flagging
+      substituted data to its own users. Being discussed.
