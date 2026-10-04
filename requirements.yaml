@@ -1226,10 +1226,10 @@ requirements:
         read back out of a delivery file, and SHALL NOT let it be
         inferred as a naive or UTC-normalised value.
       - >
-        THE SYSTEM SHALL regenerate the delivery log from scratch
-        alongside the QA results, under the same delete-and-regenerate
-        rule, and SHALL NOT leave delivery records describing a
-        history that no longer exists.
+        THE SYSTEM SHALL keep the delivery log as permanent history that
+        survives its files being moved or removed, and SHALL clear it
+        only through mothman env reset-synthetic (amended by
+        REQ-PIPE-144 criterion 24).
     non_functional_requirements:
       - >
         This is REQ-PIPE-058 criterion 8's corpus. That criterion gates
@@ -1375,13 +1375,14 @@ requirements:
         where it has more than one. Write-once makes this idempotent:
         whichever orchestrator reaches a delivery first records it, and
         the rest no-op.
+      - "CRITERION 6 AMENDED 2026-10-04 by REQ-PIPE-144 criterion 24 (Keith, signed): the delivery log is permanent history. prune() is GONE: in production processed files move to another bucket, so 'the folder is gone' must never delete a record, and only `mothman env reset-synthetic` clears the log. The filing-to-delivery foreign key refuses deleting a delivery any filing names."
     linked_tests:
       - tests/test_delivery_log.py
       - tests/test_cli_pipeline.py
       - tests/test_arrival_patterns.py
     implemented_by:
       - qa_tools/common/delivery_log.py::record
-      - qa_tools/common/delivery_log.py::prune
+      - qa_tools/common/synthetic_reset.py::reset
       - qa_tools/common/delivery_log.py::records
       - qa_tools/common/delivery_log.py::sql
       - qa_tools/common/validate_arrival_patterns.py::committed_filenames
@@ -4269,8 +4270,8 @@ requirements:
       - qa_tools/common/qa_results_reader.py::expected_tools_for
       - qa_tools/common/qa_results_reader.py::canonical_order
       - qa_tools/common/qa_results_reader.py::read_raw
-      - cli/pipeline.py::regenerate_history_command
-      - qa_tools/common/qa_store.py::delete_history
+      - cli/env.py::reset_synthetic_command
+      - qa_tools/common/bootstrap.py::bootstrap
     evidence:
       - >
         2026-09-26: regenerated from scratch, both collections, and the
@@ -4638,6 +4639,7 @@ requirements:
         purely about re-keying committed QA history, so a load-outcome
         criterion no longer belongs in it at all.
 
+      - "`mothman pipeline regenerate-history` RETIRED 2026-10-04 by REQ-PIPE-144 criterion 43 (Keith, signed): its job is `mothman env reset-synthetic` followed by `mothman pipeline bootstrap`, which still regenerates from scratch rather than migrating (criteria 4-7 hold), and the one deletion path is refused for any asset not declared synthetic."
   - id: REQ-DASH-055
     title: The dashboard shows real datasets only
     date_written: "2026-09-23"
@@ -18655,7 +18657,6 @@ requirements:
       - qa_tools/common/qa_store.py::ensure_schema
       - qa_tools/common/qa_store.py::record_results
       - qa_tools/common/qa_store.py::complete_run
-      - qa_tools/common/qa_store.py::delete_history
       - qa_tools/common/qa_store.py::ensure_publisher_role
       - qa_tools/common/qa_results_writer.py::write_qa_result
       - qa_tools/common/qa_results_reader.py::read_qa_results
@@ -18665,7 +18666,8 @@ requirements:
       - qa_tools/common/backlog.py::unprocessed
       - qa_tools/common/trial.py::discard
       - qa_tools/common/changelog.py::build_changelog
-      - cli/pipeline.py::regenerate_history_command
+      - cli/env.py::reset_synthetic_command
+      - qa_tools/common/bootstrap.py::bootstrap
       - cli/common.py::report_recorded
       - cli/common.py::decide_record
       - .github/workflows/validate-config.yml
@@ -19168,6 +19170,7 @@ requirements:
         `customProperties:`), plans/*.md, CHANGELOG.yaml and
         dashboard/snapshots/*.html.gz. The build still needs a
         checkout.
+      - "`regenerate_history_command` RETIRED 2026-10-04 by REQ-PIPE-144 criterion 43: deleting and re-running recorded history is `mothman env reset-synthetic` then `mothman pipeline bootstrap`."
   - id: REQ-PIPE-090
     title: "The activity feed comes from recorded timestamps, and the walk of git history goes away"
     date_written: "2026-09-26"
@@ -23869,7 +23872,7 @@ requirements:
       date: '2026-10-04'
     story: As a data engineer with access to more than one environment, I want the tool to stop me the moment I point it at the wrong database, so that I find out before I have changed somebody else's data rather than afterwards from the record of what I did.
     moscow: must
-    status: not_started
+    status: in_progress
     source: Keith, 2026-09-27, answering REQ-PIPE-091's question set D - 'no, protect this higher up so you can't mistakenly make changes to the wrong environment'. Drafted in that conversation without delivery-scoper; refreshed by delivery-scoper 2026-10-04. Keith answered the refresh's questions 3 and 4 on 2026-10-04 (both option A).
     acceptance_criteria:
     - THE SYSTEM SHALL record, in the database itself, the data asset id (contract/data-asset.yaml's data_asset_id) and the environment id that database belongs to.
@@ -23917,6 +23920,7 @@ requirements:
     - CRITERIA 13 AND 14 ARE BUILT INSIDE REQ-PIPE-144's CHANGE (Keith, 2026-10-04), not with the rest of this requirement, which goes after the batch and before REQ-PIPE-151/152. Both schema-version refusals live in qa_store.ensure_schema, which 144 already rewrites.
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
 
+    - "CRITERIA 13 AND 14 BUILT 2026-10-04 inside REQ-PIPE-144 (its criterion 40, Keith's call): qa_store.ensure_schema refuses a NEWER recorded schema version naming both versions, and rewrites nothing. The downgrade was reproduced first - a database recorded at version 99 came back recorded at 17 - and tests/test_schema_version_refusal.py failed before the fix. The rest of this requirement is built after the batch."
   - id: REQ-QAC-108
     title: 'Drift and volume are measured against the last supply actually PROMOTED, never against a view or an arrival nobody promoted
   
@@ -25254,10 +25258,10 @@ requirements:
     - THE SYSTEM SHALL create, in every period schema, a view named _manifest, by the same mechanism whether the period was created by a first promotion or opened by instruction (REQ-PIPE-098 criterion 4).
     - THE SYSTEM SHALL return from _manifest one row for each table or view in that period schema other than _manifest itself.
     - THE SYSTEM SHALL give each row these columns - table_name, dataset_id, kind (promoted, inherited or substituted), supply, received_at, from_period, decided_at, decided_by, acknowledged, reason, promoted_status.
-    - THE SYSTEM SHALL take received_at from the supply's filing, and SHALL leave from_period empty for a promoted table.
+    - THE SYSTEM SHALL take received_at from the single receipt view (qa.supply_receipt) through the supply's CURRENT (newest, under REQ-PIPE-141) filing, exposed as a timestamptz instant rather than the recorded text, and SHALL leave from_period empty for a promoted table (amended by REQ-PIPE-144 criterion 35).
     - THE SYSTEM SHALL fill decided_by with only rule or person, and SHALL NOT expose any actor's identity through _manifest.
     - THE SYSTEM SHALL fill acknowledged as true or false where an acknowledgement is owed (REQ-PIPE-122) and leave it empty where none is.
-    - THE SYSTEM SHALL implement _manifest as a view over the decision log and the filing record, and SHALL NOT maintain it as a table.
+    - THE SYSTEM SHALL implement _manifest as a view over the one view of what a slot holds, the filings, and the one view of a supply's receipt, and SHALL NOT maintain it as a table (amended by REQ-PIPE-144 criterion 36, wording approved by Keith 2026-10-04).
     - THE SYSTEM SHALL define, ONCE, in the metadata schema, a view of what each dataset's slot holds, built only from decisions that change a slot (REQ-PIPE-132), with a form that answers as at a given instant.
     - THE SYSTEM SHALL answer every question of what a slot holds or held - the promotion gate's filled-slot check, slot states, the stood-on guard, the newest promoted supply, and each period's _manifest - from that one view, and SHALL NOT re-derive it from the decision log anywhere else.
     - THE SYSTEM SHALL record the table name beside dataset_id on every decision-log entry that concerns a table, so that _manifest needs no dataset-to-table mapping of its own.
@@ -25289,6 +25293,7 @@ requirements:
     - 'CRITERION 8 DELIVERED, AND CRITERION 9 FOR EVERY READER BUT _manifest, 2026-10-04 (overnight sprint 2): `qa.slot_holds(dataset, as_at)` is a SQL function in the metadata schema (qa_store.SCHEMA_VERSION 15) that WALKS a slot''s decisions in effective order - an entry INTO the slot sets what fills it, an entry OUT OF it empties it only where it names the supply filling it, refusals are not read - returning the supply it holds and the last decision that CHANGED it; `slot_holds_now` is the present over every dataset. decision_log.promoted_into, latest_for_slot and promoted_supply, slot_state, drift_reference (through latest_for_slot) and pipeline/slot_timeline.py all read it, and the Python walks they carried are gone. tests/test_slot_holds.py holds the SQL to the Python rule it replaced over 40 random decision sequences, at every instant of each. The _manifest view is the rest of this requirement and comes later in the batch. CORRECTED THE SAME NIGHT: the post-build critic found criterion 9 NOT met as first committed - promotion.newest_promoted, inheritance._most_recent_promoted and promotion_state.state_for still walked the log themselves, and three readers that did call the view re-read the decision''s ACTION instead of its answer, so a re-file OUT left an emptied period reading as promoted (queue), as a real supply (substitution) and as the drift reference (the supply measured against itself). See the next decision.'
     - 'PROVISIONAL (overnight sprint 2): A FUNCTION RATHER THAN A PLAIN VIEW, so the as-at form and the one-dataset form are one definition; a view cannot take a parameter. The walk is a recursive CTE per (dataset, slot) - cheap at today''s hundreds of decisions; at production scale it would want the decision log''s (dataset_id, effective_at) index, which exists.'
     - 'THE VIEW SAYS HOW A SLOT IS HELD, NOT ONLY WHAT FILLS IT (overnight sprint 2, the critic''s option b, schema v17): qa.slot_holds returns held_as (promoted, substituted, inherited, or NULL for empty) and holder beside fills, and decision_log.held()/held_all() expose it. EVERY reader now asks held_as - slot_state, substitution, inheritance, filing_decisions, drift_reference, promotion_state, _standing_on, newest_promoted, _most_recent_promoted - and no reader interprets an action, except an EMPTY slot''s state saying how it was emptied (rejected vs returned). latest_for_slot is gone. The view reads ONLY the decisions that change a slot (an include list), so an annotating decision added later (REQ-PIPE-132) is ignored until somebody decides it changes one, never read as emptying a slot by default; and an entry about a different supply now leaves an INHERITED slot alone as well as a filled one. A real SQL defect found by the parity test on the way: `to_slot = slot` is NULL, not false, for a reject, which silently disabled the skip - now IS NOT DISTINCT FROM.'
+    - "CRITERIA 4 AND 7 AMENDED 2026-10-04 by REQ-PIPE-144 criteria 35-36 (Keith, signed; criterion 7's wording approved by him): _manifest reads the supply's receipt from qa.supply_receipt as an instant, and is a view over qa.slot_holds, the filings and that receipt view. There is no filing record document any more."
     open_questions: []
 
   - id: REQ-PIPE-131

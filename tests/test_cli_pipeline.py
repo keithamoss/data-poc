@@ -10,11 +10,42 @@ effect (same as any other real pipeline run) and must never run for
 real under pytest."""
 from __future__ import annotations
 
+import pytest
 from click.testing import CliRunner
 
 import cli.pipeline as pipeline_cli
 
 _runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def _no_history_yet(monkeypatch):
+    """These tests stub the real work, on a worker database other modules
+    have already written history into - so `pipeline run` would refuse
+    (REQ-PIPE-144 criterion 39). They are about what a run DOES, so they
+    run as though on an empty database; the refusal has its own tests."""
+    import qa_tools.common.bootstrap as boot
+    monkeypatch.setattr(boot, "holds_history", lambda conn: False)
+
+
+class TestARunOverRecordedHistoryIsRefused:
+    """REQ-PIPE-144 criterion 39."""
+
+    def test_it_refuses_and_runs_nothing(self, monkeypatch):
+        import qa_tools.common.bootstrap as boot
+        monkeypatch.setattr(boot, "holds_history", lambda conn: True)
+        calls = []
+        monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
+        monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+        result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
+        assert result.exit_code != 0 and calls == []
+        flat = " ".join(result.output.split())
+        assert "already holds QA history" in flat and "reset-synthetic" in flat
+
+    def test_regenerate_history_is_retired(self):
+        """REQ-PIPE-144 criterion 43: its job is reset-synthetic plus a
+        bootstrap, so it is not kept beside them as a second way to delete."""
+        assert "regenerate-history" not in pipeline_cli.pipeline_group.commands
 
 
 def _patch_dashboard_build_embed(monkeypatch, calls):
@@ -181,8 +212,10 @@ def _log_one(conn, name):
 
 def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
         monkeypatch, tmp_path, clean_delivery_log):
-    """A real incident, 2026-09-25, and the reason criterion 6 is built
-    as a prune rather than a wipe.
+    """A real incident, 2026-09-25 - and, since REQ-PIPE-144 criterion 19,
+    the stronger rule: a run deletes NO delivery record at all, even one
+    whose files are no longer on disk (in production, every delivery's
+    files move on).
 
     `mothman pipeline run` used to clear the whole delivery log at the
     top, on the reasoning that the run would rewrite it. The tests
@@ -216,11 +249,8 @@ def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
     result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
     assert result.exit_code == 0, result.output
 
-    # The prune DOES remove it, because that delivery genuinely is not
-    # there - what must never happen is the whole log going on a run
-    # that rewrote nothing. Proven by pointing the deliveries at a real
-    # tree instead:
-    assert [r["delivery"] for r in delivery_log.records()] == []
+    # KEPT, though its files are gone: a delivery record is history.
+    assert [r["delivery"] for r in delivery_log.records()] == ["monday"]
 
 
 def test_a_delivery_still_present_keeps_its_record_across_a_run(
@@ -263,8 +293,8 @@ def test_the_committed_history_trees_are_never_the_real_ones_in_a_test():
     """The guard in conftest, asserted rather than trusted.
 
     Six tests in this file invoke `pipeline run` without redirecting
-    anything, and that command prunes the delivery log against what is
-    on disk. On a freshly-cloned CI runner there is no `data/` at all,
+    anything, and that command USED TO prune the delivery log against
+    what was on disk (it deletes nothing since REQ-PIPE-144). On a freshly-cloned CI runner there is no `data/` at all,
     so the honest answer to "which deliveries are present" is NONE and
     every committed record would go. A test that merely passes is not
     evidence the tree survived, which is why this asserts the

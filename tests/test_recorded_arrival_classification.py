@@ -28,6 +28,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+import filing_support
 from qa_tools.common import arrival_classification as classify_mod
 from qa_tools.common import assignment, filing
 
@@ -65,7 +66,7 @@ def clean(supply_dsn):
 
 
 def _file(slot=EARLY_SLOT, received_at=ARRIVED, supply_id="s"):
-    return filing.record(assignment.Assignment(
+    return filing_support.file(assignment.Assignment(
         dataset_id=DATASET, supply_id=supply_id, slot=slot,
         branch=assignment.OPEN_UNFILLED, considered=(slot,),
         received_at=received_at))
@@ -100,7 +101,7 @@ class TestTheClassificationIsRecordedWithTheFiling:
     def test_a_held_supply_records_unfiled_rather_than_a_verdict(self, clean):
         """Criterion 6. There is no slot to be punctual against, and
         saying "on time" here would invent a verdict from an absence."""
-        filing.record(assignment.Assignment(
+        filing_support.file(assignment.Assignment(
             dataset_id=DATASET, supply_id="held", slot=None,
             branch=assignment.HELD, considered=(), received_at=ARRIVED))
         assert filing.filing_for(DATASET, "held")["classification"] == classify_mod.UNFILED

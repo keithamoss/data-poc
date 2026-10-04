@@ -43,7 +43,6 @@ pointed away from them.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -51,6 +50,24 @@ from qa_tools.common import qa_store, supply_db
 from qa_tools.common.assignment import Assignment
 
 TABLE = f'"{qa_store.SCHEMA}".filing'
+#: A supply's receipt, defined once (REQ-PIPE-144 criterion 12).
+RECEIPT = f'"{qa_store.SCHEMA}".supply_receipt'
+
+#: The columns a filing is read back from, in the dict every reader
+#: uses (criterion 4). There is no document any more - see the DDL.
+_COLUMNS = ("dataset_id", "supply_id", "slot", "branch", "classification",
+            "considered", "delivery")
+_SELECT = ", ".join(_COLUMNS)
+
+
+class FilingWithoutDelivery(ValueError):
+    """A filing would link to no delivery (REQ-PIPE-144 criterion 18)."""
+
+
+def _as_dict(row) -> dict:
+    out = dict(zip(_COLUMNS, row))
+    out["considered"] = list(out["considered"] or [])
+    return out
 
 
 def _connect(label: str) -> supply_db.SupplyConnection:
@@ -59,8 +76,16 @@ def _connect(label: str) -> supply_db.SupplyConnection:
     return conn
 
 
-def record(assignment: Assignment) -> bool:
-    """Record where one supply was filed, once.
+def record(assignment: Assignment, delivery: str | None) -> bool:
+    """Record where one supply was filed, once, linked to the delivery it
+    came in (REQ-PIPE-144 criteria 10 and 11).
+
+    `delivery` is the ARRIVAL's delivery name, passed in by whoever holds
+    the arrival - never parsed out of the supply id, which is the implicit
+    link this replaced. A filing with no delivery, or naming one with no
+    qa.delivery row, is REFUSED with the delivery named (criterion 18)
+    rather than written linking to nothing; the foreign key is the
+    database's safety net behind that.
 
     Returns True where a row was written, False where this supply was
     already filed - which is the ordinary case on every run after the
@@ -73,20 +98,27 @@ def record(assignment: Assignment) -> bool:
     clause - a supply already filed is left exactly as it was, decided by
     the database rather than by every caller remembering.
     """
+    if not delivery:
+        raise FilingWithoutDelivery(
+            f"{assignment.supply_id} ({assignment.dataset_id}) has no delivery to link "
+            f"to, so it was not filed.")
     with _connect("mothman:filing-record") as conn:
-        record = assignment.as_record()
+        if not conn.execute(
+                f'SELECT 1 FROM "{qa_store.SCHEMA}".delivery WHERE name = ?',
+                [delivery]).fetchall():
+            raise FilingWithoutDelivery(
+                f"{assignment.supply_id} ({assignment.dataset_id}) names delivery "
+                f"{delivery!r}, which has no delivery record, so it was not filed.")
         verdict = _classification_for(
             assignment.dataset_id, assignment.slot, assignment.received_at)
-        if verdict is not None:
-            record["classification"] = verdict
         rows = conn.execute(
-            f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, record, "
-            "received_at, classification) "
+            f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, "
+            "delivery, classification) "
             "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO NOTHING "
             "RETURNING dataset_id",
             [assignment.dataset_id, assignment.supply_id, assignment.slot,
-             assignment.branch, json.dumps(record),
-             assignment.received_at, verdict]).fetchall()
+             assignment.branch, list(assignment.considered), delivery,
+             verdict]).fetchall()
     return bool(rows)
 
 
@@ -167,9 +199,9 @@ def filing_for(dataset_id: str, supply_id: str) -> dict | None:
     """This supply's filing, or None where it has not been filed."""
     with _connect("mothman:filing-read") as conn:
         rows = conn.execute(
-            f"SELECT record FROM {TABLE} WHERE dataset_id = ? AND supply_id = ?",
+            f"SELECT {_SELECT} FROM {TABLE} WHERE dataset_id = ? AND supply_id = ?",
             [dataset_id, supply_id]).fetchall()
-    return rows[0][0] if rows else None
+    return _as_dict(rows[0]) if rows else None
 
 
 def filings_of(dataset_id: str) -> list[dict]:
@@ -181,8 +213,8 @@ def filings_of(dataset_id: str) -> list[dict]:
     directory layout gave for free.
     """
     with _connect("mothman:filing-read") as conn:
-        return [row[0] for row in conn.execute(
-            f"SELECT record FROM {TABLE} WHERE dataset_id = ? "
+        return [_as_dict(row) for row in conn.execute(
+            f"SELECT {_SELECT} FROM {TABLE} WHERE dataset_id = ? "
             "ORDER BY recorded_at, supply_id", [dataset_id]).fetchall()]
 
 
@@ -314,7 +346,7 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                 dataset_id=dataset_id, supply_id=supply_id,
                 at=arrival.received_at, slots=slots_by_dataset[horizon],
                 filled=filled_slots(dataset_id))
-            record(decided)
+            record(decided, arrival.delivery_name)
             # AN ASSIGNMENT-RULE HOLD IS RECORDED TOO (criterion 3). Its
             # `filing` row above is evidence of what the rule saw and
             # stays write-once; the open work item is the hold, because
@@ -351,14 +383,10 @@ def _supply_id_for(arrival, dataset_id: str) -> str:
     return base if len(names) <= 1 else f"{base}#1"
 
 
-#: A recomputation carries a reference to the re-filing that caused it
-#: (REQ-PIPE-067 criterion 5). THE REFERENCE DANGLES until the decision
-#: log exists in sprint 12 to resolve it, and that is stated rather
-#: than left for a reader to discover - the alternative failure is
-#: specific and was named at sign-off: five of six criteria built, the
-#: sixth quietly skipped as un-buildable, and the requirement reported
-#: done.
-REFILING_REFERENCE = "refiled_by"
+#: THE REFERENCE TO WHAT CAUSED A RE-FILE (REQ-PIPE-067 criterion 5) IS
+#: NOT KEPT ON THE FILING since REQ-PIPE-144 criterion 8: a re-file's
+#: from-period, to-period and reason belong to its decision-log entry,
+#: which REQ-PIPE-141 builds. refile() below has no production caller.
 
 
 def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
@@ -396,12 +424,12 @@ def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
 
     updated = dict(current)
     updated["slot"] = to_slot
-    updated["refiled_from"] = current.get("slot")
-    updated[REFILING_REFERENCE] = refiling_id
-    if reason:
-        updated["refiling_reason"] = reason
-    # The branch that ORIGINALLY filed it is kept as history and no
-    # longer describes where it sits: a person put it here.
+    # NO refiled_from / refiled_by / refiling_reason ON THE FILING
+    # (REQ-PIPE-144 criterion 8): a re-file's from-period, to-period and
+    # reason belong to its decision-log entry. The DELIVERY LINK is
+    # carried as it stands (criterion 17) - the row is updated in place.
+    # The branch that ORIGINALLY filed it no longer describes where it
+    # sits: a person put it here.
     updated["branch"] = "refiled-by-a-person"
 
     # THE VERDICT FOLLOWS, THE INSTANT DOES NOT (REQ-PIPE-080 criteria
@@ -411,10 +439,7 @@ def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
     # without anything re-deriving when it turned up.
     received_at = received_at_of(dataset_id, supply_id)
     verdict = _classification_for(dataset_id, to_slot, received_at)
-    if verdict is not None:
-        updated["classification"] = verdict
-    else:
-        updated.pop("classification", None)
+    updated["classification"] = verdict
 
     # AN UPDATE, AND THE ONLY ONE THIS TABLE TAKES. Write-once
     # (REQ-PIPE-104 criterion 2) is about the RULE never re-deriving a
@@ -424,10 +449,9 @@ def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
     # trigger while `qa.decision` does - see the DDL.
     with _connect("mothman:filing-refile") as conn:
         conn.execute(
-            f"UPDATE {TABLE} SET slot = ?, branch = ?, record = ?, classification = ? "
+            f"UPDATE {TABLE} SET slot = ?, branch = ?, classification = ? "
             "WHERE dataset_id = ? AND supply_id = ?",
-            [to_slot, updated["branch"], json.dumps(updated), verdict,
-             dataset_id, supply_id])
+            [to_slot, updated["branch"], verdict, dataset_id, supply_id])
     return updated
 
 
@@ -475,10 +499,11 @@ class RecordedArrival:
 
 
 def received_at_of(dataset_id: str, supply_id: str) -> datetime | None:
-    """Our receipt instant for this supply, as recorded."""
+    """Our receipt instant for this supply - from the one receipt view
+    (REQ-PIPE-144 criterion 16), never a copy on the filing."""
     with _connect("mothman:filing-read") as conn:
         rows = conn.execute(
-            f"SELECT received_at FROM {TABLE} WHERE dataset_id = ? AND supply_id = ?",
+            f"SELECT received_instant FROM {RECEIPT} WHERE dataset_id = ? AND supply_id = ?",
             [dataset_id, supply_id]).fetchall()
     return rows[0][0] if rows else None
 
@@ -499,9 +524,11 @@ def recorded_arrival(dataset_id: str, supply_id: str) -> RecordedArrival | None:
     paragraph warning against.
     """
     with _connect("mothman:filing-read") as conn:
+        # THE RECEIPT FROM THE ONE VIEW (REQ-PIPE-144 criterion 16).
         rows = conn.execute(
-            f"SELECT slot, received_at, classification FROM {TABLE} "
-            "WHERE dataset_id = ? AND supply_id = ?",
+            f"SELECT f.slot, r.received_instant, f.classification FROM {TABLE} f "
+            f"LEFT JOIN {RECEIPT} r USING (dataset_id, supply_id) "
+            "WHERE f.dataset_id = ? AND f.supply_id = ?",
             [dataset_id, supply_id]).fetchall()
         if not rows:
             return None

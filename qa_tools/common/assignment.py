@@ -122,10 +122,12 @@ class Assignment:
                 f"somebody assigns it.")
 
     def as_record(self) -> dict:
+        # NO resupply_of (REQ-PIPE-144 criterion 5 - it always equals the
+        # slot on a resupply) and NO unavailable (criterion 6 - a held
+        # supply's reasons live in qa.hold.reason).
         return {"dataset_id": self.dataset_id, "supply_id": self.supply_id,
                 "slot": self.slot, "branch": self.branch,
-                "considered": list(self.considered), "resupply_of": self.resupply_of,
-                "unavailable": [list(pair) for pair in self.unavailable]}
+                "considered": list(self.considered)}
 
 
 def current_slot(slots: Sequence[slots_mod.Slot], at: datetime) -> slots_mod.Slot | None:

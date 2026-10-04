@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+import filing_support
 from qa_tools.common import assignment, delivery, filing
 
 PERTH = timezone(timedelta(hours=8))
@@ -53,12 +54,12 @@ class TestWrittenOnceAndNeverReDerived:
     """Criterion 10."""
 
     def test_a_second_run_leaves_an_existing_filing_alone(self, filings):
-        assert filing.record(_assignment()) is True
+        assert filing_support.file(_assignment()) is True
         before = filing.filing_for("cp-clients", "cp-clients@2026")
 
         # A later run would derive a DIFFERENT answer, because the slot
         # state has moved on. It must not write.
-        again = filing.record(
+        again = filing_support.file(
             _assignment(slot="2026-Q4", branch=assignment.RESUPPLY))
         assert again is False
         assert filing.filing_for("cp-clients", "cp-clients@2026") == before, (
@@ -66,7 +67,7 @@ class TestWrittenOnceAndNeverReDerived:
             "under a reader")
 
     def test_the_stored_filing_keeps_the_branch_it_was_decided_by(self, filings):
-        filing.record(_assignment(branch=assignment.OPEN_UNFILLED))
+        filing_support.file(_assignment(branch=assignment.OPEN_UNFILLED))
         stored = filing.filing_for("cp-clients", "cp-clients@2026")
         assert stored["branch"] == assignment.OPEN_UNFILLED
         assert stored["considered"] == ["2026-Q1"], (
@@ -98,7 +99,7 @@ class TestFiledIsNotFilled:
         subject was shared.
         """
         mine = f"cp-filed-not-filled-{uuid.uuid4().hex[:8]}"
-        filing.record(_assignment(supply_id=f"{mine}@2026", slot="2026-Q1",
+        filing_support.file(_assignment(supply_id=f"{mine}@2026", slot="2026-Q1",
                                    dataset_id=mine))
         assert filing.filings_of(mine)[0]["slot"] == "2026-Q1"
         assert filing.filled_slots(mine) == frozenset(), (
@@ -131,8 +132,8 @@ class TestFiledIsNotFilled:
 
 class TestADatasetsFilingsAreItsOwn:
     def test_they_are_read_by_dataset_and_never_pick_up_anothers(self, filings):
-        filing.record(_assignment(dataset_id="cp-clients", supply_id="cp-clients@1"))
-        filing.record(_assignment(dataset_id="cp-carers", supply_id="cp-carers@1"))
+        filing_support.file(_assignment(dataset_id="cp-clients", supply_id="cp-clients@1"))
+        filing_support.file(_assignment(dataset_id="cp-carers", supply_id="cp-carers@1"))
         assert len(filing.filings_of("cp-clients")) == 1
         assert len(filing.filings_of("cp-carers")) == 1
         assert filing.filings_of("cp-placements") == []
@@ -142,7 +143,7 @@ class TestADatasetsFilingsAreItsOwn:
         and `#` were replaced to make a usable filename, and the real id
         survived only inside the document. A column takes it as written,
         so there is no second spelling to keep in step."""
-        assert filing.record(_assignment(supply_id="cp-clients@2026#2")) is True
+        assert filing_support.file(_assignment(supply_id="cp-clients@2026#2")) is True
         stored = filing.filing_for("cp-clients", "cp-clients@2026#2")
         assert stored is not None
         assert stored["supply_id"] == "cp-clients@2026#2"
@@ -170,6 +171,11 @@ class TestFilingRealArrivals:
         for filename in files:
             (folder / filename).write_text("a\n1\n")
         delivery.write_receipts(name, when, receipts, files=files, sequence=sequence)
+        # RECORDED, as the batch records every delivery before filing: a
+        # filing links to its delivery record (REQ-PIPE-144 criterion 10).
+        from qa_tools.common import arrivals, delivery_log
+        for d in delivery.list_deliveries(deliveries, receipts):
+            delivery_log.record(d, arrivals.recognise(d))
         return deliveries, receipts
 
     def _arrivals(self, tmp_path, collection="child-protection", prefix="cp_run_"):
@@ -236,7 +242,7 @@ class TestAFilingIsRecordedInTheDatabase:
     def test_the_record_lands_in_the_metadata_schema(self, filings):
         from qa_tools.common import qa_store
 
-        filing.record(_assignment())
+        filing_support.file(_assignment())
         rows = filings.execute(
             f'SELECT dataset_id, supply_id, slot, branch FROM "{qa_store.SCHEMA}".filing '
             "WHERE dataset_id = ?", ["cp-clients"]).fetchall()
@@ -255,12 +261,15 @@ class TestAFilingIsRecordedInTheDatabase:
             "SELECT column_name FROM information_schema.columns "
             "WHERE table_schema = ? AND table_name = 'filing'",
             [qa_store.SCHEMA]).fetchall()}
-        assert {"dataset_id", "supply_id", "slot", "branch", "record"} <= columns
+        assert {"dataset_id", "supply_id", "slot", "branch", "considered",
+                "delivery", "classification"} <= columns
+        # REQ-PIPE-144 criteria 1 and 10: no document, no copy of the receipt.
+        assert not {"record", "received_at"} & columns
 
     def test_a_held_supply_is_recorded_with_no_slot_rather_than_not_at_all(self, filings):
         """A held supply with no row is a supply nobody knows about, and
         the queue a person drains is built from these rows."""
-        filing.record(_assignment(slot=None, branch=assignment.HELD,
+        filing_support.file(_assignment(slot=None, branch=assignment.HELD,
                                    supply_id="cp-clients@held"))
         stored = filing.filing_for("cp-clients", "cp-clients@held")
         assert stored is not None and stored["slot"] is None
@@ -273,12 +282,13 @@ class TestAFilingIsRecordedInTheDatabase:
         import psycopg
         from qa_tools.common import qa_store
 
-        filing.record(_assignment())
+        filing_support.file(_assignment())
         with pytest.raises(psycopg.errors.UniqueViolation):
             filings.execute(
                 f'INSERT INTO "{qa_store.SCHEMA}".filing '
-                "(dataset_id, supply_id, branch, record) VALUES (?, ?, ?, '{}')",
-                ["cp-clients", "cp-clients@2026", assignment.RESUPPLY])
+                "(dataset_id, supply_id, branch, delivery) VALUES (?, ?, ?, ?)",
+                ["cp-clients", "cp-clients@2026", assignment.RESUPPLY,
+                 "pytest-cp-clients-cp-clients@2026"])
 
     def test_it_is_NOT_append_only_because_a_person_may_re_file(self, filings):
         """The contrast with `qa.decision`, which IS append-only, and the
@@ -287,7 +297,7 @@ class TestAFilingIsRecordedInTheDatabase:
         on; a person moving a supply is REQ-PIPE-067, and the verdict has
         to follow it. An append-only trigger would make that impossible.
         """
-        filing.record(_assignment())
+        filing_support.file(_assignment())
         moved = filing.refile("cp-clients", "cp-clients@2026", "2026-Q3",
                                refiling_id="dec-1")
         assert moved is not None and moved["slot"] == "2026-Q3"
@@ -374,7 +384,7 @@ class TestWhichPeriodAnArrivalWasFiledTo:
     """
 
     def test_it_finds_the_period_from_the_arrival_instant(self, filings):
-        filing.record(_assignment(supply_id="cp-clients@20260801010000000000",
+        filing_support.file(_assignment(supply_id="cp-clients@20260801010000000000",
                                    slot="2026-Q3"))
         assert filing.period_of(
             "cp-clients", "2026-08-01T01:00:00.000000+00:00") == "2026-Q3"
@@ -384,7 +394,7 @@ class TestWhichPeriodAnArrivalWasFiledTo:
         carries a `#1` suffix (filing._supply_id_for). Matching on the
         whole id would miss it; matching on the ARRIVAL KEY does not,
         and the arrival key is what both sides actually share."""
-        filing.record(_assignment(supply_id="cp-clients@20260801010000000000#1",
+        filing_support.file(_assignment(supply_id="cp-clients@20260801010000000000#1",
                                    slot="2026-Q3"))
         assert filing.period_of(
             "cp-clients", "2026-08-01T01:00:00.000000+00:00") == "2026-Q3"
@@ -395,7 +405,7 @@ class TestWhichPeriodAnArrivalWasFiledTo:
     def test_another_datasets_filing_at_the_same_instant_is_not_ours(self, filings):
         """Six datasets arrive in one delivery, so the arrival key alone
         is not an identifier - the dataset is the other half of it."""
-        filing.record(_assignment(supply_id="cp-carers@20260801010000000000",
+        filing_support.file(_assignment(supply_id="cp-carers@20260801010000000000",
                                    slot="2026-Q3", dataset_id="cp-carers"))
         assert filing.period_of(
             "cp-clients", "2026-08-01T01:00:00.000000+00:00") is None
@@ -406,7 +416,7 @@ class TestWhichPeriodAnArrivalWasFiledTo:
         """A supply with no confident slot is filed with slot=None
         (REQ-PIPE-059), which is a real state rather than an absence of
         a filing - and it still has no period to measure against."""
-        filing.record(_assignment(supply_id="cp-clients@20260801010000000000",
+        filing_support.file(_assignment(supply_id="cp-clients@20260801010000000000",
                                    slot=None, branch=assignment.HELD))
         assert filing.period_of(
             "cp-clients", "2026-08-01T01:00:00.000000+00:00") is None

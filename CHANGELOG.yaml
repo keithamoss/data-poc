@@ -116,6 +116,13 @@ releases:
     changes:
       - category: Fixed
         items:
+          - headline: A dataset's arrival history shows when its own file landed
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              In a delivery whose files arrived a few minutes apart, `mothman
+              supply history` showed every file at the time the first one
+              landed, with a supply id that matched no filing. Each arrival
+              now shows its own file's receipt and the id its filing carries.
           - headline: A late file is no longer filed into an older, empty period
             components: ["Pipeline & publishing", "Dashboard UI"]
             description: >
@@ -170,6 +177,15 @@ releases:
               cannot read.
       - category: Improved
         items:
+          - headline: Starting the synthetic history from empty is one deliberate command
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              `mothman env reset-synthetic` deletes the whole synthetic QA
+              history after you type a phrase naming what goes, and refuses
+              for any asset not declared synthetic. `pipeline run` and
+              `bootstrap --force` now refuse to run over existing history
+              instead of quietly adding to it, delivery records are kept for
+              good, and `pipeline regenerate-history` is gone.
           - headline: Overlapping delivery periods are caught before anything arrives
             components: ["Pipeline & publishing"]
             description: >

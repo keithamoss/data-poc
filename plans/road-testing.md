@@ -1924,6 +1924,14 @@ judgement about who reads the page rather than about the rule.
         an authored calendar's last period never closes** - a 2030 file is
         filed to 2027-Q4. Keep, or hold such arrivals? Also: TS-4a, named by
         131 c15, does not exist.
+      - SPRINT 3b CLOSED (4fb77a2, bd2f9d0, 0a9ac43): evidence from a
+        bootstrap on the final code (`supply131b`): same 137/4/9, no check
+        with two results, no raw instant in a hold, 277 of 278
+        deployed-database tests green; the arrival golden moved for exactly
+        the 9 held Case Workers arrivals and was re-captured. A SLIP, said
+        plainly: bd2f9d0 went out with that module's distribution backstop
+        still red - its commit was gated on the gate's exit code, not the
+        test run's. Fixed in 0a9ac43; commits are gated on both from here.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

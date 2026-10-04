@@ -173,7 +173,7 @@ class TestTheRecordSaysWhy:
     def test_it_records_the_slot_it_considered(self):
         got = assignment.assign("d", "s", _at(1, 13), _days(1, 2), frozenset({"01"}))
         assert got.considered == ("01",)
-        assert got.as_record()["resupply_of"] == "01"
+        assert got.resupply_of == "01" and "resupply_of" not in got.as_record()
 
 
 class TestTheRetiredRulesAreGone:

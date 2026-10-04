@@ -53,6 +53,45 @@ class BootstrapResult:
     #: Seconds per collection checked, and "total" (REQ-TEST-116
     #: criterion 6) - measured, so a speed-up is a number, not a feeling.
     timings: dict[str, float] = field(default_factory=dict)
+    #: True where it REFUSED rather than found nothing to do - a database
+    #: already holding QA history (REQ-PIPE-144 criterion 38).
+    refused: bool = False
+
+
+#: Why a re-run over recorded history is refused (REQ-PIPE-144 criteria
+#: 38 and 39) - one message for both commands, sited beside each other.
+#: Filings are write-once and the decision log append-only, so a re-run
+#: ADDS to the history rather than replacing it: on 2026-10-02 a forced
+#: bootstrap stacked on top of the last one and promoted 11 supplies
+#: where a clean run promotes dozens, while its help text promised the
+#: same content.
+HISTORY_REFUSAL = (
+    "this database already holds QA history. A re-run would ADD to it rather "
+    "than replace it - filings are write-once and the decision log is "
+    "append-only - so nothing was run and nothing was deleted. To start from "
+    "empty, run `mothman env reset-synthetic` first.")
+
+#: The tables whose rows ARE the recorded history.
+_HISTORY_TABLES = ("run", "delivery", "filing", "decision")
+
+
+def holds_history(conn) -> bool:
+    """Whether this database already holds any recorded QA history.
+
+    Asked of the database, like already_populated(), and true of a qa
+    schema from ANY version - an older one is history too, and is refused
+    by ensure_schema with the same remedy.
+    """
+    from qa_tools.common import qa_store
+
+    for table in _HISTORY_TABLES:
+        if not conn.execute(
+                f"SELECT to_regclass('{qa_store.SCHEMA}.{table}')").fetchall()[0][0]:
+            continue
+        if conn.execute(
+                f'SELECT EXISTS (SELECT 1 FROM "{qa_store.SCHEMA}".{table})').fetchall()[0][0]:
+            return True
+    return False
 
 
 def staged_table_count(conn) -> int:
@@ -76,9 +115,11 @@ def bootstrap(collection: str = "all", force: bool = False,
               on_step: Callable[[str], None] | None = None) -> BootstrapResult:
     """Ensure this environment's database has data and QA results.
 
-    `force` re-runs even when the database already holds staged tables -
-    the pipeline is deterministic and seeded, so re-running is safe and
-    reproduces the same content; it just is not free.
+    `force` runs even when staging already holds tables - but NEVER over
+    recorded QA history (REQ-PIPE-144 criterion 38): that is refused,
+    with nothing run and nothing deleted, because a re-run would stack
+    on top of the history rather than replace it. `--force` NEVER WIPES -
+    wiping is `mothman env reset-synthetic`'s alone.
     """
     say = on_step or (lambda _msg: None)
 
@@ -86,12 +127,18 @@ def bootstrap(collection: str = "all", force: bool = False,
     with supply_db.connect(label="mothman:bootstrap") as conn:
         supply_db.ensure_schemas(conn)
         before = staged_table_count(conn)
+        history = holds_history(conn)
 
     if before and not force:
         return BootstrapResult(
             populated=False, staged_before=before, staged_after=before,
             reason=f"{before} staged table(s) already present - nothing to do "
-                   f"(use --force to rebuild anyway)")
+                   f"(--force runs anyway, though never over recorded QA history: "
+                   f"`mothman env reset-synthetic` starts from empty)")
+    if history:
+        return BootstrapResult(populated=False, staged_before=before,
+                               staged_after=before, refused=True,
+                               reason=HISTORY_REFUSAL[0].upper() + HISTORY_REFUSAL[1:])
 
     # IMPORTED HERE, NOT AT MODULE LEVEL. cli/ imports this module, and
     # the orchestrators pull in all four QA tools - several seconds of

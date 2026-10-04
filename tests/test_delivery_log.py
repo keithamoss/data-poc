@@ -16,7 +16,7 @@ queryable and are now a plain SELECT.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -51,6 +51,18 @@ class _Delivery:
     #: that does not care says the honest thing rather than asserting
     #: storage reported an instant.
     received_from: str = delivery_module.RECEIVED_FROM_OUR_CLOCK
+    #: Each file's own receipt (REQ-GEN-044 criterion 12), as the real
+    #: Delivery carries it; a file absent here falls back to the
+    #: delivery's own, which is the real Delivery's behaviour too.
+    file_receipts: dict = field(default_factory=dict)
+
+    def received_at_of(self, filename):
+        return self.file_receipts[filename][0] if filename in self.file_receipts \
+            else self.received_at
+
+    def sequence_of(self, filename):
+        return self.file_receipts[filename][1] if filename in self.file_receipts \
+            else self.sequence
 
 
 @dataclass
@@ -76,8 +88,30 @@ class TestWrittenOnce:
         record, _d, _r = _one(log)
         assert record["delivery"] == "monday"
         assert record["collections"] == ["child-protection"]
-        assert record["files"] == [
-            {"filename": "cp_clients.csv", "dataset_id": "cp-clients", "contested_by": None}]
+        (entry,) = record["files"]
+        assert {k: entry[k] for k in ("filename", "dataset_id", "contested_by")} == {
+            "filename": "cp_clients.csv", "dataset_id": "cp-clients", "contested_by": None}
+
+    def test_each_file_carries_its_own_receipt(self, log):
+        """REQ-PIPE-144 criterion 9: the file's own receipt - its text with
+        the offset, the instant, the clock that gave it and its sequence."""
+        when = datetime(2026, 2, 1, 9, 0, tzinfo=timezone(timedelta(hours=8)))
+        later = when + timedelta(minutes=7)
+        d = _Delivery(name="split", files=("cp_clients.csv", "cp_carers.csv"),
+                      received_at=when,
+                      file_receipts={"cp_clients.csv": (when, 4, "storage"),
+                                     "cp_carers.csv": (later, 5, "storage")})
+        r = _Recognition(by_dataset={"cp-clients": ["cp_clients.csv"],
+                                     "cp-carers": ["cp_carers.csv"]},
+                         collections=("child-protection",))
+        delivery_log.record(d, r, conn=log)
+        rows = log.execute(
+            'SELECT filename, received_at, received_instant, received_from, receipt_sequence '
+            'FROM "qa".delivery_file WHERE delivery = ? ORDER BY filename', ["split"]).fetchall()
+        assert [(f, t, s_, q) for f, t, _i, s_, q in rows] == [
+            ("cp_carers.csv", later.isoformat(), "storage", 5),
+            ("cp_clients.csv", when.isoformat(), "storage", 4)]
+        assert rows[0][2] == later
 
     def test_a_second_recognition_does_not_rewrite_it(self, log):
         """A delivery spanning collections is recognised by both
@@ -176,53 +210,26 @@ class TestQueryableAsSql:
         assert rows == [("cp_clients.csv", "cp-clients"), ("notes.pdf", None)]
 
 
-class TestItNeverDescribesAHistoryThatIsGone:
-    """Criterion 6, built as a PRUNE rather than a wipe - and the
-    reason is a real incident rather than a preference.
+class TestARecordOutlivesItsFiles:
+    """REQ-PIPE-144 criterion 19, amending REQ-PIPE-069 criterion 6: the
+    log is permanent history. In production processed files move to
+    another bucket, so "the folder is gone" must never delete a record -
+    which is why prune() is GONE rather than unused, and the only thing
+    that clears the log is `mothman env reset-synthetic`."""
 
-    The first version cleared the whole log at the top of `mothman
-    pipeline run`. The test suite invokes that command with the real
-    work stubbed out, so the next gate run deleted sixty committed
-    records and nothing rewrote them, because the thing that would
-    have was the part being stubbed.
-    """
+    def test_there_is_no_prune(self):
+        assert not hasattr(delivery_log, "prune")
 
-    def test_a_record_for_a_delivery_that_is_gone_is_removed(self, log):
-        _one(log, name="still-here")
-        _one(log, name="deleted-upstream")
-        gone = delivery_log.prune({"still-here"}, log)
-        assert gone == ["deleted-upstream"]
-        assert [r["delivery"] for r in delivery_log.records(log)] == ["still-here"]
+    def test_a_delivery_a_filing_names_cannot_be_deleted(self, log):
+        import psycopg
+        import filing_support
 
-    def test_a_record_for_a_delivery_still_present_is_left_alone(self, log):
-        """Records are write-once, so a record for a delivery still
-        present IS what a regeneration would write again - which is
-        what makes pruning and wiping the same end state for every case
-        that can actually arise."""
-        record, _d, _r = _one(log, name="still-here")
-        assert delivery_log.prune({"still-here"}, log) == []
-        assert delivery_log.records(log) == [record]
-
-    def test_it_says_what_it_removed(self, log):
-        """A silent delete of durable records is the wrong shape even
-        when it is correct."""
-        _one(log, name="a")
-        assert delivery_log.prune(set(), log) == ["a"]
-
-    def test_an_unreadable_record_is_removed_rather_than_left(self, log):
-        """RETIRED BY REQ-PIPE-089, kept as a note rather than deleted.
-
-        A corrupt JSON file could be neither checked against what was
-        present nor attributed to a delivery, so removing it was the
-        only outcome that left the log usable. A row is either
-        committed or it is not, so there is nothing left to be
-        unreadable - and a defence removed with its hazard should say
-        which hazard, or somebody reintroduces a file-backed log
-        without knowing what it costs.
-        """
-
-    def test_pruning_nothing_is_not_an_error(self, log):
-        assert delivery_log.prune(set(), log) == []
+        _one(log, name="history")
+        filing_support.ensure_delivery("history", "cp-clients", None)
+        log.execute('INSERT INTO "qa".filing (dataset_id, supply_id, branch, delivery) '
+                    "VALUES ('cp-clients', 'cp-clients@x', 'open-slot-unfilled', 'history')")
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            log.execute('DELETE FROM "qa".delivery WHERE name = ?', ["history"])
 
 
 class TestItIsTheCollisionGatesCorpus:

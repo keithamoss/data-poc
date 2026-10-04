@@ -7,7 +7,6 @@ decides a filing has its own tests.
 """
 from __future__ import annotations
 
-import json
 import random
 import uuid
 
@@ -44,11 +43,14 @@ def world(conn):
         conn.execute(f'INSERT INTO "{supply_db.STAGING_SCHEMA}"."{physical}" VALUES (?)', [value])
         made.append(physical)
         if period_to is not None:
+            import filing_support
+            delivery = f"pytest-overlay-{key}"
+            filing_support.ensure_delivery(delivery, DATASET[table], None,
+                                           filename=f"{table}.csv")
             conn.execute(
-                f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, record) "
+                f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, delivery) "
                 "VALUES (?, ?, ?, 'test', ?)",
-                [DATASET[table], f"{DATASET[table]}@{key}", period_to,
-                 json.dumps({"supply_id": f"{DATASET[table]}@{key}", "slot": period_to})])
+                [DATASET[table], f"{DATASET[table]}@{key}", period_to, delivery])
         return physical
 
     def promote(physical: str) -> None:

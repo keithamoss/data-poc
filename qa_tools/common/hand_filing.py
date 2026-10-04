@@ -167,10 +167,9 @@ def file_supply(paths, collection_id: str, run_id_prefix: str,
     # from, and "only automated deliveries get a delivery log entry"
     # is the observation this whole requirement started from - a
     # hand-received supply that has to wait for an unrelated command
-    # to become visible is the same gap one step smaller. Recording
-    # it here is also safe against the prune: `mothman pipeline run`
-    # prunes the log against the deliveries actually on disk, and
-    # this one is.
+    # to become visible is the same gap one step smaller. And it has
+    # to be here: a filing links to its delivery record and is refused
+    # without one (REQ-PIPE-144 criterion 18).
     for d in delivery.list_deliveries(deliveries_dir, receipts_dir):
         if d.name == name:
             delivery_log.record(d, arrivals.recognise(d))

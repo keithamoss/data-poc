@@ -13,8 +13,9 @@ from datetime import date
 
 import pytest
 
+import filing_support
 from qa_tools.common import decision_log as dl
-from qa_tools.common import (assignment, filing, promotion, promotion_state,
+from qa_tools.common import (assignment, promotion, promotion_state,
                               qa_store, rejection, schedule, supply_db)
 
 AGENCY = "child-protection-family-support"
@@ -45,7 +46,7 @@ def periods(monkeypatch):
 
 def _file(dataset_id, supply_id, slot):
     """One recorded filing, by the ordinary route."""
-    filing.record(assignment.Assignment(
+    filing_support.file(assignment.Assignment(
         dataset_id=dataset_id, supply_id=supply_id, slot=slot,
         branch=assignment.OPEN_UNFILLED, considered=(slot,) if slot else ()))
 

@@ -708,14 +708,20 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
     the dirty runs then read their period, and the reference run keeps
     reading its own.
     """
-    import json
 
     from qa_tools.common import arrivals, decision_log, filing, period_overlay, promotion
     from qa_tools.common import asset_time, qa_store, supply_db
     from qa_tools.cp.build_cp_warehouses import TABLES
 
+    from qa_tools.common import delivery as delivery_mod
+    from qa_tools.common import delivery_log
+
     found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries_dir, receipts_dir)
     first = min(a.received_at for a in found)
+    # A FILING LINKS TO ITS DELIVERY RECORD (REQ-PIPE-144 criterion 10),
+    # so the deliveries are recorded first, as the batch does.
+    for d in delivery_mod.list_deliveries(deliveries_dir, receipts_dir):
+        delivery_log.record(d, arrivals.recognise(d))
 
     def file_to(arrival, period: str) -> None:
         (dataset_id,) = tuple(arrival.files_by_dataset)
@@ -723,11 +729,10 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
         with supply_db.connect(label="pytest:file-fixture") as conn:
             qa_store.ensure_schema(conn)
             conn.execute(
-                f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, record) "
+                f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, delivery) "
                 "VALUES (?, ?, ?, 'pytest-fixture', ?) ON CONFLICT (dataset_id, supply_id) "
-                "DO UPDATE SET slot = EXCLUDED.slot, record = EXCLUDED.record",
-                [dataset_id, supply_id, period,
-                 json.dumps({"supply_id": supply_id, "slot": period})])
+                "DO UPDATE SET slot = EXCLUDED.slot, delivery = EXCLUDED.delivery",
+                [dataset_id, supply_id, period, arrival.delivery_name])
 
     for arrival in [a for a in found if a.received_at == first]:
         file_to(arrival, "2026-Q1")

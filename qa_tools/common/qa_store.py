@@ -139,7 +139,22 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
+
+#: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
+#: (a column removed, a column replaced by a foreign key). `CREATE TABLE
+#: IF NOT EXISTS` leaves an existing table exactly as it was, so the DDL
+#: below cannot bring an older database forward without half-applying
+#: itself; a database recorded below this is refused and rebuilt from
+#: empty instead (criterion 29 - regenerate, never migrate). Versions at
+#: or above it are still brought forward additively.
+RESHAPED_AT = 18
+
+
+class SchemaVersionError(RuntimeError):
+    """The qa schema in this database is from a version this checkout
+    cannot safely apply its own definitions over (REQ-PIPE-144 criterion
+    29, REQ-PIPE-107 criterion 13)."""
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -349,33 +364,16 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery (
     -- storage said something it never did.
     received_from    text NOT NULL DEFAULT 'our-clock',
     collections jsonb NOT NULL DEFAULT '[]',
-    -- Derivable from the files below - two carrying one dataset_id -
-    -- and stated anyway, for the reason REQ-PIPE-059 criterion 4 gave:
-    -- the question a person opens this with is "what was contested and
-    -- what could it not choose between", and making them compute it is
-    -- how a queue stops being drained. CONTESTED since 2026-10-02 (it
-    -- was `held`, REQ-PIPE-059's retired word - REQ-PIPE-105 criterion 6).
-    contested   jsonb NOT NULL DEFAULT '[]',
+    -- NO `contested` COLUMN (REQ-PIPE-144 criterion 25). Which datasets
+    -- matched more than one file is derived from delivery_file by the
+    -- delivery_contested view below - a second copy is a copy that can
+    -- disagree.
     -- Recorded, never read. A receipt lookalike or a supplier's own
     -- manifest is excluded from the files on purpose, so this is the
     -- only place their presence survives.
     anomalies   jsonb NOT NULL DEFAULT '[]',
     recorded_at timestamptz NOT NULL DEFAULT now()
 );
-
--- Self-healing for a database created before the column existed.
-ALTER TABLE "{SCHEMA}".delivery
-    ADD COLUMN IF NOT EXISTS received_from text NOT NULL DEFAULT 'our-clock';
--- THE `held` -> `contested` RENAME (2026-10-02), applied to a database
--- created before it. Idempotent: a fresh database already has the new
--- name and skips this.
-DO $$ BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns
-               WHERE table_schema = '{SCHEMA}' AND table_name = 'delivery'
-                 AND column_name = 'held') THEN
-        ALTER TABLE "{SCHEMA}".delivery RENAME COLUMN held TO contested;
-    END IF;
-END $$;
 
 CREATE INDEX IF NOT EXISTS delivery_receipt_order
     ON "{SCHEMA}".delivery (received_instant);
@@ -389,6 +387,18 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery_file (
     -- somebody can act on and one that just says "no".
     dataset_id   text,
     contested_by jsonb,
+    -- THIS FILE'S OWN RECEIPT (REQ-PIPE-144 criterion 9) - one receipt
+    -- per file since 2026-10-02 (REQ-GEN-044 criterion 12). The same
+    -- text-plus-instant pair qa.delivery keeps, for the same reason: the
+    -- text preserves the writer's offset (REQ-PIPE-069 criterion 5), the
+    -- instant is what ordering uses. `receipt_sequence` is the
+    -- receipt-order tiebreak (REQ-PIPE-061), without which two files
+    -- received at one instant could not be put in the order arrivals
+    -- were.
+    received_at      text NOT NULL,
+    received_instant timestamptz NOT NULL,
+    received_from    text NOT NULL,
+    receipt_sequence integer NOT NULL,
     PRIMARY KEY (delivery, filename)
 );
 
@@ -427,33 +437,26 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".filing (
     -- knows about.
     slot        text,
     branch      text NOT NULL,
-    -- THE WHOLE Assignment RECORD, as a document. Normalising it would
-    -- buy a migration for every field REQ-PIPE-064/065 add to an
-    -- explanation and no query anybody runs - the same call
-    -- `dataset_stats` made, and for the same reason. The three columns
-    -- above are lifted out because they ARE queried: which slot, and why.
-    record      jsonb NOT NULL,
+    -- THE SLOTS THE RULE CONSIDERED, in the order it considered them
+    -- (REQ-PIPE-144 criterion 3; REQ-PIPE-062 criterion 9). Its own
+    -- column rather than a key in a document, so it reads back without
+    -- unpacking anything. There is NO `record` document any more
+    -- (criterion 1): every field it held is a column here, equal to one
+    -- (resupply_of is the slot), kept in qa.hold.reason (why a held
+    -- supply's slots were unavailable), or retired (the ambiguity mark).
+    considered  text[] NOT NULL DEFAULT '{{}}',
+    -- THE DELIVERY IT CAME FROM (criterion 10), and the database refuses
+    -- to delete a delivery a filing names: delivery records are history
+    -- (criterion 19). The supply's RECEIPT is read through this link from
+    -- the supply_receipt view below - there is no received_at column
+    -- here, because the file's own receipt on qa.delivery_file is the one
+    -- copy.
+    delivery    text NOT NULL REFERENCES "{SCHEMA}".delivery (name),
     recorded_at timestamptz NOT NULL DEFAULT now(),
-    -- OUR RECEIPT INSTANT, AND THE VERDICT IT EARNS AGAINST THIS SLOT
-    -- (REQ-PIPE-080 criteria 1, 4 and 8). Two columns rather than a
-    -- field in `record`, on the same test the three above already
-    -- pass: these ARE queried - "how many supplies were late", "how
-    -- long did this one wait" - and a consumer should not unpack a
-    -- document per row to ask.
-    --
-    -- THEY SIT TOGETHER ON PURPOSE. The instant is a FACT and never
-    -- moves; the slot is a DECISION and can, so the verdict derived
-    -- from the two of them has to move with it. Keeping the verdict
-    -- in the filing row is what makes it recorded AND current: a
-    -- re-file rewrites this row, so it rewrites the verdict, and
-    -- REQ-PIPE-067 is satisfied by the shape rather than by every
-    -- caller remembering to recompute.
-    --
-    -- BOTH NULLABLE. A caller with no arrival instant - a hand-filed
-    -- supply, a test - records no verdict rather than inventing one
-    -- from the clock, which would make punctuality a property of when
-    -- somebody ran the tool.
-    received_at    timestamptz,
+    -- THE VERDICT THE RECEIPT EARNS AGAINST THIS SLOT (REQ-PIPE-080
+    -- criteria 1 and 8). Kept with the slot because the slot is a
+    -- DECISION and can move, so the verdict derived from it has to move
+    -- with it. NULL where there was nothing to judge with.
     classification text,
     PRIMARY KEY (dataset_id, supply_id)
 );
@@ -469,11 +472,34 @@ CREATE INDEX IF NOT EXISTS filing_dataset
 CREATE INDEX IF NOT EXISTS filing_slot
     ON "{SCHEMA}".filing (dataset_id, slot) WHERE slot IS NOT NULL;
 
--- Same ADD COLUMN rule as load_outcome above: CREATE TABLE IF NOT
--- EXISTS does nothing to a table that already exists, so a column
--- added to the definition never reaches an older database.
-ALTER TABLE "{SCHEMA}".filing ADD COLUMN IF NOT EXISTS received_at timestamptz;
-ALTER TABLE "{SCHEMA}".filing ADD COLUMN IF NOT EXISTS classification text;
+-- A SUPPLY'S RECEIPT, DEFINED ONCE (REQ-PIPE-144 criteria 12 and 16).
+-- The receipt of the supply's file in its linked delivery. Since
+-- REQ-PIPE-105 a supply is one file with one receipt and this simply
+-- returns it; only a CONTESTED pair (two files for one dataset in one
+-- delivery) has two, and the view takes the earlier by instant then
+-- receipt sequence - the same choice the arrival made (REQ-GEN-044
+-- criterion 12), so the receipt and the supply id can never disagree.
+-- Every "when was this supply received" reads this, and nothing else
+-- re-derives the earlier-file rule.
+CREATE OR REPLACE VIEW "{SCHEMA}".supply_receipt AS
+SELECT DISTINCT ON (f.dataset_id, f.supply_id)
+       f.dataset_id, f.supply_id, f.delivery, df.filename,
+       df.received_at, df.received_instant, df.received_from, df.receipt_sequence
+FROM "{SCHEMA}".filing f
+JOIN "{SCHEMA}".delivery_file df
+  ON df.delivery = f.delivery AND df.dataset_id = f.dataset_id
+ORDER BY f.dataset_id, f.supply_id, df.received_instant, df.receipt_sequence, df.filename;
+
+-- WHICH DATASETS MATCHED MORE THAN ONE FILE OF A DELIVERY (REQ-PIPE-144
+-- criterion 26), derived from delivery_file rather than stored beside it
+-- (criterion 25). Ordered as delivery_log.records() has always returned
+-- it: by dataset, each dataset's files sorted by name.
+CREATE OR REPLACE VIEW "{SCHEMA}".delivery_contested AS
+SELECT delivery, dataset_id, array_agg(filename ORDER BY filename) AS files
+FROM "{SCHEMA}".delivery_file
+WHERE dataset_id IS NOT NULL
+GROUP BY delivery, dataset_id
+HAVING count(*) > 1;
 
 -- WHO DECIDED WHAT (REQ-PIPE-091, carrying REQ-PIPE-074's content
 -- across). THE SINGLE SYSTEM OF RECORD for every filing decision -
@@ -922,6 +948,12 @@ def ensure_schema(conn: supply_db.SupplyConnection) -> None:
         # the whole DDL again in turn - which is the thing being avoided.
         if _is_current(conn):
             return
+        # REFUSED BEFORE ANY DDL RUNS - both directions, from one place
+        # (REQ-PIPE-144 criterion 40). Applying this checkout's DDL over a
+        # NEWER schema and then recording our own version was a silent
+        # downgrade (post-build-review #79); applying it over one older
+        # than RESHAPED_AT would half-apply it.
+        _refuse_another_version(_recorded_version(conn))
         conn.raw.execute(DDL)
         conn.execute(
             f'INSERT INTO "{SCHEMA}".schema_version (version) VALUES (?) '
@@ -929,6 +961,34 @@ def ensure_schema(conn: supply_db.SupplyConnection) -> None:
             [SCHEMA_VERSION])
     finally:
         conn.execute("SELECT pg_advisory_unlock(?)", [_DDL_LOCK])
+
+
+def _recorded_version(conn: supply_db.SupplyConnection) -> int | None:
+    """The version this database's qa schema records, or None where it
+    has none yet (an empty database)."""
+    if not conn.execute(
+            f"SELECT to_regclass('{SCHEMA}.schema_version')").fetchall()[0][0]:
+        return None
+    rows = conn.execute(f'SELECT version FROM "{SCHEMA}".schema_version').fetchall()
+    return rows[0][0] if rows else None
+
+
+def _refuse_another_version(recorded: int | None) -> None:
+    """Raise where this checkout must not apply its DDL over `recorded`."""
+    if recorded is None or recorded == SCHEMA_VERSION:
+        return
+    if recorded > SCHEMA_VERSION:
+        raise SchemaVersionError(
+            f"this database's qa schema is version {recorded}, NEWER than this "
+            f"checkout's {SCHEMA_VERSION}. Refusing rather than applying older "
+            f"definitions over it and rewriting the version down - update this "
+            f"checkout, or point it at a database of its own version.")
+    if recorded < RESHAPED_AT:
+        raise SchemaVersionError(
+            f"this database's qa schema is version {recorded}, from before the "
+            f"version-{RESHAPED_AT} reshape of qa.filing and qa.delivery, which "
+            f"cannot be applied in place. Rebuild it from an empty database: "
+            f"`mothman env reset-synthetic`, then `mothman pipeline bootstrap`.")
 
 
 def _is_current(conn: supply_db.SupplyConnection) -> bool:
@@ -1246,35 +1306,6 @@ def runs_for(conn: supply_db.SupplyConnection, agency_id: str,
     return _dicts(conn.execute(
         f'SELECT * FROM "{SCHEMA}".run_visible WHERE agency_id = ? AND collection_id = ? '
         "ORDER BY run_instant, run_key", [agency_id, collection_id]))
-
-
-def delete_history(conn: supply_db.SupplyConnection, agency_id: str,
-                   collection_id: str) -> int:
-    """Delete one collection's whole recorded QA history. Returns the
-    number of runs removed.
-
-    THE ONLY DESTRUCTIVE READER-FACING OPERATION IN THIS MODULE, and it
-    exists for one caller: `mothman pipeline regenerate-history`
-    (REQ-PIPE-038 criteria 4-7), whose whole job is to throw a
-    collection's history away and write it again from the real tools.
-    Keith's own call, 2026-09-21: the data is synthetic, so re-running is
-    honest where reshaping in place would not be.
-
-    ONE DELETE, NOT SEVEN. Everything hangs off `run` by a foreign key
-    with ON DELETE CASCADE, so removing the runs removes their results,
-    tool output, tables_read and dataset_stats with them - which is the
-    point of having modelled it that way. A per-table sweep would be
-    seven statements that can disagree about what a collection is.
-
-    IT DELETES INCOMPLETE RUNS TOO, deliberately: this reads `run`
-    rather than `run_visible`. A crashed run's wreckage is exactly what
-    somebody regenerating wants gone, and leaving it would make the
-    regenerated history carry a run nothing can read.
-    """
-    deleted = conn.execute(
-        f'DELETE FROM "{SCHEMA}".run WHERE agency_id = ? AND collection_id = ?',
-        [agency_id, collection_id]).rowcount
-    return deleted or 0
 
 
 def incomplete_runs(conn: supply_db.SupplyConnection) -> list[str]:

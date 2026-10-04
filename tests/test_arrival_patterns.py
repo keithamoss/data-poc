@@ -178,14 +178,15 @@ def _corpus(conn, *filenames, delivery_name="d1"):
 
     conn.execute(
         f'INSERT INTO "{qa_store.SCHEMA}".delivery '
-        "(name, received_at, received_instant, collections, contested, anomalies) "
-        "VALUES (?, ?, ?, '[]', '[]', '[]')",
+        "(name, received_at, received_instant, collections, anomalies) "
+        "VALUES (?, ?, ?, '[]', '[]')",
         [delivery_name, "2026-09-01T09:00:00+08:00", "2026-09-01T09:00:00+08:00"])
     for name in filenames:
         conn.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".delivery_file '
-            "(delivery, filename, dataset_id, contested_by) VALUES (?, ?, NULL, NULL)",
-            [delivery_name, name])
+            "(delivery, filename, dataset_id, contested_by, received_at, received_instant, "
+            "received_from, receipt_sequence) VALUES (?, ?, NULL, NULL, ?, ?, 'our-clock', 0)",
+            [delivery_name, name, "2026-09-01T09:00:00+08:00", "2026-09-01T09:00:00+08:00"])
     return conn
 
 

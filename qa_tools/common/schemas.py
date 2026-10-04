@@ -561,3 +561,8 @@ class DataAsset(_Strict):
     #: ticketing should not have to declare that it has not - and the
     #: default is the one that keeps the queue worth reading.
     ticket_policy: Literal["all", "needs-action"] = "needs-action"
+    #: Whether this asset's history is SYNTHETIC - generated, and so safe
+    #: to delete and regenerate (REQ-PIPE-144 criterion 43, REQ-GEN-135
+    #: criterion 8). Defaults to False: an asset that never said it was
+    #: synthetic is treated as real, which is the direction that refuses.
+    synthetic: bool = False

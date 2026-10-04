@@ -1066,8 +1066,12 @@ Rough layout:
     now holds only what nobody has decided on, which is the point of it.
     Worth starting early
     rather than discovering it is needed. It is a no-op when the database already
-    holds staged tables; `--force` rebuilds anyway, and the pipeline is
-    seeded so the content is the same either way. IT USED TO LEAVE ~900
+    holds staged tables. `--force` runs anyway BUT NEVER OVER RECORDED QA
+    HISTORY - since REQ-PIPE-144 it refuses there, because filings are
+    write-once and the decision log append-only, so a re-run would stack
+    on top of the old history. Starting from empty is `mothman env
+    reset-synthetic` (typed confirmation, refused unless the asset is
+    declared synthetic) then `mothman pipeline bootstrap`. IT USED TO LEAVE ~900
     CHANGED FILES BEHIND, rewriting `qa_results/` with fresh timestamps,
     and the instruction here was to discard that churn with `git checkout
     -- qa_results/`. There is no tree and there is no churn since

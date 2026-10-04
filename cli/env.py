@@ -57,3 +57,42 @@ def current_command() -> None:
     console.print(f"{env.id} - {env.label}", style="green")
     if env.publishes:
         console.print("This is the publishing environment.", style="bold yellow")
+
+
+@env_group.command("reset-synthetic")
+def reset_synthetic_command() -> None:
+    """Delete this SYNTHETIC asset's whole QA history, to start from empty.
+
+    Deliveries, delivery files, filings, holds, decisions, runs and results,
+    and every schema holding supply rows - rebuild-from-empty made explicit
+    (REQ-PIPE-144). Refused unless contract/data-asset.yaml declares the asset
+    synthetic, and only after you type a phrase naming what goes. Follow it
+    with `mothman pipeline bootstrap`.
+    """
+    from qa_tools.common import supply_db, synthetic_reset
+
+    if synthetic_reset.in_production():
+        raise click.ClickException("this checkout is acting as `production` - nothing "
+                                   "was deleted.")
+    if not synthetic_reset.is_synthetic():
+        raise click.ClickException(
+            f"{synthetic_reset.asset_id()} is not declared synthetic in "
+            f"contract/data-asset.yaml - its history is treated as real, and "
+            f"nothing was deleted.")
+    with supply_db.connect(label="mothman:reset-synthetic") as conn:
+        counts = synthetic_reset.what_it_deletes(conn)
+        schemas = synthetic_reset.schemas_to_drop(conn)
+    console.print(f"This deletes ALL recorded QA history for "
+                  f"{synthetic_reset.asset_id()}:", style="bold yellow")
+    for table, n in counts.items():
+        console.print(f"  {table}: {n} row(s)")
+    console.print(f"  and {len(schemas)} schema(s): {', '.join(schemas) or 'none'}")
+    phrase = synthetic_reset.confirmation_phrase()
+    typed = click.prompt(f'Type "{phrase}" to delete it', default="", show_default=False)
+    with supply_db.connect(label="mothman:reset-synthetic") as conn:
+        try:
+            dropped = synthetic_reset.reset(conn, typed)
+        except (synthetic_reset.NotSynthetic, ValueError) as exc:
+            raise click.ClickException(str(exc)) from None
+    console.print(f"Deleted {len(dropped)} schema(s). Run `mothman pipeline bootstrap` "
+                  f"to regenerate.", style="green")

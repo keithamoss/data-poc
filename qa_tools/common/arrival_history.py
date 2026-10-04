@@ -86,9 +86,22 @@ def _stem(record: dict) -> str:
     return "".join(ch for ch in record.get("received_at", "") if ch.isdigit())[:20] or "0"
 
 
-def _arrivals_in(record: dict, dataset_id: str | None) -> list[Arrival]:
+def _arrivals_in(record: dict, dataset_id: str | None,
+                 filed: dict[tuple[str, str], str] | None = None) -> list[Arrival]:
+    """This record's arrivals, each labelled with ITS OWN FILE's receipt
+    and the supply id ITS FILING carries (REQ-PIPE-144 criterion 37,
+    fixing post-build-review #76).
+
+    It used to label every arrival with the DELIVERY's receipt and build
+    a supply id from that - so for the ~20% of multi-file deliveries
+    whose files land up to ten minutes apart, `mothman supply history`
+    showed the wrong time and a supply id matching no filing. The id now
+    comes from the filing (through qa.supply_receipt); only an arrival
+    nothing filed falls back to deriving one, from its own file's receipt.
+    """
     out: list[Arrival] = []
     counts: dict[str, int] = {}
+    filed = filed or {}
     for entry in record.get("files") or []:
         found = entry.get("dataset_id")
         # A file two datasets both claim is attributed to NEITHER, so it
@@ -97,25 +110,16 @@ def _arrivals_in(record: dict, dataset_id: str | None) -> list[Arrival]:
         if not found or (dataset_id is not None and found != dataset_id):
             continue
         counts[found] = counts.get(found, 0) + 1
+        own = {"received_at": entry.get("received_at") or record.get("received_at", "")}
         out.append(Arrival(
             dataset_id=found,
-            supply_id=_supply_id(found, record, counts[found]),
-            received_at=record.get("received_at", ""),
-            sequence=_sequence_of(record),
+            supply_id=(filed.get((record.get("delivery", ""), found))
+                       or _supply_id(found, own, counts[found])),
+            received_at=own["received_at"],
+            sequence=int(entry.get("receipt_sequence") or 0),
             delivery=record.get("delivery", ""),
             filename=entry.get("filename", "")))
     return out
-
-
-def _sequence_of(record: dict) -> int:
-    """The receipt's write order, recovered from the record's own path.
-
-    The delivery log does not carry the sequence in its BODY - it was
-    written before REQ-PIPE-061 existed and those files are write-once
-    - so it is read from the filename, which does carry it and is
-    generated from the same receipt.
-    """
-    return int(record.get("_sequence", 0))
 
 
 def _load(conn=None) -> Iterator[dict]:
@@ -150,8 +154,10 @@ def arrivals_of(dataset_id: str, conn=None) -> list[Arrival]:
     here.
     """
     found: list[Arrival] = []
-    for record in delivery_log.records_carrying(dataset_id, conn=conn):
-        found.extend(_arrivals_in(record, dataset_id))
+    records = delivery_log.records_carrying(dataset_id, conn=conn)
+    filed = delivery_log.supply_ids([r["delivery"] for r in records], conn=conn)
+    for record in records:
+        found.extend(_arrivals_in(record, dataset_id, filed))
     return sorted(found, key=lambda a: a.sort_key)
 
 
@@ -167,7 +173,8 @@ def last_arrived(dataset_id: str, conn=None) -> Arrival | None:
     being worth anything once the records were rows.
     """
     for record in delivery_log.records_carrying(dataset_id, limit=1, conn=conn):
-        found = _arrivals_in(record, dataset_id)
+        found = _arrivals_in(record, dataset_id,
+                             delivery_log.supply_ids([record["delivery"]], conn=conn))
         if found:
             return max(found, key=lambda a: a.sort_key)
     return None

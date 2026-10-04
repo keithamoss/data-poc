@@ -32,8 +32,17 @@ def test_no_delivery_level_kind_remains():
     assert not hasattr(supply_holds, "DELIVERY_LEVEL")
 
 
+def _recorded(arrival):
+    """The delivery record a filing links to (REQ-PIPE-144 criterion 10)."""
+    import filing_support
+    for i, name in enumerate(arrival.files_by_dataset["cp-clients"]):
+        filing_support.ensure_delivery(arrival.delivery_name, "cp-clients",
+                                       arrival.received_at, filename=name)
+    return arrival
+
+
 def test_two_files_raise_no_hold_and_are_filed(private_supply_dsn):
-    arrival = _two_files_one_arrival()
+    arrival = _recorded(_two_files_one_arrival())
     filing.file_arrivals([arrival])
     with supply_db.connect(label="test-hold-retired") as conn:
         assert not supply_holds.outstanding(conn, dataset_id="cp-clients")
@@ -42,7 +51,7 @@ def test_two_files_raise_no_hold_and_are_filed(private_supply_dsn):
 
 
 def test_the_promotion_gate_sees_it_as_contested(private_supply_dsn):
-    arrival = _two_files_one_arrival()
+    arrival = _recorded(_two_files_one_arrival())
     filing.file_arrivals([arrival])
     with supply_db.connect(label="test-hold-retired") as conn:
         supply_db.ensure_schemas(conn)
@@ -54,20 +63,19 @@ def test_the_promotion_gate_sees_it_as_contested(private_supply_dsn):
     assert "held" not in supply
 
 
-def test_an_existing_delivery_log_column_is_renamed_to_contested(private_supply_dsn):
-    """The delivery log's `held` field is `contested` since 2026-10-02
-    (Keith's call), and a database created before that is migrated in
-    place rather than left reading a column that no longer exists."""
-    from qa_tools.common import qa_store
+def test_the_contested_list_is_derived_not_stored(private_supply_dsn):
+    """REQ-PIPE-144 criteria 25-27: qa.delivery has no `contested` column
+    (the in-place `held` -> `contested` rename this replaced went with it -
+    an older schema is rebuilt, not migrated), and the delivery log still
+    returns the list, from the delivery_contested view."""
+    from qa_tools.common import delivery_log, qa_store
 
-    with supply_db.connect(label="test-rename") as conn:
-        qa_store.ensure_schema(conn)
-        conn.execute(f'ALTER TABLE "{qa_store.SCHEMA}".delivery RENAME COLUMN contested TO held')
-        # AN OLDER DATABASE, as far as the version check can tell.
-        conn.execute(f'UPDATE "{qa_store.SCHEMA}".schema_version SET version = ?',
-                     [qa_store.SCHEMA_VERSION - 1])
-        qa_store.ensure_schema(conn)
+    arrival = _recorded(_two_files_one_arrival())
+    with supply_db.connect(label="test-contested-view") as conn:
         cols = {r[0] for r in conn.execute(
             "SELECT column_name FROM information_schema.columns "
             "WHERE table_schema = ? AND table_name = 'delivery'", [qa_store.SCHEMA]).fetchall()}
-    assert "contested" in cols and "held" not in cols
+        (record,) = [r for r in delivery_log.records(conn) if r["delivery"] == arrival.delivery_name]
+    assert "contested" not in cols
+    assert record["contested"] == [
+        {"dataset_id": "cp-clients", "files": ["cp_clients (2).csv", "cp_clients.csv"]}]

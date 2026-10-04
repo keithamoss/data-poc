@@ -134,17 +134,21 @@ def record(delivery, recognition,
              # A file two datasets both claim is attributed to NEITHER,
              # and saying which two is the difference between a record
              # somebody can act on and one that just says "no".
-             "contested_by": contested.get(name)}
+             "contested_by": contested.get(name),
+             # THIS FILE'S OWN RECEIPT (REQ-PIPE-144 criterion 9) - the
+             # one copy every "when was this supply received" reads,
+             # through qa.supply_receipt. Offset preserved in the text,
+             # as for the delivery's.
+             "received_at": delivery.received_at_of(name).isoformat(),
+             "received_instant": delivery.received_at_of(name),
+             "received_from": _file_source(delivery, name),
+             "receipt_sequence": delivery.sequence_of(name)}
             for name in sorted(delivery.files)
         ],
-        # HELD SUPPLIES (REQ-PIPE-059 criterion 4). Derivable from
-        # `files` - two entries carrying one dataset_id - and stated
-        # anyway, because the question a person opens this with is
-        # "what was held and what could it not choose between", and
-        # making them compute it from a file list is how a queue stops
-        # being drained.
-        "contested": [{"dataset_id": h.dataset_id, "files": list(h.files)}
-                 for h in holds.holds_in(recognition)],
+        # WHAT WAS CONTESTED (REQ-PIPE-059 criterion 4) is NOT written:
+        # it is derived from the files above by the qa.delivery_contested
+        # view (REQ-PIPE-144 criteria 25-27), and records() still returns
+        # it in the shape it always had.
         # Recorded, never read. A receipt lookalike or a supplier's own
         # manifest is excluded from `files` on purpose, so this is the
         # only place their presence survives.
@@ -154,60 +158,38 @@ def record(delivery, recognition,
     with _db(conn) as db:
         written = db.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".delivery '
-            "(name, received_at, received_instant, received_from, collections, contested, "
+            "(name, received_at, received_instant, received_from, collections, "
             "anomalies) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
+            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
             [payload["delivery"], payload["received_at"], delivery.received_at,
              payload["received_from"],
-             json.dumps(payload["collections"]), json.dumps(payload["contested"]),
+             json.dumps(payload["collections"]),
              json.dumps(payload["anomalies"])]).fetchall()
         if not written:
             return None
         for entry in payload["files"]:
             db.execute(
                 f'INSERT INTO "{qa_store.SCHEMA}".delivery_file '
-                "(delivery, filename, dataset_id, contested_by) VALUES (?, ?, ?, ?)",
+                "(delivery, filename, dataset_id, contested_by, received_at, "
+                "received_instant, received_from, receipt_sequence) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [payload["delivery"], entry["filename"], entry["dataset_id"],
-                 json.dumps(entry["contested_by"]) if entry["contested_by"] else None])
+                 json.dumps(entry["contested_by"]) if entry["contested_by"] else None,
+                 entry["received_at"], entry["received_instant"], entry["received_from"],
+                 entry["receipt_sequence"]])
+    payload["contested"] = [{"dataset_id": h.dataset_id, "files": list(h.files)}
+                            for h in holds.holds_in(recognition)]
+    for entry in payload["files"]:
+        entry.pop("received_instant")
     return payload
 
 
-def prune(present: set[str] | frozenset[str],
-          conn: supply_db.SupplyConnection | None = None) -> list[str]:
-    """Remove records for deliveries that no longer exist.
-
-    Criterion 6 asks that the log never describe a history that no
-    longer exists, and says so as "regenerate from scratch, under the
-    same delete-and-regenerate rule". THIS PRUNES INSTEAD OF WIPING,
-    and the narrowing is deliberate rather than a shortcut.
-
-    A wipe is destructive between the delete and the rewrite, and that
-    is not theoretical: the first version cleared the whole log at the
-    top of `mothman pipeline run`, and the test suite - which invokes
-    that command with the real work stubbed out - deleted sixty
-    records on the next gate run. Nothing rewrote them, because the
-    thing that would have was the part being stubbed.
-
-    Pruning reaches the same end state for every case that can actually
-    arise. Records are write-once by criterion 1, so a record for a
-    delivery still present is BY DEFINITION what a regeneration would
-    write again; the only records a wipe removes and a rebuild does not
-    restore are exactly the ones for deliveries that are gone, which is
-    what this removes.
-
-    THE UNREADABLE CASE IS GONE WITH THE FILES. The version this
-    replaces also removed records it could not parse, because a corrupt
-    JSON file is both unusable and unattributable to a delivery. A row
-    is either committed or it is not.
-
-    Returns the names removed, because a silent delete of durable
-    records is the wrong shape even when it is correct.
-    """
-    with _db(conn) as db:
-        gone = [row[0] for row in db.execute(
-            f'DELETE FROM "{qa_store.SCHEMA}".delivery WHERE NOT (name = ANY(?)) '
-            "RETURNING name", [list(present)]).fetchall()]
-    return sorted(gone)
+def _file_source(delivery, name: str) -> str:
+    """Which clock stamped this one file's receipt (REQ-PIPE-105
+    criterion 4), falling back to the delivery's for a receipt written
+    before per-file receipts existed."""
+    receipt = delivery.file_receipts.get(name)
+    return receipt[2] if receipt else delivery.received_from
 
 
 def records(conn: supply_db.SupplyConnection | None = None) -> list[dict]:
@@ -224,23 +206,40 @@ def records(conn: supply_db.SupplyConnection | None = None) -> list[dict]:
     """
     with _db(conn) as db:
         deliveries = db.execute(
-            f'SELECT name, received_at, collections, contested, anomalies, received_from '
+            f'SELECT name, received_at, collections, anomalies, received_from '
             f'FROM "{qa_store.SCHEMA}".delivery ORDER BY received_instant, name'
         ).fetchall()
+        contested_lists = _contested(db, None)
         files: dict[str, list[dict]] = {}
-        for delivery, filename, dataset_id, contested in db.execute(
-                f'SELECT delivery, filename, dataset_id, contested_by '
+        for delivery, filename, dataset_id, contested, received_at, sequence, source in db.execute(
+                f'SELECT delivery, filename, dataset_id, contested_by, received_at, '
+                f'receipt_sequence, received_from '
                 f'FROM "{qa_store.SCHEMA}".delivery_file ORDER BY delivery, filename'
         ).fetchall():
             files.setdefault(delivery, []).append(
                 {"filename": filename, "dataset_id": dataset_id,
-                 "contested_by": contested})
+                 "contested_by": contested, "received_at": received_at,
+                 "receipt_sequence": sequence, "received_from": source})
     return [{"delivery": name, "received_at": received_at,
              "received_from": received_from,
              "collections": collections, "files": files.get(name, []),
-             "contested": contested, "anomalies": anomalies}
-            for name, received_at, collections, contested, anomalies, received_from
+             "contested": contested_lists.get(name, []), "anomalies": anomalies}
+            for name, received_at, collections, anomalies, received_from
             in deliveries]
+
+
+def _contested(db, names: list[str] | None) -> dict[str, list[dict]]:
+    """delivery -> its contested list, from qa.delivery_contested
+    (REQ-PIPE-144 criterion 27): in dataset order, each dataset's files
+    sorted, exactly the shape the stored column held."""
+    sql_text = (f'SELECT delivery, dataset_id, files FROM "{qa_store.SCHEMA}".delivery_contested'
+                + (" WHERE delivery = ANY(?)" if names is not None else "")
+                + " ORDER BY delivery, dataset_id")
+    out: dict[str, list[dict]] = {}
+    for delivery, dataset_id, files in db.execute(
+            sql_text, [names] if names is not None else []).fetchall():
+        out.setdefault(delivery, []).append({"dataset_id": dataset_id, "files": list(files)})
+    return out
 
 
 def records_carrying(dataset_id: str, limit: int | None = None,
@@ -260,7 +259,7 @@ def records_carrying(dataset_id: str, limit: int | None = None,
     "deliveries since this dataset last supplied", and this one does
     not depend on how long ago that was.
     """
-    sql_text = (f'SELECT d.name, d.received_at, d.collections, d.contested, d.anomalies, '
+    sql_text = (f'SELECT d.name, d.received_at, d.collections, d.anomalies, '
                 f'd.received_from '
                 f'FROM "{qa_store.SCHEMA}".delivery d '
                 f'WHERE EXISTS (SELECT 1 FROM "{qa_store.SCHEMA}".delivery_file f '
@@ -276,16 +275,34 @@ def records_carrying(dataset_id: str, limit: int | None = None,
             return []
         names = [row[0] for row in found]
         files: dict[str, list[dict]] = {}
-        for delivery, filename, ds_id, contested in db.execute(
-                f'SELECT delivery, filename, dataset_id, contested_by '
+        for delivery, filename, ds_id, contested, received_at, sequence, source in db.execute(
+                f'SELECT delivery, filename, dataset_id, contested_by, received_at, '
+                f'receipt_sequence, received_from '
                 f'FROM "{qa_store.SCHEMA}".delivery_file WHERE delivery = ANY(?) '
                 "ORDER BY delivery, filename", [names]).fetchall():
             files.setdefault(delivery, []).append(
-                {"filename": filename, "dataset_id": ds_id, "contested_by": contested})
+                {"filename": filename, "dataset_id": ds_id, "contested_by": contested,
+                 "received_at": received_at, "receipt_sequence": sequence,
+                 "received_from": source})
+        contested_by_delivery = _contested(db, names)
     return [{"delivery": name, "received_at": received_at, "collections": collections,
              "received_from": received_from,
-             "files": files.get(name, []), "contested": contested, "anomalies": anomalies}
-            for name, received_at, collections, contested, anomalies, received_from in found]
+             "files": files.get(name, []), "contested": contested_by_delivery.get(name, []),
+             "anomalies": anomalies}
+            for name, received_at, collections, anomalies, received_from in found]
+
+
+def supply_ids(deliveries: list[str],
+               conn: supply_db.SupplyConnection | None = None) -> dict[tuple[str, str], str]:
+    """(delivery, dataset_id) -> the supply id its FILING carries, from
+    the one receipt view (REQ-PIPE-144 criterion 37). Absent where
+    nothing was filed from that delivery for that dataset."""
+    if not deliveries:
+        return {}
+    with _db(conn) as db:
+        return {(d, ds): supply for d, ds, supply in db.execute(
+            f'SELECT delivery, dataset_id, supply_id FROM "{qa_store.SCHEMA}".supply_receipt '
+            "WHERE delivery = ANY(?)", [list(deliveries)]).fetchall()}
 
 
 def sql() -> str:

@@ -25,7 +25,11 @@ def _arrival(day: int):
 
 
 def test_a_later_arrival_in_the_same_call_files_to_its_own_open_day(private_supply_dsn):
+    import filing_support
+
     first, later = _arrival(1), _arrival(3)
+    for a in (first, later):
+        filing_support.ensure_delivery(a.delivery_name, "birth-registrations", a.received_at)
     written = filing.file_arrivals([first, later])
     by_supply = {a.supply_id: a for a in written}
     late = next(a for a in by_supply.values() if a.received_at == later.received_at)

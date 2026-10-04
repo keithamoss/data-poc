@@ -81,11 +81,10 @@ def _delivery(conn, name="monday", **overrides):
     record.update(overrides)
     conn.execute(
         f'INSERT INTO "{qa_store.SCHEMA}".delivery '
-        "(name, received_at, received_instant, collections, contested, anomalies) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
+        "(name, received_at, received_instant, collections, anomalies) "
+        "VALUES (?, ?, ?, ?, ?)",
         [record["delivery"], record["received_at"], record["received_at"],
-         json.dumps(record["collections"]), json.dumps(record["contested"]),
-         json.dumps(record["anomalies"])])
+         json.dumps(record["collections"]), json.dumps(record["anomalies"])])
     for entry in record["contested"]:
         supply_holds.raise_hold(
             conn, dataset_id=entry["dataset_id"],
@@ -100,9 +99,11 @@ def _delivery(conn, name="monday", **overrides):
     for entry in record["files"]:
         conn.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".delivery_file '
-            "(delivery, filename, dataset_id, contested_by) VALUES (?, ?, ?, ?)",
+            "(delivery, filename, dataset_id, contested_by, received_at, received_instant, "
+            "received_from, receipt_sequence) VALUES (?, ?, ?, ?, ?, ?, 'our-clock', 0)",
             [record["delivery"], entry["filename"], entry.get("dataset_id"),
-             json.dumps(entry["contested_by"]) if entry.get("contested_by") else None])
+             json.dumps(entry["contested_by"]) if entry.get("contested_by") else None,
+             record["received_at"], record["received_at"]])
     return record
 
 
