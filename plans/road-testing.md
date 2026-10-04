@@ -1290,3 +1290,11 @@ judgement about who reads the page rather than about the rule.
       Birth Registrations, 19 hours). One fork for Keith: next window must
       open after this period's due-plus-grace (drafted) or only after its
       due instant. 124/125 removed from draft_option_a.yaml.
+    - **REQ-QAC-017 RETIRED** (Keith): ACKNOWLEDGE (122) replaces its
+      per-run amber /accept; 017 is amended or retired in the same change.
+    - Confirmed for 129: moving and renaming are ALTER TABLE ... SET SCHEMA
+      / RENAME (supply_db.move_table already does the first) - catalogue
+      changes only, no data copied.
+    - Promoting INTO A SUBSTITUTED OR INHERITED SLOT: Keith - an INHERITED
+      slot must not be replaced, since inheritance means nothing was
+      expected; undecided on SUBSTITUTED - worked example requested.
