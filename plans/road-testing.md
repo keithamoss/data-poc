@@ -1083,3 +1083,11 @@ judgement about who reads the page rather than about the rule.
     - **How long overtaking stands out: FOREVER IN THE DECISION LOG; in
       the reporting layer (dashboard) until the next period's slot is
       filled.**
+    Keith accepted all seven of the scoper's working assumptions as
+    written (identical resend of a REJECTED file is checked again;
+    un-supersede waits for its re-check; settings at asset/collection/
+    dataset, not agency; CI refuses amber=hold with replacement=green-or-
+    amber; overtaking one level above WARNING; a substituted or inherited
+    next period counts as filled; a red promoted supply is dashboard-only)
+    and that a re-file into an occupied slot moves the occupant to
+    superseded. Next: sign-off walk-through.
