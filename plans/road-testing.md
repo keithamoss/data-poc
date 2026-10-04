@@ -1667,6 +1667,9 @@ judgement about who reads the page rather than about the rule.
       REQ-TEST-150 (10), REQ-PIPE-151 `mothman pipeline process` (19) and
       REQ-PIPE-152 the Lambda handlers (11), plus the re-pointing of
       REQ-PIPE-121 criterion 16, REQ-PIPE-140 criterion 8 and REQ-PIPE-120's
-      NFR at 151. Not yet placed in the build order. All the old unsigned
+      NFR at 151. PLACED the same evening (Keith): AFTER the batch -
+      post-build-review #81 (promotion actor) first, then 151, then 086,
+      150 and 152 - since 151 finishes the owed work 121, 140 and 120
+      create and logs every gate outcome under the rule's name. All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.
