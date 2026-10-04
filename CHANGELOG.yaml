@@ -160,6 +160,12 @@ releases:
               cannot read.
       - category: Improved
         items:
+          - headline: Overlapping delivery periods are caught before anything arrives
+            components: ["Pipeline & publishing"]
+            description: >
+              The configuration check now fails if any dataset's claim window
+              for one period would open before the previous period stops
+              being on time, so a file can never belong to two periods at once.
           - headline: Requirements can be retired, and filtered by status
             components: ["Docs & process", "Dashboard UI"]
             description: >

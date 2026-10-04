@@ -894,7 +894,33 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _expects_nothing_errors(raw, src)
     errors += _contract_errors(raw, src)
     errors += _retrospective_edit_errors(raw, src)
+    if src.asset_path == DATA_ASSET_YAML and not errors:
+        errors += _overlap_errors(src)
     return _attribute(errors, raw)
+
+
+def _overlap_errors(src: Source) -> list[ConfigError]:
+    """A dataset's periods never overlap (REQ-PIPE-134), every overlap
+    reported rather than the first (criterion 5).
+
+    ONLY FOR THE REAL CONFIGURATION, and only once everything above has
+    passed: it reads the schedule and contracts through the modules
+    filing uses (criterion 2), which load the committed files, so on a
+    configuration that is already broken it would report the breakage a
+    second time in a worse form.
+    """
+    from qa_tools.common import period_overlap
+
+    out = []
+    for o in period_overlap.overlaps():
+        out.append(ConfigError(
+            src.name, o.dataset_id,
+            f"{o.later}'s claim window opens at {o.later_claim_opens.isoformat()}, but "
+            f"{o.earlier} is still on time until {o.on_time_until.isoformat()} - they "
+            f"overlap by {o.by}, so a file arriving in between would belong to both.",
+            f"Shorten this dataset's claim window or grace, or move its expected time, "
+            f"until {o.later}'s window opens strictly after {o.earlier} stops being on time."))
+    return out
 
 
 def _attribute(errors: list[ConfigError], raw: dict) -> list[ConfigError]:

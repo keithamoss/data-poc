@@ -25400,36 +25400,46 @@ requirements:
     open_questions: []
 
   - id: REQ-PIPE-134
-    title: "A dataset's periods never overlap - enforced in CI from configuration"
-    date_written: "2026-10-04"
+    title: A dataset's periods never overlap - enforced in CI from configuration
+    date_written: '2026-10-04'
     signed_off:
       by: Keith
-      date: "2026-10-04"
-    story: "As someone editing a calendar or a contract, I want CI to refuse any schedule in which a period's on-time window runs into the next period's claim window, so that the closing rule can never close a period before it was even possible to be on time for it."
+      date: '2026-10-04'
+    story: As someone editing a calendar or a contract, I want CI to refuse any schedule in which a period's on-time window runs into the next period's claim window, so that the closing rule can never close a period before it was even possible to be on time for it.
     moscow: must
-    status: not_started
-    source: "Keith, 2026-10-04 ('PERIODS MUST NOT OVERLAP, ENFORCED'; '134 agreed, constraint after due time plus grace', plans/road-testing.md #16). Checked 2026-10-04: validate_schedule.py checks dates, months and grace, never one period's windows against the next. Scoped by delivery-scoper 2026-10-04; signed off by Keith 2026-10-04."
+    status: built
+    source: 'Keith, 2026-10-04 (''PERIODS MUST NOT OVERLAP, ENFORCED''; ''134 agreed, constraint after due time plus grace'', plans/road-testing.md #16). Checked 2026-10-04: validate_schedule.py checks dates, months and grace, never one period''s windows against the next. Scoped by delivery-scoper 2026-10-04; signed off by Keith 2026-10-04.'
     acceptance_criteria:
-      - "THE SYSTEM SHALL require, for every dataset and every pair of consecutive periods of that dataset's calendar - whether or not the dataset participates in either - that the claim-opening instant the dataset would have for the later period is strictly after the late-after instant (due instant plus grace) the dataset would have for the earlier one."
-      - "THE SYSTEM SHALL compute those instants exactly as filing does - the dataset's own expected time, grace and claim window from its contract, and the calendar's dates, each as effective on that period's date."
-      - "THE SYSTEM SHALL apply the check across the transition between two calendar versions, comparing the last period under the earlier version with the first under the later one."
-      - "THE SYSTEM SHALL apply the check over every period the configuration generates - every authored date, and for a cadence-rule calendar every period to the same horizon the runway warning uses."
-      - "IF the check fails, THEN THE SYSTEM SHALL fail the configuration gate naming the dataset, both periods, the two instants and by how much they overlap, and SHALL NOT stop at the first failure."
-      - "THE SYSTEM SHALL run the check in mothman's schedule validation (validate_schedule.py), from committed configuration alone, in the configuration CI workflow and in `mothman check`."
+    - THE SYSTEM SHALL require, for every dataset and every pair of consecutive periods of that dataset's calendar - whether or not the dataset participates in either - that the claim-opening instant the dataset would have for the later period is strictly after the late-after instant (due instant plus grace) the dataset would have for the earlier one.
+    - THE SYSTEM SHALL compute those instants exactly as filing does - the dataset's own expected time, grace and claim window from its contract, and the calendar's dates, each as effective on that period's date.
+    - THE SYSTEM SHALL apply the check across the transition between two calendar versions, comparing the last period under the earlier version with the first under the later one.
+    - THE SYSTEM SHALL apply the check over every period the configuration generates - every authored date, and for a cadence-rule calendar every period to the same horizon the runway warning uses.
+    - IF the check fails, THEN THE SYSTEM SHALL fail the configuration gate naming the dataset, both periods, the two instants and by how much they overlap, and SHALL NOT stop at the first failure.
+    - THE SYSTEM SHALL run the check in mothman's schedule validation (validate_schedule.py), from committed configuration alone, in the configuration CI workflow and in `mothman check`.
     non_functional_requirements:
-      - "Configuration only: reads contract/data-asset.yaml and the ODCS contracts, never supply data or the database, so it runs in GitHub Actions (validate-config.yml)."
-      - "Scale: one linear pass per dataset over its calendar's generated periods - thousands on the daily asset - so cost is proportional to period count; measure it once and record it beside the other validators' ~20s."
-      - "Checked against today's configuration while drafting (participating slots): all seven datasets pass. The narrowest gap is Birth Registrations' 19 hours (grace 1h, claim window 4h, daily); the quarterly datasets have 74 days or more. Case Workers shares the other Child Protection datasets' quarterly calendar and timing, so it passes on the full calendar sequence too - to be confirmed by the check itself once built."
-      - "Both deployments: each asset's own configuration is validated by its own CI; nothing compares across assets."
+    - 'Configuration only: reads contract/data-asset.yaml and the ODCS contracts, never supply data or the database, so it runs in GitHub Actions (validate-config.yml).'
+    - 'Scale: one linear pass per dataset over its calendar''s generated periods - thousands on the daily asset - so cost is proportional to period count; measure it once and record it beside the other validators'' ~20s.'
+    - 'Checked against today''s configuration while drafting (participating slots): all seven datasets pass. The narrowest gap is Birth Registrations'' 19 hours (grace 1h, claim window 4h, daily); the quarterly datasets have 74 days or more. Case Workers shares the other Child Protection datasets'' quarterly calendar and timing, so it passes on the full calendar sequence too - to be confirmed by the check itself once built.'
+    - 'Both deployments: each asset''s own configuration is validated by its own CI; nothing compares across assets.'
     dependencies: []
     decisions:
-      - "NON-OVERLAP IS ENFORCED, FOR BOTH CALENDAR KINDS (Keith, 2026-10-04). Nothing checked it before. Under REQ-PIPE-131 an overlap is worse than it was: if the next period's window opens before this period is due, this period closes before it can ever be on time, and every on-time supply for it is filed as the next period's early one."
-      - "THE CONSTRAINT IS 'NEXT CLAIM OPENS STRICTLY AFTER THIS DUE-PLUS-GRACE' (Keith chose it at sign-off, 2026-10-04). It protects the whole on-time window including grace: a file arriving during grace is on time and must not find the next period already open. REJECTED the weaker 'after this period's due instant', which lets grace overlap the next window. 'Strictly' because bisection takes the newer period at an exact tie, so equality would file a supply arriving at the last on-time instant as the next period's."
-      - "'NEXT' IS THE CALENDAR'S NEXT PERIOD, NOT THE DATASET'S NEXT PARTICIPATING ONE (this pass, made consistent with REQ-PIPE-131's sign-off change): a partially-participating dataset's slot closes when the calendar's next period's claim window opens, so that is the boundary the check must protect. Checking only participating slots would pass a Case Workers February slot that the calendar's May period closes before it is due."
-      - "PER DATASET, because due time, grace and claim window come from each dataset's own contract; two datasets sharing a calendar can pass or fail independently."
-      - "IT ALSO GUARANTEES THE SEQUENCE STAYS SORTED, which bisection in REQ-PIPE-131 relies on: claim-opening is never after due, due is before late-after, and late-after is before the next claim-opening. A calendar-version change that widened a claim window enough to open period n+1 before period n would otherwise silently break bisection."
-      - "STILL REJECTED: contiguous claim windows (REQ-PIPE-062) - the gap this criterion requires is exactly what keeps them non-contiguous."
+    - 'NON-OVERLAP IS ENFORCED, FOR BOTH CALENDAR KINDS (Keith, 2026-10-04). Nothing checked it before. Under REQ-PIPE-131 an overlap is worse than it was: if the next period''s window opens before this period is due, this period closes before it can ever be on time, and every on-time supply for it is filed as the next period''s early one.'
+    - 'THE CONSTRAINT IS ''NEXT CLAIM OPENS STRICTLY AFTER THIS DUE-PLUS-GRACE'' (Keith chose it at sign-off, 2026-10-04). It protects the whole on-time window including grace: a file arriving during grace is on time and must not find the next period already open. REJECTED the weaker ''after this period''s due instant'', which lets grace overlap the next window. ''Strictly'' because bisection takes the newer period at an exact tie, so equality would file a supply arriving at the last on-time instant as the next period''s.'
+    - '''NEXT'' IS THE CALENDAR''S NEXT PERIOD, NOT THE DATASET''S NEXT PARTICIPATING ONE (this pass, made consistent with REQ-PIPE-131''s sign-off change): a partially-participating dataset''s slot closes when the calendar''s next period''s claim window opens, so that is the boundary the check must protect. Checking only participating slots would pass a Case Workers February slot that the calendar''s May period closes before it is due.'
+    - PER DATASET, because due time, grace and claim window come from each dataset's own contract; two datasets sharing a calendar can pass or fail independently.
+    - 'IT ALSO GUARANTEES THE SEQUENCE STAYS SORTED, which bisection in REQ-PIPE-131 relies on: claim-opening is never after due, due is before late-after, and late-after is before the next claim-opening. A calendar-version change that widened a claim window enough to open period n+1 before period n would otherwise silently break bisection.'
+    - 'STILL REJECTED: contiguous claim windows (REQ-PIPE-062) - the gap this criterion requires is exactly what keeps them non-contiguous.'
+    - BUILT 2026-10-04 (overnight sprint 3) as a module of its own, qa_tools/common/period_overlap.py, called by the schedule gate; it walks the CALENDAR's periods (schedule.periods_for_calendar, which does not apply delivery_months) so a period the dataset skips is still checked, and resolves each period's claim window on that period's own date, so a calendar-version change is checked across like any other boundary (criterion 3). It runs only against the real configuration and only once the rest of the gate has passed, because it reads the committed files through the same modules filing uses (criterion 2).
+    - 'PROVISIONAL (overnight sprint 3, Keith''s ''take my recommendation''): the cadence-rule horizon is the END OF NEXT YEAR. Criterion 4 says ''the horizon the runway warning uses'', and the runway warning skips cadence-rule calendars entirely, so there was none to share. A cadence rule repeats, so a longer horizon adds periods without adding a way to fail.'
     open_questions: []
+    linked_tests:
+    - tests/test_period_overlap.py
+    implemented_by:
+    - qa_tools/common/period_overlap.py::overlaps
+    - qa_tools/common/period_overlap.py::overlaps_for
+    - qa_tools/common/validate_schedule.py::_overlap_errors
+    evidence:
+    - '2026-10-04 (overnight sprint 3): today''s configuration passes for all seven datasets; with a 100-day claim window forced, every quarterly and daily dataset reports every overlapping pair and the schedule gate fails naming dataset, both periods, both instants and the overlap. 7 tests. The whole check over the real configuration runs in about 1.6s as part of `python -m qa_tools.common.validate_schedule`, so the ~20s validator budget is unchanged.'
 
   - id: REQ-GEN-135
     title: "Synthetic history can play back scripted person decisions, through the same decision path a person uses"

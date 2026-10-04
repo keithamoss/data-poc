@@ -1864,6 +1864,13 @@ judgement about who reads the page rather than about the rule.
         them) - deleting them is a tidy-up for later. The critic also saw
         3 intermittent failures in one of three runs of a CLI subset,
         unattributed; the full suite since then ran clean (3,169 passed).
+      - SPRINT 3a DONE: REQ-PIPE-134 BUILT - a dataset's periods never
+        overlap, checked in the schedule gate from configuration alone
+        (qa_tools/common/period_overlap.py). Today's configuration passes
+        all seven datasets; ~1.6s. PROVISIONAL: the cadence-rule horizon is
+        the end of next year (the runway warning has none to share). No
+        plans prose removed: its source thread still feeds unbuilt batch
+        requirements and goes whole when the batch is built.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt
