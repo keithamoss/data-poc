@@ -1317,5 +1317,4 @@ judgement about who reads the page rather than about the rule.
       beside each period's own schema, not one global area - small to
       browse, and it makes retention by period trivial later. Amends the
       draft REQ-PIPE-118's "one superseded schema".
-    - **RETENTION DEFERRED** to its own later requirement - see
-      plans/running-thoughts.md.
+    - **RETENTION DEFERRED** to its own later requirement - plans/running-thoughts.md #60.
