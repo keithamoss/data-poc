@@ -26403,12 +26403,14 @@ requirements:
       - "THE SYSTEM SHALL allow the gate to promote an un-superseded supply automatically, and SHALL NOT treat the un-supersede decision as barring automatic promotion under REQ-PIPE-076 criterion 7."
       - "IF a person un-supersedes a supply WHILE another version of the same table is waiting for that period, THEN THE SYSTEM SHALL refuse it, SHALL name the waiting version, and SHALL say that it must first be rejected or superseded."
       - "IF a person promotes a supply that is superseded at the instant the entry would be appended, THEN THE SYSTEM SHALL refuse it, SHALL name the supply that superseded it, and SHALL name un-supersede as the remedy."
-      - "THE SYSTEM SHALL let a person find the superseded supplies for a dataset and period from the terminal, since none of them is in the queue of supplies awaiting a decision."
+      - "THE SYSTEM SHALL let a person find the superseded supplies for a dataset and period from the terminal, through a mothman supply superseded listing beside queue, slots and history, since none of them is in the queue of supplies awaiting a decision."
+      - "THE SYSTEM SHALL require a person un-superseding to name which superseded version, and SHALL NOT pick one by default."
       - "THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1's list of filing decisions and REQ-PIPE-074 criterion 1's to include supersede and un-supersede, and REQ-PIPE-076 criterion 7 to name un-supersede as the one person-decision after which the gate may still promote automatically."
     non_functional_requirements:
       - "Security: the two new operations are reachable only by actors in contract/people.yaml (REQ-GHUB-082 criterion 14); un-supersede can lead to an automatic promotion, so it carries a mandatory reason."
       - "Judgement is at append time inside the decision-log transaction (REQ-GHUB-082 criterion 20 and REQ-PIPE-091 criterion 3) - the 'superseded since it was shown' refusal is that rule applied, not a second check in a route."
       - "Performance: un-supersede runs a full QA run; the terminal says so and shows the outcome when it finishes, rather than returning before the gate has spoken."
+      - "Every refusal hands the person the fix as a command they can paste, not only a sentence describing it."
     dependencies: [REQ-PIPE-118]
     decisions:
       - "UN-SUPERSEDE RE-RUNS QA rather than restoring its old verdict, because the period around it has moved since it was checked - siblings may have been promoted - and the gate must read verdicts computed against what it will actually sit beside. This is the same reason REQ-PIPE-075 criterion 17 re-runs QA for a promotion into a different period."
@@ -26438,6 +26440,7 @@ requirements:
       - "THE SYSTEM SHALL NOT demote, supersede or reject a PROMOTED supply as a consequence of any re-evaluation."
       - "WHERE a supply promoted by this re-gating is itself read by another waiting supply's cross-table checks, THE SYSTEM SHALL apply this requirement to that promotion too."
       - "WHEN a re-evaluation leaves a waiting supply failing the automatic-promotion rules as resolved for its dataset - red, or amber where the resolved amber setting (REQ-PIPE-122) is 'hold' - THE SYSTEM SHALL record that in the decision log at its highest prominence, with the rule as actor, naming the supply, the promotion that caused the re-check and the reason it still cannot promote, so that a person sees it and acts."
+      - "THE SYSTEM SHALL show that record at full prominence in the terminal, and SHALL NOT dim it as the terminal dims other entries whose actor is the rule."
       - "IF the re-evaluation fails to run, THEN THE SYSTEM SHALL leave the promotion that triggered it in place, leave the waiting supply waiting on its earlier verdict, and report the failure."
     non_functional_requirements:
       - "One implementation of 're-evaluate the cross-table checks reading table T in period P, caused by X', shared with REQ-PIPE-079 criterion 6 (arrival-caused), REQ-PIPE-084 criteria 6 and 14 (substitution, unmet) and REQ-PIPE-075 criterion 17 (re-file, unmet). Four triggers, one mechanism - a second implementation of which checks read a table is how they come to disagree."
@@ -26467,6 +26470,9 @@ requirements:
       - "THE SYSTEM SHALL read one amber setting from contract/data-asset.yaml, taking exactly one of three values - hold, promote-and-acknowledge, promote - at data asset level and optionally at collection and dataset level."
       - "THE SYSTEM SHALL list those three values in that order, strictest first, wherever it lists them - in criteria, documentation, configuration comments, the configuration schema and every error message."
       - "THE SYSTEM SHALL resolve the setting for a dataset to the value at the nearest level that states one - dataset, then collection, then data asset."
+      - "THE SYSTEM SHALL hold the amber setting, at each level, as a series of versions, each with an effective date, in the same shape as a calendar's versions (REQ-PIPE-110), and SHALL resolve the value that applies to a supply from the version in effect at the instant the decision about it takes effect."
+      - "THE SYSTEM SHALL derive every state shown for the past - an amber supply waiting under hold, a supply awaiting acknowledgement, an automatic replacement - from what was recorded on the decision at the time, and SHALL NOT recompute it from the setting in force now."
+      - "THE SYSTEM SHALL refuse in CI a change that alters or removes a version of the setting whose effective date has passed, unless the change adds a changelog entry saying so - the same protection, by the same guard, that calendars have (REQ-PIPE-050)."
       - "IF the data asset level states no value, THEN THE SYSTEM SHALL refuse the configuration, and SHALL NOT assume a default."
       - "WHERE the resolved setting is hold, THE SYSTEM SHALL NOT promote an amber supply automatically, and SHALL leave it staged awaiting a person."
       - "WHERE the resolved setting is promote-and-acknowledge, THE SYSTEM SHALL promote an amber supply into an unfilled slot as REQ-PIPE-075 criterion 1 does, and SHALL record on that promotion that an acknowledgement is owed."
@@ -26476,7 +26482,8 @@ requirements:
       - "THE SYSTEM SHALL NOT change any data, re-run any check or change what any period resolves to on an acknowledgement."
       - "WHEN a supply that owes an acknowledgement leaves its period - superseded, demoted, rejected or re-filed - THE SYSTEM SHALL treat the owed acknowledgement as lapsed rather than outstanding."
       - "THE SYSTEM SHALL show an amber supply held under hold, and a promoted supply awaiting acknowledgement, in the terminal's standing queue and in REQ-PIPE-083's needs-action ticket policy, each distinguishably from the other and from a red supply awaiting a decision."
-      - "THE SYSTEM SHALL record, on every automatic promotion of an amber supply, the resolved setting and the level it came from."
+      - "THE SYSTEM SHALL NOT call an amber supply waiting under hold 'held' anywhere it is shown, since 'held' already names a supply filed to no slot (slot_state.HELD), and SHALL give it a label of its own."
+      - "THE SYSTEM SHALL record, on every automatic promotion of an amber supply, the resolved setting, the level it came from, and the version in effect."
       - "THE SYSTEM SHALL gate the setting in CI, refusing an unknown value or a setting on a level that does not exist."
       - "THE SYSTEM SHALL show on the dashboard whether a promoted amber supply is acknowledged or awaiting acknowledgement, carrying forward what REQ-QAC-017 criterion 1 asked of its per-run accept."
       - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-075 criterion 1 so that amber promotes itself only where this setting resolves to promote-and-acknowledge or promote, and REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1 to list acknowledge among the filing decisions."
@@ -26498,6 +26505,9 @@ requirements:
       - "THREE LEVELS - data asset, collection, dataset (Keith). The agency level in contract/data-asset.yaml's hierarchy is NOT one of them (working assumption, carried from the first draft, to be read to Keith)."
       - "NO DEFAULT. A missing asset-level value is a configuration error, consistent with this project's no-permissive-fallback stance."
       - "REQ-QAC-017 IS RETIRED, ACKNOWLEDGE REPLACES IT (Keith, sign-off 2026-10-04). 017's per-run /accept on an amber supply ('an accepted run stays amber with an acknowledgment badge', matched to a run by the comment's timestamp, on the old per-dataset ticket) predates supplies, slot tickets and the decision log; two acknowledgement mechanisms would disagree. Its one criterion - a decision on amber recorded and reflected in the dashboard's status - is carried forward by this requirement's dashboard criterion. Its /reject on amber was already a rejection under REQ-PIPE-076 and remains one through the ordinary reject decision; only the per-run 017 handling goes."
+      - "EFFECTIVE-DATED, VERSIONED LIKE CALENDARS (Keith, 2026-10-04, amendment wording approved). A setting change must never repaint history: past states are read from what each decision recorded, and past versions are protected by the calendars' own retrospective-edit guard rather than a second one. The version is picked by the instant the decision takes effect - what the rule actually knew when it acted."
+      - "NO SYNTHETIC EXCEPTION (Keith, 2026-10-04). The scenario eras (REQ-GEN-136) are authored as ordinary dated versions in this asset's own contract/data-asset.yaml - adding a new version, even one dated in the past, is the sanctioned mechanism, exactly as for calendars. REJECTED a 'synthetic' label on the asset unlocking past-dated versions: a flag and a second rule for one case, when the existing mechanism already allows it."
+      - "'HELD' IS TAKEN (pre-build UX review, accepted by Keith, 2026-10-04): it already means a supply filed to no slot, so an amber supply waiting under hold needs a different word."
     open_questions: []
 
 
@@ -26512,17 +26522,17 @@ requirements:
     status: not_started
     source: "Keith, 2026-10-03 ('OPTION A, ROUND TWO') and the group 2 sign-off round 2026-10-04 (plans/road-testing.md #16 - 'REPLACED ACCEPTED FILES GO TO SUPERSEDED'). Redrafted by delivery-scoper 2026-10-04."
     acceptance_criteria:
-      - "THE SYSTEM SHALL read a replacement setting taking one of never, green or green-or-amber, at data asset, collection and dataset level, resolved nearest-wins by the same mechanism as REQ-PIPE-122, with the asset level required to state a value."
+      - "THE SYSTEM SHALL read a replacement setting taking one of never, green or green-or-amber, at data asset, collection and dataset level, resolved nearest-wins and versioned by effective date, by the same mechanism as REQ-PIPE-122, with the asset level required to state a value."
       - "WHERE the resolved setting is never, THE SYSTEM SHALL leave a supply filed into a slot already filled by a promoted supply waiting for a person, as REQ-PIPE-075 criterion 4 does today."
       - "WHERE the resolved setting permits the arriving supply's status, and the slot is filled by a PROMOTED supply, THE SYSTEM SHALL promote the arriving supply and move the previously promoted supply to the superseded state, as one decision in one transaction."
       - "THE SYSTEM SHALL apply that replacement whether the previously promoted supply was promoted by the rule or by a person."
-      - "THE SYSTEM SHALL record that decision with the rule as actor, naming the supply replaced, with the resolved setting and its level as the reason (REQ-PIPE-074 criterion 6)."
+      - "THE SYSTEM SHALL record that decision with the rule as actor, naming the supply replaced, with the resolved setting, its level and the version in effect as the reason (REQ-PIPE-074 criterion 6)."
       - "THE SYSTEM SHALL show an automatic replacement in the dataset's supply history as informational - the replaced supply listed as superseded by the rule, naming the supply and the setting that replaced it (REQ-DASH-127) - and SHALL NOT give it any prominence above an ordinary supply-history entry."
       - "WHERE the arriving supply is amber and the resolved amber setting is promote-and-acknowledge, THE SYSTEM SHALL record that an acknowledgement is owed on the replacing promotion, as for any amber promotion under REQ-PIPE-122."
       - "IF any later period stands on the promoted supply (REQ-PIPE-084 criterion 11), THEN THE SYSTEM SHALL NOT replace it automatically, SHALL leave the arriving supply waiting for a person, and SHALL record why."
       - "THE SYSTEM SHALL NOT replace automatically a slot resolved by substitution or inheritance; REQ-PIPE-084 criterion 8 and REQ-PIPE-098 criterion 17 continue to hold such an arrival for a person."
       - "THE SYSTEM SHALL apply every other refusal of the promotion gate before replacing - contested, a person's decision on the arriving supply, no active checks, off-cycle - so that replacement only ever lifts the filled-slot refusal."
-      - "IF the resolved replacement setting is green-or-amber WHERE the resolved amber setting is hold, THEN THE SYSTEM SHALL refuse the configuration in CI."
+      - "IF the resolved replacement setting is green-or-amber WHERE the resolved amber setting is hold on any date where versions of the two overlap, not only as set today, THEN THE SYSTEM SHALL refuse the configuration in CI."
       - "THE SYSTEM SHALL amend REQ-PIPE-075 criterion 4 and REQ-PIPE-065 criterion 9 in the same change - both forbid automatic promotion into a filled slot - so that a filled slot blocks automatic promotion except where this setting permits replacement."
     non_functional_requirements:
       - "Security of accepted data: this is the only rule that lets automation displace accepted data, so the setting is reviewed configuration, CI-gated, and every replacement is recorded with the setting that authorised it."
@@ -26557,9 +26567,12 @@ requirements:
       - "THE SYSTEM SHALL name, beside a red promoted supply, the arrival or promotion that caused the re-evaluation that turned it red."
       - "THE SYSTEM SHALL NOT show a red promoted supply with the treatment of a green or amber one merely because it was promoted."
       - "THE SYSTEM SHALL keep the verdict the supply was promoted on visible beside its current one, so a reader can tell it went in green and later turned red."
+      - "THE SYSTEM SHALL show red promoted as a label beside the existing status pill rather than as a new status, and SHALL show nothing extra beside a promoted supply that is not red."
+      - "WHEN the dashboard is viewed as at an instant before a promoted supply turned red, THE SYSTEM SHALL show the supply as it was at that instant, with a note that it turned red on a named date after a named arrival or promotion, and SHALL NOT show the earlier view as red."
     non_functional_requirements:
       - "Assert at the layer a human sees (CLAUDE.md's shape-change rule): a real-browser test drives the built dashboard and checks a red promoted supply is rendered red, because a promoted supply rendering green is the false-green direction."
       - "Rendering only: the status is computed upstream from recorded results; nothing here reads supply rows."
+      - "A test views one supply as at an instant either side of the re-evaluation that turned it red, and asserts each shows what was true then."
     dependencies: []
     decisions:
       - "NOTHING PROMOTED IS DEMOTED BY A RE-CHECK (Keith, 2026-10-03, REQ-PIPE-121) - so the system's answer to a promoted supply going red is to show it, very clearly, and leave the decision to a person."
@@ -26580,6 +26593,7 @@ requirements:
       - "THE SYSTEM SHALL list every superseded supply in its dataset's supply history, as superseded, naming the supply that superseded it, when, and whether a rule or a person did it."
       - "THE SYSTEM SHALL show a superseded supply's recorded verdict as the verdict it had when it was superseded."
       - "THE SYSTEM SHALL distinguish superseded from rejected wherever both appear."
+      - "THE SYSTEM SHALL show each supply's outcome in the supply history - promoted, rejected, superseded or waiting - so that superseded sits among the other outcomes rather than alone."
     non_functional_requirements:
       - "Scale: superseded versions are collapsed under the version that superseded them by default, so a daily dataset with frequent resends does not bury its own history."
     dependencies: [REQ-PIPE-118]
@@ -26603,6 +26617,9 @@ requirements:
       - "IF any later period stands on the promoted supply that such a promotion would move, THEN THE SYSTEM SHALL refuse the promotion, SHALL name every blocking period, and SHALL name the decision that would unblock each (REQ-PIPE-084 criterion 11, REQ-GHUB-082 criterion 25)."
       - "WHEN a person promotes a supply into a slot resolved by SUBSTITUTION, THE SYSTEM SHALL first tell them that the substitution will be removed, obtaining the explicit confirmation REQ-PIPE-084 criterion 13 requires before any de-substitution, and SHALL then record TWO decision-log entries - a de-substitute and then the promotion - applied in one transaction."
       - "IF a person promotes a supply into a slot resolved by INHERITANCE, THEN THE SYSTEM SHALL refuse it, SHALL say that nothing was expected for that period, and SHALL name un-inherit as the separate action that must come first."
+      - "WHERE a decision has consequences beyond the slot it names, THE SYSTEM SHALL show them in one warning panel above that decision's single confirmation, and SHALL NOT ask a second yes or no; WHERE it has none, THE SYSTEM SHALL show no warning panel."
+      - "THE SYSTEM SHALL say, in every such warning, how each consequence is undone - for example that a displaced supply moves to superseded and can be restored with un-supersede - and what each affected period will read until then."
+      - "IF the consequences of a decision change between the warning being shown and the person confirming, THEN THE SYSTEM SHALL refuse the decision and show the new warning, on the terminal and on GitHub alike, where confirming then takes a second comment."
       - "THE SYSTEM SHALL NOT, by any automatic rule, promote into a slot resolved by substitution or inheritance (REQ-PIPE-084 criterion 8, REQ-PIPE-098 criterion 17)."
       - "THE SYSTEM SHALL resolve a table in a period to the one object that period holds, and SHALL NOT rank versions of a table within a period by arrival time or by promotion time."
       - "IF a period schema is found holding more than one version of a table, THEN THE SYSTEM SHALL fail loudly naming the period and table, and SHALL NOT choose between them."
@@ -26611,6 +26628,7 @@ requirements:
       - "No migration: existing databases are regenerated (Keith, 2026-10-04), so the multi-version code path is removed rather than kept for old data."
       - "Every reader that ranks versions inside a period - period_schema.newest() and promoted_in()'s list-of-versions shape, promotion.newest_promoted() where it reads a period - is enumerated and removed or simplified mechanically, not left as a dormant second path."
       - "The move and the decision entry are one transaction (REQ-PIPE-091 criterion 2)."
+      - "Every refusal hands the person the fix as a command they can paste, not only a sentence describing it."
     dependencies: [REQ-PIPE-118]
     decisions:
       - "ONE VERSION PER TABLE PER PERIOD, FOR EVERY PROMOTION (Keith, 2026-10-04, following his own reasoning on REQ-PIPE-123): the period schema is what people and external tools read, so it holds only what is in use. Before this, a person promoting a second supply left BOTH in the period schema and readers took the newest."
@@ -26618,6 +26636,8 @@ requirements:
       - "A DISPLACING PROMOTION OBEYS THE SAME 'STOOD-ON SUPPLIES DO NOT MOVE' RULE as demote, reject and re-file (REQ-PIPE-084 criterion 11), because superseding moves the physical table out of the period just as they do; a later period standing on it would otherwise be left pointing at a table no longer in use."
       - "PROMOTING INTO A SUBSTITUTED SLOT: WARN, THEN DE-SUBSTITUTE AND PROMOTE, AS TWO ENTRIES IN ONE TRANSACTION (Keith, sign-off 2026-10-04, his 'option c' after a worked example). A substitution is a stand-in a person chose while the real supply was missing; promoting the real supply is the obvious next step, so making it two separate visits is friction - but the stand-in's removal must be visible, hence the warning and its own entry. REJECTED refusing until a separate de-substitute (this draft's first proposal), and REJECTED one combined entry, which would hide the de-substitution inside a promotion. The warning IS REQ-PIPE-084 criterion 13's confirmation, so neither route can skip it."
       - "PROMOTING INTO AN INHERITED SLOT IS REFUSED until a person un-inherits it separately (Keith, sign-off 2026-10-04): inheritance means NOTHING WAS EXPECTED for that period, so a supply arriving for it is a question about the schedule, not a routine replacement."
+      - "ONE PROMPT, NOT TWO (pre-build UX review, accepted by Keith, 2026-10-04). Every decision already asks to confirm; a second yes or no for the warning teaches people to press yes twice. A warning panel shown only when there are consequences keeps it meaningful."
+      - "A STALE WARNING IS REFUSED AND RE-SHOWN ON BOTH ROUTES (Keith, 2026-10-04): if a file lands between being warned and confirming, the person confirmed something that is no longer true."
     open_questions: []
 
   - id: REQ-PIPE-129
@@ -26639,6 +26659,10 @@ requirements:
       - "THE SYSTEM SHALL keep stamped names in staging, in every period's _superseded schema and in the rejected schema, where several versions of one table can sit side by side."
       - "THE SYSTEM SHALL identify which supply a period's table holds from the decision log, and SHALL NOT parse it from a name in a period schema."
       - "THE SYSTEM SHALL decide whether an object in a period schema is a table or a view by asking the database's catalogue, and SHALL NOT infer it from the object's name - including for the check that an inheritance or a substitution stands only on a physical promoted table (REQ-PIPE-098 criterion 14, REQ-PIPE-084 criterion 16)."
+      - "THE SYSTEM SHALL move or rename a table out of a period schema through one code path only, which SHALL, in the same transaction and before it moves the table, lock it, confirm from the decision log that no later period stands on its supply, and confirm from the database catalogue that no view depends on it."
+      - "IF any view depends on a table about to leave a period schema, THEN THE SYSTEM SHALL refuse the move, naming the dependent view and its period."
+      - "THE SYSTEM SHALL install in every deployment's database a database-level guard (an event trigger) that refuses any move or rename of a table out of a period schema while a view depends on it, whatever issued the statement."
+      - "THE SYSTEM SHALL prove that each of the three refusals - the decision-log rule, the code path's check and the database guard - refuses on its own, with the other two absent."
       - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-098 criterion 16 and REQ-PIPE-084 criterion 3 so that an inherited or substituted view is visible by being named the table's plain base name."
     non_functional_requirements:
       - "Every place that reads a stamped name in a period schema is enumerated mechanically before this is called done - at least period_schema (newest, promoted_in), period_overlay's sibling resolution, promotion.promote, inheritance, substitution, rejection and demotion moves, decision_log.promoted_into's callers and the dashboard builders - and switches to looking the supply up. supply_db.split_staged() stays, for staging and the global schemas only."
@@ -26646,6 +26670,8 @@ requirements:
       - "Compatibility: external tools and people use the period schema as they would any ordinary schema - no naming contract to publish or keep in step."
       - "No migration; regenerate."
       - "Moving and renaming are catalogue changes only - ALTER TABLE ... SET SCHEMA and ALTER TABLE ... RENAME (supply_db.move_table already does the first) - and SHALL copy no data, so a rename costs the same for a ten-row table and a ten-million-row one."
+      - "A test over the source code asserts that nothing outside the one code path issues a move or rename against a period schema."
+      - "The database guard needs elevated rights to install, so the target platform's support for it is verified before it is relied on in production."
     dependencies: [REQ-PIPE-128]
     decisions:
       - "BOTH DIRECTIONS ARE EXPLICIT (Keith, sign-off 2026-10-04): plain name coming in, full stamped name restored on every way out, in the same transaction, rebuilt from the decision-log entry rather than a second store. A view has no way out to rename - it is dropped."
@@ -26653,6 +26679,7 @@ requirements:
       - "REJECTED keeping stamped names and publishing the naming rule as a parsing contract for downstream consumers (Keith's interim call, 2026-10-04, on the grounds that much code identifies a supply by its stamped name). Every consumer would then have to list the schema and strip stamps at start-up, which is the 'every consumer re-implements which is the real one' problem one layer down."
       - "REJECTED moving promoted tables to a separate storage schema behind plain-name views (Keith: a years-deep dumping ground that is hard for a human to look at)."
       - "SUPERSEDED BY THIS: an interim call the same round that inherited and substituted views take full stamped names too. The part that survives is the chain check asking the database whether an object is a table or a view rather than reading its name (Keith: 'a very reasonable fix'), which plain naming makes necessary rather than merely tidier."
+      - "THREE GUARDS ON A STOOD-ON TABLE (Keith, 2026-10-04, amendment wording approved). PostgreSQL views attach to a table by its internal id, not its name, so moving a table that a later period's inherited or substituted view stands on would silently drag that view's meaning with it into _superseded. The decision-log rule alone stops this pipeline's own decisions; the one-door check stops a code path that forgets the rule; the event trigger stops anything else, including a person at a SQL console."
     open_questions: []
 
   - id: REQ-PIPE-130
@@ -26766,12 +26793,14 @@ requirements:
       - "THE SYSTEM SHALL NOT change any data or what any period resolves to on a mark as not supplied, and SHALL NOT count the slot as filled."
       - "WHEN a slot is marked as not supplied, THE SYSTEM SHALL report it as NOT SUPPLIED (ACCEPTED), and SHALL remove it from the states needing action (REQ-PIPE-083's needs-action policy)."
       - "THE SYSTEM SHALL keep a closed, unfilled, unmarked slot among the states needing action until it is filled, substituted or marked as not supplied."
+      - "THE SYSTEM SHALL show closed, unfilled, unmarked slots in the terminal's standing queue as period items with their available responses, grouping consecutive ones of one dataset into a single item naming the count and the date range."
       - "THE SYSTEM SHALL name, for a closed unfilled slot, the responses available - substitute an earlier period's supply, mark as not supplied, or re-file a late file into it - each of which a person can take on both the GitHub and the terminal route, and SHALL say that a file arriving now is filed to the open period, not to this one."
       - "THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 (and criteria 31 and 32, which list the period-scoped decisions) and REQ-PIPE-074 criterion 1 to include mark as not supplied."
     non_functional_requirements:
       - "Vocabulary is reused where it fits: CLOSED qualifies the existing OVERDUE and NEVER-SUPPLIED states in qa_tools/common/slot_state.py, and NOT SUPPLIED (ACCEPTED) is the one new state, because it records a person's decision. Every consumer of SlotState and of the decision-log action list (ticket reconciler, TUI, CLI, GitHub command parser, dashboard builders) is enumerated per CLAUDE.md's shape-change rule."
       - "Auditability: the mark carries the person and the reason, so 'why is Q2 empty and nobody chasing it' is a decision-log lookup a year later."
       - "Cost: CLOSED is derived per slot from two instants already in hand; the mark is one decision-log row."
+      - "Every refusal hands the person the fix as a command they can paste, not only a sentence describing it."
     dependencies: [REQ-PIPE-131]
     decisions:
       - "MARK AS NOT SUPPLIED IS A NEW FILING DECISION (Keith, sign-off 2026-10-04), found because 'record the period as not supplied' was listed as a response and no such decision existed. Keith's framing: it pairs with `not_expected` in configuration - that is what we know AHEAD of time; this is the tactical, operational decision AFTER the fact. Person only, mandatory reason, changes no data; the closed period then reads 'not supplied (accepted)' and leaves the to-do list."
@@ -26797,6 +26826,10 @@ requirements:
       - "WHERE a dataset's slot for the period on show is closed and unfilled (REQ-PIPE-132), THE SYSTEM SHALL show that period on the dataset's page as red and 'no supply', distinctly from a period that is overdue but still open."
       - "WHERE such a slot has been marked as not supplied, THE SYSTEM SHALL show it as 'not supplied (accepted)', naming the decision's reason, distinctly from an unmarked closed slot."
       - "THE SYSTEM SHALL show, on the agency card, a count of datasets in that agency with a closed, unfilled, unmarked period as at the instant on show."
+      - "THE SYSTEM SHALL count a closed, unfilled, unmarked slot as red in its dataset's status, and SHALL roll that red up to the collection and the agency like any other red."
+      - "WHERE a slot is marked as not supplied, THE SYSTEM SHALL keep it out of the red roll-up, and SHALL still show it, quieter than red, at collection and agency level."
+      - "THE SYSTEM SHALL show, on the agency card, one line counting everything there waiting for a person, broken out by kind (for example '3 waiting for a person: 2 no supply, 1 red promoted'), rather than a line per kind."
+      - "THE SYSTEM SHALL group consecutive closed unfilled periods of one dataset into a single item naming the count and the date range (for example '4 days with no supply, 12-15 Oct') wherever they are listed."
       - "THE SYSTEM SHALL show every closed unfilled period, marked or not, in the dataset's supply history, whatever the period on show."
       - "THE SYSTEM SHALL judge closed, unfilled and marked as at the instant on show, so that the as-of view reproduces what a reader saw then."
       - "THE SYSTEM SHALL NOT convey any of these states by colour alone."
@@ -26808,6 +26841,9 @@ requirements:
     decisions:
       - "RED, NOT WARNING (Keith, 2026-10-04: 'very clearly as red / no supply'). On the daily asset a period with no data breaks everything downstream, which is the whole reason the closing rule exists."
       - "A MARKED SLOT LEAVES THE AGENCY-CARD COUNT (this pass, following REQ-PIPE-132): the count is of gaps nobody has dealt with; an accepted gap is history, still shown on the dataset page and in supply history."
+      - "RED ROLLS UP TO THE AGENCY (Keith, 2026-10-04). REJECTED showing a closed, unfilled period only as a label and a count while leaving the status pill alone - proposed by the pre-build UX review so that one missed day on the daily asset would not turn a whole agency red. Keith: it should roll up red all the way to the agency."
+      - "AN ACCEPTED GAP IS QUIET BUT NOT HIDDEN (Keith, 2026-10-04): outside the red roll-up, still visible at collection and agency level."
+      - "CONSECUTIVE GAPS ARE GROUPED (Keith, 2026-10-04), answering an earlier sighting of 17 separate items for one dataset."
     open_questions: []
 
   - id: REQ-PIPE-134

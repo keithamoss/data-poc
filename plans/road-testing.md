@@ -1451,3 +1451,22 @@ judgement about who reads the page rather than about the rule.
       accepted Clients and supersedes Q2's waiting Clients from 14 May" -
       so leaving an old period without its promoted table is never a
       surprise.
+    - **AMENDMENTS WRITTEN, 2026-10-04 (Keith approved both wordings):**
+      effective-dated settings into REQ-PIPE-122/123, and the three-layer
+      guard into REQ-PIPE-129. **No synthetic exception** (Keith): the
+      scenario eras are authored straight into this asset's own
+      `data-asset.yaml` as dated versions, unlabelled, since adding a new
+      version - even a past-dated one - is already the sanctioned mechanism
+      for calendars. Pre-build UX review accepted and written in: one
+      prompt with a warning panel, warnings say how to undo, paste-able
+      fixes on refusal, `mothman supply superseded`, un-supersede names its
+      version, the shout undimmed, red-promoted as a label, outcomes in
+      supply history, one marker line per agency card, 'held' not reused.
+      Keith's answers to the six UX questions: stale confirmation refused
+      and re-shown on both routes; **a closed unfilled period rolls up RED
+      to the agency** (against the reviewer's label-only lean); consecutive
+      gaps grouped; not-supplied (accepted) quieter and outside the red
+      roll-up but still visible at collection and agency level; as-of
+      before a supply turned red shows it as it was, annotated. Still open:
+      the interrupted-wait question (re-check owed) and the as-of test,
+      both pending a worked example.
