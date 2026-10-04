@@ -1313,3 +1313,9 @@ judgement about who reads the page rather than about the rule.
     - **GROUP 2 SIGNED OFF by Keith, 2026-10-04: REQ-PIPE-122, 123, 128,
       129, 130** (with the points above). Group 3: 126 and 127 agreed, 124
       and 125 dropped. Next: superseded retention, then period closing.
+    - **SUPERSEDED IS PER PERIOD** (Keith, option A): superseded_<period>
+      beside each period's own schema, not one global area - small to
+      browse, and it makes retention by period trivial later. Amends the
+      draft REQ-PIPE-118's "one superseded schema".
+    - **RETENTION DEFERRED** to its own later requirement - see
+      plans/running-thoughts.md.

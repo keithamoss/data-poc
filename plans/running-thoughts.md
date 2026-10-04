@@ -4420,3 +4420,17 @@ Belongs with batch 5's check work.
     explicitly NOT a promotion-safety measure - see the reasoning in
     this item's own opening paragraph for why I stopped claiming it
     was one.
+
+58. **[todo, 2026-10-04]** **[Pipeline & publishing]** **Retention for
+    superseded supplies (and probably the original delivery files).**
+    Deferred from option A (plans/road-testing.md #16). Superseded is now
+    per period, so a retention decision applies to whole periods. Keith's
+    shape: the data asset defines a period-level retention, overridable at
+    collection or dataset level - "two years is fine for a quarterly
+    supply, but isn't good enough for a dataset that only comes in once a
+    year on the quarterly asset." Worth deciding then whether retention is
+    expressed in TIME or in a NUMBER OF PERIODS (the latter adapts to each
+    dataset's cadence by itself). Purge the data, keep the record - the
+    receipt, QA results and decision entries - so history still reads; an
+    archived copy rather than deletion ties into plans/supply-thoughts.md.
+    Personal data kept indefinitely is the reason it matters.
