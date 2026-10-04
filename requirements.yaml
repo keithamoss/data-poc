@@ -21154,255 +21154,109 @@ requirements:
         POSTGRES_PASSWORD plus a health check (pg_isready) or the
         suite starts before the database is accepting connections.
   - id: REQ-QAC-096
-    title: "File-shape checks run at load time and are recorded as checks in their own right"
-    date_written: "2026-09-26"
-    story: >
-      As whoever maintains this pipeline, I want the questions that
-      can only be asked of the file as delivered to be asked before
-      the rows are loaded, and recorded as real checks with names and
-      history, so that loading does not silently destroy a whole class
-      of QA.
+    title: File checks are evaluated on each file as delivered, before it is loaded, and recorded as checks in a scope of their own
+    date_written: '2026-09-26'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As whoever maintains this pipeline, I want the questions that can only be asked of a file as delivered - before loading answers or destroys them - asked on every file, recorded as real, named checks with history, and kept apart from the data checks, so that loading does not silently erase a whole class of QA.
     moscow: must
     status: not_started
-    source: >
-      Keith, plans/running-thoughts.md #45 (2026-09-26) - the second
-      of the three items in the batch-5 brief, and the producing half
-      of the gap he spotted himself: the agreed load-first shape adds
-      file checks and nothing said where their results go.
+    source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - the producing half of the gap he spotted in the load-first design. REFRESHED by delivery-scoper 2026-10-04 against what had since been built and signed (REQ-QAC-088, REQ-PIPE-089, REQ-PIPE-115, REQ-PIPE-144, gap 1 of post-build-review #77). Reshaped the same day when Keith chose that any failing file check refuses the whole file.'
     acceptance_criteria:
-      - >
-        THE SYSTEM SHALL evaluate an explicit, named set of checks
-        about the file as delivered, at load time, before its rows
-        reach the warehouse.
-      - >
-        THE SYSTEM SHALL limit that set to questions loading answers
-        or destroys, including at least encoding, delimiter, header
-        row, column order, ragged or malformed rows, and duplicate
-        headers.
-      - >
-        THE SYSTEM SHALL NOT express a question about the DATA as a
-        file check.
-      - >
-        THE SYSTEM SHALL give each file check a globally unique check
-        id, on the same terms as every other check in this project.
-      - >
-        THE SYSTEM SHALL carry each file check's lifecycle metadata in
-        its own definition, and SHALL gate it in CI on the same terms
-        as the other four tools' definitions.
-      - >
-        THE SYSTEM SHALL hold each file check's authored prose to
-        docs/check-authoring-rules.md.
-      - >
-        THE SYSTEM SHALL record file-check results as a fifth tool, in
-        a scope of their own, and SHALL NOT record them among a
-        dataset's data-check results.
-      - >
-        THE SYSTEM SHALL NOT fold a file check's verdict into the
-        status of any data check.
-      - >
-        THE SYSTEM SHALL record each file-check result against the
-        delivery and the individual file it examined, so that a reader
-        can tell which file was wrong when a delivery carried several.
-      - >
-        IF a file cannot be read at all, THEN THE SYSTEM SHALL record
-        that through the existing load-failure mechanism rather than
-        as a file-check result, and SHALL NOT create a table for it.
-      - >
-        THE SYSTEM SHALL record file-check results wherever QA results
-        are recorded, so that they share that history's addressing,
-        retention and access rules.
-      - >
-        THE SYSTEM SHALL NOT let a file check's presence satisfy any
-        rule about a table having active checks.
-      - >
-        IF any file check fails for a file a delivery carried, THEN
-        THE SYSTEM SHALL NOT auto-promote the supply that file became,
-        and SHALL leave it awaiting a person's decision.
-      - >
-        THE SYSTEM SHALL have the promotion gate read file-check
-        results as an input in their own right, alongside the
-        dataset's data-check status, and SHALL NOT achieve that by
-        folding them into that status.
+    - WHEN a file attributed to a dataset is staged, THE SYSTEM SHALL evaluate every active file check against that file's bytes as delivered, before its rows are loaded.
+    - THE SYSTEM SHALL limit file checks to questions that loading answers or destroys, and SHALL NOT express a question about the data as a file check.
+    - 'THE SYSTEM SHALL include in the initial set at least: the file decodes as UTF-8; the delimiter splits the header into the expected columns; a header row is present; no header name repeats; every row has exactly as many fields as the header (too many and too few alike); and the columns are in the contract''s order.'
+    - THE SYSTEM SHALL hold each file check's definition and authored prose ONCE, and SHALL give it a derived check_id per dataset under the existing check_id grammar, using 'file' as its tool suffix, and SHALL NOT change any existing check_id.
+    - THE SYSTEM SHALL hold each file check's lifecycle metadata in committed configuration, and SHALL bring it into the existing check-lifecycle gate on the same terms as the other four tools' definitions, including failure_indicates.
+    - THE SYSTEM SHALL hold each file check's authored prose to docs/check-authoring-rules.md.
+    - THE SYSTEM SHALL record file-check results in the qa metadata schema under the tool 'file' and a scope of their own, keyed by run, trial and supply state exactly as other results are, and SHALL NOT record them in a dataset's own scope or the cross-table scope.
+    - THE SYSTEM SHALL record each file-check result against the delivery and the individual delivered file it examined, so that a reader can tell which file was wrong when a delivery carried several.
+    - THE SYSTEM SHALL NOT fold a file check's verdict into the status of any data check, and SHALL NOT add 'file' to the tool lists the data-check readers walk (qa_results_reader.TOOL_ORDER, EXPECTED_TOOLS and RESULT_TOOLS).
+    - THE SYSTEM SHALL NOT let a file check's presence satisfy any rule about a table having active checks.
+    - IF a file fails any file check recorded as a FAILURE (criterion 18), THEN THE SYSTEM SHALL record that file check as failed AND record the load failure through the existing load-failure mechanism naming that check, SHALL NOT create a table for it, and SHALL NOT run any data check over its rows.
+    - WHERE a file fails only file checks recorded as a WARNING, THE SYSTEM SHALL load it as usual, run the data checks as for any other supply, and record those warnings.
+    - IF the code evaluating a file check itself raises, THEN THE SYSTEM SHALL treat it as a failed run naming the file check, and SHALL NOT record it as a finding about the file.
+    - THE SYSTEM SHALL word each file-check result by line numbers, field counts and column names, and SHALL NOT include any value from the file's rows.
+    - THE SYSTEM SHALL evaluate file checks for both collections, and for a delivery a person filed exactly as for one received automatically.
+    - WHEN a failed load is reprocessed, THE SYSTEM SHALL evaluate the file checks again and record new results, and SHALL NOT edit or remove the earlier ones.
+    - THE SYSTEM SHALL have, for each file check, a test that feeds the real staging path a file carrying exactly that fault and asserts the recorded result at the qa schema and that no table was created, including a file whose short rows today load silently as empty values.
+    - THE SYSTEM SHALL record the column-order file check as a WARNING, and every other file check in the initial set - encoding, delimiter, header row, repeated header names and fields per row - as a FAILURE.
     non_functional_requirements:
-      - >
-        The existing check-lifecycle gate requires a check_id, an
-        introduction date, a description and a changelog, and
-        separately requires failure_indicates. A fifth tool must be
-        brought INTO that gate rather than exempted from it - an
-        ungated fifth tool is how a corpus of 257 consistent checks
-        acquires an inconsistent corner.
-      - >
-        COST AT SCALE: this set is evaluated on every arrival for
-        every dataset, so it must be answerable while the file is
-        being read once, not by a second pass over the data.
-      - >
-        RELIABILITY: a file check must never be the reason a load does
-        not happen unless the file genuinely cannot be read. A gate
-        that blocks ingestion on a cosmetic finding is a gate that
-        gets disabled.
-      - >
-        A genuinely bad file failing the load outright is itself a QA
-        signal, and it is already modelled - REQ-PIPE-060 and `mothman
-        supply failures` carry it, so this needs no new mechanism for
-        that case.
-      - >
-        AUDITABILITY: these results are part of a run's history like
-        any other, so they inherit whatever REQ-PIPE-089 settles about
-        storage and retention rather than getting their own
-        arrangement.
-    dependencies: [REQ-PIPE-087, REQ-PIPE-089]
-    open_questions:
-      - >
-        Exactly which checks are in the initial set, and whether that
-        list is configuration or code. The six named in criterion 2
-        are the ones #45 names, and the boundary rule - answered or
-        destroyed by loading - is what decides any candidate.
-      - >
-        WHETHER A FAILED FILE CHECK ALSO GATES QA ITSELF, not just
-        promotion. Keith's own words settling the promotion half:
-        "yes, a failed load-time file check gates promotion...possibly
-        even QA". The "possibly" is genuine and unresolved. FOR gating
-        QA: running four real tools over rows loaded from a file
-        already known to be malformed spends real time producing
-        verdicts about data whose shape is in doubt. AGAINST: the rows
-        DID load, so the data checks have a real subject, and their
-        verdicts are exactly what tells an operator how bad the damage
-        is - which is what a person deciding whether to promote needs
-        most. A file that cannot be read at all never reaches QA
-        anyway, by criterion 10.
+    - A FALSE GREEN IS THE FAILURE TO PREVENT. A short row padded with empty values reads to every data check as a genuinely empty field - verified 2026-10-04 against read_csv_explicit_nulls - so a missing file check is a silent pass, not a missing feature.
+    - 'COST AT SCALE: evaluated on every file of every arrival for every dataset, so it SHALL be one streaming pass over the raw bytes with bounded memory - never the whole file in memory, since synthetic_data_generator already produces millions of rows.'
+    - 'RELIABILITY: only a FAILURE-level check refuses a file (criterion 11); a cosmetic finding such as column order only warns (criterion 18). A gate that blocks ingestion on a cosmetic finding is a gate that gets disabled.'
+    - 'TOOL-NEUTRAL: file checks are this project''s own code over the raw bytes, not a feature of dbt, Soda, datacontract-cli or Evidently - so they survive REQ-QAC-145''s open question about whether dbt stays.'
+    - 'NO NEW DEPENDENCY: the Python standard library''s own CSV and codec handling is enough for the initial set.'
+    - 'PRIVACY: in a real deployment these files hold child protection and birth records; a result names where (line, column) and never what (criterion 14), the same rule REQ-PIPE-115''s NFR 9 sets for its reasons.'
+    - 'FORMAT-SPECIFIC: the set is defined for CSV, the only format accepted today. A Parquet supply (plans/supply-thoughts.md #6) makes encoding, delimiter and ragged rows meaningless and adds ''declared types disagree with the contract''; the definitions SHALL say which format each check applies to so that a second format adds checks rather than editing these.'
+    - 'AUDITABILITY: results inherit the qa schema''s history, retention and access rules (REQ-PIPE-089) and the run''s run_by and run_timestamp, with no arrangement of their own; delivery and file records are permanent history under REQ-PIPE-144.'
+    - 'CHANGELOG-WORTHY when built: a new kind of check a reader will see.'
+    dependencies:
+    - REQ-QAC-088
+    - REQ-PIPE-089
+    - REQ-PIPE-144
+    - REQ-PIPE-060
+    - REQ-DASH-148
+    open_questions: []
     decisions:
-      - >
-        THE AGREED SHAPE IS LOAD FIRST, ALL FOUR TOOLS CHECK THE
-        WAREHOUSE, PLUS A SMALL EXPLICIT SET OF FILE-SHAPE CHECKS AT
-        LOAD TIME THAT NEVER PRETEND TO BE DATA CHECKS (Keith,
-        2026-09-26). The boundary is what makes it work and it is not
-        a hedge: a class of checks can only be made on the FILE and is
-        destroyed by loading, so "check everything in the warehouse"
-        on its own would silently drop them.
-      - >
-        THEY ARE LABELLED AS WHAT THEY ARE - statements about the
-        FILE, not about the data. A reader must never have to work out
-        which subject a check was about.
-      - >
-        THE COST IS ACCEPTED KNOWINGLY: this becomes a FIFTH tool in
-        the QA results, so its checks need check_ids, lifecycle
-        metadata and prose held to docs/check-authoring-rules.md,
-        exactly like the other four tools' 257 checks.
-      - >
-        THE MODEL ALREADY HAS BOTH SHAPES TO COPY for a distinct
-        scope, so this needs no new concept: `_cross-table` is a
-        distinct scope under a collection (REQ-QAC-037), and
-        REQ-PIPE-079's
-        awaiting-supply/overdue-supply/awaiting-decision reason codes
-        are already about the SUPPLY rather than the data.
-      - >
-        Keith's own ordering was that this be scoped AFTER the Aurora
-        work. It is in the same batch because all three items touch
-        what a period resolves to and what the dashboard says about
-        it, and go through one sign-off session rather than three.
-      - >
-        A FAILED FILE CHECK GATES PROMOTION (Keith, 2026-09-26),
-        settling what this requirement was drafted without an answer
-        to. REJECTED: never gating, which lets a supply carrying a
-        known-bad file auto-promote on its data status alone; and
-        making the supply merely amber, which still auto-promotes and
-        so is not a gate. WHAT THIS DOES NOT DO, because it would undo
-        criterion 8: a file check's verdict is still never folded into
-        a data check's status. The gate reads file checks as a
-        SEPARATE input (criterion 14), which is also what stops
-        REQ-PIPE-075 criterion 2 - the gate SHALL read every check
-        contributing to the dataset's status - being silently narrowed
-        by a fifth scope that sits outside that status.
+    - 'THE AGREED SHAPE IS LOAD FIRST, ALL FOUR TOOLS CHECK THE WAREHOUSE, PLUS A SMALL EXPLICIT SET OF FILE CHECKS AT LOAD TIME THAT NEVER PRETEND TO BE DATA CHECKS (Keith, 2026-09-26). The first two halves are BUILT - REQ-QAC-088, signed and built 2026-09-27, repointed every tool at the warehouse and its criterion 5 forbids expressing a file question as a data check. This requirement is the third half, and nothing of it is built: no file check exists anywhere in the repository (checked 2026-10-04).'
+    - THEY ARE LABELLED AS WHAT THEY ARE - statements about the FILE, not about the data (Keith, 2026-09-26). A reader must never have to work out which subject a check was about.
+    - 'THE COST IS ACCEPTED KNOWINGLY (Keith, 2026-09-26): a fifth tool, with check_ids, lifecycle metadata and prose held to the authoring rules, exactly like the other four tools'' checks.'
+    - 'THE MODEL ALREADY HAS THE SHAPE TO COPY, so this needs no new concept: qa.check_result carries a scope column, and ''_cross-table'' (REQ-QAC-037) is already a scope beside a dataset''s own. The 2026-09-26 draft said ''a fifth tool in qa_results/''; that tree is gone (REQ-PIPE-089) and the scope is a column value now.'
+    - WHAT TODAY'S LOADER DOES WITH EACH CANDIDATE FAULT, measured 2026-10-04 against the real read_csv_explicit_nulls rather than assumed. FAILS THE LOAD - a non-UTF-8 byte (UnicodeDecodeError), a row with too many fields (ParserError), an empty file (EmptyDataError). LOADS AND DESTROYS THE EVIDENCE - a row with too few fields is padded with NULLs indistinguishable from real empty values; a repeated header 'name,name' is silently renamed 'name.1'; columns in a different order load by name and the order is gone. LOADS AND MISLEADS THE DATA CHECKS - a semicolon-delimited file loads as ONE column called 'id;name;dob'; a file with no header row loses its first row into the column names. A UTF-8 byte-order mark is handled silently and correctly. This list is why the boundary rule, and not a hunch, decides the initial set.
+    - 'THE LOAD-FAILURE BOUNDARY IS SHARPENED, NOT REMOVED (criterion 11; Keith chose recording both, 2026-10-04, then widened which files are refused - see ''ANY FAILING FILE CHECK REFUSES THE WHOLE FILE''). The 2026-09-26 draft said an unreadable file goes through the load-failure mechanism ''rather than as a file-check result''. Measured, three of the six named faults ARE load failures today, so that wording would leave Keith''s own TS-12 case - the ragged extract he called ''a really important one'' - with no named check at all, only a parser''s message. Proposed: record both, the load failure citing the check. REJECTED making the loader tolerant (skip bad lines, load the rest): a partial table reads as a genuinely short supply, which REQ-PIPE-060''s own decisions call the case to avoid.'
+    - 'THE EXISTING LOAD-FAILURE MECHANISM IS BUILT and is reused unchanged: no partial table survives (supply_db.load_csv_into, one transaction, qa_tools/common/supply_db.py:478), a FAILED record with the reason (qa_tools/cp/build_cp_warehouses.py:188-202, qa_tools/bdm/build_per_run_warehouses.py:136-151), ''mothman supply failures'' (cli/supply.py:329), and a ''failed-load'' outstanding item (qa_tools/common/outstanding.py:342). The old criterion 10 is therefore met as written and is replaced by criterion 11''s sharper version.'
+    - NOT IN RESULT_TOOLS, deliberately (criterion 9). Gap 1 (commit 4559a75) added 'unrunnable' and 'held' to qa_results_reader.RESULT_TOOLS because those records ARE data-check results that could not be evaluated, joined to the real check's card by check_id. A file check is not a data check and has no card to join; putting it in that list would fold it into the data checks' status, which is exactly what criterion 9 forbids. It gets its own reader, as read_cross_table_results is its own reader for its own scope.
+    - A NEW TOOL SUFFIX, NOT A GRAMMAR CHANGE. check_id.TOOLS is a closed list of four; adding 'file' extends a vocabulary and changes no segment, so REQ-QAC-039's one-time exception is not needed and no existing id moves.
+    - 'ANY FAILING FILE CHECK REFUSES THE WHOLE FILE (criterion 11) (Keith, 2026-10-04). Keith asked why the data checks would run at all once an integral file check had failed. Measured against the loader, they are noise for two of the faults (a wrong delimiter loads as one column, a missing header loses a row into the column names, so every column check reports ''missing'') and ambiguous for the others (padding is indistinguishable from real blanks). So a file failing any FAILURE-level check is not loaded, and it takes REQ-DASH-148''s ''could not be loaded'' path - one red for its dataset, with the reason naming the check. THIS SUPERSEDES the 2026-09-26 decision that a failed file check gates PROMOTION, and the REQ-PIPE-149 drafted from it was dropped unsigned the same day: a refused file never becomes a supply, so there is nothing to promote or to withhold. REJECTED: (a) as drafted - load whatever can load, run the data checks to show the damage, and hold promotion; (b) refuse the structural faults but load short rows and hold promotion. Both leave a half-broken table in staging that a reader has to interpret.'
+    - 'AN EVALUATOR BUG IS NOT A SUPPLIER FAULT (criterion 13, scoper''s proposal). The same rule REQ-PIPE-115 criterion 18 sets for the four tools: an error in our own code is a failed run, never absorbed as a verdict about somebody else''s file.'
+    - 'WRITTEN ONCE, IDS DERIVED PER DATASET (criterion 4) (Keith, 2026-10-04). REJECTED authoring each file check per dataset like every other check: six checks on 30 datasets is about 180 near-identical prose entries to keep in step. This is a deliberate exception to check_id.py''s ''validates, builds nothing'' stance, which was about hand-authored YAML ids; a derived id is still validated by the same grammar.'
+    - COLUMN ORDER WARNS, THE REST FAIL (criterion 18) (Keith, 2026-10-04). The load matches columns by name, so a reordered file does no harm to the data; every other check in the set is a fault that destroys or misleads. Only a failure refuses the file (criterion 11), so this decides how often a supply is turned away.
+    - 'AUTHORING RULE 13 AMENDED (Keith, 2026-10-04, exact wording approved): ''The other exception is a file check, whose subject is the file as delivered; there "file" is the accurate word.'' Without it criterion 6 could not be met.'
+    - 'A FOURTH LOADER BEHAVIOUR, found verifying the scoper''s probe 2026-10-04: when EVERY row carries one extra field, read_csv_explicit_nulls raises nothing - pandas takes the first column as the row index and every column shifts one place, so ''name'' values land under ''id''. Only a MIXED file (some rows long) raises ParserError. The fields-per-row check is the only thing that catches the uniform case.'
+    - HAND-FILED DELIVERIES GET NO EXEMPTION (criterion 15). REQ-PIPE-147 records who filed a delivery and by which route; that is provenance, and a person filing a file by hand does not make its bytes any better formed.
   - id: REQ-DASH-097
-    title: "A file-level failure reads as a claim about the file, never as a verdict on the data"
-    date_written: "2026-09-26"
-    story: >
-      As a data team leader looking at a dataset that holds no data
-      for this period, I want the page to tell me the file we were
-      sent could not be trusted, so that I am neither left guessing at
-      a quiet gap nor misled into thinking the data itself was checked
-      and failed.
+    title: File-check results read as claims about the file, in their own section, and a failed one reads clearly on the dataset
+    date_written: '2026-09-26'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As a data team leader looking at a dataset, I want what was wrong with the file we were sent shown as a claim about the file - in its own place, in plain words - and a failure that is holding a supply back to read clearly on the dataset itself, so that I am neither misled into thinking the data was checked and failed nor left with a green that is quietly waiting on me.
     moscow: must
     status: not_started
-    source: >
-      Keith, plans/running-thoughts.md #45 (2026-09-26) - the gap he
-      spotted in the load-first design and then settled: yes, the
-      load-time file checks reach the dashboard, as their own scope,
-      never folded into the data checks' status.
+    source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - yes, the load-time file checks reach the dashboard, as their own scope, never folded into the data checks'' status. REFRESHED by delivery-scoper 2026-10-04 to fit REQ-PIPE-115''s dataset-level red (signed that day) and REQ-DASH-070''s outstanding items, with the failed-load case moved out to REQ-DASH-148. Reshaped the same day when Keith chose that any failing file check refuses the whole file, so the red and the queue item became REQ-DASH-148''s.'
     acceptance_criteria:
-      - >
-        THE SYSTEM SHALL show file-check results as their own scope,
-        distinct from a dataset's data checks, wherever that dataset's
-        QA is shown.
-      - >
-        THE SYSTEM SHALL NOT fold a file check's verdict into the
-        status shown for that dataset's data checks.
-      - >
-        WHERE a dataset holds no data for a period because a load
-        failed, THE SYSTEM SHALL say so, and SHALL NOT leave the
-        period looking quietly empty.
-      - >
-        THE SYSTEM SHALL word a file-level failure as a statement
-        about the file that arrived, and SHALL NOT word it as a count
-        of records violating a rule.
-      - >
-        THE SYSTEM SHALL let a reader reach each individual file check
-        and its authored prose from that scope, on the same terms as
-        any other check.
-      - >
-        THE SYSTEM SHALL distinguish the scope by label as well as by
-        appearance, and SHALL NOT rely on colour alone.
-      - >
-        THE SYSTEM SHALL show a file check's history over time on the
-        same terms as any other check.
-      - >
-        THE SYSTEM SHALL NOT introduce a new value into the status
-        vocabulary.
-      - >
-        THE SYSTEM SHALL render with zero console errors in a real
-        browser.
+    - THE SYSTEM SHALL show a dataset's file-check results, on its dataset page, in a section of their own labelled as being about the file as delivered, distinct from its data checks.
+    - THE SYSTEM SHALL NOT fold a file check's verdict into any data check's status, count or trend.
+    - THE SYSTEM SHALL word a file-check failure as a statement about the file that arrived, naming the file, and SHALL NOT word it as a count of records violating a rule.
+    - THE SYSTEM SHALL let a reader open each file check, with its authored prose and its history over time, on the same terms as any other check.
+    - WHERE every file check passed for the supply on show, THE SYSTEM SHALL show that section as one line saying so, and SHALL NOT render each passing check by default.
+    - WHEN a file is refused because it failed a file check (REQ-QAC-096 criterion 11), THE SYSTEM SHALL signal it through REQ-DASH-148's failed-load item and dataset-level red, whose stated reason names the file and the failed file check, and SHALL NOT raise a second item or a second red of its own.
+    - WHERE a file loaded with only file-check WARNINGS, THE SYSTEM SHALL show those warnings in the file section and SHALL NOT change the dataset's status on their account.
+    - WHERE a file was refused, THE SYSTEM SHALL show its file section for that supply with the failed check open by default, alongside REQ-DASH-148's not-run data checks.
+    - THE SYSTEM SHALL distinguish the section and its failures from data checks by label as well as by appearance, and SHALL NOT rely on colour alone.
+    - THE SYSTEM SHALL NOT introduce a new value into the status vocabulary.
+    - THE SYSTEM SHALL render all of this from recorded QA results alone.
+    - THE SYSTEM SHALL have a real-browser test against the built dashboard in which one dataset's file was refused by a file check and another loaded with a column-order warning, asserting the file section in both, the refused dataset's red naming the check, its roll-up, that the warned dataset's status is unchanged, and zero console errors.
     non_functional_requirements:
-      - >
-        AT 30 DATASETS a fifth scope per dataset is real navigation
-        cost. It has to aggregate rather than adding a permanent panel
-        to every dataset - CLAUDE.md's own warning that a design fine
-        at 2 datasets routinely fails at 30, and that per-dataset
-        banners become noise.
-      - >
-        THE GAP THIS CLOSES IS REAL AND MEASURABLE TODAY: a failed
-        load surfaces only in `mothman supply failures`, which is
-        terminal-only, so the dashboard shows a dataset quietly
-        holding no data for that period with no explanation - the
-        confusing quiet state this project has already spent real
-        effort on.
-      - >
-        The status vocabulary must not gain a value - REQ-DASH-041's
-        prohibition. This is a scope, not a status.
-      - >
-        Renders from what the build recorded, with no live data access
-        of its own.
-    dependencies: [REQ-QAC-096]
-    open_questions:
-      - >
-        Whether a file-check failure is visible at the glancing level
-        (a dataset row) or only on drill-down. REQ-DASH-085's own
-        decision argues for the former - a qualifier only visible
-        after a click does not prevent the misreading it exists to
-        prevent - and the counter-argument is the noise NFR above.
-        Worth Keith's reaction rather than a scoper's call.
+    - AT 30 DATASETS a per-dataset panel is noise; the section collapses to one line when everything passed (criterion 5), and the only thing that reaches the agency view is REQ-DASH-148's one red and one queue item - the aggregation REQ-DASH-070 already owns, never a banner of its own.
+    - THE STATUS VOCABULARY DOES NOT GROW (REQ-DASH-041). The dataset-level red is the existing red with a reason in words, as REQ-PIPE-115 criterion 10 and REQ-DASH-133 criterion 4 already do.
+    - 'A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING ELSE (Keith, 2026-09-27): the section and the item come from the ''file'' scope and the decision log only.'
+    - 'PERFORMANCE: no new per-page fetch; the file-check results are embedded with the rest of the dataset''s recorded results, and add a handful of rows per supply.'
+    dependencies:
+    - REQ-QAC-096
+    - REQ-DASH-148
+    - REQ-DASH-070
+    open_questions: []
     decisions:
-      - >
-        AGREED ANSWER (Keith, 2026-09-26): yes, they reach the
-        dashboard, as THEIR OWN SCOPE, never folded into the data
-        checks' status. A red saying "the file had ragged rows" is a
-        different KIND of claim from "14 records violate the
-        contract", and merging them recreates the two-subjects
-        confusion the load-first decision exists to resolve.
-      - >
-        Separated from REQ-QAC-096 on the same grounds REQ-DASH-085
-        was separated from REQ-PIPE-084: the check is pipeline work
-        and the labelling is dashboard work, with different owners,
-        tests and toolchains.
+    - 'AGREED ANSWER (Keith, 2026-09-26): yes, file checks reach the dashboard, as THEIR OWN SCOPE, never folded into the data checks'' status. A red saying ''the file had ragged rows'' is a different KIND of claim from ''14 records violate the contract'', and merging them recreates the two-subjects confusion the load-first decision exists to resolve.'
+    - 'SEPARATED FROM REQ-QAC-096 on the same grounds REQ-DASH-085 was separated from REQ-PIPE-084: the check is pipeline work and the labelling is dashboard work, with different owners, tests and toolchains.'
+    - THE DATASET-LEVEL SIGNAL IS REQ-DASH-148's (criterion 6) (Keith, 2026-10-04). The refreshed draft gave a failed file check its own outstanding item and its own red on REQ-PIPE-115's pattern while a promotion waited; once Keith chose that any failing file check refuses the whole file, a refused file is a failed load, and a second item or red for the same event would be the duplication REQ-DASH-070 exists to prevent. Keith's 2026-09-26 rule is unchanged - a file check's verdict never enters a data check's status.
+    - 'NO NEW ITEM KIND. ''File problem'' was chosen earlier on 2026-10-04 and dropped the same day with the promotion gate it belonged to: a refused file uses REQ-DASH-148''s existing ''failed-load'' item, with the check named in its reason. REJECTED, before that, reusing ''withheld-promotion'', whose wording is written for REQ-PIPE-077''s off-cycle gate.'
+    - 'THE OLD CRITERION 3 (a period quietly empty because a load failed) MOVED TO REQ-DASH-148. It does not depend on file checks at all, can be built on REQ-PIPE-115 today, and part of it is already built: a failed load raises a ''failed-load'' outstanding item (qa_tools/common/outstanding.py:342-366) labelled ''Failed load'' on the page (dashboard/qa-reporting-dashboard.template.html:3996) with a ''Blocks a supply'' marker per dataset (template:4076). What is missing is the red.'
+    - THE GLANCE QUESTION IS REFRAMED, not dropped. The 2026-09-26 question was 'glancing level or drill-down'. REQ-PIPE-115 has since settled the analogous case for held and contested supplies as one dataset-level red; question 2 asks whether file checks follow it.
+    - 'THE PASSING CASE COLLAPSES (criterion 5, scoper''s proposal) for the 30-dataset NFR: six green rows on every dataset page, every day, is the noise that teaches a reader to skip the section.'
   - id: REQ-PIPE-098
     title: "A dataset that does not participate in a period stands on its most recent supply, by a view created when the period is born"
     date_written: "2026-09-26"
@@ -25747,7 +25601,7 @@ requirements:
     - WHERE a run's OWN table cannot be read, THE SYSTEM SHALL NOT run any tool for that run, and SHALL NOT record any per-check result for that dataset's own checks in that run.
     - WHERE a run's own table cannot be read because its supply is held, THE SYSTEM SHALL use the existing REQ-DASH-070 'held-supply' outstanding item as that dataset's signal, worded to say the supply is held, waiting for a person to place it.
     - WHERE a run's own table cannot be read because two files claim it (REQ-PIPE-105 criterion 6), THE SYSTEM SHALL raise a REQ-DASH-070 outstanding item scoped to that dataset, blocking, worded to say the table is contested, waiting for a person to choose a file, and naming both files - from recorded qa metadata only.
-    - IF a run's own table cannot be read for any reason other than a hold or a contest, THEN THE SYSTEM SHALL treat it as a failed run naming the table, rather than recording nothing.
+    - IF a run's own table cannot be read for any reason other than a hold, a contest, or a load that refused the file (REQ-DASH-148), THEN THE SYSTEM SHALL treat it as a failed run naming the table, rather than recording nothing.
     - WHILE a 'held-supply' or contested outstanding item is open for a dataset as at the instant on show, THE SYSTEM SHALL count that dataset's status as RED for the period on show, stating the item's reason in words, and SHALL roll that red up to the collection and the agency like any other red, as REQ-DASH-133 criterion 4 does for a closed period with no supply.
     - WHILE criterion 10 applies, THE SYSTEM SHALL show each of that dataset's own checks as not run for that period, and SHALL NOT show any of them as passing or carry an earlier run's verdict forward as that period's result.
     - THE SYSTEM SHALL judge whether such an item is open as at the instant on show, so that the as-of view reproduces what a reader saw then.
@@ -25795,7 +25649,7 @@ requirements:
     - 'A HELD SUPPLY HAS NO PERIOD, so ''red for that period'' is judged by the item being open AS AT THE INSTANT ON SHOW (criterion 12), the same rule REQ-DASH-133 criterion 9 uses: the dataset reads red for whichever period is on show while the item is open. WORTH KNOWING: outstanding.survey() today reads only what is open NOW, so an as-of view of a past instant needs each item''s raised and resolved instants carried into the build - qa.hold has both (raised_at, resolved_by); the contest item will need the same.'
     - 'REQ-PIPE-078 CRITERION 9 IS REWORDED, NOT BROKEN (Keith, 2026-10-04, option b of the scoper''s question): it forbids a TOOL VERDICT against a supply with no period, and allows a not-evaluated record. Needed because REQ-PIPE-144 criterion 13 (signed 2026-10-04) files a held contested pair to no period, and under the old wording the contested and Birth Registrations reds would have been forbidden the moment 144 landed. The original concern survives intact: a green, or any verdict that would have to be thrown away once the slot is known, never sits against no period.'
     - 'THE ROUTE IS FILTER-BEFORE-RUN, IN MEMORY, and it is built: dbt --exclude stg_<table>+ (the + takes dependants with it), Soda via readable_checks_yaml, datacontract-cli by skipping on the shared tables_read declaration, Evidently by not evaluating. REJECTED Keith''s 2026-09-30 reframing of letting the tools error and classifying the errors - it needed per-tool, version-sensitive text matching, and filtering made it unnecessary. Old criterion 6 survives as criterion 18: any tool error is a failed run.'
-    - 'NO TOOL RUNS FOR A RUN WHOSE OWN TABLE IS UNREADABLE (criterion 6): every check in such a run''s scope is either the dataset''s own or reads its table, so nothing in it is evaluable. Birth Registrations already does this; Child Protection''s contested case currently runs all four tools to leave everything out. A run''s own table can be unreadable only through a hold or a contest - its own arrival carries it - so any other cause is a failed run (criterion 9, the scoper''s proposal) rather than a silent one.'
+    - 'NO TOOL RUNS FOR A RUN WHOSE OWN TABLE IS UNREADABLE (criterion 6): every check in such a run''s scope is either the dataset''s own or reads its table, so nothing in it is evaluable. Birth Registrations already does this; Child Protection''s contested case currently runs all four tools to leave everything out. A run''s own table can be unreadable only through a hold or a contest - its own arrival carries it - so any other cause is a failed run (criterion 9, the scoper''s proposal) rather than a silent one. Amended 2026-10-04 (Keith): a refused load is a third way - the arrival carries the file and the load refuses it - and it is shown like a hold or a contest, red for its dataset, rather than failing the run.'
     - REJECTED THE EMPTY-VIEW IDEA (Keith's own, 2026-09-30). Over zero rows a not-null, uniqueness or referential check passes vacuously, giving a mostly-green table for a supply nobody could place.
     - THE RESEARCH-FIRST INSTRUCTION (Keith, 2026-09-30) IS SATISFIED FOR OUR FOUR TOOLS by the 2026-10-04 probe against the installed packages, which this project's standing lesson ranks above documentation. The wider-field survey (Great Expectations, Monte Carlo, the freshness and volume vendors) was judged unnecessary unless a real gap appears (Keith, 2026-10-04).
     - 'THE OLD OPEN QUESTIONS, ANSWERED: Soda survives a missing table (after filtering), datacontract-cli and Evidently were examined and survive, and held versus never-arrived reach a sibling the SAME way today - both as ''absent'', because period_overlay.build applies a hold only to the run''s own table and a held supply has no filing, so it is never staged for a period. Keith, 2026-10-04: held must be named as held.'
@@ -27109,3 +26963,46 @@ requirements:
     - AURORA HAS TWO VERSION NUMBERS - the engine version and aurora_version(). Gate on server_version_num, which exists everywhere; aurora_version() does not exist on vanilla PostgreSQL.
     - 'THE DECLARATION LIVES IN contract/data-asset.yaml (Keith, 2026-10-04, question 6 option B). It is a fact about the asset''s deployment, and each asset''s own data-asset.yaml can state its own - a second asset is a second deployment, so a per-asset declaration costs nothing. REJECTED: A, a .postgres-version file beside .python-version - the precedent this check borrows its reasoning from, but a repository-wide file is a single answer for every asset sharing the codebase; C, per environment in contract/environments.yaml - it would allow a different major per environment, which undoes the point of the check.'
     - 'A MINOR MISMATCH IS SILENT (delivery-scoper''s recommendation, kept 2026-10-04; Keith did not ask for a warning). Minors are bug and security fixes, and a warning on every CI run - 16.15 against Aurora''s 16.8 - would be noise a person learns to ignore. REJECTED: warning on standard error.'
+  - id: REQ-DASH-148
+    title: A dataset whose supply could not be loaded reads red for the period, saying so, through its existing failed-load item
+    date_written: '2026-10-04'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As a data team leader, I want a dataset whose supply arrived but could not be loaded to read clearly red for that period, saying the file could not be loaded and why, while the rest of the delivery is checked as usual, so that a bad file costs me one honest, explained red rather than a quiet gap, a stale green, or a stopped pipeline.
+    moscow: must
+    status: not_started
+    source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - ''today a failed load surfaces only in mothman supply failures ... the dashboard shows a dataset quietly holding no data''. Split out of REQ-DASH-097''s criterion 3 by delivery-scoper 2026-10-04, shaped on REQ-PIPE-115 (signed that day); closes REQ-PIPE-060 criterion 5''s unmet entry.'
+    acceptance_criteria:
+    - WHILE a 'failed-load' outstanding item is open for a dataset as at the instant on show, THE SYSTEM SHALL count that dataset's status as RED for the period on show, stating in words that the supply could not be loaded and the recorded reason - which, for a file refused by a file check, names that check (REQ-QAC-096 criterion 11) - and SHALL roll that red up to the collection and the agency like any other red.
+    - WHILE criterion 1 applies, THE SYSTEM SHALL show each of that dataset's own checks as not run for that period, and SHALL NOT show any of them as passing or carry an earlier run's verdict forward as that period's result.
+    - THE SYSTEM SHALL judge whether a failed-load item is open as at the instant on show - open from the failed load record until a later record for the same table says it loaded - so that the as-of view reproduces what a reader saw then.
+    - WHERE a period's slot is closed and unfilled and a supply for it failed to load, THE SYSTEM SHALL say that a supply arrived and could not be loaded, and SHALL NOT word it as no supply.
+    - IF a run's own table cannot be read because its load failed, THEN THE SYSTEM SHALL run no tool for that run, record no per-check result for that dataset's own checks, and complete the run without treating it as a failed run.
+    - WHERE a cross-table check reads a table whose load failed for the arrival being checked, THE SYSTEM SHALL record that check as not evaluated, red, under the existing 'unrunnable' pseudo-tool, giving 'could not be loaded' as the reason ahead of every slot reason.
+    - THE SYSTEM SHALL record, in the same change, that REQ-PIPE-060 criterion 5's unmet entry is delivered by criteria 1 to 3.
+    - THE SYSTEM SHALL NOT convey any of this by colour alone.
+    - THE SYSTEM SHALL have a real-browser test against the built dashboard in which one Child Protection table fails to load while the other five load, asserting that its dataset reads red with the reason, that the red rolls up, that none of its own checks reads as passing, and that the other five datasets are checked as usual.
+    non_functional_requirements:
+    - 'A FALSE GREEN IS THE FAILURE TO PREVENT: a dataset showing its last good run''s green while this period''s supply could not even be read is the worst outcome this exists to rule out.'
+    - 'IT HOLDS AT 30 DATASETS: one red per dataset, never one per check, and one aggregated queue item as REQ-DASH-070 already does.'
+    - 'RELIABILITY: one supplier''s bad file never stops the batch or costs any other dataset its QA - the case Keith called ''a really important one'' from real operational experience (TS-12).'
+    - A REASON NAMES THE FILE, LINE AND FIELD COUNT, NEVER A ROW VALUE (REQ-PIPE-115 NFR 9). The recorded reason is the parser's own message today, which already meets this; the check is that nothing new quotes the file.
+    - 'A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING ELSE: the item and the red come from qa.load_outcome only, which already carries the instant each record was written.'
+    - 'FAILING FIRST: criterion 5''s behaviour is not exercised by any test today, so the first test written reproduces what a run with its own table failed to load actually does now, before anything changes.'
+    dependencies:
+    - REQ-PIPE-115
+    - REQ-DASH-070
+    - REQ-PIPE-060
+    - REQ-DASH-133
+    open_questions: []
+    decisions:
+    - 'SPLIT OUT OF REQ-DASH-097 (scoper, 2026-10-04): a failed load is not a file-check result and needs no file check to exist. Keeping it in 097 would hold a buildable fix hostage to the whole file-check feature.'
+    - 'REUSES REQ-PIPE-115''s PATTERN WHOLE (scoper, 2026-10-04): the existing REQ-DASH-070 item is the signal, and while it is open the dataset is red for the period on show, judged as at the instant on show. Keith chose exactly this for held and contested supplies on 2026-10-04, rejecting both a new dataset-level state and a marker that sits beside a status that could still read green.'
+    - 'BUILT ALREADY, and reused rather than rebuilt: the ''failed-load'' item, blocking and needs-action, naming the table, delivery and reason (qa_tools/common/outstanding.py:342-366); its label ''Failed load'' and per-dataset ''Blocks a supply'' marker (dashboard/qa-reporting-dashboard.template.html:3996, 4076); the append-only load record whose latest entry is current (qa_tools/common/load_log.py:237). What is not built is REQ-PIPE-060 criterion 5''s red, recorded unmet on that requirement since 2026-09-25.'
+    - 'A CONFLICT WITH A SIGNED REQUIREMENT, found while refreshing this group: REQ-PIPE-115 criterion 9 says a run''s own table unreadable ''for any reason other than a hold or a contest'' is a failed run, and its decision 12 says those are the only two ways it can happen. A failed load is a third - the arrival carries the file and the load refuses it - so as signed, one supplier''s malformed file would fail the run and stop the batch. RESOLVED THE SAME DAY: Keith chose this requirement''s pattern over a queue item only and over folding it into REQ-PIPE-115, and signed the amendment to REQ-PIPE-115 criterion 9 and decision 12 on 2026-10-04 - a refused load is the third reason, shown red rather than failing the run.'
+    - 'THE BLOCKER RECORDED ON REQ-PIPE-060 IS GONE. Its unmet entry said this waits on ''a filing to present'', because a failed supply had no period. REQ-PIPE-115 decision 9 solved the same problem for a held supply, which also has no period: judge the item as open at the instant on show, and the dataset is red for whichever period is on show.'
+    - '''COULD NOT BE LOADED'' OUTRANKS THE SLOT REASONS (criterion 6), following REQ-PIPE-115 criterion 15: ''overdue'' would send somebody to chase a supplier who has already sent the file.'
+    - 'PROBE FIRST, BEFORE BUILDING: what a run whose own table failed to load does today is unverified. No test drives the orchestrator through it; REQ-GEN-044 deliberately did not inject TS-12 because, on 2026-09-28, one unloadable table took the whole delivery''s QA down. REQ-PIPE-105 has since filtered absent siblings out, but the own-table case has not been re-run. The failing-first NFR makes this the first test written.'
+    - 'WORTH KNOWING, NOT A CRITERION: the failed-load item names ''reject the supply'' as a response, and rejection.reject moves the supply''s tables to the rejected schema - a failed load has none. Whether rejecting a failed-load supply works, and whether it resolves the item (load_log.failures reads only load records), is unverified and is a candidate for plans/post-build-review.md rather than this requirement.'
+    - 'A FILE REFUSED BY A FILE CHECK TAKES THIS PATH (Keith, 2026-10-04): any failing file check refuses the whole file (REQ-QAC-096 criterion 11), so this requirement''s red and item are the only dataset-level signal for it, with the check named in the reason. REQ-DASH-097 shows the file section; it adds no red of its own.'

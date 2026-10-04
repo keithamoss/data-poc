@@ -4530,3 +4530,18 @@ twice. It deliberately did not re-find the `TypeError`.
 
     **DECIDED 2026-10-04 (Keith):** folded into REQ-PIPE-107, signed - a
     newer schema is refused, and the downgrade is fixed failing-test-first.
+
+80. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **"Reject
+    the supply" is offered for a failed load, and may not work on one.**
+    Raised by the delivery-scoper refreshing REQ-DASH-148, not yet
+    reproduced here. The `failed-load` outstanding item
+    (`qa_tools/common/outstanding.py`, `_from_loads`) offers "reject the
+    supply" as a response, but `rejection.reject` works by MOVING the
+    supply's physical tables to the rejected schema - and a failed load
+    has no table. Two things unverified: whether rejecting a failed-load
+    supply succeeds at all, and whether it clears the item, since
+    `load_log.failures()` reads only load records and a rejection writes
+    a decision-log entry. Matters more now: from REQ-QAC-096 (signed
+    2026-10-04) every file refused by a file check takes this same path.
+    A defect claim, so a failing test comes first; whether the fix is a
+    sign-off item depends on what the probe shows.

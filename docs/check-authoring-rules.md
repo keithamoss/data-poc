@@ -88,7 +88,9 @@ quoting it.
     supply", never "this run" or "a day's registrations". Say **supply**,
     never "extract" or "file" - standardised 2026-09-20. The one
     exception is the real column `extract_timestamp`, where "extract" is
-    its name rather than a word for a delivery (rule 12).
+    its name rather than a word for a delivery (rule 12). The other
+    exception is a file check, whose subject is the file as delivered;
+    there "file" is the accurate word.
 14. Drop measured results; keep the rule they justify. "tolerated null
     up to ~5%" stays, "(real observed range 0.9-3.3%)" goes.
 15. Identical wording across tools is allowed, never required. Check

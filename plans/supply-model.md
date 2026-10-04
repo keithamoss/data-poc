@@ -2351,7 +2351,7 @@ exist.
     check ids, lifecycle metadata and authored prose, reaching the dashboard
     as its own scope and never folded into the data checks' status.
 
-    **Owns:** `REQ-QAC-096`, `REQ-DASH-097`
+    **Owns:** `REQ-QAC-096`, `REQ-DASH-097`, `REQ-DASH-148`
 
     Exists because the load-first decision in sprint 26 would otherwise
     silently drop a whole class of QA: those questions are answered or
@@ -2362,6 +2362,15 @@ exist.
     **Keith's own answer on what a failure GATES, 2026-09-26**: a failed
     load-time file check gates promotion, "possibly even QA". The second half
     is deliberately tentative and is his to settle when this is built.
+
+    **SETTLED AND SUPERSEDED, 2026-10-04 (Keith).** Refreshed by
+    delivery-scoper and signed: ANY failing file check refuses the whole
+    file, so no data check runs and nothing reaches promotion - it takes
+    REQ-DASH-148's "could not be loaded" path, one red for its dataset with
+    the check named. Column order only warns. The promotion-gate draft
+    (REQ-PIPE-149) was dropped unsigned. REQ-DASH-148 (a failed load reads
+    red) also amends REQ-PIPE-115 criterion 9 and can be built ahead of the
+    file checks themselves. The decisions are on the three requirements.
 
 28. **[blocked, 2026-09-29]** **[Pipeline & publishing]** **"Inherited": a dataset
     that does not participate in a period at all.** A view created when a
