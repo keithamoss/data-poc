@@ -1298,3 +1298,15 @@ judgement about who reads the page rather than about the rule.
     - Promoting INTO A SUBSTITUTED OR INHERITED SLOT: Keith - an INHERITED
       slot must not be replaced, since inheritance means nothing was
       expected; undecided on SUBSTITUTED - worked example requested.
+    - **128 and 130 APPROVED** (Keith).
+    - **129 APPROVED, both directions explicit:** renamed to the plain base
+      name coming INTO a period, renamed back to its full stamped name on
+      EVERY way out (superseded, demoted, rejected, re-filed) in the same
+      transaction. The full name is rebuilt from the decision-log entry
+      that put it there (table name + supply id are both on it), no second
+      store.
+    - **A PERSON PROMOTING INTO A SUBSTITUTED SLOT** (Keith, "option c"):
+      warn that the substitution is about to be removed, then do it - TWO
+      decision-log entries, a de-substitute and then the promotion, in one
+      transaction. **INTO AN INHERITED SLOT: REFUSED** until a person takes
+      a separate un-inherit action (inheritance means nothing was expected).
