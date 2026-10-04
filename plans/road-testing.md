@@ -1261,3 +1261,20 @@ judgement about who reads the page rather than about the rule.
       the slot is filled and nothing changes. REVERSES Thread E's "late is
       always allowed" / an open-ended claim window, and changes REQ-PIPE-063
       - to be confirmed and scoped.
+    - **PERIOD CLOSING SETTLED (Keith):** not a setting - how the whole
+      system works, both assets. RULE: a period CLOSES once the NEXT
+      period's early (claim) window opens, or, where there is no early
+      window, once the next period opens. Must hold for date-based
+      calendars (quarterly) and cadence-based ones (daily). Reversals of
+      Thread E's "late is always allowed" and REQ-PIPE-063's "closes only
+      once a later period is filled" accepted as deliberate.
+    - **PERIODS MUST NOT OVERLAP, ENFORCED** (Keith) - for both calendar
+      kinds. Checked 2026-10-04: NOTHING enforces it today
+      (validate_schedule.py checks dates, months and grace, never one
+      period's windows against the next). Under the closing rule an
+      overlap is worse than before: if the next period's window opens
+      before this period is due, this period closes before it can ever be
+      on time.
+    - Sent to delivery-scoper as its OWN requirement(s), separate from
+      option A. REQ-PIPE-065's ambiguity flag for backward filing (option
+      b) is moot: a file can never fit two open periods.
