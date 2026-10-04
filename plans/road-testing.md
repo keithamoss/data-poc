@@ -1824,6 +1824,10 @@ judgement about who reads the page rather than about the rule.
       evening: 115 - one contested item carries a file's load failure;
       144 - regenerate-history is retired; 114 - if the toolbar spike
       fails, prompts are prefixed with the environment label.
+      CI (Keith, later the same evening): NOT checked after each sprint -
+      once, at the very end of all the sprints. A 10-minute self wake-up
+      (send_later) is re-armed before every turn ends, so the night does
+      not stall between turns.
       MORNING REPORT: written here as the night goes - per sprint what was
       built, the commit, CI's result, and every PROVISIONAL choice.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
