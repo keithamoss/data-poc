@@ -1581,7 +1581,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     side effect of making a video. Worth knowing when re-recording.
 
 15. **[todo, 2026-09-19]** **[Testing & dev tooling]** **[Docs & process]**
-    **Priority: pick up tomorrow morning (2026-09-19, Keith's own words,
+    **Former priority, cleared by Keith 2026-10-04 - pick up tomorrow morning (2026-09-19, Keith's own words,
     after watching a real `delivery-scoper` run take 5+ minutes: "in
     terms of making the agents run faster, flag all that stuff, and
     we'll come back to that tomorrow morning").**
@@ -1828,7 +1828,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     weaker than it first looked.
 
 17. **[todo, 2026-09-19]** **[Docs & process]**
-    **Priority: pick up tomorrow morning alongside #15 (2026-09-19,
+    **Former priority, cleared by Keith 2026-10-04 - pick up tomorrow morning alongside #15 (2026-09-19,
     Keith's own ask - "yes, please log the QA pipeline token problem").**
 
     This project's own orientation instruction now costs **~159,000

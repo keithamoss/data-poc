@@ -131,7 +131,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    linkage work. Needs a scoping pass with Keith before building, same as
    this item's own original 2026-09-14 scoping rounds.
 
-   **Priority: work through today/tomorrow (2026-09-19, Keith's own
+   **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
    explicit ask).**
 
 4. **[todo, 2026-09-18]** **[Data generation]** Document/explain how the
@@ -368,7 +368,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    current mechanics first, then a scoping conversation with Keith
    before building, same as every other design-fork item in this file.
 
-   **Priority: work through today/tomorrow (2026-09-19, Keith's own
+   **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
    explicit ask).**
 
 10. **[todo, 2026-09-19]** **[Data generation]** A synthetic "education"
@@ -391,7 +391,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
     `synthetic_data_generator/` or `generator/`. Needs a scoping
     conversation with Keith before building.
 
-    **Priority: work through today/tomorrow (2026-09-19, Keith's own
+    **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
     explicit ask).**
 
 11. **[todo, 2026-09-30]** **[Data generation]** The generator ignores

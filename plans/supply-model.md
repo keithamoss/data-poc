@@ -47,7 +47,7 @@ every other plans file.
 
 ## Next steps
 
-**Priority: THE OVERNIGHT BUILD PLAN, 2026-09-28 (Keith's own ask -
+**Former priority, cleared by Keith 2026-10-04 - THE OVERNIGHT BUILD PLAN, 2026-09-28 (Keith's own ask -
 build the signed-and-unbuilt backlog unattended while he sleeps).**
 Written down before starting so it survives the container. Four
 questions were put to him and answered before any code was written;
@@ -389,7 +389,7 @@ first open question, which records exactly which criteria and why it
 still reads `not_started`. REQ-TEST-114 (the terminal saying which
 environment it is acting against) depends on it and is also unsigned.
 
-**Priority: work through in THIS ORDER (Keith, 2026-09-21 night, his own
+**Former priority, cleared by Keith 2026-10-04 - work through in THIS ORDER (Keith, 2026-09-21 night, his own
 words setting the queue): "let's work through the still open items that
 you've got logged... and then we'll do one last stress test using chaos
 engineering. And then we'll work up a delivery plan and then start

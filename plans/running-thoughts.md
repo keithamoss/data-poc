@@ -375,7 +375,7 @@ while building item #3's redesign above) DOES carry a real actor on
 every event, so the underlying data GitHub has to work with is there
 even if the Teams card doesn't surface it.
 
-**Priority: work through today/tomorrow (2026-09-19, Keith's own
+**Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
 explicit ask).** Worth checking first whether CLAUDE.md's own new
 blocked-domain-reporting convention (added the same day, after this
 item's own egress-block discovery) has since gotten Keith to widen

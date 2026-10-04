@@ -736,7 +736,7 @@ common/check_lifecycle.py`'s own `check_id` convention.
     find out what he actually wants here before anything can be
     scoped, let alone built.
 
-    **Priority: work through today/tomorrow (2026-09-19, Keith's own
+    **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
     explicit ask).**
 
 11. **[done, 2026-09-19]** **[Testing & dev tooling]** CLI/TUI splash
