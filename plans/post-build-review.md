@@ -4399,7 +4399,7 @@ twice. It deliberately did not re-find the `TypeError`.
     REQ-DOCS-143 and ahead of the rest of the batch, with this entry's
     test going in alongside it, failing first.
 
-76. **[todo, 2026-10-04]** **[Dashboard UI]** **The arrival history labels
+76. **[blocked, 2026-10-04]** **[Dashboard UI]** **The arrival history labels
     an arrival with its DELIVERY's receipt time, not the file's own.**
     Spotted by `delivery-architect` reviewing REQ-PIPE-144:
     `arrival_history._arrivals_in` takes the delivery's instant, while a
@@ -4410,6 +4410,14 @@ twice. It deliberately did not re-find the `TypeError`.
     2026-10-04: fix it. A minor bug against agreed behaviour (REQ-PIPE-105:
     every file is its own arrival with its own receipt), so it gets a
     failing test first and needs no further sign-off.
+
+    **WORSE THAN A LABEL, AND FOLDED INTO REQ-PIPE-144 (Keith,
+    2026-10-04).** It is `mothman supply history` (and the delivery
+    companions beside it), and the same code builds each arrival's SUPPLY
+    ID from the delivery's time - so for a spread delivery the id matches
+    no filing. The database holds no per-file receipt until 144 adds one,
+    so 144 carries the fix as a criterion (the arrival history reads the
+    one receipt view) rather than a stopgap now.
 
 77. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An
     unreadable table no longer takes a run down - but its reds do not
