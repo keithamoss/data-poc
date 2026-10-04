@@ -1771,6 +1771,19 @@ judgement about who reads the page rather than about the rule.
       choice between readings) or ROUTINE (a faithful transcription of an
       answer he gave), applied on this blanket approval and recorded as
       such in each requirement's decisions. When unsure, HIGH VALUE.
+      **DONE THE SAME EVENING.** 78 amendments across 21 requirements: 53
+      routine applied on the blanket approval; 25 high-value presented as
+      eight questions and signed, with these answers - REQ-DASH-070's
+      three changes signed as worded; choosing one file of a contested
+      pair RE-FILES it where its own receipt gives a different period or
+      classification; the privacy and S3 read-access wording signed; a
+      scripted S3 keep takes `--originally-received storage`; a drift
+      reference passed with `--commit` is REFUSED; "a person" starting
+      `pipeline process` means a terminal is attached; the `test`
+      environment and the corrected reason-row wording signed. DEFERRED by
+      Keith: what a Lambda does when its pass is refused as busy ("decide
+      when we focus on building the aws side later"), kept as an open
+      question on REQ-PIPE-152.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

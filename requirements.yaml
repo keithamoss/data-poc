@@ -1418,274 +1418,152 @@ requirements:
         is what destroyed them the first time.
   - id: REQ-DASH-070
     title: Supply anomalies and outstanding decisions have one presentation, aggregated and never a data verdict
-    date_written: "2026-09-24"
+    date_written: '2026-09-24'
     signed_off:
       by: Keith
-      date: "2026-09-24"
-    story: >
-      As a data engineer with thirty datasets to watch, I want everything
-      that needs a person presented in one place with a count, and
-      everything that merely happened presented as what happened, so that
-      an anomaly cannot hide behind a tier's status rollup and a warning
-      cannot read as a verdict on somebody's data.
+      date: '2026-09-24'
+    story: 'As a data engineer with thirty datasets to watch, I want everything that needs a person presented in one place with a count, and everything that merely happened presented as what happened, so that an anomaly cannot hide behind a tier''s status rollup and a warning cannot read as a verdict on somebody''s data.
+  
+      '
     moscow: must
     status: built
-    source: >
-      Batch 3's pre-build review, 2026-09-24. delivery-dashboard-ux found
-      that the eleven requirements of delivery sprints 7-10 emit at least
-      fourteen dashboard-facing obligations and NOT ONE CRITERION NAMES
-      THE DASHBOARD - every sentence describing the UI lives in an NFR or
-      a decision, none of which is checkable. delivery-architect found the
-      same gap independently. Keith's call, option (a) of two: one
-      requirement owns the presentation, drafted now rather than at
-      delivery sprint 22. See plans/supply-model.md, "Batch 3's pre-build
-      review".
+    source: 'Batch 3''s pre-build review, 2026-09-24. delivery-dashboard-ux found that the eleven requirements of delivery sprints 7-10 emit at least fourteen dashboard-facing obligations and NOT ONE CRITERION NAMES THE DASHBOARD - every sentence describing the UI lives in an NFR or a decision, none of which is checkable. delivery-architect found the same gap independently. Keith''s call, option (a) of two: one requirement owns the presentation, drafted now rather than at delivery sprint 22. See plans/supply-model.md, "Batch 3''s pre-build review".
+  
+      '
     acceptance_criteria:
-      - "THE SYSTEM SHALL present everything requiring a human decision - a held supply, a failed load, an assignment made under ambiguity, and a slot closed but unfilled - in ONE element carrying a total count, and SHALL NOT render one element per item or one element per producing rule."
-      - "THE SYSTEM SHALL render that element whatever a tier's status rollup says, and SHALL carry a per-scope count on each affected agency and collection, so that a rollup cannot absorb it."
-      - "THE SYSTEM SHALL distinguish, within that element, items that BLOCK a supply from items that merely need review, so that a non-blocking item cannot read as blocking work."
-      - "THE SYSTEM SHALL keep an item in that element until it is resolved, and SHALL NOT clear it because a later run passed over it."
-      - "THE SYSTEM SHALL present event severity - informational, warning, needs-action - distinctly from data-quality status, and SHALL NOT render event severity using the status vocabulary a check's verdict uses."
-      - "THE SYSTEM SHALL distinguish every severity by label as well as by appearance, and SHALL NOT rely on colour alone."
-      - "THE SYSTEM SHALL render a slot closed by monotonic filling and left unfilled as an obligation awaiting a decision, and SHALL NOT render it as a red data verdict."
-      - "THE SYSTEM SHALL name, for an item needing a decision, the responses available to a person, and SHALL NOT present a response that cannot yet be taken as a control."
-      - "WHERE an assignment was made under ambiguity, THE SYSTEM SHALL render that qualifier everywhere the assignment itself is rendered, and SHALL NOT render it only in the feed."
-      - "THE SYSTEM SHALL NOT render an absent, unfiled or uncertain arrival classification as a punctuality verdict, and SHALL render a classification it does not recognise as unknown."
-      - "THE SYSTEM SHALL state, where a reader meets a recomputed arrival classification, that it follows the supply's current filing."
-      - "THE SYSTEM SHALL explain an event in terms of what happened and whose task it is, and SHALL NOT attribute fault to the reader."
-      - "WHERE nothing requires a person, THE SYSTEM SHALL say so rather than rendering an empty element."
+    - THE SYSTEM SHALL present everything requiring a human decision - a held supply, a failed load, an assignment made under ambiguity, and a slot closed but unfilled - in ONE element carrying a total count, and SHALL NOT render one element per item or one element per producing rule.
+    - THE SYSTEM SHALL render that element whatever a tier's status rollup says, and SHALL carry a per-scope count on each affected agency and collection, so that a rollup cannot absorb it.
+    - THE SYSTEM SHALL distinguish, within that element, items that BLOCK a supply from items that merely need review, so that a non-blocking item cannot read as blocking work.
+    - THE SYSTEM SHALL keep an item in that element until it is resolved, and SHALL NOT clear it because a later run passed over it.
+    - THE SYSTEM SHALL present event severity - informational, warning, needs-action - distinctly from data-quality status, and SHALL NOT render event severity using the status vocabulary a check's verdict uses; WHERE another requirement makes an open item count its dataset red for the period on show (REQ-PIPE-115 criterion 10, REQ-DASH-148 criterion 1, REQ-DASH-133 criterion 4), THE SYSTEM SHALL show that red as the dataset's data-quality status with the item's reason in words, and SHALL NOT state anywhere that the items in this element never change a dataset's status.
+    - THE SYSTEM SHALL distinguish every severity by label as well as by appearance, and SHALL NOT rely on colour alone.
+    - THE SYSTEM SHALL render a slot that closed unfilled (REQ-PIPE-132) as an obligation awaiting a decision in this element, and SHALL count its dataset red for that period as REQ-DASH-133 criterion 4 requires, the item and the red naming the same period.
+    - THE SYSTEM SHALL name, for an item needing a decision, the responses available to a person, and SHALL NOT present a response that cannot yet be taken as a control.
+    - WHERE an assignment was made under ambiguity, THE SYSTEM SHALL render that qualifier everywhere the assignment itself is rendered, and SHALL NOT render it only in the feed.
+    - THE SYSTEM SHALL NOT render an absent, unfiled or uncertain arrival classification as a punctuality verdict, and SHALL render a classification it does not recognise as unknown.
+    - THE SYSTEM SHALL state, where a reader meets a recomputed arrival classification, that it follows the supply's current filing.
+    - THE SYSTEM SHALL explain an event in terms of what happened and whose task it is, and SHALL NOT attribute fault to the reader.
+    - WHERE nothing requires a person, THE SYSTEM SHALL say so rather than rendering an empty element.
+    - THE SYSTEM SHALL judge every item in this element, every per-scope marker and any red an open item causes as at the same instant on show, from each item's recorded raised and resolved instants carried into the build, so that the element, its markers and the statuses never disagree about one instant.
     non_functional_requirements:
-      - >
-        This exists because six producers - REQ-PIPE-057, 058, 059, 060,
-        064 and 065 - each carry their own "report it as needing action /
-        at WARNING / as informational" criterion, while the rule governing
-        how those COMBINE sat in two NFRs on two of the six. Built
-        independently, each honours its own criterion and the aggregate
-        obligation is met by nobody. That is the unowned-IOU shape
-        CLAUDE.md already records from the batch-3 failure.
-      - >
-        At ~30 datasets the aggregation is the whole requirement, not a
-        refinement of it. REQ-PIPE-059's and REQ-PIPE-064's own NFRs say
-        it: "a banner per dataset is how people learn to ignore the whole
-        class". There is no cross-dataset view of any of this today - the
-        exec and agency tiers roll up STATUS ONLY - so without this
-        requirement every fact those eleven produce is reachable only by
-        drilling into one dataset at a time, which at 30 means nobody
-        sees them.
-      - >
-        The resolution path does not exist until delivery sprint 12, so
-        for a period this element shows work nobody can clear. That is
-        accepted for build order and is exactly why criterion 8 forbids
-        rendering a response as a control before it can be taken -
-        REQ-PIPE-064's own NFR warns that "a hold nobody can clear is
-        indistinguishable from a bug", and repeated unhelpful states
-        teach people to stop reading the thing that teaches them.
-      - >
-        Reuse the existing idioms rather than inventing a second visual
-        language. REQ-PIPE-053's own trio is the closest precedent and is
-        already the right shape: a count-led notice with no dismiss
-        control ("a dismissible notice about a task nobody has done is a
-        notice about a task nobody will do"), a per-tier marker so a
-        rollup cannot absorb it, and a pill deliberately unlike the four
-        status pills - solid border, square marker - "because this is the
-        one state that is OUR task undone rather than a verdict on
-        anybody's data", never distinguished by colour alone.
-      - >
-          This is a dashboard-build concern and may never read supply rows.
-          Every fact it renders is already RECORDED by the producing
-          requirement. AMENDED 2026-09-28 (REQ-DOCS-101 criteria 4 and 5):
-          "open data/" became "read supply rows" and "committed" became
-          "recorded". The queue is built from observations other requirements
-          made; it derives nothing from the extract, and that is what makes it
-          safe for the publisher to render.
-      - >
-        The dashboard is the ONLY way to see a hold (REQ-PIPE-057's own
-        decision), and it is rebuilt by CI on push - so the latency
-        between a hold appearing and a person seeing it is a deploy.
-    dependencies: [REQ-PIPE-057, REQ-PIPE-059, REQ-PIPE-060, REQ-PIPE-063, REQ-PIPE-064, REQ-PIPE-065, REQ-PIPE-066]
+    - 'This exists because six producers - REQ-PIPE-057, 058, 059, 060, 064 and 065 - each carry their own "report it as needing action / at WARNING / as informational" criterion, while the rule governing how those COMBINE sat in two NFRs on two of the six. Built independently, each honours its own criterion and the aggregate obligation is met by nobody. That is the unowned-IOU shape CLAUDE.md already records from the batch-3 failure.
+  
+      '
+    - 'At ~30 datasets the aggregation is the whole requirement, not a refinement of it. REQ-PIPE-059''s and REQ-PIPE-064''s own NFRs say it: "a banner per dataset is how people learn to ignore the whole class". There is no cross-dataset view of any of this today - the exec and agency tiers roll up STATUS ONLY - so without this requirement every fact those eleven produce is reachable only by drilling into one dataset at a time, which at 30 means nobody sees them.
+  
+      '
+    - 'The resolution path does not exist until delivery sprint 12, so for a period this element shows work nobody can clear. That is accepted for build order and is exactly why criterion 8 forbids rendering a response as a control before it can be taken - REQ-PIPE-064''s own NFR warns that "a hold nobody can clear is indistinguishable from a bug", and repeated unhelpful states teach people to stop reading the thing that teaches them.
+  
+      '
+    - 'Reuse the existing idioms rather than inventing a second visual language. REQ-PIPE-053''s own trio is the closest precedent and is already the right shape: a count-led notice with no dismiss control ("a dismissible notice about a task nobody has done is a notice about a task nobody will do"), a per-tier marker so a rollup cannot absorb it, and a pill deliberately unlike the four status pills - solid border, square marker - "because this is the one state that is OUR task undone rather than a verdict on anybody''s data", never distinguished by colour alone.
+  
+      '
+    - 'This is a dashboard-build concern and may never read supply rows. Every fact it renders is already RECORDED by the producing requirement. AMENDED 2026-09-28 (REQ-DOCS-101 criteria 4 and 5): "open data/" became "read supply rows" and "committed" became "recorded". The queue is built from observations other requirements made; it derives nothing from the extract, and that is what makes it safe for the publisher to render.
+  
+      '
+    - 'The dashboard is the ONLY way to see a hold (REQ-PIPE-057''s own decision), and it is rebuilt by CI on push - so the latency between a hold appearing and a person seeing it is a deploy.
+  
+      '
+    dependencies:
+    - REQ-PIPE-057
+    - REQ-PIPE-059
+    - REQ-PIPE-060
+    - REQ-PIPE-063
+    - REQ-PIPE-064
+    - REQ-PIPE-065
+    - REQ-PIPE-066
     linked_tests:
-      - tests/test_outstanding.py
-      - tests-js/outstanding.test.js
-      - tests/test_dashboard_e2e.py
+    - tests/test_outstanding.py
+    - tests-js/outstanding.test.js
+    - tests/test_dashboard_e2e.py
     implemented_by:
-      - qa_tools/common/outstanding.py::survey
-      - qa_tools/common/outstanding.py::Outstanding
-      - qa_tools/common/outstanding.py::Item
-      - dashboard/embed_dashboard_data.py::embed
+    - qa_tools/common/outstanding.py::survey
+    - qa_tools/common/outstanding.py::Outstanding
+    - qa_tools/common/outstanding.py::Item
+    - dashboard/embed_dashboard_data.py::embed
     evidence:
-      - >
-        2026-09-25: the aggregation is asserted as ONE element, not as a
-        count of items. Four items from four different producers - a
-        held supply, a failed load, a contested file and an unrecognised
-        one - render exactly one .notice-queue carrying three queue-item
-        rows, because the failure this requirement exists to prevent is
-        six correct banners and no total.
-      - >
-        2026-09-25: criterion 10 was a REAL DEFECT in built code, not a
-        gap. arrivalStatusLabel()/arrivalPill() mapped anything that was
-        not "early" or "late" to a green "On time" pill, so
-        REQ-PIPE-066's "unfiled" - which means there is no slot to be
-        punctual against at all - would have rendered as a confident
-        punctuality verdict in three places: the Tier 2 dataset table,
-        the Latest arrival tile and the supply-history Timing column.
-        Three regression tests were written first and CONFIRMED FAILING
-        against the pre-fix template (checked out from HEAD and run):
-        "expected 'On time' not to be 'On time'", "expected '<span
-        class=\"pill green \">...' not to contain 'pill green'", and
-        "expected 'On time' to be 'Unknown'". Both maps are exhaustive
-        now and an unrecognised value renders as unknown.
-      - >
-        2026-09-25: severity is asserted to share NO vocabulary with a
-        data verdict - every severity pill is checked for the absence of
-        green/amber/red, and each is checked to carry its own label in
-        words, because colour alone was never the distinction this could
-        rely on. An unrecognised severity renders at the LOUDEST weight
-        rather than the quietest, so a new producer's needs-action item
-        cannot arrive looking like a footnote.
-      - >
-        2026-09-25: criterion 8 is asserted as the ABSENCE of a control.
-        The rendered queue contains no <button> and no <a>, and says in
-        words that the responses are recorded rather than offered -
-        because REQ-PIPE-064's own NFR warns that a hold nobody can
-        clear is indistinguishable from a bug, and a dead button teaches
-        a reader that the whole panel is dead.
-      - >
-        2026-09-25: the empty state is asserted in a REAL browser at two
-        tiers, not in a unit test, because it is the state a reader
-        actually meets today - the real committed history has nothing
-        outstanding, and "nothing is waiting" must not look like "this
-        panel is broken".
-      - >
-        2026-09-26: one of criterion 11's own e2e assertions was FOUND
-        WRONG the same night, by the gate rather than in review. It
-        drove the default as-of date - today on the asset clock - and
-        went red the moment the Perth date rolled past the newest
-        generated run: Birth Registrations is daily, so a day later its
-        newest supply falls outside its own current cycle and the row
-        correctly renders the quiet state, which has no arrival cell to
-        carry a qualifier. Nothing about the page was wrong. It now
-        takes the as-of date from the page's own data. Same shape as
-        plans/post-build-review.md #59, and it would have gone red in
-        CI on the next run for the same reason.
-      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+    - '2026-09-25: the aggregation is asserted as ONE element, not as a count of items. Four items from four different producers - a held supply, a failed load, a contested file and an unrecognised one - render exactly one .notice-queue carrying three queue-item rows, because the failure this requirement exists to prevent is six correct banners and no total.
+  
+      '
+    - '2026-09-25: criterion 10 was a REAL DEFECT in built code, not a gap. arrivalStatusLabel()/arrivalPill() mapped anything that was not "early" or "late" to a green "On time" pill, so REQ-PIPE-066''s "unfiled" - which means there is no slot to be punctual against at all - would have rendered as a confident punctuality verdict in three places: the Tier 2 dataset table, the Latest arrival tile and the supply-history Timing column. Three regression tests were written first and CONFIRMED FAILING against the pre-fix template (checked out from HEAD and run): "expected ''On time'' not to be ''On time''", "expected ''<span class=\"pill green \">...'' not to contain ''pill green''", and "expected ''On time'' to be ''Unknown''". Both maps are exhaustive now and an unrecognised value renders as unknown.
+  
+      '
+    - '2026-09-25: severity is asserted to share NO vocabulary with a data verdict - every severity pill is checked for the absence of green/amber/red, and each is checked to carry its own label in words, because colour alone was never the distinction this could rely on. An unrecognised severity renders at the LOUDEST weight rather than the quietest, so a new producer''s needs-action item cannot arrive looking like a footnote.
+  
+      '
+    - '2026-09-25: criterion 8 is asserted as the ABSENCE of a control. The rendered queue contains no <button> and no <a>, and says in words that the responses are recorded rather than offered - because REQ-PIPE-064''s own NFR warns that a hold nobody can clear is indistinguishable from a bug, and a dead button teaches a reader that the whole panel is dead.
+  
+      '
+    - '2026-09-25: the empty state is asserted in a REAL browser at two tiers, not in a unit test, because it is the state a reader actually meets today - the real committed history has nothing outstanding, and "nothing is waiting" must not look like "this panel is broken".
+  
+      '
+    - '2026-09-26: one of criterion 11''s own e2e assertions was FOUND WRONG the same night, by the gate rather than in review. It drove the default as-of date - today on the asset clock - and went red the moment the Perth date rolled past the newest generated run: Birth Registrations is daily, so a day later its newest supply falls outside its own current cycle and the row correctly renders the quiet state, which has no arrival cell to carry a qualifier. Nothing about the page was wrong. It now takes the as-of date from the page''s own data. Same shape as plans/post-build-review.md #59, and it would have gone red in CI on the next run for the same reason.
+  
+      '
+    - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     unmet_criteria:
-      - criterion: >
-          Criterion 1, in part - a supply HELD BY THE ASSIGNMENT RULE
-          (REQ-PIPE-064) does not reach the queue. REQ-PIPE-059's
-          delivery-level hold does, from delivery_log/, and so do failed
-          loads, contested files and unrecognised artefacts.
-        why: >
-          supply_holds.holds_in() takes a run's decisions in memory and
-          deliberately writes nothing, because the resolution path that
-          would read a store does not exist and a store invented now
-          would have to be unpicked. So there is no committed record for
-          this to read, and this requirement may never open data/ or
-          re-run the rule. Re-check when filings are recorded.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
-      - criterion: >
-          Criterion 1, in part - a slot closed by monotonic filling and
-          left unfilled produces no item. The derivation is built and
-          criterion 7's framing is written, but it is structurally empty.
-        why: >
-          Only a PROMOTION fills a slot, and nothing closes until a later
-          one is filled. filing.filled_slots() returns an empty set on
-          purpose until promotion exists, so no slot can be closed and
-          none can therefore be closed-and-unfilled. Built against the
-          real rule rather than stubbed, so it lights up on its own.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
-      - criterion: >
-          Criterion 9, in part - the uncertain-filing qualifier is
-          rendered at all three sites an assignment appears (the Tier 2
-          arrival cell, the Latest arrival tile and the supply-history
-          Timing column) and is covered by tests, but no real supply
-          carries it today.
-        why: >
-          REQ-PIPE-062's filings are deliberately not recorded until
-          promotion exists (Keith, 2026-09-25), so filings/ is empty and
-          the reader finds nothing. The reader is built now rather than
-          later for the reason REQ-PIPE-065's rule was: a reader written
-          when the writer turns on is written by somebody who has
-          forgotten why the shape is what it is.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
+    - criterion: 'Criterion 1, in part - a supply HELD BY THE ASSIGNMENT RULE (REQ-PIPE-064) does not reach the queue. REQ-PIPE-059''s delivery-level hold does, from delivery_log/, and so do failed loads, contested files and unrecognised artefacts.
+  
+        '
+      why: 'supply_holds.holds_in() takes a run''s decisions in memory and deliberately writes nothing, because the resolution path that would read a store does not exist and a store invented now would have to be unpicked. So there is no committed record for this to read, and this requirement may never open data/ or re-run the rule. Re-check when filings are recorded.
+  
+        '
+      owner: the promotion sprint (batch 4)
+      blocked_by:
+        sprints:
+        - 11
+    - criterion: 'Criterion 1, in part - a slot closed by monotonic filling and left unfilled produces no item. The derivation is built and criterion 7''s framing is written, but it is structurally empty.
+  
+        '
+      why: 'Only a PROMOTION fills a slot, and nothing closes until a later one is filled. filing.filled_slots() returns an empty set on purpose until promotion exists, so no slot can be closed and none can therefore be closed-and-unfilled. Built against the real rule rather than stubbed, so it lights up on its own.
+  
+        '
+      owner: the promotion sprint (batch 4)
+      blocked_by:
+        sprints:
+        - 11
+    - criterion: 'Criterion 9, in part - the uncertain-filing qualifier is rendered at all three sites an assignment appears (the Tier 2 arrival cell, the Latest arrival tile and the supply-history Timing column) and is covered by tests, but no real supply carries it today.
+  
+        '
+      why: 'REQ-PIPE-062''s filings are deliberately not recorded until promotion exists (Keith, 2026-09-25), so filings/ is empty and the reader finds nothing. The reader is built now rather than later for the reason REQ-PIPE-065''s rule was: a reader written when the writer turns on is written by somebody who has forgotten why the shape is what it is.
+  
+        '
+      owner: the promotion sprint (batch 4)
+      blocked_by:
+        sprints:
+        - 11
     decisions:
-      - >
-        SETTLED 2026-09-24 (Keith), option (a) of two: ONE REQUIREMENT
-        OWNS THE PRESENTATION, drafted now rather than left to delivery
-        sprint 22. Rejected leaving it to sprint 22 with each pipeline
-        requirement carrying its own presentational criteria, because six
-        independent builds would land before anything reconciled them.
-        The eleven keep only the obligation to RECORD the fact and its
-        severity; how those combine on screen is here.
-      - >
-        Recorded because it is the finding that produced this
-        requirement: the eleven emit at least fourteen dashboard-facing
-        obligations and not one criterion names the dashboard. Every
-        sentence that actually describes the UI - "a banner per dataset is
-        how people learn to ignore the whole class", "say so where a
-        reader will meet it", "the dashboard will show a permanently red
-        slot nobody can close" - lives in an NFR or a decision. A critic
-        verifies against acceptance_criteria, so none of it was checkable.
-      - >
-        TWO SURFACES, NOT ONE, and the requirements themselves force it.
-        REQ-PIPE-064's NFR asks for both "re-presented on every run until
-        resolved" and "must not become thirty banners at 30 datasets",
-        which one time-ordered feed cannot do at once: a feed is scanned
-        and discarded, a queue is drained. Put a persistent state in a
-        feed and you get either wallpaper or a hold that scrolls away.
-        This requirement owns the QUEUE; the activity feed stays a feed
-        and remains sprint 22's.
-      - >
-        REJECTED rendering event severity with the status pill
-        vocabulary, which is criterion 5's reason for existing: an
-        unrecognised artefact at WARNING must not make a reader think the
-        dataset is amber, and REQ-PIPE-057 criterion 9 says explicitly it
-        does not fail the delivery. Event severity and data-quality
-        verdict are different claims about different things.
-      - >
-        A REAL COLLISION WITH BUILT CODE, which criterion 10 exists to
-        close: arrivalStatusLabel() in the template maps anything that is
-        not early or late to green "On time", so REQ-PIPE-066's new
-        unfiled value would render as a confident punctuality verdict on
-        the Tier 2 dataset table, the Latest arrival tile and the
-        supply-history Timing column. That is item 74's exact failure
-        mode at the last transform before the user, and REQ-PIPE-066's
-        own criteria 10 and 11 do not reach it - it is neither a
-        derivation nor a deletion, it is a permissive fallback.
-      - >
-        Criterion 9 uses the qualifier-chip idiom REQ-PIPE-063's sign-off
-        already established for the carried-forward case, deliberately
-        rather than inventing a second one. An assignment marked
-        uncertain in the feed but rendered as a confident verdict on the
-        dataset page is the false-confidence problem REQ-PIPE-065's
-        MoSCoW was raised to MUST over.
-      - >
-        SETTLED 2026-09-24 (Keith), resolving pre-build Q7: an uncertain
-        assignment SHARES the one element with the blocking states, with
-        criterion 3's visible distinction carrying the difference.
-        Rejected a separate review surface. The total is what a person
-        acts on - "six things waiting for me" is the number - and two
-        surfaces means nobody knows it. The distinction carries what
-        kind; the count carries the urgency.
-      - >
-        The risk that argues for a separate surface is real and is what
-        criterion 3 exists to manage: REQ-PIPE-065's uncertain
-        assignment is genuinely NON-BLOCKING - the supply was filed,
-        just uncertainly - and mixing a non-blocking item into a work
-        queue with a weak distinction is how people learn to ignore the
-        queue, which is the failure both aggregation NFRs already name.
-      - >
-        SETTLED 2026-09-24 (Keith), resolving pre-build Q10: the
-        in-flight delivery is rendered from a committed RUN-LEVEL
-        observation, framed as at the last regeneration. Neither drafted
-        option was buildable - see REQ-PIPE-057's own decisions for the
-        gap underneath the question and for why the record's subject had
-        to change from the delivery to the run.
+    - 'SETTLED 2026-09-24 (Keith), option (a) of two: ONE REQUIREMENT OWNS THE PRESENTATION, drafted now rather than left to delivery sprint 22. Rejected leaving it to sprint 22 with each pipeline requirement carrying its own presentational criteria, because six independent builds would land before anything reconciled them. The eleven keep only the obligation to RECORD the fact and its severity; how those combine on screen is here.
+  
+      '
+    - 'Recorded because it is the finding that produced this requirement: the eleven emit at least fourteen dashboard-facing obligations and not one criterion names the dashboard. Every sentence that actually describes the UI - "a banner per dataset is how people learn to ignore the whole class", "say so where a reader will meet it", "the dashboard will show a permanently red slot nobody can close" - lives in an NFR or a decision. A critic verifies against acceptance_criteria, so none of it was checkable.
+  
+      '
+    - 'TWO SURFACES, NOT ONE, and the requirements themselves force it. REQ-PIPE-064''s NFR asks for both "re-presented on every run until resolved" and "must not become thirty banners at 30 datasets", which one time-ordered feed cannot do at once: a feed is scanned and discarded, a queue is drained. Put a persistent state in a feed and you get either wallpaper or a hold that scrolls away. This requirement owns the QUEUE; the activity feed stays a feed and remains sprint 22''s.
+  
+      '
+    - 'REJECTED rendering event severity with the status pill vocabulary, which is criterion 5''s reason for existing: an unrecognised artefact at WARNING must not make a reader think the dataset is amber, and REQ-PIPE-057 criterion 9 says explicitly it does not fail the delivery. Event severity and data-quality verdict are different claims about different things.
+  
+      '
+    - 'A REAL COLLISION WITH BUILT CODE, which criterion 10 exists to close: arrivalStatusLabel() in the template maps anything that is not early or late to green "On time", so REQ-PIPE-066''s new unfiled value would render as a confident punctuality verdict on the Tier 2 dataset table, the Latest arrival tile and the supply-history Timing column. That is item 74''s exact failure mode at the last transform before the user, and REQ-PIPE-066''s own criteria 10 and 11 do not reach it - it is neither a derivation nor a deletion, it is a permissive fallback.
+  
+      '
+    - 'Criterion 9 uses the qualifier-chip idiom REQ-PIPE-063''s sign-off already established for the carried-forward case, deliberately rather than inventing a second one. An assignment marked uncertain in the feed but rendered as a confident verdict on the dataset page is the false-confidence problem REQ-PIPE-065''s MoSCoW was raised to MUST over.
+  
+      '
+    - 'SETTLED 2026-09-24 (Keith), resolving pre-build Q7: an uncertain assignment SHARES the one element with the blocking states, with criterion 3''s visible distinction carrying the difference. Rejected a separate review surface. The total is what a person acts on - "six things waiting for me" is the number - and two surfaces means nobody knows it. The distinction carries what kind; the count carries the urgency.
+  
+      '
+    - 'The risk that argues for a separate surface is real and is what criterion 3 exists to manage: REQ-PIPE-065''s uncertain assignment is genuinely NON-BLOCKING - the supply was filed, just uncertainly - and mixing a non-blocking item into a work queue with a weak distinction is how people learn to ignore the queue, which is the failure both aggregation NFRs already name.
+  
+      '
+    - 'SETTLED 2026-09-24 (Keith), resolving pre-build Q10: the in-flight delivery is rendered from a committed RUN-LEVEL observation, framed as at the last regeneration. Neither drafted option was buildable - see REQ-PIPE-057''s own decisions for the gap underneath the question and for why the record''s subject had to change from the delivery to the run.
+  
+      '
+    - 'A HELD, CONTESTED, UNLOADABLE OR CLOSED-UNFILLED SUPPLY REDDENS ITS DATASET, AND THE QUEUE STOPS SAYING OTHERWISE (Keith, 2026-10-04): criterion 5 as built kept event severity and status wholly apart, and the queue''s copy says ''none of them changes a dataset''s red/amber/green status'' (dashboard/qa-reporting-dashboard.template.html:4113-4114), which REQ-PIPE-115, REQ-DASH-148 and REQ-DASH-133 (all signed 2026-10-04) make false. The item keeps its event-severity pill; the dataset''s red is a status. REJECTED keeping the copy and the reds both - a page that says two contradictory things is the dashboard reviewer''s first must-fix.'
+    - 'A CLOSED, UNFILLED SLOT IS BOTH AN ITEM AND A RED (Keith, 2026-10-04), reversing criterion 7 as signed 2026-09-24 (''SHALL NOT render it as a red data verdict''). Keith chose red ''very clearly'' for REQ-DASH-133, rolling up to the agency. ''Closed by monotonic filling'' also went: REQ-PIPE-131 closes a period when the next period''s claim window opens. REJECTED leaving 070 criterion 7 as built beside REQ-DASH-133 criterion 4, which would be two signed criteria saying opposite things.'
+    - 'THE QUEUE, THE MARKERS AND THE RED ARE JUDGED AT ONE AS-OF INSTANT (Keith, 2026-10-04). Today outstanding.survey() reads only what is open NOW, so the as-of picker could show a past dataset red while the queue beside it lists today''s items. REJECTED leaving the queue as ''now'' only: the reds REQ-PIPE-115 and REQ-DASH-148 add are judged as at the instant on show, and the two would disagree on every past date.'
+    - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
 
   - id: REQ-GHUB-015
     title: GitHub Issues as the QA remediation ticketing system
@@ -18135,6 +18013,7 @@ requirements:
     - WHEN one delivery is kept through the terminal in one database and processed by the pipeline's batch in another, both starting from the same recorded state, THE SYSTEM SHALL produce the same filings, the same decision-log entries apart from their written instants and the identity that ran them, and the same check verdicts - and SHALL produce them for the Lambda route too, once REQ-PIPE-152 is built.
     - THE SYSTEM SHALL limit the steps the batch performs that a single kept arrival does not to those that concern a whole pass rather than one arrival - the in-flight survey and ticket reconciliation - and SHALL perform every per-arrival step on every route.
     - THE SYSTEM SHALL build criterion 2's single per-arrival function as its own change, before any other requirement of the option A and period-closing batch is built, changing no behaviour, and SHALL prove that by a bootstrap from an empty database before and after compared as REQ-PIPE-144 criteria 30 to 32 compare theirs.
+    - WHEN a person checks a single file, a folder or an S3 object from the terminal, THE SYSTEM SHALL ask whether to keep it or run a trial before asking for a drift reference, SHALL ask for and require a reference only for a trial, and IF a reference is given for a kept supply, THEN SHALL refuse, saying a kept supply is measured against the last promoted supply (REQ-QAC-108).
     non_functional_requirements:
     - CORRECTNESS BY CONSTRUCTION is the whole requirement. "The same functionality" is not a thing a person can verify by reading two code paths; it holds because there is one code path. Any criterion here that could be met by a careful reimplementation has been written wrong. Criterion 11 is the test of it, not a substitute for it.
     - 'COMPATIBILITY: the terminal route needs no network and no GitHub reachability (REQ-GHUB-082 criterion 30), which on a government network may make it the only route rather than the convenient one.'
@@ -18175,6 +18054,8 @@ requirements:
     - A RECORDED SYNTHETIC ARRIVAL IS MARKED, RUN AS A TRIAL, AND --commit ON IT IS REFUSED (Keith, 2026-10-04). REJECTED hiding it from the picker, which reads as though the arrival did not exist; REJECTED running a trial silently when --commit was asked for.
     - THE PER-ARRIVAL FUNCTION IS EXTRACTED FIRST (Keith, 2026-10-04), as a behaviour-preserving refactor proven by regenerate-and-diff, so every later rule in the batch lands once rather than in each route's loop (NFR 3). The rest of this requirement keeps its place after the batch. REJECTED extracting it alongside REQ-PIPE-151, which would leave every batch rule to be written into two loops first.
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - KEEP-OR-TRIAL IS ASKED FIRST, AND A REFERENCE ONLY FOR A TRIAL (Keith, 2026-10-04). Today the reference is asked for first and then ignored for a kept supply (cli/bdm.py:238-239, 467-469). REJECTED silently ignoring a reference given with --commit, which is today's behaviour and lets a person believe they chose the yardstick for a gating check; refusing follows REQ-PIPE-103 decision 11 ('passing both is refused rather than resolved').
+    - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
     open_questions: []
   - id: REQ-PIPE-087
     title: "PostgreSQL is the one warehouse engine, and DuckDB keeps only the job of reading what arrives"
@@ -20176,13 +20057,15 @@ requirements:
     - THE SYSTEM SHALL decide whether that confirmation applies from the environment's declared property, and SHALL NOT compare the environment's name against the word production.
     - THE SYSTEM SHALL NOT let --yes, or any other flag, environment variable or configuration key, skip that confirmation.
     - IF the typed id does not match the stated environment exactly, THEN THE SYSTEM SHALL record nothing and say so.
-    - THE SYSTEM SHALL declare that property as true for production, and false for local, sandbox and ci, in contract/environments.yaml.
-    - THE SYSTEM SHALL NOT require that confirmation of an unattended rule-driven write - the pipeline's own filing and promotion, scripted playback under REQ-GEN-135, or a decision arriving through the GitHub route - and SHALL state each exemption in the code beside it.
+    - THE SYSTEM SHALL declare that property as true for production, and false for local, sandbox, ci and test, in contract/environments.yaml.
+    - THE SYSTEM SHALL NOT require that confirmation of an unattended rule-driven write - the pipeline's own filing and promotion, scripted playback under REQ-GEN-135, a decision arriving through the GitHub route, or a processing pass run with no terminal attached - and SHALL state each exemption in the code beside it.
     - THE SYSTEM SHALL turn ticketing on only where the stated environment's entry in contract/environments.yaml declares it, and SHALL NOT infer it from GITHUB_REPOSITORY or any other variable a platform sets incidentally.
-    - THE SYSTEM SHALL declare ticketing off for the ci environment.
+    - THE SYSTEM SHALL declare ticketing off for the ci and test environments.
     - THE SYSTEM SHALL take the ticket repository from contract/data-asset.yaml, and SHALL NOT take it from GITHUB_REPOSITORY or any other variable a platform sets.
     - IF the stated environment turns ticketing on and contract/data-asset.yaml names no ticket repository, THEN THE SYSTEM SHALL refuse before connecting, saying which is missing.
     - THE SYSTEM SHALL state MOTHMAN_ENVIRONMENT as local in .devcontainer/devcontainer.json.
+    - WHERE the stated environment requires confirmation, THE SYSTEM SHALL require the typed id from a person who starts `mothman pipeline process` with a terminal attached, from the TUI or from flags, and SHALL NOT require it when the command runs with no terminal attached, as a scheduler runs it.
+    - THE SYSTEM SHALL declare a `test` environment in contract/environments.yaml whose publishes, confirmation and ticketing are all off, and SHALL state or mark `test` only from the test suite's own fixtures.
     non_functional_requirements:
     - 'THE PRECEDENT IS THIS PROJECT''S OWN, twice over: delivery_boundary.py treats a source stating nothing as a FAILURE rather than a default, and git_identity.py hard-errors on an unset identity rather than substituting a placeholder. mothman is the single entry point, so that is where this belongs.'
     - THE SHARP PART IS THE DEFAULT. Defaulting to production invites a fat-fingered real change; defaulting to local is WORSE, because an operator runs what they believe is a real operation and nothing tells them it went nowhere.
@@ -20218,6 +20101,12 @@ requirements:
     - TICKETING ON WITH NO REPOSITORY IS REFUSED LOUDLY (Keith, 2026-10-04). REJECTED quietly running without tickets, which is how a production asset ends up with nobody told.
     - THE DEV CONTAINER STATES ITS ENVIRONMENT (Keith, 2026-10-04); without it every command in a fresh dev container refuses under criterion 2.
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - Follows the new `test` environment (Keith, 2026-10-04).
+    - Follows the processing-pass criterion below (Keith, 2026-10-04).
+    - Follows the new `test` environment (Keith, 2026-10-04).
+    - A PERSON STARTING A PROCESSING PASS IN PRODUCTION TYPES THE ID (Keith, 2026-10-04), chosen over the CLI reviewer's 'no typed id'. 'A person' is read as 'a terminal is attached', since a scheduler has none - the same test REQ-PIPE-103 decision 12 uses for 'nobody to ask'. REJECTED keying it to the TUI only, which a person bypasses by typing the flag form.
+    - TEST DATABASES ARE THE `test` ENVIRONMENT (Keith, 2026-10-04), set only by fixtures, so a test worker is never labelled as the ci runner or the sandbox it happens to run in. REJECTED reusing `ci`, which describes a runner, not a worker's scratch database (environments.yaml's own note on why `ci` was added).
+    - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
   - id: REQ-DASH-094
     title: "The dashboard says which environment's QA it is showing"
     date_written: "2026-09-26"
@@ -22130,361 +22019,195 @@ requirements:
         by with dead parameters that look live.
 
   - id: REQ-PIPE-103
-    title: "A supply received by hand is an arrival like any other"
-    date_written: "2026-09-27"
-    story: >
-      As the person running this pipeline, I want a supply I was
-      emailed or fetched from S3 and checked by hand to be recorded as
-      an arrival, so that the delivery log and the dashboard describe
-      everything we actually received rather than only what arrived
-      automatically - and I want to be able to try a file out without
-      that happening.
+    title: A supply received by hand is an arrival like any other
+    date_written: '2026-09-27'
+    story: 'As the person running this pipeline, I want a supply I was emailed or fetched from S3 and checked by hand to be recorded as an arrival, so that the delivery log and the dashboard describe everything we actually received rather than only what arrived automatically - and I want to be able to try a file out without that happening.
+  
+      '
     moscow: must
     status: built
-    source: >
-      Keith, 2026-09-27. First the observation - "without deliveries
-      being logged it would impact what's shown in the dashboard,
-      right?" - then the design: "we should file an ad-hoc supply as a
-      real delivery, it's just like any other arrival", and then the
-      ordering that resolves the objection to it: "could we do it in
-      the right order (file delivery then run check) but gate it
-      behind a 'do you want to commit this' that the operator can
-      choose 'no' on so they can experiment with a file locally
-      without impacting anything?"
+    source: 'Keith, 2026-09-27. First the observation - "without deliveries being logged it would impact what''s shown in the dashboard, right?" - then the design: "we should file an ad-hoc supply as a real delivery, it''s just like any other arrival", and then the ordering that resolves the objection to it: "could we do it in the right order (file delivery then run check) but gate it behind a ''do you want to commit this'' that the operator can choose ''no'' on so they can experiment with a file locally without impacting anything?"
+  
+      '
     acceptance_criteria:
-      - >
-        WHERE an operator checks a supply they received by hand and
-        chooses to keep it, THE SYSTEM SHALL file it as a real
-        delivery with its own receipt before any check runs, and SHALL
-        take that run's identity from recognition exactly as it does
-        for a delivery that arrived on its own.
-      - >
-        THE SYSTEM SHALL ask before filing anything, and WHERE the
-        operator declines SHALL run the checks and write nothing that
-        outlives the command - no delivery, no receipt, no recorded
-        results.
-      - >
-        THE SYSTEM SHALL let a non-interactive caller state the answer
-        as a flag, and SHALL NOT prompt where one was given.
-      - >
-        THE SYSTEM SHALL name a run it did not file from the clock
-        alone, and SHALL NOT build that name out of the supplied
-        file's own name.
-      - >
-        THE SYSTEM SHALL call such a run a TRIAL, in its run id, in
-        what it prints, and in this repository's own prose, and SHALL
-        NOT go on calling it ad-hoc.
-      - >
-        THE SYSTEM SHALL leave nothing in the database that outlives
-        a trial - no staged table, no resolution record, no load
-        record, no schema of any kind - so that declining to keep a
-        check costs nothing anywhere.
-      - >
-        THE SYSTEM SHALL apply this to every route by which a person
-        supplies a file - a single file, a folder, one table on its
-        own, and an object fetched from S3.
-      - >
-        THE SYSTEM SHALL say which of the two things it did, and SHALL
-        NOT describe a check as local-only in a run that filed a
-        delivery.
-      - "WHEN a person chooses to keep a supply they received by hand, THE SYSTEM SHALL ask them when that supply was originally received - the email's arrival, or the S3 object's own time - before it files anything."
-      - "THE SYSTEM SHALL record that stated original arrival on each filed file's own qa.delivery_file row beside that file's receipt, and in that file's on-disk receipt record under its own key, marked as stated by a person, and SHALL keep the moment the command ran as that file's receipt."
-      - "THE SYSTEM SHALL NOT use a stated original arrival to order arrivals, to name a run or a staged table, to file a supply to a slot, to judge lateness, in the promotion gate, or to place a supply in the as-of picker."
-      - "THE SYSTEM SHALL let a non-interactive caller state the original arrival as a flag, and SHALL NOT prompt for it where one was given."
-      - "THE SYSTEM SHALL require an answer before filing a kept supply, SHALL accept `not known` as that answer, and SHALL record `not known` as such rather than as a time."
-      - "IF a non-interactive caller keeps a supply and states no original arrival, THEN THE SYSTEM SHALL refuse, say which flag is missing, and file nothing."
-      - "IF a stated original arrival is later than the command's own receipt instant, THEN THE SYSTEM SHALL refuse it, say why, and file nothing."
-      - "WHERE a stated original arrival carries no UTC offset, THE SYSTEM SHALL read it on the asset's own clock (contract/data-asset.yaml's timezone) and SHALL record it with that offset."
-      - "WHERE a kept supply was fetched from S3, THE SYSTEM SHALL offer the object's own LastModified instant as the default answer, which the person confirms or replaces, and SHALL record whichever they give only as the stated original arrival."
-      - "WHERE a delivery was received without a person filing it, THE SYSTEM SHALL record no stated original arrival, so that `never asked` stays distinguishable from `not known`."
-      - "WHEN a delivery carrying a stated original arrival is shown in `mothman supply deliveries`, in the hand-filing command's own closing message, or in the dashboard's arrival detail, THE SYSTEM SHALL show it beside the receipt, labelled as stated by the person who filed it, and SHALL NOT present it as the receipt."
+    - 'WHERE an operator checks a supply they received by hand and chooses to keep it, THE SYSTEM SHALL file it as a real delivery with its own receipt before any check runs, and SHALL take that run''s identity from recognition exactly as it does for a delivery that arrived on its own.
+  
+      '
+    - 'THE SYSTEM SHALL ask before filing anything, and WHERE the operator declines SHALL run the checks and write nothing that outlives the command - no delivery, no receipt, no recorded results.
+  
+      '
+    - 'THE SYSTEM SHALL let a non-interactive caller state the answer as a flag, and SHALL NOT prompt where one was given.
+  
+      '
+    - 'THE SYSTEM SHALL name a run it did not file from the clock alone, and SHALL NOT build that name out of the supplied file''s own name.
+  
+      '
+    - 'THE SYSTEM SHALL call such a run a TRIAL, in its run id, in what it prints, and in this repository''s own prose, and SHALL NOT go on calling it ad-hoc.
+  
+      '
+    - 'THE SYSTEM SHALL leave nothing in the database that outlives a trial - no staged table, no resolution record, no load record, no schema of any kind - so that declining to keep a check costs nothing anywhere.
+  
+      '
+    - 'THE SYSTEM SHALL apply this to every route by which a person supplies a file - a single file, a folder, one table on its own, and an object fetched from S3.
+  
+      '
+    - 'THE SYSTEM SHALL say which of the two things it did, and SHALL NOT describe a check as local-only in a run that filed a delivery.
+  
+      '
+    - WHEN a person chooses to keep a supply they received by hand, THE SYSTEM SHALL ask them when that supply was originally received - the email's arrival, or the S3 object's own time - before it files anything.
+    - THE SYSTEM SHALL record that stated original arrival on each filed file's own qa.delivery_file row beside that file's receipt, and in that file's on-disk receipt record under its own key, marked as stated by a person, and SHALL keep the moment the command ran as that file's receipt.
+    - THE SYSTEM SHALL NOT use a stated original arrival to order arrivals, to name a run or a staged table, to file a supply to a slot, to judge lateness, in the promotion gate, or to place a supply in the as-of picker.
+    - THE SYSTEM SHALL let a non-interactive caller state the original arrival as a flag, and SHALL NOT prompt for it where one was given.
+    - THE SYSTEM SHALL require an answer before filing a kept supply, SHALL accept `not known` as that answer, and SHALL record `not known` as such rather than as a time.
+    - IF a non-interactive caller keeps a supply and states no original arrival, THEN THE SYSTEM SHALL refuse, say which flag is missing, and file nothing.
+    - IF a stated original arrival is later than the command's own receipt instant, THEN THE SYSTEM SHALL refuse it, say why, and file nothing.
+    - WHERE a stated original arrival carries no UTC offset, THE SYSTEM SHALL read it on the asset's own clock (contract/data-asset.yaml's timezone) and SHALL record it with that offset.
+    - WHERE a kept supply was fetched from S3, THE SYSTEM SHALL offer each object's own LastModified instant as the default answer for that object - for an S3 delivery prefix, every object's own instant shown together as one set, which the person confirms in one step - and SHALL let the person instead give one answer, a time or `not known`, for every file, recording whichever they give, per file, only as the stated original arrival.
+    - WHERE a delivery was received without a person filing it, THE SYSTEM SHALL record no stated original arrival, so that `never asked` stays distinguishable from `not known`.
+    - WHEN a delivery carrying a stated original arrival is shown in `mothman supply deliveries`, in the hand-filing command's own closing message, or in the dashboard's arrival detail, THE SYSTEM SHALL show it beside the receipt, labelled as stated by the person who filed it, and SHALL NOT present it as the receipt.
+    - THE SYSTEM SHALL accept `--originally-received storage` for a kept supply fetched from S3, meaning each object's own LastModified, beside a time or `not-known`, and SHALL refuse it for a supply not fetched from S3.
     non_functional_requirements:
-      - >
-        THE OPERATOR'S OWN FILENAME BECOMES A PUBLISHED STRING once a
-        delivery is filed, because this repository is public and the
-        delivery log records real names (REQ-PIPE-069 entered this
-        with eyes open for generated names; this is the first route by
-        which a name we did not choose gets there). The prompt has to
-        make that consequence visible rather than burying it.
-      - >
-        NO RENUMBERING OF COMMITTED HISTORY. Run ids are positional
-        over arrivals ordered by receipt, so a filed supply must sort
-        AFTER everything already recorded - which its receipt instant
-        of "now" does - and REQ-PIPE-057's run_id_guard must stay
-        green across the change.
-      - "NOTHING DECIDES ON A TYPED DATE. An integrity property, not a display rule: a person must not be able to move a supply's slot, its lateness or its eligibility for promotion by what they type. Test it by filing the same file with two different stated arrivals and asserting identical filing, run id, staged table name and promotion verdict."
-      - "VALIDATE BEFORE WRITING ANYTHING, the order hand_filing.check() already keeps: a refused statement leaves no delivery directory, no receipt and no qa row behind."
-      - "SURVIVES A REBUILD FROM DISK. A person's statement is the one fact here that cannot be regenerated, so `mothman env reset-synthetic` followed by a bootstrap must re-record it from the on-disk receipt record."
-      - "FOLLOWS THE RECEIPT'S OWN TEXT-PLUS-INSTANT CONVENTION (REQ-PIPE-069 criterion 5, REQ-PIPE-144): the exact text with its offset, and the instant beside it."
-      - "RECORDED METADATA ONLY: the dashboard build reads the stated arrival from the qa metadata schema over its existing least-privilege grant, never from a schema holding supply rows."
-      - "PUBLIC ONCE SHOWN: the published dashboard would carry stated arrival times. They are transport metadata of the same kind as the receipts already shown, and no free-text note is recorded (rejected by Keith 2026-09-27), so nothing personal enters by this route."
-      - "REGENERATE, NEVER MIGRATE: the new columns ride REQ-PIPE-144's single SCHEMA_VERSION bump if built with it, otherwise one bump of their own and a rebuild from empty."
+    - 'THE OPERATOR''S OWN FILENAME BECOMES A PUBLISHED STRING once a delivery is filed, because this repository is public and the delivery log records real names (REQ-PIPE-069 entered this with eyes open for generated names; this is the first route by which a name we did not choose gets there). The prompt has to make that consequence visible rather than burying it.
+  
+      '
+    - 'NO RENUMBERING OF COMMITTED HISTORY. Run ids are positional over arrivals ordered by receipt, so a filed supply must sort AFTER everything already recorded - which its receipt instant of "now" does - and REQ-PIPE-057''s run_id_guard must stay green across the change.
+  
+      '
+    - 'NOTHING DECIDES ON A TYPED DATE. An integrity property, not a display rule: a person must not be able to move a supply''s slot, its lateness or its eligibility for promotion by what they type. Test it by filing the same file with two different stated arrivals and asserting identical filing, run id, staged table name and promotion verdict.'
+    - 'VALIDATE BEFORE WRITING ANYTHING, the order hand_filing.check() already keeps: a refused statement leaves no delivery directory, no receipt and no qa row behind.'
+    - SURVIVES A REBUILD FROM DISK. A person's statement is the one fact here that cannot be regenerated, so `mothman env reset-synthetic` followed by a bootstrap must re-record it from the on-disk receipt record.
+    - 'FOLLOWS THE RECEIPT''S OWN TEXT-PLUS-INSTANT CONVENTION (REQ-PIPE-069 criterion 5, REQ-PIPE-144): the exact text with its offset, and the instant beside it.'
+    - 'RECORDED METADATA ONLY: the dashboard build reads the stated arrival from the qa metadata schema over its existing least-privilege grant, never from a schema holding supply rows.'
+    - 'PUBLIC ONCE SHOWN: the published dashboard would carry stated arrival times. They are transport metadata of the same kind as the receipts already shown, and no free-text note is recorded (rejected by Keith 2026-09-27), so nothing personal enters by this route.'
+    - 'REGENERATE, NEVER MIGRATE: the new columns ride REQ-PIPE-144''s single SCHEMA_VERSION bump if built with it, otherwise one bump of their own and a rebuild from empty.'
     signed_off:
       by: Keith
-      date: "2026-09-27"
-    dependencies: [REQ-PIPE-069, REQ-PIPE-102, REQ-PIPE-144]
+      date: '2026-09-27'
+    dependencies:
+    - REQ-PIPE-069
+    - REQ-PIPE-102
+    - REQ-PIPE-144
     open_questions: []
     unmet_criteria:
-      - criterion: Criteria 9 to 19 - asking for, validating, recording and showing a stated original arrival. Added 2026-10-04 on Keith's sign-off of this amendment and not yet built.
-        why: The statement is recorded beside each file's own receipt, and per-file receipts only reach the qa metadata schema with REQ-PIPE-144 (signed 2026-10-04, not started). Building it before 144 would put it on qa.delivery and move it a second time.
-        owner: REQ-PIPE-103 itself, built straight after REQ-PIPE-144.
-        blocked_by:
-          requirements:
-          - REQ-PIPE-144
+    - criterion: Criteria 9 to 19 - asking for, validating, recording and showing a stated original arrival. Added 2026-10-04 on Keith's sign-off of this amendment and not yet built.
+      why: The statement is recorded beside each file's own receipt, and per-file receipts only reach the qa metadata schema with REQ-PIPE-144 (signed 2026-10-04, not started). Building it before 144 would put it on qa.delivery and move it a second time.
+      owner: REQ-PIPE-103 itself, built straight after REQ-PIPE-144.
+      blocked_by:
+        requirements:
+        - REQ-PIPE-144
     decisions:
-      - >
-        THE TRIAL'S LOAD RECORDS MOVED FROM A DIRECTORY TO A COLUMN
-        (2026-09-27, while building REQ-PIPE-089), and criterion 2 is
-        met more strongly than when this was signed. `trial.log_dir()`
-        put a trial's load records in a disposable directory outside
-        the committed tree, and `discard()` removed them with an
-        `rmtree` AFTER the transaction that dropped the schemas. Two
-        acts: a crash between them left a trial half-discarded, with
-        its schemas gone and its records still claiming tables that no
-        longer existed.
-
-        It is now `trial.scope_for()` and a `trial_run_id` column on
-        `qa.load_outcome`, so the DELETE runs inside the same
-        transaction as the DROPs. "A trial writes nothing that outlives
-        the command" stops being two things that both have to succeed.
-
-        What did NOT change is the part worth keeping: a trial still
-        WRITES its load records rather than skipping them, because the
-        record is the gate deciding which staged tables a run's views
-        may resolve, and a trial running under a weaker rule than the
-        real thing is not worth having.
-      - >
-        FILE FIRST, THEN CHECK - Keith's own ordering, and it is
-        what makes the rest fall out. A supply filed before the check
-        runs is recognised like any other, so it takes its run id
-        from recognition and its staged table is named for its
-        receipt instant.
-
-        REJECTED: FILING AT THE END, WHEN THE OPERATOR COMMITS. It
-        looks tidier - nothing is created unless they say yes - and
-        it cannot work, because the check has to run before they
-        decide. At check time the supply would not be filed, so
-        recognition would not know it existed and it would have no
-        run id; one would have to be invented. The checks would run
-        and record their results under that invented id. Only
-        afterwards, on commit, would the delivery be filed - and
-        recognition would see it for the first time and call it
-        `run_043`. One run, two names, and the results already
-        written carrying the wrong one. Filing first means nothing is
-        invented, so nothing has to be renamed.
-      - >
-        THE PROMPT IS WHAT MAKES "ALWAYS FILE" SAFE. Filing
-        unconditionally was the first proposal and its real cost was
-        that trying a file out would leave permanent arrival records.
-        Asking first keeps the honest position - you did receive it -
-        without making experimentation expensive.
-      - >
-        THIS REMOVES THE AD-HOC NAME PROBLEM RATHER THAN PATCHING IT.
-        A filed supply needs no minted id at all, and an unfiled one
-        never reaches committed history, so the filename stem that
-        existed "for a human skimming qa_results/ later" is
-        unnecessary in both directions. REQ-PIPE-102 capped that stem
-        to 15 characters as damage control; this deletes it, and with
-        it the duplication Keith noticed
-        (`birth_registrations__adhoc_birth_registrat_...`), which was
-        only ever our own generated filenames echoing the table name.
-      - >
-        THE WORD IS `trial`, NOT `adhoc` (Keith, 2026-09-27: "not sure
-        I like the phrase adhoc now that we've made these changes").
-        It was accurate while these runs were a side channel that left
-        nothing behind; after this they are either a real arrival,
-        which needs no special word at all, or a deliberate
-        throwaway - and `trial` says what declining the prompt means
-        while staying honest that real dbt, Soda, datacontract-cli
-        and Evidently runs happened against real staged rows.
-
-        REJECTED: `dry run`. It normally means going through the
-        motions WITHOUT doing the thing, and these runs genuinely
-        execute all four tools and produce real verdicts - the only
-        thing that does not happen is keeping the record, so the name
-        would suggest the checks were simulated. Also rejected:
-        `scratch`, which describes the record rather than what the
-        operator is doing; and `unfiled`, precise against this model
-        but defining the thing by what it is not. Same length as
-        `adhoc`, so no name-length arithmetic moves.
-      - >
-        A TRIAL LEAVES NOTHING IN THE DATABASE, Keith's own condition
-        on approving this ("a trial must write NOTHING to the
-        database that survives the end of its run"), and it is
-        stricter than the run already was. A run discards its view
-        schema and dbt's when it finishes (REQ-PIPE-068), but its
-        STAGED TABLES are permanent by design - staging only ever
-        grows, one physical table per arrival - and so are its
-        `_resolutions` rows and its load records. For a filed supply
-        that is right: the arrival really happened. For a trial it is
-        exactly wrong, because the whole point of declining is that
-        nothing happened. So a trial's staged tables go with its
-        schemas, which is also what keeps `mothman supply` views and
-        the dashboard free of supplies nobody accepted.
-      - >
-        SUB-SECOND PRECISION REPLACES THE STEM for an unfiled run.
-        Second resolution plus a prefix was enough while the stem
-        carried the distinctness; without it, two concurrent ad-hoc
-        checks in the same second would collide.
-      - >
-        A SCHEMA OF ITS OWN, NOT A TRANSACTION TO ROLL BACK. Keith
-        asked the right question - "how are we safely preventing a
-        trial from writing anything? wrapping the whole thing in a
-        transaction that we rollback?" - and a transaction cannot do
-        it. That was MEASURED rather than assumed: work inside an open
-        transaction is invisible to every other connection, and dbt,
-        Soda, datacontract-cli and Evidently each open their own, so
-        staging uncommitted would leave all four looking at an empty
-        schema. dbt additionally builds its own models on its own
-        connection, which our rollback could never reach.
-
-        So a trial stages into `trial_<stamp>` and never touches
-        shared `staging` at all; its views are `qa_trial_<stamp>` and
-        dbt's `dbt_trial_<stamp>`, so ONE prefix finds everything it
-        created. The tidy-up is a single transaction of DROP SCHEMA
-        statements - PostgreSQL has transactional DDL, which is what
-        makes it either-all-or-none rather than a walk that can stop
-        halfway. A reference run is `trial_ref_<stamp>` for the same
-        reason: every trial schema then begins the same way.
-
-        REJECTED: DROPPING A TRIAL'S TABLES OUT OF SHARED STAGING BY
-        NAME, which is what the first implementation did. It works
-        and it is a best-effort walk, not a guarantee, and it leaves
-        a trial's rows sitting among real supplies for the length of
-        the run. What is honestly NOT guaranteed either way: `kill
-        -9` still leaves schemas behind. The design makes what is
-        left identifiable from its name alone and clearable by
-        `mothman supply tidy`, which the shared-staging version could
-        not offer.
-      - >
-        A FILE RECOGNITION CANNOT PLACE IS REFUSED, NOT FILED (Keith,
-        2026-09-27, choosing from three options). Recognition reads a
-        file's own NAME against its dataset's arrival pattern, and a
-        file somebody was emailed is often called something else -
-        `Births Jan.csv`, `extract (3).csv`. The refusal names the
-        file, says why, and offers the trial, which needs no
-        recognition because the command already says which dataset is
-        being checked.
-
-        REJECTED: RENAMING IT TO MATCH THE PATTERN, since the command
-        already says which dataset it is. Keeping would always work,
-        and the delivery tree would stop being a faithful copy of
-        what arrived - it would hold a file the supplier never sent.
-        Also rejected: FILING IT ANYWAY and letting it sit
-        unplaceable, which is honest about the arrival and splits the
-        check from it - a QA run attributed to nothing, which is the
-        exact failure the supply model exists to close.
-      - >
-        A PARTIAL RESUPPLY BORROWS THE OTHER TABLES RATHER THAN
-        RE-STAGING THEM. Child Protection's dbt models ref() all six
-        tables, so a one-table supply cannot be checked alone. The
-        code used to stage the other five under THIS run, which
-        recorded five tables as having arrived in a delivery that
-        carried one - invisible while these runs were a side channel
-        and untrue the moment one becomes a real delivery.
-        supply_db.borrow_views() gives the run a view onto each table
-        the earlier run already resolved, which is exactly what
-        "unchanged since last time" means.
-      - >
-        `--commit` IS THE KEEP FLAG rather than a new flag beside it.
-        It already meant "write this run into the real, permanent
-        history", and keeping is the same decision with two halves -
-        a run whose results are kept but whose arrival was never
-        recorded is the split this requirement closes. `--trial` is
-        its explicit opposite so a script can state either answer
-        rather than relying on a default it cannot see, and passing
-        both is refused rather than resolved.
-      - >
-        A TRIAL IS THE NON-INTERACTIVE DEFAULT. With no flag and no
-        terminal there is nobody to ask, and the two wrong answers
-        are not equally wrong: a trial that should have been kept
-        costs a re-run, and a delivery filed on somebody's behalf is
-        a public record of an arrival they did not agree to.
-      - >
-        THE REFERENCE IS ALWAYS A TRIAL, whichever way the supply
-        itself went. It is a known-good file the operator already
-        had; filing it would record an arrival that never happened,
-        and the delivery log is a claim about what actually arrived.
-      - >
-        A TRIAL'S LOAD RECORDS ARE WRITTEN SOMEWHERE DISPOSABLE
-        RATHER THAN SKIPPED. The load record is the gate that decides
-        which staged tables a run's views may resolve (REQ-PIPE-060
-        criterion 7 - physical presence is not readability), so
-        skipping it would mean either a trial whose views resolve
-        nothing or a trial running under a weaker rule than a real
-        run. They go to the trial's own scratch directory, removed
-        with its schemas. Once REQ-PIPE-089 moves the load log into
-        the database they will go into the trial schema and drop with
-        it, which is where this belongs.
-      - "BESIDE THE RECEIPT, NEVER IN PLACE OF IT (Keith, 2026-10-04, plans/running-thoughts.md #52). The moment the command ran stays the receipt the system decides on - filing, lateness, the promotion gate - so nothing judges on a date a person typed; the stated original arrival is recorded for the record. This SUPERSEDES his 2026-09-27 decision 4 in that entry (the operator's date should become received_at itself), which was only ever blocked on positional run ids. REJECTED making the stated time the receipt: it lets a typed date move a supply's slot, lateness and promotion, and reopens the renumbering cost #52 set out."
-      - "PER FILE, BESIDE REQ-PIPE-144's RECEIPT, AND IN THE ON-DISK RECEIPT RECORD (Keith, 2026-10-04, question A4). 144 moves each file's receipt onto qa.delivery_file, so the statement sits on the same row; for a folder or an S3 prefix the person states once and it is recorded on every file. In each file's receipt record under data/receipts/ it has its own key, never `received_at`, so a rebuild from disk restores it. REJECTED the database alone, where a synthetic reset would erase the one fact that cannot be regenerated; REJECTED a column on qa.delivery, which 144 is moving receipts away from and which cannot hold different S3 object times."
-      - "received_from IS UNCHANGED. A hand-filed receipt is still `our-clock`; the stated arrival is neither storage's clock nor ours but a person's claim, which is why it is a separate field and is labelled as stated wherever it is shown."
-      - "REQUIRED, WITH `not known` AS AN ANSWER (Keith, 2026-10-04, question A1). His 2026-09-27 decision 1 made it required and rejected defaulting; the 2026-10-04 answer changed the stakes, because the field now decides nothing, so forcing an exact value from somebody who does not know would only invent data, while `not known` is honest and still distinguishable from an automated arrival that was never asked. REJECTED exact-time-only (pushes people to guess) and optional-and-skippable (how a field ends up empty on every row)."
-      - "THE FLAG IS `--originally-received <ISO 8601 date-time | not-known>` on `mothman bdm qa` and `mothman cp qa`, following criterion 3's existing shape. With `--commit` and no terminal, the absence is refused rather than defaulted (criterion 14), which changes today's scripted `--commit` behaviour - every existing caller and test passing `--commit` needs the flag."
-      - "BOUNDS: not later than the command's own receipt instant, which also rules out the future, since the receipt is now. REJECTED any lower bound such as 'not before the period opened': a supply emailed weeks before anybody filed it is exactly the case this exists for, and any lower bound would be a guess."
-      - "DATE AND TIME, NOT A BARE DATE. Both sources Keith named carry a time - an email's received header and an S3 object's LastModified - so a date alone would only come from guessing; a person who cannot say answers `not known`. A value with no offset is read on the asset clock (Australia/Perth today), matching how every other instant in this project is interpreted."
-      - "A TRIAL IS NEVER ASKED. A trial writes nothing that outlives the command (criterion 2), so a recorded statement about it would have nowhere to live."
-      - "S3 OFFERS LastModified AS THE DEFAULT, STILL ONLY RECORDED (Keith, 2026-10-04, question A2): the time is already in hand from the download, and making the person look it up again invites a typo. REJECTED treating LastModified as the receipt itself with received_from `storage` - arguably what REQ-PIPE-105 criterion 3 would say if the s3Source bucket is our own storage, and recorded here so nobody makes that change later without asking, because it would put a decision back on that date."
-      - "WHO FILED IT IS REQ-PIPE-147, NOT THIS AMENDMENT (Keith, 2026-10-04, question A3). #52's first gap - nothing on a delivery record says a person filed it, by which route, or who - was checked 2026-10-04 and is NOT answered today: the `handfiled-` directory prefix is a naming convention nothing parses; received_from `our-clock` only coincides with hand-filing because no automated path writes a receipt yet, and REQ-PIPE-105 criterion 4 makes it the fallback for any automated path whose storage gives no instant; and qa.run.run_by names who ran the QA RUN, is recorded for automated runs too, and is not on the delivery. Split out to keep this amendment small."
-      - "A STATED ARRIVAL IS WRITE-ONCE. Nothing decides on it, so a wrong one costs an inaccurate note rather than a wrong verdict, and building a correction path now would be work for a case nobody has met. If one is wanted later it is its own requirement - most likely a correction recorded beside the original statement rather than over it."
+    - 'THE TRIAL''S LOAD RECORDS MOVED FROM A DIRECTORY TO A COLUMN (2026-09-27, while building REQ-PIPE-089), and criterion 2 is met more strongly than when this was signed. `trial.log_dir()` put a trial''s load records in a disposable directory outside the committed tree, and `discard()` removed them with an `rmtree` AFTER the transaction that dropped the schemas. Two acts: a crash between them left a trial half-discarded, with its schemas gone and its records still claiming tables that no longer existed.
+  
+      It is now `trial.scope_for()` and a `trial_run_id` column on `qa.load_outcome`, so the DELETE runs inside the same transaction as the DROPs. "A trial writes nothing that outlives the command" stops being two things that both have to succeed.
+  
+      What did NOT change is the part worth keeping: a trial still WRITES its load records rather than skipping them, because the record is the gate deciding which staged tables a run''s views may resolve, and a trial running under a weaker rule than the real thing is not worth having.
+  
+      '
+    - 'FILE FIRST, THEN CHECK - Keith''s own ordering, and it is what makes the rest fall out. A supply filed before the check runs is recognised like any other, so it takes its run id from recognition and its staged table is named for its receipt instant.
+  
+      REJECTED: FILING AT THE END, WHEN THE OPERATOR COMMITS. It looks tidier - nothing is created unless they say yes - and it cannot work, because the check has to run before they decide. At check time the supply would not be filed, so recognition would not know it existed and it would have no run id; one would have to be invented. The checks would run and record their results under that invented id. Only afterwards, on commit, would the delivery be filed - and recognition would see it for the first time and call it `run_043`. One run, two names, and the results already written carrying the wrong one. Filing first means nothing is invented, so nothing has to be renamed.
+  
+      '
+    - 'THE PROMPT IS WHAT MAKES "ALWAYS FILE" SAFE. Filing unconditionally was the first proposal and its real cost was that trying a file out would leave permanent arrival records. Asking first keeps the honest position - you did receive it - without making experimentation expensive.
+  
+      '
+    - 'THIS REMOVES THE AD-HOC NAME PROBLEM RATHER THAN PATCHING IT. A filed supply needs no minted id at all, and an unfiled one never reaches committed history, so the filename stem that existed "for a human skimming qa_results/ later" is unnecessary in both directions. REQ-PIPE-102 capped that stem to 15 characters as damage control; this deletes it, and with it the duplication Keith noticed (`birth_registrations__adhoc_birth_registrat_...`), which was only ever our own generated filenames echoing the table name.
+  
+      '
+    - 'THE WORD IS `trial`, NOT `adhoc` (Keith, 2026-09-27: "not sure I like the phrase adhoc now that we''ve made these changes"). It was accurate while these runs were a side channel that left nothing behind; after this they are either a real arrival, which needs no special word at all, or a deliberate throwaway - and `trial` says what declining the prompt means while staying honest that real dbt, Soda, datacontract-cli and Evidently runs happened against real staged rows.
+  
+      REJECTED: `dry run`. It normally means going through the motions WITHOUT doing the thing, and these runs genuinely execute all four tools and produce real verdicts - the only thing that does not happen is keeping the record, so the name would suggest the checks were simulated. Also rejected: `scratch`, which describes the record rather than what the operator is doing; and `unfiled`, precise against this model but defining the thing by what it is not. Same length as `adhoc`, so no name-length arithmetic moves.
+  
+      '
+    - 'A TRIAL LEAVES NOTHING IN THE DATABASE, Keith''s own condition on approving this ("a trial must write NOTHING to the database that survives the end of its run"), and it is stricter than the run already was. A run discards its view schema and dbt''s when it finishes (REQ-PIPE-068), but its STAGED TABLES are permanent by design - staging only ever grows, one physical table per arrival - and so are its `_resolutions` rows and its load records. For a filed supply that is right: the arrival really happened. For a trial it is exactly wrong, because the whole point of declining is that nothing happened. So a trial''s staged tables go with its schemas, which is also what keeps `mothman supply` views and the dashboard free of supplies nobody accepted.
+  
+      '
+    - 'SUB-SECOND PRECISION REPLACES THE STEM for an unfiled run. Second resolution plus a prefix was enough while the stem carried the distinctness; without it, two concurrent ad-hoc checks in the same second would collide.
+  
+      '
+    - 'A SCHEMA OF ITS OWN, NOT A TRANSACTION TO ROLL BACK. Keith asked the right question - "how are we safely preventing a trial from writing anything? wrapping the whole thing in a transaction that we rollback?" - and a transaction cannot do it. That was MEASURED rather than assumed: work inside an open transaction is invisible to every other connection, and dbt, Soda, datacontract-cli and Evidently each open their own, so staging uncommitted would leave all four looking at an empty schema. dbt additionally builds its own models on its own connection, which our rollback could never reach.
+  
+      So a trial stages into `trial_<stamp>` and never touches shared `staging` at all; its views are `qa_trial_<stamp>` and dbt''s `dbt_trial_<stamp>`, so ONE prefix finds everything it created. The tidy-up is a single transaction of DROP SCHEMA statements - PostgreSQL has transactional DDL, which is what makes it either-all-or-none rather than a walk that can stop halfway. A reference run is `trial_ref_<stamp>` for the same reason: every trial schema then begins the same way.
+  
+      REJECTED: DROPPING A TRIAL''S TABLES OUT OF SHARED STAGING BY NAME, which is what the first implementation did. It works and it is a best-effort walk, not a guarantee, and it leaves a trial''s rows sitting among real supplies for the length of the run. What is honestly NOT guaranteed either way: `kill -9` still leaves schemas behind. The design makes what is left identifiable from its name alone and clearable by `mothman supply tidy`, which the shared-staging version could not offer.
+  
+      '
+    - 'A FILE RECOGNITION CANNOT PLACE IS REFUSED, NOT FILED (Keith, 2026-09-27, choosing from three options). Recognition reads a file''s own NAME against its dataset''s arrival pattern, and a file somebody was emailed is often called something else - `Births Jan.csv`, `extract (3).csv`. The refusal names the file, says why, and offers the trial, which needs no recognition because the command already says which dataset is being checked.
+  
+      REJECTED: RENAMING IT TO MATCH THE PATTERN, since the command already says which dataset it is. Keeping would always work, and the delivery tree would stop being a faithful copy of what arrived - it would hold a file the supplier never sent. Also rejected: FILING IT ANYWAY and letting it sit unplaceable, which is honest about the arrival and splits the check from it - a QA run attributed to nothing, which is the exact failure the supply model exists to close.
+  
+      '
+    - 'A PARTIAL RESUPPLY BORROWS THE OTHER TABLES RATHER THAN RE-STAGING THEM. Child Protection''s dbt models ref() all six tables, so a one-table supply cannot be checked alone. The code used to stage the other five under THIS run, which recorded five tables as having arrived in a delivery that carried one - invisible while these runs were a side channel and untrue the moment one becomes a real delivery. supply_db.borrow_views() gives the run a view onto each table the earlier run already resolved, which is exactly what "unchanged since last time" means.
+  
+      '
+    - '`--commit` IS THE KEEP FLAG rather than a new flag beside it. It already meant "write this run into the real, permanent history", and keeping is the same decision with two halves - a run whose results are kept but whose arrival was never recorded is the split this requirement closes. `--trial` is its explicit opposite so a script can state either answer rather than relying on a default it cannot see, and passing both is refused rather than resolved.
+  
+      '
+    - 'A TRIAL IS THE NON-INTERACTIVE DEFAULT. With no flag and no terminal there is nobody to ask, and the two wrong answers are not equally wrong: a trial that should have been kept costs a re-run, and a delivery filed on somebody''s behalf is a public record of an arrival they did not agree to.
+  
+      '
+    - 'THE REFERENCE IS ALWAYS A TRIAL, whichever way the supply itself went. It is a known-good file the operator already had; filing it would record an arrival that never happened, and the delivery log is a claim about what actually arrived.
+  
+      '
+    - 'A TRIAL''S LOAD RECORDS ARE WRITTEN SOMEWHERE DISPOSABLE RATHER THAN SKIPPED. The load record is the gate that decides which staged tables a run''s views may resolve (REQ-PIPE-060 criterion 7 - physical presence is not readability), so skipping it would mean either a trial whose views resolve nothing or a trial running under a weaker rule than a real run. They go to the trial''s own scratch directory, removed with its schemas. Once REQ-PIPE-089 moves the load log into the database they will go into the trial schema and drop with it, which is where this belongs.
+  
+      '
+    - 'BESIDE THE RECEIPT, NEVER IN PLACE OF IT (Keith, 2026-10-04, plans/running-thoughts.md #52). The moment the command ran stays the receipt the system decides on - filing, lateness, the promotion gate - so nothing judges on a date a person typed; the stated original arrival is recorded for the record. This SUPERSEDES his 2026-09-27 decision 4 in that entry (the operator''s date should become received_at itself), which was only ever blocked on positional run ids. REJECTED making the stated time the receipt: it lets a typed date move a supply''s slot, lateness and promotion, and reopens the renumbering cost #52 set out.'
+    - PER FILE, BESIDE REQ-PIPE-144's RECEIPT, AND IN THE ON-DISK RECEIPT RECORD (Keith, 2026-10-04, question A4). 144 moves each file's receipt onto qa.delivery_file, so the statement sits on the same row; for a folder or an S3 prefix the person states once and it is recorded on every file. In each file's receipt record under data/receipts/ it has its own key, never `received_at`, so a rebuild from disk restores it. REJECTED the database alone, where a synthetic reset would erase the one fact that cannot be regenerated; REJECTED a column on qa.delivery, which 144 is moving receipts away from and which cannot hold different S3 object times.
+    - received_from IS UNCHANGED. A hand-filed receipt is still `our-clock`; the stated arrival is neither storage's clock nor ours but a person's claim, which is why it is a separate field and is labelled as stated wherever it is shown.
+    - REQUIRED, WITH `not known` AS AN ANSWER (Keith, 2026-10-04, question A1). His 2026-09-27 decision 1 made it required and rejected defaulting; the 2026-10-04 answer changed the stakes, because the field now decides nothing, so forcing an exact value from somebody who does not know would only invent data, while `not known` is honest and still distinguishable from an automated arrival that was never asked. REJECTED exact-time-only (pushes people to guess) and optional-and-skippable (how a field ends up empty on every row).
+    - THE FLAG IS `--originally-received <ISO 8601 date-time | not-known>` on `mothman bdm qa` and `mothman cp qa`, following criterion 3's existing shape. With `--commit` and no terminal, the absence is refused rather than defaulted (criterion 14), which changes today's scripted `--commit` behaviour - every existing caller and test passing `--commit` needs the flag.
+    - 'BOUNDS: not later than the command''s own receipt instant, which also rules out the future, since the receipt is now. REJECTED any lower bound such as ''not before the period opened'': a supply emailed weeks before anybody filed it is exactly the case this exists for, and any lower bound would be a guess.'
+    - DATE AND TIME, NOT A BARE DATE. Both sources Keith named carry a time - an email's received header and an S3 object's LastModified - so a date alone would only come from guessing; a person who cannot say answers `not known`. A value with no offset is read on the asset clock (Australia/Perth today), matching how every other instant in this project is interpreted.
+    - A TRIAL IS NEVER ASKED. A trial writes nothing that outlives the command (criterion 2), so a recorded statement about it would have nowhere to live.
+    - 'S3 OFFERS LastModified AS THE DEFAULT, STILL ONLY RECORDED (Keith, 2026-10-04, question A2): the time is already in hand from the download, and making the person look it up again invites a typo. REJECTED treating LastModified as the receipt itself with received_from `storage` - arguably what REQ-PIPE-105 criterion 3 would say if the s3Source bucket is our own storage, and recorded here so nobody makes that change later without asking, because it would put a decision back on that date.'
+    - 'WHO FILED IT IS REQ-PIPE-147, NOT THIS AMENDMENT (Keith, 2026-10-04, question A3). #52''s first gap - nothing on a delivery record says a person filed it, by which route, or who - was checked 2026-10-04 and is NOT answered today: the `handfiled-` directory prefix is a naming convention nothing parses; received_from `our-clock` only coincides with hand-filing because no automated path writes a receipt yet, and REQ-PIPE-105 criterion 4 makes it the fallback for any automated path whose storage gives no instant; and qa.run.run_by names who ran the QA RUN, is recorded for automated runs too, and is not on the delivery. Split out to keep this amendment small.'
+    - A STATED ARRIVAL IS WRITE-ONCE. Nothing decides on it, so a wrong one costs an inaccurate note rather than a wrong verdict, and building a correction path now would be work for a case nobody has met. If one is wanted later it is its own requirement - most likely a correction recorded beside the original statement rather than over it.
+    - AN S3 PREFIX OFFERS EACH OBJECT'S OWN LastModified, CONFIRMED AS A SET IN ONE STEP (Keith, 2026-10-04). AMENDS decision 16's 'for a folder or an S3 prefix the person states once and it is recorded on every file', for an S3 prefix only - a folder still takes one statement. The objects of one prefix can carry different times and storage already knows each one; one statement for all would throw that away. REJECTED asking per object, which is thirty prompts at thirty datasets.
+    - A SCRIPTED S3 KEEP ACCEPTS EACH OBJECT'S OWN TIME WITH `--originally-received storage` (Keith, 2026-10-04). REJECTED requiring scripts to give one value for every file, which would make per-object times TUI-only.
+    - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
     linked_tests:
-      - tests/test_trial_runs.py
-      - tests/test_hand_filing.py
-      - tests/test_cli_bdm.py
-      - tests/test_cli_cp.py
-      - tests/test_run_schema_lifecycle.py
+    - tests/test_trial_runs.py
+    - tests/test_hand_filing.py
+    - tests/test_cli_bdm.py
+    - tests/test_cli_cp.py
+    - tests/test_run_schema_lifecycle.py
     implemented_by:
-      - qa_tools/common/trial.py::trial_run_id
-      - qa_tools/common/trial.py::discard
-      - qa_tools/common/trial.py::schemas_of
-      - qa_tools/common/trial.py::orphan_schemas
-      - qa_tools/common/trial.py::scope_for
-      - qa_tools/common/hand_filing.py::file_supply
-      - qa_tools/common/hand_filing.py::check
-      - qa_tools/common/supply_db.py::staging_schema_for
-      - qa_tools/common/supply_db.py::ensure_staging
-      - qa_tools/common/supply_db.py::is_trial_run
-      - qa_tools/common/supply_db.py::borrow_views
-      - cli/common.py::file_or_trial
-      - cli/common.py::decide_keep
-      - cli/common.py::keep_from_flags
-      - cli/common.py::say_what_it_did
-      - cli/bdm.py::run_check_local_file
-      - cli/cp.py::run_check_local_folder
-      - cli/cp.py::run_check_single_table
-      - qa_tools/bdm/orchestrate_bdm.py::_discard_this_runs_schemas
-      - qa_tools/cp/orchestrate_cp.py::_discard_this_runs_schemas
-      - qa_tools/bdm/build_per_run_warehouses.py::build_one
-      - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+    - qa_tools/common/trial.py::trial_run_id
+    - qa_tools/common/trial.py::discard
+    - qa_tools/common/trial.py::schemas_of
+    - qa_tools/common/trial.py::orphan_schemas
+    - qa_tools/common/trial.py::scope_for
+    - qa_tools/common/hand_filing.py::file_supply
+    - qa_tools/common/hand_filing.py::check
+    - qa_tools/common/supply_db.py::staging_schema_for
+    - qa_tools/common/supply_db.py::ensure_staging
+    - qa_tools/common/supply_db.py::is_trial_run
+    - qa_tools/common/supply_db.py::borrow_views
+    - cli/common.py::file_or_trial
+    - cli/common.py::decide_keep
+    - cli/common.py::keep_from_flags
+    - cli/common.py::say_what_it_did
+    - cli/bdm.py::run_check_local_file
+    - cli/cp.py::run_check_local_folder
+    - cli/cp.py::run_check_single_table
+    - qa_tools/bdm/orchestrate_bdm.py::_discard_this_runs_schemas
+    - qa_tools/cp/orchestrate_cp.py::_discard_this_runs_schemas
+    - qa_tools/bdm/build_per_run_warehouses.py::build_one
+    - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
     evidence:
-      - >
-        2026-09-27: tests/test_trial_runs.py drives the REAL loader -
-        a trial stages real rows into `trial_<stamp>`, its views
-        resolve through `qa_trial_<stamp>`, shared staging is
-        unchanged throughout, and after discard() no schema of the
-        trial's remains and orphan_schemas() is empty.
-      - >
-        2026-09-27: tests/test_hand_filing.py files real deliveries
-        into an isolated tree - the run id comes back from
-        recognition (`run_001`, `cp_run_001`), the receipt is written
-        outside the delivery, the file is stored byte-for-byte, six
-        files make ONE delivery, the delivery log gets its record
-        immediately rather than at the next pipeline run, and an
-        unplaceable name is refused with nothing written.
-      - >
-        2026-09-27: at the command level,
-        test_qa_command_local_file_commit_files_a_real_delivery_and_promotes
-        (BDM) and
-        test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files
-        (CP) drive the real four-tool chain end to end and check the
-        filed delivery, the recognised id and what the command says
-        it did; their trial counterparts assert nothing was filed and
-        that the output never calls a filed run local-only.
-      - >
-        2026-09-27: qa_tools/common/local_check.py and its tests are
-        deleted. `run_id_from_path()` was the only route by which a
-        user-supplied filename could become a run id, which is
-        criterion 4 enforced by absence rather than by a rule.
+    - '2026-09-27: tests/test_trial_runs.py drives the REAL loader - a trial stages real rows into `trial_<stamp>`, its views resolve through `qa_trial_<stamp>`, shared staging is unchanged throughout, and after discard() no schema of the trial''s remains and orphan_schemas() is empty.
+  
+      '
+    - '2026-09-27: tests/test_hand_filing.py files real deliveries into an isolated tree - the run id comes back from recognition (`run_001`, `cp_run_001`), the receipt is written outside the delivery, the file is stored byte-for-byte, six files make ONE delivery, the delivery log gets its record immediately rather than at the next pipeline run, and an unplaceable name is refused with nothing written.
+  
+      '
+    - '2026-09-27: at the command level, test_qa_command_local_file_commit_files_a_real_delivery_and_promotes (BDM) and test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files (CP) drive the real four-tool chain end to end and check the filed delivery, the recognised id and what the command says it did; their trial counterparts assert nothing was filed and that the output never calls a filed run local-only.
+  
+      '
+    - '2026-09-27: qa_tools/common/local_check.py and its tests are deleted. `run_id_from_path()` was the only route by which a user-supplied filename could become a run id, which is criterion 4 enforced by absence rather than by a rule.
+  
+      '
 
   - id: REQ-PIPE-104
     title: "A filing is recorded in the database, never as a committed file"
@@ -24847,6 +24570,7 @@ requirements:
     - THE SYSTEM SHALL change, in the same change, tests/test_orchestrate_single_run.py's TestABirthRegistrationsRunWithNothingItMayRead to cover a held table and a contested table, each finishing without raising, recording no per-check results, and leaving its outstanding item open.
     - WHERE one file of a contested pair cannot be loaded, THE SYSTEM SHALL keep the dataset contested for that arrival, raising criterion 8's item, saying which of the two files could not be loaded, and SHALL NOT treat the file that loaded as the supply.
     - THE SYSTEM SHALL show, in the dataset's supply history, a row for every held supply and every contested pair, saying 'Held' or 'Two files, choose one' with its receipt, whatever the period on show.
+    - WHILE criterion 10 applies, THE SYSTEM SHALL render that dataset's agency-tier row as a single reason row (the pattern already used for an ended schedule), SHALL show on its dataset page the held or contested arrival's receipt time and '—' for its row counts, and SHALL NOT show an earlier supply's row count, QA run date, arrival or sparkline as this period's.
     non_functional_requirements:
     - A FALSE GREEN IS THE FAILURE THIS EXISTS TO PREVENT, and every mechanism is judged against it first. A check that silently does not appear - or a card still showing the last run's pass - is indistinguishable from a check that passed, to the dashboard, the promotion gate and the tickets alike.
     - THE COMMITTED CONFIGURATION IS NEVER REWRITTEN (Keith, 2026-09-30). contract/*.yml and contract/*.yaml are read-only to the pipeline; any per-run narrowing of what a tool runs happens in memory, as soda_common.readable_checks_yaml already does.
@@ -24901,6 +24625,8 @@ requirements:
     - 'A HELD OR CONTESTED SUPPLY HAS A SUPPLY-HISTORY ROW (Keith, 2026-10-04) - the dashboard reviewer''s third must-fix, applied here as at REQ-DASH-148. REJECTED leaving supply history to runs only: a run whose own table is unreadable records no per-check result (criterion 6).'
     - 'REQ-PIPE-144 CRITERION 13 WAS REWORDED TO MATCH BUILT REQ-PIPE-105 CRITERION 6 (Keith, 2026-10-04): a contested pair IS filed, under `#1`. Decision 10''s reason for rewording REQ-PIPE-078 criterion 9 (''144 criterion 13 files a held contested pair to no period'') therefore no longer applies to contested pairs; the rewording still stands for HELD supplies, which have no period. Decision 17''s ''until REQ-PIPE-144 lands a contested pair has a period'' becomes permanent.'
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - 'THE PREVIOUS SUPPLY''S FIGURES ARE NEVER SHOWN BESIDE THIS RED (Keith, 2026-10-04), the dashboard UX reviewer''s must-fix: the agency-tier row becomes one reason row, as for an ended schedule, and the dataset page shows the arrival''s receipt time and a dash for rows. REJECTED leaving the normal row, which would put a stale row count and sparkline beside a red pill - a half-stale picture close to the false green this requirement exists to stop.'
+    - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
     open_questions:
     - Where one file of a contested pair could not be loaded, REQ-DASH-148 also raises a 'Could not be loaded' item for that file. Should both items show for the one dataset, or should the contested item carry the load failure and the failed-load item be folded into it?
   - id: REQ-TEST-116
@@ -26044,9 +25770,9 @@ requirements:
     - THE SYSTEM SHALL record on every qa.filing row the delivery it came from, as a foreign key to qa.delivery that refuses deletion of a delivery any filing references, and SHALL NOT keep a received_at column on qa.filing.
     - THE SYSTEM SHALL take the delivery for a new filing from the arrival being filed (its delivery name, passed by filing.file_arrivals to filing.record), never from parsing the supply id.
     - THE SYSTEM SHALL define ONCE, as a view in the qa metadata schema, a supply's receipt - the receipt of the supply's file in its linked delivery, giving its text, instant, clock and sequence.
-    - WHILE a CONTESTED pair (two files for one dataset in one delivery) is held for a person, THE SYSTEM SHALL show each of its files with that file's own receipt, SHALL file it to no period, and SHALL NOT give the held pair a single receipt of its own.
+    - WHILE a CONTESTED pair (two files for one dataset in one delivery) awaits a person's choice, THE SYSTEM SHALL file it, as REQ-PIPE-105 criterion 6 does as built, as one supply under its `#1` supply id to the period the filing rule assigns from the arrival's receipt, SHALL show each of its files with that file's own receipt, and SHALL NOT give the pair a single receipt of its own.
     - WHEN a person chooses which file of a contested pair is the supply, THE SYSTEM SHALL take that file's own receipt as the supply's receipt, in the same receipt view, and SHALL file and judge the supply on it.
-    - THE SYSTEM SHALL use the earlier file's receipt of a held contested pair only to name the held arrival and order it for processing, and SHALL NOT use it for filing, lateness or the promotion gate.
+    - THE SYSTEM SHALL use the earlier file's receipt of a contested pair only to name its arrival, order it for processing and file it under criterion 13, and SHALL NOT use it in the promotion gate.
     - THE SYSTEM SHALL answer every question of when a supply was received - filing.received_at_of, filing.recorded_arrival, the arrival classification and REQ-PIPE-130's _manifest - from that one view, and SHALL NOT re-derive the contested pair's earlier-file rule anywhere else.
     - WHERE a filing is a re-file under REQ-PIPE-141, THE SYSTEM SHALL carry its prior filing's delivery link onto the new filing row, so that a re-file is never refused for want of a delivery.
     - IF a filing would be written with no delivery, or for a delivery with no qa.delivery row, THEN THE SYSTEM SHALL refuse the filing and name the delivery or arrival concerned, rather than writing a filing that links to nothing.
@@ -26073,6 +25799,7 @@ requirements:
     - IF mothman pipeline run is run against a database that already holds QA history, THEN THE SYSTEM SHALL refuse, delete nothing, and say that a re-run would add to the existing history rather than replace it and that mothman env reset-synthetic is how to start from empty.
     - THE SYSTEM SHALL deliver REQ-PIPE-107 criteria 13 and 14 (refusing a qa schema whose recorded SCHEMA_VERSION is newer than the checkout's, with its failing test first) in this change, so that ensure_schema refuses both an older and a newer schema from one change.
     - IF mothman pipeline regenerate-history is run for a data asset whose configuration does not declare it synthetic, THEN THE SYSTEM SHALL refuse and delete nothing.
+    - WHEN a person chooses one file of a contested pair and that file's own receipt gives a different period or arrival classification than the pair's filing, THE SYSTEM SHALL write a new filing row for the chosen supply, in REQ-PIPE-141's append-only shape, and SHALL NOT edit the original.
     non_functional_requirements:
     - No behaviour change a person can see - dashboards, terminal and tickets show exactly what they showed before. This is a storage change, and the empty-database before/after bootstrap comparison is the proof, not a reading of the diff.
     - Every consumer of a changed shape is enumerated mechanically (CLAUDE.md's shape-change rule) and asserted at the last transform before a person, not only at the query. The consumers found while drafting are listed in decisions; re-grep at build time, because REQ-PIPE-131 will have added or removed some.
@@ -26121,6 +25848,10 @@ requirements:
     - '107''s NEWER-SCHEMA REFUSAL IS BUILT INSIDE THIS CHANGE (Keith, 2026-10-04): both directions live in qa_store.ensure_schema and criterion 29 already rewrites it. REJECTED building it with the rest of REQ-PIPE-107 after the batch, which leaves the known downgrade (post-build-review #79) open through every schema bump the batch makes.'
     - regenerate-history IS REFUSED WHEREVER THE ASSET IS NOT DECLARED SYNTHETIC (Keith, 2026-10-04). It deletes and re-runs recorded history (REQ-PIPE-038 criteria 4-7), which is the same act as reset-synthetic plus a bootstrap. Keyed to the asset's synthetic declaration (REQ-GEN-135 criterion 8's), not to an environment name. Its possible retirement into reset-synthetic plus a bootstrap is left as an open question.
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - 'A CONTESTED PAIR IS FILED, AS BUILT (Keith, 2026-10-04), reversing this criterion''s signed ''SHALL file it to no period''. REQ-PIPE-105 criterion 6 (built, amended 2026-10-02) files the pair under `#1` with a known period, and filing.file_arrivals does exactly that today (qa_tools/common/filing.py:274-281). REJECTED changing the built filing to match 144 as signed: it would reintroduce the second, filed-nowhere mechanism 105 retired.'
+    - 'THE EARLIER FILE''S RECEIPT NOW ALSO FILES THE PAIR (Keith, 2026-10-04), which follows from criterion 13 being reworded: a filing needs an instant, and the built rule takes the arrival''s, which for a contested pair is the earlier file''s (REQ-GEN-044 criterion 12). ''Lateness'' is dropped from the SHALL NOT because the arrival classification is computed at filing - see this requirement''s open question on criterion 14.'
+    - 'CHOOSING A FILE RE-FILES IT WHERE ITS OWN RECEIPT DIFFERS (Keith, 2026-10-04). Example: A at 11:58pm on the deadline, B at 12:03am; the pair is filed on time from A; choosing B writes a new filing saying late. REJECTED leaving the filing as made, which would leave the filing and the chosen file''s receipt disagreeing about the same supply.'
+    - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
     open_questions:
     - 'Should `mothman pipeline regenerate-history` be retired in favour of `mothman env reset-synthetic` followed by `mothman pipeline bootstrap` (Keith, 2026-10-04: ''a candidate to retire'')? And should criterion 22''s refusal of reset-synthetic key off the asset''s synthetic declaration, as regenerate-history''s now does, rather than off the environment name production (REQ-PIPE-093 decision 10 noted the same mismatch)?'
 
@@ -26247,11 +25978,13 @@ requirements:
     - THE SYSTEM SHALL name a failed load 'Could not be loaded' everywhere it labels one - the outstanding item's kind, supply history, the dataset's reason and the terminal - and SHALL NOT use the label 'Failed load'.
     - THE SYSTEM SHALL show, in the dataset's supply history, a row for every supply that could not be loaded - including a file refused by a file check (REQ-QAC-096 criterion 11) - reading 'Could not be loaded' with its receipt and its recorded reason, whatever the period on show.
     - WHEN a supply whose load failed is staged again and loads, THE SYSTEM SHALL record, in the same transaction as its new load record, that a re-check of that supply is owed, and the next processing pass (REQ-PIPE-151) SHALL run it through REQ-PIPE-140's re-check as a run of its own, keeping the first run and recording the reload as its cause.
+    - THE SYSTEM SHALL record a failed load's reason only in its own words - the kind of fault, the line number, the field counts and the column name - and SHALL NOT record the loading library's message anywhere in the qa metadata schema, printing it only to the standard error of the process that ran the load.
+    - WHILE criterion 1 applies, THE SYSTEM SHALL render that dataset's agency-tier row as a single reason row (the pattern already used for an ended schedule), SHALL show on its dataset page the failed arrival's receipt time and '—' for its row counts, and SHALL NOT show an earlier supply's row count, QA run date, arrival or sparkline as this period's.
     non_functional_requirements:
     - 'A FALSE GREEN IS THE FAILURE TO PREVENT: a dataset showing its last good run''s green while this period''s supply could not even be read is the worst outcome this exists to rule out.'
     - 'IT HOLDS AT 30 DATASETS: one red per dataset, never one per check, and one aggregated queue item as REQ-DASH-070 already does.'
     - 'RELIABILITY: one supplier''s bad file never stops the batch or costs any other dataset its QA - the case Keith called ''a really important one'' from real operational experience (TS-12).'
-    - A REASON NAMES THE FILE, LINE AND FIELD COUNT, NEVER A ROW VALUE (REQ-PIPE-115 NFR 9). The recorded reason is the parser's own message today, which already meets this; the check is that nothing new quotes the file.
+    - A REASON NAMES THE FILE, LINE, FIELD COUNT AND COLUMN, NEVER A ROW VALUE (REQ-PIPE-115 NFR 9). The parser's own message can quote a row - so it is never recorded (criterion 10); it reaches only the terminal or log of whoever ran the load.
     - 'A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING ELSE: the item and the red come from qa.load_outcome, the supply''s receipt from REQ-PIPE-144''s receipt view, and qa.decision, read on effective_at, for a rejection that closed the item (REQ-PIPE-153).'
     - 'FAILING FIRST: criterion 5''s behaviour is not exercised by any test today, so the first test written reproduces what a run with its own table failed to load actually does now, before anything changes.'
     dependencies:
@@ -26277,6 +26010,10 @@ requirements:
     - 'A SUPPLY THAT COULD NOT BE LOADED HAS A SUPPLY-HISTORY ROW (Keith, 2026-10-04) - the dashboard reviewer''s third must-fix. REJECTED leaving supply history to runs only: a run whose own table failed to load records no per-check result (criterion 5), so the arrival would vanish from the one place a reader looks for what arrived.'
     - A FIXED AND RELOADED FILE IS CHECKED THROUGH REQ-PIPE-140's RE-CHECK (Keith, 2026-10-04), as a new run that keeps the first. REJECTED re-running the first run under its own identity, which is the overwrite REQ-PIPE-086 criterion 8 forbids; REJECTED a person having to ask for the check after reloading.
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - THE PARSER'S MESSAGE DOES NOT MEET THE PRIVACY RULE, CONTRARY TO THIS NFR AS SIGNED (Keith, 2026-10-04). delivery-architect found that a loading library's message can echo row content, and the recorded reason reaches the public page. Corrected rather than left standing as a false claim.
+    - 'A RECORDED FAILED-LOAD REASON IS OUR OWN WORDS ONLY (Keith, 2026-10-04). The library''s message goes to the operator''s terminal and is never recorded, because the recorded reason is published. REJECTED recording the message and redacting it: a redactor has to know every shape a row can leak in. Narrows what REQ-PIPE-060 criterion 5''s built mechanism writes, without changing that criterion''s claim that a reason is recorded; existing rows go with the next rebuild from empty.'
+    - 'THE PREVIOUS SUPPLY''S FIGURES ARE NEVER SHOWN BESIDE THIS RED (Keith, 2026-10-04), the dashboard UX reviewer''s must-fix: the agency-tier row becomes one reason row, as for an ended schedule, and the dataset page shows the arrival''s receipt time and a dash for rows. REJECTED leaving the normal row, which would put a stale row count and sparkline beside a red pill - a half-stale picture close to the false green this requirement exists to stop.'
+    - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
   - id: REQ-TEST-150
     title: A kept terminal run says what the lifecycle decided about each arrival, and on what grounds
     date_written: '2026-10-04'
@@ -26355,7 +26092,7 @@ requirements:
     - 'SCALABILITY is the reason for it (Thread L): cost bounded by the arrivals not yet processed and the work owed, never by total history. Worth nothing at sixty deliveries and everything at roughly thirty quarterly datasets over years.'
     - 'RELIABILITY: derived rather than stored progress fails safe - a crash mid-pass leaves the unfinished arrival owed rather than skipped (qa_tools/common/backlog.py''s own account of why the stored marker was removed, 2026-09-27). Owed re-checks and re-evaluations are recorded in their deciding transaction already (REQ-PIPE-121, REQ-PIPE-140); this command is what clears them.'
     - 'COMPATIBILITY: needs no GitHub to process; ticket reconciliation is the last step and silent where unconfigured, so the command works unchanged on a government network that cannot reach GitHub.'
-    - 'SECURITY AND DATA HANDLING: it runs where the supply rows are, like the batch, and holds no access the batch does not; it is not a build and does not change what the dashboard build may read.'
+    - 'SECURITY AND DATA HANDLING: it runs where the supply rows are, like the batch, and holds no access the batch does not except READ-ONLY access to the arriving S3 bucket, which it needs to read a delivery recorded only as database rows (REQ-PIPE-152); it writes to no bucket, is not a build, and does not change what the dashboard build may read.'
     - 'OBSERVABILITY: every arrival and owed item it processes is recorded by the functions that already record them (qa.run, the decision log, the owed records); what it prints follows REQ-TEST-150''s aggregated report.'
     - 'COST: no new infrastructure. When a scheduler calls it, the scheduler is the AWS MVP''s concern (plans/wider.md), not this requirement''s.'
     dependencies:
@@ -26397,6 +26134,8 @@ requirements:
     - 'DISTINCT EXIT CODES (Keith, 2026-10-04): 0 ok, 1 red checks, 2 a stage or arrival failed, 75 another pass is running (EX_TEMPFAIL, so a scheduler can tell ''try later'' from ''broken''). REJECTED one non-zero code for every failure, which a scheduler cannot act on.'
     - 'THE LAMBDA HANDLERS RUN THIS PASS RATHER THAN THE PER-ARRIVAL FUNCTION (Keith, 2026-10-04): a handler records the delivery rows and then runs this pass, so ONE processor keeps global receipt order (criterion 9). Decisions 18 and 19 still hold; the per-arrival lock (criteria 6-7) is now mostly backed by the pass lock (criterion 16), and is kept because a terminal keep (REQ-PIPE-086) takes no pass lock.'
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - 'THE PROCESSING PASS GETS READ-ONLY ACCESS TO THE ARRIVING BUCKET (Keith, 2026-10-04), correcting this NFR''s ''holds no access the batch does not'': criterion 1 already builds arrivals from S3-only deliveries, which it cannot do without reading the bucket. REJECTED copying objects somewhere the pass can already reach (REQ-PIPE-152 decision 3 rejected copies).'
+    - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
     open_questions: []
   - id: REQ-PIPE-152
     title: The S3 Lambda handlers process each arriving object through the per-arrival lifecycle, and the S3 object is the delivery
@@ -26413,9 +26152,9 @@ requirements:
     - THE SYSTEM SHALL record such a delivery only as REQ-PIPE-144's database rows - its qa.delivery row and one qa.delivery_file row per object, carrying that file's receipt and the object's storage URI - and SHALL NOT write a delivery directory or an on-disk receipt record.
     - THE SYSTEM SHALL take each object's receipt from storage, as REQ-PIPE-105 criterion 3 requires, and SHALL NOT take it from the handler's own clock where storage gives one.
     - THE SYSTEM SHALL decide which dataset an object belongs to by that dataset's declared pattern (REQ-PIPE-058), the same as the terminal and the batch, and SHALL take the arrival's run identity from recognition, never from the object's key.
-    - THE SYSTEM SHALL process each recognised object through REQ-PIPE-086's per-arrival function, which files it, overlays its period, runs its checks and applies the promotion gate, and SHALL NOT stage, check or record an object outside that function.
-    - THE SYSTEM SHALL build, from a delivery recorded only as database rows, an arrival the per-arrival function accepts on the same terms as one recognised from the delivery tree, reading the object from storage rather than from a local file.
-    - THE SYSTEM SHALL let a handler's invocation be retried by the platform, and WHEN a retry reaches an arrival already checked and gated SHALL do nothing to it, under REQ-PIPE-151's per-arrival lock.
+    - THE SYSTEM SHALL have each handler record the recognised objects as a delivery and then run REQ-PIPE-151's processing pass, which processes them through REQ-PIPE-086's per-arrival function in global receipt order, and SHALL NOT stage, file, check or gate an object in the handler itself.
+    - THE SYSTEM SHALL let REQ-PIPE-151's processing pass build, from a delivery recorded only as database rows, an arrival the per-arrival function accepts on the same terms as one recognised from the delivery tree, reading the object from storage through its recorded storage URI rather than from a local file.
+    - THE SYSTEM SHALL let a handler's invocation be retried by the platform, SHALL record nothing twice when a retry reaches a delivery already recorded, and WHEN a retry's pass reaches an arrival already checked and gated SHALL do nothing to it.
     - THE SYSTEM SHALL NOT call the single-run entry point from either handler.
     - IF no dataset's pattern claims an object a handler receives, or more than one does, THEN THE SYSTEM SHALL report it as unplaceable on the same terms as the pipeline reports an unplaceable delivery (REQ-PIPE-057), and SHALL continue with the event's other objects.
     - THE SYSTEM SHALL record a handler's delivery as received automatically, with no person and no hand-filing route (REQ-PIPE-147 criterion 5).
@@ -26445,7 +26184,12 @@ requirements:
     - A CRASH IS RETRIED BY THE LAMBDA FIRST, AND THE PROCESSING PASS IS THE BACKSTOP (Keith, 2026-10-04). Both can reach the same arrival, so both go through REQ-PIPE-151's per-arrival lock and its already-checked-and-gated no-op (criteria 6 and 7). An S3-only delivery becomes an arrival from its recorded rows (criterion 6 here, criterion 1 there), which is also what lets the pass see it at all. How the Arrival type carries a storage location instead of a local path is a build detail, not a decision - but it must be ONE arrival type, not a Lambda-only variant the per-arrival function has to branch on.
     - AN S3-ONLY DELIVERY STORES ITS OBJECT'S STORAGE URI ON qa.delivery_file (Keith, 2026-10-04), so the processing pass can find the object (REQ-PIPE-151 criterion 1). The column rides REQ-PIPE-144's SCHEMA_VERSION bump if built with it, otherwise its own bump and a rebuild from empty, as REQ-PIPE-103's NFR 9 does. REJECTED deriving the location from the bucket's configured prefix plus the file name, which breaks the day a prefix is reorganised.
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
-    open_questions: []
+    - 'THE HANDLER ONLY RECORDS, THEN RUNS THE PROCESSING PASS (Keith, 2026-10-04), so one processor keeps global receipt order across collections. REJECTED the handler calling the per-arrival function itself (as signed): two arrivals landing at once would each be processed by its own Lambda, out of receipt order.'
+    - 'Follows criterion 5 (Keith, 2026-10-04): the arrival is built by the pass, not the handler.'
+    - A retry re-runs recording and the pass (Keith, 2026-10-04); recording must be idempotent, and the pass's own no-op rule (REQ-PIPE-151 criterion 7) covers the rest.
+    - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
+    open_questions:
+    - 'When a handler''s pass is refused because another pass is running (exit 75), should the invocation fail so the platform retries it soon (risking a retry budget spent while a long pass runs), or succeed and leave the arrival to the next scheduled pass (risking a wait as long as the schedule''s gap)? A pass that started before the delivery was recorded decides its list in one read and will not see it. DEFERRED BY KEITH, 2026-10-04: ''decide when we focus on building the aws side later''.'
   - id: REQ-PIPE-153
     title: A person rejects a supply that could not be loaded, and the rejection settles it
     date_written: '2026-10-04'
@@ -26479,7 +26223,7 @@ requirements:
     - 'ONE ANSWER, NOT TWO THAT CAN DISAGREE: closure is derived from the decision log at read time, so there is no window in which the log says rejected and the queue says waiting - the property decision_log.apply_decision gives holds by resolving them in the same transaction, reached here by storing no second record at all.'
     - 'ATTRIBUTABLE: a rejection is only ever a person''s (REQ-PIPE-076 criterion 3), carries a reason (REQ-PIPE-074), and its actor comes from the route''s own identification (REQ-GHUB-082 criterion 4) - nothing here may accept a stated actor or record one without a reason.'
     - 'COST STAYS PER FAILED LOAD: the closure check is one lookup per currently-failed table, of which there are few, so years of load and decision history do not change what reading the queue costs - and at 30 datasets the queue still lists failed loads, not checks.'
-    - 'A REASON NAMES THE FILE, LINE AND FIELD COUNT, NEVER A ROW VALUE (REQ-PIPE-115 NFR 9): the queue shows the recorded load reason, which already meets this, and nothing new quotes the file.'
+    - 'A REASON NAMES THE FILE, LINE, FIELD COUNT AND COLUMN, NEVER A ROW VALUE (REQ-PIPE-115 NFR 9): the queue shows the recorded load reason, which is in the system''s own words only (REQ-DASH-148''s own-words criterion), and nothing new quotes the file.'
     - 'FAILING FIRST: the reproduction already exists and goes in before the fix; the promote refusal and the resupply case each get a test confirmed failing against today''s code before either is fixed.'
     dependencies:
     - REQ-DASH-148
@@ -26511,3 +26255,5 @@ requirements:
     - 'A REJECTED FAILED LOAD LEAVES A SUPPLY-HISTORY ROW (Keith, 2026-10-04), so the record of what arrived survives the decision about it. REJECTED dropping the row on rejection: criterion 8''s ''as if it never arrived'' governs the period''s status, not the history.'
     - 'A RELOAD AFTER A REJECTION STILL OWES ITS RE-CHECK (Keith, 2026-10-04): REQ-DASH-148''s reload rule records the re-check owed whatever was decided; criterion 11 still holds, because the gate defers to the person''s rejection (REQ-PIPE-076 criterion 7), so the re-check gives the person verdicts without promoting anything.'
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - 'CORRECTED (Keith, 2026-10-04): the recorded load reason was the parser''s own message, which can quote a row, so ''which already meets this'' was wrong. It meets it once REQ-DASH-148 records reasons in our own words.'
+    - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
