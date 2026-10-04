@@ -1383,3 +1383,22 @@ judgement about who reads the page rather than about the rule.
       coordinates not URLs). **The dataset pages STAY UNLABELLED** (Keith) -
       a planted red looks exactly like a real one; ONLY the Scenarios tab
       says what was planted.
+    - **CHAIN PROTECTION UNDER PLAIN NAMES - checked 2026-10-04 (Keith
+      asked).** "A later period stands on this supply" is asked of the
+      DECISION LOG by dataset + SUPPLY ID (decision_log.periods_standing_on,
+      REQ-PIPE-084 criterion 11), never by table name, so plain names
+      change nothing; substitution/inheritance views are schema-qualified
+      (`period_2026_q2.cp_clients`). ONE HAZARD WORTH A GUARD when 128/129
+      are built: PostgreSQL views bind to a table by OID, so if any path
+      ever moved or renamed a stood-on table WITHOUT the log check, the
+      later period's view would silently FOLLOW it into
+      `_superseded` and keep reading set-aside data as current. Proposed
+      second line of defence: refuse a move-out when pg_depend shows a
+      dependent view, with a test.
+    - **RE-FILE'S EFFECT is from an EARLIER batch**, not this one:
+      REQ-GHUB-082 (signed 2026-09-28) offers re-file on both routes but
+      records its effect as unmet, blocked by REQ-PIPE-079; REQ-PIPE-075
+      criterion 17 (re-run QA when promoted or re-filed into a different
+      period) likewise. 079's overlay is now wired, so the blocker may be
+      largely cleared. 128, 131 and 132 name re-file as a remedy, so it
+      belongs early in the build queue.
