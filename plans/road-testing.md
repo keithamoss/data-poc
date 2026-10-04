@@ -1887,6 +1887,24 @@ judgement about who reads the page rather than about the rule.
         Critic minors NOTED, not fixed: the publisher role's ability to run
         qa.slot_holds is untested, and the view is asked per slot in two
         readers where one read would do (fine at today's volumes).
+      - SPRINT 3b: REQ-PIPE-131 - a slot closes when the next CALENDAR
+        period's claim window opens, and a supply is filed only to the
+        slot open at its receipt instant (fill / resupply / held).
+        RETIRED (REQ-DOCS-143 records): REQ-PIPE-063, REQ-PIPE-077,
+        REQ-PIPE-065 c1-2. AMENDED: 062 c2-4, 064 c1 as signed, and
+        PROVISIONAL - REQ-PIPE-052 c5 ("SHALL NOT close it"), which
+        contradicted 131 but was not in its amendment list. Scenario
+        register (TS-1, 2, 5, 6a-c, 7, 10, 33a/b) rewritten, each with a
+        test. Thread E marked SUPERSEDED (candidate for deletion whole).
+        ALSO FIXED: post-build-review #90 - the validator demanded a
+        RETIRED requirement's code still exist. GAPS until later sprints:
+        the queue has no closed-unfilled-slot item until REQ-PIPE-132
+        (sprint 7). **NEEDS KEITH: the real `supply` database still holds
+        PRE-131 filings** - filings are write-once and `bootstrap --force`
+        does not re-derive them (REQ-PIPE-062 c10), and dropping the
+        database was refused by this session's permission classifier. It
+        needs a drop-and-rebuild by you (or permission to do it). The
+        evidence below is from a fresh scratch database, `supply131`.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt
