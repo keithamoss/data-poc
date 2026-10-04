@@ -1646,3 +1646,20 @@ judgement about who reads the page rather than about the rule.
       RIGHT AFTER 144, which they both build on; REQ-QAC-108's amendment
       (compare with the older accepted supply and flag it) goes ALONGSIDE
       REQ-PIPE-115.
+    - **086 REFRESH ANSWERS, 2026-10-04 (Keith), not yet signed.** The
+      delivery-scoper found most of REQ-PIPE-086 already covered (chiefly
+      by REQ-PIPE-103) and narrowed it to the terminal routes that still
+      skip the shared per-arrival lifecycle. Keith's answers: keep the 086
+      id, narrowed; synthetic "Record" on an already-recorded arrival is
+      not offered until REQ-PIPE-140 exists and then goes only through it;
+      aws/lambda_handlers/ move onto the shared lifecycle now; a kept file
+      belonging to the other collection is refused before anything is
+      written; a new REQ-TEST-150 reports what the lifecycle decided, and
+      a trial says what recognition would do (display only); and a NEW
+      requirement for an incremental "process" command (Thread L) that
+      finishes owed work and reconciles tickets without generating data -
+      because "the next pipeline run" the signed batch relies on is today
+      a synthetic regenerate nobody would run in production. Defects found
+      on the way: post-build-review #81 (automatic promotions record the
+      operator's git identity, not the rule) and #82 (the real hand-filed
+      routes never offer the decision afterwards).

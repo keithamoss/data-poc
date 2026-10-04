@@ -4561,3 +4561,27 @@ twice. It deliberately did not re-find the `TypeError`.
     `filing_queue.awaiting` is built from slot states, and a supply that
     never loaded may never have been filed. Both belong next to
     REQ-DASH-148, which now owns how a failed load is shown.
+
+81. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An
+    automatic promotion records the git identity that ran the pipeline as
+    its actor, not the rule.** Found by delivery-scoper refreshing
+    REQ-PIPE-086, verified here: both orchestrators' `promote_after()`
+    pass `actor=run_by` with `actor_kind=rule`
+    (`qa_tools/bdm/orchestrate_bdm.py` `promote_after`,
+    `qa_tools/cp/orchestrate_cp.py` likewise), and the bootstrapped
+    database holds 69 `promote` and 9 `promotion-withheld` entries whose
+    actor is `noreply@anthropic.com`. REQ-PIPE-074's decision is that a
+    rule's actor id is THE RULE'S NAME, and inheritance gets it right
+    (`"inheritance rule"`). The KIND is correct, so the stickiness rule
+    (automation defers to a person) still works; what is wrong is who a
+    reader is told decided. Touches a built requirement's claim, so it is
+    Keith's to sign off; a failing test comes first.
+
+82. **[investigate, 2026-10-04]** **[GitHub workflow & people]**
+    **REQ-GHUB-082 criterion 17 is only half wired.** Found by
+    delivery-scoper refreshing REQ-PIPE-086, verified here: the offer to
+    decide on a supply a run left waiting (`filing_tui.offer_after_run`)
+    is called only on the synthetic route (`cli/bdm.py`, `cli/cp.py`,
+    after `report_recorded`). The real hand-filed routes end in
+    `_finish_supply` and never offer it. Touches a built requirement's
+    claim, so it is Keith's; a failing test comes first.
