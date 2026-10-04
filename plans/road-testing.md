@@ -1165,3 +1165,15 @@ judgement about who reads the page rather than about the rule.
       promote-and-acknowledge. Quarterly asset expected: "promote" at asset
       level, "promote-and-acknowledge" for problematic collections; daily:
       "promote".
+    - **PERIOD SCHEMA NAMING: KEEP STAMPED NAMES, PUBLISH THE RULE**
+      (Keith). Rejected: renaming promoted tables to plain names (much code
+      identifies a supply by its stamped name) and moving promoted tables
+      to a separate storage schema behind plain-name views (Keith: a
+      years-deep dumping ground that is hard for a human to look at).
+      Instead: the period schema holds EXACTLY ONE object per logical
+      table - `<table>__<arrival key>[__<ordinal>]` for a supply promoted
+      into the period, or plain `<table>` for an inherited view - and the
+      naming rule is published as a short contract for downstream
+      consumers, who list the schema's tables at start-up and strip the
+      stamp to find each base table. supply_db.split_staged already
+      implements the parse.
