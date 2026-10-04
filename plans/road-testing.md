@@ -1402,3 +1402,16 @@ judgement about who reads the page rather than about the rule.
       period) likewise. 079's overlay is now wired, so the blocker may be
       largely cleared. 128, 131 and 132 name re-file as a remedy, so it
       belongs early in the build queue.
+    - **RE-FILE'S EFFECT WILL BE BUILT** (Keith, 2026-10-04) - to be
+      scoped; Keith asked what in REQ-PIPE-079 / 075 criterion 17 blocks it.
+    - **SCENARIOS (REQ-GEN-135..DASH-139, scratchpad draft_scenarios.yaml):
+      Keith delegates the detail to the scoper's drafts** - surface only
+      really major decisions. Question 1 answered: **a TOP-LEVEL Scenarios
+      tab** (139 stays) beside Plans and Demo, replacing REQ-DASH-046's
+      header drawer. Question 2 (where the scripted decisions' synthetic
+      actor lives) re-explained. Question 3 (whole-history settings vs
+      scoped) opened a bigger question from Keith: **can changing one of
+      the new settings later change or misrepresent PAST history?** -
+      answered in conversation (see the next entry once settled).
+    - Keith asked how to make the pg_depend "second line of defence" (a
+      stood-on table must never be moved out of its period) 100% robust.
