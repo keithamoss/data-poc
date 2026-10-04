@@ -1237,3 +1237,27 @@ judgement about who reads the page rather than about the rule.
     table per period), 129 (plain base names), 130 (_manifest); two
     questions put to Keith (promoting into a substituted/inherited slot;
     whether ACKNOWLEDGE replaces REQ-QAC-017's built /accept).
+    - **124 AND 125 DROPPED** (Keith): filing's on-time-for-the-current-slot
+      branch already files an early next-period file to the next period;
+      the residue is indistinguishable by timing; history (127), authorised
+      replacements (123) and the re-check shout (121) cover the rest.
+    - **FOUND WHILE CHECKING THAT, and it reopened the filing rule.** A file
+      arriving after the current period's on-time window, while an OLDER
+      period is unfilled, is filed BACKWARD into the older period
+      (oldest-claimable-unfilled), because a period's claim window never
+      closes (Thread E, "late is always allowed") and monotonic filling
+      (REQ-PIPE-063) closes an older period only once a LATER one is FILLED.
+      REQ-PIPE-065's ambiguity flag does not fire for that shape (it looks
+      only for unfilled periods older than the one chosen). Keith had
+      believed periods closed when the next one opened.
+    - **KEITH'S PROPOSAL: A PERIOD CLOSES WHEN THE NEXT PERIOD'S EARLY
+      (CLAIM) WINDOW OPENS.** An unfilled period that closes is shown very
+      clearly as red / no supply. Reasoning: on the DAILY asset nothing
+      moves slowly enough for a person to decide, and a period with no data
+      breaks everything downstream - "I'd rather have some data in there
+      than nothing" - so a file that misses its window goes to the next
+      period. On the QUARTERLY asset a missing supply is resolved
+      (substitution, not-expected) long before the next quarter opens, so
+      the slot is filled and nothing changes. REVERSES Thread E's "late is
+      always allowed" / an open-ended claim window, and changes REQ-PIPE-063
+      - to be confirmed and scoped.
