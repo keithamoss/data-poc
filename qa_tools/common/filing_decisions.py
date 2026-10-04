@@ -170,7 +170,8 @@ def _reason(request: Request) -> str:
     reason = (request.reason or "").strip()
     if not reason:
         raise decision_log.DecisionRefused(
-            f"a {request.operation} needs a reason. You are deciding this on "
+            f"{'an' if request.operation[0] in 'aeiou' else 'a'} {request.operation} needs "
+            f"a reason. You are deciding this on "
             f"purpose, and somebody will ask why - this log is where they "
             f"will look.")
     return reason

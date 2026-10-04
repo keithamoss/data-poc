@@ -80,6 +80,7 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     # exception, REQ-PIPE-153 criterion 9): from the rejection on, its
     # filing no longer counts, and the period says what happened to it.
     rejected: dict[str, dict] = {}
+    superseded: set[str] = set()
     marks: dict[str, list[dict]] = {}
     for action, to_slot, effective_at, actor, reason, supply in conn.execute(
             f"SELECT action, to_slot, effective_at, actor, reason, supply "
@@ -92,6 +93,14 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
         elif action == decision_log.MARK_NOT_SUPPLIED and to_slot:
             marks.setdefault(to_slot, []).append(
                 {"at": _iso(effective_at), "actor": actor, "reason": reason or ""})
+    # A SUPERSEDED SUPPLY IS NOT WAITING (REQ-PIPE-118): the newer version
+    # that superseded it is filed to the same period and is what waits.
+    from qa_tools.common import supersession
+
+    for _, supplies in filed.items():
+        for supply, _at in supplies:
+            if supersession.is_superseded(conn, dataset_id, supply):
+                superseded.add(supply)
     changes: dict[str, list[dict]] = {}
     for entry in slot_timeline.for_dataset(dataset_id, conn):
         changes.setdefault(entry["slot"], []).append(
@@ -103,7 +112,8 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
             continue
         closes = slot.closes_at
         own_changes = changes.get(slot.name, [])
-        live = [at for supply, at in filed.get(slot.name, []) if supply not in rejected]
+        live = [at for supply, at in filed.get(slot.name, [])
+                if supply not in rejected and supply not in superseded]
         gone = [(supply, at) for supply, at in filed.get(slot.name, []) if supply in rejected]
         filed_first = min(live) if live else None
         at_close = [c for c in own_changes if datetime.fromisoformat(c["at"]) <= closes]

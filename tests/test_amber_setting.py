@@ -310,3 +310,72 @@ class TestShownApart:
                             [supply, dl.PROMOTION_WITHHELD]).fetchall()
         assert rows == [("hold", "data asset")], "recorded once, with what it acted under"
         assert slot_state._amber_waiting(conn, "cp-carers", supply)
+
+
+class TestAmberWaitingAfterAnEmptiedSlot:
+    """delivery-critic on REQ-PIPE-122, F1 (2026-10-05): an amber supply
+    waiting under hold read AWAITING_DECISION - the red supply's state -
+    where an earlier decision had emptied its slot, because only the
+    no-decision branch of state_of asked for the hold."""
+
+    def test_it_still_reads_amber_waiting(self, conn):
+        from datetime import datetime, timedelta, timezone
+
+        from qa_tools.common import slots
+
+        period = "2024-Q2"
+        rejected, _ = _staged(conn)
+        with dl.apply_decision(conn, dl.Decision(
+                agency_id="a", collection_id="c", dataset_id="cp-carers", action=dl.REJECT,
+                supply=rejected, actor=REAL_PERSON, actor_kind=dl.PERSON, effective_at=WHEN,
+                from_slot=period, reason="bad file")):
+            pass
+        amber_one, _ = _staged(conn)
+        promotion._record_amber_waiting(
+            conn, agency_id="child-protection-family-support", collection_id="child-protection",
+            dataset_id="cp-carers", supply=amber_one, period=period,
+            amber=amber_setting.Resolved("hold", amber_setting.ASSET, "2023-01-01"),
+            effective_at=WHEN)
+        at = datetime(2027, 12, 1, tzinfo=timezone(timedelta(hours=8)))
+        slot = next(s for s in slots.slots_for_dataset("cp-carers", until=at.date())
+                    if s.name == period)
+        got = slot_state.state_of(conn, dataset_id="cp-carers", slot=slot, now=at,
+                                  filings={period: {"supply_id": amber_one}},
+                                  ever_delivered=True)
+        assert got.state == slot_state.AMBER_WAITING
+
+
+class TestTheConfigurationAsItStands:
+    """delivery-critic on REQ-PIPE-122, F4 and F5."""
+
+    TODAY = date(2026, 10, 5)
+
+    def test_an_asset_level_with_only_future_versions_is_refused(self):
+        doc = _doc(asset=("2030-01-01", "promote"))
+        assert any("in effect today" in p
+                   for _, p in amber_setting.standing_problems(doc, self.TODAY))
+
+    def test_two_versions_sharing_a_date_are_refused(self):
+        doc = _doc(collection=[("2027-01-01", "hold"), ("2027-01-01", "promote")])
+        assert any("share the date" in p
+                   for _, p in amber_setting.standing_problems(doc, self.TODAY))
+
+    def test_the_real_configuration_has_no_standing_problem(self):
+        doc = yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())
+        assert amber_setting.standing_problems(doc, self.TODAY) == []
+
+
+class TestRefusalsNameTheNextCommand:
+    """CLI UX critic on REQ-PIPE-122 (#107): the case a lead is likeliest to
+    hit - acknowledging an amber supply waiting under hold - names promote."""
+
+    def test_acknowledging_a_supply_under_hold_points_at_promote(self, conn):
+        supply, _ = _staged(conn)
+        period = _period()
+        promotion._record_amber_waiting(
+            conn, agency_id="child-protection-family-support", collection_id="child-protection",
+            dataset_id="cp-carers", supply=supply, period=period,
+            amber=amber_setting.Resolved("hold", amber_setting.ASSET, "2023-01-01"),
+            effective_at=WHEN)
+        with pytest.raises(dl.DecisionRefused, match="--operation promote"):
+            _ack(conn, supply, period)

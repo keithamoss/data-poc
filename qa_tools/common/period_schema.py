@@ -63,6 +63,10 @@ from qa_tools.common import supply_db
 #: mistaken write into a period schema is promoted data nobody decided
 #: to promote.
 PERIOD_SCHEMA_PREFIX = "period_"
+#: A period's superseded schema is the period schema's own name with this
+#: suffix (REQ-PIPE-118 criterion 4). Defined here, beside the prefix, so
+#: every reader that turns a schema back into a period sees both.
+SUPERSEDED_SUFFIX = "_superseded"
 
 
 
@@ -119,8 +123,17 @@ def collisions_in(period_names: Iterable[str]) -> dict[str, list[str]]:
     in the message - instead of at the far end of a QA run.
     """
     by_schema: dict[str, list[str]] = {}
-    for name in period_names:
+    names = list(period_names)
+    for name in names:
         by_schema.setdefault(period_schema(name), []).append(name)
+    # AND A PERIOD WHOSE SCHEMA IS ANOTHER PERIOD'S SUPERSEDED SCHEMA
+    # (REQ-PIPE-118 criterion 8): "2026-Q2 superseded" would be
+    # `period_2026_q2_superseded`, the schema holding 2026-Q2's set-aside
+    # versions.
+    for name in names:
+        shadow = period_schema(name) + SUPERSEDED_SUFFIX
+        if shadow in by_schema:
+            by_schema[shadow] = by_schema[shadow] + [name]
     return {schema: sorted(names) for schema, names in sorted(by_schema.items())
             if len(set(names)) > 1}
 
@@ -156,6 +169,11 @@ def period_of(schema: str) -> str | None:
     schema name its legibility (see _encode).
     """
     if not schema.startswith(PERIOD_SCHEMA_PREFIX):
+        return None
+    # A PERIOD'S SUPERSEDED SCHEMA IS NOT A PERIOD (REQ-PIPE-118 criterion
+    # 6): `period_2026_q2_superseded` sits beside `period_2026_q2` and
+    # holds set-aside versions, never what the period resolves to.
+    if schema.endswith(SUPERSEDED_SUFFIX):
         return None
     return schema[len(PERIOD_SCHEMA_PREFIX):]
 
@@ -228,8 +246,12 @@ def open_period(conn, period_name: str, *, opened_by: str,
 def period_schemas(conn) -> list[str]:
     """Every period schema in the database, by PERIOD NAME."""
     rows = conn.execute(
-        "SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE ?",
-        [PERIOD_SCHEMA_PREFIX + "%"]).fetchall()
+        "SELECT schema_name FROM information_schema.schemata "
+        "WHERE schema_name LIKE ? ESCAPE '\\'",
+        # THE UNDERSCORE ESCAPED (REQ-PIPE-118 criterion 7): unescaped, `_`
+        # matches any one character, so the pattern says more than the
+        # prefix does; period_of() then refuses a superseded schema.
+        [PERIOD_SCHEMA_PREFIX.replace("_", "\\_") + "%"]).fetchall()
     return sorted(filter(None, (period_of(r[0]) for r in rows)))
 
 

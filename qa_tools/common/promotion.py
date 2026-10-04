@@ -603,7 +603,7 @@ def after_run(conn: supply_db.SupplyConnection, *,
     the thirtieth was odd is a step somebody turns off, which is the
     same blast-radius rule this batch applies everywhere.
     """
-    from qa_tools.common import amber_setting, inheritance, rejection
+    from qa_tools.common import amber_setting, inheritance, rejection, supersession
 
     work: list[dict] = []
     refused: dict[str, str] = {}
@@ -611,6 +611,14 @@ def after_run(conn: supply_db.SupplyConnection, *,
     for item in supplies:
         dataset_id = item["dataset_id"]
         period = item.get("period")
+        # NO AUTOMATIC RULE PROMOTES A SUPERSEDED SUPPLY (REQ-PIPE-118
+        # criterion 14): a later version of its table arrived for the same
+        # period, and only a person brings it back (REQ-PIPE-120).
+        newer = supersession.superseded_by(conn, dataset_id, item["supply"])
+        if newer:
+            refused[dataset_id] = (f"a newer version of this table for {period} arrived "
+                                   f"({newer}), so this one is superseded")
+            continue
         try:
             status = status_of(dataset_id, results, reads=reads)
         except UnreadableVerdictError as exc:

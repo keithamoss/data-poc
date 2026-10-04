@@ -161,6 +161,12 @@ def _why_not(conn, dataset_id: str, supply: str, period: str | None) -> str:
     actions = [row[0] for row in decisions]
     if decision_log.REJECT in actions:
         return REJECTED
+    # A NEWER VERSION ARRIVED FOR THE SAME PERIOD (REQ-PIPE-118) - unless a
+    # person has since brought it back (REQ-PIPE-120).
+    from qa_tools.common import supersession
+
+    if supersession.is_superseded(conn, dataset_id, supply):
+        return SUPERSEDED
     if not period:
         # Criterion 4's third reason, and it is the one an operator can
         # actually fix: the schedule has no slot for this supply.

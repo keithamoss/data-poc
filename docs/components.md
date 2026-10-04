@@ -155,14 +155,14 @@ tickets, ownership, and recorded governance decisions - plus the config
 of who's actually involved.
 
 **Owns:** `qa_tools/common/ticket_sync.py`/`ticket_status.py`/
-`github_links.py`/`people.py`/`acceptance_sync.py`/`leaderboard.py`,
+`github_links.py`/`people.py`/`leaderboard.py`,
 `contract/people.yaml`, `.github/workflows/ticket-sync.yml`.
 
 **In scope:** opening/updating/commenting on real GitHub Issues for QA
-events; routing a ticket to the right person; the real `/accept`/
-`/reject` amber-governance decision workflow (a GitHub-comment-driven
-mechanism, even though its *result* is displayed on the dashboard);
-who's assigned to what.
+events; routing a ticket to the right person; filing decisions raised
+on a slot's ticket (REQ-GHUB-082), including acknowledging an amber
+supply (REQ-PIPE-122, which retired the old per-run `/accept`/`/reject`
+workflow, REQ-QAC-017); who's assigned to what.
 
 **Out of scope:** the underlying QA status that triggers a ticket
 (`QAC`), rendering any of this in the UI (`DASH`).

@@ -461,8 +461,10 @@ def file_and_overlay(arrival) -> None:
     orchestrate_cp.file_and_overlay() for the account of both steps.
 
     Birth Registrations has one table, so what the overlay adds here is
-    REQ-PIPE-105 criterion 6: another version staged for the same day
-    makes this one contested.
+    REQ-PIPE-105 criterion 6: two files for it in ONE arrival make it
+    contested. A later arrival's file for the same day supersedes the
+    earlier waiting one at filing (REQ-PIPE-118), so two arrivals never
+    leave two versions staged for one day.
     """
     filing.file_arrivals([arrival])
     period_overlay.rebuild_for_arrival(arrival, tables=[build_per_run_warehouses.TABLE])

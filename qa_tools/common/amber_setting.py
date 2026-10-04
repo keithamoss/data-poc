@@ -109,6 +109,28 @@ def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None) -> 
 
 # ---- the configuration's guards (criteria 6 to 9 and 20) --------------
 
+def standing_problems(doc: dict, today: date) -> list[tuple[str, str]]:
+    """[(where, problem)] in the configuration as it stands - no history
+    needed (delivery-critic on REQ-PIPE-122, F4 and F5).
+
+    Criterion 9 refuses an asset that states no value; an asset whose
+    every version starts in the FUTURE states none today either, and was
+    accepted until the rule met its first amber supply. And two versions
+    of one level sharing a date are ambiguous - the later list entry won,
+    silently.
+    """
+    problems: list[tuple[str, str]] = []
+    for where, setting in _settings(doc).items():
+        starts = [str(v.get("effective_from")) for v in (setting.get("versions") or [])
+                  if isinstance(v, dict)]
+        for start in sorted({s for s in starts if starts.count(s) > 1}):
+            problems.append((where, f"two versions share the date {start}, so which "
+                                    f"applies is ambiguous"))
+    if isinstance(doc.get("amber_setting"), dict) and not _in_effect(doc["amber_setting"], today):
+        problems.append((ASSET, f"no version is in effect today ({today.isoformat()}) - the "
+                                f"data asset level must always state one"))
+    return problems
+
 def _settings(doc: dict) -> dict[str, dict]:
     """{where: setting} for every level that states one."""
     out: dict[str, dict] = {}

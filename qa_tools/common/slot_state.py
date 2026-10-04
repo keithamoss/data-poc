@@ -169,10 +169,14 @@ def _state_from(h) -> tuple[str, str | None]:
 
 
 def _rejected(conn, dataset_id: str, supply: str) -> bool:
-    """Whether a person or the rule has rejected this supply."""
+    """Whether this supply is no longer waiting: a person or the rule
+    rejected it, or a newer version superseded it (REQ-PIPE-118)."""
+    from qa_tools.common import supersession
+
     return bool(conn.execute(
         f"SELECT 1 FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
-        "AND action = ? LIMIT 1", [dataset_id, supply, decision_log.REJECT]).fetchall())
+        "AND action = ? LIMIT 1", [dataset_id, supply, decision_log.REJECT]).fetchall()
+    ) or supersession.is_superseded(conn, dataset_id, supply)
 
 
 def _amber_waiting(conn, dataset_id: str, supply: str | None) -> bool:
@@ -231,7 +235,12 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
         if unfilled and waiting_supply and not _rejected(conn, dataset_id, waiting_supply):
             return SlotState(
                 dataset_id=dataset_id, period=slot.name,
-                state=AWAITING_DECISION if waiting_supply != supply else state,
+                # AN AMBER SUPPLY UNDER HOLD keeps its own state here too
+                # (delivery-critic on REQ-PIPE-122, F1): this branch used to
+                # say AWAITING_DECISION, the red supply's state.
+                state=(state if waiting_supply == supply
+                       else AMBER_WAITING if _amber_waiting(conn, dataset_id, waiting_supply)
+                       else AWAITING_DECISION),
                 supply=waiting_supply, decided_by=_decider(conn, h.decision_id),
                 reason=_reason(conn, h.decision_id), closed=False)
         if state == PROMOTED:

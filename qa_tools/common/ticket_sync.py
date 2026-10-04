@@ -204,14 +204,9 @@ def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str,
         f"This ticket will get a real comment on every future QA run while "
         f"it stays open - closing it is always a human decision, never "
         f"automatic."
-        + (
-            "\n\nA real supply, even amber, can be accepted for now by "
-            "commenting `/accept` on this issue - it's matched to whichever "
-            "run was current at the time (running-thoughts.md #6). The "
-            "supply itself stays amber on the dashboard; a real "
-            "acknowledgment badge shows next to it."
-            if status == "amber" else ""
-        )
+        # The `/accept` paragraph that followed went with REQ-QAC-017
+        # (retired by REQ-PIPE-122, 2026-10-05): an amber supply is
+        # acknowledged as a filing decision on its SLOT's ticket now.
         # REQ-GHUB-027. The paragraph above still points at the dashboard,
         # and deliberately so - this section answers "what is wrong" where
         # the dashboard answers "and what has it been doing for a month".

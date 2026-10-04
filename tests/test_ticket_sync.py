@@ -97,7 +97,10 @@ def test_no_open_ticket_and_amber_opens_a_new_one(monkeypatch, scope):
     title = create_call[create_call.index("--title") + 1]
     assert title == "Birth Registrations is amber"
     body = create_call[create_call.index("--body") + 1]
-    assert "/accept" in body
+    # NO LONGER INVITES /accept: REQ-QAC-017 was retired by REQ-PIPE-122
+    # (2026-10-05), and a ticket telling people to use a retired command
+    # would be telling them something untrue.
+    assert "/accept" not in body
 
 
 def test_opening_a_ticket_with_a_real_assignee_passes_gh_assignee(monkeypatch, scope):

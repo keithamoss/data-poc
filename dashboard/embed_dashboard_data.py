@@ -121,14 +121,14 @@ per-person, per-dataset streak of CLEAN TICKET RESOLUTIONS (qa_tools/
 common/leaderboard.py's own build_leaderboard()), sorted by streak
 descending. No longer CI-safe without a token the way ASSIGNMENTS is -
 same real-source-not-a-file-this-script-reads-directly treatment as
-TICKET_STATUS/AMBER_DECISIONS above, for the same reason (a real `gh` call
+TICKET_STATUS above, for the same reason (a real `gh` call
 needs a real token this script doesn't have): `.github/workflows/
 deploy-pages.yml` writes the raw ticket close/reopen history for every
 real qa-ticket issue to TICKET_RESOLUTIONS_JSON below (via `python3 -m
 qa_tools.common.leaderboard`, that module's own real `gh` boundary), and
 this script calls leaderboard.build_leaderboard() (pure, no `gh`/network
 here either) to turn it into the final embed. Empty [] locally with no
-such file, same graceful degradation as TICKET_STATUS/AMBER_DECISIONS. Same
+such file, same graceful degradation as TICKET_STATUS. Same
 public-page privacy rule as ASSIGNMENTS: only people with a real
 contract/people.yaml entry ever appear, by name/nickname - resolved by
 real GitHub LOGIN now (whoever closed the ticket), not by email.

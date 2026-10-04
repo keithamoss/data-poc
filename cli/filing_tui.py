@@ -47,6 +47,8 @@ filing screen tells them and a stale one is worse than a blank one.
 """
 from __future__ import annotations
 
+import re
+
 import sys
 
 from rich.console import Console
@@ -85,6 +87,10 @@ _WHAT_IT_DOES = {
     filing_decisions.ACKNOWLEDGE: ("acknowledge - say you have looked at this amber "
                                    "supply and why it is acceptable"),
 }
+
+#: How an operation reads as a NOUN in a prompt - "this acknowledge" was
+#: the verb doing a noun's job (#107).
+_NOUN = {filing_decisions.ACKNOWLEDGE: "acknowledgement"}
 
 _HOW_IT_READS = {
     slot_state.NOT_YET_DUE: "[dim]not yet due[/dim]",
@@ -191,13 +197,15 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
 
     if reason is None:
         reason = common.text_prompt(
-            f"Why are you recording this {operation}?", flag_hint=_FLAG_HINT)
+            f"Why are you recording this {_NOUN.get(operation, operation)}?",
+            flag_hint=_FLAG_HINT)
         if reason is None:
             console.print("No reason given - nothing recorded.", style="yellow")
             return None
 
     where = f"{dataset_id} {period}" + (f" -> {to_period}" if to_period else "")
-    if not common.confirm(f"Record {operation} for {where}, as {people.actor_name(actor)}?",
+    if not common.confirm(f"Record {_NOUN.get(operation, operation)} for {where}, "
+                          f"as {people.actor_name(actor)}?",
                            yes=yes, default=False):
         console.print("Not recorded.", style="yellow")
         return None
@@ -294,7 +302,10 @@ def queue_table(states) -> Table:
 
 def _label(state: slot_state.SlotState) -> str:
     where = f"arrived {arrived(state.supply)}" if state.supply else "nothing arrived"
-    return f"{state.period}  {state.dataset_id}  {where}  ({state.state})"
+    # IN WORDS, as the table above it says it (CLI UX critic, #107): the
+    # picker used to show the machine id - `awaiting-acknowledgement`.
+    words = re.sub(r"\[/?[a-z ]+\]", "", _HOW_IT_READS.get(state.state, state.state))
+    return f"{state.period}  {state.dataset_id}  {where}  ({words})"
 
 
 def _pick_slot(states, message: str) -> slot_state.SlotState | None:

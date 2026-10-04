@@ -141,9 +141,21 @@ MARK_NOT_SUPPLIED = "mark-not-supplied"
 #: makes it more than a click.
 ACKNOWLEDGE = "acknowledge"
 
+#: A LATER VERSION OF THE SAME TABLE FOR THE SAME PERIOD ARRIVED
+#: (REQ-PIPE-118). The earlier, unaccepted version moves to its period's
+#: `_superseded` schema; nothing is deleted, and it is NOT a rejection - it
+#: says nothing about that version's quality. Recorded by the rule on
+#: arrival, or by a person (REQ-PIPE-120); `superseded_by` names the newer
+#: supply. It changes nothing a period HOLDS - only promoted, substituted
+#: and inherited supplies are held, and a promoted one is never superseded
+#: here - so qa.slot_holds ignores it by construction.
+SUPERSEDE = "supersede"
+#: A person brings a superseded supply back to staging (REQ-PIPE-120).
+UN_SUPERSEDE = "un-supersede"
+
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
            INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
-           MARK_NOT_SUPPLIED, ACKNOWLEDGE)
+           MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE)
 
 #: Actions that name no supply - each is about one that is not there.
 NO_SUPPLY = (INHERIT_REFUSED, MARK_NOT_SUPPLIED)
@@ -151,7 +163,7 @@ NO_SUPPLY = (INHERIT_REFUSED, MARK_NOT_SUPPLIED)
 #: The actions a RULE may take. Everything else is a person's, and
 #: rejection.py and substitution.py enforce that by not offering an
 #: actor_kind at all.
-AUTOMATIC_ACTIONS = (PROMOTE, INHERIT, INHERIT_REFUSED)
+AUTOMATIC_ACTIONS = (PROMOTE, INHERIT, INHERIT_REFUSED, PROMOTION_WITHHELD, SUPERSEDE)
 
 #: The decisions that move a supply, and so are the ones criterion 11
 #: refuses while a later period stands on it.
@@ -222,6 +234,8 @@ class Decision:
     amber_setting: str | None = None
     amber_level: str | None = None
     amber_version: str | None = None
+    #: The newer supply that superseded this one (REQ-PIPE-118 criterion 10).
+    superseded_by: str | None = None
 
     @property
     def slots(self) -> tuple[str, ...]:
@@ -280,6 +294,13 @@ def _check_shape(decision: Decision) -> None:
             raise DecisionRefused(
                 "an acknowledgement needs a reason - what you looked at and why "
                 "the amber is acceptable. That is what makes it more than a click.")
+    if decision.action == SUPERSEDE and not (decision.superseded_by or "").strip():
+        raise DecisionRefused(
+            "a supersession names the newer supply that superseded this one - "
+            "without it nothing can say later what replaced it.")
+    if decision.action in (SUPERSEDE, UN_SUPERSEDE) and not decision.from_slot:
+        raise DecisionRefused(
+            f"a {decision.action} names the period the supply was filed to.")
     if decision.action == INHERIT_REFUSED and (decision.supply or "").strip():
         raise DecisionRefused(
             "a refused inheritance names no supply - that is what it could not "
@@ -533,14 +554,14 @@ def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
     rows = conn.execute(
         f"INSERT INTO {TABLE} (agency_id, collection_id, dataset_id, action, supply, "
         "from_slot, to_slot, actor, actor_kind, reason, effective_at, stands_on, "
-        "amber_setting, amber_level, amber_version) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "amber_setting, amber_level, amber_version, superseded_by) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         [decision.agency_id, decision.collection_id, decision.dataset_id,
          decision.action, decision.supply or None, decision.from_slot, decision.to_slot,
          decision.actor.strip(), decision.actor_kind,
          (decision.reason or "").strip() or None, decision.effective_at,
          decision.stands_on, decision.amber_setting, decision.amber_level,
-         decision.amber_version]).fetchall()
+         decision.amber_version, decision.superseded_by]).fetchall()
     return int(rows[0][0])
 
 

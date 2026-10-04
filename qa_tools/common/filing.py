@@ -76,7 +76,7 @@ def _connect(label: str) -> supply_db.SupplyConnection:
     return conn
 
 
-def record(assignment: Assignment, delivery: str | None) -> bool:
+def record(assignment: Assignment, delivery: str | None, conn=None) -> bool:
     """Record where one supply was filed, once, linked to the delivery it
     came in (REQ-PIPE-144 criteria 10 and 11).
 
@@ -102,23 +102,25 @@ def record(assignment: Assignment, delivery: str | None) -> bool:
         raise FilingWithoutDelivery(
             f"{assignment.supply_id} ({assignment.dataset_id}) has no delivery to link "
             f"to, so it was not filed.")
-    with _connect("mothman:filing-record") as conn:
-        if not conn.execute(
-                f'SELECT 1 FROM "{qa_store.SCHEMA}".delivery WHERE name = ?',
-                [delivery]).fetchall():
-            raise FilingWithoutDelivery(
-                f"{assignment.supply_id} ({assignment.dataset_id}) names delivery "
-                f"{delivery!r}, which has no delivery record, so it was not filed.")
-        verdict = _classification_for(
-            assignment.dataset_id, assignment.slot, assignment.received_at)
-        rows = conn.execute(
-            f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, "
-            "delivery, classification) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO NOTHING "
-            "RETURNING dataset_id",
-            [assignment.dataset_id, assignment.supply_id, assignment.slot,
-             assignment.branch, list(assignment.considered), delivery,
-             verdict]).fetchall()
+    if conn is None:
+        with _connect("mothman:filing-record") as opened:
+            return record(assignment, delivery, conn=opened)
+    if not conn.execute(
+            f'SELECT 1 FROM "{qa_store.SCHEMA}".delivery WHERE name = ?',
+            [delivery]).fetchall():
+        raise FilingWithoutDelivery(
+            f"{assignment.supply_id} ({assignment.dataset_id}) names delivery "
+            f"{delivery!r}, which has no delivery record, so it was not filed.")
+    verdict = _classification_for(
+        assignment.dataset_id, assignment.slot, assignment.received_at)
+    rows = conn.execute(
+        f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, "
+        "delivery, classification) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO NOTHING "
+        "RETURNING dataset_id",
+        [assignment.dataset_id, assignment.supply_id, assignment.slot,
+         assignment.branch, list(assignment.considered), delivery,
+         verdict]).fetchall()
     return bool(rows)
 
 
@@ -346,7 +348,14 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                 dataset_id=dataset_id, supply_id=supply_id,
                 at=arrival.received_at, slots=slots_by_dataset[horizon],
                 filled=filled_slots(dataset_id))
-            record(decided, arrival.delivery_name)
+            # FILED AND SUPERSEDING IN ONE TRANSACTION (REQ-PIPE-118's
+            # reliability NFR): a crash leaves the old state or the new one,
+            # never two waiting versions of one table in one period.
+            with _connect("mothman:filing-record") as conn:
+                with conn.raw.transaction():
+                    wrote = record(decided, arrival.delivery_name, conn=conn)
+                    if wrote and decided.slot and not decided.is_held:
+                        _supersede_earlier(conn, arrival, decided)
             # AN ASSIGNMENT-RULE HOLD IS RECORDED TOO (criterion 3). Its
             # `filing` row above is evidence of what the rule saw and
             # stays write-once; the open work item is the hold, because
@@ -355,6 +364,22 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                 _raise_assignment_hold(arrival, decided)
             written.append(decided)
     return written
+
+
+def _supersede_earlier(conn, arrival, decided: Assignment) -> None:
+    """REQ-PIPE-118 criterion 1: before any check runs over this file, every
+    earlier unaccepted version of its table in the same period is
+    superseded by it."""
+    from qa_tools.common import hierarchy, supersession
+
+    entry = hierarchy.dataset(decided.dataset_id)
+    gone = supersession.supersede_earlier(
+        conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
+        dataset_id=decided.dataset_id, period=decided.slot, newer=decided.supply_id,
+        effective_at=arrival.received_at.isoformat())
+    for supply in gone:
+        print(f"superseded - {decided.dataset_id}: {supply} by {decided.supply_id} "
+              f"for {decided.slot}")
 
 
 def _raise_assignment_hold(arrival, decided: Assignment) -> None:

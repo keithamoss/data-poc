@@ -13294,9 +13294,7 @@ requirements:
         WHERE any decision has been recorded against a supply by a
         person, THE SYSTEM SHALL NOT promote that supply automatically
         thereafter.
-      - >
-        THE SYSTEM SHALL leave a red supply nobody has decided on in
-        staging, and SHALL NOT move it to the rejected schema.
+      - THE SYSTEM SHALL leave a red supply nobody has decided on in staging UNTIL a later version of its table for the same period supersedes it (REQ-PIPE-118), and SHALL NOT move it to the rejected schema. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 16.
       - >
         THE SYSTEM SHALL allow a rejection to be reversed by a later
         recorded decision, and SHALL keep both entries.
@@ -14099,16 +14097,8 @@ requirements:
       - >
         IF a supply has no filing, THEN THE SYSTEM SHALL NOT invent a
         period for it and SHALL NOT include it in any period-scoped run.
-      - >
-        THE SYSTEM SHALL overlay, for each table, the one version
-        staged for that PERIOD - whichever delivery staged it - and
-        SHALL fall back to the period's promoted state where none is
-        staged. WHERE several are staged, criteria 11 to 13 apply.
-      - >
-        WHERE a logical table resolves to more than one staged
-        candidate, THE SYSTEM SHALL treat the staged candidates as
-        offering nothing, and SHALL NOT choose between them for any
-        purpose.
+      - THE SYSTEM SHALL overlay, for each table, the one version staged for that PERIOD - whichever delivery staged it - and SHALL fall back to the period's promoted state where none is staged. Several staged versions of one table in one period arise ONLY from one arrival carrying several files for it, because a later arrival's file supersedes every earlier unaccepted version (REQ-PIPE-118); WHERE several are staged, criteria 11 to 13 apply. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 15.
+      - WHERE a logical table resolves to more than one staged candidate - which only one arrival carrying several files for it can produce (REQ-PIPE-118) - THE SYSTEM SHALL treat the staged candidates as offering nothing, and SHALL NOT choose between them for any purpose. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 15.
       - >
         WHERE the staged candidates for a table are ambiguous AND that
         period has a promoted supply for it, THE SYSTEM SHALL resolve a
@@ -22544,28 +22534,9 @@ requirements:
         file every one of them before evaluating any, so that each reads
         the others as staged for the period - this being simultaneity, not
         waiting for another file under criterion 1.
-      - >
-        THE SYSTEM SHALL RETIRE REQ-PIPE-059's delivery-level hold.
-        WHERE one arrival carries several files claiming one dataset,
-        THE SYSTEM SHALL treat that dataset as CONTESTED for that
-        arrival, running none of its own checks and promoting none of
-        them. WHERE supplies of one dataset staged for one PERIOD came
-        from DIFFERENT arrivals, THE SYSTEM SHALL check each arrival's
-        own supply against its own table under criterion 5, and SHALL
-        treat that dataset as contested only where another arrival
-        reads it as context, under criterion 8. AMENDED TWICE ON
-        2026-10-02 (Keith) - see the decision "CRITERION 6 NARROWED
-        AGAIN" for why the "however they arrived" wording went.
-      - >
-        THE SYSTEM SHALL apply "newest wins" only to PROMOTED
-        supplies, and SHALL decide which is newest by PROMOTION time
-        rather than by arrival time.
-      - >
-        THE SYSTEM SHALL treat a table as ABSENT when an arrival that
-        did not carry it finds either several staged versions for that
-        period or one held under criterion 6, so that the run reads
-        the period's promoted state rather than choosing between
-        them.
+      - 'THE SYSTEM SHALL RETIRE REQ-PIPE-059''s delivery-level hold. WHERE one arrival carries several files claiming one dataset, THE SYSTEM SHALL treat that dataset as CONTESTED for that arrival, running none of its own checks and promoting none of them. Several staged versions of one table in one period SHALL arise ONLY that way: a file from a LATER arrival supersedes every earlier unaccepted version of its table in the period (REQ-PIPE-118), so supplies of one dataset staged for one period never come from different arrivals. AMENDED TWICE ON 2026-10-02 (Keith) - see the decision "CRITERION 6 NARROWED AGAIN" - and AMENDED 2026-10-05 by REQ-PIPE-118 criterion 15.'
+      - THE SYSTEM SHALL apply "newest wins" among PROMOTED supplies by PROMOTION time rather than by arrival time; on the staged side, "newest wins" SHALL mean only REQ-PIPE-118's supersession by receipt instant. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 15.
+      - THE SYSTEM SHALL treat a table as ABSENT when an arrival that did not carry it finds either several staged versions for that period - which only one arrival carrying several files for it can produce (REQ-PIPE-118) - or one held under criterion 6, so that the run reads the period's promoted state rather than choosing between them. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 15.
       - >
         THE SYSTEM SHALL amend REQ-PIPE-035 criterion 3 AND REQ-PIPE-079
         criterion 10 in the same change, so that what is overlaid on a
@@ -25096,7 +25067,40 @@ requirements:
       date: "2026-10-04"
     story: "As the person working a period's supplies, I want a newer file for a table to move every earlier undecided version for that period out of the way, so that a clean resupply is checked against its own fresh siblings and promotes on its own, instead of piling up behind versions nobody has rejected yet."
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05: tests/test_supersession.py (11 tests) green against a real
+      database - the earlier version moves to its period''s _superseded schema
+      and is recorded by the rule naming the newer supply, never as a rejection;
+      a version received later is not superseded by an earlier one; rejected and
+      promoted versions are left alone, a demoted one is superseded; the superseded
+      schema is created on demand and dropped when empty, never read back as a
+      period, and an authored name colliding with one is refused; the gate refuses
+      a superseded supply naming the newer one, and slot_state does not treat
+      it as waiting.'
+    - '2026-10-05: measured (the NFR) by a fresh bootstrap into an empty database,
+      supply8, against the one before it on the same code less supersession (supply7):
+      20m58s against 21m03s; 28 supersessions; 10 promotions and the same 140
+      refusals (131 red verdicts, 9 with no slot) either side - and NONE refused
+      for a contest in either, so this corpus no longer shows the pile-up the
+      requirement was written for; staged tables 141 -> 113, the 28 earlier versions
+      having moved to their periods'' _superseded schemas.'
+    implemented_by:
+    - qa_tools/common/supersession.py::supersede_earlier
+    - qa_tools/common/supersession.py::earlier_unaccepted
+    - qa_tools/common/supersession.py::drop_if_empty
+    - qa_tools/common/supersession.py::superseded_by
+    - qa_tools/common/filing.py::file_arrivals
+    - qa_tools/common/filing.py::_supersede_earlier
+    - qa_tools/common/period_schema.py::period_of
+    - qa_tools/common/period_schema.py::period_schemas
+    - qa_tools/common/period_schema.py::collisions_in
+    - qa_tools/common/promotion.py::after_run
+    - qa_tools/common/slot_state.py::_rejected
+    - qa_tools/common/promotion_state.py::_why_not
+    - pipeline/closed_slots.py::for_dataset
+    linked_tests:
+    - tests/test_supersession.py
     source: "Keith, 2026-10-03 afternoon, option A (plans/road-testing.md #16, 'CHANGE OF DIRECTION' item 1, 2 and 5), replacing the shelved set-aside/re-gate design. Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
       - "WHEN a file for a table is filed to a period, THE SYSTEM SHALL move every earlier UNACCEPTED version of that table filed to the same period - every version not promoted and not rejected, whatever its verdict - to the SUPERSEDED state, before any check runs over the new file."
@@ -25136,6 +25140,29 @@ requirements:
       - "AN IDENTICAL-RESEND GUARD WAS CONSIDERED AND DROPPED (Keith, sign-off 2026-10-04; it was drafted as REQ-PIPE-119). Without it an identical resend is checked again, gets the same verdict, and supersedes the copy it repeats. The only real cost is a pointless to-do item when a supplier double-sends onto a filled quarterly slot. Cheap to add later - a digest at receipt compared against files held for the same table and period - if duplicates become a nuisance."
       - "A CONTESTED PAIR STILL SUPERSEDES EARLIER VERSIONS (provisional, this draft, a literal reading of item 1): two files in one arrival are both newer than anything already waiting. Readers then fall back to the period's promoted state as REQ-PIPE-105 criterion 8 already says."
       - "THE RULE SUPERSEDES A SUPPLY A PERSON HAS TOUCHED (Keith, 2026-10-03, answering the scoper's question 1): a supply a person returned to the queue by a demote is superseded like any other unaccepted version. A THIRD DELIBERATE REVERSAL, alongside the two above: REQ-PIPE-076's 'automation only ever acts on a supply no human has touched'. The reason is Keith's: one waiting version per table per period must always hold, or the pile-up returns, and everything stays reversible under REQ-PIPE-120. REJECTED leaving a person-touched supply waiting beside the newer file, which brings back two waiting versions and the contested reads that caused the pile-up."
+      - 'SUPERSESSION HAPPENS AT FILING, IN THE FILING''S OWN TRANSACTION (2026-10-05):
+        filing.file_arrivals records the new filing and supersedes inside one transaction
+        on one connection, so both orchestrators and the hand-filed routes get it
+        from the one place every supply is filed, and a crash leaves the old state
+        or the new one. The decision-log entry and the table move nest inside it
+        as a savepoint (decision_log.apply_decision).'
+      - 'THE OVERLAY NEEDED NO CHANGE: it reads a period''s siblings from STAGING
+        joined to qa.filing, so a superseded version - moved out of staging - drops
+        out of every later run''s view by construction. That is also why criterion
+        1''s ''before any check runs'' holds: filing precedes the overlay rebuild
+        for every arrival.'
+      - SUPERSEDE IS A RULE'S ACTION as well as a person's (REQ-PIPE-120), so it
+        joins AUTOMATIC_ACTIONS (with promotion-withheld, which REQ-PIPE-122 gave
+        a writer). It changes nothing a period HOLDS - only promoted, substituted
+        and inherited supplies are held, and a promoted one is never superseded
+        here - so qa.slot_holds ignores it by its include-list. superseded_by is
+        a column (schema 22, additive), not text in the reason.
+      - 'EVERY READER OF ''IS THIS SUPPLY STILL WAITING'' NOW ASKS supersession
+        (the NFR''s mechanical enumeration): the promotion gate refuses one (criterion
+        14), slot_state._rejected and so mark-not-supplied treat one as not waiting,
+        closed_slots does not count its filing, and promotion_state reads it as
+        SUPERSEDED. slot_state reads the LATEST filing per period, which is the
+        newer version.'
     open_questions: []
 
   - id: REQ-PIPE-120

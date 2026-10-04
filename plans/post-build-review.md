@@ -5195,3 +5195,83 @@ twice. It deliberately did not re-find the `TypeError`.
     shows only the last mark's reason; the card mixes units (datasets for
     gaps, items for the rest). The critic also noted my REQ-PIPE-122 work
     in progress had upgraded `supply7` to schema 21 mid-review.
+
+106. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **delivery-critic
+    on REQ-PIPE-122 (commit 1798c63).** Reproduced against a `git archive`
+    of the commit and a scratch database; verified against the code before
+    acting. Core sound: hold leaves an amber supply unpromoted on the real
+    `after_run` path, acknowledge has parity on the GitHub route, and the
+    past is read from what was recorded.
+    FIXED (failing test first where a defect):
+    - F1, MEDIUM: an amber supply waiting under hold read
+      `awaiting-decision` - the red supply's state - where an earlier
+      decision had emptied its slot (criterion 17). The emptied-slot branch
+      of `state_of` now asks for the hold too
+      (`TestAmberWaitingAfterAnEmptiedSlot`).
+    - F4 and F5: an asset level whose every version starts in the future,
+      and two versions of one level sharing a date, are refused by the
+      schedule gate (`amber_setting.standing_problems`,
+      `TestTheConfigurationAsItStands`).
+    - F6: "a acknowledge needs a reason".
+    - F7: the old per-dataset ticket still told people to comment
+      `/accept` (now gone, test inverted); docs/components.md and two embed
+      comments still named the retired mechanism.
+    LOGGED, NOT FIXED:
+    - F2 (latent until REQ-PIPE-121): `amber-waiting` sticks if a supply's
+      verdict later changes, because it asks whether a hold note ever
+      existed rather than reading the newest outcome.
+    - F3, MEDIUM, FOR KEITH: criterion 7's "not dated before the day it is
+      added" is measured against the day the gate RUNS, so a commit made
+      late on day D and pushed after midnight, or a CI job re-run the next
+      day, goes red on a legitimate change. The fix is to take the day from
+      the commit that added the version; it is a design call because a
+      commit's date is author-supplied.
+    - A bare `/acknowledge` with no `supply:` line is refused with "a
+      decision needs the supply it acts on", without saying how to name it.
+    - NFR "visible, not set-and-forget" is NOT BUILT and nothing records a
+      deferral: no view shows the resolved amber value and level per
+      dataset, which was the stated answer to REQ-PIPE-075's quiet-failure
+      objection. For Keith.
+    - No test drives `after_run`'s hold path end to end, the
+      `_amber_setting_errors` wiring through `diff_base`, the GitHub
+      `/acknowledge` route, or `pipeline/acknowledgements.for_dataset`.
+
+107. **[in-progress, 2026-10-05]** **[Testing & dev tooling]** **delivery-cli-ux-critic
+    on REQ-PIPE-122 (commit 1798c63).** Driven against a `git archive` of
+    the commit and a scratch database, under a real terminal capture. Both
+    routes agree, acknowledge is offered first on a promotion owing one, no
+    state or refusal says "held", and the frozen-past errors are the
+    clearest of the config errors.
+    HIGH, FOR KEITH (predates 122, made likelier by it): one indentation
+    slip in `contract/data-asset.yaml` crashes EVERY mothman command -
+    `mothman schedule validate` included - with a ~60-line traceback,
+    because `hierarchy` is loaded when `cli.app` is imported, before the
+    validator's own "could not be parsed at line X" message can run. 122 is
+    the first requirement that asks a lead to hand-edit nested levels of
+    that file. Fixing it touches how every CLI module loads the hierarchy,
+    so it is not a polish-sized change.
+    HIGH, FOR KEITH: the same NFR #106 names - the resolved amber setting,
+    its level and version are not visible anywhere in the terminal:
+    `schedule show` says nothing about amber, `supply decisions` shows the
+    rule's promotion without the setting it acted under (the row holds it),
+    and the hold note names the value but not the level.
+    FIXED 2026-10-05: the hold case's refusal now names `--operation
+    promote` (`TestRefusalsNameTheNextCommand`); "already acknowledged"
+    says by whom and when and names `supply decisions`; "not the promoted
+    supply" names `supply slots`; the TUI picker shows states in words; the
+    prompts say "acknowledgement" as a noun.
+    MEDIUM, STILL OPEN: an empty slot is refused in lower
+    case without naming `--supply`. `supply slots` truncates the automatic
+    reason to "every check ... passed..." on exactly the amber rows. The TUI
+    asks for an acknowledgement's reason without pointing at which checks
+    warned. Config errors: an unknown value's fix text talks about versions;
+    the missing asset level does not name the three values or say there is
+    no default; a past-dated new version is told to "add a NEW version".
+    LOW: `supply decide --help` reads as requirement ids and
+    `supply decisions --help` still lists four operations; `schedule
+    validate` does not say amber was checked; all three waiting states are
+    yellow (met by words); at scale the closed-gaps table pushes
+    acknowledgement rows below the fold; a stale schema version crashes
+    `supply decide` with a raw read-only-transaction traceback.
+    CAUTION RECORDED: the critic closed every `/tmp/mothman-tui-*.sock` at
+    clean-up, not only its own.

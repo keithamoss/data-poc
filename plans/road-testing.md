@@ -2114,6 +2114,33 @@ judgement about who reads the page rather than about the rule.
         acknowledgement" / "Acknowledged by" instead. PROVISIONAL: the asset
         states promote (unchanged behaviour); a second acknowledgement is
         refused rather than "already so" (criterion 14 over 082 c26).
+      - REQ-PIPE-122 PUSHED (1798c63) AND ITS CRITICS (#106 delivery, #107
+        CLI UX). Fixed: an amber supply under hold read as the red supply's
+        "awaiting-decision" where an earlier decision had emptied its slot;
+        an asset level with only future versions, and two versions sharing a
+        date, now refused by the gate; the old per-dataset ticket still
+        invited `/accept`. FOR KEITH: (1) one YAML indentation slip in
+        data-asset.yaml crashes EVERY mothman command with a traceback,
+        before the validator's own message can run - predates 122, but 122
+        is the first thing asking people to hand-edit nested levels there;
+        (2) the resolved amber setting and its level are visible nowhere in
+        the terminal or dashboard - the NFR that answered REQ-PIPE-075's
+        "set once and forgotten" objection is not built; (3) criterion 7's
+        "not dated before the day it is added" is judged on the day the gate
+        RUNS, so a late-night commit pushed after midnight goes red.
+      - REQ-PIPE-118 (in progress): a newer file for a table supersedes every
+        earlier unaccepted version in its period at FILING, in the filing's
+        own transaction - moved to `period_<p>_superseded`, recorded by the
+        rule naming the newer supply (schema 22). The overlay needed no
+        change (it reads siblings from staging). Fast suite green with it.
+        Baseline from supply7: 140 refusals, 131 red verdicts (the gap
+        cascade), 9 no-slot, NONE for a contest - so this corpus no longer
+        shows the pile-up 118 was written for; the bootstrap measurement is
+        mostly a check that nothing got worse. MEASURED (supply8 against
+        supply7): 20m58s vs 21m03s, 28 supersessions, identical promotions
+        (10) and refusals (140), staged tables 141 -> 113. PROVISIONAL: a
+        contested pair supersedes earlier versions too (decision 12, a
+        literal reading); the CLI UX critic's mediums on 122 are fixed.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

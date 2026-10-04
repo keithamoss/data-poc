@@ -883,19 +883,24 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
     from qa_tools.common import amber_setting
 
     today = today or asset_time.local_date(asset_time.now())
+    standing = [ConfigError(
+        src.name, f"amber_setting ({where})", f"{problem}.",
+        "Give each version its own effective_from, and keep a data-asset-level version "
+        "in effect - there is no default.")
+        for where, problem in amber_setting.standing_problems(raw, today)]
     ref = ref or diff_base()
     previous = _content_at(str(src.asset_path.relative_to(ROOT)), ref) \
         if src.asset_path.is_relative_to(ROOT) else None
     if previous is None:
-        return []
+        return standing
     try:
         old_doc = yaml.safe_load(previous) or {}
     except yaml.YAMLError:
-        return []
+        return standing
     if not isinstance(old_doc, dict):
-        return []
+        return standing
     synthetic = bool(old_doc.get("synthetic")) and bool(raw.get("synthetic"))
-    return [ConfigError(
+    return standing + [ConfigError(
         src.name, f"amber_setting ({where})", f"{problem}.",
         "A setting's past is frozen - add a NEW version, dated today or later, with the "
         "value you want from then on. Nothing judged under the old version changes, "
