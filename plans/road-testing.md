@@ -1356,3 +1356,7 @@ judgement about who reads the page rather than about the rule.
       `not_expected` in configuration - that is what we know AHEAD of time,
       this is the tactical, operational decision AFTER the fact. Amends
       REQ-GHUB-082 criterion 1's list of eight.
+    - **PERIOD CLOSING SIGNED OFF by Keith, 2026-10-04: REQ-PIPE-131,
+      132, REQ-DASH-133, REQ-PIPE-134**, with the points above. All signed
+      drafts go back to delivery-scoper for one final pass applying every
+      sign-off change, then into requirements.yaml.
