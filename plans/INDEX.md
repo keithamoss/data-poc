@@ -585,6 +585,7 @@ one when this line suggests it matters.
 - **#76** `todo` 2026-10-04 - The arrival history labels an arrival with its DELIVERY's receipt time, not the file's own. Spotted by...
   - *touches:* `generator/receipt_instants.py`
 - **#77** `investigate` 2026-10-04 - An unreadable table no longer takes a run down - but its reds do not all exist, and none of them reach the dashboard....
+  - *touches:* `tests/test_qa_results_reader.py`, `tests/test_build_cp_dashboard_data.py`
 
 ## plans/road-testing.md
 

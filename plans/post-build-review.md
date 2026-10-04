@@ -4399,7 +4399,7 @@ twice. It deliberately did not re-find the `TypeError`.
     REQ-DOCS-143 and ahead of the rest of the batch, with this entry's
     test going in alongside it, failing first.
 
-76. **[todo, 2026-10-04]** **[Dashboard]** **The arrival history labels
+76. **[todo, 2026-10-04]** **[Dashboard UI]** **The arrival history labels
     an arrival with its DELIVERY's receipt time, not the file's own.**
     Spotted by `delivery-architect` reviewing REQ-PIPE-144:
     `arrival_history._arrivals_in` takes the delivery's instant, while a
@@ -4455,3 +4455,29 @@ twice. It deliberately did not re-find the `TypeError`.
     Gap 1 is a defect against signed, built behaviour and goes to Keith
     for sign-off before any fix, failing test first. Gaps 2-4 are what is
     genuinely left of REQ-PIPE-078 and REQ-PIPE-115.
+
+    **GAP 1 FIXED, 2026-10-04 (Keith signed the fix).** Failing tests
+    first, each confirmed red against the old code: the reader
+    (`tests/test_qa_results_reader.py`'s
+    `TestACheckThatCouldNotRunIsReadBack`), the builder
+    (`tests/test_build_cp_dashboard_data.py`'s
+    `TestACheckThatCouldNotRunStaysOnItsOwnCard`) and the page
+    (`tests-js/not-evaluated.test.js`). The reader and the CP rebuild now
+    walk `RESULT_TOOLS` (the four tools plus `unrunnable` and `held`),
+    kept apart from `TOOL_ORDER` because a pseudo-tool is owed by no run.
+    THE BUILDER WAS WORSE THAN BLIND: a not-evaluated record (value None)
+    CRASHED it in the column stats - hidden only because the reader never
+    passed one through; the live path, which hands the builder in-memory
+    results including these records, could hit it. Each such record now
+    joins the real check's card (by check_id, not by its own check_name,
+    which would open a second card) as that run's red, carrying
+    `not_evaluated` with the reason. The page shows "not evaluated in the
+    latest run" on the card, the reason in the check panel (no invented
+    difference against an earlier run), "Not evaluated" in the chart's
+    table and tooltip, and a GAP in the trend line - it used to plot the
+    run at ZERO, the "nothing wrong" end of the axis.
+    NOT COVERED by this fix, and left to the rewritten REQ-PIPE-115:
+    gaps 2-4. Birth Registrations' builder needs no change yet because it
+    emits no such record (gap 4). No real-browser test exercises one,
+    because the bootstrapped history contains none until a scenario
+    plants one - REQ-GEN-136's planted shapes are the natural place.

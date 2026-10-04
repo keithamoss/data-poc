@@ -109,6 +109,23 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-04"
+    summary: >
+      A check that could not run now shows on the dashboard as red and
+      says why, instead of quietly disappearing.
+    changes:
+      - category: Fixed
+        items:
+          - headline: A check that could not run no longer vanishes
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              The 2 October release recorded why a check could not run, but
+              the dashboard never showed it - the check simply dropped out
+              of the run. It now appears on the check's own card in red,
+              marked "not evaluated", with the reason in its detail panel,
+              and its trend chart leaves a gap rather than drawing a zero
+              that looked like nothing was wrong.
+
   - date: "2026-10-02"
     summary: >
       Every file is now checked the moment it lands, only the supply that

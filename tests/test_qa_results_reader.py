@@ -141,3 +141,40 @@ def test_read_qa_results_skips_a_tool_with_no_committed_file_for_a_run(tmp_path)
     results = read_qa_results("agency", "dataset")
 
     assert [r["check_name"] for r in results] == ["dbt:a"]
+
+
+class TestACheckThatCouldNotRunIsReadBack:
+    """post-build-review #77, gap 1 (Keith signed the fix 2026-10-04).
+
+    A check over a table the run could not read is recorded by a
+    PSEUDO-TOOL - `unrunnable` (REQ-PIPE-105 criterion 13) or `held`
+    (REQ-PIPE-078 criterion 10) - rather than by the tool that would
+    have evaluated it, because that tool left it out. The reader used
+    to walk only the four real tools, so every such red was stored and
+    then dropped on rebuild: the check simply vanished from the
+    dashboard rather than reading red, which is the failure criterion
+    13 exists to prevent.
+    """
+
+    @pytest.mark.parametrize("tool", ["unrunnable", "held"])
+    def test_a_pseudo_tools_record_is_returned(self, tool):
+        write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "dbt", {},
+                         verified=[{"check_id": "dbt:a", "check_name": "dbt:a",
+                                    "status": "pass"}])
+        write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", tool, {},
+                         verified=[{"check_id": "dbt:b", "check_name": "dbt:b",
+                                    "status": "fail", "label": "Not evaluated"}])
+        _done("run_01")
+
+        results = read_qa_results("agency", "dataset")
+
+        assert [(r["check_id"], r["status"]) for r in results] == [
+            ("dbt:a", "pass"), ("dbt:b", "fail")], \
+            f"a {tool} record must reach the reader, after the real tools"
+
+    def test_the_pseudo_tool_names_match_their_modules(self):
+        """RESULT_TOOLS names them literally to avoid an import cycle,
+        so this is what stops a rename leaving the reader blind again."""
+        from qa_tools.common import held_blast_radius, unrunnable
+        from qa_tools.common.qa_results_reader import RESULT_TOOLS
+        assert unrunnable.TOOL in RESULT_TOOLS and held_blast_radius.TOOL in RESULT_TOOLS

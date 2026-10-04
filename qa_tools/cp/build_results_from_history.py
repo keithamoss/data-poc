@@ -30,7 +30,7 @@ import os
 from qa_tools.common import hierarchy
 from qa_tools.common.qa_results_reader import canonical_order
 from qa_tools.common.qa_results_reader import read_cross_table_results  # noqa: F401
-from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_one, TOOL_ORDER
+from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_one, RESULT_TOOLS
 from . import cp_common
 from qa_tools.common import asset_time
 
@@ -63,7 +63,7 @@ def build_results_from_history() -> dict:
     # criterion 9 already built on both sides.
     for entry in manifest:
         run_id = entry["run_id"]
-        for tool in TOOL_ORDER:
+        for tool in RESULT_TOOLS:
             all_results.extend(read_one(cp_common.AGENCY_ID, cp_common.COLLECTION_ID,
                                         run_id, tool, supply_state=None))
     # THE CROSS-TABLE SCOPE IS A SIBLING OF THE RUN DIRECTORIES, so a

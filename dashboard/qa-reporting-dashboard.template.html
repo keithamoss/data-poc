@@ -645,6 +645,9 @@ button{font:inherit; color:inherit;}
 .check-card .tool-ref{font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace; margin-bottom:6px;}
 .check-card .dim-tag{font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); margin-bottom:5px;}
 .check-card .thresholds{font-size:11.5px; color:var(--ink-muted); font-family:"IBM Plex Mono",monospace;}
+.not-evaluated-tag{color:var(--bad); font-weight:600;}
+.not-evaluated-section h4{color:var(--bad);}
+.not-evaluated-reason{font-size:13px; color:var(--ink);}
 .check-card-hint{font-size:11px; color:var(--accent); margin-top:8px;}
 
 /* Phase 5b: retired checks hidden from the current-status view by
@@ -1399,6 +1402,12 @@ function ambiguityChip(datasetId, supplyId, source){
 // `${n} noun` template literal with no singular/plural branching. One
 // helper reused everywhere instead of patching each site by hand.
 function pluralize(n, singular, plural){ return n===1 ? singular : (plural || singular+"s"); }
+// A run whose check COULD NOT BE EVALUATED (plans/post-build-review.md
+// #77, gap 1): the table it reads was missing, held or contested, so the
+// tool left it out and a pseudo-tool recorded why. It has no value - and
+// must never be drawn as zero, which reads as "nothing wrong".
+function notEvaluated(h){ return !!(h && h.not_evaluated); }
+
 function fmtMetric(x, unit){
   // item 74: a null threshold is a real, meaningful value ("no bound of
   // this kind exists"), not a missing number - render it as such rather
@@ -2962,7 +2971,8 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
   const history = check.history, warn=check.warn, fail=check.fail, unit=check.unit;
   const W=480,H=180, padL=42,padR=16,padT=14,padB=26;
   const vals = history.map(r=>r.value);
-  const maxV = Math.max((fail==null?0:fail)*1.15, ...vals, 0.0001);
+  const plotted = i => history[i].value != null && !notEvaluated(history[i]);
+  const maxV = Math.max((fail==null?0:fail)*1.15, ...vals.filter(v=>v!=null), 0.0001);
   const n=vals.length;
   // n===1 guard (2026-09-15, Keith's question about a brand new column/
   // dataset's very first run): dividing by (n-1) is undefined at n=1 -
@@ -2990,13 +3000,16 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
   // Path built as multiple segments, split at every breakInfo[i].breaking
   // index - each segment is its own <path>, so a "breaking" gap really is
   // a blank cut in the SVG, not just a color change.
+  // A run that was NOT EVALUATED is a gap, never a point: the line stops
+  // either side of it, as it does at a breaking change.
   const segments = [];
-  let current = [0];
+  let current = plotted(0) ? [0] : [];
   for(let i=0;i<n-1;i++){
-    if(breakInfo[i] && breakInfo[i].breaking){ segments.push(current); current = [i+1]; }
+    if(!plotted(i+1)){ if(current.length) segments.push(current); current = []; continue; }
+    if(breakInfo[i] && breakInfo[i].breaking){ if(current.length) segments.push(current); current = [i+1]; }
     else current.push(i+1);
   }
-  segments.push(current);
+  if(current.length) segments.push(current);
   const segPaths = segments.map(idxs=>{
     let d = ""; idxs.forEach((i,k)=>{ d += (k===0?"M":"L")+xs(i).toFixed(1)+","+ys(history[i].value).toFixed(1)+" "; });
     return d;
@@ -3005,7 +3018,7 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
   // split (still one continuous line segment above, since only breaking
   // splits the path) - drawn as short overlay strokes so that one stretch
   // of the line reads as "no real data here" without literally cutting it.
-  const dashConnectors = Object.keys(breakInfo).filter(i=> breakInfo[i].reportGap && !breakInfo[i].breaking).map(i=>{
+  const dashConnectors = Object.keys(breakInfo).filter(i=> breakInfo[i].reportGap && !breakInfo[i].breaking && plotted(+i) && plotted(+i+1)).map(i=>{
     i = +i;
     return `<line x1="${xs(i).toFixed(1)}" y1="${ys(history[i].value).toFixed(1)}" x2="${xs(i+1).toFixed(1)}" y2="${ys(history[i+1].value).toFixed(1)}" stroke="var(--ink-faint)" stroke-width="2" stroke-dasharray="4,3"/>`;
   }).join("");
@@ -3014,7 +3027,7 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
   // NOT reusing Thread C's no-data-available styling (muted/gray, a
   // whole different page state, not a chart element) - this is a
   // specific colored, deliberate "the check itself changed here" event.
-  const breakGlyphs = Object.keys(breakInfo).filter(i=> breakInfo[i].breaking).map(i=>{
+  const breakGlyphs = Object.keys(breakInfo).filter(i=> breakInfo[i].breaking && plotted(+i) && plotted(+i+1)).map(i=>{
     i = +i;
     const mx = (xs(i)+xs(i+1))/2, my = (ys(history[i].value)+ys(history[i+1].value))/2;
     const e = breakInfo[i].entry;
@@ -3032,7 +3045,7 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
   // line, same --change color as the breaking glyph above (color means
   // "changed here" either way; shape carries breaking vs. non-breaking -
   // Keith's own call, 2026-09-16).
-  const changeMarkerGlyphs = Object.keys(changeMarkers).filter(idx=> !changeMarkers[idx].breaking).map(idx=>{
+  const changeMarkerGlyphs = Object.keys(changeMarkers).filter(idx=> !changeMarkers[idx].breaking && plotted(+idx)).map(idx=>{
     idx = +idx;
     const e = changeMarkers[idx];
     const px = xs(idx), py = ys(history[idx].value);
@@ -3068,7 +3081,7 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
   // the comparison point (openCheckPanel's own dropdown/click-to-select
   // - see setCompareIdx()) - distinct from the always-filled dot on the
   // latest point above, so both are visible at once when they differ.
-  const compareMarker = (compareIdx!=null && compareIdx>=0 && compareIdx<n && compareIdx!==n-1)
+  const compareMarker = (compareIdx!=null && compareIdx>=0 && compareIdx<n && compareIdx!==n-1 && plotted(compareIdx))
     ? `<circle cx="${xs(compareIdx).toFixed(1)}" cy="${ys(history[compareIdx].value).toFixed(1)}" r="5.5" fill="none" stroke="var(--accent)" stroke-width="2"/>`
     : "";
   // Phase 5d: only shown when this check actually has a gap/marker to
@@ -3092,8 +3105,10 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
       <path d="${segPaths}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
       ${breakGlyphs}
       ${changeMarkerGlyphs}
-      <circle cx="${xs(n-1).toFixed(1)}" cy="${ys(last.value).toFixed(1)}" r="3.4" fill="${statusColorVar(lastStatus)}" stroke="var(--surface)" stroke-width="1.5"/>
-      <text x="${xs(n-1).toFixed(1)}" y="${(ys(last.value)-9).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-weight="600">${fmtMetric(last.value, unit)}</text>
+      ${plotted(n-1) ? `<circle cx="${xs(n-1).toFixed(1)}" cy="${ys(last.value).toFixed(1)}" r="3.4" fill="${statusColorVar(lastStatus)}" stroke="var(--surface)" stroke-width="1.5"/>
+      <text x="${xs(n-1).toFixed(1)}" y="${(ys(last.value)-9).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-weight="600">${fmtMetric(last.value, unit)}</text>`
+      : `<circle class="not-evaluated-mark" cx="${xs(n-1).toFixed(1)}" cy="${(H-padB).toFixed(1)}" r="4" fill="none" stroke="var(--bad)" stroke-width="2"/>
+      <text x="${xs(n-1).toFixed(1)}" y="${(H-padB-9).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--bad)" font-family="IBM Plex Mono, monospace" font-weight="600">Not evaluated</text>`}
       ${compareMarker}
       ${strip}
       ${ylabels}${xlabels}
@@ -3112,7 +3127,7 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
       <tbody>
         ${history.slice().reverse().map(r=>{
           const st=historyStatus(r, {warn, fail});
-          return `<tr><td>${fmtDate(r.date)}</td><td class="num">${fmtMetric(r.value,unit)}</td><td>${pill(st,"sm")}</td></tr>`;
+          return `<tr><td>${fmtDate(r.date)}</td><td class="num">${notEvaluated(r) ? "Not evaluated" : fmtMetric(r.value,unit)}</td><td>${pill(st,"sm")}</td></tr>`;
         }).join("")}
       </tbody>
     </table>
@@ -3142,12 +3157,12 @@ function wireChart(id, history, warn, fail, unit, xs, ys, W, padL, padR, onPoint
     hoverline.setAttribute("x1", xs(idx)); hoverline.setAttribute("x2", xs(idx)); hoverline.setAttribute("opacity","1");
     const wrapRect = svg.parentElement.getBoundingClientRect();
     const leftPx = (xs(idx)/W)*wrapRect.width;
-    const topPx = (ys(r.value)/180)*wrapRect.height;
+    const topPx = (ys(r.value==null ? 0 : r.value)/180)*wrapRect.height;
     tip.style.left = leftPx+"px"; tip.style.top = topPx+"px";
     // #45: hints the click-to-compare affordance on every point except
     // the current (last) run, which can't be compared against itself.
     const clickHint = (onPointClick && idx!==n-1) ? "<br><span style=\"opacity:.7;\">Click to compare against this run</span>" : "";
-    tip.innerHTML = `${fmtDate(r.date)}<br>${fmtMetric(r.value,unit)} · ${STATUS_LABEL[st]}${clickHint}`;
+    tip.innerHTML = `${fmtDate(r.date)}<br>${notEvaluated(r) ? "Not evaluated" : fmtMetric(r.value,unit)} · ${STATUS_LABEL[st]}${clickHint}`;
     tip.classList.add("show");
   });
   hit.addEventListener("mouseleave", ()=>{ hoverline.setAttribute("opacity","0"); tip.classList.remove("show"); });
@@ -4814,7 +4829,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
       <div class="thresholds">${[
         ck.warn==null ? null : `warn &gt; ${fmtMetric(ck.warn,ck.unit)}`,
         ck.fail==null ? null : `fail &gt; ${fmtMetric(ck.fail,ck.unit)}`,
-        `current ${fmtMetric(ck.current,ck.unit)}`,
+        notEvaluated((ck.history||[]).slice(-1)[0]) ? `<span class="not-evaluated-tag">not evaluated in the latest run</span>` : `current ${fmtMetric(ck.current,ck.unit)}`,
       ].filter(Boolean).join(" · ")}${(ck.warn==null&&ck.fail==null) ? ` <span class="muted">(no single-sided threshold — status is this tool's own verdict)</span>` : ""}</div>
       ${ck.retired? `<div class="retired-note">Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?' — '+ck.retiredReason:''} — no longer part of current status.</div>` : ""}
       <div class="check-card-hint">View current &amp; historical run detail ›</div>
@@ -5083,7 +5098,18 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   const isDefaultCompare = compareIdx === defaultCompareIdx;
 
   let compareBlock;
-  if(!hasCompareRun){
+  if(notEvaluated(currentPoint)){
+    // NOT EVALUATED IN THE CURRENT RUN (plans/post-build-review.md #77):
+    // there is no value to compare, and a difference against an earlier
+    // run would be invented. Say what happened and why, in the check's
+    // own red, and that it is not a verdict on the data.
+    compareBlock = `
+    <div class="drawer-section not-evaluated-section">
+      <h4>Not evaluated in the current run</h4>
+      <div class="not-evaluated-reason">${escHtml(String(currentPoint.not_evaluated))}</div>
+      <div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">This check did not fail on the data - it could not be run, so it counts as red until it can be.</div>
+    </div>`;
+  } else if(!hasCompareRun){
     compareBlock = `
     <div class="drawer-section">
       <h4>This run vs. a chosen run</h4>
@@ -5095,6 +5121,16 @@ function openCheckPanel(ag, col, ds, column, check, opts){
         <div class="compare-col"><div class="k">Current run</div><div class="v">${fmtMetric(currentPoint.value, check.unit)}</div></div>
       </div>
       <div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">This is the first run for this check - there's no previous run yet to compare against.</div>
+    </div>`;
+  } else if(notEvaluated(comparePoint)){
+    compareBlock = `
+    <div class="drawer-section">
+      <h4>This run vs. a chosen run</h4>
+      <div class="compare-grid">
+        <div class="compare-col"><div class="k">Compared run</div><div class="v not-evaluated-tag" style="font-size:14px;">Not evaluated</div></div>
+        <div class="compare-col"><div class="k">Current run</div><div class="v">${fmtMetric(currentPoint.value, check.unit)}</div></div>
+      </div>
+      <div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">The compared run could not evaluate this check, so there is no difference to show. Pick another run on the trend chart below.</div>
     </div>`;
   } else {
     const delta = currentPoint.value - comparePoint.value;

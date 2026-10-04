@@ -90,6 +90,23 @@ TOOL_ORDER = ["dbt", "soda", "datacontract", "evidently"]
 #: real ones plus the two pseudo-tools (REQ-PIPE-036 criterion 12).
 EXPECTED_TOOLS = tuple(TOOL_ORDER) + ("dataset_stats", "tables_read")
 
+#: Every tool whose records are CHECK RESULTS, in the order they are
+#: read back: the four real tools, then the two pseudo-tools that record
+#: a check which could NOT be evaluated - `unrunnable` (REQ-PIPE-105
+#: criterion 13) and `held` (REQ-PIPE-078 criterion 10).
+#:
+#: SEPARATE FROM TOOL_ORDER ON PURPOSE, because the two answer different
+#: questions. TOOL_ORDER is what a complete run OWES (completeness) and
+#: what a check id's tail names; a pseudo-tool is owed by no run - a run
+#: with nothing unreadable writes nothing there - so adding it to
+#: TOOL_ORDER would make every clean run incomplete. But a reader that
+#: walks only TOOL_ORDER drops every can't-run red on rebuild, and the
+#: check vanishes from the dashboard instead of reading red
+#: (plans/post-build-review.md #77, gap 1). Literal names rather than an
+#: import of those modules, which import this one;
+#: tests/test_qa_results_reader.py pins them to each module's own TOOL.
+RESULT_TOOLS = tuple(TOOL_ORDER) + ("unrunnable", "held")
+
 
 def expected_tools_for(dataset: str) -> tuple[str, ...]:
     """The tools a given DATASET owes a file, derived from the checks
@@ -378,7 +395,7 @@ def read_qa_results(agency: str, collection: str,
     try:
         out: list[dict] = []
         for run_id in list_run_ids(agency, collection, conn=conn):
-            for tool in TOOL_ORDER:
+            for tool in RESULT_TOOLS:
                 out.extend(read_one(agency, collection, run_id, tool, conn=conn,
                                     supply_state=supply_state))
         return out
@@ -402,7 +419,7 @@ def read_cross_table_results(agency: str, collection: str,
     try:
         out: list[dict] = []
         for run_id in list_run_ids(agency, collection, conn=conn):
-            for tool in TOOL_ORDER:
+            for tool in RESULT_TOOLS:
                 sql = (f'SELECT * FROM "{qa_store.SCHEMA}".check_result_visible '
                        "WHERE run_key = ? AND agency_id = ? AND collection_id = ? "
                        "AND tool = ? AND scope = ?")

@@ -6,6 +6,8 @@ tests/test_build_dashboard_data.py. Calls build_one_table() directly
 reshaping function under test."""
 from __future__ import annotations
 
+import pytest
+
 from pipeline import build_cp_dashboard_data as bcd
 
 # ARRIVAL RECORDS, not manifest entries (REQ-GEN-043) - and row counts
@@ -119,3 +121,39 @@ def test_each_dataset_shows_its_own_runs():
                 {"run_id": "cp_clients__2"}, {"run_id": "cp_run_001"}]
     assert [m["run_id"] for m in b.own_runs(manifest, "cp_clients")] == [
         "cp_clients__1", "cp_clients__2", "cp_run_001"]
+
+
+_XT = ("data-asset-1.child-protection-family-support.child-protection."
+       "cp-notifications.assigned_worker_id.relationships_dbt")
+
+
+class TestACheckThatCouldNotRunStaysOnItsOwnCard:
+    """post-build-review #77, gap 1 (Keith signed the fix 2026-10-04).
+
+    A run whose cross-table check could not be evaluated records it
+    under a pseudo-tool (`unrunnable`/`held`) with its own check_name,
+    so keying by (engine, check_name) alone would open a SECOND card for
+    the same check. It has to land on the real check's card, as that
+    run's red, carrying the reason - so a reader sees "this run could
+    not be evaluated, and why", never a pass and never a vanished run.
+    """
+
+    def _results(self, pseudo):
+        real = _check("cp_run_001", "assigned_worker_id", 0, check_id=_XT,
+                      check_name="relationships_cp_notifications_assigned_worker_id")
+        return [real, pseudo]
+
+    @pytest.mark.parametrize("reason_key", ["unrunnable_reason", "held_reason"])
+    def test_it_joins_the_real_checks_card_as_a_red_run_with_its_reason(self, reason_key):
+        pseudo = _check("cp_run_002", "cp_case_workers", None, status="fail", check_id=_XT,
+                        check_name="Every notification's worker exists",
+                        label="Not evaluated", **{reason_key: "cp_case_workers is held"})
+        table = bcd.build_one_table("cp_notifications", self._results(pseudo), FIXTURE_RUNS,
+                                    FIXTURE_DATASET_STATS, {})
+        cards = [c for col in table["columns"] for c in col["checks"] if c.get("check_id") == _XT]
+
+        assert len(cards) == 1, "one check, one card - the can't-run run must not open a second"
+        by_run = {h["run_id"]: h for h in cards[0]["history"]}
+        assert by_run["cp_run_002"]["status"] == "red"
+        assert by_run["cp_run_002"]["not_evaluated"] == "cp_case_workers is held"
+        assert by_run["cp_run_001"]["not_evaluated"] is None

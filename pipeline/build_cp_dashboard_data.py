@@ -223,6 +223,15 @@ def _value_counts(dataset_stats: dict, run_id: str):
     return ((dataset_stats.get(run_id) or {}).get("value_counts") or {}).get("concern_type")
 
 
+def _not_evaluated_reason(record: dict) -> str | None:
+    """Why a record's check could not be evaluated, or None for a real
+    verdict. Read from the reason each pseudo-tool writes -
+    `unrunnable_reason` (REQ-PIPE-105 criterion 13) and `held_reason`
+    (REQ-PIPE-078 criterion 10) - so a real tool's result can never be
+    mistaken for one."""
+    return record.get("unrunnable_reason") or record.get("held_reason") or None
+
+
 def own_runs(manifest: list[dict], table: str) -> list[dict]:
     """The runs that are FOR this table (REQ-PIPE-105).
 
@@ -246,6 +255,14 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
 
     cross_table_ids = _cross_table_check_ids()
     by_column: dict[str, dict[tuple, dict]] = {}
+    # A CHECK THAT COULD NOT BE EVALUATED (plans/post-build-review.md #77,
+    # gap 1) arrives under a pseudo-tool - `unrunnable` or `held` - with a
+    # check_name of its own, so keying it like a real result would open a
+    # SECOND card for the same check. Real results go first so every
+    # check's card exists, and each can't-run record then joins the card
+    # with its check_id, as that run's red with its reason.
+    results = ([r for r in results if not _not_evaluated_reason(r)]
+               + [r for r in results if _not_evaluated_reason(r)])
     for r in results:
         # Row-count checks used to be skipped outright here, and the
         # reason was real at the time: this check's severity is "warning"
@@ -270,12 +287,16 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         if col not in column_meta:
             continue
         key = (r["engine"], r["check_name"])
+        if _not_evaluated_reason(r):
+            key = next((k for k, s in by_column.get(col, {}).items()
+                        if s["check_id"] == r["check_id"]), key)
         slot = by_column.setdefault(col, {}).setdefault(key, {
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
-            "status_by_run": {},
+            "status_by_run": {}, "not_evaluated": {},
         })
+        slot["not_evaluated"][r["run_id"]] = _not_evaluated_reason(r)
         slot["by_run"][r["run_id"]] = r["metric_value"]
         # item 74 Bug A: the tool's own verdict, carried through rather
         # than dropped here and re-derived from thresholds downstream.
@@ -326,6 +347,9 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                         "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
                         "aggregate_values": aggregate_values,
                         "status": slot["status_by_run"].get(run_id),
+                        # Why this run's check could NOT be evaluated, or
+                        # None for a real verdict - never a value or a pass.
+                        "not_evaluated": slot["not_evaluated"].get(run_id),
                     })
             if not history:
                 continue
@@ -439,6 +463,11 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             primary_unit = checks_out[0]["unit"]
             for label, total, val in (("current", total_latest, checks_out[0]["current"]),
                                        ("previous", total_prev, checks_out[0]["previous"])):
+                # A run whose check could not be evaluated has no value
+                # (post-build-review #77) - nothing was counted, so
+                # nothing is reported invalid, rather than a crash.
+                if val is None:
+                    continue
                 n_invalid = int(round(total * val / 100)) if primary_unit == "%" else int(round(val))
                 stats[label]["invalid"] = max(0, n_invalid)
                 stats[label]["valid"] = max(0, total - stats[label]["invalid"])
@@ -461,6 +490,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 # whose cross-table result is shared here - has no count
                 # of it to divide by.
                 continue
+            if h["value"] is None:
+                continue  # not evaluated in this run - see the comment above
             n_invalid = int(round(total * h["value"] / 100)) if primary_unit == "%" else int(round(h["value"]))
             n_invalid = max(0, n_invalid)
             stats_by_run[run_id] = {

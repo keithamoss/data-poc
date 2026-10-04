@@ -3499,8 +3499,8 @@ requirements:
           orchestrate_cp._unrunnable_results -> unrunnable.results_for ->
           period_schema.check_readiness, covered by tests/test_unrunnable.py.
           CRITERIA 7 AND 8 ARE NOT MET and 079 never owned them: nothing
-          passes check_readiness a reference_period, so the temporal-
-          reference cases are never asked. They need an owner - the drift
+          passes check_readiness a reference_period, so the
+          temporal-reference cases are never asked. They need an owner - the drift
           reference (REQ-QAC-108) is the natural home - and are marked
           unowned rather than left pointing at a requirement that is done.
         owner: >
@@ -23679,11 +23679,16 @@ requirements:
       - tests/test_receipt_instants.py
       - tests/test_delivery_hold_retired.py
       - tests/test_lambda_handlers.py
+      - tests/test_qa_results_reader.py
+      - tests/test_build_cp_dashboard_data.py
+      - tests-js/not-evaluated.test.js
     implemented_by:
       - qa_tools/common/arrivals.py::arrivals_for
       - qa_tools/common/delivery.py::write_delivery
       - qa_tools/common/period_overlay.py::build
       - qa_tools/cp/orchestrate_cp.py::file_and_overlay
+      - qa_tools/common/qa_results_reader.py::RESULT_TOOLS
+      - pipeline/build_cp_dashboard_data.py::_not_evaluated_reason
       - qa_tools/cp/orchestrate_cp.py::simultaneous_with
       - qa_tools/common/qa_results_writer.py::_scope_to_run
       - qa_tools/common/unrunnable.py::results_for
@@ -23712,6 +23717,7 @@ requirements:
         blocked_by:
           requirements: [REQ-PIPE-128]
     decisions:
+      - "CRITERION 13 WAS MET IN THE DATABASE AND NOT ON THE PAGE until 2026-10-04 (plans/post-build-review.md #77, gap 1; Keith signed the fix). The can't-run reds were recorded by the `unrunnable` and `held` pseudo-tools, but the reader walked only the four real tools, so a rebuilt dashboard dropped every one and the check vanished rather than reading red - and the builder would have CRASHED on one (a None value in the column stats). Fixed with failing tests first: the reader and the CP rebuild walk RESULT_TOOLS; each not-evaluated record joins its real check's card by check_id as that run's red with its reason; the page labels it 'not evaluated', explains it in the check panel, and leaves a gap in the trend line instead of plotting zero. REJECTED adding the pseudo-tools to TOOL_ORDER, which is what a complete run OWES - no run owes a pseudo-tool, so every clean run would read incomplete."
       - >
         BUILT 2026-10-04, with criteria 6 and 8 to be amended by REQ-PIPE-118
         (one waiting version per table per period) and criterion 7 by
