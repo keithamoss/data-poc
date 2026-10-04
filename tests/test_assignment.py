@@ -317,3 +317,19 @@ class TestTheScenarioRegisterUnderTheOpenSlotRule:
         assert assignment.assign("case-workers", "s", june, partial, frozenset()).is_held
         sibling = assignment.assign("clients", "s", june, every, frozenset())
         assert sibling.slot == "Q2" and not sibling.is_held
+
+
+class TestAHoldsReasonIsWrittenForAPerson:
+    """The reason is STORED (a hold is a record) and shown verbatim in the
+    queue, so it must not carry a raw instant (REQ-DASH-071) - found by
+    the display-standard e2e test on the first bootstrap under
+    REQ-PIPE-131, which rendered '2023-04-17T09:00:00+08:00'."""
+
+    def test_no_raw_instant_in_any_reason(self):
+        import re
+        got = assignment.assign("d", "s", _at(3, 9), [
+            _slot(1, hour=22).__class__(**{**vars(_slot(1, hour=22)),
+                                           "closes_at": _slot(2, hour=22).claim_opens_at}),
+            _slot(5, hour=22)], frozenset({"01"}))
+        text = got.describe() + " ".join(why for _, why in got.unavailable)
+        assert not re.search(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}", text), text

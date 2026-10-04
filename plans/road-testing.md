@@ -1905,6 +1905,15 @@ judgement about who reads the page rather than about the rule.
         database was refused by this session's permission classifier. It
         needs a drop-and-rebuild by you (or permission to do it). The
         evidence below is from a fresh scratch database, `supply131`.
+        EVIDENCE (scratch `supply131`, from empty): 150 filings - 137
+        open-slot-unfilled, 4 resupply, 9 held (all cp-case-workers,
+        off-cycle). 14 supplies moved against the pre-131 corpus, incl.
+        Case Workers' Aug-2024 file, which the old rule had filed to
+        2023-Q1 - over a year backward. The first real holds exposed two
+        latent defects, both FIXED with failing tests first
+        (post-build-review #91 duplicate held+unrunnable records, #92 a
+        raw ISO instant in a hold's reason). Scratch databases `supply131`
+        and `supply131b` are left behind for you to drop.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

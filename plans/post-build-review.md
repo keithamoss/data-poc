@@ -4780,3 +4780,25 @@ twice. It deliberately did not re-find the `TypeError`.
     one's still are (the control). `tests/test_validate_requirements.py::
     TestARetiredRequirement::test_its_record_of_code_since_removed_is_kept_as_history`,
     confirmed failing first.
+
+91. **[done, 2026-10-04]** **[Pipeline & publishing]** **A check could
+    get two results in one run - a `held` record and an `unrunnable`
+    one.** Latent until REQ-PIPE-131 produced the first real holds: Case
+    Workers' supply was held and Notifications' own table was staged
+    awaiting a decision, so the notifications->case-workers check was
+    explained by `held_blast_radius` AND by `unrunnable`. Caught by
+    `tests/test_history_rekey.py`'s one-result-per-check invariant
+    against a fresh bootstrap. FIXED: `unrunnable.results_for` leaves a
+    check that reads any held table to `held_blast_radius`, and records
+    one result per check where several of its tables are unreadable.
+    `tests/test_unrunnable.py::TestOneRecordPerCheck`, confirmed failing
+    first.
+
+92. **[done, 2026-10-04]** **[Dashboard UI]** **A hold's reason showed a
+    raw ISO instant in the queue.** My own sprint 3b text: the reason a
+    held supply's closed slot was unavailable named "the next period's
+    claim window opened at 2023-04-17T09:00:00+08:00", and the reason is
+    stored and rendered verbatim. Caught by the display-standard e2e test
+    (REQ-DASH-071). FIXED: the reason carries no instant.
+    `tests/test_assignment.py::TestAHoldsReasonIsWrittenForAPerson`,
+    confirmed failing first.

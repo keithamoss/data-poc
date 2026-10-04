@@ -81,3 +81,39 @@ def test_a_contested_own_table_reports_only_checks_that_read_it(states):
 
 def test_nothing_missing_means_nothing_recorded(states):
     assert _run(_res(resolved={"cp_placements": "x", "cp_clients": "y"})) == []
+
+
+NOTIFICATIONS_READS_WORKERS = f"{P}.cp-notifications.assigned_worker_id.relationships_dbt"
+PLACEMENTS_READS_BOTH = f"{P}.cp-placements.carer_client.cross_dbt"
+
+
+class TestOneRecordPerCheck:
+    """A run records ONE result per check (tests/test_history_rekey.py
+    holds the built history to it). Found on the first bootstrap under
+    REQ-PIPE-131, which is the first to produce real holds: case workers'
+    supply was held, cp-notifications' own table was staged awaiting a
+    decision, and the notifications->workers check got a `held` record
+    AND an `unrunnable` one - two results for one check in one run."""
+
+    def test_a_check_reading_a_held_table_is_left_wholly_to_held_blast_radius(
+            self, states, monkeypatch):
+        monkeypatch.setattr(unrunnable, "supply_state",
+                            lambda *a: period_schema.STAGED_AWAITING_DECISION)
+        out = unrunnable.results_for(
+            None, run_id="r", run_timestamp="t", own_table="cp_case_workers",
+            own_dataset="cp-case-workers", period="2024-Q3",
+            resolution=_res(absent=["cp_notifications"],
+                            held={"cp_case_workers": "w"}),
+            reads={NOTIFICATIONS_READS_WORKERS: ["cp_case_workers"]}, as_at=AS_AT)
+        assert out == [], "held_blast_radius already records this check"
+
+    def test_a_check_reading_two_missing_tables_gets_one_record(self, states):
+        states["cp-clients"] = period_schema.STAGED_AWAITING_DECISION
+        states["cp-carers"] = period_schema.STAGED_AWAITING_DECISION
+        out = unrunnable.results_for(
+            None, run_id="r", run_timestamp="t", own_table="cp_placements",
+            own_dataset="cp-placements", period="2026-Q1",
+            resolution=_res(resolved={"cp_placements": "x"},
+                            absent=["cp_clients", "cp_carers"]),
+            reads={PLACEMENTS_READS_BOTH: ["cp_clients", "cp_carers"]}, as_at=AS_AT)
+        assert [r["check_id"] for r in out] == [PLACEMENTS_READS_BOTH]

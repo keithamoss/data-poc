@@ -86,7 +86,8 @@ def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
                 own_dataset: str, period: str, resolution: supply_db.Resolution,
                 reads: dict[str, list[str]], as_at: datetime,
                 checks_by_id: dict | None = None) -> list[dict]:
-    """One record per (in-scope check, unreadable table it reads)."""
+    """One record per in-scope check that reads an unreadable table,
+    naming the first such table."""
     from qa_tools.common import hierarchy
 
     missing = (set(resolution.absent) | set(resolution.ambiguous)) - set(resolution.held)
@@ -108,6 +109,14 @@ def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
         try:
             home = hierarchy.dataset(parsed.dataset).table
         except Exception:  # noqa: BLE001 - not one of ours, nothing to say
+            continue
+        # ONE RECORD PER CHECK (a run holds one result per check). A
+        # check that reads a HELD table is held_blast_radius's to record,
+        # so it is left out here entirely rather than explained twice -
+        # found on the first bootstrap under REQ-PIPE-131, the first to
+        # produce real holds. Where several of its tables are unreadable,
+        # the first (by name) is the one named.
+        if (set(tables) | {home}) & set(resolution.held):
             continue
         for table in sorted((set(tables) | {home}) & missing):
             if table not in states:
@@ -147,6 +156,7 @@ def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
                 "unrunnable_reason": (f"{verdict.describe()}. This check did not fail - "
                                       f"it could not be evaluated."),
             })
+            break
     return out
 
 

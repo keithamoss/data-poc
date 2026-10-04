@@ -25297,7 +25297,46 @@ requirements:
       date: "2026-10-04"
     story: "As the person responsible for a data asset, I want each dataset's period to close the moment its calendar's next period starts accepting files, so that a file is never filed backward into an old, unfilled period and downstream users always get the newest data rather than a gap."
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_assignment.py
+      - tests/test_slots.py
+      - tests/test_supply_holds.py
+      - tests/test_outstanding.py
+      - tests/test_unrunnable.py
+      - tests/test_withheld_does_not_empty_a_slot.py
+      - tests/test_cli_schedule.py
+    implemented_by:
+      - qa_tools/common/assignment.py::assign
+      - qa_tools/common/assignment.py::open_slot
+      - qa_tools/common/assignment.py::current_slot
+      - qa_tools/common/assignment.py::_why_unavailable
+      - qa_tools/common/slots.py::Slot
+      - qa_tools/common/slots.py::slots_for_dataset
+      - qa_tools/common/slots.py::_calendar_periods
+      - qa_tools/common/slots.py::is_open
+      - qa_tools/common/slots.py::is_closed
+      - qa_tools/common/promotion.py::should_promote
+      - qa_tools/common/outstanding.py::survey
+      - qa_tools/common/unrunnable.py::results_for
+      - cli/supply.py::filings_command
+      - cli/schedule.py::_show_dataset
+    evidence:
+      - >
+        2026-10-04, overnight sprint 3b: a full bootstrap from an EMPTY
+        database (scratch `supply131`) filed 150 supplies - 137
+        open-slot-unfilled, 4 resupply-of-open-slot, 9 held-no-open-slot
+        (all cp-case-workers, arriving in quarters it does not deliver
+        in, which the retired off-cycle gate used to withhold). Against
+        the pre-131 corpus 14 supplies moved, and the defect is visible
+        in real data: cp-case-workers' August 2024 file had been filed
+        to 2023-Q1, over a year BACKWARD, and now files to 2024-Q3.
+      - >
+        2026-10-04: every scenario the register rewrote (TS-1, 2, 5,
+        6a-c, 7, 10, 33a/b) is a test in tests/test_assignment.py
+        against the real rule; slots close against the REAL quarterly and
+        daily calendars, including a partially-participating dataset
+        closing with its CALENDAR period (tests/test_slots.py).
     source: "Keith, 2026-10-04, group 3 sign-off round of option A, after finding backward filing while checking the since-dropped REQ-PIPE-124 (plans/road-testing.md #16, 'FOUND WHILE CHECKING THAT', 'KEITH'S PROPOSAL', 'PERIOD CLOSING SETTLED', 'SIGN-OFF ROUND, period closing'). Scoped by delivery-scoper 2026-10-04, separately from option A; signed off by Keith 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL treat a dataset's slot as OPEN from its claim-opening instant until the claim-opening instant that dataset would have for the NEXT PERIOD OF ITS CALENDAR - whether or not the dataset participates in that next period - and as CLOSED from then on."
@@ -25340,6 +25379,10 @@ requirements:
       - "CLOSING GOVERNS FILING ONLY (carried from the draft, not contradicted at sign-off): a red supply already filed to Monday and awaiting a decision stays Monday's after Monday closes, and if a re-check (REQ-PIPE-121) later turns it green the gate may still promote it into Monday. Closing decides where NEW arrivals go, not what may happen to supplies already filed."
       - "THE HAND-FILING ROUTE IS UNCHANGED: `mothman bdm/cp qa --commit` stamps the receipt 'now' (REQ-PIPE-103), so a late file hand-filed today goes to today's open period, and a person re-files it into the closed one if that is where it belongs. Re-file's EFFECT is not yet built (REQ-GHUB-082's unmet criterion 2; REQ-PIPE-075 criterion 17), so that path is true of the requirements and not yet of the code."
       - "REQ-PIPE-077 IS RETIRED (Keith, 2026-10-04, architect review). It judged 'off-cycle' by calendar date, ignoring claim windows; under this rule a file arriving where its dataset has no open slot is already held for a person, and the one case left to 077 - an early, in-window file, e.g. 25 July for the August slot - it would withhold wrongly. REJECTED redefining it over open intervals, which would be a second rule saying what this one says."
+      - "BUILT 2026-10-04 (overnight sprint 3b). Slot.closes_at is computed in slots_for_dataset from the CALENDAR's sequence (or a dataset's own overriding dates), with the period after `until` read so the last slot generated still knows when it closes; assign() takes the newest slot whose window has opened, by bisection, and files to it only if it has not closed."
+      - "THE REAL `supply` DATABASE IS NOT REBUILT BY `bootstrap --force`: filings are write-once (REQ-PIPE-062 criterion 10), so a forced bootstrap kept every pre-131 filing. The evidence comes from a fresh scratch database; dropping the real one was refused by the session's permission classifier and is left for Keith."
+      - "TWO LATENT DEFECTS SURFACED by the first real holds, both fixed with a failing test first: a check reading a held table AND a staged one got two records in one run (unrunnable.results_for now leaves a held-reading check to held_blast_radius, and records one result per check); and a hold's stored reason carried a raw ISO instant the queue showed verbatim (REQ-DASH-071)."
+      - "LEFT FOR REQ-PIPE-132: the queue's closed-unfilled-slot item, whose producer read REQ-PIPE-063's monotonic filling, is removed rather than redefined - REQ-PIPE-132 brings it back grouped per dataset."
     open_questions: []
 
   - id: REQ-PIPE-132

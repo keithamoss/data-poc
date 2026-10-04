@@ -204,9 +204,11 @@ def _why_unavailable(slots: Sequence[slots_mod.Slot], at: datetime,
     if index > 0:
         before = slots[index - 1]
         state = ("filled by a promoted supply, and " if before.name in filled else "")
+        # NO INSTANT IN THE SENTENCE: a hold's reason is stored and shown
+        # verbatim, and a raw ISO instant is the one thing REQ-DASH-071
+        # says a reader never sees. The slot's own config says when.
         out.append((before.name,
-                    f"{state}closed - the next period's claim window opened at "
-                    f"{before.closes_at.isoformat() if before.closes_at else '?'}"))
+                    f"{state}closed - the next period's claim window had opened"))
     if index < len(slots):
         out.append((slots[index].name,
                     "its claim window has not opened yet, and nothing may claim forward"))
