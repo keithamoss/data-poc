@@ -53,6 +53,7 @@ from . import run_dbt_cp
 from . import run_soda_cp
 from . import run_datacontract_cp
 from . import run_evidently_cp
+from qa_tools.common import arrival_lifecycle
 from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -394,15 +395,21 @@ def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
     delivery and SIX arrivals, so it is six runs, and each records only
     what its own file is responsible for.
     """
-    results: list[dict] = []
-    found_arrivals = list(found_arrivals)
-    for arrival in sorted(found_arrivals, key=lambda a: (a.sequence, a.run_index, a.run_id)):
-        file_and_overlay(arrival, among=found_arrivals)
-        got = _run_one(arrival.as_entry(), asset_time.now().isoformat(), run_by,
-                        on_step=on_step)
-        promote_after(arrival, got, run_by)
-        results.extend(got)
-    return results
+    # THROUGH THE ONE PER-ARRIVAL LIFECYCLE (REQ-PIPE-086 criterion 2) -
+    # the same function the batch calls, so the two cannot drift.
+    return arrival_lifecycle.process_all(
+        sorted(found_arrivals, key=lambda a: (a.sequence, a.run_index, a.run_id)),
+        steps=STEPS, run_by=run_by, on_step=on_step)
+
+
+#: Child Protection's half of the one per-arrival lifecycle
+#: (REQ-PIPE-086 criterion 2) - see qa_tools/common/arrival_lifecycle.py.
+#: `among` is every arrival the caller knows of: a zip is filed whole.
+STEPS = arrival_lifecycle.Steps(
+    file_and_overlay=lambda arrival, among: file_and_overlay(arrival, among=among),
+    entry_for=lambda arrival: arrival.as_entry(),
+    run_one=lambda *args, **kw: _run_one(*args, **kw),
+    promote_after=lambda arrival, got, run_by: promote_after(arrival, got, run_by))
 
 
 def run_pipeline_cp(sequential: bool = False,
@@ -483,17 +490,10 @@ def run_pipeline_cp(sequential: bool = False,
     # it buys. Short version: filing every arrival up front put all 108
     # supplies in 2023-Q1, because nothing was ever filled while the
     # filings were being made.
-    by_run_id = {a.run_id: a for a in found_arrivals}
-
-    def _file(entry: dict) -> None:
-        file_and_overlay(by_run_id[entry["run_id"]], among=found_arrivals)
-
-    def _promote(entry: dict, got: list[dict]) -> None:
-        promote_after(by_run_id[entry["run_id"]], got, run_by)
-
-    all_results = parallel_orchestrate.run_manifest(
-        manifest, _run_one, run_timestamp, run_by, None,
-        sequential=sequential, before_each=_file, after_each=_promote)
+    # THROUGH THE ONE PER-ARRIVAL LIFECYCLE (REQ-PIPE-086 criterion 2),
+    # the same function a hand-filed delivery goes through.
+    all_results = arrival_lifecycle.process_all(
+        found_arrivals, steps=STEPS, run_by=run_by, run_timestamp=run_timestamp)
 
     # THE TICKETS CATCH UP WITH THE SLOTS (REQ-PIPE-083 criteria 13 and
     # 16). After promotion rather than beside it, because a ticket that

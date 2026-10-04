@@ -61,6 +61,7 @@ from . import run_dbt_bdm
 from . import run_soda_bdm
 from . import run_datacontract_bdm
 from . import run_evidently_bdm
+from qa_tools.common import arrival_lifecycle
 from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -438,17 +439,38 @@ def promote_after(arrival, got: list[dict], run_by: str) -> None:
             arrival.received_at, seed=arrival.run_id).isoformat()))
 
 
+def entry_for(arrival) -> dict:
+    """The run entry for one arrival.
+
+    TWO FILES IN ONE ARRIVAL GET A RUN (REQ-PIPE-105 criterion 6,
+    2026-10-02): CONTESTED, filed so the run has a period, while the
+    overlay refuses to choose between the two staged tables. path_for()
+    still refuses to choose, so such a run is pointed at its delivery
+    directory, which is all `csv_path` is used for here. The hand-filed
+    path used to call path_for() unconditionally and so refused a
+    contested file the batch would check - one of the drifts
+    REQ-PIPE-086 found.
+    """
+    path = (arrival.path_for(DATASET_ID) if DATASET_ID not in arrival.contested
+            else arrival.path)
+    return arrival.as_entry() | {"csv_path": str(path)}
+
+
+#: Birth Registrations' half of the one per-arrival lifecycle
+#: (REQ-PIPE-086 criterion 2) - see qa_tools/common/arrival_lifecycle.py.
+STEPS = arrival_lifecycle.Steps(
+    file_and_overlay=lambda arrival, among: file_and_overlay(arrival),
+    entry_for=entry_for,
+    run_one=lambda *args, **kw: _run_one(*args, **kw),
+    promote_after=lambda arrival, got, run_by: promote_after(arrival, got, run_by))
+
+
 def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
-    """The hand-filed path, one arrival at a time exactly as the batch
-    does it - see orchestrate_cp.run_arrivals()."""
-    results: list[dict] = []
-    for arrival in sorted(found_arrivals, key=lambda a: (a.sequence, a.run_index, a.run_id)):
-        file_and_overlay(arrival)
-        got = _run_one(arrival.as_entry() | {"csv_path": str(arrival.path_for(DATASET_ID))},
-                        asset_time.now().isoformat(), run_by, on_step=on_step)
-        promote_after(arrival, got, run_by)
-        results.extend(got)
-    return results
+    """The hand-filed path: the same per-arrival lifecycle as the batch
+    (REQ-PIPE-086), in receipt order - see orchestrate_cp.run_arrivals()."""
+    return arrival_lifecycle.process_all(
+        sorted(found_arrivals, key=lambda a: (a.sequence, a.run_index, a.run_id)),
+        steps=STEPS, run_by=run_by, on_step=on_step)
 
 
 def run_pipeline(sequential: bool = False,
@@ -498,10 +520,9 @@ def run_pipeline(sequential: bool = False,
     # run records why in its tables_read and checks nothing of its own.
     # path_for() still refuses to choose, so such a run is pointed at its
     # delivery directory, which is all `csv_path` is used for here.
-    manifest = [a.as_entry() | {"csv_path": str(
-                    a.path_for("birth-registrations") if "birth-registrations" not in a.contested
-                    else a.path)}
-                for a in found_arrivals]
+    # The run entry each arrival gets is entry_for()'s, shared with the
+    # hand-filed path; the list is kept for the results file's `runs`.
+    manifest = [entry_for(a) for a in found_arrivals]
 
     # THE BATCH NO LONGER CHOOSES A REFERENCE RUN (REQ-QAC-108
     # criterion 4, 2026-09-29). It used to take the first manifest
@@ -532,17 +553,11 @@ def run_pipeline(sequential: bool = False,
     # next. See orchestrate_cp.py's identical block for the chain that
     # forces it and parallel_orchestrate.run_manifest's docstring for
     # what it cost and what it bought.
-    by_run_id = {a.run_id: a for a in found_arrivals}
-
-    def _file(entry: dict) -> None:
-        file_and_overlay(by_run_id[entry["run_id"]])
-
-    def _promote(entry: dict, got: list[dict]) -> None:
-        promote_after(by_run_id[entry["run_id"]], got, run_by)
-
-    all_results = parallel_orchestrate.run_manifest(
-        manifest, _run_one, run_timestamp, run_by, None,
-        sequential=sequential, before_each=_file, after_each=_promote)
+    # THROUGH THE ONE PER-ARRIVAL LIFECYCLE (REQ-PIPE-086 criterion 2),
+    # the same function a hand-filed delivery goes through, so the two can
+    # never compose these steps differently.
+    all_results = arrival_lifecycle.process_all(
+        found_arrivals, steps=STEPS, run_by=run_by, run_timestamp=run_timestamp)
 
     # THE TICKETS CATCH UP WITH THE SLOTS (REQ-PIPE-083 criteria 13 and
     # 16). After promotion rather than beside it, because a ticket that
@@ -570,16 +585,15 @@ def run_pipeline(sequential: bool = False,
     # knows nothing else is going.
 
     # Read back rather than threaded through _run_one's own return value -
-    # parallel_orchestrate.run_manifest's contract is a flat list of check
-    # results, shared with orchestrate_cp.py, not worth complicating for
-    # this. Also means this is the exact same code path build_results_
+    # the lifecycle's contract is a flat list of check results, shared
+    # with orchestrate_cp.py, not worth complicating for this. Also means this is the exact same code path build_results_
     # from_history.py uses for the committed-history-only rebuild, so the
     # two can't drift on how dataset_stats gets assembled.
     dataset_stats_by_run = {}
-    for entry in manifest:
-        stats = read_dataset_stats(AGENCY_ID, COLLECTION_ID, entry["run_id"])
+    for arrival in found_arrivals:
+        stats = read_dataset_stats(AGENCY_ID, COLLECTION_ID, arrival.run_id)
         if stats is not None:
-            dataset_stats_by_run[entry["run_id"]] = stats
+            dataset_stats_by_run[arrival.run_id] = stats
 
     # ONE AGREED ORDERING down both paths (REQ-PIPE-038). A live run
     # emits a collection's tables interleaved; a rebuild reads them as

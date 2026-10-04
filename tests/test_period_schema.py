@@ -357,7 +357,9 @@ class TestLoadingCompletesBeforeQARuns:
             return None
 
         staged_at = line_of(builder)
-        fanned_at = line_of("run_manifest")
+        # The per-arrival lifecycle (REQ-PIPE-086 criterion 2) is where
+        # the runs happen now; it was parallel_orchestrate.run_manifest.
+        fanned_at = line_of("process_all")
         assert staged_at is not None, f"{function} no longer stages before anything"
         assert fanned_at is not None, f"{function} no longer fans out"
         assert staged_at < fanned_at, (

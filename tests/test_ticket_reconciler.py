@@ -337,7 +337,7 @@ class TestTheReconcilerIsInvokedAfterEveryRun:
         ticket can never say something the decision log does not."""
         calls = dict(self._calls(module, func))
         assert calls["ticket_reconciler.after_runs"] > \
-            calls["parallel_orchestrate.run_manifest"]
+            calls["arrival_lifecycle.process_all"]
 
 
 class TestNoTicketingConfiguredIsNotABrokenRun:
