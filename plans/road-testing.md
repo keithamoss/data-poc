@@ -1122,3 +1122,27 @@ judgement about who reads the page rather than about the rule.
       noted), REQ-PIPE-120, REQ-PIPE-121 (with the large shout).**
       REQ-PIPE-119 dropped. Not yet written into requirements.yaml - the
       drafts go in once all groups are signed.
+
+    **SIGN-OFF ROUND, group 2 (122-123), Keith 2026-10-04:**
+    - **DEFECT FOUND, to fix IN THIS BATCH (Keith):** period_schema.newest()
+      ranks a period's promoted versions by ARRIVAL key, but REQ-PIPE-105
+      criterion 7 (signed) says newest-wins among PROMOTED supplies is by
+      PROMOTION time. Today a period schema can hold several promoted
+      versions of a table and readers take the newest - so the wrong one
+      can be read after an out-of-order promotion. Failing test first.
+    - Corrected for the record: today a green resupply into a FILLED slot
+      does not auto-promote (the gate refuses "slot already filled"), and
+      a person promoting a second supply leaves BOTH in the period schema
+      with the newest read - nothing is superseded.
+    - **Amber acknowledgement:** a person may be asked to ACKNOWLEDGE an
+      auto-promoted amber supply - wanted on the quarterly asset for some
+      problematic collections, not on the daily asset (noise). Keith
+      expects the quarterly asset's asset-level default to be "promote,
+      don't ask", toggled to "promote and ask" for some collections.
+      ACKNOWLEDGE becomes a new decision type - reverses REQ-PIPE-091's
+      "no acknowledgement entry type", accepted by Keith.
+    - **Replaced accepted file:** Keith first chose "do as today" (leave
+      it in the period schema, newest read), then reconsidered - he wants
+      the PROMOTED SCHEMA CLEAN (no tables not actually used for the
+      period) but worries the superseded area grows "massive and
+      unwieldy". Being discussed.
