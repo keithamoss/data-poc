@@ -26136,6 +26136,7 @@ requirements:
         schemas - is made safe to run together, not merely usually fine.
     dependencies: []
     linked_tests:
+      - tests/test_bootstrap_equivalence.py
       - tests/test_bootstrap.py
       - tests/test_tools_beside.py
     implemented_by:
@@ -26162,19 +26163,6 @@ requirements:
         decisions, and provisional.
     unmet_criteria:
       - criterion: >
-          Criterion 4, in part - "kept as a test". The equivalence was
-          VERIFIED once (see decisions) by a comparison script, not by
-          anything in the suite.
-        why: >
-          A faithful test is two full bootstraps - ~70 minutes - which no
-          suite run can carry. Keith chose to commit and stop here
-          (2026-10-03) rather than design a cheaper one now.
-        owner: >
-          Nobody yet - a reduced-corpus equivalence test is the likely
-          shape, and needs scoping.
-        blocked_by:
-          unowned: true
-      - criterion: >
           Criterion 6's purpose, in part - the gain is measured but not
           trustworthy: see the timing decision.
         why: >
@@ -26189,6 +26177,7 @@ requirements:
         blocked_by:
           unowned: true
     decisions:
+      - "CRITERION 4 IS NOW KEPT AS A TEST, ON DEMAND (Keith, 2026-10-04). tests/test_bootstrap_equivalence.py runs the real bootstrap twice - sequential and parallel - over a reduced real corpus (11 runs: both collections, all four tools, pass/fail/warn/nodata, promote and promotion-withheld, three filing branches) into scratch databases, and compares every row of every qa table and every supply table, leaving out only the clock stamps and surrogate ids it names. Proved both ways when written: a reintroduced regression (the parallel path skipping the delivery log) fails it, as did 16 of 16 planted differences, and it passed on the real code; it also found the full-size 2026-10-03 pair identical under the same wider comparison (7,210 results, 84 decisions, 151 supply tables). ~3-4 minutes, so it is DESELECTED from every ordinary run and from CI and run with `uv run pytest --run-on-demand tests/test_bootstrap_equivalence.py` when the bootstrap's parallelism changes. REJECTED the fast CI half (~1-2 min on the first red signal) and the deployment half (+3-4 min on the whole run). Deselected rather than skipped, because the fast half treats any skip as a test in the wrong half."
       - >
         CRITERION 4 VERIFIED, 2026-10-03: a sequential and a parallel
         bootstrap from the same seed, each into its own empty database,

@@ -4495,3 +4495,31 @@ twice. It deliberately did not re-find the `TypeError`.
     emits no such record (gap 4). No real-browser test exercises one,
     because the bootstrapped history contains none until a scenario
     plants one - REQ-GEN-136's planted shapes are the natural place.
+
+78. **[investigate, 2026-10-04]** **[GitHub workflow & people]** **CI's
+    bootstrap would write real GitHub tickets if it ever had a token.**
+    Spotted by the agent prototyping REQ-TEST-116's equivalence test and
+    confirmed at source: `ticket_reconciler.service_from_env()` treats
+    `GITHUB_REPOSITORY` being set as "ticketing is configured", and
+    GitHub Actions sets that variable on EVERY run - so the deployment
+    half's `mothman pipeline bootstrap` reaches the reconciler with a
+    real `GitHubTickets(keithamoss, data-poc)`. Checked 2026-10-04: no
+    issue on the repository has been created or touched since
+    2026-09-28, so in practice nothing has been written - most likely
+    because the job holds no token that can write issues. LATENT, not
+    live: the gate is an incidental variable, not a decision. Natural
+    home: the environment-safety group (REQ-PIPE-093 refresh, in
+    scoping) - ticketing switched on by the environment's own declared
+    configuration. Not fixed; needs Keith.
+
+79. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An older
+    checkout can silently DOWNGRADE a database's schema marker.** Found
+    by the delivery-scoper refreshing REQ-PIPE-107, not yet reproduced
+    here: `qa_store.ensure_schema` only asks whether the database's
+    SCHEMA_VERSION EQUALS the code's, so a checkout on an older commit
+    pointed at a newer database re-runs its own older DDL and writes its
+    LOWER version over the newer one. REQ-PIPE-144 refuses an older
+    schema; nothing refuses a NEWER one. Is a defect claim, so a failing
+    test comes before any fix and Keith signs it off; it is also the
+    refresh's open question Q4 (fold the refusal into 107, or its own
+    requirement).

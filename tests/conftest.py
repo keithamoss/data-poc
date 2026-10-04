@@ -772,7 +772,35 @@ DEPLOYMENT_FIXTURE = "deployment_history"
 NEEDS_DEPLOYMENT = "needs_deployment"
 
 
-def pytest_collection_modifyitems(items):
+#: Tests too slow for every run, kept in the repository and run when their
+#: subject changes (Keith, 2026-10-04: the bootstrap equivalence test).
+ON_DEMAND = "on_demand"
+
+
+def pytest_addoption(parser):
+    parser.addoption("--run-on-demand", action="store_true", default=False,
+                     help="also run tests marked on_demand (slow; deselected otherwise)")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Mark every test that needs a bootstrapped deployment, and DESELECT
+    the on-demand ones unless asked for.
+
+    DESELECTED, NOT SKIPPED: the fast half of CI watches its skip count,
+    which should be zero, because a skip there is a test in the wrong
+    half. An on-demand test is not in any half by design, so it must not
+    show up as one.
+    """
+    if not config.getoption("--run-on-demand"):
+        kept = [i for i in items if i.get_closest_marker(ON_DEMAND) is None]
+        dropped = [i for i in items if i.get_closest_marker(ON_DEMAND) is not None]
+        if dropped:
+            config.hook.pytest_deselected(items=dropped)
+            items[:] = kept
+    _mark_deployment(items)
+
+
+def _mark_deployment(items):
     """Mark every test that needs a bootstrapped deployment.
 
     TWO WAYS TO NEED ONE, and only the first can be detected: a test that
