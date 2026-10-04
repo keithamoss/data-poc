@@ -1578,6 +1578,12 @@ judgement about who reads the page rather than about the rule.
         signed REQ-PIPE-122 (its criterion protecting past setting versions,
         and its 'NO SYNTHETIC EXCEPTION' decision) and are NOW IN QUESTION.
         Resolve before building 122.
+        **RESOLVED FOR SETTINGS THE SAME AFTERNOON (Keith):** a setting's
+        past is RECORDED on every decision, so a past version is inert and
+        never needs correcting - REQ-PIPE-122/123 now freeze past setting
+        versions outright (no changelog route), allow new versions only
+        from today, and let only a synthetic asset add past-dated ones (for
+        REQ-GEN-136's eras). 122 no longer waits on the calendar question.
 
       THE SCENARIO WALKED THROUGH: Q3 authored 1 Aug, agreement says 2 Aug.
       Noticed ON 1 Aug: 111 allows it (the date has not passed), but it
