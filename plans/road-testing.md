@@ -1637,3 +1637,9 @@ judgement about who reads the page rather than about the rule.
       120, 128+129, **081's census**, re-file (140-142), the rest of 130,
       123, 121, 126, 127, then **081's "In place on" rename** as a
       standalone change; REQ-PIPE-115 alongside where it fits.
+    - **BUILD ORDER, 2026-10-04 late afternoon (Keith).** Step 1
+      (REQ-DOCS-143, retired status) is BUILT. Step 2 (the slot view + the
+      withheld fix) waits for Keith's go - "not yet". The environment-safety
+      group signed today (REQ-PIPE-093, 107, 146, REQ-TEST-114) goes AFTER
+      the batch. Also signed today and still to place: REQ-PIPE-103's and
+      REQ-QAC-108's amendments and the new REQ-PIPE-147.
