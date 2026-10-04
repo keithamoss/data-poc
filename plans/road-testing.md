@@ -1641,5 +1641,8 @@ judgement about who reads the page rather than about the rule.
       (REQ-DOCS-143, retired status) is BUILT. Step 2 (the slot view + the
       withheld fix) waits for Keith's go - "not yet". The environment-safety
       group signed today (REQ-PIPE-093, 107, 146, REQ-TEST-114) goes AFTER
-      the batch. Also signed today and still to place: REQ-PIPE-103's and
-      REQ-QAC-108's amendments and the new REQ-PIPE-147.
+      the batch. Placed the same afternoon: REQ-PIPE-103's amendment
+      (stated original arrival) and the new REQ-PIPE-147 (who filed it) go
+      RIGHT AFTER 144, which they both build on; REQ-QAC-108's amendment
+      (compare with the older accepted supply and flag it) goes ALONGSIDE
+      REQ-PIPE-115.
