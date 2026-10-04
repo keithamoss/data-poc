@@ -1784,6 +1784,48 @@ judgement about who reads the page rather than about the rule.
       Keith: what a Lambda does when its pass is refused as busy ("decide
       when we focus on building the aws side later"), kept as an open
       question on REQ-PIPE-152.
+    - **OVERNIGHT SPRINT PLAN, 2026-10-04 ~20:00 Perth (Keith's go: "Yes,
+      all in order").** REQ-PIPE-153 goes straight after REQ-DASH-148.
+      Scope: every requirement signed 2026-10-03/04 still unbuilt (~38,
+      ~500 criteria). NOT all of it fits one night; done in this order,
+      each sprint complete (gates, selective tests, critics, CI checked)
+      and pushed before the next starts, so the night stops at a clean
+      boundary wherever it ends:
+      1. REQ-PIPE-086 criterion 2 only - extract the one per-arrival
+         function, behaviour-preserving, proven by REQ-TEST-116's
+         bootstrap equivalence test.
+      2. REQ-PIPE-130's slot view (+ as-at form), the withheld fix
+         (post-build-review #75), and #85 (drift reference) on it.
+      3. REQ-PIPE-134, REQ-PIPE-131.
+      4. REQ-PIPE-144, with REQ-PIPE-107 criteria 13-14 inside it.
+      5. REQ-PIPE-103's amendment and REQ-PIPE-147.
+      6. REQ-PIPE-115 + REQ-QAC-108's amendment, then REQ-DASH-148, then
+         REQ-PIPE-153.
+      7. REQ-PIPE-132, REQ-DASH-133 with REQ-PIPE-081's page switch.
+      8. REQ-PIPE-122, 118, 120, 128+129, then 081's census.
+      9. REQ-PIPE-140-142 (re-file).
+      10. The rest of REQ-PIPE-130, then 123, 121, REQ-DASH-126, 127,
+          then 081's "In place on" rename.
+      11. REQ-GEN-135-139 (batch scenarios).
+      12. REQ-QAC-096, REQ-DASH-097, REQ-GEN-044's injections (own
+          regenerate).
+      13. REQ-PIPE-093, 107, 146, then REQ-TEST-114 with REQ-TEST-150.
+      14. REQ-PIPE-151, the rest of REQ-PIPE-086.
+      OUT: REQ-PIPE-152 (its busy-case question is deferred to the AWS
+      work), REQ-QAC-145 and the calendar drafts (parked), REQ-TEST-117
+      (parked CI cache).
+      STANDING PERMISSIONS FOR THE NIGHT (Keith): rebootstrap the local
+      database as needed; commit, push and write CHANGELOG entries; run
+      delivery-critic and the UX critics after each build, fix minor
+      findings and log significant ones; flip status to built and delete
+      superseded plans prose. FORKS: take the recommended option, mark it
+      PROVISIONAL in the requirement's decisions, and list it in the
+      morning report below. Three open questions settled the same
+      evening: 115 - one contested item carries a file's load failure;
+      144 - regenerate-history is retired; 114 - if the toolbar spike
+      fails, prompts are prefixed with the environment label.
+      MORNING REPORT: written here as the night goes - per sprint what was
+      built, the commit, CI's result, and every PROVISIONAL choice.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

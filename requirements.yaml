@@ -24334,8 +24334,7 @@ requirements:
     dependencies:
     - REQ-PIPE-093
     - REQ-DASH-094
-    open_questions:
-    - A spike must confirm, before criterion 1 is built, that questionary can keep a bottom toolbar on screen across its prompts and that scripts/dev/record_cast.py captures it in the demo cast. If it cannot, what is the fallback - prefixing every prompt with the label (the option Keith passed over), or the label at the top of each screen as signed?
+    open_questions: []
     decisions:
     - 'A SEPARATE REQUIREMENT FROM REQ-DASH-094, NOT EXTRA CRITERIA ON IT (2026-09-28): different surface, owner and toolchain, and docs/components.md gives cli/ to TEST and the dashboard to DASH.'
     - 'WHAT IS ALREADY BUILT (checked 2026-10-04): `mothman env current` (cli/env.py:44-59) states the resolved environment and fails when unset, and `mothman env list` (cli/env.py:22-42) marks which declared one this is. Both answer only when asked; nothing states the environment unprompted - the TUI''s banner (cli/app.py:40-41, cli/banner.py) and the decision prompt (cli/filing_tui.py:190) do not mention it. So every criterion above is unbuilt; none is removed.'
@@ -24348,6 +24347,7 @@ requirements:
     - A PERSISTENT BOTTOM TOOLBAR (Keith, 2026-10-04), chosen over prefixing every prompt. UNVERIFIED that questionary and the cast recorder support it - see the open question.
     - Follows REQ-PIPE-093 criterion 4 as amended (Keith, 2026-10-04).
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - 'IF THE TOOLBAR SPIKE FAILS, PREFIX THE PROMPTS (Keith, 2026-10-04): every prompt that can change the database starts with the environment''s label, e.g. ''[Production] Record promote for cp_clients 2026-Q2?''. The spike still comes first.'
 
   - id: REQ-PIPE-110
     title: contract/calendar.yaml is the one place a delivery agreement lives
@@ -24571,6 +24571,7 @@ requirements:
     - WHERE one file of a contested pair cannot be loaded, THE SYSTEM SHALL keep the dataset contested for that arrival, raising criterion 8's item, saying which of the two files could not be loaded, and SHALL NOT treat the file that loaded as the supply.
     - THE SYSTEM SHALL show, in the dataset's supply history, a row for every held supply and every contested pair, saying 'Held' or 'Two files, choose one' with its receipt, whatever the period on show.
     - WHILE criterion 10 applies, THE SYSTEM SHALL render that dataset's agency-tier row as a single reason row (the pattern already used for an ended schedule), SHALL show on its dataset page the held or contested arrival's receipt time and '—' for its row counts, and SHALL NOT show an earlier supply's row count, QA run date, arrival or sparkline as this period's.
+    - WHERE one file of a contested pair could not be loaded, THE SYSTEM SHALL raise one contested item for that dataset carrying the load failure in its reason, and SHALL NOT raise a separate failed-load item for that file.
     non_functional_requirements:
     - A FALSE GREEN IS THE FAILURE THIS EXISTS TO PREVENT, and every mechanism is judged against it first. A check that silently does not appear - or a card still showing the last run's pass - is indistinguishable from a check that passed, to the dashboard, the promotion gate and the tickets alike.
     - THE COMMITTED CONFIGURATION IS NEVER REWRITTEN (Keith, 2026-09-30). contract/*.yml and contract/*.yaml are read-only to the pipeline; any per-run narrowing of what a tool runs happens in memory, as soda_common.readable_checks_yaml already does.
@@ -24627,8 +24628,8 @@ requirements:
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
     - 'THE PREVIOUS SUPPLY''S FIGURES ARE NEVER SHOWN BESIDE THIS RED (Keith, 2026-10-04), the dashboard UX reviewer''s must-fix: the agency-tier row becomes one reason row, as for an ended schedule, and the dataset page shows the arrival''s receipt time and a dash for rows. REJECTED leaving the normal row, which would put a stale row count and sparkline beside a red pill - a half-stale picture close to the false green this requirement exists to stop.'
     - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
-    open_questions:
-    - Where one file of a contested pair could not be loaded, REQ-DASH-148 also raises a 'Could not be loaded' item for that file. Should both items show for the one dataset, or should the contested item carry the load failure and the failed-load item be folded into it?
+    - 'ONE ITEM FOR A CONTESTED PAIR WITH AN UNLOADABLE FILE (Keith, 2026-10-04): the contested item carries the load failure. REJECTED two items for one dataset''s one problem, which is the noise REQ-DASH-070 aggregates away.'
+    open_questions: []
   - id: REQ-TEST-116
     title: A bootstrap does in parallel what does not depend on order, and produces the same history either way
     date_written: "2026-10-03"
@@ -25800,6 +25801,7 @@ requirements:
     - THE SYSTEM SHALL deliver REQ-PIPE-107 criteria 13 and 14 (refusing a qa schema whose recorded SCHEMA_VERSION is newer than the checkout's, with its failing test first) in this change, so that ensure_schema refuses both an older and a newer schema from one change.
     - IF mothman pipeline regenerate-history is run for a data asset whose configuration does not declare it synthetic, THEN THE SYSTEM SHALL refuse and delete nothing.
     - WHEN a person chooses one file of a contested pair and that file's own receipt gives a different period or arrival classification than the pair's filing, THE SYSTEM SHALL write a new filing row for the chosen supply, in REQ-PIPE-141's append-only shape, and SHALL NOT edit the original.
+    - THE SYSTEM SHALL retire `mothman pipeline regenerate-history`, its job done by `mothman env reset-synthetic` followed by `mothman pipeline bootstrap`, and SHALL key reset-synthetic's refusal off the asset's synthetic declaration (REQ-GEN-135 criterion 8) rather than off the environment name.
     non_functional_requirements:
     - No behaviour change a person can see - dashboards, terminal and tickets show exactly what they showed before. This is a storage change, and the empty-database before/after bootstrap comparison is the proof, not a reading of the diff.
     - Every consumer of a changed shape is enumerated mechanically (CLAUDE.md's shape-change rule) and asserted at the last transform before a person, not only at the query. The consumers found while drafting are listed in decisions; re-grep at build time, because REQ-PIPE-131 will have added or removed some.
@@ -25852,8 +25854,8 @@ requirements:
     - 'THE EARLIER FILE''S RECEIPT NOW ALSO FILES THE PAIR (Keith, 2026-10-04), which follows from criterion 13 being reworded: a filing needs an instant, and the built rule takes the arrival''s, which for a contested pair is the earlier file''s (REQ-GEN-044 criterion 12). ''Lateness'' is dropped from the SHALL NOT because the arrival classification is computed at filing - see this requirement''s open question on criterion 14.'
     - 'CHOOSING A FILE RE-FILES IT WHERE ITS OWN RECEIPT DIFFERS (Keith, 2026-10-04). Example: A at 11:58pm on the deadline, B at 12:03am; the pair is filed on time from A; choosing B writes a new filing saying late. REJECTED leaving the filing as made, which would leave the filing and the chosen file''s receipt disagreeing about the same supply.'
     - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
-    open_questions:
-    - 'Should `mothman pipeline regenerate-history` be retired in favour of `mothman env reset-synthetic` followed by `mothman pipeline bootstrap` (Keith, 2026-10-04: ''a candidate to retire'')? And should criterion 22''s refusal of reset-synthetic key off the asset''s synthetic declaration, as regenerate-history''s now does, rather than off the environment name production (REQ-PIPE-093 decision 10 noted the same mismatch)?'
+    - regenerate-history IS RETIRED (Keith, 2026-10-04), rather than kept beside reset-synthetic as a second deletion path; and reset-synthetic's refusal keys off the asset's synthetic declaration, the same lock regenerate-history was given, rather than the environment name production.
+    open_questions: []
 
   - id: REQ-QAC-145
     title: Every dbt test that would be dropped with a table declares that it reads it - checked from configuration, before any run
