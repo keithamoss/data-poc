@@ -1493,3 +1493,12 @@ judgement about who reads the page rather than about the rule.
       ANY table arriving in or leaving a period schema** - REQ-PIPE-121
       widened from "only promotion triggers it" to every arrival and
       departure.
+    - **ARCHITECT REVIEW ANSWERED, 2026-10-04 (Keith):** withheld bug
+      tested first (proven - post-build-review #75); **re-file built
+      AFTER REQ-PIPE-128/129**, revising "079, then re-file, then the
+      batch"; REQ-PIPE-077 retired by 131; a `retired` requirement status
+      (drafted as REQ-DOCS-143, unsigned); `_manifest` keeps every reason
+      as signed; the database guard also refuses cascaded drops of period
+      views; a platform without event triggers runs on two guards and
+      says so. Technical findings written into 118/121/128/129/130/131/
+      132/133 as amendments.

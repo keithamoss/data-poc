@@ -4369,3 +4369,26 @@ twice. It deliberately did not re-find the `TypeError`.
     the dataset's own calendar, with
     `test_another_calendars_period_is_not_its_business` confirmed failing
     first.
+
+75. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **A
+    `promotion-withheld` note makes a filled slot read as empty.** Found
+    by `delivery-architect`'s pre-build review of the option A batch, and
+    PROVEN, not just read: `tests/test_withheld_does_not_empty_a_slot.py`
+    (written first on Keith's instruction) fails on the current code -
+    `decision_log.promoted_into()` returns `None` and
+    `promotion.filled_slots()` is empty after a withheld note lands on a
+    slot holding a promoted supply.
+
+    Cause: every "what does this slot hold" reader takes the LATEST
+    decision naming the slot, and `promotion.after_run()` writes the
+    withheld note whenever an arrival is off-cycle - even when the gate's
+    real refusal was that the slot was already filled. Real case:
+    cp-case-workers' Q3 promoted; a resend arriving in Q4 (which it
+    skips) files to Q3, is withheld, and Q3 then reads unfilled, so the
+    next Q3 arrival would auto-promote over the accepted supply.
+
+    NOT YET SEEN IN DATA: the sandbox database held no withheld entries
+    when checked. A significant defect against agreed behaviour (a filled
+    slot must block automatic promotion), so the fix waits on Keith. The
+    fix is the resolving/annotating split now written into REQ-PIPE-132,
+    and REQ-PIPE-077 itself is retired by REQ-PIPE-131.

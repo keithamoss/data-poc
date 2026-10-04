@@ -26355,6 +26355,8 @@ requirements:
       - "THE SYSTEM SHALL hold a period's superseded supplies in a schema of their own for that period, named with the suffix _superseded after the period schema's own name (for example period_2026_q2_superseded beside period_2026_q2), separate from staging, every period schema and the rejected schema."
       - "THE SYSTEM SHALL create a period's superseded schema only when a first table needs it, and SHALL drop it when its last table leaves."
       - "THE SYSTEM SHALL NOT read a _superseded schema as a period schema anywhere a schema name is turned back into a period (period_schema.period_of() and every caller), and a test SHALL assert it."
+      - "THE SYSTEM SHALL match period schema names with the underscore escaped, so that a pattern for period schemas never matches a _superseded schema by wildcard."
+      - "THE SYSTEM SHALL refuse in CI an authored period name that would produce a schema name colliding with another period's _superseded schema."
       - "THE SYSTEM SHALL NOT delete a superseded supply's tables, its file, its receipt or its recorded QA results."
       - "THE SYSTEM SHALL record each supersession in the decision log as its own entry, with the rule as actor, naming the supply superseded and the supply that superseded it, in the same transaction that moves the tables."
       - "THE SYSTEM SHALL NOT record a supersession as a rejection, and SHALL NOT move a superseded supply to the rejected schema."
@@ -26450,6 +26452,7 @@ requirements:
       - "One implementation of 're-evaluate the cross-table checks reading table T in period P, caused by X', shared with REQ-PIPE-079 criterion 6 (arrival-caused), REQ-PIPE-084 criteria 6 and 14 (substitution, unmet) and REQ-PIPE-075 criterion 17 (re-file, unmet). Four triggers, one mechanism - a second implementation of which checks read a table is how they come to disagree."
       - "Cost is measured once built, as the shelved design's own NFR asked: the extra runs per bootstrap and the added wait on a person's promote. Option A should need far fewer than the shelved design, because only promotions trigger it."
       - "Terminates by construction: a supply promotes at most once, so a cascade is bounded by the number of waiting supplies in the period."
+      - "Cheapest correct path first: a waiting supply's status is recomputed from its latest result per check, and a check's tools re-run only where its latest recorded result read a different supply than the one the period now holds. Recomputing a status from latest results is one function, shared with REQ-DASH-126."
     dependencies: []
     decisions:
       - "WAITING SUPPLIES ONLY, AND NOTHING PROMOTED IS EVER DEMOTED BY A RE-CHECK (Keith, 2026-10-03). Promoted siblings already get their cross-table checks refreshed by arrival-time re-evaluation (REQ-PIPE-079 criterion 6); where that refreshed result is red, REQ-DASH-126 shows it rather than any rule acting on it. The one exception to 'never displaced automatically' is REQ-PIPE-123's opt-in replacement setting."
@@ -26635,6 +26638,8 @@ requirements:
       - "Every reader that ranks versions inside a period - period_schema.newest() and promoted_in()'s list-of-versions shape, promotion.newest_promoted() where it reads a period - is enumerated and removed or simplified mechanically, not left as a dormant second path."
       - "The move and the decision entry are one transaction (REQ-PIPE-091 criterion 2)."
       - "Every refusal hands the person the fix as a command they can paste, not only a sentence describing it."
+      - "The stood-on judgement covers the supply a decision DISPLACES as well as the one it names, so every displacing decision records the supply it replaces and the decision-log rule checks both."
+      - "Only the period-schema use of period_schema.newest() is removed; its use for the sample schema (REQ-PIPE-106) stays, moved beside the sample-data code."
     dependencies: [REQ-PIPE-118]
     decisions:
       - "ONE VERSION PER TABLE PER PERIOD, FOR EVERY PROMOTION (Keith, 2026-10-04, following his own reasoning on REQ-PIPE-123): the period schema is what people and external tools read, so it holds only what is in use. Before this, a person promoting a second supply left BOTH in the period schema and readers took the newest."
@@ -26670,6 +26675,12 @@ requirements:
       - "IF any view depends on a table about to leave a period schema, THEN THE SYSTEM SHALL refuse the move, naming the dependent view and its period."
       - "THE SYSTEM SHALL install in every deployment's database a database-level guard (an event trigger) that refuses any move or rename of a table out of a period schema while a view depends on it, whatever issued the statement."
       - "THE SYSTEM SHALL prove that each of the three refusals - the decision-log rule, the code path's check and the database guard - refuses on its own, with the other two absent."
+      - "THE SYSTEM SHALL record, on every record of which tables a QA run read, the supply each period table held at that moment, since a plain name no longer identifies it."
+      - "THE SYSTEM SHALL count as dependants, for these guards, only views in period schemas other than _superseded schemas, so that a QA run's own temporary views never block a person's decision."
+      - "THE SYSTEM SHALL lock, for a decision, every period the decision stands on as well as the periods it moves tables between, so that a substitution and a displacing promotion of the same table cannot race."
+      - "THE SYSTEM SHALL give every decision transaction a lock timeout, and IF a move waits on a running QA tool past it, THEN THE SYSTEM SHALL refuse the decision with a message saying a run is in progress and to retry, and SHALL NOT hang."
+      - "THE SYSTEM SHALL also refuse, at the database, any drop that would remove a period's inherited or substituted view as a side effect of dropping something else, whatever issued it."
+      - "WHERE the database platform does not permit the database-level guard, THE SYSTEM SHALL run on the other two guards and SHALL report the missing guard at session start and in mothman check."
       - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-098 criterion 16 and REQ-PIPE-084 criterion 3 so that an inherited or substituted view is visible by being named the table's plain base name."
     non_functional_requirements:
       - "Every place that reads a stamped name in a period schema is enumerated mechanically before this is called done - at least period_schema (newest, promoted_in), period_overlay's sibling resolution, promotion.promote, inheritance, substitution, rejection and demotion moves, decision_log.promoted_into's callers and the dashboard builders - and switches to looking the supply up. supply_db.split_staged() stays, for staging and the global schemas only."
@@ -26687,6 +26698,8 @@ requirements:
       - "REJECTED moving promoted tables to a separate storage schema behind plain-name views (Keith: a years-deep dumping ground that is hard for a human to look at)."
       - "SUPERSEDED BY THIS: an interim call the same round that inherited and substituted views take full stamped names too. The part that survives is the chain check asking the database whether an object is a table or a view rather than reading its name (Keith: 'a very reasonable fix'), which plain naming makes necessary rather than merely tidier."
       - "THREE GUARDS ON A STOOD-ON TABLE (Keith, 2026-10-04, amendment wording approved). PostgreSQL views attach to a table by its internal id, not its name, so moving a table that a later period's inherited or substituted view stands on would silently drag that view's meaning with it into _superseded. The decision-log rule alone stops this pipeline's own decisions; the one-door check stops a code path that forgets the rule; the event trigger stops anything else, including a person at a SQL console."
+      - "CASCADED DROPS ARE A FOURTH WAY TO LOSE A STOOD-ON VIEW (Keith, 2026-10-04, architect review): DROP ... CASCADE, used in about a dozen places, would silently delete a later period's inherited or substituted view, so the database guard refuses that too. Tests that tear periods down drop in dependency order instead; there is no bypass."
+      - "A PLATFORM WITHOUT EVENT TRIGGERS RUNS ON TWO GUARDS, LOUDLY (Keith, 2026-10-04, architect review). REJECTED refusing to run. Layer 3 stops accidents and non-owner consoles, never a superuser; the real protection against a person at a console is that console users are neither superuser nor table owner."
     open_questions: []
 
   - id: REQ-PIPE-130
@@ -26717,6 +26730,8 @@ requirements:
       - "Privacy: the reason column is free operator prose (REQ-PIPE-074 accepted that for the PoC). _manifest widens who reads it - every external tool with period access. Flagged for a real deployment, where a reason could mention a person or a case."
       - "Cost: a view, so nothing to maintain or back-fill; the decision log's own (dataset_id, effective_at) index keeps it cheap per period. The decision log's schema version bumps; regenerate rather than migrate."
       - "Observability is its purpose: a downstream tool can flag substituted or unacknowledged data to its own users from the period alone."
+      - "Every new decision-log column the batch needs (table name, replaced supply, status at promotion, resolved setting with level and version, a cause naming a decision) arrives in ONE schema-version change at the start of the batch, not one per requirement - each change costs a full regeneration."
+      - "Each period's _manifest embeds the period's authored name, written by the code that opens the period, rather than recovering it from the schema name in SQL."
     dependencies: [REQ-PIPE-129, REQ-PIPE-122]
     decisions:
       - "A MANIFEST IN EVERY PERIOD SCHEMA (Keith, 2026-10-04), so external tools query facts rather than parsing names - for example a downstream tool flagging substituted data to its users. It is what lets REQ-PIPE-129's plain names drop the stamp without losing what the stamp said."
@@ -26727,6 +26742,7 @@ requirements:
       - "decided_by IS ONLY rule OR person - NEVER A NAME (Keith, 2026-10-04): the period schema is read by tools outside the pipeline, and who decided is in the decision log for anyone entitled to it."
       - "WHAT IS IN THE SCHEMA COMES FROM THE CATALOGUE; WHY COMES FROM THE LOG (this draft): one row per object actually present, joined to the latest decision naming that table in that period. That keeps the SQL to 'latest decision per table' rather than a re-statement of the whole resolution."
       - "promoted_status FOR AN INHERITED OR SUBSTITUTED TABLE is the status recorded at the promotion of the supply it stands on (working assumption, to be read to Keith), so a tool can see that a substituted period stands on, say, an amber supply."
+      - "THE REASON STAYS IN _manifest, AS SIGNED (Keith, 2026-10-04, architect review). The architect proposed showing only the rule's reasons to external tools; Keith kept every reason. The privacy NFR above remains the flag for a real deployment."
     open_questions: []
 
   - id: REQ-PIPE-131
@@ -26753,7 +26769,8 @@ requirements:
       - "THE SYSTEM SHALL find the open slot by bisection over claim-opening instants, and SHALL NOT scan the period sequence per arrival."
       - "THE SYSTEM SHALL leave a supply already filed to a slot that later closes filed there, and SHALL apply the promotion gate and every person's decision to it exactly as before the slot closed."
       - "THE SYSTEM SHALL allow a person to re-file a supply into a closed slot (REQ-GHUB-082 criterion 9), to substitute a closed slot (REQ-PIPE-084), to mark it as not supplied (REQ-PIPE-132), and to promote a supply already filed to it, and SHALL NOT refuse any of these because the slot is closed."
-      - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-062 criteria 2, 3 and 4 so the rule reads 'the open slot if unfilled, else a resupply of it'; RETIRE REQ-PIPE-063 (criteria 1 to 6) and REQ-PIPE-065 criteria 1 and 2; and amend REQ-PIPE-064 criterion 1 so its trigger reads 'no slot of the dataset is open at the receipt instant'."
+      - "THE SYSTEM SHALL RETIRE REQ-PIPE-077 (the off-cycle gate) in the same change, and SHALL amend, REQ-PIPE-062 criteria 2, 3 and 4 so the rule reads 'the open slot if unfilled, else a resupply of it'; RETIRE REQ-PIPE-063 (criteria 1 to 6) and REQ-PIPE-065 criteria 1 and 2; and amend REQ-PIPE-064 criterion 1 so its trigger reads 'no slot of the dataset is open at the receipt instant'."
+      - "THE SYSTEM SHALL update, in the same change, the scenario map (SCENARIOS.md, REQ-GEN-045), the scenario injection and their tests wherever they describe the old filing rule - at least TS-4a, TS-5, TS-6a to 6c, TS-7 and the 22:00 Monday example."
     non_functional_requirements:
       - "Scale: the daily asset has thousands of slots (Birth Registrations alone has 495 today, generated to the end of 2027). Finding the open slot stays a bisection per arrival over the calendar's periods, as assignment.current_slot() already is over slots; a slot's closing instant is read from the next calendar period by index, never by walking the sequence."
       - "Derived, never recorded: whether a slot is open or closed is asked of the schedule and the instant, like overdue (slots.is_overdue), so it cannot be stale."
@@ -26778,6 +26795,7 @@ requirements:
       - "'NEXT PERIOD OPENS' WITH NO EARLY WINDOW MEANS ITS DUE INSTANT: a period with a zero claim window already becomes claimable at its due instant, so one definition - the next calendar period's claim-opening instant - covers both of Keith's cases (carried from the draft, not contradicted at sign-off)."
       - "CLOSING GOVERNS FILING ONLY (carried from the draft, not contradicted at sign-off): a red supply already filed to Monday and awaiting a decision stays Monday's after Monday closes, and if a re-check (REQ-PIPE-121) later turns it green the gate may still promote it into Monday. Closing decides where NEW arrivals go, not what may happen to supplies already filed."
       - "THE HAND-FILING ROUTE IS UNCHANGED: `mothman bdm/cp qa --commit` stamps the receipt 'now' (REQ-PIPE-103), so a late file hand-filed today goes to today's open period, and a person re-files it into the closed one if that is where it belongs. Re-file's EFFECT is not yet built (REQ-GHUB-082's unmet criterion 2; REQ-PIPE-075 criterion 17), so that path is true of the requirements and not yet of the code."
+      - "REQ-PIPE-077 IS RETIRED (Keith, 2026-10-04, architect review). It judged 'off-cycle' by calendar date, ignoring claim windows; under this rule a file arriving where its dataset has no open slot is already held for a person, and the one case left to 077 - an early, in-window file, e.g. 25 July for the August slot - it would withhold wrongly. REJECTED redefining it over open intervals, which would be a second rule saying what this one says."
     open_questions: []
 
   - id: REQ-PIPE-132
@@ -26798,6 +26816,7 @@ requirements:
       - "THE SYSTEM SHALL offer mark as not supplied per period and dataset, alongside substitute and inherit, and SHALL NOT offer it from the queue of supplies awaiting a decision (REQ-GHUB-082 criterion 31)."
       - "IF a person marks as not supplied a slot that is not closed and unfilled, THEN THE SYSTEM SHALL refuse it and say why."
       - "THE SYSTEM SHALL NOT change any data or what any period resolves to on a mark as not supplied, and SHALL NOT count the slot as filled."
+      - "THE SYSTEM SHALL decide what a slot holds only from decisions that change it - promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, and a supersession that removes a promoted supply - and SHALL NOT let a decision that only annotates a slot (withheld, inherit-refused, acknowledge, mark as not supplied, the re-check record) change what it reads as holding."
       - "WHEN a slot is marked as not supplied, THE SYSTEM SHALL report it as NOT SUPPLIED (ACCEPTED), and SHALL remove it from the states needing action (REQ-PIPE-083's needs-action policy)."
       - "THE SYSTEM SHALL keep a closed, unfilled, unmarked slot among the states needing action until it is filled, substituted or marked as not supplied."
       - "THE SYSTEM SHALL show closed, unfilled, unmarked slots in the terminal's standing queue as period items with their available responses, grouping consecutive ones of one dataset into a single item naming the count and the date range."
@@ -26817,6 +26836,7 @@ requirements:
       - "OVERDUE PLUS CLOSED, NOT A NEW STATE, FOR THE UNMARKED CASE: Keith asked for the existing overdue/never-supplied vocabulary where it fits, and a closed slot is an overdue one that can no longer be filled automatically. The only new state is the one a person's decision creates."
       - "ONLY A CLOSED, UNFILLED SLOT MAY BE MARKED (working assumption, consistent with Keith's wording 'the closed period then reads...'): while a slot is still open, a file arriving for it is still filed there, and a mark could not stop that."
       - "A MARK DOES NOT FILL THE SLOT AND DOES NOT BLOCK A LATER CORRECTION (working assumption): if a person later re-files a late file into the slot, or substitutes it, the slot reads as that new state and the mark stays in history. No separate 'unmark' decision is added."
+      - "DECISIONS THAT CHANGE A SLOT AND DECISIONS THAT ANNOTATE IT ARE SEPARATE (Keith, 2026-10-04, architect review). Every reader of 'what does this slot hold' takes the latest decision on the slot, so the first annotating entry would make a filled slot read empty - possibly already true of promotion-withheld, which is being proven with a failing test separately. Lands no later than this requirement, the first annotating decision in the batch's order."
     open_questions: []
 
   - id: REQ-DASH-133
@@ -26839,6 +26859,7 @@ requirements:
       - "THE SYSTEM SHALL group consecutive closed unfilled periods of one dataset into a single item naming the count and the date range (for example '4 days with no supply, 12-15 Oct') wherever they are listed."
       - "THE SYSTEM SHALL show every closed unfilled period, marked or not, in the dataset's supply history, whatever the period on show."
       - "THE SYSTEM SHALL judge closed, unfilled and marked as at the instant on show, so that the as-of view reproduces what a reader saw then."
+      - "THE SYSTEM SHALL replace, for real datasets, the dashboard's existing neutral 'no data' treatment of a dataset with nothing in the current cycle, so that no period is shown both as neutral 'no data' and as red 'no supply'; the build SHALL embed each slot's closing instant and the page SHALL only compare it with the instant on show, never re-derive closing."
       - "THE SYSTEM SHALL NOT convey any of these states by colour alone."
     non_functional_requirements:
       - "Scale: aggregated to a count on the agency card, per CLAUDE.md's scale bullet - at ~30 datasets per-dataset banners become noise."
@@ -27119,7 +27140,7 @@ requirements:
       - "The stood-on guard is the THREE-LAYER guard Keith approved for REQ-PIPE-128 and 129 (decision-log rule; one move-out door that locks and checks pg_depend; an event trigger refusing ALTER TABLE on a table a view depends on). Re-file uses that door and adds no fourth path."
       - "ONE MECHANISM FOR KNOCK-ON EFFECTS: the re-evaluations caused by the supply leaving its old period and entering the target period go through the one handler for every table arriving in or leaving a period schema (REQ-PIPE-121), never a re-file-specific path."
       - "Every consumer of 'the' filing of a supply (filing.filing_for, slot_state, period_overlay, the dashboard builders, the arrival classification) is enumerated, since a supply can now have several filings and only the newest is current."
-    dependencies: [REQ-PIPE-140]
+    dependencies: [REQ-PIPE-140, REQ-PIPE-118, REQ-PIPE-128, REQ-PIPE-129]
     decisions:
       - "BACK TO STAGING, FILED TO ITS NEW PERIOD, CHECKED THERE, THE NORMAL GATE DECIDES (Keith, 2026-10-04, asked whether re-file moves the supply straight into the period schema or back to staging). REJECTED moving it straight into the target period's schema, which would put a supply into a period it had never been checked against. The gate is the gate: green, or amber where REQ-PIPE-122 permits, into an empty slot promotes; anything else waits for a person."
       - "A NEW FILING, THE OLD ONE STAYS AS HISTORY (Keith, 2026-10-04). Today's filing.refile() UPDATEs the one filing row in place, which loses where a supply was first filed - the fact a reader needs to understand why it was moved. REQ-PIPE-067's verdict-follows-filing still holds: the classification shown is the current filing's."
@@ -27131,6 +27152,7 @@ requirements:
       - "REFUSED, NOT HALF-DONE (Keith, 2026-10-04): a re-file is refused for a rejected supply, for one file of a contested pair (telling the person why), and into an INHERITED period - Keith: 'refuse refiling outright and force them to un-inherit and then re-file rather than doing half the job and leaving it dangling in staging'. REJECTED the draft's assumption that an inherited-period re-file go into staging and wait there unpromotable. Into a SUBSTITUTED period the substitution stands until the re-filed supply is promoted (accepted as drafted)."
       - "A PROMOTED VERSION IN THE TARGET PERIOD STAYS UNTIL THE RE-FILED ONE IS PROMOTED (Keith, 2026-10-04): 'we don't know if it will be promoted based on the settings and the outcomes and checks', so superseding at re-file time could leave the period empty. REJECTED following REQ-GHUB-082 criterion 9's signed wording (supersede at re-file time); criterion 9 is reworded instead. 'Re-file wins' is about versions WAITING in staging only."
       - "JUDGED UNDER TODAY'S SETTINGS (Keith, 2026-10-04): a re-filed supply is gated with the settings in force when it is checked in its new period, consistent with REQ-PIPE-122's version being picked by the instant the decision takes effect."
+      - "BUILT AFTER REQ-PIPE-128 AND 129 (Keith, 2026-10-04, architect review), revising Keith's earlier order of re-file straight after REQ-PIPE-079: superseding a waiting version needs 118, and moving a promoted table out needs 128/129's one door and stamped-name restore. REJECTED building it first with displacing re-files refused in the meantime - two builds of one decision. Cost accepted: re-filing into a closed slot is unavailable while 131 and 132 are built."
     open_questions: []
 
   - id: REQ-GHUB-142
@@ -27158,3 +27180,26 @@ requirements:
       - "EVERY CONSEQUENCE, NAMED (Keith, 2026-10-04): the point is that a person never learns afterwards that a period lost its promoted table. A generic 'this may affect other supplies' would be the warning people learn to click through."
       - "REFUSE IF THE CONSEQUENCES CHANGED (this draft, applying REQ-GHUB-082 criterion 20's append-time judgement): a resend landing between the warning and the confirmation would otherwise displace something the person never saw named."
     open_questions: []
+
+  - id: REQ-DOCS-143
+    title: "A requirement can be retired - kept readable in the register, naming what replaced it, and left out of sprint counting"
+    date_written: "2026-10-04"
+    story: "As someone reading the register a year from now, I want a requirement that a later one replaced to still be there, marked retired and pointing at its successor, so that I can see what was once agreed and why it changed without digging through git."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-10-04, answering the delivery-architect's pre-build review of the option A and period-closing batch: the batch retires REQ-QAC-017, REQ-PIPE-063, REQ-PIPE-065 criteria 1 and 2 and REQ-PIPE-077, and the register had no way to say so. Drafted by the main session."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL accept retired as a requirement status, alongside not_started, in_progress and built."
+      - "THE SYSTEM SHALL require, on a retired requirement, the date it was retired, who decided it, and the requirement or requirements that replaced it, and SHALL refuse a retired requirement missing any of them."
+      - "THE SYSTEM SHALL allow a single criterion of a requirement to be marked retired, with the same three facts, while the rest of the requirement keeps its status."
+      - "THE SYSTEM SHALL NOT count a retired requirement or a retired criterion as met or unmet in the sprints gate, and SHALL NOT treat an unmet_criteria entry on one as outstanding."
+      - "THE SYSTEM SHALL keep a retired requirement's acceptance criteria and decisions unchanged as history."
+      - "THE SYSTEM SHALL refuse a requirement that names a retired requirement as a dependency."
+      - "THE SYSTEM SHALL show retired requirements on the dashboard's requirements view as retired, distinguishable from built, and filterable."
+    non_functional_requirements:
+      - "Every consumer of the status vocabulary (vocab.REQUIREMENT_STATUSES, the register schema, the sprints gate, the plans dependency graph, the dashboard's requirements view) is enumerated mechanically, per CLAUDE.md's shape-change rule."
+    dependencies: []
+    decisions:
+      - "A RETIRED STATUS, NOT DELETION (Keith, 2026-10-04). REJECTED deleting retired entries and moving their decisions into the successors: the register is the permanent artifact, and a reader should not need to know to look in git."
+    open_questions:
+      - "Should a retired criterion be marked in place on its requirement (this draft), or should the whole requirement be split so only whole requirements retire?"
