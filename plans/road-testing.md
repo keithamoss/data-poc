@@ -1514,3 +1514,16 @@ judgement about who reads the page rather than about the rule.
       the RULE does supersede in two places (118's newer-file supersession,
       123's opt-in replacement) - it is re-checks that never reject,
       demote or supersede.
+    - **ONE VIEW OF WHAT A SLOT HOLDS, and the BUILD ORDER REVISED,
+      2026-10-04 (Keith).** His idea: bake "what does this slot hold" into
+      the database once and have everything read it, rather than five
+      Python readers re-interpreting the decision log. Settled as a
+      metadata-schema view (with an as-at form) built only from decisions
+      that CHANGE a slot; every reader and each period's `_manifest` go
+      through it (REQ-PIPE-130). It fixes post-build-review #75 by
+      construction. **Revised order:** REQ-DOCS-143 (retired status) ->
+      the slot view + resolving/annotating split (with #75's test) -> 134,
+      131, 132, 133, 122, 118, 120, 128+129, re-file (140-142), the rest of
+      130, 123, 121, 126, 127. A planted scenario shows a reader re-checked
+      after both a newer-file supersession and an automatic replacement
+      (REQ-GEN-136).

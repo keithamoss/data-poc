@@ -26728,6 +26728,8 @@ requirements:
       - "THE SYSTEM SHALL fill decided_by with only rule or person, and SHALL NOT expose any actor's identity through _manifest."
       - "THE SYSTEM SHALL fill acknowledged as true or false where an acknowledgement is owed (REQ-PIPE-122) and leave it empty where none is."
       - "THE SYSTEM SHALL implement _manifest as a view over the decision log and the filing record, and SHALL NOT maintain it as a table."
+      - "THE SYSTEM SHALL define, ONCE, in the metadata schema, a view of what each dataset's slot holds, built only from decisions that change a slot (REQ-PIPE-132), with a form that answers as at a given instant."
+      - "THE SYSTEM SHALL answer every question of what a slot holds or held - the promotion gate's filled-slot check, slot states, the stood-on guard, the newest promoted supply, and each period's _manifest - from that one view, and SHALL NOT re-derive it from the decision log anywhere else."
       - "THE SYSTEM SHALL record the table name beside dataset_id on every decision-log entry that concerns a table, so that _manifest needs no dataset-to-table mapping of its own."
       - "THE SYSTEM SHALL record the supply's status at the moment of promotion on every promotion decision, rule or person, and _manifest SHALL take promoted_status from it."
       - "THE SYSTEM SHALL NOT include a supply's current health - any verdict computed after it was promoted - in _manifest."
@@ -26751,6 +26753,7 @@ requirements:
       - "WHAT IS IN THE SCHEMA COMES FROM THE CATALOGUE; WHY COMES FROM THE LOG (this draft): one row per object actually present, joined to the latest decision naming that table in that period. That keeps the SQL to 'latest decision per table' rather than a re-statement of the whole resolution."
       - "promoted_status FOR AN INHERITED OR SUBSTITUTED TABLE is the status recorded at the promotion of the supply it stands on (working assumption, to be read to Keith), so a tool can see that a substituted period stands on, say, an amber supply."
       - "THE REASON STAYS IN _manifest, AS SIGNED (Keith, 2026-10-04, architect review). The architect proposed showing only the rule's reasons to external tools; Keith kept every reason. The privacy NFR above remains the flag for a real deployment."
+      - "ONE DEFINITION OF WHAT A SLOT HOLDS, IN THE DATABASE (Keith, 2026-10-04, his idea: 'have this logic baked into the manifest once, and then everything that needed to know the current state read it'). Replaces five Python readers of 'the latest decision on a slot' (decision_log.promoted_into, latest_for_slot, _standing_on, promotion.newest_promoted, slot_state) that each re-interpreted the log, and fixes plans/post-build-review.md #75 by construction. It is a metadata-schema view rather than _manifest itself because _manifest lists only objects physically in a period, so it cannot say a slot is empty, and readers ask about the past. Each _manifest becomes a thin view on top. BUILT EARLY: this view, with the resolving-versus-annotating split, lands right after REQ-DOCS-143 and before REQ-PIPE-134; the rest of this requirement keeps its place."
     open_questions: []
 
   - id: REQ-PIPE-131
@@ -26824,7 +26827,7 @@ requirements:
       - "THE SYSTEM SHALL offer mark as not supplied per period and dataset, alongside substitute and inherit, and SHALL NOT offer it from the queue of supplies awaiting a decision (REQ-GHUB-082 criterion 31)."
       - "IF a person marks as not supplied a slot that is not closed and unfilled, THEN THE SYSTEM SHALL refuse it and say why."
       - "THE SYSTEM SHALL NOT change any data or what any period resolves to on a mark as not supplied, and SHALL NOT count the slot as filled."
-      - "THE SYSTEM SHALL decide what a slot holds only from decisions that change it - promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, and a supersession that removes a promoted supply - and SHALL NOT let a decision that only annotates a slot (withheld, inherit-refused, acknowledge, mark as not supplied, the re-check record) change what it reads as holding."
+      - "THE SYSTEM SHALL decide what a slot holds only from decisions that change it - promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, and a supersession that removes a promoted supply - and SHALL NOT let a decision that only annotates a slot (withheld, inherit-refused, acknowledge, mark as not supplied, the re-check record) change what it reads as holding - through REQ-PIPE-130's one view of what a slot holds."
       - "WHEN a slot is marked as not supplied, THE SYSTEM SHALL report it as NOT SUPPLIED (ACCEPTED), and SHALL remove it from the states needing action (REQ-PIPE-083's needs-action policy)."
       - "THE SYSTEM SHALL keep a closed, unfilled, unmarked slot among the states needing action until it is filled, substituted or marked as not supplied."
       - "THE SYSTEM SHALL show closed, unfilled, unmarked slots in the terminal's standing queue as period items with their available responses, grouping consecutive ones of one dataset into a single item naming the count and the date range."
@@ -26977,6 +26980,7 @@ requirements:
       - "THE SYSTEM SHALL plant a correction whose re-check after its partner's promotion still fails, producing the decision log's large shout (REQ-PIPE-121)."
       - "THE SYSTEM SHALL plant an amber supply held under an amber setting of hold, and an amber supply promoted under promote-and-acknowledge and left awaiting acknowledgement (REQ-PIPE-122)."
       - "THE SYSTEM SHALL plant a Birth Registrations resupply that automatically replaces an already-promoted supply under the replacement setting (REQ-PIPE-123)."
+      - "THE SYSTEM SHALL plant, for both the newer-file supersession (REQ-PIPE-118) and the automatic replacement (REQ-PIPE-123), a table that another table's cross-table check reads, so that the scenario view shows the reader re-checked against the newer version - by the newer file's own first run for a supersession in staging, and by the one knock-on handler (REQ-PIPE-121) for a replacement in the period."
       - "THE SYSTEM SHALL plant a promoted supply whose cross-table result goes red when a sibling arrives later (REQ-DASH-126)."
       - "THE SYSTEM SHALL plant a daily file arriving after the next day's claim window opened, filed to the next day, leaving the missed day closed with no supply (REQ-PIPE-131, REQ-PIPE-132, REQ-DASH-133)."
       - "THE SYSTEM SHALL plant a Case Workers arrival in a calendar period it does not participate in, held for a person (REQ-PIPE-131)."
@@ -27001,6 +27005,7 @@ requirements:
       - "REGENERATING UNDER TODAY'S SETTINGS IS HARMLESS FOR SYNTHETIC HISTORY (Keith, 2026-10-04). A real deployment's past decisions were taken under the settings in force then and are never re-derived; the synthetic history is simply regenerated, and that only ever happens to synthetic data."
       - "STILL REJECTED (REQ-GEN-044): a scenario label on injected runs. A planted red looks exactly like a real one; only the scenario view says what was planted."
       - "THE REGISTER STAYS IN plans/supply-model.md for now, though CLAUDE.md says plans prose is deleted as requirements land - it is parsed as configuration by qa_tools/common/scenarios.py, so deleting that file would delete the register. Flagged rather than moved; moving it is its own change."
+      - "THE RE-CHECK IS PART OF WHAT IS PLANTED (Keith, 2026-10-04): 'make sure there's a little test scenario covering that as well, so we can look at it' - both routes by which a reader is re-checked after a supersession, side by side."
     open_questions: []
 
   - id: REQ-GEN-137

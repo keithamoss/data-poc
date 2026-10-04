@@ -4392,3 +4392,9 @@ twice. It deliberately did not re-find the `TypeError`.
     slot must block automatic promotion), so the fix waits on Keith. The
     fix is the resolving/annotating split now written into REQ-PIPE-132,
     and REQ-PIPE-077 itself is retired by REQ-PIPE-131.
+
+    **Decided, 2026-10-04 (Keith):** fixed by construction, not patched -
+    "what does this slot hold" becomes ONE metadata-schema view built only
+    from slot-changing decisions (REQ-PIPE-130), built straight after
+    REQ-DOCS-143 and ahead of the rest of the batch, with this entry's
+    test going in alongside it, failing first.
