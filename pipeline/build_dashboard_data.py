@@ -30,6 +30,7 @@ import os
 from datetime import datetime
 
 from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
+from qa_tools.common import drift_reference
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import parse_cadence_from_contract
 from qa_tools.common import asset_time
@@ -199,12 +200,15 @@ def build() -> dict:
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "engine": r["engine"], "check_name": r["check_name"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
-            "status_by_run": {},
+            "status_by_run": {}, "reference": {},
         })
         slot["by_run"][r["run_id"]] = r["metric_value"]
         # item 74 Bug A: the tool's own verdict, carried through rather
         # than dropped here and re-derived from thresholds downstream.
         slot["status_by_run"][r["run_id"]] = dashboard_status(r.get("status"))
+        # WHAT IT WAS COMPARED WITH, AND THE MEASURED VERDICT BESIDE A GAP'S
+        # RED (REQ-QAC-108 criteria 14 and 16).
+        slot["reference"][r["run_id"]] = drift_reference.reference_note(r, dashboard_status)
         slot["row_count_total"][r["run_id"]] = r["row_count_total"]
         slot["row_count_invalid"][r["run_id"]] = r["row_count_invalid"]
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
@@ -250,6 +254,12 @@ def build() -> dict:
                         "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
                         "aggregate_values": aggregate_values,
                         "status": slot["status_by_run"].get(run_id),
+                        "reference": slot["reference"].get(run_id),
+                        # Criterion 9's red is NOT EVALUATED, said in words.
+                        "not_evaluated": ((slot["reference"].get(run_id) or {}).get("reason")
+                                          if slot["status_by_run"].get(run_id) == "red"
+                                          and slot["by_run"][run_id] is None
+                                          and slot["reference"].get(run_id) else None),
                     })
             if not history:
                 continue
@@ -374,6 +384,8 @@ def build() -> dict:
             for label, run_id, total_key in (("current", latest_run, "total_latest_manifest"), ("previous", prev_run, "total_prev_manifest")):
                 total = total_latest_manifest if label == "current" else total_prev_manifest
                 val = checks_out[0]["current"] if label == "current" else checks_out[0]["previous"]
+                if val is None:
+                    continue  # no number for that run - see the byRun loop below
                 n_invalid = int(round(total * val / 100)) if primary_unit == "%" else int(round(val))
                 stats[label]["invalid"] = max(0, n_invalid)
                 stats[label]["valid"] = max(0, total - stats[label]["invalid"])
@@ -397,7 +409,10 @@ def build() -> dict:
         for h in checks_out[0]["history"]:
             run_id = h["run_id"]
             total = row_count_by_run.get(run_id)
-            if total is None:
+            # NO NUMBER FOR THIS RUN - not evaluated, or measured against
+            # nothing - is no byRun entry, never a crash (exposed by
+            # REQ-QAC-108's gap rule making a drift check a headline).
+            if total is None or h["value"] is None:
                 continue
             n_invalid = int(round(total * h["value"] / 100)) if primary_unit == "%" else int(round(h["value"]))
             n_invalid = max(0, n_invalid)

@@ -184,7 +184,7 @@ class TestWhatWasActuallyLoaded:
         from qa_tools.common import load_log
 
         empty = _run(["failures"])
-        assert empty.exit_code == 0 and "No load is currently recorded as failed" in empty.output
+        assert empty.exit_code == 0 and "No supply is waiting because it could not be loaded" in empty.output
 
         load_log.record("monday", "cp-clients", "cp_clients__2026", load_log.FAILED,
                          WHEN.isoformat(), reason="UnicodeDecodeError: byte 0x9c")

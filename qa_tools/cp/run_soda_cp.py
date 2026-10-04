@@ -16,11 +16,11 @@ from __future__ import annotations
 import os
 
 
-from qa_tools.common import supply_db
+from qa_tools.common import left_out, supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
-    execute_scan, readable_checks_yaml,
+    execute_scan, left_out_checks, readable_checks_yaml,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
@@ -84,6 +84,7 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
         scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
             "cp_collection", supply_db.run_schema(run_id)))
         scan.add_sodacl_yaml_str(readable_checks_yaml(SODA_CHECKS_PATH, unreadable))
+        left_out.note(run_id, "soda", left_out_checks(SODA_CHECKS_PATH, unreadable))
         sampler = CaptureSampler()
         scan.sampler = sampler
         scan.disable_telemetry()

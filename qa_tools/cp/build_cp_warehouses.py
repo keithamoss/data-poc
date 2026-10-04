@@ -16,6 +16,7 @@ cp_notifications.csv, ...), which land together as ONE delivery.
 """
 from __future__ import annotations
 import os
+import sys
 
 
 from qa_tools.common import arrivals
@@ -196,9 +197,12 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
             conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
             load_log.record_load(delivery_name, dataset_id, physical, load_log.FAILED,
                              asset_time.now().isoformat(),
-                             reason=f"{type(exc).__name__}: {exc}", trial=trial_scope)
-            print(f"{run_id}: {table} FAILED to load ({type(exc).__name__}: {exc}) "
-                  f"- no table staged, recorded for human action")
+                             reason=load_log.own_words(exc), trial=trial_scope)
+            # THE LIBRARY'S OWN MESSAGE ONLY HERE, on standard error, for
+            # whoever ran the load - it can quote a row, and the recorded
+            # reason is published (REQ-DASH-148 criterion 13).
+            print(f"{run_id}: {table} could not be loaded ({type(exc).__name__}: {exc}) "
+                  f"- no table staged, recorded for human action", file=sys.stderr)
             return None
         # AFTER THE LOAD, NEVER BEFORE (criterion 14).
         load_log.record_load(delivery_name, dataset_id, physical, load_log.LOADED,

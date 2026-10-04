@@ -79,7 +79,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from qa_tools.common import (delivery_log, display_time, hierarchy,
-                             in_flight_log, load_log)
+                             in_flight_log)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -97,6 +97,11 @@ SEVERITY_ORDER = (NEEDS_ACTION, WARNING, INFORMATIONAL)
 HELD_SUPPLY = "held-supply"
 FAILED_LOAD = "failed-load"
 CONTESTED_FILE = "contested-file"
+#: TWO FILES FOR ONE DATASET in one delivery (REQ-PIPE-115 criterion 8,
+#: REQ-PIPE-105 criterion 6) - the OPPOSITE of CONTESTED_FILE, which is
+#: one file matching several datasets. Dataset-scoped and blocking: the
+#: table cannot be read until a person chooses a file.
+CONTESTED_TABLE = "contested-table"
 UNRECOGNISED_FILE = "unrecognised-file"
 IN_FLIGHT_DELIVERY = "in-flight-delivery"
 #: A slot that closed with nothing in it. Produced by REQ-PIPE-132
@@ -152,6 +157,11 @@ class Outstanding:
     """The whole queue, as ONE thing carrying ONE total."""
 
     items: tuple[Item, ...] = field(default_factory=tuple)
+    #: Every held supply and contested pair OVER ITS WHOLE LIFE
+    #: (REQ-PIPE-115 criterion 12), as dataset_blockers.Blocker records.
+    #: Not items: an item is what is waiting NOW, and the dashboard's
+    #: as-of view has to know what was waiting THEN.
+    blockers: tuple[dict, ...] = field(default_factory=tuple)
 
     @property
     def total(self) -> int:
@@ -214,7 +224,8 @@ class Outstanding:
                 "byAgency": self.by_agency,
                 "byCollection": self.by_collection,
                 "byDataset": self.by_dataset,
-                "summary": self.summary()}
+                "summary": self.summary(),
+                "blockers": list(self.blockers)}
 
 
 def _scope_of(dataset_id: str | None) -> tuple[str | None, str | None]:
@@ -333,15 +344,49 @@ def _from_holds(conn=None) -> list[Item]:
     return items
 
 
-def _from_loads() -> list[Item]:
+def _from_contested_tables(blockers) -> list[Item]:
+    """REQ-PIPE-115 criterion 8: a table two files claim, one item per
+    open pair, naming both files - and, criterion 27, carrying any load
+    the pair's files failed rather than raising a second item for it."""
+    from qa_tools.common import dataset_blockers
+
+    items = []
+    for blocker in blockers:
+        if blocker.kind != dataset_blockers.CONTESTED or not blocker.is_open:
+            continue
+        agency, collection = _scope_of(blocker.dataset_id)
+        items.append(Item(
+            kind=CONTESTED_TABLE, severity=NEEDS_ACTION, blocking=True,
+            headline=(f"{blocker.dataset_id}: two files claim one table - "
+                      f"waiting for a person to choose one"),
+            detail=blocker.reason,
+            agency_id=agency, collection_id=collection, dataset_id=blocker.dataset_id,
+            observed_at=blocker.opened_at,
+            responses=("choose which file is the supply",
+                        "reject both and ask the supplier to resend")))
+    return items
+
+
+def _from_loads(skip: frozenset = frozenset()) -> list[Item]:
     """REQ-PIPE-060's failed loads - the queue a person drains.
 
     Never retried automatically: the call is theirs, and it is one of
     two things - reject that supply, or fix a genuine bug and
     reprocess.
+
+    `skip` is the (dataset, physical) of each refused load belonging to
+    a contested pair, which that pair's own item reports (REQ-PIPE-115
+    criterion 27) - one dataset's one problem is one item.
     """
+    from qa_tools.common import dataset_blockers
+
     items = []
-    for record in load_log.failures():
+    # A PERSON'S REJECTION SETTLES IT (REQ-PIPE-153 criterion 4), derived
+    # from the decision log at read time - never by editing the load
+    # record (criterion 3).
+    for record in dataset_blockers.unsettled_failures():
+        if (record.dataset_id, record.physical) in skip:
+            continue
         agency, collection = _scope_of(record.dataset_id)
         items.append(Item(
             kind=FAILED_LOAD, severity=NEEDS_ACTION, blocking=True,
@@ -440,9 +485,14 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
     A queue ordered by when things happened puts the thing somebody has
     to do today below six things they have already seen.
     """
+    from qa_tools.common import dataset_blockers
+
+    blockers = dataset_blockers.all_blockers(conn)
     items = (_from_deliveries(conn)
               + _from_holds(conn)
-              + _from_loads()
+              + _from_contested_tables(blockers)
+              + _from_loads(dataset_blockers.refused_in_a_contest(conn))
               + _from_inheritance_refusals()
               + _from_in_flight(observations_dir))
-    return Outstanding(items=tuple(sorted(items, key=_sort_key)))
+    return Outstanding(items=tuple(sorted(items, key=_sort_key)),
+                       blockers=tuple(b.as_record() for b in blockers))

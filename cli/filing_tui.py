@@ -93,6 +93,7 @@ _HOW_IT_READS = {
     slot_state.REJECTED: "[red]rejected[/red]",
     slot_state.SUBSTITUTED: "[blue]substituted[/blue]",
     slot_state.INHERITED: "[blue]inherited[/blue]",
+    filing_queue.COULD_NOT_LOAD: "[red]could not be loaded[/red]",
 }
 
 
@@ -303,6 +304,10 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
     if not offer:
         console.print("There is nothing to decide about this one.", style="dim")
         return
+    if state.state == filing_queue.COULD_NOT_LOAD:
+        # The recorded reason, and the response that is not a control.
+        console.print(f"{state.supply} could not be loaded: {state.reason}. Reject it "
+                       f"here, or {filing_queue.REPROCESS}.", style="yellow")
     by_label = {_WHAT_IT_DOES[op]: op for op in offer}
     picked = common.select(f"{state.dataset_id} {state.period} - what are you "
                             f"recording?", list(by_label), flag_hint=_FLAG_HINT)

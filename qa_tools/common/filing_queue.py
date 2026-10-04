@@ -76,6 +76,47 @@ class LogUnreachable(Exception):
     """
 
 
+#: A supply that arrived and could not be loaded (REQ-PIPE-153 criterion
+#: 5). Listed in the queue ITSELF rather than through its slot's state:
+#: slot_state keeps one filed supply per slot, so a failed resupply of a
+#: filled slot would never be reached that way.
+COULD_NOT_LOAD = "could-not-be-loaded"
+
+#: Said beside reject, never offered as a control - it is a thing a
+#: person does outside this tool.
+REPROCESS = "fix the fault and reprocess the delivery"
+
+
+def could_not_load(conn: supply_db.SupplyConnection,
+                   collection_id: str) -> list[slot_state.SlotState]:
+    """Every open failed load in this collection whose supply was FILED to
+    a period - as a queue entry offering reject (criteria 1 and 5).
+
+    A failed load filed to no period is left to the held-supply route
+    (criterion 12): the decision log has no slot to record a rejection
+    against.
+    """
+    from qa_tools.common import filing, hierarchy, load_log
+
+    out = []
+    for record in load_log.failures(conn=conn):
+        try:
+            entry = hierarchy.dataset(record.dataset_id)
+        except hierarchy.UnknownDatasetError:
+            continue
+        parts = supply_db.split_staged(record.physical)
+        if entry.collection_id != collection_id or not parts:
+            continue
+        period = filing.period_for_key(record.dataset_id, parts[1])
+        if not period:
+            continue
+        out.append(slot_state.SlotState(
+            dataset_id=record.dataset_id, period=period, state=COULD_NOT_LOAD,
+            supply=f"{record.dataset_id}@{parts[1]}",
+            reason=record.reason or "no reason was recorded"))
+    return out
+
+
 def awaiting(conn: supply_db.SupplyConnection, collection_id: str, *,
              now: datetime | None = None) -> list[slot_state.SlotState]:
     """The standing queue: supplies waiting on a person (criterion 16).
@@ -89,9 +130,12 @@ def awaiting(conn: supply_db.SupplyConnection, collection_id: str, *,
     thing that has been waiting longest rather than on whichever dataset
     sorts first alphabetically.
     """
+    failed = could_not_load(conn, collection_id)
+    unloadable = {(f.dataset_id, arrival_key_of(f.supply)) for f in failed}
     states = [s for s in slot_state.states_for(conn, collection_id, now=now)
-              if s.state in WITH_A_SUPPLY]
-    return sorted(states, key=lambda s: (s.period, s.dataset_id))
+              if s.state in WITH_A_SUPPLY
+              and (s.dataset_id, arrival_key_of(s.supply or "")) not in unloadable]
+    return sorted(states + failed, key=lambda s: (s.period, s.dataset_id))
 
 
 def periods_needing_a_person(conn: supply_db.SupplyConnection, collection_id: str, *,
@@ -155,6 +199,11 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
     what to show.
     """
     supply_scoped: tuple[str, ...] = ()
+    if state.state == COULD_NOT_LOAD:
+        # REJECT ONLY (REQ-PIPE-153 criteria 5 and 6): promoting it is
+        # refused on every route, and the other response - fix and
+        # reprocess - is a thing a person does, named beside it.
+        return (filing_decisions.REJECT,), ()
     if state.supply:
         if state.state == slot_state.PROMOTED:
             # Already answered. The only supply-shaped things left are

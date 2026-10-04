@@ -82,6 +82,22 @@ def supply_state(conn, dataset_id: str, period: str, as_at: datetime) -> str | N
     return _STATE_TO_REASON.get(state.state)
 
 
+def _refused_with(conn, run_id: str) -> frozenset[str]:
+    """The logical tables whose load FAILED for this run's own arrival -
+    the same arrival key as the run's own staged table."""
+    parts = supply_db.split_staged(run_id)
+    if not parts:
+        return frozenset()
+    from qa_tools.common import load_log
+
+    try:
+        failed = [r for r in load_log.latest_by_table(conn=conn).values() if not r.loaded]
+    except Exception:  # noqa: BLE001 - no load record means nothing refused
+        return frozenset()
+    return frozenset(p[0] for p in (supply_db.split_staged(r.physical) for r in failed)
+                     if p and p[1] == parts[1])
+
+
 def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
                 own_dataset: str, period: str, resolution: supply_db.Resolution,
                 reads: dict[str, list[str]], as_at: datetime,
@@ -90,10 +106,18 @@ def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
     naming the first such table."""
     from qa_tools.common import hierarchy
 
-    missing = (set(resolution.absent) | set(resolution.ambiguous)) - set(resolution.held)
+    missing = ((set(resolution.absent) | set(resolution.ambiguous)) - set(resolution.held)
+               - set(resolution.resolved))
     if not missing or not reads:
         return []
+    if own_table in resolution.ambiguous or own_table in resolution.held:
+        # NOTHING UNDER THE RUN OF A SUPPLY NOBODY HAS PLACED OR CHOSEN
+        # (REQ-PIPE-115 criteria 6 and 16). Its own checks are not run,
+        # and a sibling's check reading its table is that sibling's run's
+        # to record.
+        return []
     contested_own = own_table in resolution.ambiguous
+    refused = _refused_with(conn, run_id)
     wrapped = period_schema.PeriodResolution(period=period, resolution=resolution)
     states: dict[str, str] = {}
     out: list[dict] = []
@@ -119,6 +143,15 @@ def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
         if (set(tables) | {home}) & set(resolution.held):
             continue
         for table in sorted((set(tables) | {home}) & missing):
+            if table not in states and table in refused:
+                # COULD NOT BE LOADED WINS THE REASON (REQ-DASH-148
+                # criterion 6): it came in this arrival and failed.
+                states[table] = period_schema.COULD_NOT_LOAD
+            if table not in states and table in resolution.ambiguous:
+                # CONTESTED WINS THE REASON (REQ-PIPE-115 criteria 14 and
+                # 15): the file is here, twice, and a slot reason would
+                # send somebody after a supplier who has already sent it.
+                states[table] = period_schema.CONTESTED
             if table not in states:
                 try:
                     dataset_id = hierarchy.dataset_for_table(table).dataset_id

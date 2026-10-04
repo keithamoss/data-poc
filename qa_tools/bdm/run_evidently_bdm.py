@@ -29,6 +29,7 @@ from qa_tools.common.evidently_common import (
     ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, NO_REFERENCE, WARN_ROW_DROP, FAIL_ROW_DROP,
     status_for_psi, status_for_row_drop, compute_psi,
 )
+from qa_tools.common import drift_reference
 from qa_tools.common.qa_results_writer import write_qa_result
 from .evidently_check_lifecycle import PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_ID
 
@@ -143,7 +144,8 @@ def _reference_frame(reference_run_id: str):
 
 
 def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
-                                 reference_run_id: str | None = None) -> list[dict]:
+                                 reference_run_id: str | None = None,
+        assessment=None) -> list[dict]:
     """THE CURRENT RUN COMES FROM THE WAREHOUSE; THE REFERENCE COMES
     FROM WHAT WAS RECORDED (REQ-QAC-088, 2026-09-27).
 
@@ -265,6 +267,8 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
         "reference_run_id": reference_run_id,
     })
 
+    # THE GAP RULE (REQ-QAC-108 criteria 8 to 17) - drift_reference.judge.
+    drift_reference.judge(results, assessment)
     write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "evidently", raw_output, verified=results)
     return results
 

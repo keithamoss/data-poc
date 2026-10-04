@@ -228,6 +228,11 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
     for, and come out contested (criterion 6) - the model working, and
     not what this test is about.
     """
+    # ABOUT FILING, NOT DRIFT: in this test's empty history every earlier
+    # owed period is a gap, so REQ-QAC-108's gap rule would (rightly) make
+    # Evidently red and the command exit 1. That rule has its own tests.
+    from qa_tools.common import drift_reference
+    monkeypatch.setattr(drift_reference, "assess_arrival", lambda *a, **k: None)
     _patch_cp_dirs(monkeypatch, cp_raw_dir, private_supply_dsn,
                     (tmp_path / "deliveries", tmp_path / "receipts"))
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
@@ -277,6 +282,11 @@ def test_qa_command_local_folder_reports_real_cp_failures(monkeypatch, tmp_path,
 
 def test_qa_command_local_folder_commit_records_the_run(
         monkeypatch, tmp_path, cp_raw_dir, private_supply_dsn):
+    # ABOUT FILING, NOT DRIFT: in this test's empty history every earlier
+    # owed period is a gap, so REQ-QAC-108's gap rule would (rightly) make
+    # Evidently red and the command exit 1. That rule has its own tests.
+    from qa_tools.common import drift_reference
+    monkeypatch.setattr(drift_reference, "assess_arrival", lambda *a, **k: None)
     from qa_tools.common import qa_results_reader as reader
 
     # THE DELIVERY DIRECTORIES ARE REDIRECTED, and this test is why the

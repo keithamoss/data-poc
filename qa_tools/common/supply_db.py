@@ -905,8 +905,18 @@ class Resolution:
 
     @property
     def unreadable(self) -> list[str]:
-        """Every logical name a check cannot read, for any reason."""
-        return sorted(set(self.absent) | set(self.ambiguous) | set(self.held))
+        """Every logical name a check cannot read, for any reason.
+
+        LESS EVERYTHING RESOLVED. A contested sibling falls through to the
+        period's promoted version (REQ-PIPE-079 criterion 12), so it is
+        both ambiguous and resolved - and readable. Counting it here made
+        dbt exclude checks Soda ran and nobody recorded (found by
+        REQ-PIPE-115 criterion 17's reconciliation, 2026-10-05). Whether a
+        run's OWN contested table may be checked is own_table's question,
+        asked of `ambiguous` directly.
+        """
+        return sorted((set(self.absent) | set(self.ambiguous) | set(self.held))
+                      - set(self.resolved))
 
     def as_record(self) -> dict:
         """The committed form (criterion 5): which physical version of

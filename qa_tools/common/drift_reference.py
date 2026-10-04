@@ -204,3 +204,189 @@ def reference_run_for_arrival(dataset_id: str, received_at) -> str | None:
             return reference_run_for(conn, dataset_id, period)
         except NoReference:
             return None
+
+
+# --------------------------------------------------------------------
+# THE GAP RULE (REQ-QAC-108 criteria 2 and 5 as amended, 8 to 17 -
+# Keith, 2026-10-04, taken over from REQ-PIPE-035 criteria 7 and 8).
+#
+# Walking back to the last promoted supply is right, and on its own it
+# passes a GAP silently: a dataset that missed last quarter is measured
+# against the quarter before, reads green, and nobody is told the
+# comparison skipped a period that owed a supply. So the walk now also
+# says WHAT IT SKIPPED, and the checks that measured across it go red -
+# with the real measurement kept, and said apart from the red, because
+# "drifted" and "compared across a hole" are different things to fix.
+# --------------------------------------------------------------------
+
+MEASURED = "measured"
+GAP = "gap"
+NO_REFERENCE_OWED = "no-reference-owed"
+NO_REFERENCE_NEW = "no-reference-new"
+
+
+@dataclass(frozen=True)
+class Assessment:
+    """What a drift or volume check is measured against, and whether the
+    comparison may stand unflagged."""
+
+    kind: str
+    dataset_id: str = ""
+    reference: Reference | None = None
+    run_id: str | None = None
+    #: Owed, overdue, earlier periods between the reference and now with
+    #: no accepted supply, oldest first - each one a reason for criterion
+    #: 8's red (or criterion 9's, where there is no reference at all).
+    gap: tuple[str, ...] = ()
+    #: Owed periods a person has already dealt with (criterion 17) - said,
+    #: never counted against the supply.
+    dealt_with: tuple[str, ...] = ()
+
+    @property
+    def gap_named(self) -> str:
+        """The owed periods, named - at most the five most recent, so a
+        daily feed's years of history do not become a paragraph."""
+        if len(self.gap) <= 5:
+            return ", ".join(self.gap)
+        return f"{', '.join(self.gap[-5:])} and {len(self.gap) - 5} earlier"
+
+    @property
+    def reason(self) -> str | None:
+        """The words a reader is given - criterion 8's example form."""
+        if self.kind == GAP and self.reference:
+            missing = self.gap_named
+            verb = "has" if len(self.gap) == 1 else "have"
+            return (f"compared with {self.reference.period}, not {self.gap[-1]}: "
+                    f"{missing} {verb} no accepted supply")
+        if self.kind == NO_REFERENCE_OWED:
+            missing = self.gap_named
+            return (f"not evaluated: no earlier period holds an accepted supply to compare "
+                    f"with, and {missing} owed one")
+        if self.kind == NO_REFERENCE_NEW:
+            return "no earlier period owed this dataset a supply, so there is nothing to compare with yet"
+        if self.reference and self.dealt_with:
+            return (f"compared with {self.reference.period}, not {self.dealt_with[-1]}: "
+                    f"a person has already dealt with {', '.join(self.dealt_with)}")
+        return None
+
+
+def _owed_earlier(conn, dataset_id: str, current_period: str, as_at, *,
+                  after_date=None) -> tuple[list[str], list[str]]:
+    """(gap, dealt_with): this dataset's OWN slots before the current
+    period - and after `after_date` - that are overdue at `as_at` and
+    hold no promoted supply.
+
+    FROM ITS OWN SCHEDULE (criterion 12): a period the dataset owed
+    nothing has no slot, so an inherited period is neither a gap nor a
+    reference. NOT YET OVERDUE IS NOT A GAP (criterion 11): a slot whose
+    due time and grace have not passed is simply not due.
+    """
+    from qa_tools.common import slots as slots_mod
+
+    current_date = schedule.date_of(current_period, dataset_id)
+    try:
+        own = slots_mod.slots_for_dataset(
+            dataset_id, until=slots_mod.claimable_until(dataset_id, as_at.date()))
+    except (ValueError, KeyError, FileNotFoundError):
+        return [], []
+    gap, dealt = [], []
+    for slot in own:
+        when = slot.period.date
+        if current_date is None or when >= current_date:
+            continue
+        if after_date is not None and when <= after_date:
+            continue
+        if slot.due_at + slot.grace > as_at:
+            continue
+        h = decision_log.held(conn, dataset_id, slot.name)
+        if h and h.held_as == decision_log.PROMOTED:
+            continue
+        if h and h.held_as == decision_log.SUBSTITUTED:
+            dealt.append(slot.name)
+            continue
+        gap.append(slot.name)
+    return gap, dealt
+
+
+def assess(conn: supply_db.SupplyConnection, dataset_id: str, current_period: str,
+           as_at) -> Assessment:
+    """The reference for this dataset's period, and every owed period the
+    comparison crosses (criteria 2, 5, 8 to 12 and 17)."""
+    try:
+        ref = reference_for(conn, dataset_id, current_period)
+    except NoReference:
+        gap, _dealt = _owed_earlier(conn, dataset_id, current_period, as_at)
+        return Assessment(kind=NO_REFERENCE_OWED if gap else NO_REFERENCE_NEW,
+                          dataset_id=dataset_id, gap=tuple(gap))
+    run_id = run_for(conn, dataset_id, ref.supply)
+    gap, dealt = _owed_earlier(conn, dataset_id, current_period, as_at,
+                               after_date=schedule.date_of(ref.period, dataset_id))
+    return Assessment(kind=GAP if gap else MEASURED, dataset_id=dataset_id,
+                      reference=ref, run_id=run_id,
+                      gap=tuple(gap), dealt_with=tuple(dealt))
+
+
+def assess_arrival(dataset_id: str, received_at) -> Assessment | None:
+    """assess() for the supply an arrival brought - None where it has no
+    period (held, a trial), which the caller reports as no reference."""
+    from qa_tools.common import asset_time, filing
+
+    period = filing.period_of(dataset_id, received_at)
+    if not period:
+        return None
+    at = (received_at if hasattr(received_at, "tzinfo")
+          else asset_time.parse_instant(received_at, f"received_at for {dataset_id}"))
+    with supply_db.connect(read_only=True, label="mothman:drift-reference") as conn:
+        return assess(conn, dataset_id, period, at)
+
+
+def judge(results: list[dict], assessment: Assessment | None) -> list[dict]:
+    """Apply the gap rule to drift and volume results, in place.
+
+    ONE RESULT PER CHECK AND RUN (criterion 13): the real metric stays,
+    the measured verdict is kept as `measured_status` beside the red, the
+    reference period and the reason are carried - so the dashboard,
+    terminal and ticket can say "the measurement was fine; the comparison
+    skipped a period" rather than calling it drift (criterion 14). The
+    red counts against automatic promotion like any other (criterion 15).
+    """
+    if assessment is None:
+        return results
+    for r in results:
+        # The assessment is about ONE dataset's reference; a result about
+        # another table's volume is another run's to judge.
+        if assessment.dataset_id and r.get("dataset_id") != assessment.dataset_id:
+            continue
+        if assessment.reference:
+            r["reference_period"] = assessment.reference.period
+        reason = assessment.reason
+        if reason:
+            r["reference_reason"] = reason
+        if assessment.kind == GAP:
+            r["measured_status"] = r.get("status")
+            r["status"] = "fail"
+            r["reference_gap"] = list(assessment.gap)
+        elif assessment.kind == NO_REFERENCE_OWED:
+            # CRITERION 9: red, NOT EVALUATED, under its own tool, with no
+            # metric - never "no data", never the unrunnable pseudo-tool.
+            r["status"] = "fail"
+            r["metric_value"] = None
+            r["measured_status"] = None
+            r["reference_gap"] = list(assessment.gap)
+            r["reference_not_evaluated"] = True
+    return results
+
+
+def reference_note(record: dict, to_status=lambda s: s) -> dict | None:
+    """What a dashboard shows beside a drift or volume verdict: which
+    period it was compared with, why, and - where the red is the gap
+    rule's rather than the measurement's - the verdict the measurement
+    alone gave (criterion 14). None for a record the rule did not touch.
+    `to_status` maps a recorded status to the reader's vocabulary."""
+    reason = record.get("reference_reason")
+    if not reason:
+        return None
+    measured = record.get("measured_status")
+    return {"reason": reason, "period": record.get("reference_period"),
+            "measuredStatus": to_status(measured) if measured else None,
+            "gap": record.get("reference_gap") or []}

@@ -95,6 +95,22 @@ class TestTheNameCarriesTheArrival:
             conn.close()
 
 
+class TestAFailedLoadsReasonInOurOwnWords:
+    """REQ-DASH-148 criterion 13, for the messages that DO quote a value."""
+
+    @pytest.mark.parametrize("exc, expected", [
+        (ValueError("could not convert string to float: 'SECRETNAME'"),
+         "a value could not be read as its column's type"),
+        (UnicodeDecodeError("utf-8", b"SECRETNAME\xff", 10, 11, "invalid start byte"),
+         "the file is not valid text in the expected encoding (byte 10)"),
+        (FileNotFoundError(2, "No such file", "/x/SECRETNAME.csv"), "the file was not found"),
+        (RuntimeError("Conversion Error: 'SECRETNAME'"), "the file could not be read (RuntimeError)"),
+    ])
+    def test_nothing_the_library_said_is_kept(self, exc, expected):
+        got = load_log.own_words(exc)
+        assert got == expected and "SECRETNAME" not in got
+
+
 class TestAFileThatCannotBeLoaded:
     """Criteria 5 and 6."""
 
@@ -107,6 +123,24 @@ class TestAFileThatCannotBeLoaded:
         assert [(r.delivery, r.dataset_id) for r in failed] == [("drop-1", "birth-registrations")]
         assert failed[0].reason, "the reason a load failed is the whole value of the record"
         assert load_log.loaded_tables() == frozenset()
+
+    def test_the_recorded_reason_is_in_our_own_words_never_the_parsers(self, staging,
+                                                                         capfd):
+        """REQ-DASH-148 criterion 13: a loading library's message can
+        quote a row, and the recorded reason is published. It is recorded
+        in our own words - the kind of fault, the line, the field counts -
+        and the library's message goes only to standard error."""
+        path = staging / "bad.csv"
+        path.write_text("registration_id,child_family_name\n"
+                        "BR0001,SMITH\n"
+                        "BR0002,SECRETNAME,EXTRA,FIELDS\n")
+        bdm.build_one("run_001", str(path), "2026-09-25", received_at=_RECEIPT,
+                      delivery_name="drop-1")
+        (failed,) = load_log.failures()
+        assert failed.reason == "malformed row: line 3 has 4 fields where 2 were expected"
+        assert "Error tokenizing" not in failed.reason, "the parser's own words"
+        out, err = capfd.readouterr()
+        assert "SECRETNAME" not in out
 
     def test_the_rest_of_the_delivery_still_stages(self, staging):
         bdm.build_one("run_001", str(staging / "not-here.csv"), "2026-09-25",

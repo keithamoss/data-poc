@@ -51,7 +51,7 @@ import json
 import os
 
 
-from qa_tools.common import supply_db
+from qa_tools.common import left_out, supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
@@ -233,6 +233,16 @@ def _unreadable_in(run_id: str) -> frozenset[str]:
         conn.close()
 
 
+def _check_id_for(node: dict) -> str | None:
+    """The check id a test node is recorded under - the same lookup the
+    results loop below makes."""
+    meta = node.get("test_metadata")
+    table = _table_for_test(node)
+    return _CHECK_ID_LOOKUP.get((f"stg_{table}" if meta else None,
+                                 node["column_name"] if meta else None,
+                                 meta["name"] if meta else node["name"]))
+
+
 def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # No scratch database any more (REQ-PIPE-087) - see the BDM
     # counterpart and qa_tools/common/supply_db.py. dbt writes into its
@@ -279,6 +289,15 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # rather than split artificially per table (would misrepresent what
     # the tool actually ran).
     nodes = test_nodes(manifest)
+    if exclude:
+        # WHAT dbt's DAG TOOK OUT WITH THE UNREADABLE MODELS, said so the
+        # run can reconcile it against what it recorded as not evaluated
+        # (REQ-PIPE-115 criterion 17) - the `+` follows dbt's lineage,
+        # not the reads declaration, which is exactly why it is checked.
+        ran = {r["unique_id"] for r in run_results["results"]}
+        left_out.note(run_id, "dbt", [
+            _check_id_for(node) for uid, node in nodes.items()
+            if uid not in ran and _table_for_test(node) is not None])
 
     # Unqualified names resolve to dbt's own schema - see connect_dbt().
     conn = supply_db.connect_dbt(run_id)

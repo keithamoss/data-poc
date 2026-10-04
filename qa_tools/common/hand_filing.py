@@ -135,6 +135,15 @@ def resolve_original(answer: str, *, files, received_at: datetime,
                 "not fetched from S3 - give a time, or `not-known`. Nothing was filed.")
         stated = {f: storage_times[f] for f in files}
     else:
+        # A TIME, NOT A BARE DATE (the recorded decision): a date alone
+        # only comes from guessing, and fromisoformat would record it as a
+        # midnight nobody stated. A person who cannot say answers
+        # `not known`.
+        if ":" not in text:
+            raise CannotFile(
+                f"{text!r} has no time of day. Give when this supply was originally "
+                f"received as a date and time, e.g. 2026-09-20 14:30 - or, if nobody "
+                f"can say, `not known`. Nothing was filed.")
         try:
             when = datetime.fromisoformat(text.replace(" ", "T"))
         except ValueError:

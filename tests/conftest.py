@@ -820,9 +820,14 @@ def _mark_deployment(items):
             item.add_marker(getattr(pytest.mark, NEEDS_DEPLOYMENT))
 
 
-def clone_run_views(conn, source_run: str, new_run: str, *, held=()):
+def clone_run_views(conn, source_run: str, new_run: str, *, held=(), contested=(),
+                    absent=()):
     """A run of a test's own that reads exactly what `source_run` reads,
     with the `held` tables withheld - recorded as a real resolution.
+
+    `contested` tables are recorded as two candidates with no view, the
+    way the overlay records a run whose arrival carried two files for
+    one table; `absent` tables are simply missing (REQ-PIPE-115).
 
     Over the source run's VIEWS rather than its staged tables, because
     since REQ-PIPE-105 a run's tables come from wherever its period
@@ -840,6 +845,12 @@ def clone_run_views(conn, source_run: str, new_run: str, *, held=()):
     for logical, physical in sorted(source.resolved.items()):
         if logical in held:
             res.held[logical] = physical
+            continue
+        if logical in contested:
+            res.ambiguous[logical] = [physical, f"{physical}_2"]
+            continue
+        if logical in absent:
+            res.absent.append(logical)
             continue
         conn.execute(f'CREATE VIEW "{dst}"."{logical}" AS SELECT * FROM "{src}"."{logical}"')
         res.resolved[logical] = physical

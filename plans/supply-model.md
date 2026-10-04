@@ -1813,7 +1813,7 @@ comparisons against the expected-supply sequence.
    three signed 2026-09-23 and BUILT 2026-09-25. Before this, arrival and staging assumed a delivery
    had already been recognised and its files already attributed.
 
-8. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Arrival and
+8. **[done, 2026-10-05]** **[Pipeline & publishing]** **Arrival and
    staging.** Our own receipt timestamp, never the supplier's; staging
    asserting only arrival facts; replay in arrival-timestamp order
    (Threads B and H).
@@ -2062,7 +2062,7 @@ comparisons against the expected-supply sequence.
 
     **Owns:** nothing yet - this sprint is unscoped.
 
-18. **[in-progress, 2026-10-04]** **[QA checks & contract]** **Drift and trend
+18. **[blocked, 2026-10-05]** **[QA checks & contract]** **Drift and trend
     dependencies.** A declared temporal reference; missing-but-expected
     is red, no-prior-period is `nodata`. `REQ-PIPE-035` was rewritten
     2026-09-22 and now carries both cases as acceptance criteria, so
@@ -2363,7 +2363,7 @@ exist.
     (`plans/qa-pipeline.md` item 87 - genuinely blocked), and `qa_results/` is
     still a committed tree, so `REQ-PIPE-089` onwards is untouched.
 
-27. **[todo, 2026-09-26]** **[QA checks & contract]** **Load-time file checks,
+27. **[in-progress, 2026-10-05]** **[QA checks & contract]** **Load-time file checks,
     and where their results go.** The small explicit set of checks that can
     only be made on the file as delivered - encoding, delimiter, header row,
     column order, ragged rows, duplicate headers - as a fifth tool with real

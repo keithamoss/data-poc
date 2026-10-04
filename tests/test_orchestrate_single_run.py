@@ -147,16 +147,20 @@ class TestABirthRegistrationsRunWithNothingItMayRead:
     """REAL DEFECT, 2026-10-02, found by the first bootstrap after
     REQ-PIPE-105's overlay landed - which it crashed after two minutes.
 
-    A same-day resupply beside an unpromoted red supply makes the run's
-    OWN table contested (criterion 6, Keith's call that day), and with
-    nothing promoted for that day the view falls through to nothing.
-    Birth Registrations has one table, so the run had nothing it was
-    allowed to read - and Soda raised UndefinedTable, taking the whole
-    batch down. A run with nothing it may check checks nothing, says
-    why in its tables_read, and finishes.
+    Birth Registrations has one table, so a run that may not read it has
+    nothing it may check - and Soda raised UndefinedTable, taking the
+    whole batch down. A run with nothing it may check checks nothing,
+    says why in its tables_read, and finishes.
+
+    REQ-PIPE-115 criterion 23: BOTH ways the one table can be unreadable
+    - HELD, and CONTESTED (two files for it in one arrival) - each
+    finishing without raising, recording no per-check result, and leaving
+    the dataset's outstanding item open. (The fixture used to withhold the
+    table as held while this docstring described the contested case.)
     """
 
-    def test_it_records_no_results_and_does_not_raise(self, monkeypatch, bdm_duckdb_dir):
+    @staticmethod
+    def _run(monkeypatch, *, held=(), contested=()):
         import uuid
 
         from conftest import clone_run_views
@@ -166,14 +170,54 @@ class TestABirthRegistrationsRunWithNothingItMayRead:
         written = []
         monkeypatch.setattr(orchestrate_bdm, "write_qa_result",
                             lambda *a, **k: written.append(a[4]))
-        mine = f"bdm_held_{uuid.uuid4().hex[:8]}"
+        mine = f"bdm_unreadable_{uuid.uuid4().hex[:8]}"
         with supply_db.connect(label="test-bdm-unreadable") as conn:
-            clone_run_views(conn, BDM_REF_RUN_ID, mine, held={"birth_registrations"})
+            clone_run_views(conn, BDM_REF_RUN_ID, mine, held=held, contested=contested)
         entry = {"run_id": mine, "run_index": 1, "csv_path": "unused.csv",
                  "received_at": "2026-01-01T06:00:00+00:00", "delivery": "d"}
-
         results = orchestrate_bdm._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
                                            reference_run_id=None)
+        with supply_db.connect(read_only=True, label="test-bdm-unreadable") as conn:
+            recorded = conn.execute(
+                'SELECT tool, COUNT(*) FROM "qa".check_result '
+                "WHERE run_key LIKE ? GROUP BY tool", [f"%{mine}"]).fetchall()
+        return mine, results, written, dict(recorded)
 
-        assert results == []
+    def test_a_held_table_records_no_results_and_does_not_raise(self, monkeypatch,
+                                                                 bdm_duckdb_dir):
+        _, results, written, recorded = self._run(monkeypatch, held={"birth_registrations"})
+        assert results == [] and recorded == {}
         assert "tables_read" in written and "dataset_stats" in written
+
+    def test_a_contested_table_records_no_results_and_does_not_raise(self, monkeypatch,
+                                                                      bdm_duckdb_dir):
+        _, results, written, recorded = self._run(monkeypatch,
+                                                  contested={"birth_registrations"})
+        assert results == [] and recorded == {}
+        assert "tables_read" in written and "dataset_stats" in written
+
+    def test_the_held_supplys_outstanding_item_stays_open(self, monkeypatch, bdm_duckdb_dir):
+        import uuid
+
+        from qa_tools.common import outstanding, supply_db, supply_holds
+
+        supply = f"birth-registrations@t{uuid.uuid4().hex[:12]}"
+        with supply_db.connect(label="test-bdm-unreadable") as conn:
+            supply_holds.raise_hold(conn, dataset_id="birth-registrations",
+                                    supply_id=supply, kind="assignment-rule",
+                                    reason={"why": "no slot open"}, raised_by="test")
+        try:
+            self._run(monkeypatch, held={"birth_registrations"})
+            with supply_db.connect(read_only=True, label="test-bdm-unreadable") as conn:
+                assert supply_holds.hold_on(conn, "birth-registrations", supply) is not None
+                assert any(i.kind == outstanding.HELD_SUPPLY
+                           and i.dataset_id == "birth-registrations"
+                           for i in outstanding.survey(conn).items)
+        finally:
+            # AN OPEN HOLD WITHHOLDS ITS TABLE FROM EVERY LATER RUN on this
+            # worker (supply_holds.held_tables), so it must not outlive the
+            # test - it took seven Birth Registrations tool tests down when
+            # it did.
+            with supply_db.connect(label="test-bdm-unreadable") as conn:
+                conn.execute("DELETE FROM qa.hold WHERE dataset_id = 'birth-registrations' "
+                             "AND supply_id = ?", [supply])

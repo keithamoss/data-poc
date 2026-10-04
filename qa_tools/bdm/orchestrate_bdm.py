@@ -50,6 +50,7 @@ from qa_tools.common import drift_reference
 from qa_tools.common import held_blast_radius
 from qa_tools.common import filing
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common import left_out, own_table
 from qa_tools.common import period_overlay
 from qa_tools.common import promotion
 from qa_tools.common import ticket_reconciler
@@ -165,11 +166,19 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     # and took the whole batch down on the first bootstrap after the
     # overlay landed. The run still records its stats and what it read,
     # which is where the reason lives.
+    #
+    # HELD, CONTESTED OR REFUSED, AND NOTHING ELSE (REQ-PIPE-115 criteria
+    # 5, 6 and 9). Any other reason the table is missing raises: a run
+    # that cannot read what its own arrival carried has been set up
+    # wrong, and recording nothing for it would be a silent gap.
     with supply_db.connect(read_only=True, label="mothman:bdm-readable") as conn:
-        readable = build_per_run_warehouses.TABLE in supply_db.readable_in(conn, run_id)
+        why = own_table.why_unreadable(
+            conn, run_id, build_per_run_warehouses.TABLE,
+            supply_db.resolution_for(conn, run_id), own_dataset=DATASET_ID,
+            arrival_key=_arrival_key(entry))
+    readable = why is None
     if not readable:
-        print(f"note: {run_id}: {build_per_run_warehouses.TABLE} cannot be read in this run "
-              f"(see its tables_read for why), so there is nothing to check.")
+        print(own_table.describe(run_id, build_per_run_warehouses.TABLE, why))
     run_step = _run_step if readable else (lambda collection, tool, rid, call: [])
 
     # THE REFERENCE IS RESOLVED PER SUPPLY, HERE (REQ-QAC-108 criteria
@@ -190,9 +199,14 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     # time, so by the time this line runs
     # the arrival has a period and every earlier arrival has been
     # promoted or refused.
+    #
+    # AND WHAT THE COMPARISON CROSSES (REQ-QAC-108 criteria 8 to 17): an
+    # owed, overdue period with no accepted supply between the reference
+    # and now makes the drift and volume checks red, the measurement kept.
+    assessment = None
     if reference_run_id is None:
-        reference_run_id = drift_reference.reference_run_for_arrival(
-            DATASET_ID, entry["received_at"])
+        assessment = drift_reference.assess_arrival(DATASET_ID, entry["received_at"])
+        reference_run_id = assessment.run_id if assessment else None
 
     def _dbt() -> list[dict]:
         return run_step(COLLECTION_ID, "dbt-core", run_id,
@@ -209,7 +223,8 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
         _announce(on_step, RUN_STEPS[3])
         got.extend(run_step(COLLECTION_ID, "Evidently", run_id,
             lambda: run_evidently_bdm.evaluate_evidently_bdm(
-                run_id, run_timestamp, reference_run_id=reference_run_id)))
+                run_id, run_timestamp, reference_run_id=reference_run_id,
+                assessment=assessment)))
         return got
 
     # dbt BESIDE THE OTHER THREE (REQ-TEST-116 criterion 3) - see
@@ -241,15 +256,28 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     # criterion 10) - see orchestrate_cp.py's identical block for the
     # full account of why a silently-absent check is the dangerous
     # direction and why this is its own pseudo-tool.
+    # NOTHING PER CHECK FOR A RUN THAT MAY NOT READ ITS OWN TABLE
+    # (REQ-PIPE-115 criteria 6 and 16): its dataset is signalled once, by
+    # its outstanding item, and a cross-table check is never recorded
+    # under the run of the held or contested supply it reads.
     blast = held_blast_radius.results_for(
         held=resolution.held, reads=promotion._declared_reads(),
-        run_id=run_id, run_timestamp=run_timestamp)
+        run_id=run_id, run_timestamp=run_timestamp) if readable else []
     if blast:
         print(held_blast_radius.describe(blast))
         write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp,
                          held_blast_radius.TOOL, {"held": resolution.held},
                          verified=blast)
         results.extend(blast)
+    # THE SAME RECONCILIATION AS CHILD PROTECTION'S (REQ-PIPE-115
+    # criteria 17 and 19) - see left_out.py. Birth Registrations' tools
+    # filter nothing (its one table is readable or nothing runs), so this
+    # is the guard that keeps it so: a tool that started leaving checks
+    # out here would refuse the run rather than lose them silently.
+    compared = left_out.reconcile(run_id, left_out.take(run_id), blast, lambda check: True)
+    if compared:
+        write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, left_out.TOOL,
+                         {"left_out": compared})
     # run_by stamped only on this write, not the 4 real-tool writes above -
     # one value per run is all qa_tools/common/changelog.py needs, and
     # dataset_stats.json is the one file guaranteed to exist for every
@@ -419,6 +447,13 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
 
     return _run_one(entry, run_timestamp, run_by, reference_run_id, on_step=on_step)
 
+
+
+def _arrival_key(entry: dict) -> str | None:
+    """The arrival segment a run's staged table carries, where the entry
+    has a receipt."""
+    received = entry.get("received_at")
+    return supply_db.arrival_segment(received) if received else None
 
 
 def file_and_overlay(arrival) -> None:

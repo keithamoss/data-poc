@@ -350,7 +350,7 @@ def load_command(collection_id: str | None) -> None:
                    f"[dim](an unchanged re-stage writes none)[/dim].")
     new_failures = [r for r in load_log.failures() if r.physical not in failed_before]
     if new_failures:
-        console.print(f"[red]{len(new_failures)} failed to load[/red] "
+        console.print(f"[red]{len(new_failures)} could not be loaded[/red] "
                        f"[dim]- `mothman supply failures` for the queue[/dim]")
 
 
@@ -368,13 +368,15 @@ def failures_command() -> None:
     # re-reads the same bytes and writes a NEW record rather than
     # editing this one - the history of what went wrong survives the
     # fix.
-    from qa_tools.common import asset_time, display_time, load_log
+    from qa_tools.common import asset_time, dataset_blockers, display_time
 
-    found = load_log.failures()
+    # A SUPPLY A PERSON HAS REJECTED IS SETTLED, and is not listed again
+    # (REQ-PIPE-153 criterion 4).
+    found = dataset_blockers.unsettled_failures()
     if not found:
-        console.print("No load is currently recorded as failed.")
+        console.print("No supply is waiting because it could not be loaded.")
         return
-    console.print(f"[red]{len(found)} load(s) failed[/red] "
+    console.print(f"[red]{len(found)} supply/supplies could not be loaded[/red] "
                    f"[dim]- reject the supply, or fix and reprocess[/dim]\n")
     table = Table("Delivery", "Dataset", "Recorded", "Why", box=None, pad_edge=False)
     for record in found:

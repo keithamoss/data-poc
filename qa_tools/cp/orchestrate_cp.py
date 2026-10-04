@@ -36,6 +36,7 @@ from qa_tools.common import filing
 from qa_tools.common import held_blast_radius
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common import left_out, own_table
 from qa_tools.common import period_overlay
 from qa_tools.common import promotion
 from qa_tools.common import ticket_reconciler
@@ -45,7 +46,7 @@ from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_reader import canonical_order
 from qa_tools.common.qa_results_writer import (
-    finish_run, open_run, run_owner, write_qa_result)
+    finish_run, open_run, run_owner, scope_of_run, write_qa_result)
 from . import build_cp_warehouses
 from . import cp_common
 from . import dataset_stats
@@ -169,25 +170,52 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
         # cp-notifications instead found nothing for any run filed before
         # the notifications file of its delivery.
         owner = run_owner(run_id)
-        reference_run_id = drift_reference.reference_run_for_arrival(
+        # AND WHAT THE COMPARISON CROSSES (REQ-QAC-108 criteria 8 to 17) -
+        # see orchestrate_bdm.py's identical block.
+        assessment = drift_reference.assess_arrival(
             owner[0] if owner else run_evidently_cp.DATASET_ID, entry["received_at"])
+        reference_run_id = assessment.run_id if assessment else None
+    else:
+        assessment = None
+
+    # NO TOOL RUNS FOR A RUN WHOSE OWN TABLE IS UNREADABLE (REQ-PIPE-115
+    # criteria 5, 6 and 9) - see orchestrate_bdm.py's identical guard.
+    # Every check in such a run's scope is the dataset's own or reads its
+    # table, so nothing in it is evaluable. This used to run all four
+    # tools over a HELD supply's staging-time view and record ordinary
+    # verdicts against a supply with no period. A run id that names no
+    # table (a fixture's) has no own table to guard.
+    owner = run_owner(run_id)
+    why = None
+    if owner is not None:
+        received = entry.get("received_at")
+        with supply_db.connect(read_only=True, label="mothman:cp-readable") as conn:
+            why = own_table.why_unreadable(
+                conn, run_id, owner[1], supply_db.resolution_for(conn, run_id),
+                own_dataset=owner[0],
+                arrival_key=supply_db.arrival_segment(received) if received else None)
+    readable = why is None
+    if not readable:
+        print(own_table.describe(run_id, owner[1], why))
+    run_step = _run_step if readable else (lambda collection, tool, rid, call: [])
 
     def _dbt() -> list[dict]:
-        return _run_step(cp_common.COLLECTION_ID, "dbt-core", run_id,
+        return run_step(cp_common.COLLECTION_ID, "dbt-core", run_id,
             lambda: run_dbt_cp.evaluate_dbt_cp(run_id, run_timestamp))
 
     def _the_rest() -> list[dict]:
         got: list[dict] = []
         _announce(on_step, RUN_STEPS[1])
-        got.extend(_run_step(cp_common.COLLECTION_ID, "Soda Core", run_id,
+        got.extend(run_step(cp_common.COLLECTION_ID, "Soda Core", run_id,
             lambda: run_soda_cp.evaluate_soda_cp(run_id, run_timestamp)))
         _announce(on_step, RUN_STEPS[2])
-        got.extend(_run_step(cp_common.COLLECTION_ID, "datacontract-cli", run_id,
+        got.extend(run_step(cp_common.COLLECTION_ID, "datacontract-cli", run_id,
             lambda: run_datacontract_cp.evaluate_datacontract_cp(run_id, run_timestamp)))
         _announce(on_step, RUN_STEPS[3])
-        got.extend(_run_step(cp_common.COLLECTION_ID, "Evidently", run_id,
+        got.extend(run_step(cp_common.COLLECTION_ID, "Evidently", run_id,
             lambda: run_evidently_cp.evaluate_evidently_cp(
-                run_id, run_timestamp, reference_run_id=reference_run_id)))
+                run_id, run_timestamp, reference_run_id=reference_run_id,
+                assessment=assessment)))
         return got
 
     # dbt BESIDE THE OTHER THREE (REQ-TEST-116 criterion 3) - see
@@ -218,9 +246,11 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # ITS OWN PSEUDO-TOOL, and deliberately NOT in EXPECTED_TOOLS: a
     # run with nothing held writes nothing here, and a completeness
     # rule that demanded it would make every clean run incomplete.
+    # NOTHING PER CHECK where the run may not read its own table
+    # (REQ-PIPE-115 criteria 6 and 16) - see orchestrate_bdm.py.
     blast = held_blast_radius.results_for(
         held=resolution.held, reads=promotion._declared_reads(),
-        run_id=run_id, run_timestamp=run_timestamp)
+        run_id=run_id, run_timestamp=run_timestamp) if readable else []
     if blast:
         print(held_blast_radius.describe(blast))
         write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id,
@@ -234,7 +264,8 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # record saying it could not be evaluated, red or no-data by why the
     # table is missing, and never as a verdict on the data. Only for a
     # run with a period: an unfiled supply's run is scoped to nothing.
-    missing = _unrunnable_results(entry, run_id, run_timestamp, resolution)
+    missing = (_unrunnable_results(entry, run_id, run_timestamp, resolution)
+               if readable else [])
     if missing:
         print(unrunnable.describe(missing))
         write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id,
@@ -242,6 +273,25 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
                          {"unreadable": sorted(set(resolution.absent) | set(resolution.ambiguous))},
                          verified=missing)
         results.extend(missing)
+
+    # WHAT THE TOOLS LEFT OUT MUST BE WHAT THE RUN RECORDED AS NOT
+    # EVALUATED (REQ-PIPE-115 criterion 17) - see left_out.py. A check
+    # left out and recorded by nobody reads as a pass, so a disagreement
+    # refuses the run here, before it is finished, and stops the batch.
+    # Only where unrunnable applies at all: a run with no period, or
+    # whose id names no table, is scoped to nothing.
+    #
+    # AUDITABLE AFTER THE RUN (accepted at sign-off): each tool's
+    # in-scope left-out set is recorded with the run, as its own raw
+    # output, so a later reader can see what was compared rather than
+    # only that it agreed. Nothing is written where nothing was left out.
+    noted = left_out.take(run_id)
+    if _has_scope(entry, run_id):
+        compared = left_out.reconcile(run_id, noted, [*blast, *missing],
+                                      scope_of_run(run_id))
+        if compared:
+            write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id,
+                             run_timestamp, left_out.TOOL, {"left_out": compared})
     # run_by stamped only on this write - see orchestrate_bdm.py's
     # identical comment.
     write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dataset_stats", stats,
@@ -263,6 +313,16 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # finished one.
     finish_run(run_id)
     return results
+
+
+def _has_scope(entry: dict, run_id: str) -> bool:
+    """Whether this run is one unrunnable reports for - it names a table
+    and its supply was filed to a period."""
+    owner = run_owner(run_id)
+    if owner is None:
+        return False
+    as_at = asset_time.parse_instant(entry["received_at"], f"received_at for {run_id}")
+    return bool(filing.period_of(owner[0], as_at))
 
 
 def _unrunnable_results(entry: dict, run_id: str, run_timestamp: str,

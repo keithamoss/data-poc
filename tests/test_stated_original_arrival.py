@@ -54,6 +54,15 @@ class TestResolvingTheAnswer:
         with pytest.raises(hand_filing.CannotFile, match="S3"):
             hand_filing.resolve_original("storage", files=["a.csv"], received_at=NOW)
 
+    @pytest.mark.parametrize("bare", ["2026-09-20", "20260920", "2026-W38-1"])
+    def test_a_date_with_no_time_is_refused_not_recorded_as_midnight(self, bare):
+        """The decision is DATE AND TIME, NOT A BARE DATE: a date alone
+        only comes from guessing, and a person who cannot say answers
+        `not known`. fromisoformat accepted all three and recorded a
+        midnight nobody stated (critic, sprint 5)."""
+        with pytest.raises(hand_filing.CannotFile, match="not known"):
+            hand_filing.resolve_original(bare, files=["a.csv"], received_at=NOW)
+
     def test_nonsense_is_refused_rather_than_recorded(self):
         with pytest.raises(hand_filing.CannotFile):
             hand_filing.resolve_original("last tuesday", files=["a.csv"], received_at=NOW)
@@ -110,6 +119,35 @@ class TestWhatAKeptSupplyRecords:
             assert record["filed_by"] == d.filed_by
             assert record["files"][0]["originally_received_stated"] == delivery.NOT_KNOWN
 
+    @pytest.mark.parametrize("second", [
+        {"kind": "person", "route": "s3", "who": "mallory@example.org"},
+        None,   # a receipt with the key missing reads as automated
+    ])
+    def test_receipts_that_disagree_about_who_filed_are_refused(self, tmp_path, second):
+        """REQ-PIPE-147's NFR: reading them back refuses a delivery whose
+        receipts disagree. It kept whichever it read last, silently
+        (critic, sprint 5)."""
+        import json
+
+        receipts = tmp_path / "receipts" / "d"
+        receipts.mkdir(parents=True)
+        first = {"kind": "person", "route": "folder", "who": "analyst@example.org"}
+        (receipts / "a.csv.json").write_text(json.dumps({"filed_by": first}))
+        (receipts / "b.csv.json").write_text(json.dumps({"filed_by": second} if second else {}))
+        with pytest.raises(delivery.DeliveryFormatError, match="disagree"):
+            delivery._receipt_extras("d", tmp_path / "receipts", ["a.csv", "b.csv"])
+
+    def test_receipts_that_agree_are_read(self, tmp_path):
+        import json
+
+        receipts = tmp_path / "receipts" / "d"
+        receipts.mkdir(parents=True)
+        who = {"kind": "person", "route": "folder", "who": "analyst@example.org"}
+        for name in ("a.csv", "b.csv"):
+            (receipts / f"{name}.json").write_text(json.dumps({"filed_by": who}))
+        _, filed_by = delivery._receipt_extras("d", tmp_path / "receipts", ["a.csv", "b.csv"])
+        assert filed_by == who
+
     def test_an_automated_delivery_records_no_person_and_never_asked(self, tmp_path, tree):
         """REQ-PIPE-147 criterion 5, REQ-PIPE-103 criterion 18."""
         deliveries, receipts = tree
@@ -141,6 +179,30 @@ class TestWhatAKeptSupplyRecords:
                                     route="file", filed_by="",
                                     deliveries_dir=deliveries, receipts_dir=receipts)
         assert not deliveries.exists() or not any(deliveries.iterdir())
+
+
+class TestNothingDecidesOnATypedDate:
+    """REQ-PIPE-103's NFR, asked for by test: the same file filed with
+    two different stated arrivals is filed identically - same delivery,
+    same run id, same staged name, same period and verdict. Criterion 11
+    held when checked by reading; this keeps it held (critic, sprint 5)."""
+
+    def test_two_statements_one_filing(self, tmp_path, private_supply_dsn):
+        from qa_tools.common import filing
+
+        path = _csv(tmp_path)
+        got = []
+        for i, stated in enumerate(("2026-09-20T10:00:00+08:00", delivery.NOT_KNOWN)):
+            root = tmp_path / f"tree{i}"
+            filed = hand_filing.file_supply(
+                [path], "civil-registration", "run_", received_at=NOW,
+                stated_original={"*": stated}, route="file", filed_by="a@example.org",
+                deliveries_dir=root / "deliveries", receipts_dir=root / "receipts")
+            recorded = filing.filing_for("birth-registrations",
+                                         f"birth-registrations@{filed.run_id.rsplit('__', 1)[-1]}")
+            got.append((filed.delivery_name, filed.run_id,
+                        recorded and (recorded["slot"], recorded["classification"])))
+        assert got[0] == got[1]
 
 
 class TestTheCommandLine:

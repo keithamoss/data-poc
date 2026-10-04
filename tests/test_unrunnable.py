@@ -70,13 +70,30 @@ def test_a_contested_sibling_is_reported_too(states):
     assert [r["check_id"] for r in out] == [PLACEMENTS_READS_CARERS]
 
 
-def test_a_contested_own_table_reports_only_checks_that_read_it(states):
-    """Its own checks are withheld (REQ-PIPE-079 criterion 13), so only a
-    sibling's check reading it is in scope."""
+def test_a_contested_own_table_records_nothing_under_its_own_run(states):
+    """REQ-PIPE-115 criteria 6 and 16: its own checks are not run, and a
+    sibling's check reading it is recorded in THAT sibling's run - never
+    under the run of the contested supply it reads. (This used to report
+    the siblings' checks here.)"""
     out = _run(_res(ambiguous={"cp_clients": ["a", "b"]}),
                own_table="cp_clients", own_dataset="cp-clients")
-    assert {r["check_id"] for r in out} == {PLACEMENTS_READS_CLIENTS,
-                                            NOTIFICATIONS_READS_CLIENTS}
+    assert out == []
+
+
+class TestContestedOutranksTheSlotReasons:
+    """REQ-PIPE-115 criteria 14 and 15."""
+
+    @pytest.mark.parametrize("slot_reason", [period_schema.PAST_DUE,
+                                             period_schema.NOT_YET_DUE,
+                                             period_schema.STAGED_AWAITING_DECISION, None])
+    def test_a_contested_sibling_reads_contested_whatever_its_slot_says(self, states,
+                                                                       slot_reason):
+        states["cp-carers"] = slot_reason
+        (r,) = _run(_res(resolved={"cp_placements": "x"},
+                         ambiguous={"cp_carers": ["a", "b"]}))
+        assert r["unrunnable_code"] == period_schema.CONTESTED
+        assert r["status"] == "fail"
+        assert "two files claim cp_carers" in r["unrunnable_reason"]
 
 
 def test_nothing_missing_means_nothing_recorded(states):
@@ -117,3 +134,23 @@ class TestOneRecordPerCheck:
                             absent=["cp_clients", "cp_carers"]),
             reads={PLACEMENTS_READS_BOTH: ["cp_clients", "cp_carers"]}, as_at=AS_AT)
         assert [r["check_id"] for r in out] == [PLACEMENTS_READS_BOTH]
+
+
+class TestCouldNotBeLoadedOutranksEverything:
+    """REQ-DASH-148 criterion 6."""
+
+    def test_a_sibling_refused_in_this_arrival_says_so(self, states, monkeypatch):
+        from types import SimpleNamespace
+
+        from qa_tools.common import load_log
+
+        states["cp-carers"] = period_schema.PAST_DUE
+        monkeypatch.setattr(load_log, "latest_by_table", lambda *a, **k: {"x": SimpleNamespace(
+            physical="cp_carers__202601010600000000", dataset_id="cp-carers", loaded=False)})
+        (r,) = unrunnable.results_for(
+            None, run_id="cp_placements__202601010600000000", run_timestamp="t",
+            own_table="cp_placements", own_dataset="cp-placements", period="2026-Q1",
+            resolution=_res(resolved={"cp_placements": "x"}, absent=["cp_carers"]),
+            reads=READS, as_at=AS_AT)
+        assert r["unrunnable_code"] == period_schema.COULD_NOT_LOAD
+        assert "could not be loaded" in r["unrunnable_reason"]

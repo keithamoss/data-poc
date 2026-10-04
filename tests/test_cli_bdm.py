@@ -309,6 +309,11 @@ def test_qa_command_local_file_commit_files_a_real_delivery_and_records_it(
     refused outright (Keith, 2026-09-27) - the fixture's own
     `pytest_bdm_ref.csv` is exactly such a name.
     """
+    # ABOUT FILING, NOT DRIFT: in this test's empty history every earlier
+    # owed period is a gap, so REQ-QAC-108's gap rule would (rightly) make
+    # Evidently red and the command exit 1. That rule has its own tests.
+    from qa_tools.common import drift_reference
+    monkeypatch.setattr(drift_reference, "assess_arrival", lambda *a, **k: None)
     raw_dir = tmp_path / "raw"
     (raw_dir).mkdir()
     _patch_bdm_dirs(monkeypatch, str(raw_dir), None)

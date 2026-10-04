@@ -109,6 +109,62 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-05"
+    summary: >
+      A dataset that cannot be checked - its supply held, claimed by two
+      files, or impossible to load - now reads plainly red and says why,
+      instead of showing last time's green.
+    changes:
+      - category: New
+        items:
+          - headline: A held, contested or unloadable supply turns its dataset red
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              While a supply waits for you to place it, choose between two
+              files, or deal with a file that could not be loaded, its
+              dataset reads red with the reason in words - once, not on every
+              check - and the red rolls up to the collection and agency. The
+              date picker shows it from the day the file arrived.
+          - headline: Drift checks say when they compared across a gap
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              If an earlier period you were owed has no accepted supply, the
+              drift and volume checks go red and tell you which period they
+              compared with instead - while still showing what the
+              measurement itself found, so a gap is never mistaken for drift.
+          - headline: You can reject a supply that could not be loaded
+            components: ["Pipeline & publishing"]
+            description: >
+              A file that failed to load now appears in the terminal's queue
+              of supplies waiting on you. Rejecting it settles it everywhere;
+              promoting it is refused, since there is nothing to promote.
+      - category: Fixed
+        items:
+          - headline: A supply nobody could place is no longer checked anyway
+            components: ["Pipeline & publishing"]
+            description: >
+              Held supplies were still having every check run against them and
+              recorded. Now nothing runs until you decide which period they
+              belong to.
+          - headline: No check silently drops out of a run
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Each run now confirms that every check a tool left out is
+              recorded as not evaluated. The first full run of this found two
+              checks that had been vanishing, which are now checked again.
+          - headline: Why a file could not be loaded is said in our own words
+            components: ["Pipeline & publishing"]
+            description: >
+              The recorded reason no longer copies the loading library's
+              message, which could quote a row of the file; it names the
+              line and the problem instead.
+          - headline: Hand-filing questions are no longer hidden under the progress bar
+            components: ["Testing & dev tooling"]
+            description: >
+              When you file a supply by hand, the questions and what you type
+              now show properly, a bare date is refused rather than recorded as
+              midnight, and receipts that disagree about who filed a delivery
+              are refused.
   - date: "2026-10-04"
     summary: >
       A check that could not run now shows on the dashboard as red and

@@ -28,7 +28,7 @@ covered by datacontract-cli's include_failed_samples at all.
 from __future__ import annotations
 import os
 
-from qa_tools.common import supply_db
+from qa_tools.common import left_out, supply_db
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
     run_against_warehouse, failing_sample_keys, check_id_from_quality_definition,
@@ -96,6 +96,7 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
     declared = _declared_reads_tables()
 
     results = []
+    left = []
     for c in run.checks:
         if c.type not in _QUALITY_CHECK_TYPES:
             continue
@@ -112,6 +113,8 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
         # so it is done here, against the same declaration they use.
         if table in unreadable or unreadable & set(
                 declared.get(check_id_from_quality_definition(c.qualityDefinition), ())):
+            # SAID, so the run can reconcile it (REQ-PIPE-115 criterion 17).
+            left.append(check_id_from_quality_definition(c.qualityDefinition))
             continue
 
         diag = c.diagnostics or {}
@@ -180,6 +183,7 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # No live-query correction needed (row_count is already in the raw
     # output's own diagnostics) - still writes `verified` for uniformity
     # with the other 3 tools, same reasoning as run_datacontract_bdm.py.
+    left_out.note(run_id, "datacontract", left)
     write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp,
                      "datacontract", run.model_dump(), verified=results)
     return results

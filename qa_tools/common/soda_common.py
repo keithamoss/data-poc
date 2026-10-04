@@ -266,23 +266,51 @@ def readable_checks_yaml(path: str, unreadable) -> str:
         # VERBATIM in the ordinary case, so a run that can read every
         # table is handed exactly the authored file and no round-trip.
         return text
-    doc = yaml.safe_load(text)
-    declared = _declared_reads_tables()
-    out = {}
+    out, _ = _split(yaml.safe_load(text), gone, _declared_reads_tables())
+    return yaml.safe_dump(out, sort_keys=False)
+
+
+def left_out_checks(path: str, unreadable) -> list[str]:
+    """The check ids readable_checks_yaml() leaves out, so the run can
+    reconcile them against what it recorded as not evaluated
+    (REQ-PIPE-115 criterion 17)."""
+    import yaml
+
+    from qa_tools.common.qa_results_writer import _declared_reads_tables
+
+    gone = set(unreadable)
+    if not gone:
+        return []
+    with open(path) as f:
+        doc = yaml.safe_load(f)
+    _, removed = _split(doc, gone, _declared_reads_tables())
+    return removed
+
+
+def _check_id_of(item) -> str | None:
+    if isinstance(item, dict) and len(item) == 1:
+        body = next(iter(item.values()))
+        if isinstance(body, dict):
+            return (body.get("attributes") or {}).get("check_id")
+    return None
+
+
+def _split(doc: dict, gone: set, declared: dict) -> tuple[dict, list[str]]:
+    """(the document less every unreadable check, the ids taken out)."""
+    out, removed = {}, []
     for key, checks in doc.items():
         if key.startswith("checks for ") and key[len("checks for "):].strip() in gone:
+            if isinstance(checks, list):
+                removed.extend(c for c in map(_check_id_of, checks) if c)
             continue
         if isinstance(checks, list):
             kept = []
             for item in checks:
-                check_id = None
-                if isinstance(item, dict) and len(item) == 1:
-                    body = next(iter(item.values()))
-                    if isinstance(body, dict):
-                        check_id = (body.get("attributes") or {}).get("check_id")
+                check_id = _check_id_of(item)
                 if check_id and gone & set(declared.get(check_id, ())):
+                    removed.append(check_id)
                     continue
                 kept.append(item)
             checks = kept
         out[key] = checks
-    return yaml.safe_dump(out, sort_keys=False)
+    return out, removed

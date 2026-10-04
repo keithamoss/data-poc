@@ -130,6 +130,87 @@ def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
     return out
 
 
+def name_held_siblings(conn, res: supply_db.Resolution, arrival) -> list[str]:
+    """Say HELD, not absent, for a sibling whose supply came WITH this
+    arrival and is held (REQ-PIPE-115 criterion 14).
+
+    A held supply has no filing, so it is never staged for a period and
+    its table reaches a sibling run exactly as a table that never
+    arrived does - and the checks reading it then said "no filled slot"
+    or "overdue", sending somebody after a supplier who had already sent
+    the file. Keith, 2026-10-04 (option B): only for runs of arrivals
+    received WITH the held supply - same delivery or same receipt
+    instant. Every run while any hold for the table is outstanding would
+    redden another quarter's checks for a file meant elsewhere.
+
+    ONLY A TABLE THE RUN CANNOT READ. Where the period's promoted
+    version is there to read, the check reads it, as REQ-PIPE-079
+    criterion 12 lets a sibling do (PROVISIONAL, 2026-10-04 overnight).
+
+    Moved into `held` in place, so held_blast_radius records it once,
+    naming the supply, and unrunnable leaves it alone (criterion 15).
+    Returns the tables moved.
+    """
+    from qa_tools.common import hierarchy, supply_holds
+
+    if not res.absent:
+        return []
+    key = supply_db.arrival_segment(arrival.received_at)
+    delivery = getattr(arrival, "delivery_name", None)
+    moved = []
+    for held in supply_holds.outstanding(conn):
+        if not (supply_holds.arrival_key_of(held.supply_id) == key
+                or (delivery and held.delivery == delivery)):
+            continue
+        try:
+            table = hierarchy.dataset(held.dataset_id).table
+        except Exception:  # noqa: BLE001 - a retired dataset reads as absent
+            continue
+        if table in res.absent:
+            res.absent.remove(table)
+            res.held[table] = held.supply_id
+            moved.append(table)
+    return moved
+
+
+def _withhold_if_held(arrival, dataset_id: str, own_table: str, *,
+                      dsn: str | None) -> None:
+    """A HELD supply's run must not read its own table (REQ-PIPE-115
+    criterion 5), whatever staging gave it.
+
+    THE DEFECT THIS CLOSES: staging builds every run's views before
+    filing raises the hold, and returning early here for a supply with
+    no period left that view in place - so all four tools ran over a
+    supply nobody had placed and recorded ordinary verdicts against it.
+    The view is dropped and the table recorded as HELD, which is what
+    the orchestrators read to run nothing.
+
+    ONLY WHERE THIS ARRIVAL'S SUPPLY HAS AN OPEN HOLD. An unfiled supply
+    with no hold - a trial - keeps what staging gave it, exactly as
+    before (REQ-PIPE-079 criterion 9).
+    """
+    from qa_tools.common import supply_holds
+
+    key = supply_db.arrival_segment(arrival.received_at)
+    conn = supply_db.connect(dsn=dsn, label="mothman:period-overlay")
+    try:
+        if not any(supply_holds.arrival_key_of(h.supply_id) == key
+                   for h in supply_holds.outstanding(conn, dataset_id=dataset_id)):
+            return
+        res = supply_db.resolution_for(conn, arrival.run_id)
+        physical = res.resolved.pop(own_table, None)
+        if physical is None:
+            physical = (res.ambiguous.pop(own_table, None) or [""])[0]
+        if own_table in res.absent:
+            res.absent.remove(own_table)
+        res.held[own_table] = physical
+        conn.execute(f'DROP VIEW IF EXISTS "{supply_db.run_schema(arrival.run_id)}".'
+                     f'"{own_table}"')
+        supply_db.record_resolution(conn, res)
+    finally:
+        conn.close()
+
+
 def own_table_contested(res: supply_db.Resolution, own_table: str) -> bool:
     """Whether this run's own table is contested - REQ-PIPE-079
     criterion 13's trigger for withholding its own checks."""
@@ -155,9 +236,10 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
 
     (dataset_id,) = tuple(arrival.files_by_dataset)
     period = filing.period_of(dataset_id, arrival.received_at)
-    if not period:
-        return None
     own_table = hierarchy.dataset(dataset_id).table
+    if not period:
+        _withhold_if_held(arrival, dataset_id, own_table, dsn=dsn)
+        return None
     sample = [t for t in tables
               if sample_data.is_sample(hierarchy.dataset_for_table(t).dataset_id)]
     agreed = [t for t in tables if t not in sample]
@@ -178,6 +260,7 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
                       if period_schema.newest(versions) is not None}
             supply_db.add_run_views(conn, arrival.run_id, newest,
                                      sample_data.SCHEMA, out.resolution)
+        name_held_siblings(conn, out.resolution, arrival)
         supply_db.record_resolution(conn, out.resolution)
     finally:
         conn.close()

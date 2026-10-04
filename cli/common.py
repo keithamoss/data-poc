@@ -237,6 +237,8 @@ def chain_progress(label: str):
             console=console,
             transient=True,
         ) as progress:
+            global _ACTIVE_PROGRESS
+            _ACTIVE_PROGRESS = progress
             task = progress.add_task(f"Checking {label}", total=len(RUN_STEPS))
             done = 0
 
@@ -248,10 +250,42 @@ def chain_progress(label: str):
                 progress.update(task, completed=done, description=f"Running {step_label}")
                 done += 1
 
-            yield on_step
-            progress.update(task, completed=len(RUN_STEPS), description="Done")
+            try:
+                yield on_step
+                progress.update(task, completed=len(RUN_STEPS), description="Done")
+            finally:
+                _ACTIVE_PROGRESS = None
 
     return _run()
+
+
+#: The live progress display, while one is drawing - see paused_progress().
+_ACTIVE_PROGRESS = None
+
+
+def paused_progress():
+    """Stop the live progress display while a person is asked something.
+
+    A Rich Progress keeps redrawing, so a prompt asked inside one was
+    drawn UNDER it: "Keep this check?" appeared only after it had been
+    answered, the file-names-become-public warning was never visible,
+    and a typed original-arrival time was not echoed at all (critic,
+    sprint 5, driving a real pty). The display resumes afterwards.
+    """
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _paused():
+        live = _ACTIVE_PROGRESS
+        if live is None:
+            yield
+            return
+        live.stop()
+        try:
+            yield
+        finally:
+            live.start()
+    return _paused()
 
 
 # ---------------------------------------------------------------------------
@@ -310,7 +344,7 @@ def decide_keep(paths, *, keep: bool | None) -> bool:
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         console.print(
             "Not a real terminal and no --keep/--trial given - running as a TRIAL, "
-            "which records nothing. Pass --keep to file this supply as a delivery.",
+            "which records nothing. Pass --commit to file this supply as a delivery.",
             style="yellow")
         return False
     console.print(describe_keep_choice(paths))
@@ -403,6 +437,14 @@ def file_or_trial(paths, collection_id: str, run_id_prefix: str,
     recognition because the command already says which dataset is
     being checked.
     """
+    with paused_progress():
+        return _file_or_trial(paths, collection_id, run_id_prefix, keep=keep,
+                              route=route, originally=originally,
+                              storage_times=storage_times)
+
+
+def _file_or_trial(paths, collection_id, run_id_prefix, *, keep, route, originally,
+                   storage_times) -> hand_filing.Filed:
     if not decide_keep(paths, keep=keep):
         return _as_trial(paths)
     # WHO, AND WHEN IT WAS ORIGINALLY RECEIVED - both settled before
@@ -411,7 +453,6 @@ def file_or_trial(paths, collection_id: str, run_id_prefix: str,
     # is placeable, the operator only has to answer.
     from qa_tools.common import asset_time, git_identity
 
-    received_at = asset_time.now()
     try:
         who = git_identity.get_run_by()
     except git_identity.MissingGitIdentityError as exc:
@@ -420,6 +461,11 @@ def file_or_trial(paths, collection_id: str, run_id_prefix: str,
             f"user.email you@example.org`. Nothing was filed.") from None
     names = [Path(p).name for p in paths]
     answer = originally if originally is not None else _ask_original(names, storage_times)
+    # THE RECEIPT IS TAKEN ONCE THE PERSON HAS ANSWERED, not before: a
+    # long pause at the prompt otherwise sits between our receipt and the
+    # filing, and an automated arrival landing meanwhile would carry a
+    # later receipt but be recorded first.
+    received_at = asset_time.now()
     try:
         stated = hand_filing.resolve_original(answer, files=names, received_at=received_at,
                                               storage_times=storage_times)
@@ -559,3 +605,19 @@ def keep_from_flags(commit: bool, trial_flag: bool) -> bool | None:
     if trial_flag:
         return False
     return None
+
+
+def reference_suffix(result: dict) -> str:
+    """What a drift or volume verdict was compared across, for the
+    terminal report (REQ-QAC-108 criterion 14): where the red is the gap
+    rule's, the measurement's own verdict is said apart from it, and the
+    check is not called drift unless the measurement crossed its band."""
+    reason = result.get("reference_reason")
+    if not reason:
+        return ""
+    measured = result.get("measured_status")
+    if measured and result.get("status") == "fail" and measured != "fail":
+        return f" [dim](measured {measured} - red because {reason})[/dim]"
+    if result.get("reference_not_evaluated"):
+        return f" [dim]({reason})[/dim]"
+    return ""

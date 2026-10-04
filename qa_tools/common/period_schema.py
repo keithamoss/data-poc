@@ -430,6 +430,14 @@ NO_PRIOR_PERIOD = "no-prior-period"
 NOT_YET_DUE = "not-yet-due"
 PAST_DUE = "past-due"
 STAGED_AWAITING_DECISION = "staged-awaiting-decision"
+#: TWO FILES CLAIM THE TABLE and nothing is promoted to fall through to
+#: (REQ-PIPE-115 criteria 14 and 15). Outranks every slot reason: the
+#: supplier has sent the file - twice - so "overdue" would send somebody
+#: to chase them, and "no filled slot" hides that a person must choose.
+CONTESTED = "contested"
+#: THE FILE ARRIVED AND COULD NOT BE LOADED (REQ-DASH-148 criterion 6) -
+#: first of all: the supplier has sent it, so no slot reason is true.
+COULD_NOT_LOAD = "could-not-be-loaded"
 
 
 @dataclass(frozen=True)
@@ -458,6 +466,11 @@ class Unrunnable:
                      f"not yet overdue")
         if self.reason == PAST_DUE:
             return f"could not run - {listed} is overdue for this period"
+        if self.reason == COULD_NOT_LOAD:
+            return (f"could not run - {listed} arrived and could not be loaded")
+        if self.reason == CONTESTED:
+            return (f"could not run - two files claim {listed} for this period, waiting "
+                     f"for a person to choose one")
         if self.reason == STAGED_AWAITING_DECISION:
             return (f"could not run - a supply for {listed} is staged awaiting a "
                      f"decision, so nothing is promoted for this period yet")
@@ -470,7 +483,8 @@ class Unrunnable:
 #: reported should name an action the reader can actually take: a
 #: staged supply means "go and decide", where "overdue" would send them
 #: to chase a supplier who has already sent it.
-_MISSING_PRECEDENCE = (STAGED_AWAITING_DECISION, PAST_DUE, NOT_YET_DUE)
+_MISSING_PRECEDENCE = (COULD_NOT_LOAD, CONTESTED, STAGED_AWAITING_DECISION, PAST_DUE,
+                       NOT_YET_DUE)
 
 
 def _why_missing(missing: Sequence[str], supply_states: dict[str, str]) -> "Unrunnable":

@@ -16,12 +16,13 @@ import os
 
 import psycopg
 
-from qa_tools.common import hierarchy
+from qa_tools.common import hierarchy, left_out
 from qa_tools.common.evidently_common import (
     ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, NO_REFERENCE, WARN_ROW_DROP, FAIL_ROW_DROP,
     status_for_psi, status_for_row_drop, compute_psi, recorded_row_counts,
 )
 from qa_tools.common.csv_io import load_null_values_by_column
+from qa_tools.common import drift_reference
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
 from .evidently_check_lifecycle import PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_IDS
@@ -212,7 +213,8 @@ def _volume_results(run_id: str, run_timestamp: str, reference_run_id: str | Non
 
 
 def evaluate_evidently_cp(run_id: str, run_timestamp: str,
-                                reference_run_id: str | None = None) -> list[dict]:
+                                reference_run_id: str | None = None,
+        assessment=None) -> list[dict]:
     """Reads the warehouse for the current run and the RECORDED
     distribution for the reference (REQ-QAC-088, 2026-09-27) - the BDM
     counterpart carries the full account.
@@ -227,6 +229,13 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
     if _psi_applies(run_id):
         results.append(_psi_result(run_id, run_timestamp, reference_run_id))
     results.extend(_volume_results(run_id, run_timestamp, reference_run_id))
+    # WHAT IT DID NOT EVALUATE FOR WANT OF A TABLE (REQ-PIPE-115
+    # criterion 17) - a run that is not for cp_notifications skipping PSI
+    # is out of its scope, not left out, and the scope filter says so.
+    evaluated = {r["check_id"] for r in results}
+    left_out.note(run_id, "evidently", [
+        c for c in (PSI_CHECK_ID, *ROW_COUNT_GROWTH_CHECK_IDS.values())
+        if c not in evaluated and _unreadable_for(run_id, c)])
 
     # Written under the COLLECTION id, not this module's own table-scoped
     # DATASET_ID - 2026-09-16 fix, Keith's call: qa_results/ output stays
@@ -239,9 +248,22 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
     # per-table grouping; only the FILE location changes here.
     psi_snapshot = results[0].pop("_snapshot", None) if results and \
         results[0].get("check_id") == PSI_CHECK_ID else None
+    # THE GAP RULE (REQ-QAC-108 criteria 8 to 17) - drift_reference.judge.
+    drift_reference.judge(results, assessment)
     write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "evidently",
                      {"psi": psi_snapshot}, verified=results)
     return results
+
+
+def _unreadable_for(run_id: str, check_id: str) -> bool:
+    """Whether `check_id` went unevaluated because its table cannot be
+    read, rather than because it is another run's."""
+    from qa_tools.common import supply_db
+
+    table = ("cp_notifications" if check_id == PSI_CHECK_ID else
+             next(t for t, c in ROW_COUNT_GROWTH_CHECK_IDS.items() if c == check_id))
+    with supply_db.connect(read_only=True, label="mothman:evidently-cp") as conn:
+        return table in supply_db.resolution_for(conn, run_id).unreadable
 
 
 def _psi_applies(run_id: str) -> bool:

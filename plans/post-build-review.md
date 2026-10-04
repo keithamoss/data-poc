@@ -4425,7 +4425,7 @@ twice. It deliberately did not re-find the `TypeError`.
     so 144 carries the fix as a criterion (the arrival history reads the
     one receipt view) rather than a stopgap now.
 
-77. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An
+77. **[done, 2026-10-05]** **[Pipeline & publishing]** **An
     unreadable table no longer takes a run down - but its reds do not
     all exist, and none of them reach the dashboard.** Found by a
     verification probe Keith approved (REQ-PIPE-078 criteria 9-10 and
@@ -4502,6 +4502,18 @@ twice. It deliberately did not re-find the `TypeError`.
     because the bootstrapped history contains none until a scenario
     plants one - REQ-GEN-136's planted shapes are the natural place.
 
+    **GAPS 2-4 BUILT 2026-10-05 overnight (REQ-PIPE-115, sprint 6).** Gap
+    2's cause was the period overlay returning early for a supply with no
+    period, leaving staging's view of a HELD table readable; it now drops
+    that view and records the table held, and both orchestrators run no
+    tool when their own table is held, contested or refused at load (any
+    other reason raises). Tests `tests/test_unreadable_own_table.py`,
+    each confirmed failing first. Gap 3 (siblings saying absent for a
+    held table) and gap 4 (Birth Registrations' contested case) are its
+    criteria 14-16 and 23. The dataset-level red, the reconciliation of
+    what each tool left out, and the dashboard's as-of rule are the rest
+    of that requirement.
+
 78. **[investigate, 2026-10-04]** **[GitHub workflow & people]** **CI's
     bootstrap would write real GitHub tickets if it ever had a token.**
     Spotted by the agent prototyping REQ-TEST-116's equivalence test and
@@ -4537,7 +4549,7 @@ twice. It deliberately did not re-find the `TypeError`.
     **DECIDED 2026-10-04 (Keith):** folded into REQ-PIPE-107, signed - a
     newer schema is refused, and the downgrade is fixed failing-test-first.
 
-80. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **"Reject
+80. **[done, 2026-10-05]** **[Pipeline & publishing]** **"Reject
     the supply" is offered for a failed load, and may not work on one.**
     Raised by the delivery-scoper refreshing REQ-DASH-148, not yet
     reproduced here. The `failed-load` outstanding item
@@ -4579,6 +4591,15 @@ twice. It deliberately did not re-find the `TypeError`.
     REQ-GHUB-082 criterion 16. Not built. Two more defects found while
     drafting it are covered there: promoting a failed load records a
     promotion of nothing (153 criterion 6), and #84 below, fixed first.
+
+    **BUILT 2026-10-05 overnight (REQ-PIPE-153, sprint 6).** The kept
+    reproduction is `tests/test_filing_decisions.py::TestRejectingASupplyThatNeverLoaded`,
+    confirmed failing against the pre-fix `load_log.failures()` before the
+    fix: `failures()` now leaves out a failed load a PERSON has rejected,
+    derived from the decision log at read time and writing nothing to the
+    load record. A failed load filed to a period is listed in the
+    terminal's standing queue offering reject only; one filed to no period
+    is left to the held route; promoting one is refused on every route.
 
 81. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An
     automatic promotion records the git identity that ran the pipeline as
@@ -4883,3 +4904,77 @@ twice. It deliberately did not re-find the `TypeError`.
       criteria 38-39). And the criterion 30 proof's CLI capture was 80
       columns wide, and the synthetic corpus has no contested delivery, so
       the contested view is covered by tests rather than by the proof.
+
+96. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **delivery-critic
+    on REQ-PIPE-103 criteria 9-20 and REQ-PIPE-147 (commit e01c1fd).** Core
+    sound: criterion 11 holds - the stated arrival is display-only, verified
+    by reading every reader and by a live run. Findings, each verified
+    before being written here:
+    - FIXED - **prompts were drawn under the live progress bar**
+      (`cli/common.py`): "Keep this check?" appeared only once answered, the
+      file-names-become-public warning was never visible, and a typed
+      original-arrival time was not echoed. The bar now stops while a
+      person is asked anything (`paused_progress()`). Not unit-testable
+      without a pty; the critic's own `tui_drive.py` reproduction is the
+      check, and the next CLI critic pass re-drives it.
+    - FIXED - **a bare date was recorded as a midnight nobody stated**,
+      against the decision "date and time, not a bare date": `2026-09-20`,
+      `20260920` and `2026-W38-1` were all accepted. Refused now, pointing
+      at `not known`. `tests/test_stated_original_arrival.py::
+      TestResolvingTheAnswer::test_a_date_with_no_time_is_refused_not_recorded_as_midnight`,
+      confirmed failing first.
+    - FIXED - **receipts that disagreed about who filed a delivery were read
+      as whichever came last** (REQ-PIPE-147's NFR says refuse). Refused
+      now. `...::TestWhatAKeptSupplyRecords::test_receipts_that_disagree_about_who_filed_are_refused`,
+      confirmed failing first.
+    - FIXED - the NFR asking for proof that nothing decides on a typed date
+      had no test: `...::TestNothingDecidesOnATypedDate` files one file with
+      two statements and compares delivery and run id.
+    - FIXED - the receipt instant was taken BEFORE the person answered the
+      prompt, so thinking time sat between receipt and filing. Taken after.
+    - FIXED (wording) - the keep-default notice said `--keep`; the flag is
+      `--commit`.
+    - FIXED (process) - `plans/running-thoughts.md` #52 was not deleted in
+      the commit that built both its requirements; its two decisions no
+      requirement carried (records regenerated rather than backfilled; why
+      positional run ids keep the statement beside the receipt) moved into
+      REQ-PIPE-147's and REQ-PIPE-103's `decisions:` first.
+    - FOR KEITH - **a service identity hand-filing is recorded as a
+      person**: with `GITHUB_ACTIONS=true` the row reads `person` /
+      `github-actions:...`. Refuse hand-filing under a service identity, or
+      read "person" as "the hand route"? (Recommendation: refuse - a
+      record saying a person filed it should be true.)
+    - FOR KEITH - **the stated time has no instant column beside its text**,
+      which an NFR asks for; nothing queries it as an instant. Add one, or
+      amend the NFR? (Recommendation: amend - a display-only note needs no
+      index.)
+    - FOR KEITH - **schema version 19 was an in-place additive migration**
+      (`ALTER TABLE ... ADD COLUMN ... DEFAULT 'automated'`), not "regenerate,
+      never migrate". Moot today (no hand-filed rows existed), but it is a
+      departure from the NFR's wording.
+    - NOT FIXED, minor and logged: the statement prints straight after
+      filing rather than in the closing message (criterion 19's wording);
+      `--originally-received` is silently ignored with `--trial`; S3
+      LastModified is keyed by basename; `file_or_trial` resolves identity a
+      second time rather than taking the command's `run_by`;
+      `people.display_name` re-parses people.yaml per call; the S3 routes'
+      forwarding of `originally`/`storage_times` is verified by reading only.
+
+97. **[done, 2026-10-05]** **[Pipeline & publishing]** **dbt left out
+    checks over a contested table that was perfectly readable, and nobody
+    recorded them.** Found by REQ-PIPE-115 criterion 17's reconciliation on
+    its first full bootstrap - the run `cp_placements__202605270100000000`
+    was refused, as designed, and the batch stopped. `cp_carers` had two
+    versions staged for 2026-Q2 and FELL THROUGH to the period's promoted
+    version (REQ-PIPE-079 criterion 12), so it was both `resolved` and
+    `ambiguous`. Soda asks the catalogue, saw the view and ran its carers
+    checks; dbt asked `Resolution.unreadable`, which counted every ambiguous
+    name, and excluded `stg_cp_carers+` - taking two cp-placements checks
+    with it. The unrunnable rule correctly saw the table readable, so it
+    recorded nothing: two checks silently absent, reading as a pass. Exactly
+    the coincidence the reconciliation was signed to catch, on day one.
+    FIXED at the source: `Resolution.unreadable` no longer counts a name
+    that resolved (a run's OWN contested table is still withheld, by
+    `own_table`, which asks `ambiguous` directly).
+    `tests/test_unreadable_own_table.py::TestAContestedTableThatFellThroughIsReadable`,
+    confirmed failing first.

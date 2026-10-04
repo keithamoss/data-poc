@@ -247,6 +247,36 @@ def _scope_to_run(verified: list[dict], run_id: str) -> None:
             verified[i] = reevaluation.mark(record, caused_by=run_id)
 
 
+def scope_of_run(run_id: str):
+    """`_scope_to_run()`'s rule as a predicate on a check id - what the
+    left-out reconciliation (REQ-PIPE-115 criterion 17) compares within,
+    so the two cannot disagree about which checks are this run's.
+    Everything is in scope for a run id that names no table."""
+    from qa_tools.common import check_id as check_id_mod
+    from qa_tools.common import reevaluation, supply_db
+
+    owner = run_owner(run_id)
+    if owner is None:
+        return lambda check: True
+    dataset_id, table = owner
+    try:
+        conn = supply_db.connect(read_only=True, label="mothman:run-scope")
+        try:
+            contested = table in supply_db.resolution_for(conn, run_id).ambiguous
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001 - no resolution means nothing contested
+        contested = False
+    readers = reevaluation.plan(table=table, period=_period_of_run(dataset_id, run_id),
+                                reads=_declared_reads_tables()).check_ids
+
+    def in_scope(check: str) -> bool:
+        parsed = check_id_mod.try_parse(check)
+        own = parsed is not None and parsed.dataset == dataset_id
+        return (own and not contested) or check in readers
+    return in_scope
+
+
 def _period_of_run(dataset_id: str, run_id: str) -> str:
     """The period this run's supply was filed to, or "" where that cannot
     be read - it is carried on the plan for the record, and never decides

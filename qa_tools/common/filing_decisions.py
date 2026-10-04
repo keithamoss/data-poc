@@ -309,6 +309,32 @@ def _is_promoted(conn, request: Request) -> bool:
         conn, request.dataset_id, request.period) == request.supply
 
 
+def _refuse_promoting_what_never_loaded(conn, request: Request) -> None:
+    """REQ-PIPE-153 criterion 6: a supply whose current load record is
+    FAILED cannot be promoted, on any route. Promotion moves the tables it
+    is given - none - and would record a period filled by a supply nothing
+    can read. Refused naming the failed load and its recorded reason, and
+    before anything is written."""
+    if request.operation != PROMOTE or "@" not in (request.supply or ""):
+        return
+    from qa_tools.common import load_log
+
+    key = request.supply.rsplit("@", 1)[1].split("#", 1)[0]
+    try:
+        table = hierarchy.dataset(request.dataset_id).table
+    except hierarchy.UnknownDatasetError:
+        return
+    for physical, record in load_log.latest_by_table(conn=conn).items():
+        parts = supply_db.split_staged(physical)
+        if (parts and parts[0] == table and parts[1] == key
+                and record.dataset_id == request.dataset_id and not record.loaded):
+            why = record.reason or "no reason was recorded"
+            raise decision_log.DecisionRefused(
+                f"{request.supply} could not be loaded ({why}), so there is nothing "
+                f"to promote. Reject it, or fix the fault and reprocess the delivery. "
+                f"Nothing was recorded.")
+
+
 def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     """Raise one filing decision, from whichever route.
 
@@ -335,6 +361,7 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
         with supply_db.connect(label="mothman:filing-decision") as opened:
             return apply(request, effective_at=effective_at, conn=opened)
 
+    _refuse_promoting_what_never_loaded(conn, request)
     already = _already(conn, request)
     if already is not None:
         return Outcome(operation=request.operation, dataset_id=request.dataset_id,

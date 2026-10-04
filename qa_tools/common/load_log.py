@@ -245,8 +245,28 @@ def failures(trial: str | None = None,
     to read it changed, and deliveries are immutable on disk, so a
     reprocess re-reads the same bytes.
     """
-    return sorted((e for e in latest_by_table(trial, conn).values() if not e.loaded),
+    with _db(conn) as db:
+        latest = latest_by_table(trial, db)
+        # A PERSON'S REJECTION SETTLES IT (REQ-PIPE-153 criteria 3 and 4):
+        # read from the decision log here, at read time, and never by
+        # writing, editing or deleting a load record - so there is no
+        # window in which the log says rejected and the queue says waiting.
+        settled = _settled_by_rejection(db)
+    return sorted((e for e in latest.values() if not e.loaded
+                   and (e.dataset_id, (supply_db.split_staged(e.physical) or ("", ""))[1])
+                   not in settled),
                   key=lambda e: (e.delivery, e.dataset_id))
+
+
+def _settled_by_rejection(db) -> set[tuple[str, str]]:
+    """(dataset, arrival key) for every supply a PERSON has rejected."""
+    from qa_tools.common import dataset_blockers, decision_log
+
+    return {(dataset_id, dataset_blockers._arrival_of(supply))
+            for dataset_id, supply in db.execute(
+                "SELECT dataset_id, supply FROM qa.decision "
+                "WHERE action = ? AND actor_kind = ?",
+                [decision_log.REJECT, decision_log.PERSON]).fetchall()}
 
 
 def delivery_is_processed(delivery: str, expected: set[str] | frozenset[str],
@@ -270,3 +290,38 @@ def delivery_is_processed(delivery: str, expected: set[str] | frozenset[str],
             f"WHERE delivery = ? AND {_REAL_ONLY} ORDER BY physical, id DESC",
             [delivery]).fetchall()}
     return bool(expected) and set(expected) <= have
+
+
+
+def own_words(exc: BaseException) -> str:
+    """Why a load failed, in OUR OWN WORDS only (REQ-DASH-148 criterion 13).
+
+    A loading library's message can quote a row - a value it could not
+    convert, the line it could not split - and the recorded reason is
+    published on a dashboard that, in a real deployment, sits over child
+    protection data. So the reason is rebuilt from what the fault IS: its
+    kind, a line number, field counts, a byte offset. Nothing the library
+    said is copied. (REJECTED recording the message and redacting it: a
+    redactor has to know every shape a row can leak in - Keith,
+    2026-10-04.) The library's own message goes to standard error only,
+    for whoever ran the load.
+    """
+    import re
+
+    text = str(exc)
+    name = type(exc).__name__
+    if name == "ParserError":
+        m = re.search(r"Expected (\d+) fields in line (\d+), saw (\d+)", text)
+        if m:
+            return (f"malformed row: line {m.group(2)} has {m.group(3)} fields where "
+                    f"{m.group(1)} were expected")
+        return "the file could not be split into rows and columns"
+    if name == "EmptyDataError":
+        return "the file is empty"
+    if isinstance(exc, UnicodeDecodeError):
+        return f"the file is not valid text in the expected encoding (byte {exc.start})"
+    if isinstance(exc, FileNotFoundError):
+        return "the file was not found"
+    if isinstance(exc, ValueError):
+        return "a value could not be read as its column's type"
+    return f"the file could not be read ({name})"

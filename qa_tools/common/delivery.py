@@ -610,18 +610,28 @@ def _receipt_extras(name: str, receipts_dir, files) -> tuple[dict[str, str], dic
     """
     receipt_dir = Path(receipts_dir or RECEIPTS_DIR) / name
     stated: dict[str, str] = {}
-    filed_by: dict = dict(AUTOMATED)
+    seen: list[tuple[str, dict]] = []
     for filename in files:
         path = receipt_dir / f"{filename}.json"
         if not path.is_file():
             continue
         record = json.loads(path.read_text())
-        if isinstance(record.get("filed_by"), dict) and record["filed_by"].get("kind"):
-            filed_by = record["filed_by"]
+        given = record.get("filed_by")
+        seen.append((filename, given if isinstance(given, dict) and given.get("kind")
+                     else dict(AUTOMATED)))
         original = record.get("originally_received")
         if isinstance(original, dict) and original.get("value"):
             stated[filename] = original["value"]
-    return stated, filed_by
+    # ONE DELIVERY, ONE ANSWER TO WHO FILED IT (REQ-PIPE-147's NFR). A
+    # delivery whose receipts disagree is refused rather than read as
+    # whichever came last - which is what it used to do, silently.
+    distinct = {json.dumps(f, sort_keys=True) for _, f in seen}
+    if len(distinct) > 1:
+        raise DeliveryFormatError(
+            f"delivery {name!r}: its receipts disagree about who filed it - "
+            + "; ".join(f"{fn}: {json.dumps(f, sort_keys=True)}" for fn, f in seen)
+            + ". Nothing is read from a delivery whose own record contradicts itself.")
+    return stated, (seen[0][1] if seen else dict(AUTOMATED))
 
 
 @dataclass(frozen=True)

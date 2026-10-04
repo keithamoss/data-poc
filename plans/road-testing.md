@@ -1976,6 +1976,54 @@ judgement about who reads the page rather than about the rule.
         accepted spellings of "not known"; where the prompt appears in flag
         mode; one-answer-for-all when the S3 set is declined; people.yaml
         name shown where one exists, else the identity.
+      - SPRINT 5 CRITIC (post-build-review #96): core sound. FIXED: prompts
+        drawn under the live progress bar (unreadable, typed time not
+        echoed); a bare date recorded as midnight; receipts disagreeing
+        about who filed accepted; the receipt instant taken before the
+        person answered; `--keep` named instead of `--commit`; #52 not
+        deleted. FOR KEITH (#96): a GitHub Actions identity hand-filing is
+        recorded as a PERSON (rec: refuse); the stated time has no instant
+        column (rec: amend the NFR); schema 19 was an additive migration,
+        not "regenerate, never migrate".
+      - SPRINT 6 DONE: REQ-PIPE-115, REQ-QAC-108's amendment, REQ-DASH-148
+        and REQ-PIPE-153 BUILT (148 and 153 with criteria waiting on the
+        unbuilt REQ-DASH-133/REQ-PIPE-132/140/151; 108 c17's "accepted as
+        not supplied" half waits on 132). A held, contested or unloadable
+        supply now runs NO tool and its dataset reads RED, once, with the
+        reason, rolled up, judged as at the date on show from the supply's
+        receipt; siblings say held/contested/could-not-be-loaded ahead of
+        slot reasons; each run reconciles what its tools left out against
+        its not-evaluated records; a failed load can be rejected from the
+        queue (and promotion is refused); its reason is in our own words.
+        Proved on a fresh bootstrap (supply6): 0 tool verdicts on the nine
+        held supplies (18 each before).
+        **HIGH-VALUE, PLEASE READ FIRST - THE GAP CASCADE (REQ-QAC-108).**
+        Built as signed, and it changes the demo corpus drastically: once
+        one owed period has no accepted supply, the next supply's drift and
+        volume checks are red "compared across a gap" (c8), red is not
+        auto-promoted (c15), so the period after has a gap too - every later
+        supply of that dataset waits for a person. Nobody acts in a
+        bootstrap, so it promoted 9 supplies where it promoted 67 before,
+        and 172 of 193 Evidently results are gap reds (the measurement kept
+        beside each). Birth Registrations stops at its first red day. Two
+        e2e tests that needed ambers now read gap reds at their measured
+        verdict. Options: (a) keep - it is what a person would see in real
+        life, and the corpus needs a simulated person; (b) let a gap red
+        NOT count against promotion (drop c15's half), so the red is
+        information only; (c) count a gap only once its slot has CLOSED
+        (REQ-PIPE-131's sense) rather than when merely overdue - softens a
+        daily feed, not a quarterly one. Recommendation: (b) - a red that
+        explains a comparison, without blocking, keeps the warning and
+        stops one missed period freezing a dataset; but it reverses a
+        signed criterion, so it is yours.
+        ALSO FOR KEITH: Case Workers reads red from May 2023 on - its nine
+        May/November supplies are held (it only takes Feb/Aug) and a hold
+        is red until resolved (115 c10); PROVISIONAL choices on 115 (held
+        outranks an ended schedule; a sibling says held only when it cannot
+        read the table; unrunnable keeps one record per check while c2 says
+        per table - #91's invariant says per check); the reconciliation
+        caught a REAL defect on its first bootstrap (#97, two checks
+        silently missing when a contested table fell through).
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

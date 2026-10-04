@@ -553,3 +553,21 @@ def test_a_run_that_measured_nothing_is_not_current(tmp_path, monkeypatch):
 
     assert data["rowCount"] == 4 and data["prevRowCount"] == 3
     assert "run_003" in {a["run_id"] for a in data["arrivalHistory"]}
+
+
+def test_a_headline_check_with_no_value_for_a_run_does_not_crash_the_build(tmp_path, monkeypatch):
+    """REAL DEFECT, exposed 2026-10-05 by REQ-QAC-108's gap rule: a red
+    drift check became the `sex` column's headline check, and its first
+    run - measured against nothing - has no value. byRun multiplied by
+    it and the whole build raised TypeError. A run the headline check has
+    no number for simply has no byRun entry."""
+    _no_retired_checks(monkeypatch)
+    results = [_check("run_001", "sex", None, status="nodata"),
+               _check("run_002", "sex", 1, status="fail")]
+    path = tmp_path / "results_bdm.json"
+    path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": results,
+                                "dataset_stats": FIXTURE_DATASET_STATS}))
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(path))
+    data = bdd.build()
+    sex = next(c for c in data["columns"] if c["name"] == "sex")
+    assert set(sex["stats"]["byRun"]) == {"run_002"}

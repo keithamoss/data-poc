@@ -719,6 +719,16 @@ def _real_amber_bdm_runs() -> list[tuple[str, str]]:
     previous = os.environ.get("MOTHMAN_SUPPLY_DSN")
     if dsn:
         os.environ["MOTHMAN_SUPPLY_DSN"] = dsn
+    # A GAP RED IS READ AT ITS MEASURED VERDICT here (REQ-QAC-108, 2026-10-05):
+    # once one owed day has no accepted supply, every later Birth
+    # Registrations supply is red for the gap, and these tests are about
+    # amber badges, not about the gap rule - which has its own tests.
+    for column in dataset.get("columns", []):
+        for check in column.get("checks", []):
+            for h in check.get("history", []):
+                measured = (h.get("reference") or {}).get("measuredStatus")
+                if measured:
+                    h["status"] = measured
     try:
         amber = {run_id for run_id, status in status_by_run(dataset).items()
                  if status == "amber"}
@@ -1577,34 +1587,34 @@ class TestAnExhaustedScheduleIsLoud:
     DS = {"tier": "dataset", "agencyId": CP, "collectionId": "child-protection",
           "datasetId": "cp-case-workers"}
 
-    def test_nothing_is_said_while_the_calendar_still_has_dates(self, page, built_dashboard_html):
-        _goto(page, built_dashboard_html, as_of=self.NONE_EXHAUSTED)
+    def test_nothing_is_said_while_the_calendar_still_has_dates(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, as_of=self.NONE_EXHAUSTED)
         assert page.locator(".notice-exhausted").count() == 0
 
-    def test_the_executive_tier_says_how_many_above_the_grid(self, page, built_dashboard_html):
-        _goto(page, built_dashboard_html, as_of=self.ONE_EXHAUSTED)
+    def test_the_executive_tier_says_how_many_above_the_grid(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, as_of=self.ONE_EXHAUSTED)
         notice = page.locator(".notice-exhausted")
         assert notice.count() == 1
         text = " ".join(notice.inner_text().split())
         assert "1 dataset cannot be processed" in text
         assert "schedule has ended" in text
 
-    def test_the_count_tracks_the_as_of_date(self, page, built_dashboard_html):
-        _goto(page, built_dashboard_html, as_of=self.ALL_EXHAUSTED)
+    def test_the_count_tracks_the_as_of_date(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, as_of=self.ALL_EXHAUSTED)
         text = " ".join(page.locator(".notice-exhausted").inner_text().split())
         assert "6 datasets cannot be processed" in text
 
-    def test_the_notice_names_the_file_to_edit(self, page, built_dashboard_html):
-        _goto(page, built_dashboard_html, as_of=self.ONE_EXHAUSTED)
+    def test_the_notice_names_the_file_to_edit(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, as_of=self.ONE_EXHAUSTED)
         text = " ".join(page.locator(".notice-exhausted").inner_text().split())
         assert "contract/data-asset.yaml" in text
         assert "candidate-dates" in text, "and how to get the next dates proposed"
 
-    def test_the_notice_cannot_be_dismissed(self, page, built_dashboard_html):
+    def test_the_notice_cannot_be_dismissed(self, page, dashboard_html_without_blockers):
         """A dismissible notice about a task nobody has done is a notice
         about a task nobody will do - and a dismissal persisted in
         browser storage would hide it for that person permanently."""
-        _goto(page, built_dashboard_html, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, as_of=self.ONE_EXHAUSTED)
         assert page.locator(".notice-exhausted button").count() == 0
         assert page.locator(".notice-exhausted [role=button]").count() == 0
         stored = page.evaluate(
@@ -1612,45 +1622,45 @@ class TestAnExhaustedScheduleIsLoud:
         assert "exhaust" not in stored.lower(), stored
         assert "dismiss" not in stored.lower(), stored
 
-    def test_one_exhausted_dataset_among_five_healthy_is_not_swallowed(self, page, built_dashboard_html):
+    def test_one_exhausted_dataset_among_five_healthy_is_not_swallowed(self, page, dashboard_html_without_blockers):
         """The nodata trap, at the tier it would vanish from."""
-        _goto(page, built_dashboard_html, state={"tier": "agency", "agencyId": self.CP},
+        _goto(page, dashboard_html_without_blockers, state={"tier": "agency", "agencyId": self.CP},
               as_of=self.ONE_EXHAUSTED)
         rows = page.locator("tr", has=page.locator("td", has_text="Delivery schedule ended"))
         assert rows.count() == 1
         assert "Case Workers" in rows.first.inner_text()
 
-    def test_the_dataset_itself_says_so_in_its_own_words(self, page, built_dashboard_html):
-        _goto(page, built_dashboard_html, state=self.DS, as_of=self.ONE_EXHAUSTED)
+    def test_the_dataset_itself_says_so_in_its_own_words(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, state=self.DS, as_of=self.ONE_EXHAUSTED)
         text = " ".join(page.locator("#view").inner_text().split())
         assert "delivery schedule has ended" in text.lower()
         assert "contract/data-asset.yaml" in text
 
-    def test_it_names_the_datasets_own_last_period_not_its_calendars(self, page, built_dashboard_html):
+    def test_it_names_the_datasets_own_last_period_not_its_calendars(self, page, dashboard_html_without_blockers):
         """cp-case-workers' last owed period is 2027-Q3; the quarterly
         calendar runs to 2027-Q4. Naming the calendar's would tell a
         reader their dataset ended after a period it never had."""
-        _goto(page, built_dashboard_html, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, state=self.DS, as_of=self.ONE_EXHAUSTED)
         text = " ".join(page.locator("#view").inner_text().split())
         assert "2027-Q3" in text
         assert "2027-Q4" not in text
 
-    def test_it_reads_differently_from_a_dataset_that_simply_has_no_run(self, page, built_dashboard_html):
+    def test_it_reads_differently_from_a_dataset_that_simply_has_no_run(self, page, dashboard_html_without_blockers):
         """Both are quiet tiles. Only one of them is somebody's job, and
         identical wording is exactly what would hide that."""
-        _goto(page, built_dashboard_html, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, state=self.DS, as_of=self.ONE_EXHAUSTED)
         ended = " ".join(page.locator("#view").inner_text().split())
-        _goto(page, built_dashboard_html, state=self.DS, as_of="2023-01-01")
+        _goto(page, dashboard_html_without_blockers, state=self.DS, as_of="2023-01-01")
         no_run = " ".join(page.locator("#view").inner_text().split())
         assert ended != no_run
         assert "schedule has ended" in ended.lower()
         assert "schedule has ended" not in no_run.lower()
 
-    def test_it_is_not_rendered_as_red(self, page, built_dashboard_html):
+    def test_it_is_not_rendered_as_red(self, page, dashboard_html_without_blockers):
         """A supplier's clean dataset reading red because WE forgot to
         type next year's dates is an attribution error, and the fastest
         way to teach people that red does not mean what it says."""
-        _goto(page, built_dashboard_html, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, state=self.DS, as_of=self.ONE_EXHAUSTED)
         # `.view-head` rather than `#view h2` since 2026-09-25: the
         # status pill moved OUT of the heading and into the right-hand
         # cluster every other dataset page puts it in
@@ -1662,7 +1672,7 @@ class TestAnExhaustedScheduleIsLoud:
         assert head.locator(".pill.exhausted").count() == 1
         assert head.locator(".pill.red").count() == 0
 
-    def test_the_page_still_has_zero_console_errors(self, clean_page, built_dashboard_html):
+    def test_the_page_still_has_zero_console_errors(self, clean_page, dashboard_html_without_blockers):
         """`clean_page`, NOT `page` (plans/post-build-review.md #43).
 
         This used to take the plain `page` fixture and register only a
@@ -1673,8 +1683,8 @@ class TestAnExhaustedScheduleIsLoud:
         `pageerror` all along, and asserts them empty in teardown.
         """
         for as_of in (self.NONE_EXHAUSTED, self.ONE_EXHAUSTED, self.ALL_EXHAUSTED):
-            _goto(clean_page, built_dashboard_html, as_of=as_of)
-            _goto(clean_page, built_dashboard_html, state=self.DS, as_of=as_of)
+            _goto(clean_page, dashboard_html_without_blockers, as_of=as_of)
+            _goto(clean_page, dashboard_html_without_blockers, state=self.DS, as_of=as_of)
 
 
 def _contrast(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
@@ -2299,38 +2309,38 @@ class TestAnExhaustedDatasetStillShowsItsHistory:
         page.wait_for_timeout(400)
 
     def test_the_message_is_still_there_and_still_first(self, clean_page,
-                                                         built_dashboard_html):
-        self._open(clean_page, built_dashboard_html)
+                                                         dashboard_html_without_blockers):
+        self._open(clean_page, dashboard_html_without_blockers)
         text = clean_page.locator("#view").inner_text()
         assert "delivery schedule has ended" in text.lower()
 
     def test_the_columns_are_reachable_rather_than_replaced(self, clean_page,
-                                                             built_dashboard_html):
-        self._open(clean_page, built_dashboard_html)
+                                                             dashboard_html_without_blockers):
+        self._open(clean_page, dashboard_html_without_blockers)
         assert clean_page.locator(".column-tile, .col-tile").count() > 0, (
             "the whole page is still the message - 7 columns of real history are hidden")
 
     def test_the_supply_history_is_reachable_too(self, clean_page,
-                                                  built_dashboard_html):
-        self._open(clean_page, built_dashboard_html)
+                                                  dashboard_html_without_blockers):
+        self._open(clean_page, dashboard_html_without_blockers)
         assert clean_page.locator("#supply-history-toggle, .supply-history").count() > 0
 
     def test_the_head_still_says_the_schedule_ended(self, clean_page,
-                                                     built_dashboard_html):
+                                                     dashboard_html_without_blockers):
         """Showing history under the message must not make the page look
         ordinary at a glance - but the pill belongs where every other
         dataset's status pill is, which is the right-hand cluster.
         Putting a second one in the <h2> was the shape #53 complains
         about (a reader who has learned "status is top-right" finding it
         top-left), and the first draft of #13 did exactly that."""
-        self._open(clean_page, built_dashboard_html)
+        self._open(clean_page, dashboard_html_without_blockers)
         assert clean_page.locator("#view h2 .pill.exhausted").count() == 0
         assert clean_page.locator(".view-head .pill.exhausted").count() == 1
 
-    def test_it_renders_without_throwing(self, clean_page, built_dashboard_html):
+    def test_it_renders_without_throwing(self, clean_page, dashboard_html_without_blockers):
         """clean_page's teardown asserts no console error - the whole
         point, since this path never ran the normal renderer before."""
-        self._open(clean_page, built_dashboard_html)
+        self._open(clean_page, dashboard_html_without_blockers)
         assert clean_page.locator("#view h2").count() == 1
 
 
@@ -3059,8 +3069,14 @@ class TestCrossTableChecks:
                 .find(c=>c.id === "child-protection");
             const ds = cp.datasets.find(d=>d.id === "cp-carers");
             const scoped = ds.columns.filter(c=>c.scope === "cross-table");
-            const without = {columns: ds.columns.filter(c=>c.scope !== "cross-table")};
-            const withAll = datasetStatusByRun(ds);
+            // A GAP RED IS READ AT ITS MEASURED VERDICT (REQ-QAC-108): it is
+            // the gap rule's red, not cp-carers' own data, and this test
+            // is about folding cross-table checks in.
+            const measured = c => ({...c, checks: (c.checks||[]).map(ck => ({...ck,
+                history: (ck.history||[]).map(h => h.reference && h.reference.measuredStatus
+                    ? {...h, status: h.reference.measuredStatus} : h)}))});
+            const without = {columns: ds.columns.filter(c=>c.scope !== "cross-table").map(measured)};
+            const withAll = datasetStatusByRun({...ds, columns: ds.columns.map(measured)});
             const ownOnly = datasetStatusByRun(without);
             const turned = [];
             for(const [runId, status] of withAll){
@@ -3400,3 +3416,206 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         clean_page.locator('[data-testid="standing-in-drill"]').click()
         clean_page.locator('[data-testid="arrival-back"]').click()
         assert errors == []
+
+
+def _with_blockers(built: Path, out: Path, blockers: list) -> Path:
+    """The built page with its OUTSTANDING record's blockers replaced -
+    only that one const rewritten, every other byte the real build."""
+    root = Path(__file__).resolve().parent.parent / "dashboard"
+    for name in ("fonts", "vendor"):
+        if not (out.parent / name).exists():
+            (out.parent / name).symlink_to((root / name).resolve())
+    html = built.read_text()
+    start = html.index("const OUTSTANDING = ") + len("const OUTSTANDING = ")
+    end = html.index(";\n", start)
+    record = json.loads(html[start:end])
+    record["blockers"] = blockers
+    out.write_text(html[:start] + json.dumps(record, separators=(",", ":")) + html[end:])
+    return out
+
+
+@pytest.fixture(scope="class")
+def dashboard_html_without_blockers(built_dashboard_html, tmp_path_factory) -> Path:
+    """The built page with no held supply or contested pair in it.
+
+    WHY THE ENDED-SCHEDULE TESTS NEED IT (REQ-PIPE-115, 2026-10-05). The
+    real corpus files cp-case-workers' May and November supplies to no
+    period - it takes only February and August, so REQ-PIPE-131 holds
+    them - and nobody resolves a hold in a bootstrap. An open hold makes
+    the dataset RED, and red OUTRANKS an ended schedule (PROVISIONAL): a
+    file is here waiting on a person, so "no supply expected" would be
+    untrue. Those tests are about the ended schedule alone, so they read
+    a page where nothing is held; TestHeldOutranksAnEndedSchedule covers
+    the two together.
+    """
+    tmp = tmp_path_factory.mktemp("noblockers")
+    return _with_blockers(built_dashboard_html, tmp / "dashboard_no_blockers.html", [])
+
+
+@pytest.fixture(scope="class")
+def dashboard_html_with_blockers(built_dashboard_html, tmp_path_factory) -> Path:
+    """Exactly two blockers - one held supply, one contested pair - in
+    place of whatever the deployment held, so REQ-PIPE-115 criterion 13
+    is asserted against a known case rather than a corpus that may have
+    none of either."""
+    opened = TestAHeldOrContestedDatasetReadsRed.OPENED
+    tmp = tmp_path_factory.mktemp("blockers")
+    return _with_blockers(built_dashboard_html, tmp / "dashboard_with_blockers.html", [
+        {"kind": "held", "datasetId": "cp-carers", "supply": "cp-carers@k1",
+         "openedAt": opened, "resolvedAt": None,
+         "reason": "cp-carers@k1 could not be placed - no slot was open.",
+         "files": [], "loadFailures": [], "delivery": "d1"},
+        {"kind": "contested", "datasetId": "cp-clients", "supply": "cp-clients@k2#1",
+         "openedAt": opened, "resolvedAt": None,
+         "reason": "Two files claim this dataset's table: a.csv and b.csv.",
+         "files": ["a.csv", "b.csv"], "loadFailures": [], "delivery": "d2"}])
+
+
+class TestAHeldOrContestedDatasetReadsRed:
+    """REQ-PIPE-115 criterion 13: one dataset held, another contested;
+    each reads red with its reason, the red rolls up to its collection
+    and agency, and none of its own checks reads as passing."""
+
+    OPENED = "2026-09-01T02:00:00+00:00"
+    AS_OF = "2026-09-23"
+    BEFORE = "2026-08-20"
+    CP = "child-protection-family-support"
+
+    def _ds(self, dataset_id):
+        return {"tier": "dataset", "agencyId": self.CP, "collectionId": "child-protection",
+                "datasetId": dataset_id}
+
+    def test_each_reads_red_with_its_reason_at_the_agency_tier(self, page,
+                                                               dashboard_html_with_blockers):
+        _goto(page, dashboard_html_with_blockers, state={"tier": "agency", "agencyId": self.CP},
+              as_of=self.AS_OF)
+        held = page.locator("tr[data-blocked=held]")
+        contested = page.locator("tr[data-blocked=contested]")
+        assert held.count() == 1 and contested.count() == 1
+        assert "Carer Register" in held.inner_text() and "Held" in held.inner_text()
+        assert "Two files, choose one" in contested.inner_text()
+        for row in (held, contested):
+            assert row.locator(".pill.red").count() == 1
+            # One reason row: no row count, run date or sparkline beside it.
+            assert row.locator("svg").count() == 0
+
+    def test_the_red_rolls_up_to_the_collection_and_the_agency(self, page,
+                                                               dashboard_html_with_blockers):
+        _goto(page, dashboard_html_with_blockers, state={"tier": "agency", "agencyId": self.CP},
+              as_of=self.AS_OF)
+        statuses = page.evaluate(f"""() => {{
+            const ag = DATA.agencies.find(a => a.id === "{self.CP}");
+            return {{agency: ag.status, collection: ag.collections[0].status}};
+        }}""")
+        assert statuses == {"agency": "red", "collection": "red"}
+
+    @pytest.mark.parametrize("dataset_id", ["cp-carers", "cp-clients"])
+    def test_none_of_its_own_checks_reads_as_passing(self, page, dashboard_html_with_blockers,
+                                                     dataset_id):
+        _goto(page, dashboard_html_with_blockers, state=self._ds(dataset_id), as_of=self.AS_OF)
+        got = page.evaluate(f"""() => {{
+            const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+                           .find(d => d.id === "{dataset_id}");
+            return {{status: ds.status,
+                     checks: [...new Set(ds.columns.flatMap(c => c.checks).map(checkStatus))],
+                     columns: [...new Set(ds.columns.map(c => c.status))]}};
+        }}""")
+        assert got["status"] == "red"
+        assert got["checks"] in ([], ["nodata"]) and got["columns"] in ([], ["nodata"])
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "nothing is checked for this dataset until a person resolves it" in text
+        assert page.locator("#col-grid .pill.green").count() == 0
+
+    def test_its_supply_history_lists_it(self, page, dashboard_html_with_blockers):
+        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), as_of=self.AS_OF)
+        assert page.locator("tr[data-blocker=held]").count() == 1
+
+    def test_before_its_receipt_nothing_is_red_for_it(self, page, dashboard_html_with_blockers):
+        """Criterion 12: open from the supply's own receipt, so the as-of
+        view of an earlier date shows what a reader saw then."""
+        _goto(page, dashboard_html_with_blockers, state={"tier": "agency", "agencyId": self.CP},
+              as_of=self.BEFORE)
+        assert page.locator("tr[data-blocked]").count() == 0
+
+
+class TestHeldOutranksAnEndedSchedule:
+    """The two together (PROVISIONAL, 2026-10-05): a held supply on a
+    dataset whose schedule has ended reads RED with the hold's reason,
+    not as the quiet ended-schedule row - a file arrived and waits on a
+    person, so "no supply expected" would be untrue."""
+
+    def test_the_row_says_held(self, page, built_dashboard_html, tmp_path):
+        out = _with_blockers(built_dashboard_html, tmp_path / "both.html", [
+            {"kind": "held", "datasetId": "cp-case-workers", "supply": "cp-case-workers@k",
+             "openedAt": "2027-08-20T02:00:00+00:00", "resolvedAt": None,
+             "reason": "could not be placed", "files": [], "loadFailures": []}])
+        _goto(page, out, state={"tier": "agency", "agencyId": "child-protection-family-support"},
+              as_of="2027-09-15")
+        row = page.locator("tr[data-blocked=held]")
+        assert row.count() == 1 and "Case Workers" in row.inner_text()
+        assert row.locator(".pill.red").count() == 1
+
+
+class TestASupplyThatCouldNotBeLoaded:
+    """REQ-DASH-148 criterion 9 and REQ-PIPE-153 criterion 15: one Child
+    Protection table could not be loaded while the other five loaded. Its
+    dataset reads red with the reason and rolls up; none of its own checks
+    reads as passing; the other five are checked as usual. Once a person
+    rejects it, it is no longer red on that account - and still is as at
+    an instant between the failure and the rejection."""
+
+    CP = "child-protection-family-support"
+    FAILED = "2026-09-01T02:00:00+00:00"
+    REJECTED = "2026-09-10T02:00:00+00:00"
+
+    def _page(self, built, tmp_path, *, rejected: bool):
+        return _with_blockers(built, tmp_path / f"refused{int(rejected)}.html", [
+            {"kind": "refused", "datasetId": "cp-placements", "supply": "cp-placements@k",
+             "openedAt": self.FAILED,
+             "resolvedAt": self.REJECTED if rejected else None,
+             "reason": "The supply could not be loaded: malformed row: line 3 has 4 fields "
+                       "where 2 were expected. Nothing can read the table, so nothing is checked.",
+             "files": [], "loadFailures": [], "delivery": "d",
+             "rejected": ({"actor": "Keith Moss", "at": self.REJECTED,
+                           "reason": "supplier is resending"} if rejected else None)}])
+
+    def _status(self, page, dataset_id):
+        return page.evaluate(f"""() => DATA.agencies.flatMap(a => a.collections)
+            .flatMap(c => c.datasets).find(d => d.id === "{dataset_id}").status""")
+
+    def test_it_reads_red_with_the_reason_and_the_rest_are_checked(self, page, tmp_path,
+                                                                   built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path, rejected=False)
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, as_of="2026-09-23")
+        row = page.locator("tr[data-blocked=refused]")
+        assert row.count() == 1 and "Could not be loaded" in row.inner_text()
+        assert self._status(page, "cp-placements") == "red"
+        assert page.evaluate(f"""() => DATA.agencies.find(a => a.id === "{self.CP}").status""") == "red"
+        others = page.evaluate("""() => DATA.agencies.flatMap(a => a.collections)
+            .flatMap(c => c.datasets).filter(d => d.id.startsWith("cp-") && d.id !== "cp-placements")
+            .map(d => !!d.blocked)""")
+        assert others and not any(others)
+
+    def test_its_own_checks_do_not_read_as_passing(self, page, tmp_path, built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path, rejected=False)
+        _goto(page, out, state={"tier": "dataset", "agencyId": self.CP,
+                                "collectionId": "child-protection", "datasetId": "cp-placements"},
+              as_of="2026-09-23")
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "line 3 has 4 fields" in text
+        assert page.locator("#col-grid .pill.green").count() == 0
+
+    def test_a_rejection_settles_it_and_the_as_of_view_still_shows_it(self, page, tmp_path,
+                                                                     built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path, rejected=True)
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, as_of="2026-09-23")
+        assert page.locator("tr[data-blocked=refused]").count() == 0
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, as_of="2026-09-05")
+        assert page.locator("tr[data-blocked=refused]").count() == 1
+        _goto(page, out, state={"tier": "dataset", "agencyId": self.CP,
+                                "collectionId": "child-protection", "datasetId": "cp-placements"},
+              as_of="2026-09-23")
+        row = page.locator("tr[data-blocker=refused]")
+        assert row.count() == 1
+        assert "rejected by Keith Moss" in row.inner_text()
+        assert "supplier is resending" in row.inner_text()

@@ -26,6 +26,7 @@ scratch file.
 """
 from __future__ import annotations
 import os
+import sys
 
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 from qa_tools.common import arrivals, asset_time, load_log, sample_data, supply_db, supply_holds, trial
@@ -145,9 +146,12 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
             conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
             load_log.record_load(delivery_name, DATASET_ID, physical, load_log.FAILED,
                              asset_time.now().isoformat(),
-                             reason=f"{type(exc).__name__}: {exc}", trial=trial_scope)
-            print(f"{run_id}: {TABLE} FAILED to load ({type(exc).__name__}: {exc}) "
-                  f"- no table staged, recorded for human action")
+                             reason=load_log.own_words(exc), trial=trial_scope)
+            # THE LIBRARY'S OWN MESSAGE ONLY HERE, on standard error, for
+            # whoever ran the load - it can quote a row, and the recorded
+            # reason is published (REQ-DASH-148 criterion 13).
+            print(f"{run_id}: {TABLE} could not be loaded ({type(exc).__name__}: {exc}) "
+                  f"- no table staged, recorded for human action", file=sys.stderr)
             return None
         # AFTER THE LOAD, NEVER BEFORE (criterion 14). A crash between
         # these two lines re-loads a table that was already fine; the

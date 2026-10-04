@@ -78,7 +78,8 @@ class _FakeConn:
 def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatch, tmp_path):
     captured = {}
 
-    def fake_evaluate_evidently_bdm(run_id, run_timestamp, reference_run_id=None):
+    def fake_evaluate_evidently_bdm(run_id, run_timestamp, reference_run_id=None,
+                                    assessment=None):
         captured["reference_run_id"] = reference_run_id
         return []
 
@@ -135,7 +136,8 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
 def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatch, tmp_path):
     captured = {}
 
-    def fake_evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=None):
+    def fake_evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=None,
+                                   assessment=None):
         captured["reference_run_id"] = reference_run_id
         return []
 

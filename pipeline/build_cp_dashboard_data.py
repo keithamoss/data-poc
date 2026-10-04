@@ -30,6 +30,7 @@ import os
 from datetime import datetime
 
 from pipeline import recorded_arrival, slot_timeline
+from qa_tools.common import drift_reference
 from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
@@ -251,7 +252,11 @@ def _not_evaluated_reason(record: dict) -> str | None:
     `unrunnable_reason` (REQ-PIPE-105 criterion 13) and `held_reason`
     (REQ-PIPE-078 criterion 10) - so a real tool's result can never be
     mistaken for one."""
-    return record.get("unrunnable_reason") or record.get("held_reason") or None
+    return (record.get("unrunnable_reason") or record.get("held_reason")
+            # REQ-QAC-108 criterion 9: red, not evaluated, under Evidently.
+            or (record.get("reference_reason") if record.get("reference_not_evaluated")
+                else None)
+            or None)
 
 
 def own_runs(manifest: list[dict], table: str) -> list[dict]:
@@ -321,13 +326,16 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
-            "status_by_run": {}, "not_evaluated": {},
+            "status_by_run": {}, "reference": {}, "not_evaluated": {},
         })
         slot["not_evaluated"][r["run_id"]] = _not_evaluated_reason(r)
         slot["by_run"][r["run_id"]] = r["metric_value"]
         # item 74 Bug A: the tool's own verdict, carried through rather
         # than dropped here and re-derived from thresholds downstream.
         slot["status_by_run"][r["run_id"]] = dashboard_status(r.get("status"))
+        # WHAT IT WAS COMPARED WITH, AND THE MEASURED VERDICT BESIDE A GAP'S
+        # RED (REQ-QAC-108 criteria 14 and 16).
+        slot["reference"][r["run_id"]] = drift_reference.reference_note(r, dashboard_status)
         slot["row_count_total"][r["run_id"]] = r["row_count_total"]
         slot["row_count_invalid"][r["run_id"]] = r["row_count_invalid"]
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
@@ -375,6 +383,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                         "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
                         "aggregate_values": aggregate_values,
                         "status": slot["status_by_run"].get(run_id),
+                        "reference": slot["reference"].get(run_id),
                         # Why this run's check could NOT be evaluated, or
                         # None for a real verdict - never a value or a pass.
                         "not_evaluated": slot["not_evaluated"].get(run_id),
