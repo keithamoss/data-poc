@@ -1091,3 +1091,23 @@ judgement about who reads the page rather than about the rule.
     next period counts as filled; a red promoted supply is dashboard-only)
     and that a re-file into an occupied slot moves the occupant to
     superseded. Next: sign-off walk-through.
+
+    **SIGN-OFF ROUND, group 1 (118-121), Keith 2026-10-04:**
+    - 118: asked how we know a file is "older" (answered: our own receipt
+      instant, never anything in the file - see conversation) and whether
+      a newer file after a contested same-zip pair supersedes BOTH (yes, as
+      drafted: both are unaccepted waiting versions, so the contest
+      resolves itself).
+    - 119 (identical-resend guard): Keith questioned whether it is needed
+      at all - "a file turns up, it's identical... it gets checked and
+      pushed through... so what?" Under discussion.
+    - 120: agreed.
+    - 121: when a re-check leaves a waiting supply failing the
+      auto-promotion rules AS RESOLVED FOR ITS DATASET (red; or amber where
+      the amber setting is "hold"), that is a LARGE SHOUT in the decision
+      log, so a person sees it and acts.
+    - **119 DROPPED, noted** (Keith): without it an identical resend is
+      re-checked and gets the same verdict; the only real cost is a
+      pointless to-do item when a supplier double-sends onto a filled
+      quarterly slot. Record in 118's decisions as considered and dropped;
+      cheap to add later if duplicates become a nuisance.
