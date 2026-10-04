@@ -634,7 +634,8 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
 ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS superseded_by text;
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_supersede_shape;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_supersede_shape
-    CHECK (action <> 'supersede' OR (superseded_by IS NOT NULL AND from_slot IS NOT NULL));
+    CHECK (action <> 'supersede'
+           OR (from_slot IS NOT NULL AND (superseded_by IS NOT NULL OR actor_kind = 'person')));
 -- THE AMBER SETTING A RULE ACTED UNDER (REQ-PIPE-122 criteria 5, 11 and
 -- 19) - value, level and version - on every automatic promotion of an
 -- amber supply and on the withheld note under hold. Schema 21, additive.

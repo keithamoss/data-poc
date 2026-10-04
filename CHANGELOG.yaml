@@ -152,6 +152,12 @@ releases:
               When a supplier resends a table, the earlier version nobody had
               accepted is set aside for that period - kept, not deleted - and
               only the newest waits for you or is checked against its siblings.
+          - headline: You can set a supply aside, or bring a set-aside one back
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              Supersede a waiting supply to set it aside without rejecting it,
+              or un-supersede one to bring it back. `mothman supply superseded`
+              lists the set-aside versions and what replaced each.
           - headline: You choose what happens to an amber supply
             components: ["Pipeline & publishing", "QA checks & contract"]
             description: >

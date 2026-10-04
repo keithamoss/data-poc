@@ -183,3 +183,93 @@ class TestNoRuleBringsItBack:
         _supersede(conn, period, new)
         assert slot_state._rejected(conn, DS, old)
         assert not slot_state._rejected(conn, DS, new)
+
+
+def _request(operation, supply, period, reason="looked at both"):
+    from qa_tools.common import filing_decisions as fd
+    from qa_tools.common import people
+
+    return fd.Request(operation=operation, dataset_id=DS,
+                      actor=people.person_by_email(REAL_PERSON), reason=reason,
+                      period=period, supply=supply)
+
+
+class TestAPersonSupersedesAndBringsBack:
+    """REQ-PIPE-120 criteria 1 to 8."""
+
+    def test_a_person_supersedes_a_waiting_supply(self, conn, period):
+        from qa_tools.common import filing_decisions as fd
+
+        supply, table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        fd.apply(_request(fd.SUPERSEDE, supply, period), effective_at=WHEN, conn=conn)
+        assert _schema_of(conn, table) == [supersession.superseded_schema(period)]
+        rows = conn.execute(f"SELECT actor_kind FROM {dl.TABLE} WHERE supply = ? "
+                            "AND action = ?", [supply, dl.SUPERSEDE]).fetchall()
+        assert rows == [(dl.PERSON,)]
+
+    def test_un_supersede_returns_it_to_staging_and_the_gate_may_promote(self, conn, period):
+        from qa_tools.common import filing_decisions as fd
+        from qa_tools.common import rejection
+
+        old, old_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        new, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
+        _supersede(conn, period, new)
+        fd.apply(_request(fd.REJECT, new, period), effective_at=WHEN, conn=conn)
+        fd.apply(_request(fd.UN_SUPERSEDE, old, period), effective_at=WHEN, conn=conn)
+        assert _schema_of(conn, old_table) == [supply_db.STAGING_SCHEMA]
+        assert not supersession.is_superseded(conn, DS, old)
+        assert not rejection.decided_by_a_person(conn, DS, old), \
+            "criterion 4: un-supersede does not bar the gate"
+        assert not conn.execute("SELECT 1 FROM information_schema.schemata WHERE schema_name = ?",
+                                [supersession.superseded_schema(period)]).fetchall(), \
+            "and the emptied superseded schema is dropped"
+
+    def test_un_supersede_beside_a_waiting_version_is_refused_naming_it(self, conn, period):
+        from qa_tools.common import filing_decisions as fd
+
+        old, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        new, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
+        _supersede(conn, period, new)
+        with pytest.raises(dl.DecisionRefused, match=f"{new} is waiting.*supersede"):
+            fd.apply(_request(fd.UN_SUPERSEDE, old, period), effective_at=WHEN, conn=conn)
+
+    def test_promoting_a_superseded_supply_is_refused_naming_un_supersede(self, conn, period):
+        from qa_tools.common import filing_decisions as fd
+
+        old, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        new, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
+        _supersede(conn, period, new)
+        with pytest.raises(dl.DecisionRefused, match=f"superseded by {new}.*un-supersede"):
+            fd.apply(_request(fd.PROMOTE, old, period), effective_at=WHEN, conn=conn)
+
+    def test_un_supersede_names_its_version(self, conn, period):
+        with pytest.raises(dl.DecisionRefused, match="names which superseded version"):
+            supersession.un_supersede(
+                conn, agency_id="a", collection_id="c", dataset_id=DS, supply="",
+                period=period, actor=REAL_PERSON, reason="r", effective_at=WHEN)
+
+    def test_the_listing_finds_them(self, conn, period):
+        old, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        new, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
+        _supersede(conn, period, new)
+        assert [(v["supply"], v["superseded_by"]) for v in
+                supersession.superseded_in(conn, DS, period)] == [(old, new)]
+
+
+def test_mothman_supply_superseded_lists_them(supply_dsn, monkeypatch):
+    """REQ-PIPE-120 criterion 7, through the real command."""
+
+    from click.testing import CliRunner as ClickRunner
+
+    from cli.supply import supply_group
+
+    with supply_db.connect(label="test-supersession") as conn:
+        qa_store.ensure_schema(conn)
+        period = f"2099-S{uuid.uuid4().hex[:6]}"
+        old, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        new, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
+        _supersede(conn, period, new)
+    result = ClickRunner().invoke(supply_group, ["superseded", "--collection", "child-protection",
+                                                 "--dataset", DS, "--period", period])
+    assert result.exit_code == 0, result.output
+    assert f"{old}  superseded by {new}" in result.output

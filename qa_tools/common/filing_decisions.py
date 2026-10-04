@@ -58,13 +58,18 @@ MARK_NOT_SUPPLIED = decision_log.MARK_NOT_SUPPLIED
 #: reason required, changes no data.
 ACKNOWLEDGE = decision_log.ACKNOWLEDGE
 
+#: The eleventh and twelfth (REQ-PIPE-120 criterion 1): set a waiting
+#: supply aside for a newer one, and bring a superseded one back.
+SUPERSEDE = decision_log.SUPERSEDE
+UN_SUPERSEDE = decision_log.UN_SUPERSEDE
+
 OPERATIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
-              INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED, ACKNOWLEDGE)
+              INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE)
 
 #: The four that act on a SUPPLY - "what do I do with this thing that
 #: arrived" - and so belong in the queue of supplies awaiting a decision
 #: (criterion 16).
-SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE)
+SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE)
 
 #: The four that act on a PERIOD - how it is filled when a supply for it
 #: never came. None of them answers a question about an arriving supply,
@@ -300,6 +305,14 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> Non
                 actor_kind=decision_log.PERSON, effective_at=effective_at,
                 to_slot=request.period, reason=reason)):
             pass
+    elif request.operation in (SUPERSEDE, UN_SUPERSEDE):
+        from qa_tools.common import supersession
+
+        act = supersession.supersede if request.operation == SUPERSEDE \
+            else supersession.un_supersede
+        act(conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
+            dataset_id=request.dataset_id, supply=request.supply, period=request.period,
+            actor=request.actor_name, reason=reason, effective_at=effective_at)
     elif request.operation == UN_INHERIT:
         inheritance.un_inherit(
             conn, dataset_id=request.dataset_id, period=request.period,

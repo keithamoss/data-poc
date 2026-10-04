@@ -503,7 +503,7 @@ class TestEveryOperationIsReachableFromSomeDoor:
         assert not offered & set(fd.PERIOD_SCOPED)
         assert fd.PROMOTE in offered
 
-    def test_between_the_two_doors_all_ten_are_reachable(self, monkeypatch):
+    def test_between_the_two_doors_all_twelve_are_reachable(self, monkeypatch):
         """Eight, mark as not supplied on a CLOSED period (REQ-PIPE-132),
         and acknowledge on a promotion owing one (REQ-PIPE-122)."""
         reachable = set()

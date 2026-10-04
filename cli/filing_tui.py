@@ -86,6 +86,10 @@ _WHAT_IT_DOES = {
                                          "period was missed, with a reason"),
     filing_decisions.ACKNOWLEDGE: ("acknowledge - say you have looked at this amber "
                                    "supply and why it is acceptable"),
+    filing_decisions.SUPERSEDE: ("supersede - set this supply aside for a newer version; "
+                                 "it is kept, and can be brought back"),
+    filing_decisions.UN_SUPERSEDE: ("un-supersede - bring a superseded version back to be "
+                                    "checked again"),
 }
 
 #: How an operation reads as a NOUN in a prompt - "this acknowledge" was
@@ -336,6 +340,24 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
     operation = by_label[picked]
 
     to_period = stands_on = None
+    supply = state.supply
+    if operation == filing_decisions.UN_SUPERSEDE:
+        # WHICH VERSION, NAMED, NEVER A DEFAULT (REQ-PIPE-120 criterion 8).
+        from qa_tools.common import supersession
+
+        with open_log() as conn:
+            versions = supersession.superseded_in(conn, state.dataset_id, state.period)
+        if not versions:
+            console.print(f"Nothing is superseded for {state.dataset_id} {state.period}.",
+                          style="dim")
+            return
+        by_label = {f"{v['supply']}  (superseded by {v['superseded_by'] or 'a person'})":
+                    v["supply"] for v in versions}
+        picked_version = common.select("Which superseded version should come back?",
+                                       list(by_label), flag_hint=_FLAG_HINT)
+        if picked_version is None:
+            return
+        supply = by_label[picked_version]
     if operation == filing_decisions.REFILE:
         to_period = common.text_prompt("Which period should it move to?",
                                         flag_hint=_FLAG_HINT)
@@ -348,7 +370,7 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
             return
 
     apply_decision(operation=operation, dataset_id=state.dataset_id,
-                    period=state.period, supply=state.supply,
+                    period=state.period, supply=supply,
                     stands_on=stands_on, to_period=to_period)
 
 

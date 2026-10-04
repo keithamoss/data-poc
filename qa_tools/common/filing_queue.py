@@ -302,10 +302,15 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
         elif state.state == slot_state.REJECTED:
             # Rejected, and nothing replaced it. Promoting it anyway is
             # a real thing an operator does after a second look.
-            supply_scoped = (filing_decisions.PROMOTE, filing_decisions.REFILE)
+            # ...or bringing back a version a newer one superseded, once
+            # the newer one has been rejected (REQ-PIPE-120 criterion 5).
+            supply_scoped = (filing_decisions.PROMOTE, filing_decisions.REFILE,
+                             filing_decisions.UN_SUPERSEDE)
         else:
+            # SUPERSEDE IS OFFERED ON A WAITING SUPPLY (REQ-PIPE-120
+            # criterion 1): set it aside without rejecting it.
             supply_scoped = (filing_decisions.PROMOTE, filing_decisions.REJECT,
-                             filing_decisions.REFILE)
+                             filing_decisions.REFILE, filing_decisions.SUPERSEDE)
 
     if state.state == slot_state.NOT_SUPPLIED_ACCEPTED:
         # Accepted - and a late file can still be re-filed in, or an

@@ -101,9 +101,9 @@ class TestTheEightAreOneList:
         for operation in fd.OPERATIONS:
             assert operation in dl.ACTIONS, operation
 
-    def test_there_are_ten_of_them(self):
+    def test_there_are_twelve_of_them(self):
         """Eight, and REQ-PIPE-132's mark as not supplied (2026-10-05)."""
-        assert len(set(fd.OPERATIONS)) == 10
+        assert len(set(fd.OPERATIONS)) == 12
         assert fd.MARK_NOT_SUPPLIED in fd.PERIOD_SCOPED
 
     def test_supply_scoped_and_period_scoped_partition_them(self):

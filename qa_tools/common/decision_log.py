@@ -294,7 +294,8 @@ def _check_shape(decision: Decision) -> None:
             raise DecisionRefused(
                 "an acknowledgement needs a reason - what you looked at and why "
                 "the amber is acceptable. That is what makes it more than a click.")
-    if decision.action == SUPERSEDE and not (decision.superseded_by or "").strip():
+    if (decision.action == SUPERSEDE and decision.actor_kind == RULE
+            and not (decision.superseded_by or "").strip()):
         raise DecisionRefused(
             "a supersession names the newer supply that superseded this one - "
             "without it nothing can say later what replaced it.")
@@ -493,6 +494,21 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
         raise DecisionRefused(
             f"{needs_reason} needs a reason. Somebody will ask why a year from "
             "now, and this log is where they will look.")
+
+    if decision.action == PROMOTE:
+        # A SUPERSEDED SUPPLY IS NOT PROMOTED (REQ-PIPE-120 criterion 6),
+        # judged at the instant the entry is appended - a resend may have
+        # landed while somebody was looking at the ticket.
+        from qa_tools.common import supersession
+
+        newer = supersession.superseded_by(conn, decision.dataset_id, decision.supply)
+        if supersession.is_superseded(conn, decision.dataset_id, decision.supply):
+            raise DecisionRefused(
+                f"{decision.supply} has been superseded"
+                + (f" by {newer}" if newer else " by a person")
+                + f". To bring it back first: `mothman supply decide --operation "
+                f"un-supersede --dataset {decision.dataset_id} --period "
+                f"{decision.to_slot} --supply {decision.supply} --reason '<why>'`.")
 
     if decision.action == ACKNOWLEDGE:
         # REQ-PIPE-122 criterion 14: only a supply that OWES one, and the

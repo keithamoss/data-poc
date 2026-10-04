@@ -146,3 +146,97 @@ def drop_if_empty(conn, period: str) -> bool:
         return False
     conn.execute(f'DROP SCHEMA "{target}"')
     return True
+
+
+# ---- a person's own decisions (REQ-PIPE-120) ------------------------------
+
+def superseded_in(conn, dataset_id: str, period: str) -> list[dict]:
+    """The superseded versions of this dataset's table for `period`, newest
+    first - each with what superseded it (criterion 7)."""
+    out = []
+    for (supply,) in conn.execute(
+            "SELECT f.supply_id FROM qa.filing f JOIN qa.supply_receipt r "
+            "ON r.dataset_id = f.dataset_id AND r.supply_id = f.supply_id "
+            "WHERE f.dataset_id = ? AND f.slot = ? ORDER BY r.received_instant DESC",
+            [dataset_id, period]).fetchall():
+        by = superseded_by(conn, dataset_id, supply)
+        if by is not None:
+            out.append({"supply": supply, "superseded_by": by,
+                        "received": _receipt(conn, dataset_id, supply)})
+    return out
+
+
+def waiting_in(conn, dataset_id: str, period: str, *, besides: str | None = None) -> list[str]:
+    """Versions of this table filed to `period` that are still WAITING -
+    not promoted, rejected or superseded (criterion 5's refusal)."""
+    out = []
+    for (supply,) in conn.execute(
+            "SELECT supply_id FROM qa.filing WHERE dataset_id = ? AND slot = ?",
+            [dataset_id, period]).fetchall():
+        if supply == besides:
+            continue
+        if (_rejected(conn, dataset_id, supply) or is_superseded(conn, dataset_id, supply)
+                or _ever_promoted_and_still_held(conn, dataset_id, supply, period)):
+            continue
+        out.append(supply)
+    return out
+
+
+def supersede(conn, *, agency_id: str, collection_id: str, dataset_id: str, supply: str,
+              period: str, actor: str, reason: str, effective_at: str) -> None:
+    """A PERSON supersedes a waiting supply (criterion 2): its tables move to
+    the period's superseded schema, with that person as actor."""
+    from qa_tools.common import decision_log as dl
+
+    if is_superseded(conn, dataset_id, supply):
+        raise dl.DecisionRefused(f"{supply} is already superseded.")
+    if _rejected(conn, dataset_id, supply):
+        raise dl.DecisionRefused(f"{supply} was rejected; there is nothing waiting to supersede.")
+    if _ever_promoted_and_still_held(conn, dataset_id, supply, period):
+        raise dl.DecisionRefused(
+            f"{supply} is promoted into {period}; superseding a promoted supply is "
+            f"REQ-PIPE-128's, through promoting the one that replaces it.")
+    target = superseded_schema(period)
+    tables = staged_tables(conn, dataset_id, supply)
+    with dl.apply_decision(conn, dl.Decision(
+            agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
+            action=dl.SUPERSEDE, supply=supply, actor=actor, actor_kind=dl.PERSON,
+            effective_at=effective_at, from_slot=period, reason=reason)):
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{target}"')
+        for physical in tables:
+            supply_db.move_table(conn, physical, supply_db.STAGING_SCHEMA, target)
+
+
+def un_supersede(conn, *, agency_id: str, collection_id: str, dataset_id: str, supply: str,
+                 period: str, actor: str, reason: str, effective_at: str) -> None:
+    """A PERSON returns a superseded supply to staging for its period
+    (criterion 3), refused while another version of the table is waiting
+    there (criterion 5). Its QA is owed again; the gate then applies as for
+    a first arrival (criterion 4)."""
+    from qa_tools.common import decision_log as dl
+    from qa_tools.common import hierarchy, supply_holds
+
+    if not supply:
+        raise dl.DecisionRefused(
+            "an un-supersede names which superseded version - there is no default. "
+            "`mothman supply superseded` lists them.")
+    if not is_superseded(conn, dataset_id, supply):
+        raise dl.DecisionRefused(f"{supply} is not superseded, so there is nothing to bring back.")
+    waiting = waiting_in(conn, dataset_id, period, besides=supply)
+    if waiting:
+        raise dl.DecisionRefused(
+            f"{waiting[0]} is waiting for {period}, so {supply} cannot come back beside it - "
+            f"reject or supersede {waiting[0]} first: `mothman supply decide --operation "
+            f"reject --dataset {dataset_id} --period {period} --supply {waiting[0]} "
+            f"--reason '<why>'`, or the same with `--operation supersede`.")
+    source = superseded_schema(period)
+    logical = hierarchy.dataset(dataset_id).table
+    key = supply_holds.arrival_key_of(supply)
+    tables = list(supply_db.candidates_in(conn, source, [logical], arrival=key).get(logical) or [])
+    with dl.apply_decision(conn, dl.Decision(
+            agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
+            action=dl.UN_SUPERSEDE, supply=supply, actor=actor, actor_kind=dl.PERSON,
+            effective_at=effective_at, from_slot=period, reason=reason)):
+        for physical in tables:
+            supply_db.move_table(conn, physical, source, supply_db.STAGING_SCHEMA)
+    drop_if_empty(conn, period)

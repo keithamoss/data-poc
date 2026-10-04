@@ -790,6 +790,45 @@ def slots_command(collection_id: str, dataset_id: str | None) -> None:
     filing_tui.standing_view(collection_id, dataset_id)
 
 
+@supply_group.command("superseded")
+@click.option("--collection", "collection_id", required=True,
+               help="Which collection's superseded supplies to list.")
+@click.option("--dataset", "dataset_id", default=None, help="Narrow to one dataset.")
+@click.option("--period", default=None, help="Narrow to one period.")
+def superseded_command(collection_id: str, dataset_id: str | None, period: str | None) -> None:
+    """Superseded supplies, and what superseded each (REQ-PIPE-120 criterion 7).
+
+    None of them is in the queue of supplies awaiting a decision - a newer
+    version of the same table for the same period took its place - so this
+    is where a person finds one to bring back with `--operation
+    un-supersede`.
+    """
+    from qa_tools.common import hierarchy, supersession, supply_db
+
+    # ONE PLAIN LINE PER SUPPLY, not a table: the ids are what a person
+    # pastes into un-supersede, and a table column truncates or folds them.
+    datasets = [d.dataset_id for d in hierarchy.datasets_in_collection(collection_id)
+                if dataset_id in (None, d.dataset_id)]
+    lines = []
+    with supply_db.connect(read_only=True, label="mothman:supply-superseded") as conn:
+        for ds in datasets:
+            periods = [period] if period else [r[0] for r in conn.execute(
+                "SELECT DISTINCT slot FROM qa.filing WHERE dataset_id = ? AND slot IS NOT NULL "
+                "ORDER BY slot", [ds]).fetchall()]
+            for p in periods:
+                for v in supersession.superseded_in(conn, ds, p):
+                    lines.append(f"{ds}  {p}  {v['supply']}  superseded by "
+                                 f"{v['superseded_by'] or 'a person'}")
+    if not lines:
+        click.echo("Nothing is superseded here.")
+        return
+    click.echo(f"Superseded supplies - {collection_id} ({len(lines)}):")
+    for line in lines:
+        click.echo(f"  {line}")
+    click.echo("To bring one back: mothman supply decide --operation un-supersede "
+               "--dataset <id> --period <period> --supply <supply> --reason '<why>'")
+
+
 @supply_group.command("decide")
 @click.option("--operation", required=True,
                type=click.Choice(list(filing_decisions.OPERATIONS), case_sensitive=False),

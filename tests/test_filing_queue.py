@@ -88,7 +88,7 @@ class TestWhatASlotOffers:
     """Criterion 2 read against criterion 31 - all eight are reachable,
     and the four period-scoped ones are never reached from the queue."""
 
-    def test_every_one_of_the_ten_is_offered_by_some_slot(self):
+    def test_every_one_of_the_twelve_is_offered_by_some_slot(self):
         """Mark as not supplied is offered on a CLOSED period (REQ-PIPE-132),
         acknowledge on a promotion owing one (REQ-PIPE-122)."""
         offered = set()

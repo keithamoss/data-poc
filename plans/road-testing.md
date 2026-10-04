@@ -2141,6 +2141,17 @@ judgement about who reads the page rather than about the rule.
         (10) and refusals (140), staged tables 141 -> 113. PROVISIONAL: a
         contested pair supersedes earlier versions too (decision 12, a
         literal reading); the CLI UX critic's mediums on 122 are fixed.
+      - REQ-PIPE-118 PUSHED (5063641). REQ-PIPE-120 BUILT: a person can
+        supersede a waiting supply (set aside, kept) or un-supersede one
+        (back to staging, and the gate may promote it again); un-supersede
+        beside a waiting version is refused naming it; promoting a
+        superseded supply is refused naming what replaced it and the
+        un-supersede command; `mothman supply superseded` lists them, one
+        pasteable line each (28 on the supply8 bootstrap). DEFERRED, with
+        its owner recorded: criterion 3's QA RE-RUN after an un-supersede
+        waits on REQ-PIPE-151's processing pass, as its own decision 7 says.
+        The TUI reaches un-supersede from a REJECTED slot (Keith's worked
+        example), asking which version.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

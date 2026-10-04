@@ -110,10 +110,15 @@ def decided_by_a_person(conn: supply_db.SupplyConnection,
     time - which falls out of reading an append-only log rather than
     needing to be enforced.
     """
+    # SUPERSEDE AND UN-SUPERSEDE DO NOT COUNT (REQ-PIPE-120 criterion 4):
+    # un-supersede asks for the supply to be judged again, and the gate
+    # stays the gate - a superseded supply is refused on its own account.
     rows = conn.execute(
         f"SELECT 1 FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND supply = ? AND actor_kind = ? LIMIT 1",
-        [dataset_id, supply, decision_log.PERSON]).fetchall()
+        "WHERE dataset_id = ? AND supply = ? AND actor_kind = ? "
+        "AND action NOT IN (?, ?) LIMIT 1",
+        [dataset_id, supply, decision_log.PERSON, decision_log.SUPERSEDE,
+         decision_log.UN_SUPERSEDE]).fetchall()
     return bool(rows)
 
 

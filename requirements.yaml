@@ -12475,7 +12475,7 @@ requirements:
       by: Keith
       date: "2026-09-26"
     acceptance_criteria:
-      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied and acknowledge - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 and REQ-PIPE-122 criterion 22.
+      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede and un-supersede - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9.
       - >
         THE SYSTEM SHALL record, with each entry, the actor, the instant
         the decision took effect, the instant the entry was written, the
@@ -13290,10 +13290,7 @@ requirements:
       - >
         THE SYSTEM SHALL distinguish, among staged supplies, one nobody
         has decided on from one a person has looked at and returned.
-      - >
-        WHERE any decision has been recorded against a supply by a
-        person, THE SYSTEM SHALL NOT promote that supply automatically
-        thereafter.
+      - WHERE any decision has been recorded against a supply by a person, THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT un-supersede, the one person-decision after which the gate may still promote automatically, and the supersede it undoes (REQ-PIPE-120 criterion 4). AMENDED 2026-10-05 by REQ-PIPE-120 criterion 9.
       - THE SYSTEM SHALL leave a red supply nobody has decided on in staging UNTIL a later version of its table for the same period supersedes it (REQ-PIPE-118), and SHALL NOT move it to the rejected schema. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 16.
       - >
         THE SYSTEM SHALL allow a rejection to be reversed by a later
@@ -15420,7 +15417,7 @@ requirements:
       the write path 2026-09-22. Scoped by delivery-scoper, batch 4,
       2026-09-26.
     acceptance_criteria:
-      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied and acknowledge as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those ten. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied) and REQ-PIPE-122 criterion 22 (acknowledge).
+      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede and un-supersede as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those twelve. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede).
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
@@ -25173,7 +25170,48 @@ requirements:
       date: "2026-10-04"
     story: "As the person working a period's supplies, I want to pull an earlier good version back out of superseded and have it checked and gated like any arrival, so that when a newer file turns out to be the wrong one I can restore the right one without asking the supplier to send it again."
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 3 (the QA re-run half) - an un-superseded supply is
+        returned to staging, but its QA is not re-run against the period, so the
+        gate does not yet re-judge it.
+      owner: REQ-PIPE-151
+      why: 'Decision 7 (Keith, 2026-10-04): owed work completes on the next run
+        of the processing pass, REQ-PIPE-151, which is not built. The return to
+        staging and the gate''s eligibility (criterion 4) are built.'
+      blocked_by:
+        requirements:
+        - REQ-PIPE-151
+    evidence:
+    - '2026-10-05: tests/test_supersession.py''s REQ-PIPE-120 tests green against
+      a real database - a person supersedes a waiting supply (tables to the period''s
+      superseded schema, the person as actor); after the newer version is rejected,
+      un-supersede returns the earlier one to staging, leaves it promotable by
+      the gate (decided_by_a_person ignores supersede and un-supersede) and drops
+      the emptied superseded schema; un-supersede beside a waiting version is
+      refused naming it and naming reject or supersede; promoting a superseded
+      supply is refused naming what superseded it and the un-supersede command;
+      un-supersede with no supply named is refused; `mothman supply superseded`
+      lists each with what superseded it, one pasteable line each.'
+    - '2026-10-05: `mothman supply superseded --collection child-protection` against
+      the supply8 bootstrap lists its 28 superseded supplies across both collections (16 Child Protection, 12 Birth Registrations), one line each.'
+    implemented_by:
+    - qa_tools/common/supersession.py::supersede
+    - qa_tools/common/supersession.py::un_supersede
+    - qa_tools/common/supersession.py::superseded_in
+    - qa_tools/common/supersession.py::waiting_in
+    - qa_tools/common/decision_log.py::_judge
+    - qa_tools/common/rejection.py::decided_by_a_person
+    - qa_tools/common/filing_decisions.py::_apply_one
+    - qa_tools/common/filing_queue.py::operations_for
+    - cli/filing_tui.py::_decide_on
+    - cli/supply.py::superseded_command
+    linked_tests:
+    - tests/test_supersession.py::TestAPersonSupersedesAndBringsBack
+    - tests/test_supersession.py::test_mothman_supply_superseded_lists_them
+    - tests/test_filing_decisions.py
+    - tests/test_filing_queue.py
+    - tests/test_cli_filing_tui.py
     source: "Keith, 2026-10-03, option A items 3 and 4, with his own worked case: reject the bad newer file, pull the earlier good one out of superseded, re-run, promote (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
       - "THE SYSTEM SHALL offer SUPERSEDE and UN-SUPERSEDE as filing decisions a person raises, on the same terms as every other filing decision - actor, reason, allowlist, refusal and parity across the GitHub and terminal routes (REQ-GHUB-082)."
@@ -25200,6 +25238,19 @@ requirements:
       - "UN-SUPERSEDE BESIDE A WAITING VERSION IS REFUSED UNTIL RESOLVED (Keith, 2026-10-03): a person rejects or supersedes the waiting one first, which is his own worked example in order. REJECTED swapping them automatically, which would be the system moving a supply as a side effect of a decision about a different one."
       - "THE TERMINAL WAITS for the QA run an un-supersede triggers and shows the gate's outcome (working assumption, this draft, to be read to Keith at sign-off - the same answer he gave the shelved design's Q6, adopted here on its own merits rather than carried forward). A queue can come later if the wait proves too long."
       - 'RE-POINTED 2026-10-04 (Keith, wording approved): owed work completes on the next run of the processing pass (REQ-PIPE-151) rather than ''the next pipeline run'', because `mothman pipeline run` regenerates synthetic data and would never run in production.'
+      - 'UN-SUPERSEDE IS OFFERED ON A REJECTED SLOT (2026-10-05): a superseded supply
+        is in no queue (criterion 7), so the TUI reaches it from the period whose
+        waiting version a person rejected - Keith''s own worked example, in order
+        - and then asks which superseded version, never picking one (criterion 8).
+        The flag route and the GitHub route take --supply / supply: as for any supply
+        decision. SUPERSEDE is offered beside promote and reject on any waiting
+        supply.'
+      - 'A PERSON''S SUPERSESSION NAMES NO NEWER SUPPLY (2026-10-05): the shape
+        check and the table''s constraint require superseded_by only of the rule.
+        A person may set a supply aside before its replacement arrives.'
+      - '`mothman supply superseded` PRINTS PLAIN LINES, not a table (2026-10-05):
+        a table column truncated or folded the supply ids, and the ids are exactly
+        what a person pastes into un-supersede.'
     open_questions: []
 
   - id: REQ-PIPE-121
