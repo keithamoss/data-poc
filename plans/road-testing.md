@@ -1478,3 +1478,18 @@ judgement about who reads the page rather than about the rule.
       the re-check completes (one transaction around both rejected: the
       tools cannot see an uncommitted promotion, the lock would block the
       period, and a failed re-check would undo the promotion).
+    - **SCENARIOS AND RE-FILE SIGNED, 2026-10-04 (Keith).** REQ-GEN-135..
+      REQ-DASH-139 as the scoper drafted them, including its settings-era
+      choice; the asset's synthetic declaration stays as playback's lock
+      only. REQ-PIPE-140..REQ-GHUB-142 with Keith's changes: "fails" means
+      the run breaking, and a broken run is owed and retried; a re-filed
+      supply is gated under TODAY's settings; "re-file wins" is over
+      versions waiting in staging only - **a promoted version in the target
+      period stays until the re-filed one is promoted** (082 criterion 9
+      reworded, no gap); re-file is REFUSED for a rejected supply, one file
+      of a contested pair (saying why), and into an inherited period
+      ("force them to un-inherit and then re-file rather than ... leaving
+      it dangling in staging"). **ONE MECHANISM for the knock-on effects of
+      ANY table arriving in or leaving a period schema** - REQ-PIPE-121
+      widened from "only promotion triggers it" to every arrival and
+      departure.

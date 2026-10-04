@@ -26423,7 +26423,7 @@ requirements:
     open_questions: []
 
   - id: REQ-PIPE-121
-    title: "Promoting a supply re-checks the waiting supplies in its period that read it, and re-applies the gate"
+    title: "A table arriving in or leaving a period re-checks the waiting supplies in that period that read it, and re-applies the gate - through one mechanism"
     date_written: "2026-10-03"
     signed_off:
       by: Keith
@@ -26433,12 +26433,13 @@ requirements:
     status: not_started
     source: "Keith, 2026-10-03, option A item 7, confirmed in the 'OPTION A CONFIRMED' paragraph (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
-      - "WHEN a supply is promoted, by a rule or by a person, THE SYSTEM SHALL re-evaluate, within that period only, every cross-table check that declares it reads the promoted table and belongs to a supply still WAITING in that period."
+      - "WHEN a table arrives in or leaves a period schema - promoted by a rule or a person, re-filed in or out, superseded, demoted or rejected - THE SYSTEM SHALL re-evaluate, within that period only, every cross-table check that declares it reads the promoted table and belongs to a supply still WAITING in that period."
       - "THE SYSTEM SHALL NOT re-run a waiting supply's own table-level and column-level checks for this re-evaluation."
       - "WHEN that re-evaluation completes, THE SYSTEM SHALL apply the promotion gate to each waiting supply it touched, exactly as for a first arrival, reading the supply's whole status (REQ-PIPE-075 criterion 2)."
       - "THE SYSTEM SHALL NOT re-evaluate, under this requirement, a supply whose own first QA run has not yet happened."
-      - "THE SYSTEM SHALL name, on every result this re-evaluation records, the promotion decision that caused it, distinguishably from a re-evaluation caused by an arrival (REQ-PIPE-079 criterion 7)."
+      - "THE SYSTEM SHALL name, on every result this re-evaluation records, the decision that caused it, distinguishably from a re-evaluation caused by an arrival (REQ-PIPE-079 criterion 7)."
       - "THE SYSTEM SHALL NOT demote, supersede or reject a PROMOTED supply as a consequence of any re-evaluation."
+      - "THE SYSTEM SHALL handle the knock-on effects of every table arriving in or leaving a period schema through one mechanism, whatever decision moved it, and SHALL NOT have a separate path for any one decision."
       - "WHERE a supply promoted by this re-gating is itself read by another waiting supply's cross-table checks, THE SYSTEM SHALL apply this requirement to that promotion too."
       - "WHEN a re-evaluation leaves a waiting supply failing the automatic-promotion rules as resolved for its dataset - red, or amber where the resolved amber setting (REQ-PIPE-122) is 'hold' - THE SYSTEM SHALL record that in the decision log at its highest prominence, with the rule as actor, naming the supply, the promotion that caused the re-check and the reason it still cannot promote, so that a person sees it and acts."
       - "THE SYSTEM SHALL show that record at full prominence in the terminal, and SHALL NOT dim it as the terminal dims other entries whose actor is the rule."
@@ -26458,6 +26459,7 @@ requirements:
       - "A RE-CHECK THAT STILL CANNOT PROMOTE IS A LARGE SHOUT (Keith, sign-off 2026-10-04): a waiting supply that was re-checked and still fails is exactly the case a person must look at, so it is recorded at the decision log's highest prominence rather than left as a quiet refusal. An amber supply where the setting is 'promote-and-acknowledge' does NOT fail the rules - it promotes and asks for an acknowledgement (REQ-PIPE-122) - so it is not a shout."
       - "AN ARRIVAL-TIME RE-EVALUATION OF PROMOTED SIBLINGS IS TAKEN AS ALREADY BUILT on Keith's confirmation; this draft verified only that qa_results_writer marks re-evaluated records with qa_tools/common/reevaluation.py's CAUSED_BY key. Worth confirming against a real run before building on it."
       - "AN INTERRUPTED WAIT LEAVES A RE-CHECK OWED, NEVER LOST (Keith, 2026-10-04). If the person's terminal is interrupted after a promotion commits, the promotion stands and the owed record survives for the next run. REJECTED one transaction around promotion and re-check: the QA tools run on their own connections and cannot see an uncommitted promotion, the move's exclusive lock would block the period for the length of a QA run, and a failed re-check would undo the person's promotion, which criterion 9 forbids. REJECTED relying on a person to notice and re-run by hand."
+      - "EVERY ARRIVAL AND DEPARTURE, ONE MECHANISM (Keith, 2026-10-04, at re-file's sign-off): 'there should be one bit of the code that handles the knock-on effects of something arriving in or leaving a period schema'. This WIDENS the earlier 'ONLY PROMOTION TRIGGERS IT' decision above: a departure (reject, demote, supersede, re-file out) cannot promote a waiting reader, but re-checking it keeps every reader's shown verdict true to what the period actually holds. REJECTED one shared path that still fired only on arrivals and re-file."
     open_questions: []
 
   - id: REQ-PIPE-122
@@ -26627,7 +26629,7 @@ requirements:
       - "THE SYSTEM SHALL NOT, by any automatic rule, promote into a slot resolved by substitution or inheritance (REQ-PIPE-084 criterion 8, REQ-PIPE-098 criterion 17)."
       - "THE SYSTEM SHALL resolve a table in a period to the one object that period holds, and SHALL NOT rank versions of a table within a period by arrival time or by promotion time."
       - "IF a period schema is found holding more than one version of a table, THEN THE SYSTEM SHALL fail loudly naming the period and table, and SHALL NOT choose between them."
-      - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-105 criterion 7 so that newest-wins among promoted supplies no longer arises within a period, and REQ-GHUB-082 criterion 9 so that a re-file into an occupied slot moves what is there to the superseded state."
+      - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-105 criterion 7 so that newest-wins among promoted supplies no longer arises within a period, and REQ-GHUB-082 criterion 9 so that a re-file into a period holding a promoted version leaves that version in place until the re-filed supply is promoted, which then supersedes it (REQ-PIPE-141)."
     non_functional_requirements:
       - "No migration: existing databases are regenerated (Keith, 2026-10-04), so the multi-version code path is removed rather than kept for old data."
       - "Every reader that ranks versions inside a period - period_schema.newest() and promoted_in()'s list-of-versions shape, promotion.newest_promoted() where it reads a period - is enumerated and removed or simplified mechanically, not left as a dormant second path."
@@ -26642,6 +26644,7 @@ requirements:
       - "PROMOTING INTO AN INHERITED SLOT IS REFUSED until a person un-inherits it separately (Keith, sign-off 2026-10-04): inheritance means NOTHING WAS EXPECTED for that period, so a supply arriving for it is a question about the schedule, not a routine replacement."
       - "ONE PROMPT, NOT TWO (pre-build UX review, accepted by Keith, 2026-10-04). Every decision already asks to confirm; a second yes or no for the warning teaches people to press yes twice. A warning panel shown only when there are consequences keeps it meaningful."
       - "A STALE WARNING IS REFUSED AND RE-SHOWN ON BOTH ROUTES (Keith, 2026-10-04): if a file lands between being warned and confirming, the person confirmed something that is no longer true."
+      - "RE-FILE DOES NOT DISPLACE A PROMOTED VERSION ON ITS OWN (Keith, 2026-10-04, at re-file's sign-off): the re-filed supply is checked first and may never be promoted, so the promoted version stays until it is. This replaces this requirement's earlier instruction to amend REQ-GHUB-082 criterion 9 to supersede at re-file time."
     open_questions: []
 
   - id: REQ-PIPE-129
@@ -26880,4 +26883,278 @@ requirements:
       - "PER DATASET, because due time, grace and claim window come from each dataset's own contract; two datasets sharing a calendar can pass or fail independently."
       - "IT ALSO GUARANTEES THE SEQUENCE STAYS SORTED, which bisection in REQ-PIPE-131 relies on: claim-opening is never after due, due is before late-after, and late-after is before the next claim-opening. A calendar-version change that widened a claim window enough to open period n+1 before period n would otherwise silently break bisection."
       - "STILL REJECTED: contiguous claim windows (REQ-PIPE-062) - the gap this criterion requires is exactly what keeps them non-contiguous."
+    open_questions: []
+
+  - id: REQ-GEN-135
+    title: "Synthetic history can play back scripted person decisions, through the same decision path a person uses"
+    date_written: "2026-10-04"
+    signed_off:
+      by: Keith
+      date: "2026-10-04"
+    story: "As Keith demonstrating the supply model, I want the synthetic history to contain people's decisions - an un-supersede, a mark as not supplied, an acknowledgement, a substitution - taken at a scripted moment, so that the dashboard shows what happens after a person acts and not only what the rules do on their own."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-10-04, 'SCRIPTED HUMAN DECISIONS WILL BE BUILT' (plans/road-testing.md #16 - 'the generator produces files only today, so synthetic history gains a way to play back seeded decisions'). Scoped by delivery-scoper 2026-10-04."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL read scripted decisions from a committed configuration file, each naming the scenario it belongs to, the filing decision, the dataset, the supply or period it acts on, the instant it takes effect, and a reason."
+      - "THE SYSTEM SHALL identify the supply a scripted decision acts on through the scenario's recorded placement (REQ-GEN-044 criterion 7), and SHALL NOT require the script to name a generated supply id."
+      - "WHEN the pipeline replays the synthetic history, THE SYSTEM SHALL apply each scripted decision after every arrival received before its effective instant and before every arrival received at or after it."
+      - "THE SYSTEM SHALL apply a scripted decision through the one filing-decision implementation every route uses (REQ-GHUB-082 criterion 13), judged against the filing state at that point exactly as a person's would be (criterion 20), and SHALL NOT write the decision log by any other path."
+      - "THE SYSTEM SHALL record a scripted decision as a PERSON's decision, with a dedicated synthetic actor, the scripted reason, and the scripted instant as the instant it took effect."
+      - "IF a scripted decision is refused, THEN THE SYSTEM SHALL fail the replay loudly, naming the scenario, the decision and the refusal, and SHALL NOT continue with a history silently missing it."
+      - "THE SYSTEM SHALL produce the same decisions, at the same instants, with the same effects, every time the same configuration is replayed."
+      - "THE SYSTEM SHALL refuse to play back scripted decisions for any data asset whose configuration does not declare it synthetic."
+      - "THE SYSTEM SHALL hold the synthetic actor as an entry in contract/people.yaml marked synthetic, and SHALL apply the normal allowlist check to it like any other actor."
+      - "THE SYSTEM SHALL refuse the synthetic actor on the GitHub route, and on every route outside scripted playback."
+      - "THE SYSTEM SHALL amend REQ-GHUB-082 criterion 29 in the same change so that an entry marked synthetic needs no GitHub username, is never assigned a ticket, and may raise decisions only through scripted playback - and SHALL gate in CI that a synthetic entry carries no GitHub username and is not also marked placeholder."
+      - "THE SYSTEM SHALL show a scripted decision on the dataset pages exactly as any person's decision is shown there, and SHALL NOT label it as scripted on those pages."
+      - "THE SYSTEM SHALL validate the script in CI against configuration alone: every scenario it names is registered, every decision is one of the filing decisions, and every reason is present."
+    non_functional_requirements:
+      - "Configuration, not state: the script is committed and reviewed like the injection table; the decisions it produces are rows in the decision log, written only by a replay, never committed."
+      - "Security: this is the one path that writes person-decisions with no person behind them. It is closed by three locks that must all hold - the asset must declare itself synthetic, the actor must be the dedicated synthetic one, and the route must be playback. A test asserts each lock refuses on its own."
+      - "No back door: playback goes through filing_decisions.apply(); a test asserts the decision log has no other writer, so a later convenience path cannot quietly bypass the judgement."
+      - "Determinism: a decision's instant derives from its scenario's placement (an index into the generated periods, as REQ-GEN-044's injections are placed), with no random draw - so regenerating the history moves nothing."
+      - "Bootstrap cost: each scripted decision is one transaction plus whatever it triggers (an un-supersede re-runs QA; a promotion re-checks waiting readers under REQ-PIPE-121). Measure the bootstrap before and after and record both; flag it if it grows by more than a few percent."
+      - "Auditability: the decision log and the terminal name the synthetic actor, so anyone reading the record can tell a scripted decision from a real one, even though the dataset pages deliberately cannot."
+    dependencies: []
+    decisions:
+      - "SCRIPTED PERSON DECISIONS ARE BUILT (Keith, 2026-10-04), because the generator produces files only and half of the batch's shapes are what happens AFTER a person acts - un-supersede, mark as not supplied, acknowledge, substitute."
+      - "THE SAME DECISION PATH, NO BACK DOOR (Keith's condition, 2026-10-04). A scripted decision is judged exactly as a person's would be at that moment, so a scenario that scripts something the rules forbid fails the replay rather than planting a history the system could never have produced. REJECTED writing decision-log rows directly from the generator, which would demonstrate a state the real path might refuse."
+      - "THE SCRIPT IS CONFIGURATION, ITS EFFECTS ARE STATE (CLAUDE.md's standing rule): it is a committed, reviewed declaration of what a person does in the demonstration, like the injection table and SCENARIOS.md; the entries it produces live only in the database and are regenerated with it."
+      - "RECORDED AS A PERSON'S DECISION, NOT A RULE'S (Keith, 2026-10-04): the point is to show what a person's decision looks like, and REQ-PIPE-074 criterion 4 makes person and rule distinguishable - a rule actor would show the wrong thing. The ACTOR is what makes it clearly synthetic."
+      - "UNLABELLED ON THE DATASET PAGES (Keith, 2026-10-04: 'the dataset pages stay unlabelled'). The synthetic actor's identity is visible in the decision log and the terminal, which is where a person's identity is shown anyway; the pages show a person decided, as they would for anyone. Only the scenario view says what was planted."
+      - "THE EFFECTIVE INSTANT IS SCRIPTED, THE RECORDED INSTANT IS REAL, following REQ-PIPE-074 criterion 2's two instants and promotion.effective_at_for()'s precedent for replayed history, so the as-of view shows the decision at the moment the scenario says it happened."
+      - "GUARDED BY THE ASSET, NOT THE ENVIRONMENT (this draft). The published PoC dashboard is built in the `production` environment from synthetic data, so 'refuse in production' would hide the scenarios exactly where Keith wants them seen. What must never happen is a scripted decision acting on a REAL asset, so the asset's own configuration declares whether it is synthetic, and a real deployment never says so."
+      - "DETERMINISTIC BY PLACEMENT, NOT BY SEED, following REQ-GEN-044's injection module ('A seed would be a second thing that has to stay fixed for the placement to be reproducible'). Keith said 'deterministic from the seed'; placement-derived instants meet that and need nothing extra."
+      - "THE SYNTHETIC ACTOR LIVES IN contract/people.yaml, MARKED SYNTHETIC (Keith, 2026-10-04, option a), so the ordinary allowlist check applies to it exactly as to anyone. REJECTED keeping it only in the decision script with playback accepting it on the asset's say-so - that skips the allowlist for one actor, which is the back door Keith ruled out. COST, ACCEPTED: REQ-GHUB-082 criterion 29 (every non-placeholder needs a GitHub username; a placeholder may not raise a decision) did not allow for a third kind of entry, and is amended to."
+      - "THE SYNTHETIC DECLARATION GATES PLAYBACK ONLY (Keith, 2026-10-04). Distinct from REQ-PIPE-122's 'no synthetic exception': the asset's setting eras are ordinary dated versions and do not depend on the declaration; this declaration exists solely so scripted, person-less decisions can never act on a real asset. All three locks stay."
+    open_questions: []
+
+  - id: REQ-GEN-136
+    title: "Every arrival-driven shape of the option A and period-closing batch is planted in the synthetic history"
+    date_written: "2026-10-04"
+    signed_off:
+      by: Keith
+      date: "2026-10-04"
+    story: "As Keith showing someone the supply model, I want each awkward shape we designed this batch for - a resend superseding a failure, a correction rescued by its partner, an amber supply held, a daily replacement, a red promoted supply, a late daily file, a Case Workers file in its gap - to exist in the real generated history, so that I can show the system handling it rather than describe it."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-10-04, 'SCENARIOS FOR THIS BATCH, VISIBLE IN THE REPORTING UI' (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-04."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL register each scenario below in the test scenario register as a new [INJECT] entry, stating its configuration, what it expects and how it would break, and naming the requirement or requirements it demonstrates."
+      - "THE SYSTEM SHALL plant, through REQ-GEN-044's injection mechanism, a resend that supersedes an earlier failed supply for the same table and period (demonstrates REQ-PIPE-118)."
+      - "THE SYSTEM SHALL plant a contested same-arrival pair of one Child Protection table, resolved when a later file for that table supersedes both (REQ-PIPE-118, REQ-PIPE-105 criterion 6)."
+      - "THE SYSTEM SHALL plant a single-table correction that arrives before its partner is promoted, goes red on a cross-table check, and is promoted when the partner's promotion re-checks it (REQ-PIPE-121)."
+      - "THE SYSTEM SHALL plant a correction whose re-check after its partner's promotion still fails, producing the decision log's large shout (REQ-PIPE-121)."
+      - "THE SYSTEM SHALL plant an amber supply held under an amber setting of hold, and an amber supply promoted under promote-and-acknowledge and left awaiting acknowledgement (REQ-PIPE-122)."
+      - "THE SYSTEM SHALL plant a Birth Registrations resupply that automatically replaces an already-promoted supply under the replacement setting (REQ-PIPE-123)."
+      - "THE SYSTEM SHALL plant a promoted supply whose cross-table result goes red when a sibling arrives later (REQ-DASH-126)."
+      - "THE SYSTEM SHALL plant a daily file arriving after the next day's claim window opened, filed to the next day, leaving the missed day closed with no supply (REQ-PIPE-131, REQ-PIPE-132, REQ-DASH-133)."
+      - "THE SYSTEM SHALL plant a Case Workers arrival in a calendar period it does not participate in, held for a person (REQ-PIPE-131)."
+      - "THE SYSTEM SHALL generate only the arrival shapes, and SHALL NOT generate any verdict, filing, supersession or promotion those scenarios expect (REQ-GEN-044 criterion 6)."
+      - "IF a scenario's demonstrated requirement is not yet built, THEN THE SYSTEM SHALL keep it registered and SHALL NOT inject it, and the scenario map SHALL say it has no data behind it (REQ-GEN-045 criterion 6)."
+      - "THE SYSTEM SHALL express the amber and replacement settings these scenarios need as effective-dated setting versions in the committed synthetic configuration, switched on at a date so that one synthetic history shows the history before and after, and SHALL state in each register entry the setting version in force where it lands."
+      - "THE SYSTEM SHALL place each scenario that needs a setting inside that setting version's period of effect, and SHALL NOT place two scenarios needing incompatible settings within one version's period of effect (as REQ-GEN-044 criterion 11 already requires of schedule versions)."
+      - "THE SYSTEM SHALL NOT mark any of these scenarios on the dataset pages (REQ-GEN-044 criterion 5)."
+    non_functional_requirements:
+      - "Built alongside, not after: each scenario is injected in the same change that builds the requirement it demonstrates, and that change is not done until the scenario is visible in the scenario map with coordinates."
+      - "Determinism and loud failure are REQ-GEN-044's (criteria 3 and 4), inherited rather than restated in a second mechanism."
+      - "Bootstrap cost: ten scenarios add a handful of arrivals and the re-checks they trigger. Measure the bootstrap before and after (it was 26 minutes on 2026-10-02) and record both."
+      - "Noise: inside a setting version's era the setting applies to every supply, not only the scenario's. Count how many supplies each era holds or leaves awaiting acknowledgement, and record it, so the queue is known rather than discovered."
+      - "Configuration only for the register and the injections; every effect lives in the database (CLAUDE.md's configuration-not-state rule)."
+    dependencies: [REQ-GEN-044, REQ-GEN-045]
+    decisions:
+      - "BUILT ON THE EXISTING MACHINERY, NOT BESIDE IT (Keith, 2026-10-04): the register in plans/supply-model.md, REQ-GEN-044's injection table, and REQ-GEN-045's map. A second scenario mechanism would be a second answer to 'what was planted'."
+      - "EVERY SHAPE OF THE BATCH GETS A PLANTED SCENARIO (Keith, 2026-10-04). The arrival-driven ones are here; the ones that need a person to act are REQ-GEN-137, because they depend on scripted decisions and this half does not."
+      - "WHICH SCENARIO DEPENDS ON WHICH REQUIREMENT, so each can be built alongside it: resend supersedes failure, and the same-zip pair - REQ-PIPE-118. Correction rescued by re-check, and the shout - REQ-PIPE-121 (the shout's amber variant also REQ-PIPE-122). Amber held, and promote-and-acknowledge awaiting acknowledgement - REQ-PIPE-122. Daily replacement - REQ-PIPE-123 (with REQ-PIPE-128 and 129). Red promoted - REQ-DASH-126, with no new pipeline logic. Late daily file closing the missed day empty - REQ-PIPE-131, 132 and REQ-DASH-133. Case Workers gap arrival held - REQ-PIPE-131."
+      - "SETTINGS ARE EFFECTIVE-DATED, VERSIONED LIKE CALENDARS (Keith, 2026-10-04, approving an amendment to the signed REQ-PIPE-122 and REQ-PIPE-123 whose wording is drafted separately). The synthetic configuration switches each demonstration setting on at a date, so one history shows the asset before and after - rather than a setting applying to all four years, which would have left every amber Child Protection supply ever generated awaiting acknowledgement. This requirement depends on that amendment being built."
+      - "THE SYNTHETIC SETTING ERAS (delivery-scoper, under Keith's delegation of the scenarios' detail): the early history runs on Keith's expected real defaults - amber promote, replacement never. A later era switches on Birth Registrations replacement green (his daily expectation) and Child Protection promote-and-acknowledge (standing in for 'a problematic collection'). A short era holds amber on ONE Child Protection dataset, because held amber and the shout's amber variant cannot be shown without it, and its readers' cross-table reds stay confined to that era."
+      - "REGENERATING UNDER TODAY'S SETTINGS IS HARMLESS FOR SYNTHETIC HISTORY (Keith, 2026-10-04). A real deployment's past decisions were taken under the settings in force then and are never re-derived; the synthetic history is simply regenerated, and that only ever happens to synthetic data."
+      - "STILL REJECTED (REQ-GEN-044): a scenario label on injected runs. A planted red looks exactly like a real one; only the scenario view says what was planted."
+      - "THE REGISTER STAYS IN plans/supply-model.md for now, though CLAUDE.md says plans prose is deleted as requirements land - it is parsed as configuration by qa_tools/common/scenarios.py, so deleting that file would delete the register. Flagged rather than moved; moving it is its own change."
+    open_questions: []
+
+  - id: REQ-GEN-137
+    title: "The batch's person decisions, and the _manifest's three kinds of table, are planted in the synthetic history"
+    date_written: "2026-10-04"
+    signed_off:
+      by: Keith
+      date: "2026-10-04"
+    story: "As Keith showing someone the supply model, I want the history to contain a person un-superseding a good file, marking a closed period as not supplied, acknowledging an amber supply and substituting a missing one - and a period whose _manifest lists a promoted, an inherited and a substituted table - so that the after-a-person-acts half of the model is visible too."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-04, 'SCENARIOS FOR THIS BATCH' (person decisions; the manifest showing promoted/inherited/substituted), plans/road-testing.md #16. Scoped by delivery-scoper 2026-10-04."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL register each scenario below as an [INJECT] entry naming the arrivals it needs, the scripted decisions it plays back and the requirements it demonstrates."
+      - "THE SYSTEM SHALL plant Keith's worked un-supersede case: a good file superseded by a bad later one; a person rejects the bad one and un-supersedes the good one, which is re-checked and promoted by the gate (REQ-PIPE-120)."
+      - "THE SYSTEM SHALL plant a closed, unfilled period that a person marks as not supplied, so it reads 'not supplied (accepted)' (REQ-PIPE-132, REQ-DASH-133)."
+      - "THE SYSTEM SHALL plant, inside the promote-and-acknowledge setting era REQ-GEN-136 configures, an amber supply that a person later acknowledges, beside one left awaiting acknowledgement (REQ-PIPE-122)."
+      - "THE SYSTEM SHALL plant a period a person substitutes onto an earlier promoted supply (REQ-PIPE-084)."
+      - "THE SYSTEM SHALL arrange that at least one period's _manifest lists a promoted, an inherited and a substituted table together (REQ-PIPE-130)."
+      - "THE SYSTEM SHALL play back every decision through REQ-GEN-135, and SHALL NOT write any decision-log entry by other means."
+      - "IF a scenario's demonstrated requirement or REQ-GEN-135 is not yet built, THEN THE SYSTEM SHALL keep the scenario registered and not injected."
+    non_functional_requirements:
+      - "Each scenario is injected in the same change that builds the requirement it demonstrates, as for REQ-GEN-136."
+      - "Bootstrap cost: the un-supersede scenario re-runs one supply's QA; record the bootstrap time before and after."
+      - "The inherited table needs a period a dataset does not participate in. REQ-PIPE-098's own unmet note says no dataset declares one today, so inheritance never fires on the synthetic corpus - this scenario is what first exercises it on real data, and may need a not-expected period added to the synthetic configuration."
+    dependencies: [REQ-GEN-135, REQ-GEN-136]
+    decisions:
+      - "SPLIT FROM REQ-GEN-136 because every scenario here needs a person to act, so it cannot be built until REQ-GEN-135 is, while REQ-GEN-136's arrival-driven half can be built alongside each pipeline requirement."
+      - "WHICH SCENARIO DEPENDS ON WHICH REQUIREMENT: un-supersede - REQ-PIPE-120 (and 118). Mark as not supplied - REQ-PIPE-132 (and 131, REQ-DASH-133). Acknowledge - REQ-PIPE-122. Substitute - REQ-PIPE-084, already built. The three-kind _manifest - REQ-PIPE-130 (and 128, 129, 098). Every one also needs REQ-GEN-135."
+      - "KEITH'S OWN WORKED CASE IS THE UN-SUPERSEDE SCENARIO (option A item 3: 'reject the bad newer file, pull the earlier good one out of superseded, re-run, promote') - in that order, because REQ-PIPE-120 refuses an un-supersede beside a waiting version."
+    open_questions: []
+
+  - id: REQ-GEN-138
+    title: "Existing register entries are re-checked against the batch, and any expectation the batch changed is rewritten"
+    date_written: "2026-10-04"
+    signed_off:
+      by: Keith
+      date: "2026-10-04"
+    story: "As someone reading the scenario map, I want every scenario's stated expectation to match the rules as they now are, so that a planted scenario never 'fails' because the register still describes a rule the batch replaced."
+    moscow: must
+    status: not_started
+    source: "Found by delivery-scoper 2026-10-04 while drafting the batch's scenarios: several register entries in plans/supply-model.md assert the filing rule that REQ-PIPE-131 replaces. Scoped by delivery-scoper 2026-10-04."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL re-check every entry in the test scenario register against the option A and period-closing requirements, and SHALL rewrite each expectation those requirements change in the same change that builds the requirement."
+      - "THE SYSTEM SHALL rewrite at least TS-5, TS-6c and TS-7, which expect monotonic filling or a hold that REQ-PIPE-131 removes, and TS-2 and TS-27, which name 'marked missed' where REQ-PIPE-132 introduces mark as not supplied."
+      - "WHERE a rewritten entry is injected, THE SYSTEM SHALL regenerate the scenario map in the same change (REQ-GEN-045 criterion 3)."
+      - "THE SYSTEM SHALL keep each superseded expectation in the entry as a sentence saying what it used to expect and which requirement changed it, rather than deleting it."
+    non_functional_requirements:
+      - "Mechanical, not by eye: grep the register for the retired vocabulary - monotonic, oldest claimable, non-claimable, held/hold, marked missed, ambiguity - and account for every hit."
+    dependencies: []
+    decisions:
+      - "WHAT THE CHECK FOUND, 2026-10-04, against REQ-PIPE-131: TS-6c and TS-7 expect a backfill to be HELD because monotonic filling closed its slot - under period closing it is filed to the open period instead. TS-5 explains Tuesday's closure by monotonic filling, which is retired. TS-2 and TS-27 speak of a person 'marking missed', which is now REQ-PIPE-132's mark as not supplied. TS-1, TS-3a to TS-3d and TS-6a/b come out the same under their stated configurations, though their reasoning text cites the retired branches."
+      - "KEPT AS A SENTENCE, NOT DELETED: a register entry that silently changes its expectation reads as though it always said so, and the old expectation is the record of what the old rule did."
+    open_questions: []
+
+  - id: REQ-DASH-139
+    title: "The scenario map becomes a top-level Scenarios tab beside Plans and Demo"
+    date_written: "2026-10-04"
+    signed_off:
+      by: Keith
+      date: "2026-10-04"
+    story: "As Keith walking someone through the PoC, I want the scenario map to be a destination of its own beside Plans and Demo, so that 'what was planted, and where do I see it' is one click from the top of the page rather than a side drawer."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-04, 'THE SCENARIO MAP IS ALSO SHOWN INSIDE THE DASHBOARD (e.g. a Scenarios tab beside Plans and Demo)', plans/road-testing.md #16. Scoped by delivery-scoper 2026-10-04, which found REQ-DASH-046 already renders the map in a side drawer with click-through links."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL render the committed scenario map as a top-level tab with its own URL, alongside Plans and Demo, in place of REQ-DASH-046's side drawer."
+      - "THE SYSTEM SHALL keep every behaviour REQ-DASH-046 specifies - links built from coordinates to the as-of date and the page, plain text where there are none, read from committed SCENARIOS.md only, zero console errors."
+      - "THE SYSTEM SHALL show, for each scenario, the requirement or requirements it demonstrates and whether it has data behind it yet."
+      - "THE SYSTEM SHALL NOT mark planted supplies anywhere outside this tab."
+    non_functional_requirements:
+      - "Self-hosted and file:// safe like the other tabs: embedded at build time, no fetch."
+      - "Real-browser test of the tab and of one click-through landing on the right page and as-of date."
+    dependencies: [REQ-GEN-045]
+    decisions:
+      - "A TOP-LEVEL TAB REPLACES REQ-DASH-046's HEADER DRAWER (Keith, 2026-10-04, told the drawer already existed). The drawer was built 2026-09-22 when the map had almost nothing in it; with a whole batch of scenarios to walk through, it becomes a destination like Plans and Demo, with its own URL. REQ-DASH-046's criteria all survive - none of them says 'drawer' - so this replaces how it is presented, not what it promises; the drawer, its header button and its side-panel entry are removed in the same change, so there are never two ways in."
+      - "LINKS ARE THE DASHBOARD'S, COORDINATES THE GENERATOR'S (REQ-GEN-045 criterion 5; REQ-DASH-046 criterion 3) - unchanged."
+    open_questions: []
+
+  - id: REQ-PIPE-140
+    title: "A decision can run a supply's QA again, on demand, as a run of its own that never overwrites the first"
+    date_written: "2026-10-04"
+    signed_off:
+      by: Keith
+      date: "2026-10-04"
+    story: "As the person working a period's supplies, I want a decision that changes what a supply is judged against - a re-file, an un-supersede - to run that supply's checks again there and then, so that the gate decides on verdicts computed against where the supply now sits, and the verdicts it earned before are kept rather than replaced."
+    moscow: must
+    status: not_started
+    source: "Found by delivery-scoper 2026-10-04 verifying what REQ-PIPE-079 still lacks for re-file (Keith: 'build it, after REQ-PIPE-079 is finished'). REQ-PIPE-075 criterion 17's unmet entry already named it: 'reevaluation.plan() answers WHICH checks, and nothing executes a plan'. Scoped by delivery-scoper 2026-10-04."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL offer one way to run QA for a supply that is already staged and filed, outside the processing of an arrival, evaluating the supply's own checks and the cross-table checks that read it against its filed period's overlay - the same scope an arrival's run has (REQ-PIPE-105 criterion 11)."
+      - "THE SYSTEM SHALL offer, through the same mechanism, a run of only the cross-table checks that read a given table in a given period, for the decisions that re-evaluate readers without re-running a supply's own checks."
+      - "THE SYSTEM SHALL give every such run a run identity of its own, distinct from the supply's first run, and SHALL NOT overwrite or delete any result an earlier run recorded."
+      - "THE SYSTEM SHALL record, on every result such a run produces, the decision that caused it, distinguishably from a re-evaluation caused by an arrival (REQ-PIPE-079 criterion 7)."
+      - "THE SYSTEM SHALL let the promotion gate, the dashboard and the terminal read a supply's verdict from its most recent run, while every earlier run's verdicts remain readable as history."
+      - "THE SYSTEM SHALL run QA this way only from the orchestrator path that legitimately holds a connection to supply rows, and SHALL NOT run it from any read-committed-history path."
+      - "THE SYSTEM SHALL record, in the transaction of the decision that triggers such a run, that the run is owed, and SHALL clear that record only when the run completes."
+      - "IF such a run fails to complete - the run itself breaking, as distinct from a red or amber verdict, which the gate judges as usual - THEN THE SYSTEM SHALL leave the decision that triggered it in place, leave the supply's earlier verdict as its current one, report the failure, and complete the owed run on the next pipeline run."
+    non_functional_requirements:
+      - "ONE executor for every decision-triggered run. Its callers, each today waiting on it: re-file (REQ-PIPE-141), un-supersede (REQ-PIPE-120 criterion 3), the re-check on promotion (REQ-PIPE-121), substitution's reader re-evaluation (REQ-PIPE-084 criteria 6 and 14, unmet) and REQ-PIPE-075 criterion 17. A second implementation is how 'which checks touch this table' comes to have two answers - reevaluation.plan() stays the one answer."
+      - "Cost: a decision-triggered run is one supply's checks, seconds to a minute; the terminal waits for it and shows the outcome (REQ-PIPE-120's decision on waiting). Measure one on the largest Child Protection table and record it."
+      - "The dbt scratch directory of each such run is removed with its schemas, as an arrival's is (CLAUDE.md's data/ leak note), keyed by the new run identity so it cannot collide with the first run's."
+    dependencies: []
+    decisions:
+      - "THIS IS WHAT REQ-PIPE-079 STILL LACKS FOR RE-FILE, verified against the code 2026-10-04. 079's overlay and decision layer are wired (period_overlay.build(), unrunnable.py), and arrival-time re-evaluation happens INSIDE an arrival's own run (qa_results_writer._scope_to_run keeps readers' checks and marks them caused_by). What does not exist is a run started by a DECISION: reevaluation.plan() and promotion.needs_requalification() have no production caller. REQ-PIPE-075 criterion 17, REQ-PIPE-084 criteria 6 and 14 and REQ-GHUB-082's re-file are all blocked on exactly this, which is why it is its own requirement and lands first."
+      - "A NEW RUN IDENTITY, BECAUSE THE OLD ONE WOULD ERASE HISTORY (found 2026-10-04): since REQ-PIPE-105 a run's id IS its supply's id, and qa_store.write_results replaces a run's results for the same run key. Re-running a re-filed supply under its own id would silently overwrite the verdicts it earned in its original period - exactly the history a reader needs to see why it was moved."
+      - "A RUN THAT BREAKS IS OWED, NEVER LOST (Keith, 2026-10-04), the same mechanism as REQ-PIPE-121's owed re-evaluation: recorded in the deciding transaction, retried by the next pipeline run. 'Fails' in this requirement means the run breaking, never a red verdict - a red or amber verdict goes to the gate under the settings in force at the time."
+      - "THE MOST RECENT RUN IS CURRENT, EARLIER RUNS ARE HISTORY, following REQ-PIPE-067's 'the verdict follows the filing': a supply re-checked in a new period is judged by that check, and what it scored where it was first filed stays on record."
+    open_questions: []
+
+  - id: REQ-PIPE-141
+    title: "Re-filing a supply returns it to staging under a new filing for its new period, where it is checked and the normal gate decides"
+    date_written: "2026-10-04"
+    signed_off:
+      by: Keith
+      date: "2026-10-04"
+    story: "As the person working a period's supplies, I want to move a supply that landed in the wrong period to the right one, and have it checked there and promoted by the ordinary rules, so that correcting a filing is one decision rather than a demote, a re-check and a promote I have to stitch together."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-10-04, 'RE-FILE MECHANICS SETTLED' and 'BUILD ORDER' (plans/road-testing.md #16); REQ-GHUB-082's unmet criterion 2 (re-file's effect) and REQ-PIPE-075 criterion 17. Scoped by delivery-scoper 2026-10-04."
+    acceptance_criteria:
+      - "WHEN a person re-files a supply, THE SYSTEM SHALL record a NEW filing of that supply to the target period, and SHALL keep its earlier filing unchanged as history."
+      - "THE SYSTEM SHALL treat a supply's most recent filing as its current one, and SHALL compute its arrival classification against that filing (REQ-PIPE-067)."
+      - "WHERE the supply is promoted in its old period, THE SYSTEM SHALL move it out of that period first - restoring its full stamped name (REQ-PIPE-129) - through the one move-out path REQ-PIPE-128 and REQ-PIPE-129 guard, so that the old period's slot is left unfilled."
+      - "WHERE the supply is waiting in staging or superseded in its old period, THE SYSTEM SHALL move it to staging for the target period."
+      - "IF any later period stands on the supply (REQ-PIPE-084 criterion 11), THEN THE SYSTEM SHALL refuse the re-file, SHALL name every blocking period, and SHALL name the decision that would unblock each."
+      - "WHEN a supply is re-filed into a period, THE SYSTEM SHALL supersede every unaccepted version of that table waiting in staging for the target period, whatever their receipt instants, recording each supersession as REQ-PIPE-118 criterion 8 requires."
+      - "THE SYSTEM SHALL then run the re-filed supply's QA against the target period through REQ-PIPE-140, and SHALL apply the promotion gate to it exactly as for a first arrival, with the amber and replacement settings in force at that instant (REQ-PIPE-122, REQ-PIPE-123), not those in force when it first arrived or was first checked."
+      - "THE SYSTEM SHALL NOT treat the re-file decision as barring automatic promotion of the re-filed supply under REQ-PIPE-076 criterion 7."
+      - "WHERE the target period already holds a PROMOTED version of the table, THE SYSTEM SHALL leave that version promoted until the re-filed supply is promoted, SHALL treat the re-filed supply as a resupply of a filled slot (REQ-PIPE-123 decides whether the gate may replace it), and SHALL NOT leave the period without its promoted version while the re-filed supply is checked."
+      - "IF a person re-files a REJECTED supply, THEN THE SYSTEM SHALL refuse it, say why, and name reversing the rejection as the step that must come first."
+      - "IF a person re-files one file of a CONTESTED pair, THEN THE SYSTEM SHALL refuse it, say that the contest is per arrival so moving one file would not end it, and name resolving the contest as the step that must come first."
+      - "IF a person re-files a supply into a period where its dataset's slot is resolved by INHERITANCE, THEN THE SYSTEM SHALL refuse it, say that nothing was expected for that period, and name un-inherit as the step that must come first."
+      - "WHERE a supply is re-filed into a period whose slot is resolved by SUBSTITUTION, THE SYSTEM SHALL leave the substitution in place until the re-filed supply is promoted, when REQ-PIPE-128's warn-and-de-substitute applies."
+      - "WHEN a promoted supply leaves its old period, THE SYSTEM SHALL re-evaluate, in the old period, the cross-table checks that read its table, and SHALL re-apply the gate to every waiting supply those checks belong to."
+      - "WHEN the re-filed supply is checked in the target period, THE SYSTEM SHALL re-evaluate the cross-table checks there that read its table, as for an arrival (REQ-PIPE-079 criterion 6), and, if it is promoted, re-check waiting readers under REQ-PIPE-121."
+      - "THE SYSTEM SHALL record the re-file as ONE decision-log entry with its from-period, its to-period and one reason (REQ-PIPE-074 criterion 9), with the supersessions and moves it causes recorded as their own rule-actor entries in the same transaction."
+      - "THE SYSTEM SHALL allow a re-file into a CLOSED period (REQ-PIPE-131 criterion 13)."
+      - "IF the re-filed supply then fails its checks, THEN THE SYSTEM SHALL leave it waiting red in the target period, with every version it displaced intact in that period's _superseded schema."
+      - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-118 criteria 1 and 2 to name re-file as the one exception to supersession by receipt order; REQ-PIPE-076 criterion 7 to name re-file beside un-supersede; REQ-PIPE-075 criterion 17 to read as met by this requirement for a re-file and by criterion 8 for a promotion; REQ-GHUB-082 criterion 9 (and REQ-PIPE-128 criterion 9's amendment of it) so that a re-file into a period holding a promoted version leaves that version until the re-filed supply is promoted; and clear REQ-GHUB-082's unmet criterion 2."
+    non_functional_requirements:
+      - "Atomic: the new filing, the move out of the old period, the move into staging, the supersessions and the decision-log entries are one transaction (REQ-PIPE-091 criterion 2). The QA run that follows is a separate step (REQ-PIPE-075 criterion 13's reasoning), so a failed run is retried without re-doing the re-file."
+      - "Moves and renames are catalogue changes only (REQ-PIPE-129's NFR): no supply rows are copied."
+      - "The filing table becomes append-only - no UPDATE remains (filing.refile() is the one place that updates it today) - so REQ-PIPE-104 criterion 2's write-once holds literally, and an append-only trigger can enforce it as qa.decision's does."
+      - "The stood-on guard is the THREE-LAYER guard Keith approved for REQ-PIPE-128 and 129 (decision-log rule; one move-out door that locks and checks pg_depend; an event trigger refusing ALTER TABLE on a table a view depends on). Re-file uses that door and adds no fourth path."
+      - "ONE MECHANISM FOR KNOCK-ON EFFECTS: the re-evaluations caused by the supply leaving its old period and entering the target period go through the one handler for every table arriving in or leaving a period schema (REQ-PIPE-121), never a re-file-specific path."
+      - "Every consumer of 'the' filing of a supply (filing.filing_for, slot_state, period_overlay, the dashboard builders, the arrival classification) is enumerated, since a supply can now have several filings and only the newest is current."
+    dependencies: [REQ-PIPE-140]
+    decisions:
+      - "BACK TO STAGING, FILED TO ITS NEW PERIOD, CHECKED THERE, THE NORMAL GATE DECIDES (Keith, 2026-10-04, asked whether re-file moves the supply straight into the period schema or back to staging). REJECTED moving it straight into the target period's schema, which would put a supply into a period it had never been checked against. The gate is the gate: green, or amber where REQ-PIPE-122 permits, into an empty slot promotes; anything else waits for a person."
+      - "A NEW FILING, THE OLD ONE STAYS AS HISTORY (Keith, 2026-10-04). Today's filing.refile() UPDATEs the one filing row in place, which loses where a supply was first filed - the fact a reader needs to understand why it was moved. REQ-PIPE-067's verdict-follows-filing still holds: the classification shown is the current filing's."
+      - "RE-FILE WINS (Keith, 2026-10-04): it supersedes a version already waiting in the target period even if that version was received LATER. A DELIBERATE EXCEPTION to REQ-PIPE-118's supersession by receipt order: a person moving a supply is saying which version the period should be judged on, which outranks arrival order. If the re-filed supply then fails, the displaced version is intact in _superseded - reject, then un-supersede (REQ-PIPE-120)."
+      - "THE OLD PERIOD THEN READS AS NEEDING ATTENTION (Keith, 2026-10-04): a promoted supply leaving it leaves the slot unfilled, which slot_state already reports as needing action. Nothing is restored there automatically - REQ-PIPE-120's 'never automatic in reverse' applies."
+      - "ONE ENTRY FOR THE RE-FILE, NOT DEMOTE-THEN-PROMOTE (REQ-PIPE-074 criterion 9; REQ-PIPE-067's rejection of re-file through un-decide). Moving the supply back to staging is the re-file's EFFECT, not a separate demotion decision. The rule-actor supersessions it causes are separate entries because each concerns a different supply."
+      - "RE-FILE IS CARVED OUT OF REQ-PIPE-076's 'AUTOMATION DEFERS TO A PERSON PERMANENTLY', as un-supersede already is: a person re-filing is asking for the supply to be judged where it now sits, and Keith's 'the normal gate decides' needs the gate free to promote it."
+      - "REQ-PIPE-075 CRITERION 17 IS MET HERE AND BY CONSTRUCTION. Its re-file half is this requirement. Its promotion half - a person promoting a supply into a period its QA was not run against - cannot arise once re-file goes through staging: a person promotes a supply into exactly the period its filing names (075 criterion 8), which is the period it was checked against."
+      - "REFUSED, NOT HALF-DONE (Keith, 2026-10-04): a re-file is refused for a rejected supply, for one file of a contested pair (telling the person why), and into an INHERITED period - Keith: 'refuse refiling outright and force them to un-inherit and then re-file rather than doing half the job and leaving it dangling in staging'. REJECTED the draft's assumption that an inherited-period re-file go into staging and wait there unpromotable. Into a SUBSTITUTED period the substitution stands until the re-filed supply is promoted (accepted as drafted)."
+      - "A PROMOTED VERSION IN THE TARGET PERIOD STAYS UNTIL THE RE-FILED ONE IS PROMOTED (Keith, 2026-10-04): 'we don't know if it will be promoted based on the settings and the outcomes and checks', so superseding at re-file time could leave the period empty. REJECTED following REQ-GHUB-082 criterion 9's signed wording (supersede at re-file time); criterion 9 is reworded instead. 'Re-file wins' is about versions WAITING in staging only."
+      - "JUDGED UNDER TODAY'S SETTINGS (Keith, 2026-10-04): a re-filed supply is gated with the settings in force when it is checked in its new period, consistent with REQ-PIPE-122's version being picked by the instant the decision takes effect."
+    open_questions: []
+
+  - id: REQ-GHUB-142
+    title: "A re-file that will displace anything is confirmed against a warning naming every consequence, on both routes"
+    date_written: "2026-10-04"
+    signed_off:
+      by: Keith
+      date: "2026-10-04"
+    story: "As a person re-filing a supply, I want to be told before it happens exactly which accepted and waiting tables it will remove or set aside, in which periods, so that leaving an old period without its promoted table is never a surprise."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-10-04, 'RE-FILE MECHANICS SETTLED' - 'A person making a re-file is WARNED AND MUST CONFIRM whenever it will displace another table, and the warning names EVERY consequence' (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-04."
+    acceptance_criteria:
+      - "WHERE a re-file will move a promoted supply out of its period, or supersede any version waiting in the target period, THE SYSTEM SHALL show the person, before applying it, a warning naming every such consequence - each period, each table, whether it is accepted or waiting, and its receipt date."
+      - "THE SYSTEM SHALL compute that warning from the same judgement that will apply the re-file, so that what the person confirms is what happens."
+      - "THE SYSTEM SHALL apply the re-file only after the person explicitly confirms that warning, on the terminal route and on the GitHub route, showing the warning in one panel above the decision's single confirmation as REQ-PIPE-128 requires, with confirming on GitHub taking a second comment after the warning is posted."
+      - "IF the consequences at the instant the re-file would be applied differ from those the person confirmed, THEN THE SYSTEM SHALL refuse it, say what changed, and ask again (REQ-GHUB-082 criterion 20)."
+      - "THE SYSTEM SHALL word the warning in plain terms, for example: 'This removes Q3's accepted Clients and supersedes Q2's waiting Clients from 14 May. Continue?'"
+      - "THE SYSTEM SHALL say in the warning how each consequence is undone - a superseded version can be restored with un-supersede - and what each affected period will read until then."
+    non_functional_requirements:
+      - "Parity: one implementation computes the consequence list for both routes (REQ-GHUB-082 criteria 13 and 24); a test asserts the terminal and GitHub warnings for the same re-file are identical."
+      - "Accessibility of the wording: periods and tables by their names, dates in the asset's own timezone, no supply ids unless asked."
+    dependencies: [REQ-PIPE-141]
+    decisions:
+      - "EVERY CONSEQUENCE, NAMED (Keith, 2026-10-04): the point is that a person never learns afterwards that a period lost its promoted table. A generic 'this may affect other supplies' would be the warning people learn to click through."
+      - "REFUSE IF THE CONSEQUENCES CHANGED (this draft, applying REQ-GHUB-082 criterion 20's append-time judgement): a resend landing between the warning and the confirmation would otherwise displace something the person never saw named."
     open_questions: []
