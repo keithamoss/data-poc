@@ -2185,6 +2185,67 @@ judgement about who reads the page rather than about the rule.
         the YAML-slip crash (#106, #107); (4) the open questions under
         sprints 6 and 7 above; (5) #109's F8 (demote beside a newer
         waiting version).
+      - KEITH'S ANSWERS, 2026-10-05 morning (working through the five held
+        items so the build can continue; each to be carried into its
+        requirement as an amendment before it is built):
+        (1) GAP CASCADE: WARN, DON'T BLOCK. A gap red keeps its red label
+            and its reason on the check, but REQ-QAC-108 c15 is dropped -
+            the promotion rule judges the supply on its MEASURED verdict,
+            so a real drift still blocks and one undecided supply no
+            longer freezes every later one. Chosen after the full account
+            (the waiting supply counts as a gap; a person promoting it
+            later still leaves every later supply's recorded red in place
+            until REQ-PIPE-151 re-judges). Rejected: block-until-resolved
+            (waits on 151), only-an-empty-gap, keep-as-signed.
+        (2) 081 PAGE SWITCH: THE NEWEST SUPPLY IN PLACE OR AWAITING A
+            DECISION, labelled which; only withdrawn supplies (rejected,
+            demoted, re-filed out) leave the view. Bends c1 and c8.
+        (5) F8: REFUSE THE DEMOTE where a newer version of the table is
+            waiting in the period, naming it and saying to reject or
+            supersede it first. Rejected: demote-then-supersede (my
+            recommendation), and allowing two to wait.
+        (3) REQ-PIPE-122: (a) a malformed data-asset.yaml stops EVERY
+            command with one line - file, line, what is wrong - and a
+            non-zero exit, never a traceback (a defect fix, failing test
+            first); (b) BUILD THE VISIBILITY NFR NOW, in both places: one
+            line on each dataset page ("Amber supplies: promote and
+            acknowledge (set for Child Protection, since 5 Oct 2026)"),
+            the same in `mothman supply slots`, and a new `mothman supply
+            amber-setting` listing every dataset; (c) criterion 7's "the
+            day it is added" is the date, on the asset clock, of the COMMIT
+            that introduced the version, not the day the gate runs.
+        (4a) REQ-PIPE-115: an open hold does NOT blank out later periods -
+            the dataset stays red with the hold's reason, each period shows
+            its own checked results (amend c10-11); a check reading two
+            unreadable tables gets ONE not-evaluated record naming both
+            (amend c2); TRIAL RUNS GET THE c17 RECONCILIATION TOO (Keith
+            chose this over my "accept"). A gap red (now warn-only) is the
+            same red, labelled at the check group with its measured verdict.
+        (4b) SPRINT 5 / #93 / MIGRATIONS: the stated original-receipt
+            time GETS AN INSTANT COLUMN beside its text, as the NFR asked
+            (Keith chose this over my "amend the NFR"); a file arriving
+            after an authored calendar runs out is HELD for a person (the
+            last period closes when its claim window would have ended);
+            ALWAYS WIPE AND REBUILD on a schema change (Keith chose this
+            over my "allow additive in place") - so ensure_schema refuses
+            ANY older version with the reset-then-bootstrap message, and
+            the additive-migration DDL path goes; a service identity
+            hand-filing is DROPPED as moot - Keith: "why would it?", and
+            nothing does (only the critic's faked GITHUB_ACTIONS test).
+        (4c) SPRINT 7 / 144 / DATABASES: the no-supply banner says CHASE
+            THE SUPPLIER FIRST, then names the wizard (`mothman supply
+            decide`), which offers all three decisions; a daily feed's row
+            names TODAY'S LATE-BUT-OPEN FILE beside an old gap; the
+            contested-pair choice (144 c14/c42) goes to SPRINT 9's re-file
+            requirements (REQ-PIPE-140-142) as an amendment for sign-off, a
+            new filing decision on both routes; PERMISSION GIVEN to reset
+            and rebuild the real `supply` database and to drop the seven
+            scratch databases (supply131, supply131b, equiv144_before,
+            equiv144_after, equiv_after, supply6, supply7). THE DROP WAS
+            REFUSED by this session's permission classifier despite the yes,
+            and was not worked around - Keith runs it, or adds a permission
+            rule. Also left over and NOT in the yes: boot_par, boot_seq,
+            ov_overlap, ov_sequential, supply115.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt
