@@ -4434,3 +4434,28 @@ Belongs with batch 5's check work.
     receipt, QA results and decision entries - so history still reads; an
     archived copy rather than deletion ties into plans/supply-thoughts.md.
     Personal data kept indefinitely is the reason it matters.
+
+61. **[todo, 2026-10-04]** **[Pipeline & publishing]** **A concurrency
+    pass once the supply model settles: what happens when runs overlap.**
+    Keith's ask, 2026-10-04, timed for "once we settle how all this works
+    over the next week or two" - after the option A and period-closing
+    batch is built, not before. Today the pipeline processes arrivals ONE
+    AT A TIME (filing depends on what the previous arrival promoted), and
+    the design so far quietly leans on that. Once arrivals are automated
+    there may be several QA runs at once - across datasets, collections
+    and agencies - plus people deciding things on the terminal and GitHub
+    while runs are in flight. The pass should first decide WHETHER
+    simultaneous runs are allowed at all (and at what grain: per dataset,
+    per collection, per period), then walk the race conditions and
+    oddities that follow. Already known to look at: two decisions'
+    re-checks overlapping (REQ-PIPE-121 settles "newest cause wins, not
+    last to finish", but nothing else has been checked that way); a file
+    landing between a warning and its confirmation (REQ-PIPE-128 refuses
+    and re-shows); a decision waiting on a running QA tool's lock
+    (REQ-PIPE-129's lock timeout); the substitute-versus-displace race
+    (129's stands_on lock); two arrivals for the same table and period
+    being filed at once (REQ-PIPE-118's supersession by receipt instant
+    assumes receipt order); cross-table checks reading a sibling that
+    another run is mid-way through promoting; and owed re-checks
+    (REQ-PIPE-120/121/140) being picked up by two runs at once. Worth a
+    delivery-architect pass of its own when it comes up.
