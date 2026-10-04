@@ -1761,6 +1761,16 @@ judgement about who reads the page rather than about the rule.
       REQ-DASH-070 and a REQ-GEN item - via delivery-scoper, then place
       the extraction of 086's per-arrival function FIRST in the build
       order.
+      **HOW THOSE AMENDMENTS ARE SIGNED (Keith, 2026-10-04 evening):**
+      "I'm happy for you to turn it into exact amendment wording, but I
+      don't feel a need to review all of it. Only bring me the really high
+      value stuff." So each amendment is classed HIGH VALUE (shown to
+      Keith: changes what a person sees or must do beyond what he chose,
+      touches privacy or security, reverses or narrows an earlier
+      decision of his, changes a BUILT requirement's claims, or needed a
+      choice between readings) or ROUTINE (a faithful transcription of an
+      answer he gave), applied on this blanket approval and recorded as
+      such in each requirement's decisions. When unsure, HIGH VALUE.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt
