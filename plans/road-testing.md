@@ -786,7 +786,7 @@ Three things it might be, and it is not obvious which:
 Nothing done. It needs Keith, because "how much is too much" is a
 judgement about who reads the page rather than about the rule.
 
-15. **[todo, 2026-10-02]** **[Testing & dev tooling]** **`mothman
+15. **[blocked, 2026-10-04]** **[Testing & dev tooling]** **`mothman
     pipeline bootstrap --force` no longer reproduces the same content.**
 
     Seen while regenerating for REQ-PIPE-105: a `--force` bootstrap over
@@ -814,6 +814,11 @@ judgement about who reads the page rather than about the rule.
     is a call about how destructive a dev command may be, so it is
     Keith's rather than fixed in passing. CI is unaffected: every runner
     starts from an empty database.
+
+    **DECIDED 2026-10-04 (Keith), carried by REQ-PIPE-144:** `--force` on a
+    database that already holds history REFUSES and points at the new
+    guarded `mothman env reset-synthetic`; it never wipes anything itself.
+    Delete this entry when REQ-PIPE-144 is built.
 
 16. **[investigate, 2026-10-03]** **[Pipeline & publishing]** **A clean
     resupply cannot get through once a quarter has two undecided
