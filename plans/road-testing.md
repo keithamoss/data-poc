@@ -1415,3 +1415,28 @@ judgement about who reads the page rather than about the rule.
       answered in conversation (see the next entry once settled).
     - Keith asked how to make the pg_depend "second line of defence" (a
       stood-on table must never be moved out of its period) 100% robust.
+    - **STOOD-ON-TABLE GUARD: ALL THREE LAYERS** (Keith) - (1) the
+      decision-log rule; (2) one door for every move/rename out of a period,
+      locking the table and checking pg_depend in the same transaction, with
+      a test that nothing else issues that DDL; (3) a PostgreSQL EVENT
+      TRIGGER on ALTER TABLE refusing a move-out while a view depends on
+      it, catching any path including a person at a SQL console. Each layer
+      tested to refuse on its own. Event triggers need elevated rights -
+      verify the target platform supports them. Goes into 128/129.
+    - **BUILD ORDER (Keith): REQ-PIPE-079 finished FIRST** (verify it is
+      built; build what is not), **then RE-FILE's effect, then today's
+      batch.** Keith asked whether re-file moves the supply into the period
+      schema or back to STAGING with its new period, then QA - to settle in
+      re-file scoping. REQ-PIPE-075 criterion 17 agreed.
+    - **SYNTHETIC ACTOR: option (a)** (Keith) - a synthetic person in
+      contract/people.yaml, locked to synthetic playback, refused on
+      GitHub.
+    - **SETTINGS ARE EFFECTIVE-DATED, VERSIONED LIKE CALENDARS** (Keith):
+      the amber and replacement settings carry effective dates so a change
+      can never reach back and alter how the past is represented; each
+      decision records the setting that applied and every display of the
+      past reads the RECORDED value, never the current one. Amends signed
+      REQ-PIPE-122 and 123 (wording to be approved). Synthetic history
+      re-replaying under today's settings on regenerate is accepted as
+      harmless (synthetic only); effective-dating also lets one synthetic
+      history show both eras of a setting.
