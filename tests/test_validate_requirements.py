@@ -698,3 +698,67 @@ class TestNoHyphenWrapArtifacts:
             f"{name} now has a literal block at line(s) {literal} - "
             f"test_no_scalar_is_wrapped_at_a_hyphen assumes folded scalars "
             f"throughout and must be narrowed to skip it")
+
+
+class TestARetiredRequirement:
+    """REQ-DOCS-143: a requirement a later one replaced stays in the
+    register as history, saying when, who decided and what replaced it."""
+
+    _RETIRED = {"date": "2026-10-04", "by": "Keith", "replaced_by": ["REQ-QAC-002"]}
+
+    def _pair(self, **overrides):
+        return [_valid_entry(**overrides), _valid_entry(id="REQ-QAC-002")]
+
+    def test_a_retired_requirement_with_its_three_facts_is_valid(self):
+        assert validate(self._pair(status="retired", retired=dict(self._RETIRED))) == []
+
+    def test_retired_without_saying_when_who_and_what_replaced_it_is_refused(self):
+        errors = validate(self._pair(status="retired"))
+        assert any("no `retired:` block" in e for e in errors), errors
+
+    @pytest.mark.parametrize("missing", ["date", "by", "replaced_by"])
+    def test_each_of_the_three_facts_is_required(self, missing):
+        retired = {k: v for k, v in self._RETIRED.items() if k != missing}
+        assert validate(self._pair(status="retired", retired=retired)), missing
+
+    def test_a_retired_block_on_a_live_requirement_is_refused(self):
+        errors = validate(self._pair(retired=dict(self._RETIRED)))
+        assert any("has a `retired:` block but status is 'built'" in e for e in errors), errors
+
+    def test_the_successor_must_exist(self):
+        errors = validate([_valid_entry(status="retired",
+                                         retired={**self._RETIRED, "replaced_by": ["REQ-QAC-099"]})])
+        assert any("REQ-QAC-099" in e for e in errors), errors
+
+    def test_depending_on_a_retired_requirement_is_refused(self):
+        reqs = self._pair(status="retired", retired=dict(self._RETIRED))
+        reqs[1]["dependencies"] = ["REQ-QAC-001"]
+        errors = validate(reqs)
+        assert any("depends on REQ-QAC-001, which is retired" in e for e in errors), errors
+
+    def test_it_keeps_its_history_without_being_refused_for_it(self):
+        """Criterion 5: a retired requirement that was once built still
+        names its tests and code; that is history, not a contradiction."""
+        assert validate(self._pair(status="retired", retired=dict(self._RETIRED))) == []
+
+    def test_a_never_signed_draft_can_be_retired(self):
+        assert validate(self._pair(status="retired", retired=dict(self._RETIRED),
+                                   signed_off=None, linked_tests=[], implemented_by=[],
+                                   evidence=[])) == []
+
+
+class TestARetiredCriterion:
+    """REQ-DOCS-143 criterion 3: one criterion retires, the rest stands."""
+
+    def test_a_retired_criterion_is_valid_by_position(self):
+        reqs = [_valid_entry(acceptance_criteria=["One.", "Two."],
+                             retired_criteria=[{"criterion": 2, "date": "2026-10-04",
+                                                "by": "Keith", "replaced_by": ["REQ-QAC-002"]}]),
+                _valid_entry(id="REQ-QAC-002")]
+        assert validate(reqs) == []
+
+    def test_a_position_past_the_last_criterion_is_refused(self):
+        reqs = [_valid_entry(retired_criteria=[{"criterion": 5, "date": "2026-10-04",
+                                                "by": "Keith", "replaced_by": ["REQ-QAC-002"]}]),
+                _valid_entry(id="REQ-QAC-002")]
+        assert any("only 1" in e for e in validate(reqs))

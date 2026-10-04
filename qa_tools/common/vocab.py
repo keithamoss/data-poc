@@ -31,7 +31,11 @@ COMPONENT_CODES: dict[str, str] = {
 
 MOSCOW: tuple[str, ...] = ("must", "should", "could", "wont")
 
-REQUIREMENT_STATUSES: tuple[str, ...] = ("not_started", "in_progress", "built")
+# `retired` (REQ-DOCS-143, Keith 2026-10-04): a requirement a later one
+# replaced. Kept in the register as history rather than deleted, so a
+# reader a year on can see what was once agreed and what took its place
+# without knowing to look in git.
+REQUIREMENT_STATUSES: tuple[str, ...] = ("not_started", "in_progress", "built", "retired")
 
 # Plain words rather than Keep a Changelog's Added/Changed/Fixed, which
 # read as a spec for a maintainer; these read as a sentence for a

@@ -218,6 +218,7 @@ def _cross_reference_errors(requirements: list[Requirement]) -> list[str]:
     an enforced one."""
     errors: list[str] = []
     all_ids = {r.id for r in requirements}
+    retired_ids = {r.id for r in requirements if r.status == "retired"}
 
     seen: dict[str, int] = {}
     for r in requirements:
@@ -248,6 +249,18 @@ def _cross_reference_errors(requirements: list[Requirement]) -> list[str]:
             if dep not in all_ids:
                 errors.append(f"{r.id}: dependencies entry {dep!r} does not match any real "
                                f"requirement id in this file")
+            elif dep in retired_ids and r.status != "retired":
+                # REQ-DOCS-143 criterion 6: depend on what replaced it.
+                errors.append(f"{r.id}: depends on {dep}, which is retired - depend on what "
+                               f"replaced it instead")
+        for problem in r.retirement_problems():
+            errors.append(f"{r.id}: {problem}")
+        for where, retirement in ([("retired", r.retired)] if r.retired else []) + [
+                (f"retired_criteria (criterion {c.criterion})", c) for c in r.retired_criteria]:
+            for successor in retirement.replaced_by:
+                if successor not in all_ids:
+                    errors.append(f"{r.id}: {where} says it was replaced by {successor!r}, "
+                                   f"which is not a requirement id in this file")
         # REQ-DOCS-073 criterion 7. A blocker nothing can resolve is
         # worse than free text, because free text at least does not
         # claim to be checkable - and a typo'd id silently drops the

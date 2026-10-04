@@ -536,6 +536,28 @@ class TestRequirementsPanel:
         assert "panel=requirements" not in clean_page.url
         assert clean_page.locator("#requirements-panel").get_attribute("aria-hidden") == "true"
 
+    def test_the_status_filter_shows_only_the_chosen_status(self, clean_page, built_dashboard_html):
+        """REQ-DOCS-143 criterion 7 - retired requirements are filterable,
+        which needs a status filter at all. Asserted on the real register:
+        choosing 'Built' leaves only Built pills, and 'All' brings the rest
+        back."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#requirements-btn").click()
+        body = clean_page.locator("#requirements-panel-body")
+        everything = body.inner_text()
+
+        rows = body.locator("[data-req-row-status]")
+        all_rows = rows.count()
+
+        body.locator('[data-req-status="built"]').click()
+        statuses = {rows.nth(i).get_attribute("data-req-row-status") for i in range(rows.count())}
+        assert statuses == {"built"}, statuses
+        assert rows.count() < all_rows, "the real register has unbuilt requirements to hide"
+
+        body.locator('[data-req-status="all"]').click()
+        assert rows.count() == all_rows
+        assert body.inner_text() == everything
+
 
 class TestReleaseNotesPanel:
     def test_it_reads_as_a_whats_new_page_not_an_engineering_log(self, clean_page, built_dashboard_html):

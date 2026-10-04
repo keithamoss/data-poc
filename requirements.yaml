@@ -27168,7 +27168,7 @@ requirements:
       date: "2026-10-04"
     story: "As someone reading the register a year from now, I want a requirement that a later one replaced to still be there, marked retired and pointing at its successor, so that I can see what was once agreed and why it changed without digging through git."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, 2026-10-04, answering the delivery-architect's pre-build review of the option A and period-closing batch: the batch retires REQ-QAC-017, REQ-PIPE-063, REQ-PIPE-065 criteria 1 and 2 and REQ-PIPE-077, and the register had no way to say so. Drafted by the main session."
     acceptance_criteria:
       - "THE SYSTEM SHALL accept retired as a requirement status, alongside not_started, in_progress and built."
@@ -27180,8 +27180,27 @@ requirements:
       - "THE SYSTEM SHALL show retired requirements on the dashboard's requirements view as retired, distinguishable from built, and filterable."
     non_functional_requirements:
       - "Every consumer of the status vocabulary (vocab.REQUIREMENT_STATUSES, the register schema, the sprints gate, the plans dependency graph, the dashboard's requirements view) is enumerated mechanically, per CLAUDE.md's shape-change rule."
+    linked_tests:
+      - tests/test_validate_requirements.py::TestARetiredRequirement
+      - tests/test_validate_requirements.py::TestARetiredCriterion
+      - tests/test_sprint_state.py::TestRetiredCountsForNothing
+      - tests/test_schemas.py
+      - tests-js/requirements.test.js
+      - tests/test_dashboard_e2e.py::TestRequirementsPanel::test_the_status_filter_shows_only_the_chosen_status
+    implemented_by:
+      - qa_tools/common/vocab.py::REQUIREMENT_STATUSES
+      - qa_tools/common/schemas.py::Retirement
+      - qa_tools/common/schemas.py::RetiredCriterion
+      - qa_tools/common/schemas.py::Requirement
+      - qa_tools/common/validate_requirements.py::validate
+      - qa_tools/common/sprint_state.py::survey
+      - qa_tools/common/sprint_state.py::satisfied_blockers
+    evidence:
+      - "2026-10-04: 14 new Python tests across the validator and the sprint gate - 11 confirmed failing against the pre-change code (the other 3 assert only that an error is raised, which the old code also does by refusing the status outright); 2 new JS tests; register validates with 141 requirements, zero errors, none of them retired yet. The real-browser filter test runs in CI's deployment half, since the dashboard build needs a bootstrapped database."
     dependencies: []
     decisions:
+      - "BUILT 2026-10-04 as the first step of the option A batch's build order (Keith: start building). A retired REQUIREMENT carries a `retired:` block (date, by, replaced_by, optional reason); a retired CRITERION is listed in `retired_criteria` by its 1-based position with the same facts, and its text stays in place so every decision citing its number still reads. Retired counts for nothing in the sprint gate, its unmet entries included; a deferral blocked on a retired requirement is reported for re-pointing like one whose blocker shipped. A retired requirement is exempt from sign-off and from the 'evidence before the work' rule, since it keeps whatever it carried as history. On the dashboard: a muted 'Retired' pill (the retired CHECK's own), the retirement line, retired criteria struck through in place, and a status filter."
+      - "UNMET ENTRIES CANNOT BE LINKED TO A RETIRED CRITERION MECHANICALLY: an unmet entry names its criterion in free text, so whoever retires a criterion removes its matching unmet entry by hand. A retired REQUIREMENT's unmet entries are ignored wholesale."
       - "A RETIRED STATUS, NOT DELETION (Keith, 2026-10-04). REJECTED deleting retired entries and moving their decisions into the successors: the register is the permanent artifact, and a reader should not need to know to look in git."
       - "BOTH GRAINS ARE ALLOWED (Keith, 2026-10-04): a whole requirement or a single criterion can be retired, whichever fits the case."
     open_questions: []

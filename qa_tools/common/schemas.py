@@ -209,6 +209,32 @@ class UnmetCriterion(_Strict):
     blocked_by: BlockedBy
 
 
+class Retirement(_Strict):
+    """Why a requirement - or one of its criteria - is retired
+    (REQ-DOCS-143 criteria 2 and 3).
+
+    WHEN, WHO, AND WHAT REPLACED IT are all required: a retirement that
+    cannot name its successor is a deletion with extra steps, and the
+    successor is the one thing a reader arriving at a retired entry
+    needs next. `reason` is optional because the successor's own
+    decisions usually say why, and a second account invites drift.
+    """
+
+    date: str = Field(pattern=_DATE_PATTERN)
+    by: NonEmptyStr
+    replaced_by: list[str] = Field(min_length=1)
+    reason: NonEmptyStr | None = None
+
+
+class RetiredCriterion(Retirement):
+    """One retired acceptance criterion, by its 1-based position - the
+    numbering every decision and amendment already cites, which is why
+    the criterion's text stays in place rather than being deleted
+    (REQ-DOCS-143 criterion 5: history unchanged)."""
+
+    criterion: int = Field(ge=1)
+
+
 class Requirement(_Strict):
     id: str = Field(pattern=_ID_PATTERN)
     title: NonEmptyStr
@@ -259,12 +285,49 @@ class Requirement(_Strict):
     # validator below.
     unmet_criteria: list[UnmetCriterion] = []
 
+    # REQ-DOCS-143. `retired` is present exactly when status is
+    # "retired"; `retired_criteria` lets one criterion go while the rest
+    # of the requirement keeps its status. Both checked as whole-record
+    # rules in retirement_problems() below, so the validator can report
+    # every problem in one run.
+    retired: Retirement | None = None
+    retired_criteria: list[RetiredCriterion] = []
+
     @field_validator("date_written")
     @classmethod
     def _real_date(cls, v: str) -> str:
         if v and not re.match(_DATE_PATTERN, v):
             raise ValueError('must be a real "YYYY-MM-DD" date')
         return v
+
+    def retired_positions(self) -> set[int]:
+        """1-based positions of this requirement's retired criteria."""
+        return {c.criterion for c in self.retired_criteria}
+
+    def counted_criteria(self) -> int:
+        """Criteria that still count toward a sprint - none for a retired
+        requirement, and never a retired criterion (REQ-DOCS-143
+        criterion 4)."""
+        if self.status == "retired":
+            return 0
+        return len(self.acceptance_criteria) - len(self.retired_positions())
+
+    def retirement_problems(self) -> list[str]:
+        """Whole-record rules for REQ-DOCS-143 criteria 2 and 3."""
+        out = []
+        if self.status == "retired" and self.retired is None:
+            out.append("status is 'retired' but it has no `retired:` block saying when, "
+                       "who decided and what replaced it")
+        if self.retired is not None and self.status != "retired":
+            out.append(f"has a `retired:` block but status is {self.status!r}")
+        positions = [c.criterion for c in self.retired_criteria]
+        for n in positions:
+            if n > len(self.acceptance_criteria):
+                out.append(f"retired_criteria names criterion {n}, but there are only "
+                           f"{len(self.acceptance_criteria)}")
+        if len(positions) != len(set(positions)):
+            out.append("retired_criteria names the same criterion more than once")
+        return out
 
     def missing_when_built(self) -> list[str]:
         """The four fields a `built` requirement must carry, and why they
@@ -286,7 +349,11 @@ class Requirement(_Strict):
         not-yet-started requirement is the normal resting state between
         the two, not an error.
         """
-        return self.status != "not_started" and self.signed_off is None
+        # A retired requirement is history: it may never have been
+        # signed (a draft superseded before sign-off), and demanding a
+        # signature now would be asking someone to agree to something
+        # nobody will build.
+        return self.status not in ("not_started", "retired") and self.signed_off is None
 
     def present_but_not_built(self) -> list[str]:
         """Fields that cannot honestly precede the work, on a requirement
@@ -309,7 +376,10 @@ class Requirement(_Strict):
         something that cannot exist yet: code that implements it, tests
         that verify it, a measurement taken against it.
         """
-        if self.status == "built":
+        # A RETIRED requirement keeps whatever it carried as history
+        # (REQ-DOCS-143 criterion 5) - one that was built still names
+        # the tests and code that met it.
+        if self.status in ("built", "retired"):
             return []
         out = [name for name in ("linked_tests", "implemented_by", "evidence")
                if getattr(self, name)]

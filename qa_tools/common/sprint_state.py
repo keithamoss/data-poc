@@ -249,7 +249,13 @@ def survey(sprints_file: Path | str = SPRINTS_FILE,
             req = reqs.get(req_id)
             if req is None:
                 continue
-            criteria = len(req.get("acceptance_criteria") or [])
+            # RETIRED counts for nothing (REQ-DOCS-143 criterion 4): a
+            # retired requirement, a retired criterion, and any unmet
+            # entry a retired requirement still carries as history.
+            if req.get("status") == "retired":
+                continue
+            criteria = (len(req.get("acceptance_criteria") or [])
+                        - len(req.get("retired_criteria") or []))
             unmet = req.get("unmet_criteria") or []
             sprint.total += criteria
             # A criterion is met only where the requirement is BUILT and
@@ -314,8 +320,11 @@ def satisfied_blockers(sprints_file: Path | str = SPRINTS_FILE,
     for d in all_deferrals(sprints_file, requirements_file):
         if d.unowned or not (d.sprints or d.requirements):
             continue
+        # A RETIRED blocker counts as delivered for this purpose: it will
+        # never ship, so the deferral pointing at it needs re-pointing at
+        # whatever replaced it (REQ-DOCS-143).
         blockers = ([("sprint %d" % n, n in done_sprints) for n in d.sprints]
-                     + [(q, (reqs.get(q) or {}).get("status") == "built")
+                     + [(q, (reqs.get(q) or {}).get("status") in ("built", "retired"))
                         for q in d.requirements])
         if blockers and all(delivered for _name, delivered in blockers):
             names = ", ".join(name for name, _ in blockers)

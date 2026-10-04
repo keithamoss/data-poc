@@ -58,6 +58,9 @@ def test_parses_a_full_entry(tmp_path):
         # renders, and a field appearing in it silently is one nobody
         # decided to show.
         "unmet_criteria": [],
+        # REQ-DOCS-143: present and empty on a live requirement.
+        "retired": None,
+        "retired_criteria": [],
     }
 
 

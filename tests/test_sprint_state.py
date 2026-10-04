@@ -463,3 +463,21 @@ class TestTheRealFiles:
         """Every branch this gate can report is reachable against the
         real corpus, so none of them is dead code."""
         assert any(s.derived == state for s in ss.survey())
+
+
+class TestRetiredCountsForNothing:
+    """REQ-DOCS-143 criterion 4."""
+
+    def test_a_retired_requirement_adds_nothing_to_a_sprint(self, tmp_path):
+        s = _one(tmp_path, "done", [("REQ-X-001", "built", 4, []),
+                                    ("REQ-X-002", "retired", 3, ["sprint 2"])])
+        assert (s.met, s.total) == (4, 4)
+        assert s.deferrals == [], "a retired requirement's unmet entries are history, not work"
+
+    def test_a_retired_criterion_leaves_the_count(self, tmp_path):
+        path = _register(tmp_path, [("REQ-X-001", "not_started", 3, [])])
+        data = yaml.safe_load(path.read_text())
+        data["requirements"][0]["retired_criteria"] = [{"criterion": 2}]
+        path.write_text(yaml.safe_dump(data))
+        s = ss.survey(_plan(tmp_path, [(1, "todo", ["REQ-X-001"])]), path)[0]
+        assert s.total == 2

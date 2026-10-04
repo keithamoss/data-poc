@@ -98,3 +98,19 @@ describe("renderRequirementsPanel (raw template, illustrative-fallback state)", 
     expect(body.innerHTML).toContain("No requirements yet");
   });
 });
+
+describe("a retired requirement (REQ-DOCS-143)", () => {
+  it("is labelled Retired in the retired check's muted pill", () => {
+    const w = load();
+    expect(w.requirementStatusLabel("retired")).toBe("Retired");
+    expect(w.requirementStatusPill("retired")).toContain("pill retired");
+  });
+
+  it("says when, who and what replaced it", () => {
+    const w = load();
+    const note = w.retirementNote({ date: "2026-10-04", by: "Keith", replaced_by: ["REQ-PIPE-131"] });
+    expect(note).toContain("2026-10-04");
+    expect(note).toContain("Keith");
+    expect(note).toContain("REQ-PIPE-131");
+  });
+});

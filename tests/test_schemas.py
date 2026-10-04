@@ -123,7 +123,7 @@ def test_the_vocabularies_have_one_home():
     assert _COMPONENT_CODES is COMPONENT_CODES
     assert len(COMPONENT_CODES) == 7
     assert MOSCOW == ("must", "should", "could", "wont")
-    assert REQUIREMENT_STATUSES == ("not_started", "in_progress", "built")
+    assert REQUIREMENT_STATUSES == ("not_started", "in_progress", "built", "retired")
     assert CHANGELOG_CATEGORIES == ("New", "Improved", "Fixed")
 
 

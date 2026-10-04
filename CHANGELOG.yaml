@@ -125,6 +125,16 @@ releases:
               marked "not evaluated", with the reason in its detail panel,
               and its trend chart leaves a gap rather than drawing a zero
               that looked like nothing was wrong.
+      - category: Improved
+        items:
+          - headline: Requirements can be retired, and filtered by status
+            components: ["Docs & process", "Dashboard UI"]
+            description: >
+              A requirement a later one replaces now stays in the
+              Requirements panel marked "Retired", saying when, who decided
+              and what replaced it - a single criterion can be retired the
+              same way. The panel also gains a filter, so you can show only
+              what is built, in progress, not started or retired.
 
   - date: "2026-10-02"
     summary: >

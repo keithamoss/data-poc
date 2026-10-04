@@ -5676,8 +5676,18 @@ const MOSCOW_LABEL = {must:"Must", should:"Should", could:"Could", wont:"Won't"}
 const MOSCOW_CLASS = {must:"prio-1", should:"prio-2", could:"prio-3", wont:"prio-4"};
 function moscowLabel(m){ return MOSCOW_LABEL[m] || m; }
 function moscowPill(m){ return `<span class="pill ${MOSCOW_CLASS[m]||"nodata"} sm"><span class="ico"></span>${moscowLabel(m)}</span>`; }
-const REQ_STATUS_LABEL = {built:"Built", in_progress:"In progress", not_started:"Not started"};
-const REQ_STATUS_CLASS = {built:"green", in_progress:"amber", not_started:"nodata"};
+const REQ_STATUS_LABEL = {built:"Built", in_progress:"In progress", not_started:"Not started", retired:"Retired"};
+// `retired` (REQ-DOCS-143) borrows the RETIRED CHECK's own muted pill:
+// one meaning - "no longer part of what is current" - for both.
+const REQ_STATUS_CLASS = {built:"green", in_progress:"amber", not_started:"nodata", retired:"retired"};
+// The status filter (REQ-DOCS-143 criterion 7). Per page load, not in the
+// URL: the panel is a side drawer with no route of its own.
+let REQ_STATUS_FILTER = "all";
+function retirementNote(ret){
+  if(!ret) return "";
+  const by = (ret.replaced_by||[]).map(id=>`<span class="mono">${escHtml(id)}</span>`).join(", ");
+  return `Retired ${escHtml(ret.date)} by ${escHtml(ret.by)} - replaced by ${by}${ret.reason ? ". "+escHtml(ret.reason) : ""}`;
+}
 function requirementStatusLabel(s){ return REQ_STATUS_LABEL[s] || s; }
 function requirementStatusPill(s){ return `<span class="pill ${REQ_STATUS_CLASS[s]||"nodata"} sm"><span class="ico"></span>${requirementStatusLabel(s)}</span>`; }
 function renderRequirementsPanel(){
@@ -5689,8 +5699,19 @@ function renderRequirementsPanel(){
     </div>`;
     return;
   }
-  body.innerHTML = REQUIREMENTS.map(r=>{
-    const criteria = (r.acceptance_criteria||[]).map(c=>`<li style="margin-bottom:4px;">${c}</li>`).join("");
+  const counts = {all: REQUIREMENTS.length};
+  REQUIREMENTS.forEach(r=>{ counts[r.status] = (counts[r.status]||0) + 1; });
+  const filterRow = `<div class="req-status-filter" role="group" aria-label="Filter requirements by status" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;">
+    ${["all","not_started","in_progress","built","retired"].filter(s=> s==="all" || counts[s]).map(s=>
+      `<button type="button" class="link-btn${REQ_STATUS_FILTER===s?" is-active":""}" data-req-status="${s}" aria-pressed="${REQ_STATUS_FILTER===s}">${s==="all"?"All":requirementStatusLabel(s)} (${counts[s]||0})</button>`).join("")}
+  </div>`;
+  const shown = REQUIREMENTS.filter(r=> REQ_STATUS_FILTER==="all" || r.status===REQ_STATUS_FILTER);
+  body.innerHTML = filterRow + shown.map(r=>{
+    const retiredAt = {};
+    (r.retired_criteria||[]).forEach(c=>{ retiredAt[c.criterion] = c; });
+    const criteria = (r.acceptance_criteria||[]).map((c,i)=> retiredAt[i+1]
+      ? `<li style="margin-bottom:4px; color:var(--ink-faint);"><s>${c}</s> <span class="pill retired sm"><span class="ico"></span>Retired</span> <span style="font-size:11.5px;">${retirementNote(retiredAt[i+1])}</span></li>`
+      : `<li style="margin-bottom:4px;">${c}</li>`).join("");
     const tests = (r.linked_tests||[]).length
       ? `<div style="margin-top:10px; font-size:12px; color:var(--ink-muted);">
           Verified by: ${r.linked_tests.map(t=>`<code>${t}</code>`).join(", ")}
@@ -5760,13 +5781,14 @@ function renderRequirementsPanel(){
           <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.evidence.map(e=>`<li>${e}</li>`).join("")}</ul>
         </div>` : "";
     return `
-      <div style="margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--line);">
+      <div data-req-row-status="${r.status}" style="margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--line);">
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
           <span class="mono" style="font-size:11.5px; color:var(--ink-faint);">${r.id}</span>
           <b style="font-size:14px;">${r.title}</b>
           ${dateWritten}
         </div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">${moscowPill(r.moscow)}${requirementStatusPill(r.status)}${signedOff}</div>
+        ${r.retired ? `<div class="req-retired-note" style="font-size:12.5px; color:var(--ink-muted); margin-bottom:8px;">${retirementNote(r.retired)}</div>` : ""}
         <div style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;">${r.story}</div>
         <ul style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.5;">${criteria}</ul>
         ${nfrs}
@@ -5780,6 +5802,10 @@ function renderRequirementsPanel(){
         ${source}
       </div>`;
   }).join("");
+  body.querySelectorAll("[data-req-status]").forEach(btn=> btn.addEventListener("click", ()=>{
+    REQ_STATUS_FILTER = btn.dataset.reqStatus;
+    renderRequirementsPanel();
+  }));
 }
 document.getElementById("requirements-btn").addEventListener("click", ()=> openPanel("requirements"));
 
