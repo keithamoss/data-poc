@@ -4469,3 +4469,19 @@ Belongs with batch 5's check work.
     another run is mid-way through promoting; and owed re-checks
     (REQ-PIPE-120/121/140) being picked up by two runs at once. Worth a
     delivery-architect pass of its own when it comes up.
+
+62. **[todo, 2026-10-04]** **[Pipeline & publishing]** **A wider
+    "did anything slip through" check after every run - maybe later.**
+    Keith, 2026-10-04, choosing the NARROW reconciliation for the
+    rewritten REQ-PIPE-115 ("let's do A and flag B in running thoughts
+    as maybe something we do later"). 115's check compares each tool's
+    SKIPPED checks against the "not evaluated" records it wrote - e.g.
+    dbt left out 6 checks, so there must be exactly 6. The wider version
+    would compare EVERY check the configuration says a run should
+    produce (say 43) against everything recorded, verdict or not
+    evaluated - catching a check that vanished for ANY reason (a tool
+    quietly producing fewer results, a misconfigured check), not just
+    the skip mechanism. Deferred because it has never been measured
+    against real runs and could refuse good runs on day one for reasons
+    nobody has met yet; worth doing once a clean run's real output has
+    been measured.
