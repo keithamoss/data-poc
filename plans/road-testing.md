@@ -1440,3 +1440,14 @@ judgement about who reads the page rather than about the rule.
       re-replaying under today's settings on regenerate is accepted as
       harmless (synthetic only); effective-dating also lets one synthetic
       history show both eras of a setting.
+    - **RE-FILE MECHANICS SETTLED (Keith):** a re-filed supply goes BACK TO
+      STAGING filed to its new period, is QA'd there, and the normal gate
+      decides. RE-FILE WINS: it supersedes a version already waiting in the
+      target period. If the re-filed supply then fails, it waits red and the
+      displaced version sits intact in that period's _superseded schema -
+      reject, then un-supersede (REQ-PIPE-120). **A person making a re-file
+      is WARNED AND MUST CONFIRM whenever it will displace another table,
+      and the warning names EVERY consequence** - e.g. "This removes Q3's
+      accepted Clients and supersedes Q2's waiting Clients from 14 May" -
+      so leaving an old period without its promoted table is never a
+      surprise.
