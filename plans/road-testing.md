@@ -1117,3 +1117,8 @@ judgement about who reads the page rather than about the rule.
       hand-filed file's receipt is "now"). Replace with a plain statement:
       "newer" means received later by our own clock, and files are always
       processed in receipt order.
+    - **GROUP 1 SIGNED OFF by Keith, 2026-10-04: REQ-PIPE-118 (criterion
+      3 dropped, receipt-order statement in its place, 119's dropping
+      noted), REQ-PIPE-120, REQ-PIPE-121 (with the large shout).**
+      REQ-PIPE-119 dropped. Not yet written into requirements.yaml - the
+      drafts go in once all groups are signed.
