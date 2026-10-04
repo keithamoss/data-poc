@@ -1146,3 +1146,22 @@ judgement about who reads the page rather than about the rule.
       the PROMOTED SCHEMA CLEAN (no tables not actually used for the
       period) but worries the superseded area grows "massive and
       unwieldy". Being discussed.
+    - **REPLACED ACCEPTED FILES GO TO SUPERSEDED** (Keith, settled): the
+      period schema is what people AND EXTERNAL TOOLS read, so it must
+      hold only what is in use - otherwise every consumer re-implements
+      "which is the real one", or we maintain a separate list of tables.
+      Superseded's growth is a RETENTION question (it is the same data
+      either way) - a separate item, not this batch, unless Keith says
+      otherwise. Raised as following from his reasoning: (1) EVERY
+      promotion, including a person promoting a second supply by hand,
+      leaves exactly ONE version per table in the period - the previous
+      one moves to superseded; the newest() arrival-vs-promotion defect
+      then becomes mostly moot by construction, but is still fixed and
+      tested for periods already holding several; (2) each period exposes
+      the promoted table under its PLAIN logical name (e.g. cp_clients),
+      as inherited tables already are, so a person or tool queries
+      <period>.cp_clients with no knowledge of arrival keys.
+    - **AMBER: ONE SETTING, THREE VALUES** (Keith): hold | promote |
+      promote-and-acknowledge. Quarterly asset expected: "promote" at asset
+      level, "promote-and-acknowledge" for problematic collections; daily:
+      "promote".
