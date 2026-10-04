@@ -1111,3 +1111,9 @@ judgement about who reads the page rather than about the rule.
       pointless to-do item when a supplier double-sends onto a filled
       quarterly slot. Record in 118's decisions as considered and dropped;
       cheap to add later if duplicates become a nuisance.
+    - **118 criterion 3 DROPPED** (Keith): "older" was read as the file's
+      contents; it only ever meant processed-later-than-received, which the
+      pipeline already prevents (always processed in receipt order; a
+      hand-filed file's receipt is "now"). Replace with a plain statement:
+      "newer" means received later by our own clock, and files are always
+      processed in receipt order.
