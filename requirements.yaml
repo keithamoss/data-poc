@@ -25326,7 +25326,9 @@ requirements:
     evidence:
       - >
         2026-10-04, overnight sprint 3b: a full bootstrap from an EMPTY
-        database (scratch `supply131`) filed 150 supplies - 137
+        database (scratch `supply131b`, on the code as committed in
+        beef8b2 - an earlier `supply131` predated the #91/#92 fixes and
+        gave the same counts) filed 150 supplies - 137
         open-slot-unfilled, 4 resupply-of-open-slot, 9 held-no-open-slot
         (all cp-case-workers, arriving in quarters it does not deliver
         in, which the retired off-cycle gate used to withhold). Against
@@ -25339,6 +25341,14 @@ requirements:
         against the real rule; slots close against the REAL quarterly and
         daily calendars, including a partially-participating dataset
         closing with its CALENDAR period (tests/test_slots.py).
+      - >
+        2026-10-04: against `supply131b`, all 278 tests needing the
+        deployed database ran - 277 passed, and the one that failed was the
+        arrival-semantics characterization pin, whose verdicts moved for
+        exactly the 9 held cp-case-workers arrivals (late -> unfiled), the
+        intended effect of criterion 10; re-captured, 9 lines changed. No
+        check has two results in one run, and no hold reason carries a raw
+        instant.
     source: "Keith, 2026-10-04, group 3 sign-off round of option A, after finding backward filing while checking the since-dropped REQ-PIPE-124 (plans/road-testing.md #16, 'FOUND WHILE CHECKING THAT', 'KEITH'S PROPOSAL', 'PERIOD CLOSING SETTLED', 'SIGN-OFF ROUND, period closing'). Scoped by delivery-scoper 2026-10-04, separately from option A; signed off by Keith 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL treat a dataset's slot as OPEN from its claim-opening instant until the claim-opening instant that dataset would have for the NEXT PERIOD OF ITS CALENDAR - whether or not the dataset participates in that next period - and as CLOSED from then on."
