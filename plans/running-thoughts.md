@@ -4396,6 +4396,11 @@ Belongs with batch 5's check work.
     receipt-clock column, which already distinguishes 'our-clock' from
     storage's).
 
+    **SCOPED AND SIGNED, 2026-10-04 (Keith):** the stated original arrival
+    is REQ-PIPE-103's amendment (criteria 9-19), and "who filed it" (the
+    first gap above) is the new REQ-PIPE-147. Delete this entry when both
+    are built.
+
 57. **[investigate, 2026-09-28]** **[QA checks & contract]** The drift
     reference is the FIRST arrival ever, not the previous period - so
     the check measures distance from the beginning of history rather

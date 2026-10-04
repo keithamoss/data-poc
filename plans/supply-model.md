@@ -1955,7 +1955,7 @@ comparisons against the expected-supply sequence.
     the triggering event, so a cancelled run costs nothing. Settled
     2026-09-22, see Thread H.
 
-13. **[in-progress, 2026-10-04]** **[Pipeline & publishing]** **SPLIT
+13. **[done, 2026-10-04]** **[Pipeline & publishing]** **SPLIT
     2026-09-24 (Keith). What remains here is SCHEMA-PER-PERIOD**; the
     single-database half - retiring the per-run warehouses, one database
     per test worker (Thread J) - **moved to sprint 8**, because staging
@@ -2048,7 +2048,11 @@ comparisons against the expected-supply sequence.
     this sprint no longer has to fix the requirement before building
     it. BUILT 2026-09-25 - criteria 7 and 8 are the two cases.
 
-    **Owns:** `REQ-PIPE-035`
+    **Owns:** `REQ-QAC-108`
+
+    *Re-pointed 2026-10-04 (Keith):* REQ-PIPE-035 criteria 7 and 8 (red-for-unrun
+    on a check's temporal reference) moved into REQ-QAC-108's amendment, so this
+    sprint now owns 108's new criteria rather than 035; sprint 13 still owns 035.
 
 19. **[done, 2026-09-26]** **[Dashboard UI]** **Supply history and
     as-of under per-dataset arrivals.** `REQ-DASH-041`, BUILT.

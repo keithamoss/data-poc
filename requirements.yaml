@@ -3371,12 +3371,8 @@ requirements:
         THEN THE SYSTEM SHALL report that check RED, naming the missing
         table, and SHALL NOT evaluate it against an absent table and
         SHALL NOT report it as having no data.
-      - IF a check declares a temporal reference and the referenced
-        period was owed but has no filled slot, THEN THE SYSTEM SHALL
-        report that check RED, naming the referenced period.
-      - IF a check declares a temporal reference and no prior period was
-        ever owed, because the dataset is new, THEN THE SYSTEM SHALL
-        report that check as having no data rather than red.
+      - "IF a check declares a temporal reference and an earlier period owed its dataset a supply that was never promoted, THEN THE SYSTEM SHALL report that check RED as REQ-QAC-108 criteria 8 and 9 specify. MOVED 2026-10-04 (Keith) to REQ-QAC-108, which owns what a drift or volume check is measured against."
+      - "IF a check declares a temporal reference and no prior period was ever owed, because the dataset is new, THEN THE SYSTEM SHALL report that check as having no data as REQ-QAC-108 criterion 10 specifies. MOVED 2026-10-04 (Keith) to REQ-QAC-108."
       - THE SYSTEM SHALL resolve a temporal reference as a cross-schema
         read within the same database, and SHALL NOT copy a reference
         period into a separate database to evaluate it.
@@ -3464,50 +3460,6 @@ requirements:
         database and call no evaluate_* tool, so a historical verdict
         is replayed rather than re-derived.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
-    unmet_criteria:
-      - criterion: >
-          Criteria 7 and 8 - red-for-unrun for a check's TEMPORAL
-          REFERENCE (red where the referenced period was owed and is
-          unfilled, nodata where no prior period was ever owed). The
-          decision function supports both, but no production caller
-          passes a reference period, so no verdict is produced through
-          them.
-        why: >
-          The same dependency: red-for-unrun is asked of a run scoped to
-          a period, and no run is. Built now rather than later because
-          the nodata carve-out for a brand-new dataset is the part most
-          likely to be re-derived wrongly - without it every new dataset
-          starts life red on all its drift checks, which is how people
-          learn to ignore a signal.
-
-          AMENDED 2026-10-02: still true, and now waiting on the same
-          thing the overlay waits on - red-for-unrun is asked of a run
-          scoped to a period, and REQ-PIPE-105 is what gives every run
-          one. Wiring it alone was considered and rejected: it would
-          tell a reader WHY a table is absent while what the check
-          reads is still assembled the old way, which is two accounts
-          of one run from two mechanisms.
-
-          AMENDED AGAIN 2026-10-02 evening: REQ-PIPE-105 gave every run
-          a period, so that blocker is gone. What is left is wiring the
-          decision layer itself, which is REQ-PIPE-079's.
-
-          RE-TESTED 2026-10-04, after REQ-PIPE-079 was built. CRITERION 6
-          IS NOW MET and comes off this entry: a check whose table has no
-          filled slot and is not staged gets a red (or, not yet due, a
-          nodata) record naming the table in a real run -
-          orchestrate_cp._unrunnable_results -> unrunnable.results_for ->
-          period_schema.check_readiness, covered by tests/test_unrunnable.py.
-          CRITERIA 7 AND 8 ARE NOT MET and 079 never owned them: nothing
-          passes check_readiness a reference_period, so the
-          temporal-reference cases are never asked. They need an owner - the drift
-          reference (REQ-QAC-108) is the natural home - and are marked
-          unowned rather than left pointing at a requirement that is done.
-        owner: >
-          Nobody yet - the temporal-reference half of red-for-unrun needs
-          a home; REQ-QAC-108's drift reference is the likely one.
-        blocked_by:
-          unowned: true
     decisions:
       - >
         fan_out() DELETED 2026-10-04 with REQ-PIPE-079's close-out: it had
@@ -3763,6 +3715,7 @@ requirements:
         scratch database per run for dbt, the shared warehouse ATTACHed
         read-only, all shared writes serialised through one
         load/promotion step - needs deciding before build.
+      - "CRITERIA 7 AND 8 MOVED TO REQ-QAC-108 (Keith, 2026-10-04), after REQ-PIPE-079's close-out found them unowned. Replaced in place rather than deleted so that criteria 9 to 11 keep their numbers, which decisions in this entry cite. The rule moved with a change Keith chose the same day, recorded on REQ-QAC-108: an owed period with no promoted supply is red whether or not an older promoted supply exists - measured against the older one where it exists, not evaluated where none does. check_readiness() stays in this entry's implemented_by because criterion 6 is served by it."
   - id: REQ-PIPE-036
     title: A delivery triggers one QA run, and each dataset's results stand alone
     date_written: "2026-09-21"
@@ -23049,6 +23002,17 @@ requirements:
         THE SYSTEM SHALL say which of the two things it did, and SHALL
         NOT describe a check as local-only in a run that filed a
         delivery.
+      - "WHEN a person chooses to keep a supply they received by hand, THE SYSTEM SHALL ask them when that supply was originally received - the email's arrival, or the S3 object's own time - before it files anything."
+      - "THE SYSTEM SHALL record that stated original arrival on each filed file's own qa.delivery_file row beside that file's receipt, and in that file's on-disk receipt record under its own key, marked as stated by a person, and SHALL keep the moment the command ran as that file's receipt."
+      - "THE SYSTEM SHALL NOT use a stated original arrival to order arrivals, to name a run or a staged table, to file a supply to a slot, to judge lateness, in the promotion gate, or to place a supply in the as-of picker."
+      - "THE SYSTEM SHALL let a non-interactive caller state the original arrival as a flag, and SHALL NOT prompt for it where one was given."
+      - "THE SYSTEM SHALL require an answer before filing a kept supply, SHALL accept `not known` as that answer, and SHALL record `not known` as such rather than as a time."
+      - "IF a non-interactive caller keeps a supply and states no original arrival, THEN THE SYSTEM SHALL refuse, say which flag is missing, and file nothing."
+      - "IF a stated original arrival is later than the command's own receipt instant, THEN THE SYSTEM SHALL refuse it, say why, and file nothing."
+      - "WHERE a stated original arrival carries no UTC offset, THE SYSTEM SHALL read it on the asset's own clock (contract/data-asset.yaml's timezone) and SHALL record it with that offset."
+      - "WHERE a kept supply was fetched from S3, THE SYSTEM SHALL offer the object's own LastModified instant as the default answer, which the person confirms or replaces, and SHALL record whichever they give only as the stated original arrival."
+      - "WHERE a delivery was received without a person filing it, THE SYSTEM SHALL record no stated original arrival, so that `never asked` stays distinguishable from `not known`."
+      - "WHEN a delivery carrying a stated original arrival is shown in `mothman supply deliveries`, in the hand-filing command's own closing message, or in the dashboard's arrival detail, THE SYSTEM SHALL show it beside the receipt, labelled as stated by the person who filed it, and SHALL NOT present it as the receipt."
     non_functional_requirements:
       - >
         THE OPERATOR'S OWN FILENAME BECOMES A PUBLISHED STRING once a
@@ -23063,11 +23027,25 @@ requirements:
         AFTER everything already recorded - which its receipt instant
         of "now" does - and REQ-PIPE-057's run_id_guard must stay
         green across the change.
+      - "NOTHING DECIDES ON A TYPED DATE. An integrity property, not a display rule: a person must not be able to move a supply's slot, its lateness or its eligibility for promotion by what they type. Test it by filing the same file with two different stated arrivals and asserting identical filing, run id, staged table name and promotion verdict."
+      - "VALIDATE BEFORE WRITING ANYTHING, the order hand_filing.check() already keeps: a refused statement leaves no delivery directory, no receipt and no qa row behind."
+      - "SURVIVES A REBUILD FROM DISK. A person's statement is the one fact here that cannot be regenerated, so `mothman env reset-synthetic` followed by a bootstrap must re-record it from the on-disk receipt record."
+      - "FOLLOWS THE RECEIPT'S OWN TEXT-PLUS-INSTANT CONVENTION (REQ-PIPE-069 criterion 5, REQ-PIPE-144): the exact text with its offset, and the instant beside it."
+      - "RECORDED METADATA ONLY: the dashboard build reads the stated arrival from the qa metadata schema over its existing least-privilege grant, never from a schema holding supply rows."
+      - "PUBLIC ONCE SHOWN: the published dashboard would carry stated arrival times. They are transport metadata of the same kind as the receipts already shown, and no free-text note is recorded (rejected by Keith 2026-09-27), so nothing personal enters by this route."
+      - "REGENERATE, NEVER MIGRATE: the new columns ride REQ-PIPE-144's single SCHEMA_VERSION bump if built with it, otherwise one bump of their own and a rebuild from empty."
     signed_off:
       by: Keith
       date: "2026-09-27"
-    dependencies: [REQ-PIPE-069, REQ-PIPE-102]
+    dependencies: [REQ-PIPE-069, REQ-PIPE-102, REQ-PIPE-144]
     open_questions: []
+    unmet_criteria:
+      - criterion: Criteria 9 to 19 - asking for, validating, recording and showing a stated original arrival. Added 2026-10-04 on Keith's sign-off of this amendment and not yet built.
+        why: The statement is recorded beside each file's own receipt, and per-file receipts only reach the qa metadata schema with REQ-PIPE-144 (signed 2026-10-04, not started). Building it before 144 would put it on qa.delivery and move it a second time.
+        owner: REQ-PIPE-103 itself, built straight after REQ-PIPE-144.
+        blocked_by:
+          requirements:
+          - REQ-PIPE-144
     decisions:
       - >
         THE TRIAL'S LOAD RECORDS MOVED FROM A DIRECTORY TO A COLUMN
@@ -23253,6 +23231,17 @@ requirements:
         with its schemas. Once REQ-PIPE-089 moves the load log into
         the database they will go into the trial schema and drop with
         it, which is where this belongs.
+      - "BESIDE THE RECEIPT, NEVER IN PLACE OF IT (Keith, 2026-10-04, plans/running-thoughts.md #52). The moment the command ran stays the receipt the system decides on - filing, lateness, the promotion gate - so nothing judges on a date a person typed; the stated original arrival is recorded for the record. This SUPERSEDES his 2026-09-27 decision 4 in that entry (the operator's date should become received_at itself), which was only ever blocked on positional run ids. REJECTED making the stated time the receipt: it lets a typed date move a supply's slot, lateness and promotion, and reopens the renumbering cost #52 set out."
+      - "PER FILE, BESIDE REQ-PIPE-144's RECEIPT, AND IN THE ON-DISK RECEIPT RECORD (Keith, 2026-10-04, question A4). 144 moves each file's receipt onto qa.delivery_file, so the statement sits on the same row; for a folder or an S3 prefix the person states once and it is recorded on every file. In each file's receipt record under data/receipts/ it has its own key, never `received_at`, so a rebuild from disk restores it. REJECTED the database alone, where a synthetic reset would erase the one fact that cannot be regenerated; REJECTED a column on qa.delivery, which 144 is moving receipts away from and which cannot hold different S3 object times."
+      - "received_from IS UNCHANGED. A hand-filed receipt is still `our-clock`; the stated arrival is neither storage's clock nor ours but a person's claim, which is why it is a separate field and is labelled as stated wherever it is shown."
+      - "REQUIRED, WITH `not known` AS AN ANSWER (Keith, 2026-10-04, question A1). His 2026-09-27 decision 1 made it required and rejected defaulting; the 2026-10-04 answer changed the stakes, because the field now decides nothing, so forcing an exact value from somebody who does not know would only invent data, while `not known` is honest and still distinguishable from an automated arrival that was never asked. REJECTED exact-time-only (pushes people to guess) and optional-and-skippable (how a field ends up empty on every row)."
+      - "THE FLAG IS `--originally-received <ISO 8601 date-time | not-known>` on `mothman bdm qa` and `mothman cp qa`, following criterion 3's existing shape. With `--commit` and no terminal, the absence is refused rather than defaulted (criterion 14), which changes today's scripted `--commit` behaviour - every existing caller and test passing `--commit` needs the flag."
+      - "BOUNDS: not later than the command's own receipt instant, which also rules out the future, since the receipt is now. REJECTED any lower bound such as 'not before the period opened': a supply emailed weeks before anybody filed it is exactly the case this exists for, and any lower bound would be a guess."
+      - "DATE AND TIME, NOT A BARE DATE. Both sources Keith named carry a time - an email's received header and an S3 object's LastModified - so a date alone would only come from guessing; a person who cannot say answers `not known`. A value with no offset is read on the asset clock (Australia/Perth today), matching how every other instant in this project is interpreted."
+      - "A TRIAL IS NEVER ASKED. A trial writes nothing that outlives the command (criterion 2), so a recorded statement about it would have nowhere to live."
+      - "S3 OFFERS LastModified AS THE DEFAULT, STILL ONLY RECORDED (Keith, 2026-10-04, question A2): the time is already in hand from the download, and making the person look it up again invites a typo. REJECTED treating LastModified as the receipt itself with received_from `storage` - arguably what REQ-PIPE-105 criterion 3 would say if the s3Source bucket is our own storage, and recorded here so nobody makes that change later without asking, because it would put a decision back on that date."
+      - "WHO FILED IT IS REQ-PIPE-147, NOT THIS AMENDMENT (Keith, 2026-10-04, question A3). #52's first gap - nothing on a delivery record says a person filed it, by which route, or who - was checked 2026-10-04 and is NOT answered today: the `handfiled-` directory prefix is a naming convention nothing parses; received_from `our-clock` only coincides with hand-filing because no automated path writes a receipt yet, and REQ-PIPE-105 criterion 4 makes it the fallback for any automated path whose storage gives no instant; and qa.run.run_by names who ran the QA RUN, is recorded for automated runs too, and is not on the delivery. Split out to keep this amendment small."
+      - "A STATED ARRIVAL IS WRITE-ONCE. Nothing decides on it, so a wrong one costs an inaccurate note rather than a wrong verdict, and building a correction path now would be work for a case nobody has met. If one is wanted later it is its own requirement - most likely a correction recorded beside the original statement rather than over it."
     linked_tests:
       - tests/test_trial_runs.py
       - tests/test_hand_filing.py
@@ -25078,10 +25067,7 @@ requirements:
         THE SYSTEM SHALL apply a relative volume check to EACH of Child
         Protection's six datasets, with a warn band and a fail band, so
         that both collections judge volume the same way.
-      - >
-        THE SYSTEM SHALL take the reference for every drift and volume
-        check from the MOST RECENT EARLIER PERIOD IN WHICH A SUPPLY FOR
-        THAT DATASET WAS PROMOTED, however many periods ago that was.
+      - "THE SYSTEM SHALL take the reference for every drift and volume check from the MOST RECENT EARLIER PERIOD IN WHICH A SUPPLY FOR THAT DATASET WAS PROMOTED, however many periods ago that was, and WHERE a more recent earlier period owed the dataset a supply and holds none promoted, SHALL flag the check under criterion 8 rather than pass that gap silently, except as criteria 11 and 17 provide. AMENDED 2026-10-04 (Keith)."
       - >
         THE SYSTEM SHALL NOT take that reference from a supply in the
         CURRENT period, so that a resupply is never measured against the
@@ -25089,10 +25075,7 @@ requirements:
       - >
         THE SYSTEM SHALL NOT take that reference from an arrival that
         was never promoted, nor from a fixed run chosen once.
-      - >
-        WHERE no earlier period has a promoted supply for that dataset,
-        THE SYSTEM SHALL report the check as having no reference, and
-        SHALL NOT report it as passing.
+      - "WHERE no earlier period has a promoted supply for that dataset, THE SYSTEM SHALL report the check as having no reference - red or no data as criteria 9 and 10 decide - and SHALL NOT report it as passing. AMENDED 2026-10-04 (Keith) on taking over REQ-PIPE-035 criteria 7 and 8."
       - >
         THE SYSTEM SHALL skip, when looking back for that reference, any
         period whose table is a VIEW ONTO AN EARLIER SUPPLY rather than
@@ -25104,6 +25087,16 @@ requirements:
         THE SYSTEM SHALL let both the drift and volume checks reach a
         RED verdict, so that a supply failing either is ineligible for
         automatic promotion under REQ-PIPE-075 criterion 3.
+      - "WHERE the most recent earlier period that owed the dataset a supply holds none promoted, and an older period does, THE SYSTEM SHALL measure against that older promoted supply, SHALL report the check RED, and SHALL say in words which period it was compared with and which owed period has no accepted supply - for example \"compared with 2026-Q1, not 2026-Q2: the previous quarter has no accepted supply\"."
+      - "IF no earlier period holds a promoted supply and at least one earlier period owed the dataset one, THEN THE SYSTEM SHALL report every drift and volume check measured against that dataset RED, as not evaluated, naming the owed periods that have no accepted supply, and SHALL NOT report it as having no data."
+      - "IF no earlier period ever owed the dataset a supply, because the dataset is new to its calendar, THEN THE SYSTEM SHALL report those checks as having no data rather than red."
+      - "IF an owed earlier period is not yet overdue, THEN THE SYSTEM SHALL treat it as not yet due, SHALL NOT make the check red under criterion 8 or 9 on its account, and WHERE an older promoted supply exists SHALL measure against it and report the measured verdict unflagged."
+      - "THE SYSTEM SHALL decide whether a period owed the dataset a supply from that dataset's own schedule, so that a period it owed nothing - an inherited period - neither makes the check red nor serves as its reference."
+      - "WHERE a check is red under criterion 8, THE SYSTEM SHALL record ONE result for that check and run, carrying the real metric, the period it was measured against, the verdict the measurement alone gives, and the reason it is red."
+      - "WHERE a check is red under criterion 8, THE SYSTEM SHALL show the measured verdict apart from the red - on the dashboard, in the terminal and in a ticket - and SHALL NOT describe the check as drift or as a change in volume unless the measurement itself crossed its band."
+      - "THE SYSTEM SHALL count a red under criterion 8 or 9 against the supply's eligibility for automatic promotion exactly as criterion 7's red does (REQ-PIPE-075 criterion 3), so that the supply waits for a person."
+      - "THE SYSTEM SHALL apply criteria 8 to 15 and 17 to both collections' drift and volume checks, and SHALL carry their reds and reasons to both collections' dashboards."
+      - "WHERE a person has already dealt with the gap period's slot - substituted it, carried it forward, or accepted it as not supplied under REQ-PIPE-132 - THE SYSTEM SHALL measure against the older promoted supply, SHALL say which period it was compared with, and SHALL NOT report the check red or count it against automatic promotion on that gap's account."
     non_functional_requirements:
       - >
         The reference lookup runs where a warehouse connection is
@@ -25121,7 +25114,12 @@ requirements:
         They move to the per-check entry in each collection's
         evidently_check_lifecycle.py, which already carries that
         check's category, introduced_date and prose.
-    dependencies: [REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-098]
+      - "Decided once, in the orchestrator's own run step where a connection is legitimately open, and recorded with the result; the dashboard build reads the recorded reason and the recorded reference period, and never re-derives owed-ness or the reference."
+      - "AT SCALE, A NEW DATASET MUST NOT START RED. Criterion 10 is the guard: across ~30 datasets on the quarterly asset, a red on every newcomer's drift checks is how people learn to ignore red (the reason REQ-PIPE-035 gave for building the no-data carve-out early)."
+      - "AT SCALE, A MISSED PERIOD COSTS A PERSON ONE DECISION PER DATASET, not one per check: criterion 8's red blocks the supply's automatic promotion, and once a person promotes it the next supply has an unbroken reference again. The annual-on-quarterly dataset is not flagged in the three periods it owes nothing (criterion 12)."
+      - "SHAPE CHANGE, SO ENUMERATE CONSUMERS (CLAUDE.md's shape-change rule): a result carrying a measured verdict beside a red has to be read correctly by promotion.status_of(), dataset_status in both languages, both dashboard builders, the page's check panel and trend line, composed ticket bodies and the run summary counts - asserted at the last transform before a person, not at the record."
+      - "Never a false 'drifted': the dangerous misreading here is a within-band measurement reported as drift, which teaches people that drift reds are noise. A test drives a gap case whose measurement is within band and asserts no surface a person reads says drift or volume change."
+    dependencies: [REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-098, REQ-PIPE-035]
     implemented_by:
       - qa_tools/common/drift_reference.py::reference_run_for_arrival
       - qa_tools/common/drift_reference.py::reference_for
@@ -25157,6 +25155,13 @@ requirements:
         warn, fail and no-reference on demand, and never flagging a
         supply that GREW. The lifecycle gate counts 265 checks where it
         counted 259.
+    unmet_criteria:
+      - criterion: Criterion 2 as amended, criterion 5 as amended, and criteria 8 to 17 - taken over from REQ-PIPE-035 criteria 7 and 8 on 2026-10-04 with Keith's gap rule. period_schema.check_readiness() already decides the no-reference cases from reference_period, reference_filled and any_prior_period_owed, but no production caller passes them; the orchestrators turn every NoReference into `nodata`, and the walk-back passes gaps silently.
+        why: Moved here on Keith's agreement the day it was found unowned; nothing else has to land first.
+        owner: REQ-QAC-108, under delivery sprint 18 (drift and trend dependencies), whose Owns line moves from REQ-PIPE-035 to this requirement in the same change.
+        blocked_by:
+          sprints:
+          - 18
     decisions:
       - >
         BUILT IN TWO HALVES, and this records which is which on
@@ -25507,6 +25512,14 @@ requirements:
         cp_notifications, so one multiplier put it in a different band
         from the other five and made the test about how far the fixture
         happened to move rather than about the bands.
+      - "TAKES OVER REQ-PIPE-035 CRITERIA 7 AND 8 (Keith, 2026-10-04). REQ-PIPE-079's close-out re-tested 035 that day and found both unowned: 079 never owned them, and check_readiness()'s reference_period, reference_filled and any_prior_period_owed arguments have no production caller. This requirement already owns what a drift or volume check is measured against, so what happens when that is missing belongs here too. 035 keeps its criteria numbers, with 7 and 8 replaced in place by pointers here."
+      - "A GAP IN THE OWED PERIODS IS MEASURED AND FLAGGED (Keith, 2026-10-04), chosen explicitly after being told it REVERSES this requirement's signed rule that the walk-back passes gaps silently (criterion 2 as signed 2026-09-28, 'however many periods ago'). Where the immediately previous owed period has no accepted supply and an older one exists, the walk-back still finds the older reference so the number exists, and the check is red so the supply waits for a person instead of auto-promoting against data two periods stale. Where no earlier accepted supply exists although something was owed: red, not evaluated, naming the owed periods. Where nothing was ever owed: no data. REJECTED option A, red only when nothing was ever accepted - it keeps the silent walk-back, so a supply after a missed quarter auto-promotes on a comparison with older data and nobody is told. REJECTED plain option B, red with no comparison - it throws away a real measurement the walk-back can still make, leaving the person deciding with less information. What criterion 2's walk-back still guarantees is unchanged: the reference is a PROMOTED supply, never a view, a rejection or the current period's own."
+      - "ONE RECORD, NOT TWO, for the compared-but-flagged case (criterion 13). Read 2026-10-04: pipeline/build_cp_dashboard_data.py keys a check's history by run, so a second record for the same check and run OVERWRITES the first - today a can't-run record joined to the card would replace the real metric with None and plot a gap where a measurement exists. promotion.status_of() likewise reads one verdict per check per run, and two would have to be reconciled by a rule nobody has written. So the drift or volume result itself carries status red (`fail`), the real metric_value, the reference period, a separate `measured_status` (what the band alone says), and a reference-gap reason. REJECTED two records (the overwrite above); REJECTED a new sixth tool status, which costs both languages' status vocabularies and every rollup (the cost this requirement already paid once for `nodata`); REJECTED reusing the `unrunnable_reason` key, because the page reads that as not evaluated and plots a gap, which is false here - it WAS evaluated, against an older period."
+      - "WHY `fail` IS SAFE ONLY WITH THE REASON BESIDE IT. A `fail` with a metric is exactly what 'the data drifted' looks like, so criterion 14 makes every reader show the reason and the measured verdict, and NFR 4 makes the consumer sweep mandatory. Where the measurement itself also crossed its band, both are true and both are shown."
+      - "NO EARLIER ACCEPTED SUPPLY AT ALL IS THE NOT-EVALUATED ROUTE (Keith, 2026-10-04, question B3): an `unrunnable`-style record with reason, check_readiness()'s MISSING_REFERENCE_PERIOD wording, joined to the check's card by check_id - which since commit 4559a75 (post-build-review #77 gap 1) reaches the dashboard. BUT ONLY FOR CHILD PROTECTION today: read 2026-10-04, neither orchestrate_bdm.py nor pipeline/build_dashboard_data.py has any unrunnable or not-evaluated handling, and Birth Registrations owns one of the two drift checks. Criterion 16 therefore includes wiring that route for Birth Registrations; it is the largest single piece of this amendment."
+      - "NOT YET DUE IS NOT A GAP (Keith, 2026-10-04, question B2), mirroring REQ-PIPE-079's NOT_YET_DUE for a missing table: an owed period still inside its claim window has not failed to arrive, and a red on its account would be about our timing rather than the data. WHERE AN OLDER PROMOTED SUPPLY EXISTS the check measures against it and reports the measured verdict UNFLAGGED (Keith, 2026-10-04, closing the scoper's open question) - REJECTED reporting no data, which would discard a real measurement for a period that has not failed. RARE BY CONSTRUCTION: under REQ-PIPE-131's closing rule a period closes once its calendar's next period's claim window opens, so a CONSECUTIVE previous period is already closed when the next file arrives and cannot still be inside its window; this arises at most for a dataset that skips periods."
+      - "A GAP A PERSON ALREADY DEALT WITH IS NOT FLAGGED (Keith, 2026-10-04: a person already decided about that gap, so don't make them decide again). Where the gap period's slot was substituted, carried forward (sprint 25), or accepted as not supplied (REQ-PIPE-132's mark-as-not-supplied decision), the check measures against the older promoted supply and still states which period it was compared with, so the gap stays visible, but it is not red and does not block promotion (criterion 17). Criterion 8's red is kept for a gap NOBODY has decided about. REJECTED flagging anyway: it asks a person to make the same decision twice, and a red that a recorded decision has already answered is the kind people learn to ignore. Note this sits beside criterion 6 rather than against it: a substituted or carried-forward period is still never itself the reference, because it holds a view rather than a promoted supply."
+      - "WHAT HAPPENED BEFORE THIS, read from the code 2026-10-04. Every no-reference case collapsed to `nodata` (drift_reference.reference_run_for_arrival() returns None on NoReference; both evaluators record NO_REFERENCE), so 035 criterion 8's outcome was met for a new dataset by a blanket rule, and 035 criterion 7 was not: a dataset whose every earlier owed supply was rejected or never came read `nodata`, and because promotion.status_of() ranks a quiet status below green on mixed input, such a supply auto-promoted with drift and volume never measured."
 
   - id: REQ-GHUB-109
     title: >
@@ -27316,3 +27329,37 @@ requirements:
     - REJECTED putting it inside REQ-PIPE-115 - Keith asked for small, self-contained requirements, and this is independently useful and independently testable.
     open_questions:
       - "PARKED (Keith, 2026-10-04): 'we may or may not decide to keep dbt, but I would like to keep the shape of this check in place for when we have settled the tools.' Not to be signed or built until the tool set is settled; then restate it for whichever tools survive. The shape to keep: for every check a tool would drop when a table is unreadable, the check must belong to that table's dataset or declare the table it reads - verified from configuration alone, in CI."
+
+  - id: REQ-PIPE-147
+    title: A delivery record says whether a person filed it, by which route, and who
+    date_written: '2026-10-04'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As whoever reads the delivery log later, I want every delivery to say whether a person filed it by hand or it arrived on its own - and, for a person, which route they used and who they were - so that I can tell real delivery times from whenever somebody got around to running the tool without having to know a naming convention.
+    moscow: should
+    status: not_started
+    source: 'Keith, 2026-09-27, plans/running-thoughts.md #52''s first gap ("does it show in the log that it came from a human and not the automated system?") and his decision 2 there; split out of the REQ-PIPE-103 amendment on 2026-10-04 at his choice (question A3). Drafted by delivery-scoper the same day.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL record on every delivery record whether a person filed it or it was received automatically, as data, and SHALL NOT leave a reader to infer it from the delivery's name or its receipt clock.
+    - WHERE a person filed a delivery, THE SYSTEM SHALL record the route they used - a single file, a folder, one table on its own, or an S3 object - as one of those four values.
+    - WHERE a person filed a delivery, THE SYSTEM SHALL record who, as the same identity qa.run.run_by carries for that person (git_identity.get_run_by).
+    - IF no identity can be resolved for a person filing a delivery, THEN THE SYSTEM SHALL refuse to file it, say how to set one, and file nothing.
+    - WHERE a delivery was received automatically, THE SYSTEM SHALL record it as automated with no person and no hand-filing route.
+    - THE SYSTEM SHALL record these facts in the on-disk receipt record as well as in the qa metadata schema, so that a rebuild from disk restores them.
+    - WHEN a delivery is shown in `mothman supply deliveries` or in the dashboard's arrival detail, THE SYSTEM SHALL say whether a person filed it and, if so, by which route and who, with the person resolved through contract/people.yaml as the dashboard already resolves run_by.
+    non_functional_requirements:
+    - 'One act, one record: a hand-filed delivery is one command by one person, so these are facts about the DELIVERY (qa.delivery), not repeated per file in the database; on disk they go into each file''s receipt record because that is the only receipt format, and reading them back refuses a delivery whose receipts disagree.'
+    - 'No new identity mechanism: the same get_run_by() that stamps run_by, with its existing refusal to fall back to a guessed identity.'
+    - 'Same public exposure as today: the published dashboard already shows `published by` a run_by resolved through contract/people.yaml, so naming who filed a delivery adds no new kind of personal data to the page.'
+    - 'Regenerate, never migrate: rides REQ-PIPE-144''s SCHEMA_VERSION bump if built with it; synthetic deliveries come back as automated on the rebuild, which is true of every one of them.'
+    - 'Recorded metadata only: the dashboard build reads these from the qa metadata schema, never from a schema holding supply rows.'
+    dependencies:
+    - REQ-PIPE-103
+    - REQ-PIPE-144
+    decisions:
+    - 'SPLIT FROM REQ-PIPE-103''s AMENDMENT (Keith, 2026-10-04, question A3), to keep each requirement small. Built alongside it: both touch the hand-filing path and both ride REQ-PIPE-144''s schema change.'
+    - 'WHAT EXISTS TODAY IS INCIDENTAL, checked 2026-10-04: the `handfiled-` directory prefix (hand_filing.HAND_FILED_PREFIX) is a naming convention nothing parses; received_from `our-clock` coincides with hand-filing only because no automated path writes a receipt yet, and REQ-PIPE-105 criterion 4 makes it the fallback for any automated path whose storage gives no instant; qa.run.run_by names who ran the QA run, is recorded for automated runs too, and is not on the delivery. REQ-PIPE-103''s stated original arrival would also be an incidental marker. None of them is a record of who filed what.'
+    - 'THE ROUTE IS A CLOSED SET OF FOUR - the four routes REQ-PIPE-103 criterion 7 names - plus automated. REJECTED a free-text note from the person (Keith, 2026-09-27): nothing can aggregate it.'
+    - 'THE 2026-09-27 PLAN TO REGENERATE THE EXISTING RECORDS STANDS in its current form: regenerate rather than migrate, and every synthetic delivery is truthfully automated.'
+    open_questions: []
