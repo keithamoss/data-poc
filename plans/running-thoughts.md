@@ -4386,6 +4386,16 @@ Belongs with batch 5's check work.
     meets its own criteria - this is the fact those criteria did not
     ask about.
 
+    **KEITH'S ANSWER, 2026-10-04:** hand-filing should also PROMPT the
+    person for when the file was ORIGINALLY received (the email's
+    arrival, the S3 object's time) and record it. The moment the person
+    runs the command stays the receipt the system DECIDES on - filing,
+    lateness, the gate - so nothing judges on a date a person typed; the
+    stated original arrival is recorded beside it, for the record. Needs
+    scoping as an amendment to REQ-PIPE-103 (and touches REQ-PIPE-105's
+    receipt-clock column, which already distinguishes 'our-clock' from
+    storage's).
+
 57. **[investigate, 2026-09-28]** **[QA checks & contract]** The drift
     reference is the FIRST arrival ever, not the previous period - so
     the check measures distance from the beginning of history rather
