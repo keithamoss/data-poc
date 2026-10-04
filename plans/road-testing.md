@@ -1830,6 +1830,15 @@ judgement about who reads the page rather than about the rule.
       not stall between turns.
       MORNING REPORT: written here as the night goes - per sprint what was
       built, the commit, CI's result, and every PROVISIONAL choice.
+      - SPRINT 1 DONE (commits 45ebb77 + this one): REQ-PIPE-086 criteria 2
+        and 13. qa_tools/common/arrival_lifecycle.py; both batches and both
+        hand-filed paths call it. Proof: full bootstraps before/after into
+        two empty databases, ZERO differences across 7,210 check results,
+        82 decisions, 150 filings, 151 supply tables. PROVISIONAL: staging
+        stays outside the function (moving it in would change the batch);
+        the hand-filed BDM path now checks a contested file as the batch
+        does instead of refusing it. Post-build-review #75's test added -
+        it passes since #84's fix.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

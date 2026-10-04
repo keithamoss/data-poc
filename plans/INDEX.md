@@ -633,7 +633,7 @@ one when this line suggests it matters.
   - *touches:* `pipeline/build_dashboard_data.py`
 - **#15** `blocked` 2026-10-04 - mothman pipeline bootstrap --force no longer reproduces the same content. Seen while regenerating for REQ-PIPE-105: a...
 - **#16** `investigate` 2026-10-03 - A clean resupply cannot get through once a quarter has two undecided versions of anything. Seen in the first regenerate...
-  - *touches:* `contract/people.yaml`
+  - *touches:* `contract/people.yaml`, `qa_tools/common/arrival_lifecycle.py`
 
 ## plans/supply-model.md
 
