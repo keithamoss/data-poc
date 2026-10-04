@@ -1380,6 +1380,6 @@ judgement about who reads the page rather than about the rule.
       THE DASHBOARD** (Keith) - e.g. a Scenarios tab beside Plans and Demo,
       embedded like PLANS. Inside the dashboard it can LINK to the page
       (the dashboard knows its own routes, which is why SCENARIOS.md gives
-      coordinates not URLs). To settle in scoping: whether the dataset
-      pages themselves stay unlabelled (SCENARIOS.md's deliberate stance -
-      a planted red looks like a real one) or carry a marker.
+      coordinates not URLs). **The dataset pages STAY UNLABELLED** (Keith) -
+      a planted red looks exactly like a real one; ONLY the Scenarios tab
+      says what was planted.
