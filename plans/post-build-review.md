@@ -4410,3 +4410,48 @@ twice. It deliberately did not re-find the `TypeError`.
     2026-10-04: fix it. A minor bug against agreed behaviour (REQ-PIPE-105:
     every file is its own arrival with its own receipt), so it gets a
     failing test first and needs no further sign-off.
+
+77. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An
+    unreadable table no longer takes a run down - but its reds do not
+    all exist, and none of them reach the dashboard.** Found by a
+    verification probe Keith approved (REQ-PIPE-078 criteria 9-10 and
+    the unsigned REQ-PIPE-115), run against real tools on scratch
+    databases; probe and per-case output in the session scratchpad,
+    nothing committed. Key claims re-checked at source by the main
+    session.
+
+    WORKS: in Child Protection, with a sibling table ABSENT, every run
+    completes, all four tools run, each tool leaves out exactly the
+    checks over the absent table, and each of those reappears as an
+    `unrunnable` red naming the table ("did not fail - it could not be
+    evaluated"). No pass for an unevaluated check anywhere.
+
+    FOUR GAPS, the first being the most serious:
+    1. **The reds never reach the dashboard.** `qa_results_reader`
+       (TOOL_ORDER, ~line 67/87) and `cp/build_results_from_history.py`
+       read only dbt/soda/datacontract/evidently, so `unrunnable` and
+       `held` records are stored and dropped on rebuild; the template has
+       no treatment for them. REQ-PIPE-105 criterion 13 ("make plain the
+       check is red for want of a promoted table") is therefore met in
+       the database and NOT at the layer a person sees - a claim
+       `requirements.yaml` makes that the display does not bear out.
+    2. **A HELD supply's own checks are evaluated in batch order** -
+       views are built before filing raises the hold, so its run records
+       ordinary verdicts against a supply with no period (37 in the
+       probe). REQ-PIPE-078 criterion 9 is not met. Even when withheld,
+       the held reds are written under the period-less held run, and the
+       sibling runs report the same checks as "no filled slot" rather
+       than "held" - two reds, two reasons, never one saying "held".
+    3. **A CONTESTED run's own checks vanish** (40 of 43 in the probe) -
+       by design under REQ-PIPE-079 criterion 13, but it is the "silently
+       omitted" REQ-PIPE-115 exists to stop.
+    4. **Birth Registrations emits nothing** when its one table is
+       unreadable - every tool is replaced by `lambda: []`
+       (`orchestrate_bdm.py` ~163-168), reason only in `tables_read`.
+    Also: nothing reconciles what was withheld against what was reddened
+    (115 criterion 7), and the not-yet-due / overdue / awaiting-decision
+    reason branches were not exercised by the probe's fixture.
+
+    Gap 1 is a defect against signed, built behaviour and goes to Keith
+    for sign-off before any fix, failing test first. Gaps 2-4 are what is
+    genuinely left of REQ-PIPE-078 and REQ-PIPE-115.
