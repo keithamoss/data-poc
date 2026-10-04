@@ -1278,3 +1278,15 @@ judgement about who reads the page rather than about the rule.
     - Sent to delivery-scoper as its OWN requirement(s), separate from
       option A. REQ-PIPE-065's ambiguity flag for backward filing (option
       b) is moot: a file can never fit two open periods.
+    - **PERIOD CLOSING SCOPED** by delivery-scoper as drafts REQ-PIPE-131
+      (a period closes once the next period's claim window opens; file to
+      the one open slot, else resupply), REQ-PIPE-132 (a slot closing
+      unfilled is final and reads as not supplied), REQ-DASH-133 (shown very
+      clearly), REQ-PIPE-134 (non-overlap enforced in CI) - unsigned,
+      scratchpad draft_period_closing.yaml. VERIFIED: a THIRD reversal -
+      REQ-PIPE-062 records "Rejected CLOSING a slot's window when the next
+      one opens ... Monday's supply landing Tuesday morning would file as
+      Tuesday". Today's configuration passes 134's constraint (narrowest:
+      Birth Registrations, 19 hours). One fork for Keith: next window must
+      open after this period's due-plus-grace (drafted) or only after its
+      due instant. 124/125 removed from draft_option_a.yaml.
