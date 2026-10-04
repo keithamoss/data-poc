@@ -1213,3 +1213,8 @@ judgement about who reads the page rather than about the rule.
       Table name: Keith suggested writing it into the decision log beside
       dataset_id (rather than re-implementing the dataset->table mapping in
       SQL as well as in the pipeline) - being confirmed.
+    - **TABLE NAME GOES INTO THE DECISION LOG** beside dataset_id (Keith,
+      confirmed) - no dataset->table mapping re-implemented in SQL. Group 2
+      (122, 123, plus the period-schema rules and _manifest) sent back to
+      delivery-scoper for a full redraft, since the manifest and plain
+      naming had never been through it.
