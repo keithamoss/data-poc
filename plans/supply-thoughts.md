@@ -63,9 +63,9 @@ in `REQ-PIPE-079`'s own decisions. That leaves
 
 **UPDATED 2026-10-02 evening: `REQ-PIPE-105`'s arrival unit and its
 period overlay are BUILT** (criteria 1 and 5 together, with 079's
-overlay wired by the same change), so that door is open. What remains of
-105 - retiring the delivery-level hold in code, the 035/036 amendments,
-criterion 13 - is listed in its own first decision.
+overlay wired by the same change), so that door is open. **105 is BUILT
+as of 2026-10-04**; only criterion 7 is left unmet, for `REQ-PIPE-128`
+to retire.
 
 ---
 
