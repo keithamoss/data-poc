@@ -1318,3 +1318,10 @@ judgement about who reads the page rather than about the rule.
       browse, and it makes retention by period trivial later. Amends the
       draft REQ-PIPE-118's "one superseded schema".
     - **RETENTION DEFERRED** to its own later requirement - plans/running-thoughts.md #60.
+    - **SUPERSEDED SCHEMA NAMING AND LIFECYCLE** (Keith): a SUFFIX, not a
+      prefix - `period_2026_q2_superseded` sorts directly after
+      `period_2026_q2`, so a person browsing sees each period with its
+      set-aside versions beside it. Created ONLY when a first table needs
+      it, and DROPPED when its last table leaves. NOTE for drafting: the
+      period_of() parser reads schema names back into periods, so it must
+      not mistake a `_superseded` schema for a period.
