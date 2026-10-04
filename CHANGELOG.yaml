@@ -179,6 +179,13 @@ releases:
               The two collections could both create the same shared table at
               the same moment, and one would crash. Shared tables and schemas
               are now created one at a time.
+          - headline: Setting a supply aside yourself now takes effect everywhere
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A supply you superseded by hand was not recognised as superseded,
+              so it could still be promoted and could not be brought back. It
+              is now listed, refused promotion and can be un-superseded, and a
+              superseded supply no longer shows on the dashboard as still waiting.
           - headline: A period emptied after it closed reads as having no supply again
             components: ["Dashboard UI", "Pipeline & publishing"]
             description: >

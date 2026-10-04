@@ -25087,17 +25087,22 @@ requirements:
     - qa_tools/common/supersession.py::earlier_unaccepted
     - qa_tools/common/supersession.py::drop_if_empty
     - qa_tools/common/supersession.py::superseded_by
+    - qa_tools/common/supersession.py::_accepted_into
     - qa_tools/common/filing.py::file_arrivals
     - qa_tools/common/filing.py::_supersede_earlier
+    - qa_tools/common/filing.py::recorded_arrival
     - qa_tools/common/period_schema.py::period_of
     - qa_tools/common/period_schema.py::period_schemas
     - qa_tools/common/period_schema.py::collisions_in
     - qa_tools/common/promotion.py::after_run
     - qa_tools/common/slot_state.py::_rejected
+    - qa_tools/common/slot_state.py::filings_by_period
     - qa_tools/common/promotion_state.py::_why_not
+    - qa_tools/common/synthetic_reset.py::schemas_to_drop
     - pipeline/closed_slots.py::for_dataset
     linked_tests:
     - tests/test_supersession.py
+    - tests/test_supersession_critic.py
     source: "Keith, 2026-10-03 afternoon, option A (plans/road-testing.md #16, 'CHANGE OF DIRECTION' item 1, 2 and 5), replacing the shelved set-aside/re-gate design. Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
       - "WHEN a file for a table is filed to a period, THE SYSTEM SHALL move every earlier UNACCEPTED version of that table filed to the same period - every version not promoted and not rejected, whatever its verdict - to the SUPERSEDED state, before any check runs over the new file."
@@ -25160,6 +25165,29 @@ requirements:
         closed_slots does not count its filing, and promotion_state reads it as
         SUPERSEDED. slot_state reads the LATEST filing per period, which is the
         newer version.'
+      - 'A SUPPLY ACCEPTED INTO THE PERIOD IS NEVER SUPERSEDED, WHETHER OR NOT IT
+        STILL HOLDS IT (post-build-review #109, F6): a promoted supply displaced
+        by a person''s promotion of another keeps its tables in the period schema,
+        so the first build - which asked only whether it still held the slot - recorded
+        a supersession and moved nothing. A demote undoes the acceptance (decision
+        13).'
+      - 'THE SLOT SPEAKS FOR THE LATEST LIVE FILING, not the latest filing (F3,
+        F4): slot_state.filings_by_period(), used by states_for and unrunnable,
+        so a rejected or superseded newest supply neither hides an older one waiting
+        nor reads as awaiting a decision.'
+      - 'A SET-ASIDE SUPPLY IS NOT WAITING (F5): RecordedArrival.awaiting is false
+        and waited empty for a rejected or superseded supply, so the dashboard no
+        longer shows 28 superseded supplies as ''waiting 32d'' and counting.'
+      - 'THE REASON TEXT COVERS ALL THREE WAYS A SUPPLY IS SUPERSEDED (F11): a newer
+        version arrived, a person set it aside, or another was promoted - the first
+        wording claimed only the last.'
+      - 'A RESET DROPS PERIOD AND SUPERSEDED SCHEMAS BY SCHEMA NAME (F12, pre-existing
+        since REQ-PIPE-144): period_schemas() answers with period names, so reset-synthetic
+        failed on any database holding a period schema.'
+      - 'LOGGED, NOT FIXED: F9 (closed_slots drops a superseded supply by its CURRENT
+        state, so the as-of history could turn a period red retroactively - no instance
+        in the supply8 corpus, so latent) and F13 (a period whose own name normalises
+        to end in _superseded is unreadable as a period).'
     open_questions: []
 
   - id: REQ-PIPE-120
@@ -25182,6 +25210,16 @@ requirements:
       blocked_by:
         requirements:
         - REQ-PIPE-151
+    - criterion: The NFR that the owed QA re-run is recorded in the un-supersede
+        decision's own transaction, and the NFR that the terminal waits for the
+        re-run and shows its outcome.
+      owner: REQ-PIPE-151
+      why: 'Both ride on the re-run itself (criterion 3), which REQ-PIPE-151''s
+        processing pass owns and which is not built. Found unlisted by the delivery
+        critic (post-build-review #109).'
+      blocked_by:
+        requirements:
+        - REQ-PIPE-151
     evidence:
     - '2026-10-05: tests/test_supersession.py''s REQ-PIPE-120 tests green against
       a real database - a person supersedes a waiting supply (tables to the period''s
@@ -25193,22 +25231,40 @@ requirements:
       supply is refused naming what superseded it and the un-supersede command;
       un-supersede with no supply named is refused; `mothman supply superseded`
       lists each with what superseded it, one pasteable line each.'
-    - '2026-10-05: `mothman supply superseded --collection child-protection` against
-      the supply8 bootstrap lists its 28 superseded supplies across both collections (16 Child Protection, 12 Birth Registrations), one line each.'
+    - '2026-10-05: `mothman supply superseded` against the supply8 bootstrap,
+      one invocation per collection: --collection child-protection lists 16 and
+      --collection civil-registration lists 12, the 28 the bootstrap superseded,
+      one line each. (Corrected from a first record that said one invocation listed
+      all 28 - post-build-review #109, F15.)'
+    - '2026-10-05: AS FIRST COMMITTED (99abafd) CRITERIA 2 AND 5-8 WERE NOT MET
+      for a person''s supersession, and the delivery critic found it (post-build-review
+      #109): is_superseded() read the superseded_by column, which a person''s
+      supersession leaves empty, so every one was invisible - listed nowhere,
+      promotable, not bringable back - and the relaxed constraint shipped without
+      a schema-version bump. tests/test_supersession_critic.py reproduces each
+      finding and is green on the fix: a person''s supersession is seen, listed,
+      refused promotion and brought back; the slot shows the supply actually waiting
+      after an un-supersede; a superseded supply cannot be rejected; only a supply
+      filed to the period can be superseded; a repeat is done already rather than
+      refused.'
     implemented_by:
     - qa_tools/common/supersession.py::supersede
     - qa_tools/common/supersession.py::un_supersede
     - qa_tools/common/supersession.py::superseded_in
     - qa_tools/common/supersession.py::waiting_in
+    - qa_tools/common/supersession.py::is_superseded
     - qa_tools/common/decision_log.py::_judge
     - qa_tools/common/rejection.py::decided_by_a_person
     - qa_tools/common/filing_decisions.py::_apply_one
+    - qa_tools/common/filing_decisions.py::_already
     - qa_tools/common/filing_queue.py::operations_for
     - cli/filing_tui.py::_decide_on
     - cli/supply.py::superseded_command
+    - qa_tools/common/qa_store.py::ensure_schema
     linked_tests:
     - tests/test_supersession.py::TestAPersonSupersedesAndBringsBack
     - tests/test_supersession.py::test_mothman_supply_superseded_lists_them
+    - tests/test_supersession_critic.py
     - tests/test_filing_decisions.py
     - tests/test_filing_queue.py
     - tests/test_cli_filing_tui.py
@@ -25251,6 +25307,24 @@ requirements:
       - '`mothman supply superseded` PRINTS PLAIN LINES, not a table (2026-10-05):
         a table column truncated or folded the supply ids, and the ids are exactly
         what a person pastes into un-supersede.'
+      - 'IS IT SUPERSEDED IS READ FROM THE ACTION, NEVER FROM superseded_by (post-build-review
+        #109, F1). A person''s supersession names no newer supply, and the first
+        build asked the column, which made every one invisible. superseded_by()
+        is now only for saying what replaced a supply; is_superseded() answers whether
+        anything did.'
+      - 'A SUPERSEDED SUPPLY CANNOT BE REJECTED, and a rejected one cannot be un-superseded
+        (F7). One supply holds one of the two states: superseded is already out
+        of the queue, and letting it be rejected and then brought back put a rejected
+        supply in staging where the overlay reads it.'
+      - ONLY A SUPPLY FILED TO THE PERIOD CAN BE SUPERSEDED (F10), refused otherwise
+        naming the command that shows what is filed where - a wrong period moved
+        a real supply's tables into that period's superseded schema.
+      - A REPEAT IS DONE ALREADY, NOT REFUSED (F14; REQ-GHUB-082 criterion 26),
+        the same as every other filing decision.
+      - 'OPEN, FOR KEITH (F8): demoting a promoted supply into a period where a
+        newer version is waiting leaves two waiting versions of one table. Whether
+        that demote should supersede the demoted supply or be refused is a product
+        decision and is not built either way.'
     open_questions: []
 
   - id: REQ-PIPE-121

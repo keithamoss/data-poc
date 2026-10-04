@@ -505,11 +505,15 @@ class RecordedArrival:
     stated_original: str | None = None
     #: Whether a person filed it, by which route, and who (REQ-PIPE-147).
     filed_by: dict | None = None
+    #: Rejected or superseded - out of the queue without being promoted,
+    #: so nobody is deciding on it (post-build-review #109, F5).
+    set_aside: bool = False
 
     @property
     def awaiting(self) -> bool:
-        """Whether the wait is still running (criterion 10)."""
-        return self.received_at is not None and self.filled_at is None
+        """Whether the wait is still running (criterion 10) - never for a
+        supply set aside, which is waiting on nobody."""
+        return self.received_at is not None and self.filled_at is None and not self.set_aside
 
     @property
     def waited(self) -> timedelta | None:
@@ -525,6 +529,11 @@ class RecordedArrival:
         from qa_tools.common import asset_time
 
         if self.received_at is None:
+            return None
+        if self.filled_at is None and self.set_aside:
+            # A SET-ASIDE SUPPLY NEVER FINISHED WAITING (post-build-review
+            # #109, F5): a figure measured to now would read as a wait that
+            # ended in a promotion, which it did not.
             return None
         return (self.filled_at or asset_time.now()) - self.received_at
 
@@ -568,10 +577,13 @@ def recorded_arrival(dataset_id: str, supply_id: str) -> RecordedArrival | None:
             return None
         slot, received_at, classification, stated, kind, route, who = rows[0]
         filled_at = _filled_at(conn, dataset_id, supply_id, slot)
+        from qa_tools.common import slot_state
+
+        set_aside = slot_state._rejected(conn, dataset_id, supply_id)
     return RecordedArrival(dataset_id=dataset_id, supply_id=supply_id, slot=slot,
                             received_at=received_at, filled_at=filled_at,
                             classification=classification, stated_original=stated,
-                            filed_by=({"kind": kind} if kind != "person"
+                            set_aside=set_aside, filed_by=({"kind": kind} if kind != "person"
                                       else {"kind": kind, "route": route, "who": who}))
 
 

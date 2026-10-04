@@ -179,6 +179,28 @@ def _rejected(conn, dataset_id: str, supply: str) -> bool:
     ) or supersession.is_superseded(conn, dataset_id, supply)
 
 
+def filings_by_period(conn, dataset_id: str, filings: list[dict]) -> dict:
+    """{period: the filing that speaks for it} for this dataset.
+
+    THE LATEST LIVE FILING, NOT THE LATEST FILING (post-build-review
+    #109, F3): after a newer supply was rejected and the older one brought
+    back from superseded, the latest filing names the rejected one and the
+    slot hid the supply actually waiting. Where every filing to a period
+    is rejected or superseded the latest still speaks for it, so a period
+    with a decided supply is never read as having had no delivery.
+    """
+    out: dict = {}
+    for f in filings:
+        slot = f.get("slot")
+        if not slot:
+            continue
+        live = not _rejected(conn, dataset_id, f.get("supply_id") or "")
+        current = out.get(slot)
+        if current is None or live or not current[1]:
+            out[slot] = (f, live)
+    return {slot: f for slot, (f, _) in out.items()}
+
+
 def _amber_waiting(conn, dataset_id: str, supply: str | None) -> bool:
     """Whether the rule stood back from this supply because it is amber
     and its setting was hold - read from what the rule RECORDED
@@ -262,9 +284,10 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
     if held:
         return SlotState(dataset_id=dataset_id, period=slot.name, state=HELD,
                           supply=(filed or {}).get("supply_id"))
-    if filed:
+    if filed and not _rejected(conn, dataset_id, filed.get("supply_id") or ""):
         # AWAITING A DECISION, closed or not (REQ-PIPE-132 criterion 3): a
-        # supply is here, so the period is not unsupplied.
+        # supply is here, so the period is not unsupplied. Not a superseded
+        # one (post-build-review #109, F4), which is waiting on nobody.
         supply = filed.get("supply_id")
         return SlotState(dataset_id=dataset_id, period=slot.name,
                           state=AMBER_WAITING if _amber_waiting(conn, dataset_id, supply)
@@ -368,8 +391,7 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
             print(f"note: {entry.dataset_id} has no slots to reconcile "
                   f"({type(exc).__name__}: {exc}).")
             continue
-        filings = {f["slot"]: f for f in filing.filings_of(entry.dataset_id)
-                    if f.get("slot")}
+        filings = filings_by_period(conn, entry.dataset_id, filing.filings_of(entry.dataset_id))
         ever = bool(filing.filings_of(entry.dataset_id))
         for slot in dataset_slots:
             out.append(state_of(conn, dataset_id=entry.dataset_id, slot=slot,

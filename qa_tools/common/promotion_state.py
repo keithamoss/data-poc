@@ -45,8 +45,11 @@ WHY_NOT = {
     REJECTED: "a person rejected this supply, so it was never promoted",
     NO_SLOT: ("no slot could be claimed for this supply, so there is no period "
                "for it to be promoted into"),
-    SUPERSEDED: ("a later supply was promoted into this period, so this one is "
-                  "no longer what the period holds"),
+    # F11 of post-build-review #109: since REQ-PIPE-118 this also covers a
+    # newer version arriving and a person setting this one aside.
+    SUPERSEDED: ("this one was superseded - a newer version arrived for the same "
+                  "period, a person set it aside, or a later supply was promoted "
+                  "into the period - so it is no longer what the period holds"),
 }
 
 

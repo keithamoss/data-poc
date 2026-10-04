@@ -75,8 +75,8 @@ def supply_state(conn, dataset_id: str, period: str, as_at: datetime) -> str | N
     slot = next((s for s in dataset_slots if s.name == period), None)
     if slot is None:
         return None
-    filings = {r.get("slot"): r for r in filing.filings_of(dataset_id)
-               if r.get("slot") == period}
+    filings = slot_state.filings_by_period(
+        conn, dataset_id, [r for r in filing.filings_of(dataset_id) if r.get("slot") == period])
     state = slot_state.state_of(conn, dataset_id=dataset_id, slot=slot, now=as_at,
                                 filings=filings, ever_delivered=True)
     return _STATE_TO_REASON.get(state.state)

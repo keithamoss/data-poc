@@ -2159,7 +2159,15 @@ judgement about who reads the page rather than about the rule.
         and 1798c63's deployment half died in CI's bootstrap on a REAL,
         INTERMITTENT DDL race between the two collections' parallel
         processes (post-build-review #108), reproduced with threads and
-        fixed in the commit after this note. Re-check the newest run.
+        fixed in ba70fcb. Re-check the newest run.
+      - REQ-PIPE-118/120 CRITIC (post-build-review #109): a PERSON'S
+        SUPERSESSION WAS INVISIBLE as first committed - every one unseen,
+        promotable and stranded - and five readers did not know about
+        superseded supplies. All fixed with failing tests first, on the
+        commit after ba70fcb. ONE QUESTION FOR YOU (F8): demoting a
+        promoted supply into a period where a newer version is waiting
+        leaves two waiting versions of one table - should that demote
+        supersede the demoted supply, or be refused?
       - WHERE THE NIGHT ENDED (Perth ~04:30). BUILT: sprints 1-7 and, of
         sprint 8, REQ-PIPE-122, 118 and 120. NOT STARTED: the rest of sprint
         8 (REQ-PIPE-128 one version per period, 129 plain base names and its
@@ -2173,7 +2181,8 @@ judgement about who reads the page rather than about the rule.
         (REQ-QAC-108) - 10 promotions in a whole bootstrap; (2) 081's PAGE
         SWITCH (a false green as signed); (3) 122's invisible setting and
         the YAML-slip crash (#106, #107); (4) the open questions under
-        sprints 6 and 7 above.
+        sprints 6 and 7 above; (5) #109's F8 (demote beside a newer
+        waiting version).
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

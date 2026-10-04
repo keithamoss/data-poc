@@ -510,6 +510,20 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
                 f"un-supersede --dataset {decision.dataset_id} --period "
                 f"{decision.to_slot} --supply {decision.supply} --reason '<why>'`.")
 
+    if decision.action == REJECT and decision.supply:
+        # A SUPERSEDED SUPPLY IS NOT REJECTED (post-build-review #109, F7):
+        # it is already out of staging, and rejecting it would let an
+        # un-supersede bring a rejected supply back where the overlay reads
+        # it. The two states say different things and one supply holds one.
+        from qa_tools.common import hierarchy, supersession
+
+        if supersession.is_superseded(conn, decision.dataset_id, decision.supply):
+            collection = hierarchy.dataset(decision.dataset_id).collection_id
+            raise DecisionRefused(
+                f"{decision.supply} is superseded, which already takes it out of the "
+                f"queue - there is nothing waiting to reject. `mothman supply superseded "
+                f"--collection {collection} --dataset {decision.dataset_id}` lists it.")
+
     if decision.action == ACKNOWLEDGE:
         # REQ-PIPE-122 criterion 14: only a supply that OWES one, and the
         # refusal says which of the four reasons it is.

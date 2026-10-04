@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 23
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -630,7 +630,10 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
                       'promotion-withheld', 'mark-not-supplied', 'acknowledge',
                       'supersede', 'un-supersede'));
 -- WHICH NEWER SUPPLY SUPERSEDED THIS ONE (REQ-PIPE-118 criterion 10).
--- Schema 22, additive.
+-- Schema 22, additive. Schema 23 relaxed the shape for a PERSON's
+-- supersession (REQ-PIPE-120), which names no newer supply - shipped first
+-- without the bump, so a database already at 22 kept the old constraint
+-- and refused every one (post-build-review #109, F2).
 ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS superseded_by text;
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_supersede_shape;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_supersede_shape

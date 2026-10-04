@@ -83,7 +83,11 @@ def schemas_to_drop(conn: supply_db.SupplyConnection) -> list[str]:
 
     present = {row[0] for row in conn.execute("SELECT nspname FROM pg_namespace").fetchall()}
     ours = {n for n in _FIXED if n in present}
-    ours |= set(period_schema.period_schemas(conn))
+    # BY SCHEMA NAME (post-build-review #109, F12): period_schemas()
+    # answers with PERIOD names, so this used to add names that are not
+    # schemas and leave every period schema - and its superseded schema
+    # beside it (REQ-PIPE-118) - behind.
+    ours |= set(supply_db.schemas_with_prefix(conn, period_schema.PERIOD_SCHEMA_PREFIX))
     ours |= set(supply_db.run_schemas(conn))
     ours |= set(supply_db.dbt_schemas(conn))
     ours |= set(supply_db.schemas_with_prefix(conn, supply_db.TRIAL_SCHEMA_PREFIX))

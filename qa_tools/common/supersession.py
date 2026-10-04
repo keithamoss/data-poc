@@ -44,21 +44,38 @@ def is_superseded_schema(schema: str) -> bool:
     return schema.startswith(period_schema.PERIOD_SCHEMA_PREFIX) and schema.endswith(SUFFIX)
 
 
-def superseded_by(conn, dataset_id: str, supply: str) -> str | None:
-    """The supply that superseded this one, where it stands superseded -
-    the latest supersession of it not undone by a later un-supersede."""
+def _latest(conn, dataset_id: str, supply: str):
+    """The latest supersession or un-supersession of this supply, as
+    (action, superseded_by), or None."""
     rows = conn.execute(
         f"SELECT action, superseded_by FROM {decision_log.TABLE} "
         "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?) "
         "ORDER BY effective_at DESC, id DESC LIMIT 1",
         [dataset_id, supply, decision_log.SUPERSEDE, decision_log.UN_SUPERSEDE]).fetchall()
-    if not rows or rows[0][0] != decision_log.SUPERSEDE:
-        return None
-    return rows[0][1]
+    return rows[0] if rows else None
 
 
 def is_superseded(conn, dataset_id: str, supply: str) -> bool:
-    return superseded_by(conn, dataset_id, supply) is not None
+    """Whether this supply stands superseded - its latest supersession not
+    undone by a later un-supersede.
+
+    READ FROM THE ACTION, NEVER FROM `superseded_by` (post-build-review
+    #109, F1): a PERSON's supersession names no newer supply, so asking
+    the column made every one of them invisible - tables set aside, and
+    nothing that read this knew."""
+    latest = _latest(conn, dataset_id, supply)
+    return bool(latest) and latest[0] == decision_log.SUPERSEDE
+
+
+def superseded_by(conn, dataset_id: str, supply: str) -> str | None:
+    """The supply that superseded this one, where the RULE superseded it;
+    None where it is not superseded OR a person superseded it - so this
+    is for saying what replaced it, never for asking whether anything
+    did. That is is_superseded()."""
+    latest = _latest(conn, dataset_id, supply)
+    if not latest or latest[0] != decision_log.SUPERSEDE:
+        return None
+    return latest[1]
 
 
 def _receipt(conn, dataset_id: str, supply: str):
@@ -74,9 +91,32 @@ def _rejected(conn, dataset_id: str, supply: str) -> bool:
         "AND action = ? LIMIT 1", [dataset_id, supply, decision_log.REJECT]).fetchall())
 
 
-def _ever_promoted_and_still_held(conn, dataset_id: str, supply: str, period: str) -> bool:
-    h = decision_log.held(conn, dataset_id, period)
-    return bool(h and h.held_as is not None and h.holder == supply)
+def _accepted_into(conn, dataset_id: str, supply: str, period: str) -> bool:
+    """Whether this supply was accepted into `period` - promoted or re-filed
+    in - whether or not it still holds it.
+
+    EVER, NOT STILL (post-build-review #109, F6): a promoted supply
+    displaced by a person's promotion of another keeps its tables in the
+    period schema, not in staging, so the rule superseding it recorded a
+    supersession and moved nothing. Superseding a promoted supply is
+    REQ-PIPE-128's (criterion 12).
+
+    UNLESS A PERSON SINCE DEMOTED IT: a demote returns its tables to
+    staging and makes it unaccepted again, superseded like any other
+    (decision 13)."""
+    rows = conn.execute(
+        f"SELECT action FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
+        "AND ((to_slot = ? AND action IN (?, ?)) OR (from_slot = ? AND action = ?)) "
+        "ORDER BY effective_at DESC, id DESC LIMIT 1",
+        [dataset_id, supply, period, decision_log.PROMOTE, decision_log.REFILE,
+         period, decision_log.DEMOTE]).fetchall()
+    return bool(rows) and rows[0][0] != decision_log.DEMOTE
+
+
+def _filed_to(conn, dataset_id: str, supply: str, period: str) -> bool:
+    return bool(conn.execute(
+        "SELECT 1 FROM qa.filing WHERE dataset_id = ? AND supply_id = ? AND slot = ?",
+        [dataset_id, supply, period]).fetchall())
 
 
 def staged_tables(conn, dataset_id: str, supply: str) -> list[str]:
@@ -103,7 +143,7 @@ def earlier_unaccepted(conn, dataset_id: str, period: str, newer: str) -> list[s
         if at is None or at >= newer_at:
             continue
         if (_rejected(conn, dataset_id, supply) or is_superseded(conn, dataset_id, supply)
-                or _ever_promoted_and_still_held(conn, dataset_id, supply, period)):
+                or _accepted_into(conn, dataset_id, supply, period)):
             continue
         out.append((at, supply))
     return [s for _, s in sorted(out)]
@@ -159,9 +199,8 @@ def superseded_in(conn, dataset_id: str, period: str) -> list[dict]:
             "ON r.dataset_id = f.dataset_id AND r.supply_id = f.supply_id "
             "WHERE f.dataset_id = ? AND f.slot = ? ORDER BY r.received_instant DESC",
             [dataset_id, period]).fetchall():
-        by = superseded_by(conn, dataset_id, supply)
-        if by is not None:
-            out.append({"supply": supply, "superseded_by": by,
+        if is_superseded(conn, dataset_id, supply):
+            out.append({"supply": supply, "superseded_by": superseded_by(conn, dataset_id, supply),
                         "received": _receipt(conn, dataset_id, supply)})
     return out
 
@@ -176,7 +215,7 @@ def waiting_in(conn, dataset_id: str, period: str, *, besides: str | None = None
         if supply == besides:
             continue
         if (_rejected(conn, dataset_id, supply) or is_superseded(conn, dataset_id, supply)
-                or _ever_promoted_and_still_held(conn, dataset_id, supply, period)):
+                or _accepted_into(conn, dataset_id, supply, period)):
             continue
         out.append(supply)
     return out
@@ -188,13 +227,19 @@ def supersede(conn, *, agency_id: str, collection_id: str, dataset_id: str, supp
     the period's superseded schema, with that person as actor."""
     from qa_tools.common import decision_log as dl
 
-    if is_superseded(conn, dataset_id, supply):
-        raise dl.DecisionRefused(f"{supply} is already superseded.")
+    if not _filed_to(conn, dataset_id, supply, period):
+        # F10: a supply that does not exist, or a real one named against
+        # the wrong period, would have had its tables moved into THAT
+        # period's superseded schema.
+        raise dl.DecisionRefused(
+            f"{supply} is not filed to {period} for {dataset_id}, so there is nothing of "
+            f"it there to supersede. `mothman supply slots --dataset {dataset_id}` shows "
+            f"what is filed where.")
     if _rejected(conn, dataset_id, supply):
         raise dl.DecisionRefused(f"{supply} was rejected; there is nothing waiting to supersede.")
-    if _ever_promoted_and_still_held(conn, dataset_id, supply, period):
+    if _accepted_into(conn, dataset_id, supply, period):
         raise dl.DecisionRefused(
-            f"{supply} is promoted into {period}; superseding a promoted supply is "
+            f"{supply} was promoted into {period}; superseding a promoted supply is "
             f"REQ-PIPE-128's, through promoting the one that replaces it.")
     target = superseded_schema(period)
     tables = staged_tables(conn, dataset_id, supply)
@@ -222,6 +267,11 @@ def un_supersede(conn, *, agency_id: str, collection_id: str, dataset_id: str, s
             "`mothman supply superseded` lists them.")
     if not is_superseded(conn, dataset_id, supply):
         raise dl.DecisionRefused(f"{supply} is not superseded, so there is nothing to bring back.")
+    if _rejected(conn, dataset_id, supply):
+        # F7: brought back still rejected, it would sit in staging where
+        # the overlay reads it.
+        raise dl.DecisionRefused(
+            f"{supply} was rejected after it was superseded, so it cannot come back.")
     waiting = waiting_in(conn, dataset_id, period, besides=supply)
     if waiting:
         raise dl.DecisionRefused(

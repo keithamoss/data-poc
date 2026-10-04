@@ -614,10 +614,11 @@ def after_run(conn: supply_db.SupplyConnection, *,
         # NO AUTOMATIC RULE PROMOTES A SUPERSEDED SUPPLY (REQ-PIPE-118
         # criterion 14): a later version of its table arrived for the same
         # period, and only a person brings it back (REQ-PIPE-120).
-        newer = supersession.superseded_by(conn, dataset_id, item["supply"])
-        if newer:
+        if supersession.is_superseded(conn, dataset_id, item["supply"]):
+            newer = supersession.superseded_by(conn, dataset_id, item["supply"])
             refused[dataset_id] = (f"a newer version of this table for {period} arrived "
-                                   f"({newer}), so this one is superseded")
+                                   f"({newer}), so this one is superseded" if newer else
+                                   "a person superseded this supply")
             continue
         try:
             status = status_of(dataset_id, results, reads=reads)

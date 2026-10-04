@@ -235,6 +235,18 @@ def _already(conn, request: Request) -> str | None:
         if already is not None:
             return (f"{period} is already marked as not supplied for "
                     f"{request.dataset_id}, by {already.actor}. Nothing to do.")
+    elif request.operation in (SUPERSEDE, UN_SUPERSEDE) and request.supply:
+        # A REPEAT IS DONE ALREADY, not refused (criterion 26; post-build-
+        # review #109, F14) - the same as every other filing decision.
+        from qa_tools.common import supersession
+
+        now = supersession.is_superseded(conn, request.dataset_id, request.supply)
+        if request.operation == SUPERSEDE and now:
+            return f"{request.supply} is already superseded. Nothing to do."
+        if (request.operation == UN_SUPERSEDE and not now
+                and supersession._latest(conn, request.dataset_id, request.supply)):
+            return (f"{request.supply} has already been brought back from superseded. "
+                    f"Nothing to do.")
     elif request.operation == UN_INHERIT:
         if inheritance.inherited(conn, request.dataset_id, period) is None:
             # NOT where it holds a SUBSTITUTION - that is a real

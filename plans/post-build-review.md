@@ -5294,3 +5294,43 @@ twice. It deliberately did not re-find the `TypeError`.
     uncommitted row - at the staging, period, superseded, rejected and
     sample schema sites and the resolutions table. The same pattern
     `qa_store.ensure_schema` already used for its own DDL.
+
+109. **[done, 2026-10-05]** **[Pipeline & publishing]** **The delivery critic on
+    REQ-PIPE-118/120: a person's supersession was invisible, and five readers
+    did not know about superseded supplies.** Every finding was reproduced in
+    `tests/test_supersession_critic.py` before it was fixed, and each failed
+    against 99abafd.
+    - **F1, critical:** `is_superseded()` read the `superseded_by` column,
+      which a person's supersession leaves empty. So every one was unseen:
+      not listed, still promotable while its tables sat in the superseded
+      schema, and impossible to bring back. It now reads the action.
+    - **F2, critical:** the relaxed shape constraint shipped without a
+      schema-version bump, so a database already at 22 refused a person's
+      supersede with a CheckViolation. Bumped to 23.
+    - **F3/F4:** the slot read the LATEST filing. After an un-supersede it
+      showed the rejected newer supply, and a superseded latest filing read
+      "awaiting a decision". Fixed with `slot_state.filings_by_period()`.
+    - **F5:** all 28 superseded supplies in supply8 read "waiting Nd" on the
+      dashboard; `awaiting` and `waited` are now empty for a set-aside supply.
+    - **F6:** a promoted supply displaced by a person's promotion was
+      "superseded" with nothing moved. A supply accepted into the period is
+      now left alone unless it was demoted.
+    - **F7:** a superseded supply could be rejected and then brought back
+      still rejected. Both are now refused.
+    - **F10:** a person could supersede a supply not filed to the period.
+      Now refused.
+    - **F11:** the "why not promoted" text claimed only one of the three
+      causes. Now covers all three.
+    - **F12, pre-existing:** reset-synthetic added period names, not schema
+      names. Now drops period and superseded schemas by name.
+    - **F14:** a repeated supersede was refused. Now done-already.
+    - **F15:** REQ-PIPE-120's evidence claimed one invocation listed all 28;
+      re-measured as 16 + 12 across two.
+    - **Not fixed:** F8 is a product question **for Keith**: demoting into a
+      period with a newer waiting version leaves two waiting versions —
+      supersede the demoted one, or refuse? F9 (closed_slots judges
+      supersession by current state, not as-of) is latent; the supply8
+      corpus has no instance. F13 (a period whose name normalises to end in
+      `_superseded`) is an edge case. All three are recorded on the
+      requirements' decisions. The critic also found two REQ-PIPE-120 NFRs
+      riding on REQ-PIPE-151 that were not listed as unmet; they are now.
