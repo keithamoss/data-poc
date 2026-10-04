@@ -242,7 +242,7 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
 
     def test_the_distribution_is_the_one_that_was_measured(self):
         """A blunt backstop for the two tests above, readable without a
-        diff: 131 on time, 16 early, 3 late over 150 arrivals.
+        diff - see the history below for the figure's moves.
 
         THIS NUMBER WENT TO 28 EARLY AND BACK, and the round trip is the
         useful part. It moved to 28 on 2026-09-27 when twelve arrivals were
@@ -294,13 +294,21 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         The key `onTime` also becomes `on_time`: the retired
         `cadence.classify_arrival()` and `arrival_classification` spell
         it differently, and the page has rendered both for some time.
+
+        AND AGAIN FOR REQ-PIPE-131, to 106 / 14 / 21 late / 9 unfiled.
+        Exactly nine verdicts moved, all cp-case-workers, all late ->
+        unfiled: arrivals in quarters Case Workers does not deliver in,
+        which the old rule filed backward into an earlier quarter (one of
+        them over a year back) and which are now HELD, because no period
+        of theirs was open (criterion 10). Checked entry by entry: the
+        golden's diff is those nine lines and nothing else.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"on_time": 106, "early": 14, "late": 30}
+        assert counts == {"on_time": 106, "early": 14, "late": 21, "unfiled": 9}
         assert sum(counts.values()) == 150
 
 
