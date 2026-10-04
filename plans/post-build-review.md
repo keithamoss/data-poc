@@ -4585,3 +4585,15 @@ twice. It deliberately did not re-find the `TypeError`.
     after `report_recorded`). The real hand-filed routes end in
     `_finish_supply` and never offer it. Touches a built requirement's
     claim, so it is Keith's; a failing test comes first.
+
+83. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **The
+    Birth Registrations Lambda handler would crash on its first file.**
+    Found by delivery-scoper refreshing REQ-PIPE-086, verified here by
+    reading: `aws/lambda_handlers/bdm_ingest_handler.py` calls
+    `orchestrate_bdm.run_single(..., reference_csv=REFERENCE_CSV)`, and
+    `run_single` no longer takes `reference_csv` (REQ-QAC-108 moved the
+    drift reference), so it raises `TypeError`. The CP handler does not
+    pass it. Nothing runs these handlers today, which is how it went
+    unnoticed. Owned by the Lambda requirement split out of REQ-PIPE-086
+    (REQ-PIPE-152, drafting), whose criteria move both handlers onto the
+    shared lifecycle; a failing test comes first.
