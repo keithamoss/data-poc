@@ -1540,3 +1540,16 @@ judgement about who reads the page rather than about the rule.
       REQ-PIPE-075 crit 17 -> 140/141; REQ-GHUB-082 crit 2 -> 141;
       REQ-PIPE-084 crits 6/14 and REQ-PIPE-099 crit 11 -> 121/140. Sprint
       tags moved to match: 11 blocked, 13 and 18 in-progress.
+    - **CALENDAR DRAFTS 110-113, PART-SETTLED 2026-10-04 (Keith).**
+      110: `participates` REPLACES `delivery_months`; `not_expected` STAYS
+      as its own thing - "a once-off decision, or a series of once-off
+      decisions we might make ahead of time", where participation is an
+      ongoing one. 111: point 1 MATCHES CALENDARS (a past date can be
+      corrected when the change adds a changelog line; 111's "a changelog
+      never licenses it" is dropped); point 2 (refusing ADDED past-dated
+      entries, and freezing every effective-dated setting) still with
+      Keith. 112: the timezone STAYS in `data-asset.yaml` (wider than the
+      calendar) and IS worth versioning now. 113: deduplicated - its
+      overlap check is REQ-PIPE-134's; it keeps only where a due instant
+      comes from. Still open: slaProperties' `frequency`, 111 point 2.
+      Then all four go back to the scoper.

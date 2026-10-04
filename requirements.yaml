@@ -25967,9 +25967,9 @@ requirements:
       - "WHETHER THE ZONE STAYS IN contract/data-asset.yaml or moves into contract/calendar.yaml. The recommendation above is that it stays, on the grounds that it is used well beyond the calendars, but the counter-argument is real: this batch's organising idea is that one file holds the delivery agreement, and a wall-clock expected time is meaningless without the zone that interprets it. It is a cheap decision to take now and an annoying one to reverse later."
       - "WHETHER THE API CHURN IS WORTH IT TODAY, given that there is exactly one timezone version and a second is hypothetical. The alternative is to leave the scalar in place and revisit if an asset ever needs a second zone, accepting that the instants computed in the meantime would be re-judged by that change. Recorded as a genuine fork rather than presented as settled, because it is the only requirement in this batch whose benefit is entirely in the future."
   - id: REQ-PIPE-113
-    title: A slot's due instant comes from the agreement, and overlapping windows are refused at config time
+    title: "A slot's due instant comes from the delivery agreement in force on its period's date, and a later change never moves an earlier slot"
     date_written: "2026-09-28"
-    story: "As whoever has to explain why a supply was filed where it was, I want two consecutive slots' windows never to overlap, so that an arrival can only ever have belonged to one of them."
+    story: "As whoever has to explain why a supply was judged on time or late, I want each slot's due instant computed from the agreement in force on that period's own date, so that changing a dataset's expected time or claim window going forward never re-judges a slot that has already been due."
     moscow: must
     status: not_started
     source: "Keith, 2026-09-28 - the gap invariant recorded in plans/supply-model.md Thread C's `contract/calendar.yaml` subsection, stated as `claim_window + grace < the gap between consecutive due instants`, concretely `claim_opens_at(N+1) > late_after(N)`. Scoped by delivery-scoper, 2026-09-28."
@@ -25978,23 +25978,11 @@ requirements:
       - "THE SYSTEM SHALL take a slot's expected time of day and its grace allowance from the calendar configuration in force on that period's own date."
       - "WHEN a calendar version changes a dataset's expected time of day, THE SYSTEM SHALL leave every earlier slot's due instant unchanged."
       - "THE SYSTEM SHALL express a supply due on the evening before its period's date, and SHALL NOT require a separate rule to reinterpret the arrival afterwards."
-      - "THE SYSTEM SHALL check, for every dataset, that each slot's claim window opens strictly after the previous slot's lateness begins."
-      - "IF a configuration would make a slot's claim window open on or before the previous slot's lateness begins, THEN THE SYSTEM SHALL reject that configuration."
-      - "WHEN the configuration is rejected for this reason, THE SYSTEM SHALL name the dataset, the two consecutive periods, both instants, and by how much they overlap."
-      - "THE SYSTEM SHALL reject such a configuration when the configuration is validated, and SHALL NOT discover it when an ambiguous arrival occurs."
-      - "THE SYSTEM SHALL check every consecutive pair of slots a dataset's configuration produces, and SHALL NOT check only the pair around today."
-      - "THE SYSTEM SHALL check the pair that straddles a version boundary, where two consecutive slots take their timing from different calendar versions."
-      - "WHERE a calendar is expressed as a cadence rule, THE SYSTEM SHALL check the invariant against the gap that rule generates."
       - "WHERE a dataset widens its claim window, THE SYSTEM SHALL treat that as changing how early a supply may arrive, and SHALL NOT let it move that dataset's due instant."
-      - "THE SYSTEM SHALL check the invariant without opening or querying any database, warehouse schema or anything under data/."
       - "THE SYSTEM SHALL give REQ-GEN-044's generated history somewhere effective-dated to state a due time, so that its criteria 8 to 11 can be built."
+      - "THE SYSTEM SHALL read the due instant, the expected time, the grace allowance and the claim window from configuration alone, without opening or querying any database, warehouse schema or anything under data/."
     non_functional_requirements:
-      - "THE REAL COMMITTED CONFIGURATION MUST SATISFY THE INVARIANT BEFORE THE CHECK SHIPS, or the gate lands red on day one and the first thing anybody does is turn it off. Check both calendars as they stand - the daily feed due 14:00 with sixty minutes of grace and a four-hour window, and the quarterly one due 09:00 with eight hours of grace and a fourteen-day window - and say what the real margin is rather than assuming it is comfortable."
-      - "THE MARGIN SHRINKS AS THE CLAIM WINDOW WIDENS, and widening Child Protection's window is exactly what this batch allows. So the invariant check has to land in the same change as the widening, not after it - a configuration that is legal today can be made ambiguous by the very feature it arrives with."
-      - "At ~30 datasets across years of periods this walks every consecutive pair, which is linear in slots rather than cheap-by-inspection. It runs inside a gate whose siblings are sub-second, so either keep it in that band or state plainly which bounded window it checks and why that is enough."
-      - "What a wrong answer costs is not an error, it is a silently wrong history: an arrival that two slots can both claim gets filed by whichever branch of the assignment rule happens to run first, and the record then says something nobody decided. That is the false-green direction, which is why this is refused rather than warned about."
       - "Config only, no data access, so both the gate and the dashboard build can compute it under the standing rule."
-      - "The claim window is a genuine TRADE rather than a tuning knob - tight windows buy cascade-immunity at the price of boundary misfiling, wide ones do the reverse. This check must read as protecting that trade, not as an invitation to tune the window until the gate goes quiet."
     dependencies:
       - REQ-PIPE-110
       - REQ-PIPE-112
@@ -26008,9 +25996,9 @@ requirements:
       - "THE EVENING-BEFORE SHAPE NEEDS NO CUTOFF RULE, which REQ-PIPE-052 already decided and this requirement inherits: `arrives 10pm, so it is for tomorrow` is not special handling, it is a due instant that genuinely falls on the previous calendar day, with the window opening accordingly."
       - "Decided the Child Protection override widens the claim window and does not move the deadline (Keith corrected this explicitly, 2026-09-28). Recorded on this requirement as well as REQ-PIPE-110 because it is the override most likely to breach the invariant, and the two facts have to be read together."
       - "Recorded because a quarterly gap is NOT uniform and an implementation will assume it is: February to May is 89 days, May to August is 92, and November to February is 92. An invariant checked against a nominal quarter rather than against real consecutive dates would pass a configuration that fails on the shortest gap of the year."
-    open_questions:
-      - "WHETHER THE INVARIANT IS CHECKED ACROSS A DATASET'S WHOLE HISTORY OR ONLY FORWARD FROM TODAY. Checking everything is the honest reading and makes a past configuration's ambiguity visible; it also means importing a historically ambiguous configuration fails the gate on work nobody can now change, which the freeze rule in REQ-PIPE-111 would then prevent anybody from fixing. Checking forward only avoids that and leaves a real past ambiguity unreported."
-      - "WHAT HAPPENS TO A CONFIGURATION ALREADY IN FORCE THAT BREACHES THE INVARIANT, if one is ever found. Rejecting it stops the pipeline for that dataset, which is REQ-PIPE-053's exhausted-schedule shape and is arguably right; refusing only the EDIT that introduces it is gentler and leaves a known ambiguity running. This does not arise for today's two calendars, which is exactly why it is cheap to decide now."
+      - "DEDUPLICATED AGAINST REQ-PIPE-134 (Keith, 2026-10-04). Its overlap check - each slot's claim window opening strictly after the previous slot's lateness begins, refused at config time, checked over every period the configuration generates including across version boundaries - is now REQ-PIPE-134's, signed that day, so those criteria and their NFRs came out of this requirement. Both of this draft's open questions are answered there: the whole configuration is checked, and CI refuses a breach. What stays here is what 134 does not say - where a due instant comes from, and that a later change never moves an earlier slot."
+      - "STALE DECISION FLAGGED FOR THE SCOPER (2026-10-04): the decision above that the claim window 'opens before due and NEVER CLOSES' (REQ-PIPE-052) is reversed by REQ-PIPE-131, signed 2026-10-04 - a period now closes when its calendar's next period's claim window opens. To be rewritten on the scoper pass, not deleted, since its reasoning is history."
+    open_questions: []
   - id: REQ-PIPE-115
     title: A table the run cannot read is red and says so, and never stops the run
     date_written: "2026-09-30"
