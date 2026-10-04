@@ -1376,5 +1376,10 @@ judgement about who reads the page rather than about the rule.
       generator produces files only today, so synthetic history gains a
       way to play back seeded decisions ("on <date> a person
       un-supersedes X"). Its own requirement(s), via delivery-scoper after
-      the final pass on the batch. Open: whether the scenario map is also
-      shown inside the dashboard.
+      the final pass on the batch. **THE SCENARIO MAP IS ALSO SHOWN INSIDE
+      THE DASHBOARD** (Keith) - e.g. a Scenarios tab beside Plans and Demo,
+      embedded like PLANS. Inside the dashboard it can LINK to the page
+      (the dashboard knows its own routes, which is why SCENARIOS.md gives
+      coordinates not URLs). To settle in scoping: whether the dataset
+      pages themselves stay unlabelled (SCENARIOS.md's deliberate stance -
+      a planted red looks like a real one) or carry a marker.
