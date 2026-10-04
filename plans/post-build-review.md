@@ -4661,3 +4661,41 @@ twice. It deliberately did not re-find the `TypeError`.
     it answers "what was the last decision", which substitution's refusal
     wording needs. REQ-PIPE-130's slot view (signed, build step 2) will
     replace both readers with one.
+
+85. **[investigate, 2026-10-04]** **[QA checks & contract]** **The drift
+    reference skips a promoted period when a later entry is about another
+    supply - a third copy of #84's rule.** Found by delivery-architect's
+    pre-build review of the file-check group, confirmed here by reading
+    the code, not yet reproduced: `drift_reference.reference_for()` walks
+    back through periods and accepts one only if
+    `decision_log.latest_for_slot()`'s LAST entry is a promote or re-file.
+    #84's fix went into `promoted_into` and `slot_state`, not here. So a
+    reject or demote of a different supply, a `promotion-withheld`, an
+    `inherit-refused`, and (once REQ-PIPE-151 lands) every
+    `promotion-refused` make it skip a period that holds a promoted
+    supply. The result today is a reference further back than it should
+    be. Under REQ-QAC-108's 2026-10-04 amendment it becomes a false red
+    ("no accepted earlier supply"). The architect also names `_standing_on`,
+    `substitution.py` and `inheritance.py` as `latest_for_slot` readers to
+    check. A defect against built code, so a failing test comes first;
+    the obvious fix is to ask `promoted_into`, which #84 corrected.
+
+86. **[investigate, 2026-10-04]** **[Pipeline & publishing]**
+    **`supply_db._redact` misses a keyword-form DSN.** Found by
+    delivery-architect's review of REQ-PIPE-093, confirmed by reading: the
+    redaction is one regex over the URL form (`://user:pw@`), so a DSN
+    written as `host=... password=secret` passes through unredacted, and
+    psycopg's own parse errors can echo DSN fragments. The docstring says
+    why it matters - errors reach CI logs on a public repository. Latent:
+    every DSN this project sets is URL-form. Minor fix, failing test first
+    (a keyword-form DSN and a malformed one); REQ-PIPE-093 criterion 3
+    leans on it.
+
+87. **[investigate, 2026-10-04]** **[Testing & dev tooling]**
+    **The dev-container/CI PostgreSQL pin test checks only the first CI
+    service.** Found by the same review, confirmed by reading:
+    `tests/test_devcontainer.py::_ci_postgres_image` returns the first job
+    with a postgres service, and `.github/workflows/test.yml` has two
+    (both `postgres:16` today), so the second could drift unchecked.
+    Minor; REQ-PIPE-146 criterion 5 replaces this comparison with "every
+    image tag equals the declaration", so fold it in there.

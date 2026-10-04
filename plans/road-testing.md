@@ -1670,6 +1670,47 @@ judgement about who reads the page rather than about the rule.
       NFR at 151. PLACED the same evening (Keith): AFTER the batch -
       post-build-review #81 (promotion actor) first, then 151, then 086,
       150 and 152 - since 151 finishes the owed work 121, 140 and 120
-      create and logs every gate outcome under the rule's name. All the old unsigned
+      create and logs every gate outcome under the rule's name.
+    - **PRE-BUILD REVIEWS, 2026-10-04 evening (Keith's ask).** delivery-architect
+      (three passes), delivery-dashboard-ux and delivery-cli-ux reviewed
+      everything scoper-refreshed today: 093/107/146/114, 103-amendment/147,
+      096/097/148/153, 115, 108-amendment, 086/150/151/152. ANSWERED SO
+      FAR (Keith):
+      - DASHBOARD: a blocked dataset's own columns read the existing grey
+        "No data"; the "waiting for a person" panel, markers and red are
+        all judged at the SAME as-of instant (the build carries raised and
+        resolved instants); a rejected failed load leaves a supply-history
+        row ("Could not be loaded - rejected by X, when: why"); the label
+        is "Could not be loaded" everywhere, replacing "Failed load".
+      - CLI: in a confirming environment the typed id REPLACES the y/N and
+        is asked ONCE PER FLOW; keep-or-trial is asked before the drift
+        reference, which is asked for (and required as a flag) only for a
+        trial; an already-recorded synthetic arrival is marked "recorded"
+        in the picker, runs as a trial with one line why, and `--commit`
+        on it is refused naming `--trial`; `pipeline process` is on the
+        TUI menu and a PERSON starting it in production types the id
+        (Keith chose this over the reviewer's "no typed id").
+      STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
+      delivery; how "fix and reprocess" reaches a check; an S3 prefix's
+      default arrival time), architect C Q1-Q7 (Lambda/backstop receipt
+      order; what continues after a failed arrival; which commands take
+      the pass lock; `pipeline run` on a populated database; gating a
+      supply with no slot, incl. 144 c13 vs 105 c6; extracting the
+      per-arrival function BEFORE the batch; where an S3-only delivery's
+      object location lives), architect A Q1-Q8 (a test environment for
+      test databases; the ticket repository; 128's one prompt vs 093's
+      typed id; regenerate-history in production; moving 107's downgrade
+      fix into 144 and 093/107 before 151/152; the dev container; keeping
+      the environment visible in the TUI; an S3 prefix's default), and
+      architect B Q1-Q8 (file-check history on reprocess; which instant
+      opens a failed-load item or hold - receipt vs wall clock; failed-load
+      REASONS CAN LEAK ROW VALUES to the public page; where 108's
+      no-earlier-supply record goes; synthetic fixtures; 070 c5/c7
+      contradictions; contested pair with one refused file; a gate
+      refusal reason for a failed load). Defects found: #85 (drift
+      reference, a third copy of #84), plus two to log - `_redact` misses
+      keyword-form DSNs; test_devcontainer checks only the first CI
+      postgres service.
+ All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.
