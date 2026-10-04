@@ -1346,3 +1346,13 @@ judgement about who reads the page rather than about the rule.
     - 133 agreed. 134 agreed, constraint "after due time plus grace".
     - The 118 change (superseded per period, `_superseded` suffix, created
       and dropped on demand) approved.
+    - Follow-ups settled (Keith): (1) filing is by receipt instant, stated
+      in as many words; (2) a partially-participating dataset's period
+      closes with its calendar period, and an arrival in a gap with no
+      open slot is HELD FOR A PERSON - agreed; (3) **A NINTH FILING
+      DECISION, "MARK AS NOT SUPPLIED"**, person-only with a MANDATORY
+      reason, changing no data; the period then reads "not supplied
+      (accepted)" and leaves the to-do list. Keith's framing: it pairs with
+      `not_expected` in configuration - that is what we know AHEAD of time,
+      this is the tactical, operational decision AFTER the fact. Amends
+      REQ-GHUB-082 criterion 1's list of eight.
