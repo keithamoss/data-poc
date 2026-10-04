@@ -1195,3 +1195,21 @@ judgement about who reads the page rather than about the rule.
       inherited or substituted table came from). External tools query it
       instead of parsing names, e.g. a downstream tool flagging
       substituted data to its own users. Being discussed.
+    - **PERIOD SCHEMA TABLES TAKE PLAIN BASE NAMES** (Keith, revising the
+      stamped-names call above): `cp_clients`, not `cp_clients__<stamp>`,
+      for promoted, inherited and substituted alike. The facts the stamp
+      carried move to the manifest. Cost acknowledged: every place the
+      pipeline reads a stamped name in a period schema switches to looking
+      the supply up; one version per table per period is what makes that
+      safe.
+    - **THE MANIFEST: `_manifest`, a VIEW over the decision log** (Keith:
+      "that's elegant"), one row per table in the period: table_name,
+      dataset_id, kind (promoted / inherited / substituted), supply,
+      received_at (from the filing), from_period (inherited/substituted),
+      decided_at, decided_by (RULE OR PERSON ONLY - no names), acknowledged,
+      reason, promoted_status. Current health (e.g. red promoted) is kept
+      OUT - it changes as checks re-run and belongs on the dashboard.
+      Status at promotion is RECORDED ON THE PROMOTION DECISION ITSELF.
+      Table name: Keith suggested writing it into the decision log beside
+      dataset_id (rather than re-implementing the dataset->table mapping in
+      SQL as well as in the pipeline) - being confirmed.
