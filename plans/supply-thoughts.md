@@ -786,3 +786,21 @@ to retire.
     11's shape; and whether this is the same mechanism as a trial
     (REQ-PIPE-103) seen from the other end - a trial is a run that was
     never going to count, and this is one that stopped counting.
+
+13. **[todo, 2026-10-04]** **[Pipeline & publishing]** **What happens to
+    a delivery's files once processed, and what the database keeps.**
+    Keith, 2026-10-04, while settling REQ-PIPE-144: in production today a
+    supplier's files are MOVED TO A DIFFERENT S3 BUCKET BY HAND once they
+    have been processed, and "that's probably something we need to build
+    into the tool as part of the transport layer". It matters to the
+    database: `mothman pipeline run` used to delete a delivery's records
+    whenever its folder vanished from `data/deliveries/`, which in
+    production would erase history every time files were archived. Keith
+    chose to stop that (REQ-PIPE-144) - delivery records are history, and
+    only a deliberate synthetic-data reset clears them. Left for this
+    layer: whether the tool does the archiving move itself; what a
+    DELIVERY is in production (a zip, a folder, an upload session - the
+    synthetic generator models a folder whose files can land up to ten
+    minutes apart); and whether the per-file versus per-delivery receipt
+    split needs anything further. Keith: "leave further changes there
+    until we do the transport layer".

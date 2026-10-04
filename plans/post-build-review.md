@@ -4398,3 +4398,15 @@ twice. It deliberately did not re-find the `TypeError`.
     from slot-changing decisions (REQ-PIPE-130), built straight after
     REQ-DOCS-143 and ahead of the rest of the batch, with this entry's
     test going in alongside it, failing first.
+
+76. **[todo, 2026-10-04]** **[Dashboard]** **The arrival history labels
+    an arrival with its DELIVERY's receipt time, not the file's own.**
+    Spotted by `delivery-architect` reviewing REQ-PIPE-144:
+    `arrival_history._arrivals_in` takes the delivery's instant, while a
+    filing (and the dashboard's own `arrivedAt`) uses the file's. They
+    differ whenever a delivery's files land at different times, which the
+    synthetic generator already does for ~20% of multi-file deliveries
+    (`generator/receipt_instants.py`, up to ten minutes apart). Keith,
+    2026-10-04: fix it. A minor bug against agreed behaviour (REQ-PIPE-105:
+    every file is its own arrival with its own receipt), so it gets a
+    failing test first and needs no further sign-off.
