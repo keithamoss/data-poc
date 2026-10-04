@@ -391,8 +391,7 @@ class TestAnOperatorAsksForOneInheritance:
         assert got.stands_on == first
         found = inheritance.inherited(conn, annual.dataset_id, second)
         assert found is not None and found.stands_on == first
-        latest = dl.latest_for_slot(conn, annual.dataset_id, second)
-        assert latest[0] == dl.INHERIT
+        assert dl.held(conn, annual.dataset_id, second).held_as == dl.INHERITED
         # THE ENTRY FOR THIS PERIOD, NEVER THE LAST ONE FOR THE DATASET.
         # `_promote_into` above opens the period, and opening one makes
         # the RULE try to inherit into every later period it can - each
@@ -501,7 +500,8 @@ class TestUnInheriting:
             "AND table_name = ?", [schema, annual.table]).fetchall()
         assert not found, "the view survived the un-inheritance"
         assert inheritance.inherited(conn, annual.dataset_id, second) is None
-        assert dl.latest_for_slot(conn, annual.dataset_id, second)[0] == dl.UN_INHERIT
+        h = dl.held(conn, annual.dataset_id, second)
+        assert h.held_as is None and h.action == dl.UN_INHERIT
 
     def test_it_needs_an_explicit_confirmation(self, conn, annual, periods, owes_nothing):
         """Criterion 10, and a required argument rather than a prompt -

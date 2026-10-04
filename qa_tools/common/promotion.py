@@ -565,21 +565,12 @@ def newest_promoted(conn: supply_db.SupplyConnection,
     decision_log.promoted_into does: two decisions can share an instant,
     and `id` is the only total order there is.
     """
-    rows = conn.execute(
-        f"SELECT action, supply FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND (to_slot = ? OR from_slot = ?) "
-        "ORDER BY effective_at DESC, id DESC LIMIT 1",
-        [dataset_id, period, period]).fetchall()
-    if not rows:
-        return None
-    action, supply = rows[0]
-    # The last decision touching this slot decides what it holds - a
-    # promote or a re-file INTO it fills it, anything else empties it.
-    # Reusing that rule rather than restating it is why this asks the
-    # log rather than the catalogue.
-    if action in (decision_log.PROMOTE, decision_log.REFILE):
-        return supply
-    return None
+    # WHAT THE SLOT HOLDS COMES FROM qa.slot_holds (REQ-PIPE-130
+    # criterion 9). This used to take the newest entry naming the slot,
+    # so a withheld note on a filled period read it as empty
+    # (delivery-critic, overnight sprint 2).
+    h = decision_log.held(conn, dataset_id, period)
+    return h.holder if h and h.held_as == decision_log.PROMOTED else None
 
 
 # ---------------------------------------------------------------------------

@@ -194,8 +194,10 @@ def standing_in(conn: supply_db.SupplyConnection, dataset_id: str) -> StandingIn
         "ORDER BY effective_at DESC, id DESC",
         [dataset_id, decision_log.SUBSTITUTE, decision_log.INHERIT]).fetchall()
     for action, slot, stands_on, supply, actor, reason, actor_kind in rows:
-        latest = decision_log.latest_for_slot(conn, dataset_id, slot)
-        if not latest or latest[0] != action:
+        h = decision_log.held(conn, dataset_id, slot)
+        wanted = (decision_log.SUBSTITUTED if action == decision_log.SUBSTITUTE
+                  else decision_log.INHERITED)
+        if not h or h.held_as != wanted or h.decision_id is None:
             # Something has happened to that period since - a real
             # supply promoted into it, or the indirection removed. Not
             # standing in any more.
@@ -232,17 +234,15 @@ def state_for(dataset_id: str, conn: supply_db.SupplyConnection | None = None) -
 
     from qa_tools.common import filing
 
-    rows = conn.execute(
-        f"SELECT to_slot, supply FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND action IN (?, ?) AND to_slot IS NOT NULL "
-        "ORDER BY effective_at DESC, id DESC LIMIT 1",
-        [dataset_id, decision_log.PROMOTE, decision_log.REFILE]).fetchall()
-    promoted_period, promoted_supply = rows[0] if rows else (None, None)
-    if promoted_period is not None and decision_log.promoted_into(
-            conn, dataset_id, promoted_period) != promoted_supply:
-        # Promoted and since taken back out - a demote, a reject or a
-        # re-file OUT. The period holds nothing, so neither does this.
-        promoted_period, promoted_supply = None, None
+    # THE NEWEST SUPPLY A SLOT STILL HOLDS, from qa.slot_holds through
+    # decision_log.promoted_supply (REQ-PIPE-130 criterion 9). This took
+    # the newest promotion and, if that slot had since been emptied,
+    # reported nothing - never falling back to an older supply still
+    # held, so two answers to one question disagreed (delivery-critic,
+    # overnight sprint 2).
+    newest = decision_log.promoted_supply(conn, dataset_id)
+    promoted_period = newest["to_slot"] if newest else None
+    promoted_supply = newest["supply"] if newest else None
 
     standing = standing_in(conn, dataset_id)
 

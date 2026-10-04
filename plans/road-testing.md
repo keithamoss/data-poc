@@ -1871,6 +1871,22 @@ judgement about who reads the page rather than about the rule.
         the end of next year (the runway warning has none to share). No
         plans prose removed: its source thread still feeds unbuilt batch
         requirements and goes whole when the batch is built.
+      - SPRINT 2 CRITIC, AND THE FIX (same night): the critic found
+        REQ-PIPE-130 criterion 9 NOT met as first committed and reproduced
+        four wrong answers - three readers still walked the log, and three
+        that called the view re-read the action, so a re-file OUT left an
+        emptied period reading as promoted (queue), as a real supply
+        (substitution) and as the drift reference. FIXED with the critic's
+        option (b): the view now returns HOW a slot is held (held_as), every
+        reader asks that, latest_for_slot is gone, and the view reads an
+        include-list of slot-changing decisions. A NULL-comparison bug in my
+        own SQL (a reject never skipped) was caught by the parity test.
+        Regression tests for each reproduced defect in
+        tests/test_slot_holds.py. Schema v17 (three bumps tonight: 15, 16,
+        17 - each additive, applied on connect; nothing needed a rebuild).
+        Critic minors NOTED, not fixed: the publisher role's ability to run
+        qa.slot_holds is untested, and the view is asked per slot in two
+        readers where one read would do (fine at today's volumes).
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

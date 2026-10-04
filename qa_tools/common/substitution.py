@@ -115,10 +115,10 @@ def substituted(conn: supply_db.SupplyConnection, dataset_id: str,
     drop the object would otherwise read as a live substitution
     forever.
     """
-    latest = decision_log.latest_for_slot(conn, dataset_id, period)
-    if not latest or latest[0] != decision_log.SUBSTITUTE:
+    h = decision_log.held(conn, dataset_id, period)
+    if not h or h.held_as != decision_log.SUBSTITUTED:
         return None
-    return Substitution(period=period, stands_on=latest[2], supply=latest[1])
+    return Substitution(period=period, stands_on=h.stands_on, supply=h.holder)
 
 
 def _refuse_unless_substitutable(conn, *, dataset_id: str, period: str,
@@ -133,30 +133,31 @@ def _refuse_unless_substitutable(conn, *, dataset_id: str, period: str,
             f"not participate in it, so there is no gap to fill. A period that "
             f"was never owed a supply is INHERITED, not substituted.")
 
-    holds = decision_log.latest_for_slot(conn, dataset_id, period)
-    if holds and holds[0] in (decision_log.PROMOTE, decision_log.REFILE):
+    holds = decision_log.held(conn, dataset_id, period)
+    if holds and holds.held_as == decision_log.PROMOTED:
         # Criterion 15.
         raise SubstitutionRefused(
-            f"{period} already resolves to a real supply ({holds[1]}). A period "
+            f"{period} already resolves to a real supply ({holds.holder}). A period "
             f"holding a promoted table is answered; substituting into it would "
             f"replace an answer rather than supply a missing one.")
 
-    source = decision_log.latest_for_slot(conn, dataset_id, stands_on)
-    if not source or source[0] not in (decision_log.PROMOTE, decision_log.REFILE):
+    source = decision_log.held(conn, dataset_id, stands_on)
+    if not source or source.held_as != decision_log.PROMOTED:
         # Criteria 7 and 16 meet here, and the message has to serve both.
         # A period that is itself substituted or inherited fails the same
         # test as one that holds nothing: neither has a physical promoted
         # table of its own, and standing on it would build a chain whose
         # bottom nobody can see.
-        what = (f"is itself {source[0]}d" if source else "holds no promoted supply")
+        what = (f"is itself {source.held_as}" if source and source.held_as
+                else "holds no promoted supply")
         raise SubstitutionRefused(
             f"{stands_on} cannot be stood on: it {what}. A substitution points "
             f"at a real promoted table, never at another period's indirection - "
             f"otherwise a chain forms and nothing can say what the data is.")
 
-    if source[1] != supply:
+    if source.holder != supply:
         raise SubstitutionRefused(
-            f"{stands_on} resolves to {source[1]!r}, not {supply!r}. Stand on "
+            f"{stands_on} resolves to {source.holder!r}, not {supply!r}. Stand on "
             f"what the period actually holds.")
 
 

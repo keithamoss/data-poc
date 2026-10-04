@@ -254,58 +254,71 @@ def _check_shape(decision: Decision) -> None:
             f"{decision.action!r} does not")
 
 
-def promoted_into(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
-                   as_at: str | None = None) -> str | None:
-    """The supply this slot resolves to, as at an instant (criterion 9).
+#: How a slot is held, as qa.slot_holds says (REQ-PIPE-130 criterion 9).
+#: Readers ask this and never interpret a decision's action themselves.
+PROMOTED = "promoted"
+SUBSTITUTED = "substituted"
+INHERITED = "inherited"
+
+
+@dataclass(frozen=True)
+class Held:
+    """What one slot holds, from qa.slot_holds.
+
+    `held_as` is PROMOTED, SUBSTITUTED, INHERITED or None for an empty
+    slot; `holder` is the supply holding it (for a substitution or an
+    inheritance, the supply it stands on); `decision_id` is the last
+    decision that CHANGED the slot - what its state, its reason and who
+    decided it are read from; `action` is that decision's action, which
+    for an EMPTY slot says how it was emptied (a reject, a demote, a
+    re-file out) and is meaningless otherwise; `stands_on` is the period
+    an indirection points at.
+    """
+
+    held_as: str | None
+    holder: str | None
+    decision_id: int
+    action: str
+    stands_on: str | None
+
+    @property
+    def filled(self) -> bool:
+        return self.held_as in (PROMOTED, SUBSTITUTED)
+
+
+def held(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
+         as_at: str | None = None) -> Held | None:
+    """What this slot holds, as at an instant, or None where no decision
+    has ever changed it.
 
     READ FROM `qa.slot_holds`, THE ONE DEFINITION OF WHAT A SLOT HOLDS
-    (REQ-PIPE-130 criteria 8 and 9) - the rule and why it is the rule are
-    written there, beside the SQL, and nowhere else. This used to walk the
-    log here in Python, and before that took the latest entry naming the
-    slot, which was wrong three ways (post-build-review #75, #84, #85);
-    the walk moved into the database so that every reader shares it.
-
-    `as_at` IS ABOUT `effective_at`, NEVER `recorded_at`: what the
-    warehouse held at that moment, not what we knew then.
+    (REQ-PIPE-130 criteria 8 and 9) - the rule, and why it is the rule,
+    is written beside the SQL and nowhere else. `as_at` is about
+    `effective_at`, never `recorded_at`: what the warehouse held at that
+    moment, not what we knew then.
     """
-    row = _held(conn, dataset_id, slot, as_at)
-    return row[1] if row else None
+    return held_all(conn, dataset_id, as_at).get(slot)
 
 
-def _held(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
-          as_at: str | None = None) -> tuple[int, str | None] | None:
-    """`(decision_id, fills)` from qa.slot_holds for one slot, or None
-    where nothing has ever changed it."""
+def held_all(conn: supply_db.SupplyConnection, dataset_id: str,
+             as_at: str | None = None) -> dict[str, Held]:
+    """`held()` for every slot of one dataset, in one read."""
     rows = conn.execute(
-        f'SELECT decision_id, fills FROM "{qa_store.SCHEMA}".slot_holds(?, ?) '
-        "WHERE slot = ?", [dataset_id, as_at, slot]).fetchall()
-    return (rows[0][0], rows[0][1]) if rows else None
+        f'SELECT h.slot, h.held_as, h.holder, h.decision_id, d.action, d.stands_on '
+        f'FROM "{qa_store.SCHEMA}".slot_holds(?, ?) h JOIN {TABLE} d ON d.id = h.decision_id',
+        [dataset_id, as_at]).fetchall()
+    return {slot: Held(held_as=held_as, holder=holder, decision_id=decision_id,
+                       action=action, stands_on=stands_on)
+            for slot, held_as, holder, decision_id, action, stands_on in rows}
 
 
-def latest_for_slot(conn: supply_db.SupplyConnection, dataset_id: str,
-                     slot: str) -> tuple[str, str, str | None] | None:
-    """`(action, supply, stands_on)` of the last decision that CHANGED
-    this slot.
-
-    promoted_into() answers "what does this period resolve to" and
-    deliberately flattens a substitution into the supply it stands on,
-    which is what every reader of a period wants. This answers the
-    narrower question a DECISION has to ask: HOW does it resolve, so
-    that substituting into a period that already holds a real promoted
-    supply can be refused with the right words (criterion 15).
-
-    THE LAST DECISION THAT CHANGED IT, from qa.slot_holds - not the last
-    entry naming it. A refusal, or a reject of a different supply filed
-    to the same period, names the slot without changing it, and reading
-    either as the slot's latest decision is the defect #84 and #85 found.
-    """
-    row = _held(conn, dataset_id, slot)
-    if row is None:
-        return None
-    found = conn.execute(
-        f"SELECT action, supply, stands_on FROM {TABLE} WHERE id = ?",
-        [row[0]]).fetchall()
-    return (found[0][0], found[0][1], found[0][2]) if found else None
+def promoted_into(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
+                   as_at: str | None = None) -> str | None:
+    """The supply this slot resolves to, as at an instant (criterion 9):
+    the holder of a promoted or substituted slot, None otherwise. From
+    qa.slot_holds - see held()."""
+    h = held(conn, dataset_id, slot, as_at)
+    return h.holder if h and h.filled else None
 
 
 def periods_standing_on(conn: supply_db.SupplyConnection, dataset_id: str,
@@ -348,10 +361,12 @@ def _standing_on(conn: supply_db.SupplyConnection, dataset_id: str,
         "AND to_slot IS NOT NULL",
         [dataset_id, supply, SUBSTITUTE, INHERIT]).fetchall()
     standing = []
+    how = {SUBSTITUTED: SUBSTITUTE, INHERITED: INHERIT}
+    holds = held_all(conn, dataset_id)
     for (slot,) in rows:
-        latest = latest_for_slot(conn, dataset_id, slot)
-        if latest and latest[0] in STANDS_ON_A_SUPPLY and latest[1] == supply:
-            standing.append((slot, latest[0]))
+        h = holds.get(slot)
+        if h and h.held_as in how and h.holder == supply:
+            standing.append((slot, how[h.held_as]))
     return tuple(sorted(standing))
 
 
@@ -580,7 +595,7 @@ def promoted_supply(conn: supply_db.SupplyConnection, dataset_id: str,
     rows = _rows(conn.execute(
         f"SELECT {', '.join('d.' + f for f in FIELDS)} "
         f'FROM "{qa_store.SCHEMA}".slot_holds(?, ?) h JOIN {TABLE} d ON d.id = h.decision_id '
-        "WHERE h.fills IS NOT NULL AND d.action IN (?, ?) "
+        "WHERE h.held_as = ? "
         "ORDER BY d.effective_at DESC, d.id DESC LIMIT 1",
-        [dataset_id, as_at, PROMOTE, REFILE]))
+        [dataset_id, as_at, PROMOTED]))
     return rows[0] if rows else None

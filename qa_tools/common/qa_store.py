@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 17
 
 DDL = f"""
 CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
@@ -784,13 +784,18 @@ CREATE OR REPLACE VIEW "{SCHEMA}".dataset_stats_visible AS
 -- slot whichever supply that is - rejecting an unpromoted resupply of a
 -- filled period is not a decision about what fills it.
 --
--- So the slot's decisions are WALKED in effective order: an entry INTO
--- the slot sets what fills it (a promote, re-file or substitution fills
--- it; anything else - an inheritance - leaves it holding no supply,
--- because an inherited period is one the dataset does not take part in,
--- so there is no slot to fill (REQ-PIPE-084 criteria 4 and 7)); an
--- entry OUT OF it empties it only where it names the supply filling it;
--- refusals are not read at all. `decision_id` is the last entry that
+-- So the slot's decisions are WALKED in effective order. An entry INTO
+-- the slot sets how it is held and by what: `held_as` is promoted (a
+-- promote or re-file), substituted or inherited, and `holder` the supply.
+-- An entry OUT OF it empties it, except a reject, demote or re-file
+-- naming a supply OTHER than the holder, which changes nothing. Refusals
+-- are not read at all. `fills` is the holder where the slot is FILLED -
+-- promoted or substituted; an inherited period is one the dataset does
+-- not take part in, so it has no slot to fill (REQ-PIPE-084 criteria 4
+-- and 7). Readers ask `held_as` and never interpret an action
+-- themselves: a re-file OUT leaves its action as the slot's last
+-- decision, and reading 'refile' as "holds a supply" is how an emptied
+-- slot read as promoted (delivery-critic, sprint 2). `decision_id` is the last entry that
 -- CHANGED the slot, which is what a slot's state and its "decided by"
 -- are read from. `as_at` filters on effective_at (what the warehouse
 -- held then), never on recorded_at.
@@ -798,8 +803,11 @@ CREATE OR REPLACE VIEW "{SCHEMA}".dataset_stats_visible AS
 -- A FUNCTION RATHER THAN A PLAIN VIEW so the as-at form and the
 -- one-dataset form are the same definition; slot_holds_now is the view
 -- for a reader that wants the present over every dataset.
-CREATE OR REPLACE FUNCTION "{SCHEMA}".slot_holds(for_dataset text, as_at timestamptz)
-RETURNS TABLE (dataset_id text, slot text, decision_id bigint, fills text)
+DROP VIEW IF EXISTS "{SCHEMA}".slot_holds_now;
+DROP FUNCTION IF EXISTS "{SCHEMA}".slot_holds(text, timestamptz);
+CREATE FUNCTION "{SCHEMA}".slot_holds(for_dataset text, as_at timestamptz)
+RETURNS TABLE (dataset_id text, slot text, decision_id bigint, fills text,
+               held_as text, holder text)
 LANGUAGE sql STABLE AS $fn$
 WITH RECURSIVE named AS (
     SELECT d.id, d.dataset_id, s.slot, d.action, d.supply, d.to_slot,
@@ -810,38 +818,59 @@ WITH RECURSIVE named AS (
     WHERE s.slot IS NOT NULL
       AND (for_dataset IS NULL OR d.dataset_id = for_dataset)
       AND (as_at IS NULL OR d.effective_at <= as_at)
-      AND d.action NOT IN ('promotion-withheld', 'inherit-refused')
+      -- ONLY DECISIONS THAT CHANGE A SLOT, listed rather than the
+      -- refusals excluded, so an annotating decision added later
+      -- (REQ-PIPE-132's acknowledgements, a re-check record) is ignored
+      -- until somebody decides it changes a slot - never read as one by
+      -- default.
+      AND d.action IN ('promote', 'refile', 'substitute', 'inherit',
+                       'reject', 'demote', 'de-substitute', 'un-inherit')
+), step AS (
+    -- What one entry does to a slot, given what the slot held before:
+    -- `skips` where it is about a supply other than the one holding it.
+    SELECT n.*,
+           -- IS NOT DISTINCT FROM, never `=`: a reject's to_slot is NULL,
+           -- and `NULL = slot` is NULL rather than false, which made
+           -- every "about another supply" skip below silently not fire.
+           (n.to_slot IS NOT DISTINCT FROM n.slot) AS into_slot
+    FROM named n
 ), walk AS (
     SELECT n.dataset_id, n.slot, n.rn, n.id AS last_id,
-           CASE WHEN n.to_slot = n.slot
-                     AND n.action IN ('promote', 'refile', 'substitute')
-                THEN n.supply END AS fills
-    FROM named n WHERE n.rn = 1
+           CASE WHEN n.into_slot THEN CASE n.action
+                WHEN 'promote' THEN 'promoted' WHEN 'refile' THEN 'promoted'
+                WHEN 'substitute' THEN 'substituted' WHEN 'inherit' THEN 'inherited'
+                END END AS held_as,
+           CASE WHEN n.into_slot THEN n.supply END AS holder
+    FROM step n WHERE n.rn = 1
     UNION ALL
     SELECT n.dataset_id, n.slot, n.rn,
-           CASE WHEN n.to_slot IS DISTINCT FROM n.slot
-                     AND n.action IN ('reject', 'demote', 'refile')
-                     AND n.supply IS NOT NULL AND w.fills IS NOT NULL
-                     AND n.supply <> w.fills
+           CASE WHEN NOT n.into_slot AND n.action IN ('reject', 'demote', 'refile')
+                     AND w.holder IS NOT NULL AND n.supply <> w.holder
                 THEN w.last_id ELSE n.id END,
-           CASE WHEN n.to_slot = n.slot
-                THEN CASE WHEN n.action IN ('promote', 'refile', 'substitute')
-                          THEN n.supply END
+           CASE WHEN n.into_slot THEN CASE n.action
+                WHEN 'promote' THEN 'promoted' WHEN 'refile' THEN 'promoted'
+                WHEN 'substitute' THEN 'substituted' WHEN 'inherit' THEN 'inherited'
+                END
                 WHEN n.action IN ('reject', 'demote', 'refile')
-                     AND n.supply IS NOT NULL AND w.fills IS NOT NULL
-                     AND n.supply <> w.fills
-                THEN w.fills
-                ELSE NULL END
+                     AND w.holder IS NOT NULL AND n.supply <> w.holder
+                THEN w.held_as END,
+           CASE WHEN n.into_slot THEN n.supply
+                WHEN n.action IN ('reject', 'demote', 'refile')
+                     AND w.holder IS NOT NULL AND n.supply <> w.holder
+                THEN w.holder END
     FROM walk w
-    JOIN named n ON n.dataset_id = w.dataset_id AND n.slot = w.slot
-                AND n.rn = w.rn + 1
+    JOIN step n ON n.dataset_id = w.dataset_id AND n.slot = w.slot
+               AND n.rn = w.rn + 1
 )
-SELECT DISTINCT ON (w.dataset_id, w.slot) w.dataset_id, w.slot, w.last_id, w.fills
+SELECT DISTINCT ON (w.dataset_id, w.slot)
+       w.dataset_id, w.slot, w.last_id,
+       CASE WHEN w.held_as IN ('promoted', 'substituted') THEN w.holder END,
+       w.held_as, w.holder
 FROM walk w
 ORDER BY w.dataset_id, w.slot, w.rn DESC
 $fn$;
 
-CREATE OR REPLACE VIEW "{SCHEMA}".slot_holds_now AS
+CREATE VIEW "{SCHEMA}".slot_holds_now AS
 SELECT * FROM "{SCHEMA}".slot_holds(NULL, NULL);
 """
 

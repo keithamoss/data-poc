@@ -196,7 +196,7 @@ def _already(conn, request: Request) -> str | None:
     period = request.period
     if period is None:
         return None
-    latest = decision_log.latest_for_slot(conn, request.dataset_id, period)
+    holds = decision_log.held(conn, request.dataset_id, period)
 
     if request.operation == PROMOTE:
         if decision_log.promoted_into(conn, request.dataset_id, period) == request.supply:
@@ -221,7 +221,7 @@ def _already(conn, request: Request) -> str | None:
             # refusal, because the two are identical in SQL and opposite
             # in meaning and the operator has asked to undo the wrong
             # one. inheritance.un_inherit() says so in those words.
-            if not (latest and latest[0] == decision_log.SUBSTITUTE):
+            if not (holds and holds.held_as == decision_log.SUBSTITUTED):
                 return (f"{period} holds no inheritance for "
                         f"{request.dataset_id}. Nothing to do.")
     return None

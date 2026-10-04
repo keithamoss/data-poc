@@ -38,9 +38,9 @@ from dataclasses import dataclass
 
 from qa_tools.common import decision_log, schedule, supply_db
 
-#: The two actions that put a real supply INTO a period. A substitution
-#: or an inheritance puts a view there, which is what criterion 6 skips.
-A_REAL_SUPPLY = (decision_log.PROMOTE, decision_log.REFILE)
+#: (A period holds a real supply where qa.slot_holds says it is held as
+#: PROMOTED; a substitution or an inheritance puts a view there, which is
+#: what criterion 6 skips - REQ-PIPE-130 criterion 9.)
 
 
 @dataclass(frozen=True)
@@ -99,9 +99,9 @@ def reference_for(conn: supply_db.SupplyConnection, dataset_id: str,
         candidates.append((when, slot))
 
     for _when, slot in sorted(candidates, reverse=True):
-        latest = decision_log.latest_for_slot(conn, dataset_id, slot)
-        if latest and latest[0] in A_REAL_SUPPLY:
-            return Reference(dataset_id=dataset_id, period=slot, supply=latest[1])
+        h = decision_log.held(conn, dataset_id, slot)
+        if h and h.held_as == decision_log.PROMOTED:
+            return Reference(dataset_id=dataset_id, period=slot, supply=h.holder)
         # Anything else - a view, a rejection, a demotion - is not a
         # supply this period holds, so keep walking (criterion 6).
 

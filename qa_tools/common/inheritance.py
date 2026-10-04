@@ -149,23 +149,19 @@ def _most_recent_promoted(conn, dataset_id: str,
     happened, because "the supply that is still current" is a statement
     about the data's period, not about our paperwork.
     """
-    rows = conn.execute(
-        f"SELECT to_slot, supply, action FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND to_slot IS NOT NULL "
-        "ORDER BY effective_at DESC, id DESC",
-        [dataset_id]).fetchall()
-    seen: set[str] = set()
+    # WHAT EACH SLOT HOLDS COMES FROM qa.slot_holds (REQ-PIPE-130
+    # criterion 9). This walked the log itself, newest-first, reading the
+    # first entry INTO each slot - so it never saw a demote, reject or
+    # re-file OUT (those name only from_slot) and pointed an inheritance
+    # at a supply whose table had gone; and a withheld note read a filled
+    # period as empty (delivery-critic, overnight sprint 2).
     best: tuple[str, str] | None = None
     best_date = None
     before_date = schedule.date_of(before, dataset_id)
-    for slot, supply, action in rows:
-        if slot in seen:
-            # The log is newest-first, so the first row for a slot is
-            # the one that decides what it holds now.
+    for slot, h in decision_log.held_all(conn, dataset_id).items():
+        if h.held_as != decision_log.PROMOTED:
             continue
-        seen.add(slot)
-        if action not in (decision_log.PROMOTE, decision_log.REFILE):
-            continue
+        supply = h.holder
         when = schedule.date_of(slot, dataset_id)
         if when is None:
             # A period this dataset's calendar does not name - another
@@ -309,11 +305,11 @@ def inherited(conn: supply_db.SupplyConnection, dataset_id: str,
     view in a schema says an object exists, not what put it there or
     whether it still means what it meant.
     """
-    latest = decision_log.latest_for_slot(conn, dataset_id, period)
-    if not latest or latest[0] != decision_log.INHERIT:
+    h = decision_log.held(conn, dataset_id, period)
+    if not h or h.held_as != decision_log.INHERITED:
         return None
-    return Inherited(dataset_id=dataset_id, period=period, stands_on=latest[2],
-                     supply=latest[1], reason="")
+    return Inherited(dataset_id=dataset_id, period=period, stands_on=h.stands_on,
+                     supply=h.holder, reason="")
 
 
 def refusals(conn: supply_db.SupplyConnection | None = None) -> list[Refused]:

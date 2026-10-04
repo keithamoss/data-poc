@@ -114,23 +114,26 @@ class SlotState:
         return f"{self.dataset_id}/{self.period}"
 
 
-def _state_from_decision(latest) -> tuple[str, str | None]:
-    """The state a decision leaves a slot in, and the supply it names."""
-    action, supply, _stands_on = latest
-    if action in (decision_log.PROMOTE, decision_log.REFILE):
-        return PROMOTED, supply
-    if action == decision_log.REJECT:
-        return REJECTED, supply
-    if action == decision_log.SUBSTITUTE:
-        return SUBSTITUTED, supply
-    if action == decision_log.INHERIT:
-        return INHERITED, supply
-    if action == decision_log.INHERIT_REFUSED:
-        # The rule tried and had nothing to stand on. The period is as
-        # empty as it was, so the schedule decides what to say about it.
-        return "", None
-    # A demote or a re-file OUT leaves it empty and a person involved.
-    return RETURNED, supply
+def _state_from(h) -> tuple[str, str | None]:
+    """The state qa.slot_holds leaves a slot in, and the supply it names.
+
+    HOW THE SLOT IS HELD COMES FROM THE VIEW (REQ-PIPE-130 criterion 9),
+    never from re-reading an action: a re-file OUT leaves 'refile' as the
+    slot's last decision, and reading that as promoted is how an emptied
+    period showed as promoted (delivery-critic, overnight sprint 2). Only
+    for an EMPTY slot is the action read, to say how it was emptied.
+    """
+    if h.held_as == decision_log.PROMOTED:
+        return PROMOTED, h.holder
+    if h.held_as == decision_log.SUBSTITUTED:
+        return SUBSTITUTED, h.holder
+    if h.held_as == decision_log.INHERITED:
+        return INHERITED, h.holder
+    if h.action == decision_log.REJECT:
+        return REJECTED, None
+    # A demote, a re-file OUT, a de-substitution or an un-inheritance
+    # leaves it empty and a person involved.
+    return RETURNED, None
 
 
 def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
@@ -156,17 +159,19 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
     # THE LAST DECISION THAT CHANGED THE SLOT, from qa.slot_holds
     # (REQ-PIPE-130 criterion 9) - not the last one naming it, which can
     # be about another supply or a refusal (post-build-review #84).
-    latest = decision_log.latest_for_slot(conn, dataset_id, slot.name)
-    changed_by = decision_log._held(conn, dataset_id, slot.name)
-    about = changed_by[0] if changed_by else None
-    if latest:
-        state, supply = _state_from_decision(latest)
-        if state:
-            return SlotState(
-                dataset_id=dataset_id, period=slot.name, state=state,
-                supply=supply, stands_on=latest[2],
-                decided_by=_decider(conn, about),
-                reason=_reason(conn, about))
+    h = decision_log.held(conn, dataset_id, slot.name)
+    if h:
+        state, supply = _state_from(h)
+        if supply is None:
+            # An emptied slot names the supply that was taken out.
+            supply = conn.execute(
+                f"SELECT supply FROM {decision_log.TABLE} WHERE id = ?",
+                [h.decision_id]).fetchall()[0][0]
+        return SlotState(
+            dataset_id=dataset_id, period=slot.name, state=state,
+            supply=supply, stands_on=h.stands_on if h.held_as else None,
+            decided_by=_decider(conn, h.decision_id),
+            reason=_reason(conn, h.decision_id))
 
     filed = filings.get(slot.name)
     if held:
