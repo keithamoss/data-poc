@@ -1325,3 +1325,24 @@ judgement about who reads the page rather than about the rule.
       it, and DROPPED when its last table leaves. NOTE for drafting: the
       period_of() parser reads schema names back into periods, so it must
       not mistake a `_superseded` schema for a period.
+
+    **SIGN-OFF ROUND, period closing (131-134), Keith 2026-10-04:**
+    - 131 broadly agreed. A file that ARRIVED inside a period but is
+      PROCESSED after it closes must be honoured as arriving in the window
+      - already the drafted rule (filing is by RECEIPT instant, never
+      processing time); to be stated plainly.
+    - 131 "next period" for a dataset that participates in only some
+      periods (delivery_months, e.g. Case Workers Feb + Aug): Keith -
+      its period CLOSES WHEN THE CALENDAR PERIOD IT PARTICIPATES IN
+      CLOSES, not when its own next participating period opens. A dataset
+      wanting a longer period gets its own calendar (e.g. an annual one).
+      Reverses the scoper's working assumption 1. Consequence to confirm:
+      a gap with no open slot (Case Workers May-August), where an arrival
+      is held for a person.
+    - 132 agreed; Keith assumed its listed responses are all actions a
+      person can take on GitHub or in the terminal. CHECKED: substitute
+      and re-file are (REQ-GHUB-082's eight), "record as not supplied" is
+      NOT a decision that exists - to settle.
+    - 133 agreed. 134 agreed, constraint "after due time plus grace".
+    - The 118 change (superseded per period, `_superseded` suffix, created
+      and dropped on demand) approved.
