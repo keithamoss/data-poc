@@ -1470,3 +1470,11 @@ judgement about who reads the page rather than about the rule.
       before a supply turned red shows it as it was, annotated. Still open:
       the interrupted-wait question (re-check owed) and the as-of test,
       both pending a worked example.
+    - **CLOSED THE SAME DAY (Keith):** past setting versions are corrected
+      exactly as calendars are (allowed only with an added changelog line);
+      the setting version is picked by the instant the decision takes
+      effect; an interrupted terminal wait leaves a **re-check owed**
+      record, written in the promotion's own transaction and cleared when
+      the re-check completes (one transaction around both rejected: the
+      tools cannot see an uncommitted promotion, the lock would block the
+      period, and a failed re-check would undo the promotion).
