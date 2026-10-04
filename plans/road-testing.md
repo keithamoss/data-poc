@@ -1218,3 +1218,22 @@ judgement about who reads the page rather than about the rule.
       (122, 123, plus the period-schema rules and _manifest) sent back to
       delivery-scoper for a full redraft, since the manifest and plain
       naming had never been through it.
+
+    **SIGN-OFF ROUND, group 3 (124-127), Keith 2026-10-04:**
+    - 126 agreed - and confirmed as NO NEW LOGIC: a promoted supply goes red
+      on refreshed cross-table results exactly as a staged one would; it is
+      only shown in a new place.
+    - 127 agreed (identical-resend parts removed with 119).
+    - 124/125: Keith asked for worked examples. Doing so exposed a flaw: as
+      drafted, "promoted while another version was waiting or superseded"
+      makes EVERY ordinary correction under option A an unauthorised
+      overtaking that shouts (and, under 128, every hand promotion of a
+      second supply too). Proposed: flag instead a promotion whose supply
+      ARRIVED AFTER THE NEXT PERIOD'S EARLY-ARRIVAL WINDOW HAD OPENED - the
+      actual "this may be next period's file" signal; ordinary corrections,
+      supersessions and authorised replacements are history, not shouts.
+      Awaiting Keith.
+    Group 2 redrafted by delivery-scoper as 122, 123, 128 (one version per
+    table per period), 129 (plain base names), 130 (_manifest); two
+    questions put to Keith (promoting into a substituted/inherited slot;
+    whether ACKNOWLEDGE replaces REQ-QAC-017's built /accept).
