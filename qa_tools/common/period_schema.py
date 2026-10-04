@@ -186,7 +186,7 @@ def ensure_period_schema(conn, period_name: str) -> str:
     period", which is a true and useful thing for a check to read.
     """
     schema = period_schema(period_name)
-    conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+    supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
     return schema
 
 

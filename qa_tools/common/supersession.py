@@ -126,7 +126,7 @@ def supersede_earlier(conn, *, agency_id: str, collection_id: str, dataset_id: s
             reason=f"a newer version of this table for {period} arrived: {newer}",
             superseded_by=newer)
         with decision_log.apply_decision(conn, decision):
-            conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{target}"')
+            supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{target}"')
             for physical in tables:
                 supply_db.move_table(conn, physical, supply_db.STAGING_SCHEMA, target)
         done.append(supply)
@@ -202,7 +202,7 @@ def supersede(conn, *, agency_id: str, collection_id: str, dataset_id: str, supp
             agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
             action=dl.SUPERSEDE, supply=supply, actor=actor, actor_kind=dl.PERSON,
             effective_at=effective_at, from_slot=period, reason=reason)):
-        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{target}"')
+        supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{target}"')
         for physical in tables:
             supply_db.move_table(conn, physical, supply_db.STAGING_SCHEMA, target)
 

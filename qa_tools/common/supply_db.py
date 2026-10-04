@@ -751,7 +751,7 @@ def ensure_staging(conn, run_id: str) -> str:
     """
     schema = staging_schema_for(run_id)
     if schema != STAGING_SCHEMA:
-        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+        create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
     return schema
 
 
@@ -868,7 +868,7 @@ def ensure_schemas(conn) -> None:
     nobody has promoted into are the same fact stated twice.
     """
     for schema in (STAGING_SCHEMA, REJECTED_SCHEMA, SAMPLE_SCHEMA):
-        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+        create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
 
 
 @dataclass
@@ -1383,6 +1383,44 @@ def dbt_target_path(run_id: str) -> Path:
 
 _RESOLUTIONS = "_resolutions"
 
+#: The advisory lock every shared CREATE ... IF NOT EXISTS here takes. A
+#: fixed key, distinct from qa_store's own DDL lock.
+_SHARED_DDL_LOCK = 0x5D4C_0001
+
+
+def create_if_absent(conn, ddl: str) -> None:
+    """Run a `CREATE ... IF NOT EXISTS` that two processes may run at once.
+
+    IF NOT EXISTS IS NOT SAFE AGAINST A CONCURRENT CREATOR: both see the
+    object absent, both create, and one dies with a UniqueViolation on the
+    catalogue. Found by CI on 2026-10-05 - the bootstrap runs its two
+    collections in parallel processes, and both created
+    staging._resolutions on their first run. Serialised on a session
+    advisory lock, the same pattern qa_store.ensure_schema uses for its own
+    DDL, so the second creator waits and then finds the object there.
+    """
+    import psycopg
+
+    # INSIDE A TRANSACTION the lock must last until COMMIT: released after
+    # the statement, a second creator would pass IF NOT EXISTS against the
+    # first's still-uncommitted row and die on it when the first commits.
+    raw = getattr(conn, "raw", None)
+    if not isinstance(raw, psycopg.Connection):
+        # NOT POSTGRESQL - a DuckDB connection some readers and tests still
+        # pass has no advisory locks, and no second process to race.
+        conn.execute(ddl)
+        return
+    in_transaction = raw.info.transaction_status != psycopg.pq.TransactionStatus.IDLE
+    if in_transaction:
+        conn.execute("SELECT pg_advisory_xact_lock(?)", [_SHARED_DDL_LOCK])
+        conn.execute(ddl)
+        return
+    conn.execute("SELECT pg_advisory_lock(?)", [_SHARED_DDL_LOCK])
+    try:
+        conn.execute(ddl)
+    finally:
+        conn.execute("SELECT pg_advisory_unlock(?)", [_SHARED_DDL_LOCK])
+
 
 def record_resolution(conn, res: Resolution) -> None:
     """Persist one run's resolution, replacing any earlier one for that
@@ -1397,8 +1435,8 @@ def record_resolution(conn, res: Resolution) -> None:
     eventually is not.
     """
     schema = staging_schema_for(res.run_id)
-    conn.execute(
-        f'CREATE TABLE IF NOT EXISTS "{schema}"."{_RESOLUTIONS}" '
+    create_if_absent(
+        conn, f'CREATE TABLE IF NOT EXISTS "{schema}"."{_RESOLUTIONS}" '
         "(run_id VARCHAR, logical VARCHAR, physical VARCHAR, state VARCHAR)")
     conn.execute(
         f'DELETE FROM "{schema}"."{_RESOLUTIONS}" WHERE run_id = ?', [res.run_id])

@@ -5275,3 +5275,22 @@ twice. It deliberately did not re-find the `TypeError`.
     `supply decide` with a raw read-only-transaction traceback.
     CAUTION RECORDED: the critic closed every `/tmp/mothman-tui-*.sock` at
     clean-up, not only its own.
+
+108. **[done, 2026-10-05]** **[Testing & dev tooling]** **CI's bootstrap
+    died on a DDL race between the two collections.** Found checking CI at
+    the end of the night, as Keith asked: the deployment half of "Run test
+    suite" failed on 1798c63 inside `mothman pipeline bootstrap` with
+    `UniqueViolation ... pg_type_typname_nsp_index`. The bootstrap runs Birth
+    Registrations and Child Protection in parallel processes, and both ran
+    `CREATE TABLE IF NOT EXISTS staging._resolutions` on their first run -
+    PostgreSQL's IF NOT EXISTS is not safe against a concurrent creator.
+    Intermittent (0f96148's bootstrap passed), so it read as noise until it
+    happened. Reproduced first with eight threads at a barrier, on the first
+    attempt, with the exact CI error (`tests/test_concurrent_ddl.py`).
+    Fixed: `supply_db.create_if_absent()` serialises every shared
+    `CREATE ... IF NOT EXISTS` on an advisory lock - held to COMMIT when
+    called inside a transaction, because a lock released after the
+    statement lets a second creator pass the check against the first's
+    uncommitted row - at the staging, period, superseded, rejected and
+    sample schema sites and the resolutions table. The same pattern
+    `qa_store.ensure_schema` already used for its own DDL.

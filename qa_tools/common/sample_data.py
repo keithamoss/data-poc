@@ -132,7 +132,7 @@ def ensure_schema_for_table(conn, run_id: str, table: str) -> str:
     of the two they always have unambiguously - see is_sample_table().
     """
     if is_sample_table(table):
-        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"')
+        supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"')
         return SCHEMA
     return supply_db.ensure_staging(conn, run_id)
 
@@ -163,7 +163,7 @@ def ensure_schema_for(conn, run_id: str, dataset_id: str | None) -> str:
     why it delegates rather than repeating the CREATE.
     """
     if dataset_id and is_sample(dataset_id):
-        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"')
+        supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"')
         return SCHEMA
     return supply_db.ensure_staging(conn, run_id)
 

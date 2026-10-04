@@ -2152,6 +2152,28 @@ judgement about who reads the page rather than about the rule.
         waits on REQ-PIPE-151's processing pass, as its own decision 7 says.
         The TUI reaches un-supersede from a REJECTED slot (Keith's worked
         example), asking which version.
+      - REQ-PIPE-120 PUSHED (99abafd). CI CHECKED AT THE END, as asked:
+        "Validate committed configuration" is green on every push tonight.
+        "Run test suite" was red on fbf5a57/0f96148/1798c63 - 0f96148's fast
+        half was the order-dependent reconciliation test fixed in 1798c63,
+        and 1798c63's deployment half died in CI's bootstrap on a REAL,
+        INTERMITTENT DDL race between the two collections' parallel
+        processes (post-build-review #108), reproduced with threads and
+        fixed in the commit after this note. Re-check the newest run.
+      - WHERE THE NIGHT ENDED (Perth ~04:30). BUILT: sprints 1-7 and, of
+        sprint 8, REQ-PIPE-122, 118 and 120. NOT STARTED: the rest of sprint
+        8 (REQ-PIPE-128 one version per period, 129 plain base names and its
+        database guards, 081's census) and sprints 9-14 (140-142 re-file,
+        the rest of 130, 123, 121, 126, 127, the 081 rename, REQ-GEN-135-139,
+        096/097/GEN-044 injections, 093/107/146/114+150, 151 and the rest of
+        086). 128 and 129 were left rather than started: each is large
+        (event-trigger guards, warning panels, a GitHub second-comment
+        confirmation), and half of one is worse than none.
+        HELD FOR YOU, in order of what they block: (1) the GAP CASCADE
+        (REQ-QAC-108) - 10 promotions in a whole bootstrap; (2) 081's PAGE
+        SWITCH (a false green as signed); (3) 122's invisible setting and
+        the YAML-slip crash (#106, #107); (4) the open questions under
+        sprints 6 and 7 above.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

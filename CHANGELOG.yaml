@@ -173,6 +173,12 @@ releases:
               promoting it is refused, since there is nothing to promote.
       - category: Fixed
         items:
+          - headline: Bootstrapping both collections at once no longer fails at random
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              The two collections could both create the same shared table at
+              the same moment, and one would crash. Shared tables and schemas
+              are now created one at a time.
           - headline: A period emptied after it closed reads as having no supply again
             components: ["Dashboard UI", "Pipeline & publishing"]
             description: >

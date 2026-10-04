@@ -80,7 +80,7 @@ def reject(conn: supply_db.SupplyConnection, *,
     source = period_schema.period_schema(from_slot) if promoted \
         else supply_db.STAGING_SCHEMA
     schema = supply_db.REJECTED_SCHEMA
-    conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+    supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
     decision = decision_log.Decision(
         agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
         action=decision_log.REJECT, supply=supply, actor=actor,
