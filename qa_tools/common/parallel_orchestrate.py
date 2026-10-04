@@ -51,8 +51,9 @@ def run_manifest(
     passing either FORCES SEQUENTIAL EXECUTION whatever `sequential`
     says - and that is the point of them rather than a limitation.
     They exist for filing and promotion (REQ-PIPE-075 criteria 1 and 7):
-    a supply is filed to the oldest slot no PROMOTION has filled, so
-    arrival N's filing genuinely depends on arrival N-1's promotion,
+    a supply fills its open slot or is a resupply of it according to
+    whether a PROMOTION has filled it (REQ-PIPE-131), so arrival N's
+    filing genuinely depends on arrival N-1's promotion,
     which depends on arrival N-1's checks. The chain is real.
 
     MEASURED, because it costs something and the number should not be

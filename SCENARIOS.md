@@ -36,7 +36,7 @@ for injection and has not been placed yet.
 
 ### TS-1 - Forward cascade
 
-**What it demonstrates.** The 20:00 arrival files as a **resupply of Monday**, because Tuesday's claim window has not opened and no claimable unfilled slot exists. Being a filled slot, it does NOT auto-promote - it holds and warns (TS-4).
+**What it demonstrates.** The 20:00 arrival files as a **resupply of Monday**, because Monday is still the OPEN period - Tuesday's claim window has not opened (REQ-PIPE-131). Being a filled slot, it does NOT auto-promote - it holds and warns (TS-4).
 
 **What it would look like if the rule were wrong.** Files as Tuesday's supply; the next file takes Wednesday; every later supply is permanently off by one, each day looking locally plausible.
 
@@ -51,7 +51,7 @@ for injection and has not been placed yet.
 
 ### TS-2 - Backward cascade
 
-**What it demonstrates.** Files as **Thursday** (on-time-wins-for-the-current-slot). Tuesday and Wednesday stay unfilled, go overdue, and a human marks them missed with a reason.
+**What it demonstrates.** Files as **Thursday**, the period open when it arrived (REQ-PIPE-131). Tuesday and Wednesday closed unfilled when the next day's window opened, read as overdue, and a human marks them not supplied with a reason (REQ-PIPE-132).
 
 **What it would look like if the rule were wrong.** Files as Tuesday, two days late; the next as Wednesday; the feed sits permanently two days behind for ever.
 
@@ -109,9 +109,9 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Period | 2026-09-15 |
 | Set the as-of date to | 2026-09-15 |
 
-### TS-5 - Monotonic filling - a missed slot must not absorb a later resupply
+### TS-5 - A missed slot must not absorb a later resupply
 
-**What it demonstrates.** Tuesday is **non-claimable**, because a later slot (Wednesday) is filled. That is the whole point of the test.
+**What it demonstrates.** Tuesday is **closed** - it closed when Wednesday's claim window opened (REQ-PIPE-131, which replaced REQ-PIPE-063's monotonic filling: closing by time, not by a later slot filling). That is the whole point of the test.
 
 **What it would look like if the rule were wrong.** Files as Tuesday - recording a missed delivery as MET, using another day's data. Worse than a cascade, because it manufactures a delivery that never happened.
 
@@ -121,25 +121,25 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-6a - Genuine lateness still fills its own slot
 
-**What it demonstrates.** Fills **Monday, late**. Monotonic filling does not block it, because no later slot is filled.
+**What it demonstrates.** Fills **Monday, late**. Monday is still the open period: lateness is allowed WITHIN a period's open interval (REQ-PIPE-131).
 
 *unit test - no generated data, nothing to navigate to*
 
 ### TS-6b - A rolling lag stays correctly recorded
 
-**What it demonstrates.** Each fills its own slot, each classified one day late. Nothing is left permanently unfilled - the feed is simply running a day behind, and says so.
+**What it demonstrates.** Each fills its own slot, each classified late - each arrives before the next day's window opens, so its own day is still open. Nothing is left permanently unfilled - the feed is running behind, and says so. **A feed running MORE than one window behind** is the deliberate reversal (REQ-PIPE-131, reversing REQ-PIPE-063 criterion 3): it fills the open period, and the days it skipped close unfilled.
 
 *unit test - no generated data, nothing to navigate to*
 
 ### TS-6c - A skipped day becomes missed, and a later backfill cannot be placed
 
-**What it demonstrates.** Wednesday's fills **Wednesday** (on-time-wins). Tuesday now has a filled successor, so it is **non-claimable** -> missed, overdue, red, and a human marks it missed. If Tuesday's supply then turns up afterwards, **nothing is claimable** and it is **held for a human** (TS-7) rather than defaulted forward.
+**What it demonstrates.** Wednesday's fills **Wednesday**, the open period. Tuesday closed unfilled when Wednesday's window opened -> overdue, and a human marks it not supplied (REQ-PIPE-132). If Tuesday's supply then turns up afterwards it is filed to whichever period is OPEN when it arrives - as a resupply where that period is filled - and a person re-files it into Tuesday (REQ-PIPE-131). It is never filed backward automatically, and never held merely for being late.
 
 *unit test - no generated data, nothing to navigate to*
 
-### TS-7 - Nothing confidently claimable - hold, do not guess
+### TS-7 - No period open - hold, do not guess
 
-**What it demonstrates.** **held for a human**, never defaulted into a future slot. Defaulting forward is the forward cascade again.
+**What it demonstrates.** **held for a human**, never defaulted forward or backward. Defaulting forward is the forward cascade again.
 
 *unit test - no generated data, nothing to navigate to*
 
@@ -165,9 +165,9 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-10 - Evening-before daily arrival - two variants
 
-*Config: daily, Tuesday's supply due 22:00 MONDAY.* - **Monday's slot filled** -> the 22:00 arrival fills **Tuesday, on time**. - **Monday's slot unfilled** -> it fills **Monday, late**. Same arrival instant, two different correct answers, decided by slot state rather than by a cutoff rule. This is what lets the cutoff live in `due_at` instead of in code. **Keith, 2026-09-22**: early and late arrivals must be **flagged in the activity feed** for humans to check - see "The activity feed" below.
+*Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.* - **Monday's slot filled** -> the 22:00 arrival fills **Tuesday, on time**. - **Monday's slot unfilled** -> it ALSO fills **Tuesday, on time**, and Monday closes with no supply. **Changed 2026-10-04 by REQ-PIPE-131**: this variant used to file Monday, late - slot state decided between two answers. Keith's worked consequence: Monday's file arriving after Tuesday's claim window opened is filed as Tuesday's; Monday closes empty, visibly, and Tuesday's real file then supersedes it (REQ-PIPE-118), replaces it (REQ-PIPE-123), or waits for a person. The cutoff still lives in `due_at` and the claim window, not in code. **Keith, 2026-09-22**: early and late arrivals must be **flagged in the activity feed** for humans to check - see "The activity feed" below.
 
-*Config: daily, Tuesday's supply due 22:00 MONDAY.*
+*Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.*
 
 **not injected - nothing to look at yet**
 
@@ -388,17 +388,17 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 
 *unit test - no generated data, nothing to navigate to*
 
-## The off-cycle arrival gate
+## An arrival with no open period
 
 ### TS-33a - A supply arriving in a period its dataset does not deliver in
 
-**What it demonstrates.** QA **runs**, and that supply **does not auto-promote** - a human review gate, whatever its verdict.
+**What it demonstrates.** A June arrival of it is **held for a person** (REQ-PIPE-064) - filed neither backward into February nor forward into August.
 
 *unit test - no generated data, nothing to navigate to*
 
-### TS-33b - Its siblings must NOT be withheld with it
+### TS-33b - Its siblings must NOT be held with it
 
-**What it demonstrates.** Normal auto-promotion on green/amber for all five. The gate fires on one supply only.
+**What it demonstrates.** Each is filed to its own open period and promoted on the ordinary green-or-amber rule. The hold is on one supply only.
 
 *unit test - no generated data, nothing to navigate to*
 
@@ -411,7 +411,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "INJECT",
    "title": "Forward cascade",
    "section": "Slot assignment",
-   "demonstrates": "The 20:00 arrival files as a **resupply of Monday**, because Tuesday's claim window has not opened and no claimable unfilled slot exists. Being a filled slot, it does NOT auto-promote - it holds and warns (TS-4).",
+   "demonstrates": "The 20:00 arrival files as a **resupply of Monday**, because Monday is still the OPEN period - Tuesday's claim window has not opened (REQ-PIPE-131). Being a filled slot, it does NOT auto-promote - it holds and warns (TS-4).",
    "breaksAs": "Files as Tuesday's supply; the next file takes Wednesday; every later supply is permanently off by one, each day looking locally plausible.",
    "config": "Config: daily, due 12:00.",
    "coordinates": {
@@ -430,7 +430,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "INJECT",
    "title": "Backward cascade",
    "section": "Slot assignment",
-   "demonstrates": "Files as **Thursday** (on-time-wins-for-the-current-slot). Tuesday and Wednesday stay unfilled, go overdue, and a human marks them missed with a reason.",
+   "demonstrates": "Files as **Thursday**, the period open when it arrived (REQ-PIPE-131). Tuesday and Wednesday closed unfilled when the next day's window opened, read as overdue, and a human marks them not supplied with a reason (REQ-PIPE-132).",
    "breaksAs": "Files as Tuesday, two days late; the next as Wednesday; the feed sits permanently two days behind for ever.",
    "config": "Config: daily, due ~22:00.",
    "coordinates": {
@@ -514,9 +514,9 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
   {
    "id": "TS-5",
    "mode": "unit",
-   "title": "Monotonic filling - a missed slot must not absorb a later resupply",
+   "title": "A missed slot must not absorb a later resupply",
    "section": "Slot assignment",
-   "demonstrates": "Tuesday is **non-claimable**, because a later slot (Wednesday) is filled. That is the whole point of the test.",
+   "demonstrates": "Tuesday is **closed** - it closed when Wednesday's claim window opened (REQ-PIPE-131, which replaced REQ-PIPE-063's monotonic filling: closing by time, not by a later slot filling). That is the whole point of the test.",
    "breaksAs": "Files as Tuesday - recording a missed delivery as MET, using another day's data. Worse than a cascade, because it manufactures a delivery that never happened.",
    "config": "Config: MUST be stated per variant - Keith's correction.",
    "coordinates": null
@@ -526,7 +526,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "unit",
    "title": "Genuine lateness still fills its own slot",
    "section": "Slot assignment",
-   "demonstrates": "Fills **Monday, late**. Monotonic filling does not block it, because no later slot is filled.",
+   "demonstrates": "Fills **Monday, late**. Monday is still the open period: lateness is allowed WITHIN a period's open interval (REQ-PIPE-131).",
    "breaksAs": null,
    "config": null,
    "coordinates": null
@@ -536,7 +536,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "unit",
    "title": "A rolling lag stays correctly recorded",
    "section": "Slot assignment",
-   "demonstrates": "Each fills its own slot, each classified one day late. Nothing is left permanently unfilled - the feed is simply running a day behind, and says so.",
+   "demonstrates": "Each fills its own slot, each classified late - each arrives before the next day's window opens, so its own day is still open. Nothing is left permanently unfilled - the feed is running behind, and says so. **A feed running MORE than one window behind** is the deliberate reversal (REQ-PIPE-131, reversing REQ-PIPE-063 criterion 3): it fills the open period, and the days it skipped close unfilled.",
    "breaksAs": null,
    "config": null,
    "coordinates": null
@@ -546,7 +546,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "unit",
    "title": "A skipped day becomes missed, and a later backfill cannot be placed",
    "section": "Slot assignment",
-   "demonstrates": "Wednesday's fills **Wednesday** (on-time-wins). Tuesday now has a filled successor, so it is **non-claimable** -> missed, overdue, red, and a human marks it missed. If Tuesday's supply then turns up afterwards, **nothing is claimable** and it is **held for a human** (TS-7) rather than defaulted forward.",
+   "demonstrates": "Wednesday's fills **Wednesday**, the open period. Tuesday closed unfilled when Wednesday's window opened -> overdue, and a human marks it not supplied (REQ-PIPE-132). If Tuesday's supply then turns up afterwards it is filed to whichever period is OPEN when it arrives - as a resupply where that period is filled - and a person re-files it into Tuesday (REQ-PIPE-131). It is never filed backward automatically, and never held merely for being late.",
    "breaksAs": null,
    "config": null,
    "coordinates": null
@@ -554,9 +554,9 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
   {
    "id": "TS-7",
    "mode": "unit",
-   "title": "Nothing confidently claimable - hold, do not guess",
+   "title": "No period open - hold, do not guess",
    "section": "Slot assignment",
-   "demonstrates": "**held for a human**, never defaulted into a future slot. Defaulting forward is the forward cascade again.",
+   "demonstrates": "**held for a human**, never defaulted forward or backward. Defaulting forward is the forward cascade again.",
    "breaksAs": null,
    "config": null,
    "coordinates": null
@@ -586,9 +586,9 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "mode": "INJECT",
    "title": "Evening-before daily arrival - two variants",
    "section": "Arrival classification",
-   "demonstrates": "*Config: daily, Tuesday's supply due 22:00 MONDAY.* - **Monday's slot filled** -> the 22:00 arrival fills **Tuesday, on time**. - **Monday's slot unfilled** -> it fills **Monday, late**. Same arrival instant, two different correct answers, decided by slot state rather than by a cutoff rule. This is what lets the cutoff live in `due_at` instead of in code. **Keith, 2026-09-22**: early and late arrivals must be **flagged in the activity feed** for humans to check - see \"The activity feed\" below.",
+   "demonstrates": "*Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.* - **Monday's slot filled** -> the 22:00 arrival fills **Tuesday, on time**. - **Monday's slot unfilled** -> it ALSO fills **Tuesday, on time**, and Monday closes with no supply. **Changed 2026-10-04 by REQ-PIPE-131**: this variant used to file Monday, late - slot state decided between two answers. Keith's worked consequence: Monday's file arriving after Tuesday's claim window opened is filed as Tuesday's; Monday closes empty, visibly, and Tuesday's real file then supersedes it (REQ-PIPE-118), replaces it (REQ-PIPE-123), or waits for a person. The cutoff still lives in `due_at` and the claim window, not in code. **Keith, 2026-09-22**: early and late arrivals must be **flagged in the activity feed** for humans to check - see \"The activity feed\" below.",
    "breaksAs": null,
-   "config": "Config: daily, Tuesday's supply due 22:00 MONDAY.",
+   "config": "Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.",
    "coordinates": null
   },
   {
@@ -825,8 +825,8 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
    "id": "TS-33a",
    "mode": "unit",
    "title": "A supply arriving in a period its dataset does not deliver in",
-   "section": "The off-cycle arrival gate",
-   "demonstrates": "QA **runs**, and that supply **does not auto-promote** - a human review gate, whatever its verdict.",
+   "section": "An arrival with no open period",
+   "demonstrates": "A June arrival of it is **held for a person** (REQ-PIPE-064) - filed neither backward into February nor forward into August.",
    "breaksAs": null,
    "config": null,
    "coordinates": null
@@ -834,9 +834,9 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
   {
    "id": "TS-33b",
    "mode": "unit",
-   "title": "Its siblings must NOT be withheld with it",
-   "section": "The off-cycle arrival gate",
-   "demonstrates": "Normal auto-promotion on green/amber for all five. The gate fires on one supply only.",
+   "title": "Its siblings must NOT be held with it",
+   "section": "An arrival with no open period",
+   "demonstrates": "Each is filed to its own open period and promoted on the ordinary green-or-amber rule. The hold is on one supply only.",
    "breaksAs": null,
    "config": null,
    "coordinates": null

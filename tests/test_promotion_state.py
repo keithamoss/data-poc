@@ -47,7 +47,7 @@ def _file(dataset_id, supply_id, slot):
     """One recorded filing, by the ordinary route."""
     filing.record(assignment.Assignment(
         dataset_id=dataset_id, supply_id=supply_id, slot=slot,
-        branch=assignment.ON_TIME, considered=(slot,) if slot else ()))
+        branch=assignment.OPEN_UNFILLED, considered=(slot,) if slot else ()))
 
 
 def _stage(conn, physical):

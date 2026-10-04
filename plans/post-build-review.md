@@ -4763,3 +4763,20 @@ twice. It deliberately did not re-find the `TypeError`.
     to its filing and reads AWAITING_DECISION, which is what REQ-PIPE-077
     meant ("a person decides whether it fills this period"). No test
     pinned the old reading. Flagged rather than assumed right.
+    **MOOT since sprint 3b (REQ-PIPE-131, 2026-10-04)**: the off-cycle
+    gate that wrote `promotion-withheld` is retired, so nothing produces
+    a withheld supply any more - an arrival with no open period is held
+    before it is filed. Left for Keith only as a record.
+
+90. **[done, 2026-10-04]** **[Docs & process]** **The validator demanded
+    that a RETIRED requirement's code still exist.** Found retiring
+    REQ-PIPE-063 and REQ-PIPE-077 (overnight sprint 3b): the requirements
+    gate failed on their `implemented_by`/`linked_tests`, because the
+    whole point of those retirements was to REMOVE that code - and
+    REQ-DOCS-143's own decision says a retired requirement "keeps whatever
+    it carried as history". Satisfying the gate would have meant deleting
+    the history. A minor gap in REQ-DOCS-143's build, not a design change:
+    FIXED - a retired requirement's links are no longer resolved; a live
+    one's still are (the control). `tests/test_validate_requirements.py::
+    TestARetiredRequirement::test_its_record_of_code_since_removed_is_kept_as_history`,
+    confirmed failing first.

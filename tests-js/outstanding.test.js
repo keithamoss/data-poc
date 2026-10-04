@@ -30,7 +30,7 @@ function item(overrides) {
     agencyId: "dcp", collectionId: "child-protection", datasetId: "cp-clients",
     observedAt: "2026-09-01T09:00:00+08:00",
     responses: ["assign one of the files to the slot", "reject the supply"],
-    actionable: false, ambiguity: null,
+    actionable: false,
     ...overrides,
   };
 }
@@ -59,18 +59,17 @@ const UNRECOGNISED = item({
   datasetId: null,
   responses: ["confirm it is not a supply"],
 });
-const UNCERTAIN = item({
-  kind: "uncertain-assignment", severity: "warning", blocking: false,
-  headline: "Clients' supply 2026-09-01 was filed under uncertainty",
-  detail: "An earlier slot was also unfilled.",
-  ambiguity: "an earlier slot, 2026-Q2, was also unfilled",
-  responses: ["confirm the slot"],
+const REFUSED = item({
+  kind: "inheritance-refused", severity: "warning", blocking: false,
+  headline: "Clients has no table at all for 2026-Q2",
+  detail: "No earlier period holds a supply to stand on.",
+  responses: ["file a supply into an earlier period"],
 });
 
 describe("one element, not one per producing rule", () => {
   it("renders ONE queue carrying the total, whatever produced the items", () => {
     const w = load();
-    const html = w.outstandingQueue(null, null, queueOf([HELD, UNRECOGNISED, UNCERTAIN]));
+    const html = w.outstandingQueue(null, null, queueOf([HELD, UNRECOGNISED, REFUSED]));
     // One element. Three items inside it, not three notices.
     expect(html.match(/notice-queue/g)).toHaveLength(1);
     expect(html.match(/queue-item /g)).toHaveLength(3);
@@ -79,7 +78,7 @@ describe("one element, not one per producing rule", () => {
 
   it("states the blocking and needs-review split in the heading", () => {
     const w = load();
-    const html = w.outstandingQueue(null, null, queueOf([HELD, UNRECOGNISED, UNCERTAIN]));
+    const html = w.outstandingQueue(null, null, queueOf([HELD, UNRECOGNISED, REFUSED]));
     expect(html).toContain("1</b> blocking a supply");
     expect(html).toContain("2</b> needing review");
   });
@@ -179,23 +178,11 @@ describe("responses are named, never offered as controls", () => {
   });
 });
 
-describe("the qualifier travels with the assignment (criterion 9)", () => {
-  it("renders the uncertainty chip for a dataset with an uncertain filing", () => {
+describe("an uncertain filing is no longer a thing (REQ-PIPE-131)", () => {
+  it("has no uncertainty chip to render - a file can never fit two open periods", () => {
     const w = load();
-    const chip = w.ambiguityChip("cp-clients", null, queueOf([UNCERTAIN]));
-    expect(chip).toContain("Uncertain filing");
-    expect(chip).toContain("an earlier slot, 2026-Q2, was also unfilled");
-  });
-
-  it("renders nothing where the assignment was certain", () => {
-    const w = load();
-    expect(w.ambiguityChip("cp-clients", null, queueOf([HELD]))).toBe("");
-  });
-
-  it("is a qualifier, not a status pill - it never uses the verdict vocabulary", () => {
-    const w = load();
-    const chip = w.ambiguityChip("cp-clients", null, queueOf([UNCERTAIN]));
-    expect(chip).not.toMatch(/pill [^"]*\b(green|amber|red)\b/);
+    expect(w.ambiguityChip).toBeUndefined();
+    expect(w.outstandingKindLabel("uncertain-assignment")).toBe("uncertain-assignment");
   });
 });
 

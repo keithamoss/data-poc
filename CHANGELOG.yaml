@@ -116,6 +116,16 @@ releases:
     changes:
       - category: Fixed
         items:
+          - headline: A late file is no longer filed into an older, empty period
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              Each period now closes the moment the next period starts
+              accepting files, and a file goes to whichever period was open
+              when we received it - never backward into an older one left
+              empty. A file that arrives when none of its dataset's periods
+              is open is held for you to place. The "Uncertain filing"
+              marker and the separate review of off-cycle arrivals are gone,
+              since neither case can happen any more.
           - headline: A check that could not run no longer vanishes
             components: ["Dashboard UI", "Pipeline & publishing"]
             description: >

@@ -210,7 +210,7 @@ def test_show_dataset_says_the_window_opens_early_and_never_closes():
     assert result.exit_code == 0, result.output
     flat = " ".join(result.output.split())
     assert "before each deadline" in flat
-    assert "never closes" in flat
+    assert "closes when the next period's opens" in flat
 
 
 class TestAWarningSurvivesTheCliWrapper:

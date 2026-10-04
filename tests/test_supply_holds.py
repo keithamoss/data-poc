@@ -17,23 +17,39 @@ from qa_tools.common.slots import Slot
 PERTH = timezone(timedelta(hours=8))
 
 
-def _slot(day: int, hour: int = 22) -> Slot:
+def _slot(day: int, hour: int = 22, closes: datetime | None = None) -> Slot:
     due = datetime(2026, 6, day, hour, 0, tzinfo=PERTH)
     return Slot(dataset_id="d", period=Period(name=f"{day:02d}", date=due.date()),
                  due_at=due, grace=timedelta(minutes=60),
-                 claim_opens_at=due - timedelta(hours=6))
+                 claim_opens_at=due - timedelta(hours=6), closes_at=closes)
+
+
+def _daily(*days: int) -> list[Slot]:
+    """Every day owed, each closing as the next opens."""
+    out = []
+    for i, d in enumerate(days):
+        nxt = _slot(days[i + 1]).claim_opens_at if i + 1 < len(days) else None
+        out.append(_slot(d, closes=nxt))
+    return out
 
 
 def _at(day: int, hour: int) -> datetime:
     return datetime(2026, 6, day, hour, tzinfo=PERTH)
 
 
+def _gap() -> list[Slot]:
+    """A dataset owing the 1st and the 5th of a daily calendar: the 1st
+    closes when the CALENDAR's 2nd opens (REQ-PIPE-131), and nothing is
+    open again until the 5th's window."""
+    return [_slot(1, closes=_slot(2).claim_opens_at), _slot(5, closes=_slot(6).claim_opens_at)]
+
+
 def _held():
-    """The reachable case decision 4 names: a slot is skipped, a later
-    one is filled, monotonic filling closes the skipped one, and the
-    genuine backfill turns up."""
-    slots = [_slot(d) for d in range(1, 6)]
-    return assignment.assign("d", "backfill", _at(3, 9), slots, frozenset({"04"}))
+    """The reachable case since REQ-PIPE-131: a supply arriving in a
+    calendar period its dataset does not participate in. (The old one -
+    a backfill into a slot monotonic filling had closed - cannot happen
+    any more: the backfill is filed to the open period.)"""
+    return assignment.assign("d", "between", _at(3, 9), _gap(), frozenset({"01"}))
 
 
 class TestItHoldsRatherThanDefaultingForward:
@@ -57,9 +73,14 @@ class TestItHoldsRatherThanDefaultingForward:
     def test_an_ordinary_arrival_is_not_held(self):
         """The control: if everything were held, the tests above would
         pass against a rule that does nothing but refuse."""
-        slots = [_slot(d) for d in range(1, 6)]
-        ordinary = assignment.assign("d", "s", _at(2, 22), slots, frozenset({"01"}))
-        assert ordinary.branch == assignment.ON_TIME and ordinary.slot == "02"
+        ordinary = assignment.assign("d", "s", _at(2, 22), _daily(1, 2, 3, 4, 5),
+                                     frozenset({"01"}))
+        assert ordinary.branch == assignment.OPEN_UNFILLED and ordinary.slot == "02"
+
+    def test_before_the_first_window_it_is_held_too(self):
+        """The other reachable case (REQ-PIPE-131 criterion 10)."""
+        early = assignment.assign("d", "s", _at(1, 1), _daily(1, 2), frozenset())
+        assert early.branch == assignment.HELD and early.slot is None
 
 
 class TestItSaysWhy:
@@ -74,10 +95,11 @@ class TestItSaysWhy:
             assert name and why, f"{name!r} has no reason given"
 
     def test_the_reasons_distinguish_filled_closed_and_not_yet_open(self):
-        reasons = " ".join(why for _, why in _held().unavailable)
-        assert "already filled" in reasons
-        assert "closed" in reasons
-        assert "has not opened" in reasons
+        reasons = dict(_held().unavailable)
+        assert "filled by a promoted supply" in reasons["01"] and "closed" in reasons["01"]
+        assert "has not opened" in reasons["05"]
+        unfilled = dict(assignment.assign("d", "s", _at(3, 9), _gap(), frozenset()).unavailable)
+        assert "filled" not in unfilled["01"] and "closed" in unfilled["01"]
 
     def test_the_description_is_readable_and_says_what_happens_next(self):
         spoken = _held().describe()
@@ -87,9 +109,9 @@ class TestItSaysWhy:
     def test_it_does_not_list_every_slot_a_feed_ever_had(self):
         """Listing hundreds would bury the three that matter - the same
         reasoning that keeps holds aggregated."""
-        slots = [_slot(d) for d in range(1, 29)]
-        decided = assignment.assign("d", "backfill", _at(3, 9), slots, frozenset({"04"}))
-        assert 0 < len(decided.unavailable) <= 6
+        slots = [_slot(1, closes=_slot(2).claim_opens_at)] + _daily(*range(20, 29))
+        decided = assignment.assign("d", "between", _at(3, 9), slots, frozenset())
+        assert [name for name, _ in decided.unavailable] == ["01", "20"]
 
 
 class TestHoldsAggregate:
@@ -125,8 +147,7 @@ class TestHoldsAggregate:
         assert supply_holds.holds_in([_held()]).needs_action is True
 
     def test_only_holds_are_counted(self):
-        slots = [_slot(d) for d in range(1, 6)]
-        ordinary = assignment.assign("d", "s", _at(2, 22), slots, frozenset({"01"}))
+        ordinary = assignment.assign("d", "s", _at(2, 22), _daily(1, 2, 3), frozenset({"01"}))
         assert supply_holds.holds_in([ordinary, _held()]).total == 1
 
 
@@ -134,22 +155,20 @@ class TestHoldingChangesNothingElse:
     """Criteria 6 and 7."""
 
     def test_the_slots_are_left_exactly_as_they_were(self):
-        slots = [_slot(d) for d in range(1, 6)]
-        filled = frozenset({"04"})
-        before = [(s.name, s.due_at, s.claim_opens_at) for s in slots]
-        assignment.assign("d", "backfill", _at(3, 9), slots, filled)
-        after = [(s.name, s.due_at, s.claim_opens_at) for s in slots]
-        assert before == after and filled == frozenset({"04"})
+        slots = _gap()
+        filled = frozenset({"01"})
+        before = list(slots)
+        assignment.assign("d", "between", _at(3, 9), slots, filled)
+        assert slots == before and filled == frozenset({"01"})
 
     def test_another_dataset_is_unaffected_by_a_hold(self):
         """Criterion 7 - one held supply must not stop the other 29
         datasets, which is the blast-radius rule this batch applies
         everywhere."""
         held = _held()
-        slots = [_slot(d) for d in range(1, 6)]
-        other = assignment.assign("other", "s", _at(2, 22), slots, frozenset({"01"}))
+        other = assignment.assign("other", "s", _at(2, 22), _daily(1, 2, 3), frozenset({"01"}))
         assert held.branch == assignment.HELD
-        assert other.branch == assignment.ON_TIME and other.slot == "02"
+        assert other.branch == assignment.OPEN_UNFILLED and other.slot == "02"
 
 
 class TestItIsNoLongerADeadEnd:

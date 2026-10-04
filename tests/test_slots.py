@@ -102,9 +102,10 @@ class TestEachSlotCarriesItsOwnTiming:
         assert "late_after" not in vars(slot)
 
 
-class TestTheClaimWindowOpensEarlyAndNeverCloses:
-    """Thread E, and the half that makes the forward cascade
-    structurally impossible rather than merely unlikely."""
+class TestTheClaimWindowOpensEarlyAndClosesWithTheNextPeriod:
+    """Thread E's early window - the half that makes the forward cascade
+    structurally impossible - and REQ-PIPE-131's close, which reversed
+    Thread E's open end."""
 
     def test_it_opens_the_configured_interval_before_the_due_instant(self):
         slot = _cp_slots("cp-clients")[0]
@@ -114,25 +115,48 @@ class TestTheClaimWindowOpensEarlyAndNeverCloses:
         slot = slots.slots_for_dataset("birth-registrations", until=BDM_UNTIL)[-1]
         assert slot.claim_opens_at == slot.due_at - timedelta(hours=4)
 
-    def test_there_is_no_closing_instant_at_all(self):
-        """Asserted on the dataclass, because the tempting 'fix' for a
-        boundary misfile is to close the window, and closing it is what
-        would make a late supply unfileable."""
-        assert "closes_at" not in vars(_cp_slots("cp-clients")[0])
+    def test_a_slot_closes_when_the_next_periods_claim_window_opens(self):
+        """Criteria 1 and 2, against the real quarterly calendar."""
+        sequence = _cp_slots("cp-clients")
+        for here, there in zip(sequence, sequence[1:]):
+            assert here.closes_at == there.claim_opens_at, here.name
 
-    def test_a_supply_arriving_years_late_can_still_claim_its_slot(self):
-        slot = _cp_slots("cp-clients")[0]
-        assert slots.is_claimable(slot, slot.due_at + timedelta(days=3650))
+    def test_a_daily_slot_closes_when_tomorrows_window_opens(self):
+        sequence = slots.slots_for_dataset("birth-registrations", until=BDM_UNTIL)
+        for here, there in zip(sequence, sequence[1:]):
+            assert here.closes_at == there.claim_opens_at, here.name
+        # And the LAST slot generated still knows when it closes - the
+        # period after `until` is read for it.
+        last = sequence[-1]
+        assert last.closes_at == last.claim_opens_at + timedelta(days=1)
 
-    def test_a_supply_arriving_before_the_window_opens_cannot(self):
+    def test_a_partial_dataset_closes_with_its_CALENDAR_period(self):
+        """Keith's sign-off reversal: Case Workers, February and August on
+        the quarterly calendar, closes February when MAY's window opens,
+        not August's - and has no open slot between."""
+        workers = _cp_slots("cp-case-workers")
+        clients = {s.name: s for s in _cp_slots("cp-clients")}
+        names = [s.name for s in workers]
+        first = workers[0]
+        following = [n for n in clients if clients[n].date > first.date][0]
+        assert following not in names, "precondition: a period case workers skips"
+        assert first.closes_at == clients[following].claim_opens_at
+        gap = first.closes_at + timedelta(days=1)
+        assert not any(slots.is_open(s, gap) for s in workers)
+
+    def test_open_is_from_the_window_opening_until_the_close(self):
         slot = _cp_slots("cp-clients")[0]
-        assert not slots.is_claimable(slot, slot.claim_opens_at - timedelta(seconds=1))
-        assert slots.is_claimable(slot, slot.claim_opens_at)
+        assert not slots.is_open(slot, slot.claim_opens_at - timedelta(seconds=1))
+        assert slots.is_open(slot, slot.claim_opens_at)
+        assert slots.is_open(slot, slot.closes_at - timedelta(seconds=1))
+        assert not slots.is_open(slot, slot.closes_at)
+        assert slots.is_closed(slot, slot.closes_at)
+        assert not slots.is_closed(slot, slot.closes_at - timedelta(seconds=1))
 
     def test_a_naive_instant_is_refused_rather_than_read_as_utc(self):
         slot = _cp_slots("cp-clients")[0]
         with pytest.raises(Exception):
-            slots.is_claimable(slot, datetime(2026, 2, 1, 9, 0))
+            slots.is_open(slot, datetime(2026, 2, 1, 9, 0))
 
     def test_a_contract_override_wins_over_the_calendar_default(self, monkeypatch):
         """Criterion 10. No dataset declares one today, so the wiring
@@ -218,39 +242,6 @@ class TestOverdueIsAskedNotRecorded:
             slots.is_overdue(self._slot(), datetime(2030, 1, 1), filled=False)
 
 
-class TestTheAssignmentRulesOwnHalf:
-    """next_unfilled_claimable() is the half of Thread E's rule that is
-    derivable from configuration. The resupply half needs promotion
-    state, which needs data, which is REQ-PIPE-034's."""
-
-    def test_it_returns_the_oldest_unfilled_slot_whose_window_is_open(self):
-        sequence = _cp_slots("cp-clients")
-        at = sequence[2].due_at
-        found = slots.next_unfilled_claimable(sequence, at, filled=set())
-        assert found is sequence[0]
-
-    def test_a_filled_slot_is_skipped(self):
-        sequence = _cp_slots("cp-clients")
-        at = sequence[2].due_at
-        found = slots.next_unfilled_claimable(
-            sequence, at, filled={sequence[0].name, sequence[1].name})
-        assert found is sequence[2]
-
-    def test_it_never_reaches_into_a_slot_whose_window_has_not_opened(self):
-        """The forward cascade, prevented structurally. An arrival
-        before every window has opened claims nothing at all rather
-        than claiming the next one."""
-        sequence = _cp_slots("cp-clients")
-        at = sequence[0].claim_opens_at - timedelta(days=1)
-        assert slots.next_unfilled_claimable(sequence, at, filled=set()) is None
-
-    def test_everything_filled_yields_nothing_rather_than_guessing(self):
-        sequence = _cp_slots("cp-clients")
-        at = sequence[-1].due_at
-        assert slots.next_unfilled_claimable(
-            sequence, at, filled={s.name for s in sequence}) is None
-
-
 class TestItTouchesNoData:
     def test_deriving_slots_opens_nothing_under_data(self, monkeypatch):
         from pathlib import Path
@@ -279,9 +270,9 @@ class TestTheClaimWindowIsEffectiveDated:
     the other half of the same config:
     `periods_for_calendar()` got it right and `claim_window()` did not.
 
-    It matters more than a display detail because Thread E's settled
-    assignment rule is "the oldest slot whose claim window is open" -
-    so a window that moves retroactively means re-deriving a past
+    It matters more than a display detail because the assignment rule
+    files to the slot whose claim window is OPEN (REQ-PIPE-131) - so a
+    window that moves retroactively means re-deriving a past
     assignment can give a different answer than the one history was
     actually filed under.
     """

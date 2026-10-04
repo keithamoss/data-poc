@@ -28,8 +28,8 @@ appearances on the page, and neither is ever distinguished by colour
 alone.
 
 BLOCKING IS A SECOND AXIS, not a third severity (criterion 3).
-REQ-PIPE-065's uncertain assignment is genuinely NON-BLOCKING - the
-supply was filed, just uncertainly - and mixing a non-blocking item
+An inheritance that could not complete is genuinely NON-BLOCKING - no
+supply is stopped by it - and mixing a non-blocking item
 into a work queue with a weak distinction is how people learn to
 ignore the queue. Keith's call, 2026-09-24, was that it nonetheless
 SHARES the one element: the total is what a person acts on, "six
@@ -63,20 +63,22 @@ about records, and `supply_db.connect` can answer any question at all.
     the decision log        inheritances that could not complete
     observations/in_flight/ a delivery still being written when we
                             looked
-    filings/                an assignment made under ambiguity
 
-FILINGS ARE NOT RECORDED YET (Keith, 2026-09-25, on REQ-PIPE-062), so
-that last source contributes nothing today. It is read anyway, for the
-same reason REQ-PIPE-065's rule was built before anything could
-exercise it: a reader written when the writer turns on is a reader
-written by somebody who has forgotten why the shape is what it is.
+THREE SOURCES THIS USED TO READ ARE GONE WITH THE RULES THAT FED THEM
+(REQ-PIPE-131, 2026-10-04): an assignment "made under ambiguity"
+(REQ-PIPE-065 criteria 1-2 - a file can no longer fit two open periods),
+a slot closed by monotonic filling (REQ-PIPE-063, retired - periods
+close by time now) and a supply the off-cycle gate withheld
+(REQ-PIPE-077, retired - an arrival with no open period is held instead,
+and holds are already here). A slot that CLOSES unfilled comes back as
+REQ-PIPE-132's item, grouped per dataset rather than one per day.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from qa_tools.common import (delivery_log, display_time, filing, hierarchy,
+from qa_tools.common import (delivery_log, display_time, hierarchy,
                              in_flight_log, load_log)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -97,7 +99,9 @@ FAILED_LOAD = "failed-load"
 CONTESTED_FILE = "contested-file"
 UNRECOGNISED_FILE = "unrecognised-file"
 IN_FLIGHT_DELIVERY = "in-flight-delivery"
-UNCERTAIN_ASSIGNMENT = "uncertain-assignment"
+#: A slot that closed with nothing in it. Produced by REQ-PIPE-132
+#: (not built yet); the kind is kept so the dashboard's label for it
+#: and this name do not drift apart in the meantime.
 CLOSED_UNFILLED_SLOT = "closed-unfilled-slot"
 #: An inheritance that could not complete (REQ-PIPE-098 criterion 10).
 #: WARNING rather than needs-action: there is nothing for a person to
@@ -106,11 +110,6 @@ CLOSED_UNFILLED_SLOT = "closed-unfilled-slot"
 #: ours rather than the supplier's, which is exactly what somebody
 #: looking at an empty period needs told.
 INHERITANCE_REFUSED = "inheritance-refused"
-#: A supply the off-cycle gate withheld (REQ-PIPE-077 criterion 4).
-#: NEEDS-ACTION and BLOCKING: the supply is checked and sitting there,
-#: and only a person can move it - which is the definition of work in
-#: somebody's queue rather than something to know about.
-WITHHELD_PROMOTION = "withheld-promotion"
 
 
 @dataclass(frozen=True)
@@ -118,7 +117,7 @@ class Item:
     """One thing waiting for a person.
 
     `blocking` and `severity` are separate on purpose (criterion 3): a
-    held supply and an uncertain assignment are both worth a person's
+    held supply and a refused inheritance are both worth a person's
     attention and only one of them stops a supply.
 
     `actionable` is FALSE for everything today and is a field rather
@@ -139,18 +138,13 @@ class Item:
     observed_at: str | None = None
     responses: tuple[str, ...] = ()
     actionable: bool = False
-    #: REQ-PIPE-065 criterion 1's qualifier, carried so criterion 9 can
-    #: render it everywhere the assignment is rendered rather than only
-    #: here.
-    ambiguity: str | None = None
 
     def as_record(self) -> dict:
         return {"kind": self.kind, "severity": self.severity, "blocking": self.blocking,
                 "headline": self.headline, "detail": self.detail,
                 "agencyId": self.agency_id, "collectionId": self.collection_id,
                 "datasetId": self.dataset_id, "observedAt": self.observed_at,
-                "responses": list(self.responses), "actionable": self.actionable,
-                "ambiguity": self.ambiguity}
+                "responses": list(self.responses), "actionable": self.actionable}
 
 
 @dataclass(frozen=True)
@@ -389,114 +383,6 @@ def _from_in_flight(observations_dir: Path | None = None) -> list[Item]:
     return items
 
 
-def _from_filings() -> list[Item]:
-    """REQ-PIPE-065's uncertain assignment - NON-BLOCKING, and the one
-    item here that is not a failure of anything.
-
-    The supply WAS filed. The rule took the oldest claimable unfilled
-    slot while an earlier slot for the same dataset was also unfilled,
-    so the supply might have been for that one. It defaults backward
-    because late is commoner than early, and says so rather than
-    presenting the guess as certain.
-    """
-    items = []
-    for entry in hierarchy.all_datasets():
-        for record in filing.filings_of(entry.dataset_id):
-            if not record.get("ambiguous"):
-                continue
-            items.append(Item(
-                kind=UNCERTAIN_ASSIGNMENT, severity=WARNING, blocking=False,
-                headline=(f"{entry.dataset_name}'s supply "
-                           f"{record.get('supply_id', '')} was filed under uncertainty"),
-                detail=(f"It was filed to {display_time.format_period(record.get('slot') or '')}, "
-                         f"but an earlier slot "
-                         f"was also unfilled, so it may have been for that one instead. "
-                         f"The supply is filed and checked - this is a qualifier on "
-                         f"which period it counts for, not a fault in the data."),
-                agency_id=entry.agency_id, collection_id=entry.collection_id,
-                dataset_id=entry.dataset_id,
-                responses=("confirm the slot", "re-file it to the earlier slot"),
-                # WRITTEN FOR A PERSON at render time, not at
-                # composition time: a filing is write-once, so
-                # formatting the stored sentence when it was made would
-                # leave every earlier filing showing raw dates forever.
-                ambiguity=display_time.format_periods_in(record.get("ambiguity") or "")))
-    return items
-
-
-def _from_closed_slots() -> list[Item]:
-    """REQ-PIPE-063's slot closed by monotonic filling and left unfilled
-    (criterion 7).
-
-    AN OBLIGATION AWAITING A DECISION, NEVER A RED DATA VERDICT. A slot
-    that closed unfilled means a supply we expected never arrived and
-    can no longer be claimed - which is a fact about a supplier and a
-    schedule, not a finding about anybody's data. Rendering it red
-    would put a permanent failure on a dataset whose data is fine.
-
-    NOTHING CLOSES A SLOT UNTIL A LATER ONE IS FILLED, and only a
-    PROMOTION fills one. It is derived from the same filled-slot
-    question rather than from filings, because reading filings here is
-    the single easiest way to reintroduce the forward cascade.
-
-    THIS USED TO SAY "structurally empty today", and it was - promotion
-    did not exist. It does now (REQ-PIPE-075, 2026-09-28), and the first
-    thing this function did on being reached for real was crash: it
-    asked for a dataset's slots with no `until`, which a daily calendar
-    refuses. Worth leaving the note rather than deleting it, because the
-    shape recurs - a guard that makes a path unreachable also makes it
-    untested, and the path runs for the first time on the day the guard
-    stops holding.
-    """
-    from qa_tools.common import assignment as assignment_mod
-    from qa_tools.common import asset_time
-    from qa_tools.common import slots as slots_mod
-
-    # TODAY ON THE ASSET CLOCK, and it is required rather than tidy: a
-    # DAILY calendar generates periods without end, and
-    # schedule.periods_for_dataset() refuses an unbounded ask rather
-    # than looping forever. This asked without one until 2026-09-28 and
-    # nothing noticed, because the early return above meant the call was
-    # unreachable while no slot was ever filled - see this function's
-    # own note below, and the test named for it.
-    #
-    # Today is the right bound rather than an arbitrary one: a slot in
-    # the future cannot be CLOSED, since closure means a later slot was
-    # filled and nothing fills a slot that is not yet due.
-    until = asset_time.now().date()
-
-    items = []
-    for entry in hierarchy.all_datasets():
-        filled = filing.filled_slots(entry.dataset_id)
-        if not filled:
-            continue
-        dataset_slots = slots_mod.slots_for_dataset(entry.dataset_id, until=until)
-        # A SET OF NAMES, not of Slots - closed_by_monotonic_filling()
-        # returns frozenset[str], and this read `slot.name` until
-        # 2026-09-28. Sorted so the queue is stable between runs, which a
-        # frozenset is not.
-        closed = sorted(assignment_mod.closed_by_monotonic_filling(dataset_slots, filled))
-        for slot in closed:
-            # A DAILY calendar names its periods by the day, so the
-            # identifier is a bare ISO date - which is the one thing
-            # REQ-DASH-071 says a reader is never shown. The item keeps
-            # the identifier in `dataset_id`/its own kind; only the prose
-            # is written for a person.
-            shown = display_time.format_period(slot)
-            items.append(Item(
-                kind=CLOSED_UNFILLED_SLOT, severity=NEEDS_ACTION, blocking=False,
-                headline=f"{entry.dataset_name} has no supply for {shown}",
-                detail=(f"A later slot has been filled, so {shown} can no longer "
-                         f"be claimed by an arriving supply. This is a missing delivery "
-                         f"awaiting a decision, not a finding about the data that did "
-                         f"arrive."),
-                agency_id=entry.agency_id, collection_id=entry.collection_id,
-                dataset_id=entry.dataset_id,
-                responses=("record the period as not supplied",
-                            "re-file a supply to this slot")))
-    return items
-
-
 def _from_inheritance_refusals() -> list[Item]:
     """REQ-PIPE-098 criterion 10 - an inheritance that could not
     complete, surfaced rather than silent.
@@ -507,7 +393,7 @@ def _from_inheritance_refusals() -> list[Item]:
     nothing, and the result is a genuinely absent table with an
     explanation nobody can see unless it is put here.
     """
-    from qa_tools.common import display_time, inheritance
+    from qa_tools.common import inheritance
 
     items = []
     try:
@@ -541,51 +427,6 @@ def _from_inheritance_refusals() -> list[Item]:
     return items
 
 
-def _from_withheld_promotions() -> list[Item]:
-    """REQ-PIPE-077 criterion 4 - a supply that arrived in a period its
-    dataset does not deliver in, waiting for somebody to look.
-
-    NAMING BOTH PERIODS IS THE CRITERION, not a nicety: this gate only
-    ever fires where the period a supply ARRIVED in differs from the
-    one it was FILED to, and an item naming one of them invites the
-    reader to assume they are the same.
-
-    ONE ITEM PER SUPPLY, matching the log, and only ever the odd supply
-    itself - its siblings in the same delivery go through the ordinary
-    gate and have nothing in this queue.
-    """
-    from qa_tools.common import display_time, promotion
-
-    items = []
-    try:
-        stood_back = promotion.withheld()
-    except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
-        print(f"note: could not read withheld promotions "
-              f"({type(exc).__name__}: {exc}) - the rest of the queue is unaffected.")
-        return items
-
-    for entry in stood_back:
-        try:
-            dataset = hierarchy.dataset(entry.dataset_id)
-        except hierarchy.UnknownDatasetError:
-            continue
-        shown = display_time.format_period(entry.period)
-        items.append(Item(
-            kind=WITHHELD_PROMOTION, severity=NEEDS_ACTION, blocking=True,
-            headline=(f"{dataset.dataset_name}'s supply for {shown} is waiting "
-                       f"on a review"),
-            detail=(f"{display_time.format_periods_in(entry.reason)} The supply "
-                     f"is filed and checked - what is waiting is the decision "
-                     f"about whether an off-cycle supply should fill this "
-                     f"period at all."),
-            agency_id=dataset.agency_id, collection_id=dataset.collection_id,
-            dataset_id=dataset.dataset_id,
-            responses=("promote it if the filing looks right",
-                        "re-file it to the period it belongs to",
-                        "reject it and ask the supplier to resend")))
-    return items
-
-
 def _sort_key(item: Item) -> tuple:
     return (0 if item.blocking else 1,
             SEVERITY_ORDER.index(item.severity) if item.severity in SEVERITY_ORDER else 9,
@@ -602,9 +443,6 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
     items = (_from_deliveries(conn)
               + _from_holds(conn)
               + _from_loads()
-              + _from_filings()
-              + _from_closed_slots()
               + _from_inheritance_refusals()
-              + _from_withheld_promotions()
               + _from_in_flight(observations_dir))
     return Outstanding(items=tuple(sorted(items, key=_sort_key)))

@@ -433,10 +433,9 @@ def filings_command(dataset_id: str, limit: int) -> None:
         return
 
     readable = {
-        assignment.ON_TIME: "on time for this slot",
-        assignment.OLDEST_CLAIMABLE: "oldest slot still owed",
-        assignment.RESUPPLY: "resupply - that slot was already filled",
-        assignment.UNASSIGNABLE: "[yellow]no slot was open for it[/yellow]",
+        assignment.OPEN_UNFILLED: "the period open when it arrived",
+        assignment.RESUPPLY: "resupply - the open period was already filled",
+        assignment.HELD: "[yellow]no period was open for it - held for a person[/yellow]",
     }
     console.print(f"[bold]{dataset_id}[/bold] - {len(found)} supply/supplies filed\n")
     table = Table("Supply", "Filed against", "Why", box=None, pad_edge=False)

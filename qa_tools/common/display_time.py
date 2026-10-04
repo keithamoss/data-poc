@@ -184,12 +184,11 @@ _ISO_DAY_IN_TEXT = re.compile(r"(?<![\d-])(\d{4}-\d{2}-\d{2})(?![\d-]|[T ]\d{2}:
 def format_periods_in(text: str) -> str:
     """Every bare ISO date in a sentence, rewritten for a person.
 
-    FOR PROSE THAT WAS COMPOSED AS A RECORD. `assignment.Assignment`
-    writes an `ambiguity` sentence naming the slots it hesitated
-    between, and that sentence is stored - a filing is write-once, so
-    formatting it at composition time would fix only the filings made
-    after the change and leave every earlier one showing raw dates
-    forever.
+    FOR PROSE THAT WAS COMPOSED AS A RECORD. A decision's stored reason
+    names the periods it was about, and that sentence is stored - the
+    log is append-only, so formatting it at composition time would fix
+    only the entries made after the change and leave every earlier one
+    showing raw dates forever.
 
     So the record keeps the identifiers and this is the last transform
     before an eye, which is what the rest of this module already is. It

@@ -61,7 +61,9 @@ def test_parallel_result_count_matches_manifest_size():
 class TestArrivalsThatDependOnEachOther:
     """REQ-PIPE-075 criteria 1 and 7, and the defect that put this here.
 
-    A supply is filed to the oldest slot no PROMOTION has filled. Filing
+    (Written under the old rule - a supply filed to the oldest slot no
+    PROMOTION had filled. REQ-PIPE-131's open-slot rule still reads
+    promotion state, to tell a fill from a resupply.) Filing
     every arrival up front means no slot is ever filled while the
     filings are being made - so on an empty database all 108 Child
     Protection supplies filed to 2023-Q1 and six promoted. Interleaved,

@@ -200,7 +200,7 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
     # Shown in the form the config authors it in - `14d`, not
     # `14 days, 0:00:00` (post-build-review #27).
     console.print(f"  claim window: {schedule.format_duration(schedule.claim_window(dataset))} "
-                   f"before each deadline [dim](opens early, never closes)[/dim]")
+                   f"before each deadline [dim](opens early; closes when the next period's opens)[/dim]")
 
     from qa_tools.common import asset_time
     today = asset_time.local_date(asset_time.now())

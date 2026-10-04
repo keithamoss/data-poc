@@ -728,8 +728,9 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
     REQ-PIPE-052). A window measured forwards from the period's date
     describes something that CLOSES - a deadline for claiming - and the
     settled rule is the opposite: the window opens a configured
-    interval BEFORE the due instant and NEVER closes, because late is
-    always allowed (plans/supply-model.md Thread E).
+    interval BEFORE the due instant, and the slot then stays open until
+    the NEXT calendar period's window opens (REQ-PIPE-131, which replaced
+    Thread E's "never closes").
 
     The difference is not pedantry. What the window prevents is
     claiming FORWARD into a slot that is not yet claimable, which is

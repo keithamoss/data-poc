@@ -126,7 +126,9 @@ class TestFilingIsInterleavedRatherThanDoneUpFront:
     """The defect this class exists for, found by running the real
     pipeline against a scratch database.
 
-    A supply is filed to the oldest slot no PROMOTION has filled. Filing
+    (Written under the old rule - a supply filed to the oldest slot no
+    PROMOTION had filled. REQ-PIPE-131's open-slot rule still reads
+    promotion state, to tell a fill from a resupply.) Filing
     every arrival before any of them is checked means no slot is ever
     filled while the filings are being made - so all 108 Child
     Protection supplies filed to 2023-Q1 and six promoted. One arrival

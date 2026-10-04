@@ -503,8 +503,8 @@ INJECTIONS: tuple[Injection, ...] = (
             ExtraArrival(0, "16:00", None, "the resupply, which passes"),
             ExtraArrival(0, "20:00", None,
                           "the third file - expected to file as a resupply of this same "
-                          "day, because tomorrow's window has not opened and no claimable "
-                          "unfilled slot exists"),
+                          "day, because tomorrow's window has not opened, so this day is "
+                          "still the open period"),
         ),
         also_demonstrates=("TS-4",),
     ),

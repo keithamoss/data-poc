@@ -156,13 +156,12 @@ class TestAPeriodNameWrittenForAPerson:
         assert display_time.format_period(" 2026-01-01 ") == "Thursday, 1 January 2026"
 
     def test_it_rewrites_every_period_named_in_a_stored_sentence(self):
-        """A filing's `ambiguity` sentence is composed once and stored,
-        so it has to be written for a person at render time - otherwise
-        only filings made after this change would read correctly."""
+        """A decision's stored reason is composed once and stored, so it
+        has to be written for a person at render time - otherwise only
+        entries made after this change would read correctly."""
         assert display_time.format_periods_in(
-            "filed to 2026-08-31, but 2026-08-27 is also unfilled") == \
-            "filed to Monday, 31 August 2026, but Thursday, 27 August 2026 " \
-            "is also unfilled"
+            "re-filed to 2026-08-31 from 2026-08-27") == \
+            "re-filed to Monday, 31 August 2026 from Thursday, 27 August 2026"
 
     def test_it_leaves_a_quarterly_name_alone(self):
         assert display_time.format_periods_in("filed to 2023-Q1") == "filed to 2023-Q1"

@@ -67,7 +67,7 @@ def clean(supply_dsn):
 def _file(slot=EARLY_SLOT, received_at=ARRIVED, supply_id="s"):
     return filing.record(assignment.Assignment(
         dataset_id=DATASET, supply_id=supply_id, slot=slot,
-        branch=assignment.OLDEST_CLAIMABLE, considered=(slot,),
+        branch=assignment.OPEN_UNFILLED, considered=(slot,),
         received_at=received_at))
 
 

@@ -43,7 +43,7 @@ def filings(supply_dsn):
 
 
 def _assignment(supply_id="cp-clients@2026", slot="2026-Q1",
-                 branch=assignment.ON_TIME, dataset_id="cp-clients"):
+                 branch=assignment.OPEN_UNFILLED, dataset_id="cp-clients"):
     return assignment.Assignment(
         dataset_id=dataset_id, supply_id=supply_id, slot=slot, branch=branch,
         considered=(slot,) if slot else ())
@@ -66,9 +66,9 @@ class TestWrittenOnceAndNeverReDerived:
             "under a reader")
 
     def test_the_stored_filing_keeps_the_branch_it_was_decided_by(self, filings):
-        filing.record(_assignment(branch=assignment.OLDEST_CLAIMABLE))
+        filing.record(_assignment(branch=assignment.OPEN_UNFILLED))
         stored = filing.filing_for("cp-clients", "cp-clients@2026")
-        assert stored["branch"] == assignment.OLDEST_CLAIMABLE
+        assert stored["branch"] == assignment.OPEN_UNFILLED
         assert stored["considered"] == ["2026-Q1"], (
             "recomputing this later is NOT equivalent - the slot state it was decided "
             "against has moved on")
@@ -240,7 +240,7 @@ class TestAFilingIsRecordedInTheDatabase:
         rows = filings.execute(
             f'SELECT dataset_id, supply_id, slot, branch FROM "{qa_store.SCHEMA}".filing '
             "WHERE dataset_id = ?", ["cp-clients"]).fetchall()
-        assert rows == [("cp-clients", "cp-clients@2026", "2026-Q1", assignment.ON_TIME)]
+        assert rows == [("cp-clients", "cp-clients@2026", "2026-Q1", assignment.OPEN_UNFILLED)]
 
     def test_the_slot_and_the_branch_are_real_columns(self, filings):
         """Criterion 1 names four things to record, and the two that get
@@ -407,6 +407,6 @@ class TestWhichPeriodAnArrivalWasFiledTo:
         (REQ-PIPE-059), which is a real state rather than an absence of
         a filing - and it still has no period to measure against."""
         filing.record(_assignment(supply_id="cp-clients@20260801010000000000",
-                                   slot=None, branch=assignment.UNASSIGNABLE))
+                                   slot=None, branch=assignment.HELD))
         assert filing.period_of(
             "cp-clients", "2026-08-01T01:00:00.000000+00:00") is None

@@ -21,7 +21,7 @@ nothing to drift.
 NOTHING HERE RECORDS ANYTHING. Whether a slot is overdue is a QUESTION
 asked of the schedule and the slot's current state, not a flag some
 sweep sets - see is_overdue() for why that matters. Same for
-claimability.
+whether a slot is open or closed.
 
 WHY THIS IMPORTS pipeline.cadence, which is worth naming rather than
 leaving as an oddity: a dataset's expected time of day, grace allowance
@@ -49,13 +49,20 @@ class Slot:
     offset (REQ-PIPE-048), never wall-clock times somebody has to
     interpret.
 
-    There is no `closes_at`, and its absence is a decision rather than
-    an omission: a claim window OPENS a configured interval before the
-    due instant and NEVER CLOSES, because late is always allowed
-    (plans/supply-model.md Thread E). What the window prevents is
-    claiming FORWARD - a slot whose window has not opened yet cannot be
-    claimed at all, which makes the forward cascade structurally
-    impossible rather than merely unlikely.
+    `closes_at` IS WHEN THE NEXT CALENDAR PERIOD'S CLAIM WINDOW OPENS
+    (REQ-PIPE-131), whether or not this dataset owes anything in that
+    next period - so a dataset delivering February and August on a
+    quarterly calendar closes February when MAY's window opens, and has
+    no open slot until August's does. None only where the calendar has
+    no next period at all (an authored calendar's last date).
+
+    This REVERSES the open-ended window this docstring used to defend
+    ("NEVER CLOSES, because late is always allowed" - plans/supply-
+    model.md Thread E). Lateness is still allowed WITHIN a period's open
+    interval; it is no longer allowed across the next period's opening,
+    which is what let a late file be filed backward into an older,
+    unfilled period. Claiming FORWARD stays impossible: a slot whose
+    window has not opened cannot be claimed at all.
     """
 
     dataset_id: str
@@ -63,6 +70,7 @@ class Slot:
     due_at: datetime
     grace: timedelta
     claim_opens_at: datetime
+    closes_at: datetime | None = None
 
     @property
     def name(self) -> str:
@@ -129,9 +137,8 @@ def claimable_until(dataset_id: str, at: date) -> date:
     into the previous quarter - 14 days of every 91 exposed.
 
     WIDENING THE LIST IS NOT WIDENING WHAT MAY BE CLAIMED.
-    `assignment.current_slot()` and `is_claimable()` still filter on
-    `claim_opens_at`, so a slot whose window has not opened is offered
-    and not chosen - the behaviour the daily feed has always had for
+    `assignment.open_slot()` still filters on `claim_opens_at`, so a
+    slot whose window has not opened is offered and not chosen - the behaviour the daily feed has always had for
     the current day. This only stops a claimable slot being absent.
     """
     return at + claim_window(dataset_id)
@@ -167,32 +174,77 @@ def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
     expected_time, grace_minutes, window_override = _contract_timing(dataset_id)
     grace = timedelta(minutes=grace_minutes)
 
-    out = []
-    for dataset_period in schedule.periods_for_dataset(dataset_id, until=until):
-        if not dataset_period.expected:
-            continue
+    def claim_opens(period_date: date) -> datetime:
         # Resolved PER PERIOD, on that period's own date. Hoisting this
         # out of the loop is what made a new calendar version move every
         # historical slot's claim_opens_at - the same retroactivity
         # _effect_windows() already prevents for the dates themselves
-        # (post-build-review #42).
-        window = schedule.claim_window(dataset_id, window_override,
-                                        on=dataset_period.period.date)
+        # (post-build-review #42). A zero window opens at the due
+        # instant, which is REQ-PIPE-131 criterion 3 for free.
+        window = schedule.claim_window(dataset_id, window_override, on=period_date)
+        return asset_time.wall_clock(period_date, expected_time) - window
+
+    # THE CALENDAR'S periods, not only the ones this dataset owes, so a
+    # slot closes when the NEXT CALENDAR PERIOD's window opens
+    # (REQ-PIPE-131 criterion 1). Read by index, never by walking the
+    # sequence per slot (NFR 1).
+    sequence = _calendar_periods(dataset_id, until)
+    following = {p.name: sequence[i + 1].date for i, p in enumerate(sequence[:-1])}
+
+    out = []
+    for dataset_period in schedule.periods_for_dataset(dataset_id, until=until):
+        if not dataset_period.expected:
+            continue
+        opens = claim_opens(dataset_period.date)
         due_at = asset_time.wall_clock(dataset_period.date, expected_time)
+        nxt = following.get(dataset_period.period.name)
         out.append(Slot(dataset_id=dataset_id, period=dataset_period.period,
-                         due_at=due_at, grace=grace, claim_opens_at=due_at - window))
+                         due_at=due_at, grace=grace, claim_opens_at=opens,
+                         closes_at=claim_opens(nxt) if nxt is not None else None))
     return out
 
 
-def is_claimable(slot: Slot, at: datetime) -> bool:
-    """Could a supply arriving at `at` be filed against this slot?
+def _calendar_periods(dataset_id: str, until: date | None) -> list[Period]:
+    """The full period sequence a dataset's slots close against - its
+    calendar's, or its own dates where it overrides the calendar - with
+    the period AFTER `until` included, so the last slot generated still
+    knows when it closes.
 
-    Open-ended on purpose - see Slot's own docstring. The only thing
-    this refuses is claiming FORWARD, into a slot whose window has not
-    opened.
+    ONE EXTRA PERIOD, not a longer horizon: a cadence rule generates a
+    day at a time, so `until` plus a day reaches its next period; an
+    authored calendar is finite, so it is read whole where the next
+    period lies beyond that.
     """
-    asset_time.parse_instant(at, "is_claimable(at)")
-    return at >= slot.claim_opens_at
+    override = schedule.dataset_dates_override(dataset_id)
+    if override is not None:
+        return sorted(override, key=lambda p: p.date)
+    cal = schedule.calendar_for_dataset(dataset_id)
+    if until is None:
+        return schedule.periods_for_calendar(cal.name)
+    periods = schedule.periods_for_calendar(cal.name, until=until + timedelta(days=1))
+    if (not periods or periods[-1].date <= until) and not cal.current.is_cadence_rule:
+        periods = schedule.periods_for_calendar(cal.name)
+    return periods
+
+
+def is_open(slot: Slot, at: datetime) -> bool:
+    """Is this slot OPEN at `at` (REQ-PIPE-131 criterion 1)?
+
+    From its claim-opening instant until the next calendar period's.
+    DERIVED, NEVER RECORDED, like is_overdue(), so it cannot be stale.
+    """
+    asset_time.parse_instant(at, "is_open(at)")
+    return at >= slot.claim_opens_at and (slot.closes_at is None or at < slot.closes_at)
+
+
+def is_closed(slot: Slot, at: datetime) -> bool:
+    """Has this slot CLOSED by `at` - the next calendar period's claim
+    window has opened? A closed slot is never filed to automatically,
+    though a person may still re-file into it, substitute it, mark it
+    not supplied, or promote what is already filed there
+    (REQ-PIPE-131 criteria 9 and 13)."""
+    asset_time.parse_instant(at, "is_closed(at)")
+    return slot.closes_at is not None and at >= slot.closes_at
 
 
 def is_overdue(slot: Slot, now: datetime, filled: bool) -> bool:
@@ -213,43 +265,6 @@ def is_overdue(slot: Slot, now: datetime, filled: bool) -> bool:
     """
     asset_time.parse_instant(now, "is_overdue(now)")
     return not filled and now > slot.late_after
-
-
-def next_unfilled_claimable(slots: list[Slot], at: datetime,
-                             filled: set[str]) -> Slot | None:
-    """The OLDEST slot whose window is open and which is unfilled.
-
-    The assignment rule itself, stated once (plans/supply-model.md
-    Thread E): "assign to the oldest slot whose claim window is open
-    and which is unfilled. If there is no such slot, it is a resupply
-    of the most recently filled slot."
-
-    Only the first half lives here - this returns None for the resupply
-    case rather than deciding it, because deciding it needs promotion
-    state and therefore data. Filing is REQ-PIPE-034's; this is the
-    schedule's own half of the answer, which is the half that has to be
-    derivable from config alone.
-
-    DO NOT USE THIS AS THE ASSIGNMENT RULE. It is not one, and the
-    paragraph above understates what is missing: as well as the resupply
-    case, this has NO on-time-wins-for-the-current-slot branch and NO
-    monotonic filling. "Oldest claimable unfilled slot" on its own is
-    precisely the rule plans/supply-model.md Thread E proves
-    catastrophic - it produces the backward cascade, where a punctual
-    supplier is recorded as a very late resupply AND the slot they
-    actually filled is left to go overdue as a phantom missing delivery.
-
-    Nothing calls this yet, which is why it is a trap rather than a bug
-    (found 2026-09-23 while scoping sprints 7-10). REQ-PIPE-062 is the
-    requirement that carries the whole rule; extend this there rather
-    than reaching for it as-is.
-    """
-    for slot in slots:
-        if slot.name in filled:
-            continue
-        if is_claimable(slot, at):
-            return slot
-    return None
 
 
 def is_owed_supplies(dataset_id: str) -> bool:

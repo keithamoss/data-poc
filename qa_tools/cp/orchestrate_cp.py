@@ -481,8 +481,9 @@ def run_pipeline_cp(sequential: bool = False,
 
     # IN RECEIPT ORDER, ONE ARRIVAL AT A TIME - file it, check it,
     # promote it, then the next. The chain is real rather than
-    # cautious: a supply is filed to the oldest slot no PROMOTION has
-    # filled, so arrival N's filing depends on arrival N-1's promotion,
+    # cautious: a supply fills its open slot or is a resupply of it
+    # according to whether a PROMOTION has filled it (REQ-PIPE-131), so
+    # arrival N's filing depends on arrival N-1's promotion,
     # which depends on arrival N-1's checks.
     #
     # THIS COST THE CROSS-ARRIVAL PARALLELISM, and the measurement is in

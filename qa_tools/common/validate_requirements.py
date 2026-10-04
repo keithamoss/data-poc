@@ -239,11 +239,15 @@ def _cross_reference_errors(requirements: list[Requirement]) -> list[str]:
                            f"cannot carry that before the work exists. Set status to 'built', "
                            f"or remove it")
 
-        for entry in r.linked_tests:
+        # A RETIRED requirement's links are HISTORY (REQ-DOCS-143: it
+        # "keeps whatever it carried"), and retiring one usually means its
+        # code was removed - so they are not required to resolve any more.
+        live = r.status != "retired"
+        for entry in r.linked_tests if live else ():
             if not _linked_test_exists(entry):
                 errors.append(f"{r.id}: linked_tests entry {entry!r} does not resolve to a real "
                                f"file/test")
-        for entry in r.implemented_by:
+        for entry in r.implemented_by if live else ():
             errors.extend(_implemented_by_errors(entry, r.id))
         for dep in r.dependencies:
             if dep not in all_ids:

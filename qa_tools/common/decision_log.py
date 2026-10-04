@@ -105,7 +105,14 @@ INHERIT_REFUSED = "inherit-refused"
 UN_INHERIT = "un-inherit"
 
 #: A supply the off-cycle gate withheld from automatic promotion
-#: (REQ-PIPE-077 criterion 6). ALWAYS A RULE'S, and it is the only
+#: (REQ-PIPE-077 criterion 6). NOTHING WRITES IT ANY MORE: REQ-PIPE-131
+#: retired that gate (2026-10-04), because an arrival with no open period
+#: is now HELD for a person before it is ever checked. It stays in the
+#: vocabulary - and in the table's CHECK constraint - as the one example
+#: of an entry that ANNOTATES a slot without changing it, which
+#: qa.slot_holds and REQ-PIPE-132 criterion 8 are written against.
+#:
+#: ALWAYS A RULE'S, and it is the only
 #: action here that records something NOT happening to a supply - the
 #: same shape as `inherit-refused`, and for the same reason: a refusal
 #: nobody recorded is indistinguishable from a rule that never ran.

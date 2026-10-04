@@ -72,9 +72,10 @@ def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
                 run_timestamp: str | None = None, on_step=None) -> list[dict]:
     """`process()` each arrival in the order given, one at a time.
 
-    ONE AT A TIME BECAUSE THE CHAIN IS REAL: a supply is filed to the
-    oldest slot no promotion has filled, so arrival N's filing depends on
-    arrival N-1's promotion (parallel_orchestrate.run_manifest's docstring
+    ONE AT A TIME BECAUSE THE CHAIN IS REAL: a supply fills its open slot,
+    or is a resupply of it where a promotion already filled it
+    (REQ-PIPE-131), so arrival N's filing depends on arrival N-1's
+    promotion (parallel_orchestrate.run_manifest's docstring
     has the measurement).
 
     `run_timestamp` None stamps each arrival as it starts, which is what

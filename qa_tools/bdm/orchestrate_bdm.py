@@ -9,7 +9,8 @@ RUNS ONE ARRIVAL AT A TIME, IN RECEIPT ORDER, and this reversed on
 (qa_tools/common/parallel_orchestrate.py, one process per CPU core -
 measured ~3.4x on this project's own 15-run manifest, see
 plans/performance.md #4). Promotion is what ended that: a supply is
-filed to the oldest slot no PROMOTION has filled, so arrival N's filing
+filed as a fill of its open slot or a RESUPPLY of it according to
+whether a PROMOTION has filled it (REQ-PIPE-131), so arrival N's filing
 depends on arrival N-1's promotion, which depends on arrival N-1's
 checks. `--sequential` still exists and no longer changes anything.
 Each arrival goes through qa_tools/common/arrival_lifecycle.py, the one

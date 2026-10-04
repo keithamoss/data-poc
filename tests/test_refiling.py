@@ -51,7 +51,7 @@ def filings(supply_dsn):
         conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing')
         filing.record(assignment.Assignment(
             dataset_id="d", supply_id="s", slot="2026-Q2",
-            branch=assignment.OLDEST_CLAIMABLE, considered=("2026-Q2",)))
+            branch=assignment.OPEN_UNFILLED, considered=("2026-Q2",)))
         yield conn
 
 
@@ -145,7 +145,7 @@ class TestItIsLocalToTheSupplyThatMoved:
     def test_another_supplys_filing_is_untouched(self, filings):
         filing.record(assignment.Assignment(
             dataset_id="d", supply_id="other", slot="2026-Q2",
-            branch=assignment.ON_TIME, considered=("2026-Q2",)))
+            branch=assignment.OPEN_UNFILLED, considered=("2026-Q2",)))
         filing.refile("d", "s", "2026-Q3", refiling_id="dec-1")
         assert filing.filing_for("d", "other")["slot"] == "2026-Q2"
 

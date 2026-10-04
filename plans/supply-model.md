@@ -1188,8 +1188,9 @@ historical fact once re-filing exists, which contradicts
 `pipeline/cadence.py`'s current docstring. The dashboard's JS never
 recomputes classification.
 
-**Thread E - slot assignment (sprint 9, no requirement).** The rule
-itself: assign to the oldest slot whose claim window is open and which
+**Thread E - slot assignment (sprint 9, no requirement).** *(Superseded
+2026-10-04 by REQ-PIPE-131's open-slot rule - see Thread E's own
+banner.)* The rule as first stated: assign to the oldest slot whose claim window is open and which
 is unfilled; if none, it is a RESUPPLY of the most recently filled slot.
 NEVER CLAIM FORWARD, and why the risk is asymmetric - backwards is one
 contained error, forwards cascades through every future delivery. The
@@ -1352,11 +1353,15 @@ but it still needs a `QAC` requirement of its own.
   `REQ-PIPE-035` specifies and **sprint 13** builds. Staging has nowhere
   to stage into before then. Either sprint 13 moves forward to sit with
   sprint 8, or staging gets built twice.
-- A slot closed by monotonic filling can only be resolved by a human
+- *(Superseded: REQ-PIPE-063 is retired, and a slot closes by time
+  under REQ-PIPE-131; REQ-PIPE-132 is the mark-as-not-supplied.)* A slot
+  closed by monotonic filling could only be resolved by a human
   marking it missed, which is **sprint 12**. Until then such a slot is
   permanently red and unclearable - correct, and visibly unfinished.
 
 **A live trap found by running the real code rather than reading it.**
+*(Removed 2026-10-04 with REQ-PIPE-131 - `next_unfilled_claimable()` no
+longer exists.)*
 `qa_tools/common/slots.py`'s `next_unfilled_claimable()` implements
 "oldest claimable unfilled slot" with **no on-time-wins branch and no
 monotonic filling** - which is exactly the rule Thread E proves
@@ -2816,9 +2821,9 @@ Monday's supply arrives 14:00 and fails QA - red, rejected, so Monday's
 slot stays unfilled. A resupply lands 16:00, passes, and is promoted, so
 Monday is now filled. Then a THIRD file arrives at 20:00 the same day.
 **Expect**: the 20:00 arrival files as a **resupply of Monday**, because
-Tuesday's claim window has not opened and no claimable unfilled slot
-exists. Being a filled slot, it does NOT auto-promote - it holds and
-warns (TS-4).
+Monday is still the OPEN period - Tuesday's claim window has not opened
+(REQ-PIPE-131). Being a filled slot, it does NOT auto-promote - it holds
+and warns (TS-4).
 **Breaks as**: files as Tuesday's supply; the next file takes Wednesday;
 every later supply is permanently off by one, each day looking locally
 plausible.
@@ -2828,9 +2833,10 @@ plausible.
 Monday received and filled. The supplier's system goes down for an
 upgrade - found out 9pm Tuesday, too late to renegotiate. Wednesday
 missed too. The next supply arrives on time at 22:00 Thursday.
-**Expect**: files as **Thursday** (on-time-wins-for-the-current-slot).
-Tuesday and Wednesday stay unfilled, go overdue, and a human marks them
-missed with a reason.
+**Expect**: files as **Thursday**, the period open when it arrived
+(REQ-PIPE-131). Tuesday and Wednesday closed unfilled when the next
+day's window opened, read as overdue, and a human marks them not
+supplied with a reason (REQ-PIPE-132).
 **Breaks as**: files as Tuesday, two days late; the next as Wednesday;
 the feed sits permanently two days behind for ever.
 
@@ -2892,54 +2898,62 @@ accepted at 16:00", plus the boundary detail where relevant); and the
 three genuinely different actions are reachable - **accept** as a
 correction, **re-file** to another slot, **reject** as a duplicate.
 
-**TS-5 `[unit]` Monotonic filling - a missed slot must not absorb a
-later resupply.**
+**TS-5 `[unit]` A missed slot must not absorb a later resupply.**
 *Config: MUST be stated per variant - Keith's correction.*
 Tuesday missed entirely. Wednesday arrives on time at 22:00, green,
 promoted. A further supply arrives 23:00 Wednesday.
-**Expect**: Tuesday is **non-claimable**, because a later slot
-(Wednesday) is filled. That is the whole point of the test.
+**Expect**: Tuesday is **closed** - it closed when Wednesday's claim
+window opened (REQ-PIPE-131, which replaced REQ-PIPE-063's monotonic
+filling: closing by time, not by a later slot filling). That is the
+whole point of the test.
 **What the 23:00 arrival then does DEPENDS ON CONFIG**, and the first
 draft asserted one answer unconditionally:
-- Thursday's window shut at 23:00 -> no claimable unfilled slot ->
-  **resupply of Wednesday**.
+- Thursday's window not yet open at 23:00 -> Wednesday is the open
+  period and filled -> **resupply of Wednesday**.
 - Thursday due Wednesday evening (an evening-before feed), so its window
-  is open and past due -> **fills Thursday**, correctly, and is not a
-  resupply at all.
+  is open -> Thursday is the open period -> **fills Thursday**,
+  correctly, and is not a resupply at all.
 **Breaks as**: files as Tuesday - recording a missed delivery as MET,
 using another day's data. Worse than a cascade, because it manufactures
 a delivery that never happened.
 
 **TS-6a `[unit]` Genuine lateness still fills its own slot.**
-*Config: daily.* Monday's slot unfilled; Monday's supply arrives Tuesday
-03:00 with Tuesday not yet filled.
-**Expect**: fills **Monday, late**. Monotonic filling does not block it,
-because no later slot is filled.
+*Config: daily, due 22:00, claim window 6 hours - so Tuesday's window
+opens 16:00 Tuesday.* Monday's slot unfilled; Monday's supply arrives
+Tuesday 03:00.
+**Expect**: fills **Monday, late**. Monday is still the open period:
+lateness is allowed WITHIN a period's open interval (REQ-PIPE-131).
 
 **TS-6b `[unit]` A rolling lag stays correctly recorded.**
 Continuing 6a: Tuesday's supply arrives Wednesday 03:00, Wednesday's
 arrives Thursday 03:00.
-**Expect**: each fills its own slot, each classified one day late.
-Nothing is left permanently unfilled - the feed is simply running a day
-behind, and says so.
+**Expect**: each fills its own slot, each classified late - each arrives
+before the next day's window opens, so its own day is still open.
+Nothing is left permanently unfilled - the feed is running behind, and
+says so. **A feed running MORE than one window behind** is the
+deliberate reversal (REQ-PIPE-131, reversing REQ-PIPE-063 criterion 3):
+it fills the open period, and the days it skipped close unfilled.
 
 **TS-6c `[unit]` A skipped day becomes missed, and a later backfill
 cannot be placed.**
 Continuing 6a: Tuesday's supply never comes, and Wednesday's arrives on
 time at 22:00.
-**Expect**: Wednesday's fills **Wednesday** (on-time-wins). Tuesday now
-has a filled successor, so it is **non-claimable** -> missed, overdue,
-red, and a human marks it missed. If Tuesday's supply then turns up
-afterwards, **nothing is claimable** and it is **held for a human**
-(TS-7) rather than defaulted forward.
+**Expect**: Wednesday's fills **Wednesday**, the open period. Tuesday
+closed unfilled when Wednesday's window opened -> overdue, and a human
+marks it not supplied (REQ-PIPE-132). If Tuesday's supply then turns up
+afterwards it is filed to whichever period is OPEN when it arrives - as
+a resupply where that period is filled - and a person re-files it into
+Tuesday (REQ-PIPE-131). It is never filed backward automatically, and
+never held merely for being late.
 
 Split into three at Keith's request: as one test it hid exactly the
 ambiguity he asked about ("would it file to Tuesday or Wednesday?").
 
-**TS-7 `[unit]` Nothing confidently claimable - hold, do not guess.**
-An arrival that no rule can place: earlier slots non-claimable, current
-slot filled or outside its window.
-**Expect**: **held for a human**, never defaulted into a future slot.
+**TS-7 `[unit]` No period open - hold, do not guess.**
+An arrival when no slot of its dataset is open: before its first claim
+window, or in a calendar period a partially-participating dataset is not
+in (REQ-PIPE-131 criterion 10).
+**Expect**: **held for a human**, never defaulted forward or backward.
 Defaulting forward is the forward cascade again.
 
 **TS-8 `[unit]` Assignment must be order-independent.**
@@ -2967,13 +2981,18 @@ the 1 May anchor and reports the supply ~12 weeks LATE for a quarter
 that was filled months ago.
 
 **TS-10 `[INJECT]` Evening-before daily arrival - two variants.**
-*Config: daily, Tuesday's supply due 22:00 MONDAY.*
+*Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours -
+so Tuesday's window opens 18:00 Monday, and Monday closes then.*
 - **Monday's slot filled** -> the 22:00 arrival fills **Tuesday, on
   time**.
-- **Monday's slot unfilled** -> it fills **Monday, late**.
-Same arrival instant, two different correct answers, decided by slot
-state rather than by a cutoff rule. This is what lets the cutoff live in
-`due_at` instead of in code.
+- **Monday's slot unfilled** -> it ALSO fills **Tuesday, on time**, and
+  Monday closes with no supply. **Changed 2026-10-04 by REQ-PIPE-131**:
+  this variant used to file Monday, late - slot state decided between
+  two answers. Keith's worked consequence: Monday's file arriving after
+  Tuesday's claim window opened is filed as Tuesday's; Monday closes
+  empty, visibly, and Tuesday's real file then supersedes it
+  (REQ-PIPE-118), replaces it (REQ-PIPE-123), or waits for a person.
+The cutoff still lives in `due_at` and the claim window, not in code.
 **Keith, 2026-09-22**: early and late arrivals must be **flagged in the
 activity feed** for humans to check - see "The activity feed" below.
 
@@ -3429,34 +3448,32 @@ written only AFTER the load is durable. Kill the process between load
 and record, and the table is re-loaded - wasteful and safe. The opposite
 order would skip a table that never loaded.
 
-### The off-cycle arrival gate
+### An arrival with no open period
 
-*Amended 2026-10-02 with REQ-PIPE-077. Both scenarios used to be about
-a DELIVERY whose tables landed in different periods; the requirement's
-own decisions record why that condition was replaced, and these follow
-it.*
+*Amended 2026-10-04 with REQ-PIPE-131, which RETIRED REQ-PIPE-077's
+off-cycle gate: an arrival where its dataset has no open slot is now
+held for a person before it is ever filed or checked, so there is
+nothing left for a promotion gate to stand back from.*
 
 **TS-33a `[unit]` A supply arriving in a period its dataset does not
 deliver in.** `cp-case-workers` carries `delivery_months: [February,
-August]`, so a May arrival of it is off-cycle - it will be FILED to its
-oldest claimable slot, which is perfectly ordinary, but it ARRIVED in a
-quarter it is not due in.
-**Expect**: QA **runs**, and that supply **does not auto-promote** - a
-human review gate, whatever its verdict.
+August]`, so its February slot closes when the calendar's MAY period's
+claim window opens, and nothing is open again until August's does.
+**Expect**: a June arrival of it is **held for a person** (REQ-PIPE-064)
+- filed neither backward into February nor forward into August.
 
-**TS-33b `[unit]` Its siblings must NOT be withheld with it.** The same
+**TS-33b `[unit]` Its siblings must NOT be held with it.** The same
 arrival carrying the other five Child Protection tables, all of them
 due this quarter.
-**Expect**: normal auto-promotion on green/amber for all five. The gate
-fires on one supply only.
+**Expect**: each is filed to its own open period and promoted on the
+ordinary green-or-amber rule. The hold is on one supply only.
 
-**TS-33b is the important half**, and it is the half the first
-implementation got wrong rather than a hypothetical: the old gate
+**TS-33b is the important half**, and it is the half an earlier
+implementation got wrong rather than a hypothetical: a gate once
 withheld the whole delivery, which cost 45 healthy supplies a person's
-attention across the real corpus. The condition is a fact about ONE
-dataset's participation on ONE date - so a sibling can neither earn it
-nor escape it. Without the negative case the bug ships, because the
-positive case alone looks like it works.
+attention across the real corpus. Whether a slot is open is a fact about
+ONE dataset on ONE instant - so a sibling can neither earn a hold nor
+escape one.
 
 ### The activity feed
 
@@ -4785,7 +4802,18 @@ TS-11), so the question below is settled except where noted:
   no saving worth having.
 
 ## Thread E - Slot assignment and the two cascades
-**Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
+**Status:** superseded (2026-10-04) · **Category:** Pipeline & publishing
+
+> **SUPERSEDED BY REQ-PIPE-131 (built 2026-10-04) - THE RULE BELOW IS
+> HISTORY, NOT THE RULE.** A claim window no longer "never closes": a
+> slot is OPEN from its claim-opening instant until the next CALENDAR
+> period's, and a supply is filed only to the slot open at its receipt
+> instant - to fill it, as a resupply of it, or held where none is open.
+> "Oldest claimable unfilled", on-time-wins and monotonic filling
+> (REQ-PIPE-063, retired) are all gone; so is the ambiguity mark
+> (REQ-PIPE-065 criteria 1-2, retired). The cascade analysis below is
+> still why NEVER CLAIM FORWARD holds, and REQ-PIPE-062's and
+> REQ-PIPE-131's own decisions carry it. Candidate for deletion whole.
 
 ### Slot assignment - the claim-window rule
 

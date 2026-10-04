@@ -282,8 +282,8 @@ button{font:inherit; color:inherit;}
 .pill.ev-info .ico{background:transparent; outline:1.5px solid var(--ink-faint);
   outline-offset:-1.5px;}
 /* BLOCKING IS A SECOND AXIS, not a fourth severity (criterion 3).
-   REQ-PIPE-065's uncertain assignment is genuinely non-blocking - the
-   supply was filed, just uncertainly - and mixing a non-blocking item
+   A refused inheritance is genuinely non-blocking - no supply is
+   stopped by it - and mixing a non-blocking item
    into a work queue with a weak distinction is how people learn to
    ignore the queue. A filled left bar is a different channel from the
    pill entirely, so the two distinctions cannot be confused for one. */
@@ -1374,28 +1374,6 @@ function waitedChip(e){
 // and one who concludes the page is wrong.
 const ARRIVAL_FOLLOWS_FILING =
   "Measured against the slot this supply is currently filed to. Re-filing it to another slot recomputes this.";
-// CRITERION 9: EVERYWHERE THE ASSIGNMENT IS RENDERED, not only in the
-// feed. REQ-PIPE-065's rule files a supply to the oldest claimable
-// unfilled slot while an EARLIER slot was also unfilled, and marks
-// that assignment uncertain - and an assignment marked uncertain in
-// one place and rendered as a confident verdict everywhere else is
-// exactly the false confidence that requirement's MoSCoW was raised
-// to MUST over. So the qualifier travels with the punctuality verdict
-// rather than living beside it.
-//
-// It reuses REQ-PIPE-063's own qualifier-chip idiom deliberately,
-// rather than inventing a second one for the same kind of claim.
-// Sourced from the outstanding queue because that is where the
-// uncertain filings already are - one reader, not two.
-function ambiguityChip(datasetId, supplyId, source){
-  const items = outstandingItems("dataset", datasetId, source)
-    .filter(i=> i.kind==="uncertain-assignment");
-  if(!items.length) return "";
-  const match = supplyId ? items.find(i=> (i.headline||"").indexOf(supplyId) !== -1) : items[0];
-  if(!match) return "";
-  const why = match.ambiguity || match.detail || "";
-  return `<span class="pill ev ev-warn sm" title="${escHtml(why)}"><span class="ico"></span>Uncertain filing</span>`;
-}
 // item 54 (plans/qa-pipeline.md) - Keith's report: "1 collections"/"1
 // datasets" on the Executive tier's agency cards, plus 4 other
 // count-plus-noun sites found in the audit he asked for, all a plain
@@ -3995,7 +3973,7 @@ function eventSeverityPill(severity, size){
 const OUTSTANDING_KIND_LABEL = {
   "held-supply":"Held supply", "failed-load":"Failed load",
   "contested-file":"Contested file", "unrecognised-file":"Unrecognised file",
-  "in-flight-delivery":"Still arriving", "uncertain-assignment":"Uncertain filing",
+  "in-flight-delivery":"Still arriving",
   "closed-unfilled-slot":"Missing supply"};
 function outstandingKindLabel(kind){ return OUTSTANDING_KIND_LABEL[kind] || kind; }
 
@@ -4057,8 +4035,6 @@ function outstandingItemHtml(item){
   // fault attributed to the reader - the headline names the artefact
   // or the supply, not a person.
   const klass = item.blocking ? "blocking" : "review";
-  const ambiguity = item.ambiguity
-    ? `<div class="queue-detail"><i>${escHtml(item.ambiguity)}</i></div>` : "";
   // THROUGH THE PAGE'S ONE WAY OF WRITING A DATE (REQ-DASH-071), which
   // this was the last place not to do. It rendered the stored instant
   // verbatim - `2026-09-28T06:10:22+08:00` - and nobody had seen it,
@@ -4077,7 +4053,6 @@ function outstandingItemHtml(item){
       ${when}
     </div>
     <div class="queue-detail">${escHtml(item.detail||"")}</div>
-    ${ambiguity}
     ${outstandingResponses(item)}
   </div>`;
 }
@@ -4098,7 +4073,7 @@ function outstandingQueue(scope, id, source){
     return `<div class="notice-queue quiet" role="status">
       <b>Nothing is waiting for a person${where}</b>
       <div style="color:var(--ink-muted); font-size:13px;">No supply is held, no load has
-        failed, no artefact is unattributed and no filing is uncertain. This panel is always
+        failed and no artefact is unattributed. This panel is always
         shown, so an empty one means checked and clear rather than not looked at.</div>
     </div>`;
   }
@@ -4312,7 +4287,7 @@ function renderAgency(view, agencyId){
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
-            <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> ${ambiguityChip(ds.id)} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="When we received this supply">${fmtArrival(ds.lastArrival)}</span> ${waitedChip(ds.lastArrival)}</td>
+            <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="When we received this supply">${fmtArrival(ds.lastArrival)}</span> ${waitedChip(ds.lastArrival)}</td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
             <td style="min-width:100px;">${dsSpark}</td>
@@ -4408,7 +4383,7 @@ function renderSupplyCycleRows(entries, datasetId){
       // e.arrivedAt used to be emitted RAW here - offset, microseconds
       // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
       // one column. REQ-DASH-071.
-      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPill(e.arrivalStatus,"sm")}</span>` : ""} ${ambiguityChip(datasetId, e.run_id)} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt) : ""}</span> ${waitedChip(e)}`;
+      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPill(e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt) : ""}</span> ${waitedChip(e)}`;
     // data-run-id alongside data-run-date: run_date is NOT unique (a
     // resupply shares its base run's date - plans/conceptual-design.md
     // Thread A found 352 real BDM runs across only 123 distinct dates),
@@ -4597,7 +4572,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     ${promotionSplit(ds)}
     <div class="sla-strip">
       <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${cadenceLabel(ds.sla.cadence)}</div></div>
-      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)} <span title="${ARRIVAL_FOLLOWS_FILING}">${ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : ""}</span> ${ambiguityChip(ds.id)}</div></div>
+      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)} <span title="${ARRIVAL_FOLLOWS_FILING}">${ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : ""}</span></div></div>
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">${fmtInt(ds.rowCount)} <span style="font-size:11.5px; color:${rowDelta>=0?'var(--good)':'var(--bad)'};">(${rowDelta>=0?'+':''}${fmtInt(rowDelta)})</span></div></div>
     </div>

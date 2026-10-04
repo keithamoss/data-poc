@@ -51,16 +51,16 @@ pytestmark = pytest.mark.on_demand
 #: (TestTheCorpusIsWorthComparing holds it to that):
 #:
 #: Birth Registrations - two clean daily supplies (promoted), the first
-#: RED one (fails checks, so is filed and not promoted) and a supply
-#: received days later, which files LATE into the oldest slot nothing has
-#: promoted into - a filing that reads the decision log, which is what
-#: makes the chain a chain.
+#: RED one (fails checks, so is filed and not promoted) and a later
+#: supply, whose filing reads the decision log to tell a fill from a
+#: resupply - which is what makes the chain a chain.
 #:
 #: Child Protection - its first quarterly delivery, six files and so six
 #: arrivals into six datasets, all promoted into ONE period schema: the
 #: shared-write case at its most concentrated. Then ONE file of its
-#: second delivery: case workers are not due that quarter, so promotion
-#: is WITHHELD - a decision that is not a promotion. Trimmed to that one
+#: second delivery: case workers are not due that quarter, so no slot of
+#: theirs is open and the supply is HELD (REQ-PIPE-131) - a filing that
+#: is not a fill. Trimmed to that one
 #: file because each file is a whole run, and the other five add a minute
 #: without adding a kind of record.
 KEEP = {"birth-registrations": ("run_001", "run_002", "run_009", "run_017"),
@@ -221,11 +221,11 @@ class TestTheCorpusIsWorthComparing:
         statuses = {json.loads(row[cols.index("status")]) for row in rows}
         assert {"pass", "fail"} <= statuses, statuses
 
-    def test_the_decision_log_has_promotions_and_something_else(self, both):
+    def test_the_decision_log_has_promotions(self, both):
         sequential, _ = both
         cols, rows = sequential["qa.decision"]
         actions = {json.loads(row[cols.index("action")]) for row in rows}
-        assert {"promote", "promotion-withheld"} <= actions, actions
+        assert "promote" in actions, actions
 
     def test_a_filing_depended_on_an_earlier_promotion(self, both):
         """A supply filed anywhere but its own current slot - the branch
@@ -233,7 +233,7 @@ class TestTheCorpusIsWorthComparing:
         sequential, _ = both
         cols, rows = sequential["qa.filing"]
         branches = {json.loads(row[cols.index("branch")]) for row in rows}
-        assert branches - {"on-time-current-slot"}, branches
+        assert branches - {"open-slot-unfilled"}, branches
 
 
 class TestParallelRecordsTheSameHistory:

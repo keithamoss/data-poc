@@ -19,6 +19,11 @@ Q3 as a resupply. The gate refuses it - filled slot, and off-cycle - and
 records the withheld note against Q3. From then on Q3 reads unfilled, so
 the next Case Workers arrival for Q3 would be promoted automatically
 over the accepted one.
+
+THE GATE IS GONE (REQ-PIPE-131 retired REQ-PIPE-077, 2026-10-04), so
+nothing writes this entry today. The property is kept because it is
+about every entry that annotates a slot without changing it, and
+`promotion-withheld` is still the vocabulary's example of one.
 """
 from __future__ import annotations
 
@@ -60,11 +65,14 @@ def a_filled_slot_then_withheld(conn, dataset):
             to_slot=SLOT)):
         pass
     assert dl.promoted_into(conn, dataset, SLOT) == ACCEPTED, "precondition"
-    promotion._record_withheld(
-        conn, agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
-        supply=RESEND, period=SLOT, arrived_in="2026-Q4",
-        actor="mothman:promotion-gate",
-        effective_at="2026-11-02T10:00:00+08:00")
+    # Written directly: the gate that wrote these was retired by
+    # REQ-PIPE-131, and an annotating entry must still never change what
+    # a slot holds (REQ-PIPE-132 criterion 8).
+    dl.record_automatic(conn, dl.Decision(
+        agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
+        action=dl.PROMOTION_WITHHELD, supply=RESEND, actor="mothman:promotion-gate",
+        actor_kind=dl.RULE, effective_at="2026-11-02T10:00:00+08:00", to_slot=SLOT,
+        reason="this dataset is not due in 2026-Q4, the period this supply arrived in"))
     conn.commit()
     return dataset
 

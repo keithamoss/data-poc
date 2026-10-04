@@ -694,8 +694,8 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
     what fixture_ids.CP_REF_RUN_ID names.
 
     FILED TO FIXED PERIODS, NOT THROUGH THE ASSIGNMENT RULE - and that is
-    a hermeticity fix found the hard way, 2026-10-02. The rule files to
-    the oldest slot no PROMOTION has filled, and the decision log it
+    a hermeticity fix found the hard way, 2026-10-02. The rule files as
+    a fill or a resupply by what has been PROMOTED, and the decision log it
     reads is append-only and shared by every module on this worker - so
     any module that promoted cp-clients somewhere moved where the
     reference delivery filed, and two of its six tables silently left

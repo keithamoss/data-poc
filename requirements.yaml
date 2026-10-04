@@ -1468,7 +1468,7 @@ requirements:
     - REQ-PIPE-057
     - REQ-PIPE-059
     - REQ-PIPE-060
-    - REQ-PIPE-063
+    - REQ-PIPE-132
     - REQ-PIPE-064
     - REQ-PIPE-065
     - REQ-PIPE-066
@@ -8098,7 +8098,9 @@ requirements:
       - THE SYSTEM SHALL give each slot its own grace allowance, taken
         from its own dataset's contract.
       - THE SYSTEM SHALL open a slot's claim window a configured
-        interval before that slot's due instant, and SHALL NOT close it.
+        interval before that slot's due instant, and SHALL close it when
+        the next period of its calendar opens its own claim window
+        (amended by REQ-PIPE-131).
       - IF a dataset declares a period as not expected, THEN THE SYSTEM
         SHALL create no slot for it.
       - THE SYSTEM SHALL determine whether a slot is overdue by querying
@@ -8258,6 +8260,7 @@ requirements:
         two parsers for one file. Named in the module docstring rather
         than left as an oddity; the tidier fix is a refactor this
         requirement does not need."
+      - "CRITERION 5 AMENDED 2026-10-04 by REQ-PIPE-131, PROVISIONAL (a consequential amendment Keith's blanket approval covers, listed in the overnight morning report because REQ-PIPE-131's own criterion 14 did not name it): it read 'and SHALL NOT close it'. A slot now closes when the next CALENDAR period's claim window opens, whether or not the dataset owes that period (slots.Slot.closes_at, slots.is_open/is_closed). next_unfilled_claimable() - the uncalled trap - and is_claimable() were removed with the open-ended window."
     linked_tests:
       - tests/test_slots.py
       - tests/test_schedule.py
@@ -8267,9 +8270,9 @@ requirements:
       - qa_tools/common/slots.py::slots_for_dataset
       - qa_tools/common/slots.py::claimable_until
       - qa_tools/common/slots.py::claim_window
-      - qa_tools/common/slots.py::is_claimable
+      - qa_tools/common/slots.py::is_open
+      - qa_tools/common/slots.py::is_closed
       - qa_tools/common/slots.py::is_overdue
-      - qa_tools/common/slots.py::next_unfilled_claimable
       - cli/schedule.py::_show_dataset
     evidence:
       - >
@@ -10975,8 +10978,7 @@ requirements:
     implemented_by:
       - qa_tools/common/assignment.py::assign
       - qa_tools/common/assignment.py::current_slot
-      - qa_tools/common/assignment.py::oldest_claimable_unfilled
-      - qa_tools/common/assignment.py::most_recently_filled
+      - qa_tools/common/assignment.py::open_slot
       - qa_tools/common/assignment.py::Assignment
       - qa_tools/common/filing.py::record
       - qa_tools/common/filing.py::filing_for
@@ -11056,9 +11058,9 @@ requirements:
     source: "Keith, delivery sprint 9 - the highest-risk sprint in the plan. plans/supply-model.md Thread E in full, including both cascades found by his own stress tests, plus Thread D's split of assignment from promotion. Test scenario register TS-1, TS-2, TS-3a-d, TS-6a, TS-6b, TS-9, TS-10. Honours the deferral REQ-PIPE-052 wrote: 'the rules that USE it - oldest claimable unfilled slot, on-time-wins-for-the-current-slot, monotonic filling, hold for a human - are slot ASSIGNMENT and belong to batch 3'. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "WHEN a supply arrives and is attributed to a dataset, THE SYSTEM SHALL assign it to exactly one of that dataset's own slots, record it as a resupply of a filled slot, or hold it - and SHALL do so before any check runs over it."
-      - "IF the arrival falls at or before the due instant of that dataset's current slot plus that slot's grace allowance, and that slot is unfilled, THEN THE SYSTEM SHALL assign the supply to that slot, even where earlier slots are unfilled."
-      - "WHERE that rule does not apply, THE SYSTEM SHALL assign the supply to the oldest slot that is unfilled and claimable."
-      - "IF no such slot exists, THEN THE SYSTEM SHALL record the supply as a resupply of the most recently filled slot."
+      - "WHERE the dataset has a slot open at the supply's receipt instant (REQ-PIPE-131) and that slot is unfilled, THE SYSTEM SHALL assign the supply to that slot, whether it is early, on time or late for it, even where earlier slots are unfilled (amended by REQ-PIPE-131)."
+      - "WHERE that open slot is already filled by a promoted supply, THE SYSTEM SHALL record the supply as a resupply of that open slot (amended by REQ-PIPE-131)."
+      - "THE SYSTEM SHALL NOT assign a supply automatically to any slot other than the one open at its receipt instant (amended by REQ-PIPE-131)."
       - "THE SYSTEM SHALL NOT assign a supply to a slot whose claim window has not opened, under any rule or any circumstance."
       - "THE SYSTEM SHALL treat a slot as filled only where a supply has been PROMOTED into it, and SHALL NOT treat an arrival, a staged supply or a rejected supply as filling one."
       - "THE SYSTEM SHALL assign each dataset's supplies against that dataset's own slot sequence alone."
@@ -11133,6 +11135,7 @@ requirements:
         today declares, per dataset, that its supplies are for the
         following period, or generates its slot calendar accordingly.
 
+      - "CRITERIA 2, 3 AND 4 AMENDED 2026-10-04 by REQ-PIPE-131 (Keith, signed): the rule reads 'the open slot if unfilled, else a resupply of it'. The old three branches - on-time-for-the-current-slot, oldest-claimable-unfilled, resupply-of-the-most-recently-filled - are replaced by open-slot-unfilled, resupply-of-open-slot and held-no-open-slot. The decision recorded above that 'Rejected CLOSING a slot's window when the next one opens' is REVERSED: Keith judged a closed, visibly empty Monday better than Monday's data filed backward. Filings already recorded are not re-derived (criterion 10); deployments regenerate."
   - id: REQ-PIPE-063
     title: A slot stops being claimable once a later one is filled
     date_written: "2026-09-23"
@@ -11141,9 +11144,13 @@ requirements:
       date: "2026-09-24"
     story: "As an agency data owner, I want a delivery that never arrived to stay recorded as not arrived, so that a later resupply of a different day cannot be quietly filed against it and turn a service failure into a met obligation."
     moscow: must
-    status: built
+    status: retired
+    retired:
+      date: "2026-10-04"
+      by: Keith
+      replaced_by: [REQ-PIPE-131, REQ-PIPE-132]
+      reason: "Closing by time replaces closing by filling. A slot closes when the next calendar period's claim window opens (REQ-PIPE-131); a slot that closes unfilled reads as not supplied, and a person records that with a reason (REQ-PIPE-132). Criterion 3 is deliberately reversed - a feed running more than one window behind now fills the open period and the skipped ones close unfilled."
     linked_tests:
-      - tests/test_monotonic_filling.py
       - tests/test_assignment.py
     implemented_by:
       - qa_tools/common/assignment.py::closed_by_monotonic_filling
@@ -11238,7 +11245,6 @@ requirements:
     status: built
     linked_tests:
       - tests/test_supply_holds.py
-      - tests/test_monotonic_filling.py
       - tests/test_assignment.py
     implemented_by:
       - qa_tools/common/supply_holds.py::holds_in
@@ -11295,7 +11301,7 @@ requirements:
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: "Keith, delivery sprint 9, plans/supply-model.md Thread H first chaos pass #3 and Thread E's standing principle - where a rule genuinely cannot know, SAY SO rather than commit silently. Test scenario register TS-7 and TS-6c's tail. Honours REQ-PIPE-052's deferral, in which 'hold for a human' appears exactly once in the whole register and nowhere else. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
-      - "IF no slot can be assigned by the rule and the supply cannot be recorded as a resupply of a filled slot, THEN THE SYSTEM SHALL hold it for a human."
+      - "IF no slot of the dataset is open at the supply's receipt instant, THEN THE SYSTEM SHALL hold it for a human (amended by REQ-PIPE-131)."
       - "THE SYSTEM SHALL NOT assign a held supply to a slot whose claim window has not opened, under any fallback, default or recovery path."
       - "WHILE a supply is held, THE SYSTEM SHALL keep it staged, and SHALL NOT promote it or classify its arrival."
       - "WHEN a supply is held, THE SYSTEM SHALL state why no slot could be assigned, naming the slots it considered and why each was unavailable."
@@ -11308,7 +11314,7 @@ requirements:
       - "At ~30 datasets, holds must aggregate. A design that is fine at two datasets produces thirty banners at thirty, and a banner per dataset is how people learn to ignore the whole class."
       - "A held supply is a state that persists across runs and must be re-presented on every run until it is resolved, not reported once into a log nobody re-reads."
       - "The resolution path does not exist until sprint 12, so a hold built now is a dead end by construction. That is acceptable for a build order but must be stated, because a hold nobody can clear is indistinguishable from a bug."
-    dependencies: [REQ-PIPE-062, REQ-PIPE-063]
+    dependencies: [REQ-PIPE-062, REQ-PIPE-131]
     decisions:
       - "Decided HOLD, never default forward. Defaulting a supply nothing can place into a future slot is the forward cascade again, arriving by the recovery path rather than by the rule."
       - "Decided this is a standing principle rather than a one-off, and Keith endorsed it as such: where a rule genuinely cannot know, SAY SO rather than commit silently. It has now produced three separate requirements in this area alone - this one, the ambiguity marking in REQ-PIPE-065, and the duplicate-file hold in REQ-PIPE-059."
@@ -11356,6 +11362,7 @@ requirements:
         cp_notifications, cp_investigations and cp_placements all carry
         a referential check against it.
 
+      - "CRITERION 1 AMENDED 2026-10-04 by REQ-PIPE-131 (Keith, signed): the trigger is 'no slot of the dataset is open at the receipt instant'. Two triggers remain reachable - an arrival before the dataset's first claim window, and one during a calendar period a partially-participating dataset is not in. The old worked case - a backfill into a slot monotonic filling had closed - cannot happen any more: the backfill is filed to the open period and a person re-files it. A hold now names the two slots either side of the arrival (the closed one, and the one not yet open), found by bisection."
   - id: REQ-PIPE-065
     title: An uncertain assignment says it is uncertain, and an arrival into a filled slot is reported
     date_written: "2026-09-23"
@@ -11365,6 +11372,17 @@ requirements:
     story: "As an operator, I want to be shown the filings the rule was not sure about and the supplies that landed on top of something already accepted, so that the two cases the rule genuinely cannot resolve reach a person while they are still cheap to correct."
     moscow: must
     status: built
+    retired_criteria:
+      - criterion: 1
+        date: "2026-10-04"
+        by: Keith
+        replaced_by: [REQ-PIPE-131]
+        reason: "A file is filed only to the one open period, so it can never fit two; there is no ambiguity left to mark."
+      - criterion: 2
+        date: "2026-10-04"
+        by: Keith
+        replaced_by: [REQ-PIPE-131]
+        reason: "Nothing is marked under ambiguity any more, so there is nothing to surface; the dashboard's 'Uncertain filing' chip and the queue's uncertain-assignment item are removed."
     linked_tests:
       - tests/test_landed_on_accepted.py
       - tests/test_assignment.py
@@ -11376,10 +11394,10 @@ requirements:
       - qa_tools/common/assignment.py::Assignment
     unmet_criteria:
       - criterion: >-
-          Criteria 2 and 8, in part - surfacing an ambiguous assignment for
-          review, and reporting both cases as warnings that do not stop
-          processing. The marks and the report are produced and tested; no
-          run emits them yet.
+          Criterion 8, in part - reporting an arrival into a filled slot as
+          a warning that does not stop processing. The report is produced
+          and tested; no run emits it yet. (Criterion 2's half of this entry
+          went with that criterion's retirement, REQ-PIPE-131.)
         why: >-
           Both need a filing to attach to, and REQ-PIPE-062's filings are
           deliberately not recorded until promotion exists. The report also
@@ -13499,7 +13517,12 @@ requirements:
       filing itself quietly - and so that the tables which arrived when
       they were due are not made to wait alongside it.
     moscow: should
-    status: built
+    status: retired
+    retired:
+      date: "2026-10-04"
+      by: Keith
+      replaced_by: [REQ-PIPE-131]
+      reason: "It judged 'off-cycle' by calendar date, ignoring claim windows. Under REQ-PIPE-131 an arrival where its dataset has no open slot is already held for a person before it is filed or checked, and the one case left to this gate - an early, in-window file - it would withhold wrongly. REJECTED redefining it over open intervals, which would be a second rule saying what REQ-PIPE-131 says."
     source: >
       plans/supply-model.md Thread H second chaos pass #4 and test
       scenarios TS-33a/TS-33b, settled with Keith 2026-09-22. Assigned

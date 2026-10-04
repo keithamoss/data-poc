@@ -102,20 +102,19 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
     """A cadence rule generates periods from its own effective_from, so
     that date is the whole of what says when the feed began.
 
-    Set too early it is not a harmless overcount. "Oldest claimable
-    unfilled slot" is one of the assignment rule's real branches, so
-    every supply that is not on time for its own current day files
-    against the earliest unfilled slot in the calendar - which, with a
-    start date years before the data, is the very first one. Measured
-    before this was fixed: the daily calendar owed 1,365 slots against
-    32 real supply days, and a supply meant for a Monday in August 2026
-    filed to 2023-01-01.
+    Set too early it is not a harmless overcount. Under the assignment
+    rule of the day, "oldest claimable unfilled slot" was a real branch,
+    so every supply not on time for its own day filed against the
+    earliest unfilled slot in the calendar - with a start date years
+    before the data, the very first one. Measured before this was fixed:
+    the daily calendar owed 1,365 slots against 32 real supply days, and
+    a supply meant for a Monday in August 2026 filed to 2023-01-01.
+    (REQ-PIPE-131's open-slot rule cannot file backward at all, so the
+    filing half is now guarded twice.)
 
-    It reaches past assignment too: monotonic filling closes every slot
-    behind the newest filled one, so those 1,333 unfilled slots become
-    1,333 closed-and-unfilled obligations in REQ-DASH-070's queue the
-    moment promotion lands, and a dashboard saying Birth Registrations
-    missed 1,333 deliveries.
+    It reaches past assignment too: every one of those slots closes
+    unfilled, so a calendar starting too early is a dashboard saying
+    Birth Registrations missed 1,333 deliveries.
     """
 
     def _generator_first_period(self):
@@ -160,8 +159,8 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
         due = first + timedelta(days=10)
         all_slots = slots.slots_for_dataset("birth-registrations", until=due)
         # Nothing filled, and a supply arriving the morning after its
-        # own slot's grace ran out. It is late, so it takes the oldest
-        # claimable unfilled slot - which must be its own recent one.
+        # own slot's grace ran out. It is late, and must still file to its
+        # own recent day rather than anywhere near the calendar's start.
         arrived = asset_time.wall_clock(due, "09:00") + timedelta(days=1)
         decided = assignment.assign("birth-registrations", "a-late-supply", arrived,
                                      all_slots, filled=frozenset())
@@ -170,8 +169,8 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
         filed = date.fromisoformat(decided.slot)
         assert (due - filed).days <= 31, (
             f"a supply arriving {arrived.date()} filed to {filed}, "
-            f"{(due - filed).days} days earlier - the oldest-claimable branch is "
-            f"reaching back to the start of the calendar")
+            f"{(due - filed).days} days earlier - filing is reaching back to the "
+            f"start of the calendar")
 
 
 class TestParticipation:

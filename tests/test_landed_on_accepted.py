@@ -1,14 +1,16 @@
-"""An uncertain assignment says it is uncertain, and an arrival into a
-filled slot is reported (REQ-PIPE-065).
+"""An arrival into a filled slot is reported (REQ-PIPE-065 criteria 3
+to 9).
 
-Two rules with one thing in common: both exist so a case the rule
-cannot resolve reaches a person while it is still cheap to correct.
+Criteria 1 and 2 - marking an assignment made under ambiguity - were
+RETIRED by REQ-PIPE-131 (2026-10-04): a file is filed only to the one
+open period, so it can never fit two, and there is no ambiguity left to
+mark. tests/test_assignment.py asserts the mark is gone.
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from qa_tools.common import assignment, landed_on_accepted
+from qa_tools.common import landed_on_accepted
 from qa_tools.common.schedule import Period
 from qa_tools.common.slots import Slot
 
@@ -24,56 +26,6 @@ def _slot(day: int, hour: int = 22) -> Slot:
 
 def _at(day: int, hour: int, minute: int = 0) -> datetime:
     return datetime(2026, 6, day, hour, minute, tzinfo=PERTH)
-
-
-class TestAnUncertainAssignmentSaysSo:
-    """Criteria 1 and 2. Unbuilt, this leaves ambiguous assignments
-    presented as CERTAIN - a false-confidence problem rather than a
-    missing nicety, which is why it was raised from should to must."""
-
-    def test_it_is_marked_when_an_earlier_slot_is_also_unfilled(self):
-        """The 2nd was filled, so the 1st is closed by monotonic
-        filling and still unfilled. A supply then arrives just after
-        midnight on the 4th - too late for the 3rd's grace, so it takes
-        the 3rd as the oldest CLAIMABLE unfilled slot, while the 1st
-        sits there unfilled and unclaimable. Late for the 3rd, or a
-        backfill for the 1st? No rule can tell.
-        """
-        slots = [_slot(d) for d in range(1, 5)]
-        got = assignment.assign("d", "s", _at(4, 0, 30), slots, frozenset({"02"}))
-        assert got.branch == assignment.OLDEST_CLAIMABLE and got.slot == "03"
-        assert got.ambiguous is True
-        assert got.ambiguity and "also unfilled" in got.ambiguity
-
-    def test_it_is_not_marked_when_nothing_earlier_is_outstanding(self):
-        """The control: if everything were marked ambiguous the flag
-        would carry no information at all."""
-        slots = [_slot(1), _slot(2)]
-        got = assignment.assign("d", "s", _at(2, 3), slots, frozenset())
-        assert got.branch == assignment.OLDEST_CLAIMABLE
-        assert got.ambiguous is False and got.ambiguity is None
-
-    def test_an_on_time_assignment_is_never_ambiguous(self):
-        slots = [_slot(1), _slot(2), _slot(3)]
-        got = assignment.assign("d", "s", _at(3, 22), slots, frozenset())
-        assert got.branch == assignment.ON_TIME and got.ambiguous is False
-
-    def test_it_defaults_backward_rather_than_refusing(self):
-        """Decision 4 - late is commoner than early, so it files and
-        flags rather than holding. Cheap to correct, because filing is
-        mutable and the verdict recomputes."""
-        slots = [_slot(d) for d in range(1, 5)]
-        got = assignment.assign("d", "s", _at(4, 0, 30), slots, frozenset({"02"}))
-        assert got.slot == "03", "it must still file, not refuse"
-        assert got.branch != assignment.HELD
-
-    def test_the_mark_survives_into_the_record(self):
-        """The NFR: it must stay visible until somebody looks, not be
-        cleared by the next run passing over it again."""
-        slots = [_slot(d) for d in range(1, 5)]
-        record = assignment.assign(
-            "d", "s", _at(4, 0, 30), slots, frozenset({"02"})).as_record()
-        assert record["ambiguous"] is True and record["ambiguity"]
 
 
 class TestArrivingForAnAlreadyAcceptedSlot:

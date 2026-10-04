@@ -203,66 +203,13 @@ def effective_at_for(received_at: datetime, *, now: datetime | None = None,
     return min(now, received_at + _LAG_MIN + _LAG_SPAN * fraction)
 
 
-def arrived_off_cycle(dataset_id: str, at) -> tuple[bool, str]:
-    """Whether a supply ARRIVED in a period its dataset does not
-    participate in, and which period that was (REQ-PIPE-077 criterion 1).
-
-    A FACT ABOUT ONE DATASET AND ONE INSTANT, which is the whole of the
-    2026-10-02 amendment. This used to be `spans_periods(supplies)` -
-    whether one delivery's tables were filed to more than one period -
-    and that condition withheld every supply in such a delivery,
-    including the five whose own period was unremarkable. Measured over
-    the real corpus it fired on nine of sixty deliveries and every one
-    of them was a partial-participation dataset riding along in an
-    ordinary quarterly drop. Worse, it could not NAME its own target:
-    given five supplies in Q2 and one in Q1 only counting said which was
-    odd, and counting has no answer on a three-three split.
-
-    ARRIVED, NOT FILED, and the distinction is the point. A May arrival
-    of `cp-case-workers` FILES to 2023-Q1, because that is the oldest
-    slot it can still claim - but it ARRIVED in Q2, a quarter it does
-    not deliver in, and that is what makes it worth a person's time.
-    Comparing a supply's filed period with its own period is always
-    equal and would catch nothing.
-
-    READ FROM CONFIGURATION ALONE - the calendar says which period
-    contains `at`, the dataset's own `delivery_months` say whether it
-    participates in that one. No delivery, no siblings, no data access
-    (NFR 3).
-
-    EVERY UNANSWERABLE CASE IS "NOT OFF-CYCLE", deliberately. A dataset
-    the hierarchy does not know, one with no agreed calendar at all, a
-    calendar misconfiguration, an arrival before the calendar's first
-    period opens - none of those is evidence that a supply is early or
-    late, and a gate that withheld on them would take a run down over an
-    id it could not place. Same blast-radius rule this area applies
-    everywhere.
-    """
-    from qa_tools.common import schedule
-
-    on = at.date() if hasattr(at, "date") else at
-    try:
-        cal = schedule.calendar_for_dataset(dataset_id)
-        opened = schedule.periods_for_calendar(cal.name, until=on)
-        participates = {p.name for p in schedule.periods_for_dataset(dataset_id, until=on)}
-    except Exception:  # noqa: BLE001 - see the docstring
-        return False, ""
-    if not opened:
-        # The calendar has not started. There is no period it is absent
-        # from, so there is nothing to withhold it for.
-        return False, ""
-    arrived_in = opened[-1].name
-    return arrived_in not in participates, arrived_in
-
-
 def should_promote(*, status: str,
                    slot_filled: bool,
                    held_without_slot: bool,
                    has_active_checks: bool,
                    decided_by_a_person: bool = False,
                    contested: bool = False,
-                   inherited: bool = False,
-                   arrived_off_cycle: bool = False) -> tuple[bool, str | None]:
+                   inherited: bool = False) -> tuple[bool, str | None]:
     """Whether automation may promote this supply, and why not if not.
 
     The reason is not decoration: "not promoted" with no explanation is
@@ -311,19 +258,6 @@ def should_promote(*, status: str,
         # Criterion 3.
         return False, (f"this supply's status is {status} rather than green or "
                        "amber, so it waits for a person")
-    if arrived_off_cycle:
-        # REQ-PIPE-077 criterion 1. AFTER the verdict, because the
-        # refusal reported should be the one worth acting on first: a
-        # red supply is a thing to fix, where arriving early is merely
-        # why today's attempt stopped.
-        #
-        # IT WITHHOLDS THIS SUPPLY AND NOTHING ELSE. The gate used to
-        # take the whole delivery with it; a supply arriving when its
-        # dataset is not due says nothing at all about the siblings that
-        # arrived when they were.
-        return False, ("this dataset is not due in the period this supply "
-                       "arrived in, so it is off-cycle and a person decides "
-                       "before it is promoted")
     if slot_filled:
         # Criterion 4, whatever the status.
         return False, ("this supply's slot is already filled by a promoted "
@@ -631,8 +565,7 @@ def after_run(conn: supply_db.SupplyConnection, *,
               reads: dict[str, list[str]],
               actor: str,
               actor_kind: str,
-              effective_at: str,
-              arrived_at=None) -> AfterRun:
+              effective_at: str) -> AfterRun:
     """Promote whatever this run's supplies earned, one decision each.
 
     `supplies` is what the run actually carried, one dict per dataset:
@@ -640,13 +573,6 @@ def after_run(conn: supply_db.SupplyConnection, *,
       physical_tables, and the two refusals only the caller can see -
       `held` (REQ-PIPE-059 could not choose between two files) and
       `contested` (REQ-PIPE-079 criterion 13).
-
-    `arrived_at` is when the delivery was RECEIVED, which is not
-    `effective_at`: a batch stamps every decision with one clock while
-    replaying arrivals that span years, and whether a supply is
-    off-cycle is a fact about the day it turned up. Omit it and the
-    off-cycle gate simply does not fire, which is the right default for
-    a caller that genuinely does not know.
 
     `results` is this run's check results and `reads` is check_id -> the
     tables each declares, which together are how status_of() finds every
@@ -663,16 +589,9 @@ def after_run(conn: supply_db.SupplyConnection, *,
     work: list[dict] = []
     refused: dict[str, str] = {}
 
-    # ONCE PER SUPPLY, NOT ONCE PER DELIVERY (REQ-PIPE-077 criterion 1,
-    # as amended 2026-10-02). Off-cycle is a fact about one dataset's
-    # own participation on one date, so a sibling cannot earn it and a
-    # sibling cannot escape it.
-
     for item in supplies:
         dataset_id = item["dataset_id"]
         period = item.get("period")
-        off_cycle, arrived_in = (arrived_off_cycle(dataset_id, arrived_at)
-                                 if arrived_at is not None else (False, ""))
         try:
             status = status_of(dataset_id, results, reads=reads)
         except UnreadableVerdictError as exc:
@@ -696,15 +615,9 @@ def after_run(conn: supply_db.SupplyConnection, *,
                        and inheritance.inherited(conn, dataset_id, period) is not None),
             decided_by_a_person=rejection.decided_by_a_person(
                 conn, dataset_id, item["supply"]),
-            arrived_off_cycle=off_cycle,
         )
         if not ok:
             refused[dataset_id] = why or "refused"
-            if off_cycle and period:
-                _record_withheld(
-                    conn, agency_id=agency_id, collection_id=collection_id,
-                    dataset_id=dataset_id, supply=item["supply"], period=period,
-                    arrived_in=arrived_in, actor=actor, effective_at=effective_at)
             continue
         work.append({"dataset_id": dataset_id, "supply": item["supply"],
                      "period": period,
@@ -719,80 +632,6 @@ def after_run(conn: supply_db.SupplyConnection, *,
         period="", actor=actor, actor_kind=actor_kind,
         effective_at=effective_at)
     return AfterRun(promoted=tuple(promoted), refused=refused, failed=failed)
-
-
-@dataclass(frozen=True)
-class Withheld:
-    """One supply the off-cycle gate stood back from."""
-
-    dataset_id: str
-    period: str
-    reason: str
-
-
-def withheld(conn=None) -> list[Withheld]:
-    """Every supply the off-cycle gate withheld (REQ-PIPE-077
-    criterion 4).
-
-    A NARROW READER, and opens its own connection when not given one -
-    the same shape as `inheritance.refusals()` and for the reason
-    outstanding.py's own docstring gives: a narrow reader can only
-    answer questions about RECORDS, where `supply_db.connect` can
-    answer any question at all, including ones about supply rows a
-    dashboard build must never ask.
-    """
-    if conn is None:
-        with supply_db.connect(read_only=True,
-                                label="mothman:withheld-promotions") as opened:
-            return withheld(opened)
-    from qa_tools.common import decision_log
-
-    rows = conn.execute(
-        f"SELECT dataset_id, to_slot, reason FROM {decision_log.TABLE} "
-        "WHERE action = ? ORDER BY dataset_id, to_slot",
-        [decision_log.PROMOTION_WITHHELD]).fetchall()
-    return [Withheld(dataset_id=d, period=p, reason=r or "") for d, p, r in rows]
-
-
-def _record_withheld(conn, *, agency_id: str, collection_id: str,
-                      dataset_id: str, supply: str, period: str,
-                      arrived_in: str, actor: str,
-                      effective_at: str) -> None:
-    """Record that the off-cycle gate stood back (criterion 6).
-
-    ONE ENTRY PER SUPPLY, because the log is keyed on a dataset and a
-    slot, and because "why is this one not promoted" is asked of a
-    supply. It names BOTH periods - the one the supply arrived in and
-    the one it was filed to - because those differ in every case this
-    gate fires on, and an entry naming only one invites the reader to
-    assume they are the same.
-
-    THE RULE IS THE ACTOR, never a person: nobody decided this, a gate
-    fired. `_decider()` in slot_state.py depends on that distinction -
-    naming a person here would put a decision on somebody who never
-    made one.
-
-    IT DOES NOT RAISE. A gate that cannot write its own note must not
-    cost the delivery its QA, which is the blast-radius rule this area
-    applies everywhere - and the refusal itself has already been
-    recorded in `refused`, which is what the terminal and the ticket
-    show.
-    """
-    from qa_tools.common import decision_log
-
-    try:
-        decision_log.record_automatic(conn, decision_log.Decision(
-            agency_id=agency_id, collection_id=collection_id,
-            dataset_id=dataset_id, action=decision_log.PROMOTION_WITHHELD,
-            supply=supply, actor=actor, actor_kind=decision_log.RULE,
-            effective_at=effective_at, to_slot=period,
-            reason=(f"this dataset is not due in {arrived_in}, the period "
-                     f"this supply arrived in, so automation stood back and "
-                     f"a person decides whether it fills {period}")))
-    except Exception as exc:  # noqa: BLE001 - see the docstring
-        print(f"note: could not record the withheld promotion for "
-               f"{dataset_id} ({type(exc).__name__}: {exc}) - the refusal "
-               f"itself still stands and is reported.")
 
 
 def after_runs(found_arrivals, results: Sequence[dict], *,
@@ -843,8 +682,7 @@ def after_runs(found_arrivals, results: Sequence[dict], *,
                 supplies=filing.supplies_of(conn, arrival),
                 results=by_run.get(arrival.run_id, []),
                 reads=reads, actor=actor, actor_kind=actor_kind,
-                effective_at=effective_at,
-                arrived_at=arrival.received_at)
+                effective_at=effective_at)
             promoted.extend(outcome.promoted)
             # LAST WORD WINS on a dataset seen twice, which is the right
             # answer rather than a shortcut: a later arrival's refusal

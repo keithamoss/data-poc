@@ -725,6 +725,22 @@ class TestARetiredRequirement:
         errors = validate(self._pair(retired=dict(self._RETIRED)))
         assert any("has a `retired:` block but status is 'built'" in e for e in errors), errors
 
+    def test_its_record_of_code_since_removed_is_kept_as_history(self):
+        """Found retiring REQ-PIPE-063 and REQ-PIPE-077 (2026-10-04): the
+        whole point of a retirement is usually that its code was REMOVED,
+        and a retired requirement "keeps whatever it carried as history"
+        (REQ-DOCS-143's own decision) - so demanding its implemented_by and
+        linked_tests still resolve would force the history to be deleted."""
+        reqs = self._pair(status="retired", retired=dict(self._RETIRED),
+                          implemented_by=["qa_tools/common/assignment.py::gone_long_ago"],
+                          linked_tests=["tests/test_never_existed.py"])
+        assert validate(reqs) == []
+
+    def test_a_live_requirement_still_needs_its_code_to_exist(self):
+        """The control: only a RETIRED record is history."""
+        reqs = self._pair(implemented_by=["qa_tools/common/assignment.py::gone_long_ago"])
+        assert any("gone_long_ago" in e for e in validate(reqs))
+
     def test_the_successor_must_exist(self):
         errors = validate([_valid_entry(status="retired",
                                          retired={**self._RETIRED, "replaced_by": ["REQ-QAC-099"]})])
