@@ -5466,3 +5466,17 @@ urgent.
    rather than a fabricated scalar. The lower bound is still not
    displayed as a number, so if that specific gap matters it wants a new
    item against the real Soda path rather than reviving this one.
+
+88. **[todo, 2026-10-04]** **[Pipeline & publishing]** The qa metadata
+    schema states each fact once - `REQ-PIPE-144`, signed 2026-10-04.
+    Keith's ask after auditing the live schema. Three copies go:
+    `filing.record` (a JSON copy of the row's own columns plus retired
+    rule fields; "slots considered" survives as its own ordered column),
+    `filing.received_at` (the FILE's own receipt, so it moves onto
+    `qa.delivery_file` and every reader asks one receipt view; a
+    contested pair claims no single receipt until a person picks a
+    file), and `delivery.contested` (becomes a view). Delivery records
+    become permanent history: `mothman pipeline run` stops pruning them
+    and only a guarded `mothman env reset-synthetic` clears them. Built
+    straight after REQ-PIPE-131. Delete this entry when REQ-PIPE-144 is
+    built.

@@ -1527,3 +1527,8 @@ judgement about who reads the page rather than about the rule.
       130, 123, 121, 126, 127. A planted scenario shows a reader re-checked
       after both a newer-file supersession and an automatic replacement
       (REQ-GEN-136).
+    - **REQ-PIPE-144 SIGNED, 2026-10-04 (Keith)** - the qa schema states
+      each fact once; slotted straight after REQ-PIPE-131, before re-file.
+      Order now: REQ-DOCS-143 -> slot view + withheld fix -> 134, 131,
+      **144**, 132, 133, 122, 118, 120, 128+129, re-file (140-142), the
+      rest of 130, 123, 121, 126, 127.
