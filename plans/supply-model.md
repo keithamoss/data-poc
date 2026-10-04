@@ -1879,7 +1879,17 @@ comparisons against the expected-supply sequence.
     amended 2026-10-02).
 
     **Owns:** `REQ-PIPE-075`, `REQ-PIPE-076`, `REQ-PIPE-077`, `REQ-PIPE-079`,
-    `REQ-PIPE-080`, `REQ-PIPE-081`, `REQ-GHUB-082`, `REQ-PIPE-086`
+    `REQ-PIPE-080`, `REQ-PIPE-081`, `REQ-GHUB-082`, `REQ-PIPE-086`,
+    `REQ-TEST-150`, `REQ-PIPE-151`, `REQ-PIPE-152`
+
+    *Refreshed and signed 2026-10-04 (Keith, via delivery-scoper)*:
+    REQ-PIPE-086 narrowed to "every kept terminal route goes through the
+    shared per-arrival lifecycle"; its rehearsal and recognition criteria
+    are REQ-PIPE-103's. REQ-TEST-150 reports what the lifecycle decided.
+    REQ-PIPE-151 is `mothman pipeline process` (Thread L): the pass that
+    finishes owed work in production, with every gate refusal now logged
+    under the rule. REQ-PIPE-152 moves the S3 Lambda handlers onto the
+    lifecycle, the S3 object being the delivery.
 
     *Scope grew 2026-09-22*: the gate is a promotion rule rather than
     an assignment one, so it lives here. *Amended 2026-10-02*: its

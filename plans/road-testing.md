@@ -1663,3 +1663,10 @@ judgement about who reads the page rather than about the rule.
       on the way: post-build-review #81 (automatic promotions record the
       operator's git identity, not the rule) and #82 (the real hand-filed
       routes never offer the decision afterwards).
+      **SIGNED later the same evening**: REQ-PIPE-086 (12 criteria),
+      REQ-TEST-150 (10), REQ-PIPE-151 `mothman pipeline process` (19) and
+      REQ-PIPE-152 the Lambda handlers (11), plus the re-pointing of
+      REQ-PIPE-121 criterion 16, REQ-PIPE-140 criterion 8 and REQ-PIPE-120's
+      NFR at 151. Not yet placed in the build order. All the old unsigned
+      drafts have now been refreshed except the parked calendar group
+      (110-113) and REQ-QAC-145.

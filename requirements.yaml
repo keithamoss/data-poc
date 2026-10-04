@@ -18505,204 +18505,66 @@ requirements:
         copies of a listener is how one of them stops being added.
 
   - id: REQ-PIPE-086
-    title: The terminal runs the whole supply lifecycle, using the automated path's own logic
-    date_written: "2026-09-26"
-    story: >
-      As a data engineer who will be running this from a terminal long
-      before any of it is automated, I want the TUI to do everything the
-      automated path does - recognise a delivery, work out which dataset
-      and which slot it belongs to, run QA, and apply the same rules
-      about what gets promoted - so that what I do by hand today is the
-      same thing the automation will do later, rather than a simpler
-      version of it that quietly behaves differently.
+    title: Every terminal route that keeps a supply processes it through the pipeline's own per-arrival lifecycle, and no other
+    date_written: '2026-09-26'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As a data engineer who will be running this from a terminal long before any of it is automated, I want every way I can keep a supply from the terminal - a file, a folder, one table, an S3 object, or an arrival I picked from the ones on disk - to go through exactly the steps the pipeline takes for an arrival (file it, overlay its period, check it, apply the promotion gate), so that what I do by hand today is the thing the automation will do later, rather than a narrower version of it that quietly behaves differently.
     moscow: must
     status: not_started
-    source: >
-      Keith, 2026-09-26, mid sign-off of REQ-GHUB-082: "data engineers
-      will start by using the TUI for QA and then we'll wire in an
-      automated path later", so "the TUI MUST offer 100% the same
-      functionality end to end as the automated pathway - deliveries,
-      matching files, running QA, and all of the automation logic around
-      what goes where". Split out of REQ-GHUB-082 the same day at his
-      own call, once folding it in had taken that requirement to 21
-      criteria.
+    source: 'Keith, 2026-09-26, mid sign-off of REQ-GHUB-082: "data engineers will start by using the TUI for QA and then we''ll wire in an automated path later", so "the TUI MUST offer 100% the same functionality end to end as the automated pathway - deliveries, matching files, running QA, and all of the automation logic around what goes where". Split out of REQ-GHUB-082 the same day at his own call. REFRESHED by delivery-scoper 2026-10-04 against everything built and signed since, and narrowed at Keith''s answers the same day (questions Q1-Q5): most of the original twelve criteria are now carried by REQ-PIPE-103 and by the shared per-arrival functions REQ-PIPE-105 introduced; what remains is every route that still goes round them. The Lambda handlers were added at Keith''s Q2 answer and then split out to REQ-PIPE-152 at his follow-up answer the same day.'
     acceptance_criteria:
-      - >
-        THE SYSTEM SHALL drive, from the TUI, every stage of the supply
-        lifecycle the automated path drives - recognising a delivery,
-        matching its files to datasets, staging them, running QA,
-        assigning a slot, and applying the automatic promotion gate.
-      - >
-        THE SYSTEM SHALL do so by invoking the implementation the
-        automated path invokes, and SHALL NOT carry a second
-        implementation of any stage for the terminal.
-      - >
-        THE SYSTEM SHALL NOT reach, from the TUI, an outcome the
-        automated path would not reach from the same inputs.
-      - >
-        WHERE the automatic promotion gate promotes a supply during a
-        TUI run, THE SYSTEM SHALL record the rule as the actor, and
-        SHALL NOT record the operator who started the run.
-      - >
-        THE SYSTEM SHALL tell the operator, at each stage, what the
-        shared logic decided and on what grounds, so that a person
-        running it by hand can see the rule working rather than only
-        its result.
-      - >
-        WHERE a stage would be skipped or would fail, THE SYSTEM SHALL
-        say which stage and why, and SHALL NOT present a partially
-        completed run as a completed one.
-      - >
-        THE SYSTEM SHALL ask, before an interactive QA run begins,
-        whether it is a rehearsal or a real run against a filed
-        delivery, and SHALL say plainly what each one does.
-      - >
-        THE SYSTEM SHALL treat only a real run as a delivery's QA for
-        the purposes of automatic promotion, and SHALL NOT let a
-        rehearsal run file a supply, promote one, or change anything in
-        the warehouse.
-      - >
-        THE SYSTEM SHALL put a file offered to the TUI through the same
-        recognition the automated path uses - the dataset's own declared
-        arrival pattern, the collection's delivery boundary, and the
-        same slot assignment rule - and SHALL NOT accept a file into a
-        real run on the strength of the operator having chosen it.
-      - >
-        IF no dataset claims a file offered to the TUI, or more than one
-        does, THEN THE SYSTEM SHALL report that the way the automated
-        path reports an unplaceable delivery, and SHALL NOT let the
-        operator name the dataset to get past it.
-      - >
-        THE SYSTEM SHALL tell the operator what recognition made of a
-        file in a rehearsal run too, and SHALL NOT block the rehearsal
-        on the answer.
-      - >
-        THE SYSTEM SHALL NOT offer to save a rehearsal run's results
-        into the committed QA history, and SHALL say that is why rather
-        than omitting the step silently.
+    - THE SYSTEM SHALL process every arrival a person keeps from the terminal - through a single file, a folder, one table on its own, an S3 object or an S3 delivery prefix, from the TUI or from flags - by calling the same per-arrival function the pipeline calls for each arrival, which files it, overlays its period, runs its checks and applies the promotion gate.
+    - THE SYSTEM SHALL have the pipeline's batch process each arrival by calling that same per-arrival function, and SHALL NOT compose filing, overlay, checking and promotion a second time in the batch's own loop.
+    - WHERE a person keeps one Child Protection table on its own, THE SYSTEM SHALL let that arrival read the collection's other tables from its filed period, as for any other single-file arrival, and SHALL NOT borrow them from an earlier run's delivery.
+    - WHERE a person keeps a folder, THE SYSTEM SHALL decide which dataset each file belongs to by recognition alone, and SHALL accept any set of recognised files the pipeline would accept, rather than requiring a file for every table in the collection.
+    - IF a kept file is recognised as belonging to a collection other than the one the command names, THEN THE SYSTEM SHALL refuse it before writing any delivery or receipt, and SHALL say which collection it belongs to.
+    - WHILE REQ-PIPE-140 is not built, THE SYSTEM SHALL NOT offer, in the terminal's synthetic source mode, to record a check of an arrival whose QA results are already recorded.
+    - WHERE REQ-PIPE-140 is built, THE SYSTEM SHALL record a further check of an arrival whose QA results are already recorded only through REQ-PIPE-140's re-check, under a run identity of its own.
+    - THE SYSTEM SHALL NOT record results under an already-recorded arrival's own run identity a second time, and SHALL NOT replace or delete any result already recorded for it, from any route.
+    - WHERE a person picks, in the terminal's synthetic source mode, an arrival recognised on disk that has no recorded QA, and keeps it, THE SYSTEM SHALL process it through the per-arrival function of criterion 1.
+    - THE SYSTEM SHALL use the single-run entry point (orchestrate_bdm.run_single, orchestrate_cp.run_single) for trials only, from every route, and IF it is asked to record a run under a non-trial identity, THEN THE SYSTEM SHALL refuse and record nothing.
+    - WHEN one delivery is kept through the terminal in one database and processed by the pipeline's batch in another, both starting from the same recorded state, THE SYSTEM SHALL produce the same filings, the same decision-log entries apart from their written instants and the identity that ran them, and the same check verdicts - and SHALL produce them for the Lambda route too, once REQ-PIPE-152 is built.
+    - THE SYSTEM SHALL limit the steps the batch performs that a single kept arrival does not to those that concern a whole pass rather than one arrival - the in-flight survey and ticket reconciliation - and SHALL perform every per-arrival step on every route.
     non_functional_requirements:
-      - >
-        CORRECTNESS BY CONSTRUCTION is the whole requirement. "The same
-        functionality" is not a thing a person can verify by reading two
-        code paths; it is a thing that holds because there is one code
-        path. Any criterion here that could be met by a careful
-        reimplementation has been written wrong.
-      - >
-        COMPATIBILITY: this route is the one that works with no network
-        and no GitHub reachability, which on a government network may
-        make it the only route rather than the convenient one - the same
-        point REQ-GHUB-082's own NFR 2 makes about its decision surface.
-      - >
-        MAINTAINABILITY: the automated path does not exist yet, so
-        nothing will catch the two drifting apart by failing. Until it
-        does, the guard is that the shared implementation is the only
-        implementation, not a test comparing two of them.
-      - >
-        OPERABILITY at 30 datasets: a quarterly round driven by hand
-        from a terminal is a long sitting. Whatever the TUI reports at
-        each stage has to stay readable when the answer is the same
-        thirty times running.
-    dependencies: [REQ-GHUB-082, REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-PIPE-057, REQ-PIPE-058, REQ-PIPE-062]
+    - CORRECTNESS BY CONSTRUCTION is the whole requirement. "The same functionality" is not a thing a person can verify by reading two code paths; it holds because there is one code path. Any criterion here that could be met by a careful reimplementation has been written wrong. Criterion 11 is the test of it, not a substitute for it.
+    - 'COMPATIBILITY: the terminal route needs no network and no GitHub reachability (REQ-GHUB-082 criterion 30), which on a government network may make it the only route rather than the convenient one.'
+    - 'MAINTAINABILITY: every signed rule in the option A batch (REQ-PIPE-118, 121, 122, 123, 128-132) is built into the per-arrival function rather than into any one route''s loop, so the terminal, the Lambda handlers (REQ-PIPE-152) and the batch all get it with no further work.'
+    - 'PERFORMANCE, settled by measurement rather than asked: a kept Child Protection folder is already six arrivals processed one at a time (REQ-PIPE-105, since 2026-10-02), about twenty seconds each on the batch''s own 2026-09-28 figure (eighteen arrivals in 6m14s). Moving the single-table route onto the same function adds filing, overlay and the gate to one arrival, which is small beside its four tools.'
+    - 'SECURITY: this narrows what a route can do rather than widening it - it removes the routes that record verdicts outside the gate, and adds no credential, grant or new write.'
+    - 'AUDITABILITY: every route''s filing, decisions and verdicts are recorded by the same functions, so qa.run.run_by, REQ-PIPE-147''s who-filed-it and the decision log answer the same questions whichever route an arrival came by.'
+    - PRODUCTION FRICTION is REQ-PIPE-093 criterion 4's, which already names hand-filing among the person-initiated changes that ask for the typed environment name; nothing here adds or relaxes it.
+    dependencies:
+    - REQ-PIPE-103
+    - REQ-PIPE-105
+    - REQ-PIPE-075
+    - REQ-PIPE-079
+    - REQ-PIPE-140
+    - REQ-PIPE-144
+    - REQ-PIPE-147
+    - REQ-GHUB-082
     decisions:
-      - >
-        THE TERMINAL IS THE FIRST REAL PATH, NOT A REHEARSAL SURFACE
-        (Keith, 2026-09-26). The order of delivery is the terminal
-        first and the automated path afterwards, which makes "the TUI
-        is a convenience over the real pipeline" exactly backwards for
-        the whole period that matters. The consequence recorded here
-        rather than left implicit: for that period the TUI IS the
-        pipeline, so anything it cannot do is something the system
-        cannot do, and any rule it applies differently is the rule as
-        actually operated.
-      - >
-        AN AUTOMATIC PROMOTION DURING A TUI RUN IS LOGGED AGAINST THE
-        RULE, NOT THE OPERATOR, and it is counterintuitive enough to
-        write down. A green supply landing in an empty slot promotes
-        itself (REQ-PIPE-075 criterion 1) whether a workflow or a person
-        started the run; the person invoked the thing that decided, they
-        did not decide. REQ-PIPE-074 criteria 3 and 4 already require
-        an automatic decision to be recorded with the rule as actor and
-        to be distinguishable from a person's - so "I ran it" and "I
-        promoted it" are different claims, and the log must not blur
-        them just because a human was present. Rejected attributing it
-        to the operator on the grounds that they chose to run it, which
-        would make the log unable to answer which promotions anybody
-        actually decided.
-      - >
-        RECORDED AS THE REASON THIS IS SEPARATE FROM REQ-GHUB-082: that
-        requirement is a DECISION CHANNEL - four operations, two routes,
-        one log entry - and this is a LIFECYCLE PATH. They have
-        different tests, and folding this in had already taken 082 to 21
-        criteria with the wizard work inside a requirement about
-        recording decisions. Keith's own call on the split, 2026-09-26.
-      - >
-        AN INTERACTIVE QA RUN DECLARES UP FRONT WHETHER IT IS A
-        REHEARSAL OR THE REAL THING (Keith, 2026-09-26, answering a seam
-        this session found while walking the flow through end to end and
-        which nothing in the register had settled). REQ-PIPE-075
-        criterion 1 fires automatic promotion when "a delivery's QA has
-        completed", and it was not established which runs count. Both
-        implicit readings are bad: if an interactive run counts, an ad
-        hoc check against a CSV on somebody's laptop can promote a real
-        supply into the warehouse; if it silently does not, an engineer
-        who has just checked a delivery in the terminal reasonably
-        believes they have done the real thing and has not. Today's code
-        points at the second reading without saying so - the local-file
-        path builds its run_id from the file PATH
-        (local_run_id_from_path), which is not a supply id, so there is
-        no supply on that path to promote. The mode question costs one
-        prompt in a flow that is already several, and buys a flow where
-        nothing consequential is implicit. Rejected making every
-        interactive run a rehearsal, which is the simplest and matches
-        the code today, but forecloses driving a real delivery from a
-        terminal on a network where GitHub is not reachable - the very
-        case NFR 2 says the TUI exists for. Rejected treating a run
-        against a recognised delivery as automatically real, which makes
-        consequence depend on whether recognition happened to fire.
-      - >
-        THE TUI USES THE SAME RECOGNITION AS THE AUTOMATED PATH, NOT ITS
-        OWN (Keith, 2026-09-26: "obviously the TUI should apply all of
-        the same file type and pattern matching logic as we do for the
-        automated pathway"). It does none of it today: the local-file
-        path takes whatever CSV is pointed at and builds a run_id from
-        the file PATH, so nothing asks which dataset claims that name,
-        nothing applies the arrival pattern REQ-PIPE-058 gates, and
-        nothing consults the collection's delivery boundary. That is
-        harmless while every interactive run is a rehearsal and
-        indefensible once one can be real - an operator would be able to
-        file and promote a supply the automated path would have refused
-        to place, by the single act of choosing the file. The rule is
-        therefore that recognition is the same code in both modes and
-        only its CONSEQUENCE differs: a real run is refused where
-        recognition cannot place the file, a rehearsal says what
-        recognition made of it and proceeds anyway, because a rehearsal
-        against an unrecognised file is a legitimate thing to want -
-        checking a CSV a supplier just emailed is the case the local-file mode was built for. Rejected letting the operator name the
-        dataset when no pattern claims the file, which is the permissive
-        fallback this project refuses elsewhere and would make the
-        pattern gate advisory; the fix for a file nothing claims is the
-        pattern, not an override.
-      - >
-        A REHEARSAL'S RESULTS DO NOT ENTER COMMITTED QA HISTORY (Keith,
-        2026-09-26). qa_results/ is what the dashboard publishes and it
-        is never pruned, so anything saved into it is permanent public
-        record; letting a rehearsal in would mix QA of supplies the
-        system filed with QA of whatever was on somebody's laptop, and
-        nothing downstream could tell them apart. This is a real change
-        from today, where any interactive run can be saved. WHAT IT
-        DOES NOT COST, because the obvious objection is that the wizard
-        can no longer write history at all: the synthetic source mode
-        already picks from arrivals RECOGNISED ON DISK
-        (arrivals.arrivals_for), so in the synthetic world those are
-        real deliveries and such a run can be a real run and save
-        normally. What loses the save is a run against a file
-        recognition cannot place - which is the case this rule is
-        about. Rejected saving rehearsals behind a flag, which keeps the
-        evidence but adds a field to the results format and a question
-        about how the dashboard treats it, for a kind of run whose value
-        is the answer on screen rather than the record; rejected leaving
-        today's behaviour, which is simplest and is what makes the
-        mixing possible.
+    - 'THE TERMINAL IS THE FIRST REAL PATH, NOT A REHEARSAL SURFACE (Keith, 2026-09-26). The order of delivery is terminal first and the automated path afterwards, so for the whole period that matters the TUI IS the pipeline: anything it cannot do is something the system cannot do, and any rule it applies differently is the rule as actually operated. Carried unchanged from the original draft.'
+    - SEPARATE FROM REQ-GHUB-082 AND FROM REQ-PIPE-103 (Keith's split, 2026-09-26; restated at the 2026-10-04 refresh). 082 is a DECISION CHANNEL - operations, two routes, one log entry. 103 is how a person's file becomes an arrival - keep or trial, recognition, the receipt. This is which LIFECYCLE a kept arrival then goes through. Three different tests.
+    - 'THE 086 ID IS KEPT, NARROWED (Keith, 2026-10-04, Q5). Rejected retiring 086 in favour of REQ-PIPE-103 plus new ids: the residue is real, and keeping the id keeps his 2026-09-26 source quote and its decisions beside the work they govern.'
+    - THE LAMBDA HANDLERS ARE SPLIT OUT TO REQ-PIPE-152 (Keith, 2026-10-04, follow-up answer 2). Keith's Q2 answer put them in 086, which took it to fifteen criteria; at his follow-up he split them so that 086 stays about terminal routes. 086's equivalence test (criterion 11) still names the Lambda route, by reference to 152.
+    - MOST OF THE ORIGINAL DRAFT IS NOW CARRIED ELSEWHERE, checked against the code 2026-10-04, and is deleted here rather than duplicated. Original criteria 7, 8 and 12 (declare rehearsal or real up front; only a real run counts for promotion; a rehearsal saves nothing) are REQ-PIPE-103 criteria 2, 3, 5 and 6 as built - cli/common.py decide_keep (line 293), decide_record (349), file_or_trial (382), and qa_tools/common/trial.py. Original criteria 9 and 10 (the same recognition, refused rather than overridden) are REQ-PIPE-103 criterion 1 and its decision 'A FILE RECOGNITION CANNOT PLACE IS REFUSED' - hand_filing.check (qa_tools/common/hand_filing.py:75) and file_supply (121), which takes the run id back from recognition. Original criteria 1-3 are built for the BDM file and S3 routes (cli/bdm.py:232-251 into orchestrate_bdm.run_arrivals, qa_tools/bdm/orchestrate_bdm.py:441) and the CP folder and S3 routes (cli/cp.py:277-290 into _check_filed_delivery, cli/cp.py:242, into orchestrate_cp.run_arrivals, qa_tools/cp/orchestrate_cp.py:387) - the same file_and_overlay and promote_after the batch hooks in (orchestrate_bdm.py:537-545, orchestrate_cp.py:488-496).
+    - '''REHEARSAL'' IS NOW ''TRIAL''. REQ-PIPE-103 settled the word with Keith on 2026-09-27 (rejecting ''dry run'', ''scratch'' and ''unfiled''), so this requirement uses it rather than its own original ''rehearsal''.'
+    - 'TWO TERMINAL ROUTES STILL BYPASS THE LIFECYCLE, found at the 2026-10-04 refresh. (1) Keeping ONE Child Protection table (cli/cp.py:372-410) files the delivery and then calls orchestrate_cp.run_single with the other five tables borrowed from an earlier run (supply_db.borrow_views) - no filing to a slot, no period overlay, no promotion gate. (2) Synthetic mode''s ''Record this check'' (cli/bdm.py:181, cli/cp.py:237) re-runs an arrival through run_single under its OWN run id: no filing, no gate, and qa_store.record_results REPLACES the results that arrival already recorded - the overwrite REQ-PIPE-140''s second decision names as erasing history. Criteria 3 and 6-9 close these.'
+    - A TRIAL OF AN ALREADY-RECORDED ARRIVAL STAYS, AS REQ-PIPE-103 BUILT IT (Keith, 2026-10-04, follow-up answer 4). Only 'Record' waits for REQ-PIPE-140; declining to record still runs a trial (cli/common.py decide_record), which writes nothing and so cannot overwrite anything. 'No interim trial-only route' in his Q1 answer rejected the trial as a STAND-IN for recording, not the trial itself.
+    - 'SYNTHETIC ''RECORD'' ON AN ALREADY-RECORDED ARRIVAL IS NOT OFFERED UNTIL REQ-PIPE-140 IS BUILT, AND THEN GOES ONLY THROUGH 140''s RE-CHECK (Keith, 2026-10-04, Q1). REJECTED offering a trial in its place for now: an interim route is one more thing to retire when 140 lands, and it would read as the replacement for recording rather than as a different act. REJECTED removing ''record'' from synthetic mode altogether: once 140 exists, re-checking a recorded arrival is exactly what it is for, and the synthetic world is where people will first try it.'
+    - 'THE BORROW IS RIGHT FOR A TRIAL AND WRONG FOR A KEPT TABLE. A trial has no filed period, so borrowing the other five tables from an earlier run is the only way its cross-table checks can run, and it stays. A kept single table HAS a period once filed, and REQ-PIPE-105 criterion 5''s overlay already supplies the siblings from that period''s staged or promoted state - which is what the batch does for every one-file arrival. Rejected keeping the borrow for kept tables on the grounds it already works: it answers ''what did the last run see'', which is not the question the gate is asking.'
+    - A FOLDER'S 'ALL SIX' RULE IS THE TERMINAL'S OWN, NOT RECOGNITION'S (cli/cp.py:156, _require_all_six). It checks for six hard-coded `<table>.csv` names, which coincide with today's arrival patterns only because those patterns are exact; and since REQ-PIPE-105 each file is its own arrival, so the batch processes three files as three arrivals without complaint. It stays as a precondition only for a TRIAL, which genuinely has no period to read the missing tables from.
+    - 'A KEPT FILE FROM THE OTHER COLLECTION IS REFUSED BEFORE ANYTHING IS WRITTEN, NAMING THE COLLECTION IT BELONGS TO (Keith, 2026-10-04, Q4). Today `mothman bdm qa --commit --file cp_clients.csv` passes hand_filing.check (the file IS recognised, just not as Birth Registrations), writes the delivery and its receipt, and only then raises ''The delivery is on disk'' (hand_filing.py:186-189) - leaving a Child Protection arrival nobody meant to file. REJECTED filing it and processing it under the collection recognition names, which is what the automated path would do: the command said which collection the person meant, and a mismatch is far likelier a slip than an intention. REJECTED today''s behaviour, which records an arrival after reporting failure.'
+    - THE PER-ARRIVAL FUNCTION IS THE UNIT, NOT THE BATCH. The batch already composes the same three steps (file_and_overlay, the tools, promote_after) through parallel_orchestrate.run_manifest's before_each and after_each hooks, so the two are equivalent today by care rather than by construction. Criterion 2 makes it construction. The steps that are genuinely per PASS - delivery_log.record_all (the hand-filing route records its own delivery, hand_filing.py:174-177), the in-flight survey, run_id_guard (whose positional premise REQ-PIPE-105 removed) and ticket_reconciler.report - stay with the pass, and criterion 12 says so.
+    - RUN_SINGLE IS FOR TRIALS ONLY, FROM EVERY ROUTE (Keith, 2026-10-04, Q2) - criterion 10. aws/'s Lambda handlers call it today (bdm_ingest_handler.py:93, cp_ingest_handler.py:95), so moving them onto the lifecycle is part of the same answer; it is REQ-PIPE-152's, split out at Keith's follow-up (below), and this criterion only takes effect once 152 has moved them. REJECTED marking the handlers 'not the automated path' until it is scoped, and REJECTED retiring them - see REQ-PIPE-152's decisions.
+    - 'REJECTED, CARRIED FROM THE ORIGINAL DRAFT: LETTING THE OPERATOR NAME THE DATASET when no pattern claims a file. It is the permissive fallback this project refuses elsewhere and would make REQ-PIPE-058''s pattern gate advisory; the fix for a file nothing claims is the pattern, not an override. REQ-PIPE-103 refuses and offers a trial, which keeps this rejection true without restating it as a criterion.'
+    - 'REJECTED, CARRIED FROM THE ORIGINAL DRAFT: SAVING TRIAL RESULTS BEHIND A FLAG. It keeps the evidence but adds a field to the results and a question about how the dashboard treats it, for a kind of run whose value is the answer on screen. REQ-PIPE-103 criterion 6 made it moot - a trial writes nothing at all - and qa_results/ no longer exists to be saved into (REQ-PIPE-089).'
+    - 'ORIGINAL CRITERION 4 (an automatic promotion during a terminal run is logged against the RULE, not the operator) IS MOVED OUT, NOT DROPPED. The principle stands - REQ-GHUB-082''s own decision ''A PERSON IS THE ACTOR ON ANYTHING A PERSON DECIDES'' draws the same line from the other side, and REQ-PIPE-074 decided a rule''s actor id is the rule''s NAME. But the built code does not do it on ANY route: promote_after passes actor=run_by with actor_kind=rule (qa_tools/bdm/orchestrate_bdm.py:431-438, qa_tools/cp/orchestrate_cp.py:382), and the bootstrapped database holds 69 `promote` and 9 `promotion-withheld` entries whose actor is the git identity that ran the pipeline, beside inheritance''s own ''inheritance rule'' (qa_tools/common/inheritance.py:47). That is a defect in built REQ-PIPE-075 against REQ-PIPE-074''s decision, for plans/post-build-review.md and a failing test first - not a terminal feature.'
+    - ORIGINAL CRITERIA 5, 6 AND 11 (say what the shared logic decided at each stage; never present a partial run as complete; tell a trial what recognition made of its file) AND THE 30-DATASET OPERABILITY NFR MOVE TO REQ-TEST-150, so that this requirement stays about which code runs and that one about what the person is told.
+    - 'OWED WORK AND TICKET RECONCILIATION ARE REQ-PIPE-151''s (Keith, 2026-10-04, Q3), not this requirement''s: a single kept arrival does not drain the backlog, the processing pass does.'
+    open_questions: []
   - id: REQ-PIPE-087
     title: "PostgreSQL is the one warehouse engine, and DuckDB keeps only the job of reading what arrives"
     date_written: "2026-09-26"
@@ -25945,7 +25807,7 @@ requirements:
       - "Judgement is at append time inside the decision-log transaction (REQ-GHUB-082 criterion 20 and REQ-PIPE-091 criterion 3) - the 'superseded since it was shown' refusal is that rule applied, not a second check in a route."
       - "Performance: un-supersede runs a full QA run; the terminal says so and shows the outcome when it finishes, rather than returning before the gate has spoken."
       - "Every refusal hands the person the fix as a command they can paste, not only a sentence describing it."
-      - "An interrupted wait loses nothing: the QA run an un-supersede triggers is recorded as owed in the decision's own transaction and completed on the next pipeline run, the same mechanism as REQ-PIPE-121's owed re-evaluation."
+      - "An interrupted wait loses nothing: the QA run an un-supersede triggers is recorded as owed in the decision's own transaction and completed on the next run of the processing pass (REQ-PIPE-151), the same mechanism as REQ-PIPE-121's owed re-evaluation."
     dependencies: [REQ-PIPE-118]
     decisions:
       - "UN-SUPERSEDE RE-RUNS QA rather than restoring its old verdict, because the period around it has moved since it was checked - siblings may have been promoted - and the gate must read verdicts computed against what it will actually sit beside. This is the same reason REQ-PIPE-075 criterion 17 re-runs QA for a promotion into a different period."
@@ -25954,6 +25816,7 @@ requirements:
       - "NEVER AUTOMATIC IN REVERSE. Rejecting or demoting the version that superseded something does NOT bring the earlier one back by itself; a person un-supersedes it. REJECTED auto-restoring the previous version, which would make a rejection silently promote something nobody chose."
       - "UN-SUPERSEDE BESIDE A WAITING VERSION IS REFUSED UNTIL RESOLVED (Keith, 2026-10-03): a person rejects or supersedes the waiting one first, which is his own worked example in order. REJECTED swapping them automatically, which would be the system moving a supply as a side effect of a decision about a different one."
       - "THE TERMINAL WAITS for the QA run an un-supersede triggers and shows the gate's outcome (working assumption, this draft, to be read to Keith at sign-off - the same answer he gave the shelved design's Q6, adopted here on its own merits rather than carried forward). A queue can come later if the wait proves too long."
+      - 'RE-POINTED 2026-10-04 (Keith, wording approved): owed work completes on the next run of the processing pass (REQ-PIPE-151) rather than ''the next pipeline run'', because `mothman pipeline run` regenerates synthetic data and would never run in production.'
     open_questions: []
 
   - id: REQ-PIPE-121
@@ -25982,7 +25845,7 @@ requirements:
       - "THE SYSTEM SHALL show that record at full prominence in the terminal, and SHALL NOT dim it as the terminal dims other entries whose actor is the rule."
       - "IF the re-evaluation fails to run, THEN THE SYSTEM SHALL leave the promotion that triggered it in place, leave the waiting supply waiting on its earlier verdict, and report the failure."
       - "THE SYSTEM SHALL record, in the same transaction as the promotion, that a re-evaluation is owed, and SHALL clear that record only when the re-evaluation completes."
-      - "WHILE a re-evaluation is owed, THE SYSTEM SHALL show it as owed in the terminal, and SHALL complete it on the next pipeline run."
+      - "WHILE a re-evaluation is owed, THE SYSTEM SHALL show it as owed in the terminal, and SHALL complete it on the next run of the processing pass (REQ-PIPE-151)."
     non_functional_requirements:
       - "One implementation of 're-evaluate the cross-table checks reading table T in period P, caused by X', shared with REQ-PIPE-079 criterion 6 (arrival-caused), REQ-PIPE-084 criteria 6 and 14 (substitution, unmet) and REQ-PIPE-075 criterion 17 (re-file, unmet). Four triggers, one mechanism - a second implementation of which checks read a table is how they come to disagree."
       - "Cost is measured once built, as the shelved design's own NFR asked: the extra runs per bootstrap and the added wait on a person's promote. Option A should need far fewer than the shelved design, because only promotions trigger it."
@@ -26002,6 +25865,7 @@ requirements:
       - "ONE RUN PER DECISION; NEWEST CAUSE WINS; SHOUTS GROUPED PER DECISION (Keith, 2026-10-04). A displacing promotion moves two tables and must not re-check readers twice; a slower, older re-check must never overwrite a newer one's verdict; and one rejection must not raise a shout per reader."
       - "A FILE LANDING IN STAGING STAYS OUTSIDE THIS MECHANISM (Keith, 2026-10-04): it is not a period movement, and its own first run already evaluates it and refreshes its readers (REQ-PIPE-079). Both share reevaluation.plan() as the one answer to 'which checks read this table'. REJECTED folding a first run into this handler, which would mix a QA run from scratch with a knock-on re-check."
       - "CASCADES ARE BOUNDED (Keith, 2026-10-04): a re-evaluation can only lead to promotions, never a rejection, demotion or supersession; a supply promotes at most once; nothing automatically restores a superseded supply. A departure can lead to a promotion - a reader that failed only against the departed table may pass against a waiting version of it - which is the same rule arrivals follow."
+      - 'RE-POINTED 2026-10-04 (Keith, wording approved): owed work completes on the next run of the processing pass (REQ-PIPE-151) rather than ''the next pipeline run'', because `mothman pipeline run` regenerates synthetic data and would never run in production.'
     open_questions: []
 
   - id: REQ-PIPE-122
@@ -26638,7 +26502,7 @@ requirements:
       - "THE SYSTEM SHALL let the promotion gate, the dashboard and the terminal read a supply's verdict from its most recent run, while every earlier run's verdicts remain readable as history."
       - "THE SYSTEM SHALL run QA this way only from the orchestrator path that legitimately holds a connection to supply rows, and SHALL NOT run it from any read-committed-history path."
       - "THE SYSTEM SHALL record, in the transaction of the decision that triggers such a run, that the run is owed, and SHALL clear that record only when the run completes."
-      - "IF such a run fails to complete - the run itself breaking, as distinct from a red or amber verdict, which the gate judges as usual - THEN THE SYSTEM SHALL leave the decision that triggered it in place, leave the supply's earlier verdict as its current one, report the failure, and complete the owed run on the next pipeline run."
+      - "IF such a run fails to complete - the run itself breaking, as distinct from a red or amber verdict, which the gate judges as usual - THEN THE SYSTEM SHALL leave the decision that triggered it in place, leave the supply's earlier verdict as its current one, report the failure, and complete the owed run on the next run of the processing pass (REQ-PIPE-151)."
     non_functional_requirements:
       - "ONE executor for every decision-triggered run. Its callers, each today waiting on it: re-file (REQ-PIPE-141), un-supersede (REQ-PIPE-120 criterion 3), the re-check on promotion (REQ-PIPE-121), substitution's reader re-evaluation (REQ-PIPE-084 criteria 6 and 14, unmet) and REQ-PIPE-075 criterion 17. A second implementation is how 'which checks touch this table' comes to have two answers - reevaluation.plan() stays the one answer."
       - "Cost: a decision-triggered run is one supply's checks, seconds to a minute; the terminal waits for it and shows the outcome (REQ-PIPE-120's decision on waiting). Measure one on the largest Child Protection table and record it."
@@ -26649,6 +26513,7 @@ requirements:
       - "A NEW RUN IDENTITY, BECAUSE THE OLD ONE WOULD ERASE HISTORY (found 2026-10-04): since REQ-PIPE-105 a run's id IS its supply's id, and qa_store.write_results replaces a run's results for the same run key. Re-running a re-filed supply under its own id would silently overwrite the verdicts it earned in its original period - exactly the history a reader needs to see why it was moved."
       - "A RUN THAT BREAKS IS OWED, NEVER LOST (Keith, 2026-10-04), the same mechanism as REQ-PIPE-121's owed re-evaluation: recorded in the deciding transaction, retried by the next pipeline run. 'Fails' in this requirement means the run breaking, never a red verdict - a red or amber verdict goes to the gate under the settings in force at the time."
       - "THE MOST RECENT RUN IS CURRENT, EARLIER RUNS ARE HISTORY, following REQ-PIPE-067's 'the verdict follows the filing': a supply re-checked in a new period is judged by that check, and what it scored where it was first filed stays on record."
+      - 'RE-POINTED 2026-10-04 (Keith, wording approved): owed work completes on the next run of the processing pass (REQ-PIPE-151) rather than ''the next pipeline run'', because `mothman pipeline run` regenerates synthetic data and would never run in production.'
     open_questions: []
 
   - id: REQ-PIPE-141
@@ -27010,3 +26875,157 @@ requirements:
     - 'PROBE FIRST, BEFORE BUILDING: what a run whose own table failed to load does today is unverified. No test drives the orchestrator through it; REQ-GEN-044 deliberately did not inject TS-12 because, on 2026-09-28, one unloadable table took the whole delivery''s QA down. REQ-PIPE-105 has since filtered absent siblings out, but the own-table case has not been re-run. The failing-first NFR makes this the first test written.'
     - 'WORTH KNOWING, NOT A CRITERION: the failed-load item names ''reject the supply'' as a response, and rejection.reject moves the supply''s tables to the rejected schema - a failed load has none. Whether rejecting a failed-load supply works, and whether it resolves the item (load_log.failures reads only load records), is unverified and is a candidate for plans/post-build-review.md rather than this requirement.'
     - 'A FILE REFUSED BY A FILE CHECK TAKES THIS PATH (Keith, 2026-10-04): any failing file check refuses the whole file (REQ-QAC-096 criterion 11), so this requirement''s red and item are the only dataset-level signal for it, with the check named in the reason. REQ-DASH-097 shows the file section; it adds no red of its own.'
+  - id: REQ-TEST-150
+    title: A kept terminal run says what the lifecycle decided about each arrival, and on what grounds
+    date_written: '2026-10-04'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As a data engineer running supplies from the terminal, I want to be told, for each arrival I keep, which period and slot it was filed to, whether it was early, on time or late, whether it was held and why, and what the promotion gate did with it - so that I can see the rules working rather than only a table of check results, and notice at once when an arrival went somewhere I did not expect.
+    moscow: should
+    status: not_started
+    source: 'Split out of REQ-PIPE-086 at its 2026-10-04 refresh by delivery-scoper: original criteria 5, 6 and 11 and its 30-dataset operability NFR, from Keith''s 2026-09-26 framing that the terminal is the first real path. Checked against the code the same day - filing.file_arrivals is silent (qa_tools/common/filing.py:246; its one print, line 297, is for a dataset with no slots), and a kept run ends with the check table and ''Kept. <run> is a real arrival'' (cli/common.py:458-468), so of every lifecycle stage only the promotion gate reports itself (qa_tools/common/promotion.py:888-905). Split and component confirmed by Keith 2026-10-04 (Q5, Q7).'
+    acceptance_criteria:
+    - WHEN a person keeps a supply from the terminal, THE SYSTEM SHALL report, for each arrival it became, the dataset recognition placed it in and the period and slot it was filed to.
+    - WHEN a kept arrival is filed to a slot, THE SYSTEM SHALL report its arrival classification - early, on time or late - against that slot.
+    - IF filing holds a kept arrival, THEN THE SYSTEM SHALL say so, name the slots it considered and why each was unavailable (REQ-PIPE-064 criterion 4), and say that no check ran over it.
+    - IF a kept arrival is contested, THEN THE SYSTEM SHALL say so and name the other file staged for the same table and period.
+    - WHEN the promotion gate has acted on a kept arrival, THE SYSTEM SHALL report what it did - promoted, withheld, or left for a person - with the reason it recorded, and SHALL say that the rule, not the person running the command, made that decision.
+    - WHERE filing a kept arrival opened a period and the cadence inherited a supply into it, THE SYSTEM SHALL report the inheritance as the rule's.
+    - IF any stage fails for a kept arrival, THEN THE SYSTEM SHALL name the arrival and the stage, say which stages completed before it, and SHALL NOT end with the message that describes a completed kept run.
+    - WHERE one kept delivery became more than one arrival, THE SYSTEM SHALL report an outcome shared by several arrivals once, naming how many, and SHALL report each arrival whose outcome differs on a line of its own.
+    - THE SYSTEM SHALL take every outcome it reports from what was recorded - the filing, the hold, the decision-log entry - and SHALL NOT work any of them out again in the terminal.
+    - WHERE a person runs a trial, THE SYSTEM SHALL say what recognition would make of each file if it were kept - the dataset that claims it, or that none or several do - and SHALL NOT stop the trial on the answer.
+    non_functional_requirements:
+    - 'OPERABILITY AT 30 DATASETS: a quarterly round driven by hand from a terminal is a long sitting, and what the terminal reports has to stay readable when the answer is the same thirty times running - hence criterion 8, the same aggregate-not-repeat rule REQ-DASH-070 applies on the dashboard.'
+    - 'ONE SOURCE OF TRUTH: the report reads the recorded filing, hold and decision rows (criterion 9). A terminal that re-derived ''which slot'' would be a second implementation of assignment, which is exactly what REQ-PIPE-086 forbids.'
+    - 'PRIVACY: the report names datasets, periods, slots, rules and file names - never supply rows or values. File names are already public through the delivery log (REQ-PIPE-103''s first NFR).'
+    - 'ACCESSIBILITY AND PORTABILITY: every outcome reads in words, not only colour, and holds with NO_COLOR set or output not a terminal - the same bar REQ-TEST-114 criterion 6 sets for the environment label. The flag route prints the same lines as the TUI.'
+    - 'COMPATIBILITY: nothing reported needs GitHub or the network; where a kept run changed a slot, its ticket is reconciled by REQ-PIPE-151''s processing pass (REQ-GHUB-082 criterion 30), and the terminal does not pretend otherwise.'
+    dependencies:
+    - REQ-PIPE-086
+    - REQ-PIPE-064
+    - REQ-PIPE-066
+    - REQ-PIPE-075
+    - REQ-PIPE-105
+    - REQ-PIPE-078
+    decisions:
+    - 'SPLIT FROM REQ-PIPE-086 (Keith, 2026-10-04, Q5): 086 is about which code a kept arrival goes through, this is about what the person is told. Different tests - one compares database rows with the batch''s, the other reads terminal output.'
+    - 'TEST, NOT PIPE (Keith, 2026-10-04, Q7): cli/ is TEST-owned (docs/components.md) and the precedent is REQ-TEST-114, the terminal saying which environment it is acting against. The thing being built is what the terminal shows; the facts it shows are PIPE''s and are only read here.'
+    - 'THE GATE''S LINE ALREADY EXISTS AND IS KEPT: promotion.report prints promoted, refused and failed on every run (promotion.py:888-905) and the batch relies on it. This requirement adds the stages before it, and the ''made by the rule'' wording that carries forward REQ-PIPE-086''s original decision about attribution into what the person reads - independent of the separate defect in what the decision log records as the actor.'
+    - 'A TRIAL SAYS WHAT RECOGNITION WOULD MAKE OF ITS FILE - A DELIBERATE, DISPLAY-ONLY REVERSAL OF REQ-PIPE-103 (Keith, 2026-10-04, Q6). 103 decided a trial ''needs no recognition, because the command already says which dataset is being checked'', so a trial runs none (cli/common.py _as_trial). That stays true for RUNNING the trial - recognition still decides nothing about it. Criterion 10 adds only the telling, so a person who checks an emailed file as a trial learns before keeping it that its name would be refused. Rejected dropping it: the cost is a line of output, and the alternative is finding out at the moment of keeping.'
+    open_questions: []
+  - id: REQ-PIPE-151
+    title: One processing pass handles what has arrived and finishes what is owed, never generates data, and is what a scheduler calls
+    date_written: '2026-10-04'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As whoever runs this asset - a data engineer at a terminal today, a scheduler later - I want one command that processes every arrival not yet processed, finishes any re-check or re-evaluation a decision left owed, and brings the GitHub tickets up to date, without generating or regenerating anything, so that the work signed requirements defer to 'the next pipeline run' actually has a next run in a real deployment, and so that its cost depends on what is new rather than on all history.
+    moscow: must
+    status: not_started
+    source: 'Keith, 2026-10-04, answering delivery-scoper''s Q3 on the REQ-PIPE-086 refresh: scope plans/supply-model.md Thread L (incremental processing, his own ask 2026-09-25) now, as a command that processes new arrivals, finishes owed work (REQ-PIPE-121 criterion 16, REQ-PIPE-140 criterion 8, REQ-PIPE-120) and reconciles tickets (REQ-GHUB-082), never generates data, is reachable from the TUI, and is what an automated scheduler would call. Drafted by delivery-scoper the same day from Thread L in full.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL provide one command, `mothman pipeline process`, that processes, in receipt order across every collection, every arrival not yet processed - recognised from the delivery tree or built from a recorded delivery (REQ-PIPE-144's qa.delivery and qa.delivery_file rows) whose files exist only in storage - each through REQ-PIPE-086's per-arrival function.
+    - THE SYSTEM SHALL treat an arrival as processed only once its QA run has completed AND the promotion gate has run on it, and SHALL pick up on the next pass any arrival short of both - loaded but unchecked, checked but not gated.
+    - WHEN the promotion gate does not promote an arrival, THE SYSTEM SHALL record that outcome in the decision log as an entry whose actor kind is rule and whose actor is the rule's name - `promotion-withheld` for an off-cycle arrival, as today, and a new `promotion-refused` action for every other outcome (a red verdict, a filled slot, a supply a person has already decided on, a held supply, a contested table, no active checks), naming which one as its reason.
+    - THE SYSTEM SHALL derive that the gate has run on an arrival from the decision log alone - a promote, promotion-withheld or promotion-refused entry for that supply - and SHALL NOT keep a separate record of it.
+    - THE SYSTEM SHALL keep `promotion-refused` entries out of what a slot holds (REQ-PIPE-130's view is built only from decisions that change a slot), out of the standing queue's definition of 'awaiting a person' except where its reason already puts a supply there, and out of REQ-GHUB-109's ticket comments, which say only something new.
+    - THE SYSTEM SHALL process one arrival exclusively - holding a lock on its arrival key, such as a PostgreSQL advisory lock, from before it is filed until its gate outcome is recorded - so that a Lambda retry and a processing pass can never process the same arrival at once.
+    - WHEN a finisher takes an arrival's lock and finds it already checked and gated, THE SYSTEM SHALL do nothing to it and record nothing, so that processing an arrival a second time is harmless.
+    - THE SYSTEM SHALL decide which arrivals are not yet processed from what is recorded in the database, in one read whatever the length of history, and SHALL NOT keep a stored marker of how far processing has got.
+    - THE SYSTEM SHALL make one pass over all collections' arrivals in a single global receipt order, dispatching each arrival to its own collection, and SHALL NOT make a separate pass per collection.
+    - THE SYSTEM SHALL NOT generate, regenerate or delete any delivery, receipt or recorded result, and SHALL NOT re-process an arrival already processed.
+    - WHEN the command runs, THE SYSTEM SHALL complete every re-evaluation recorded as owed (REQ-PIPE-121 criterion 16) and every re-check recorded as owed (REQ-PIPE-140 criterion 8, including one an interrupted un-supersede left owed under REQ-PIPE-120), and SHALL clear each owed record only when its work completes.
+    - WHEN the command has processed its arrivals and owed work, THE SYSTEM SHALL reconcile every slot's ticket through REQ-PIPE-083's pass, and WHERE no ticketing is configured SHALL say so in one line and finish normally.
+    - THE SYSTEM SHALL offer the command from the TUI's main menu and as a flag-invocable command that asks nothing, so that a scheduler can call it unattended.
+    - IF any arrival or owed item fails, THEN THE SYSTEM SHALL leave it owed, continue with the others, report each failure, and exit with a non-zero status.
+    - WHERE there is nothing to process and nothing owed, THE SYSTEM SHALL say so and exit with a zero status.
+    - IF a pass is already running against the same database, THEN THE SYSTEM SHALL refuse at once, say that a pass is running and since when, and change nothing.
+    - THE SYSTEM SHALL keep `mothman pipeline run` and `mothman pipeline bootstrap` as the full rebuild from generated data, so that regenerate-and-diff remains available as a correctness check, and SHALL NOT give this command a mode that generates data.
+    - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-061 criterion 6's rule as implemented in qa_tools/common/backlog.py (unprocessed()), so that 'processed' means checked and gated rather than loaded.
+    - 'THE SYSTEM SHALL add `promotion-refused` to decision_log.AUTOMATIC_ACTIONS in the same change, and SHALL NOT change REQ-PIPE-074''s text: its criterion 1 lists the filing decisions a person makes, and its criterion 2 already records an automatic decision in the same log with the rule as actor.'
+    non_functional_requirements:
+    - 'SCALABILITY is the reason for it (Thread L): cost bounded by the arrivals not yet processed and the work owed, never by total history. Worth nothing at sixty deliveries and everything at roughly thirty quarterly datasets over years.'
+    - 'RELIABILITY: derived rather than stored progress fails safe - a crash mid-pass leaves the unfinished arrival owed rather than skipped (qa_tools/common/backlog.py''s own account of why the stored marker was removed, 2026-09-27). Owed re-checks and re-evaluations are recorded in their deciding transaction already (REQ-PIPE-121, REQ-PIPE-140); this command is what clears them.'
+    - 'COMPATIBILITY: needs no GitHub to process; ticket reconciliation is the last step and silent where unconfigured, so the command works unchanged on a government network that cannot reach GitHub.'
+    - 'SECURITY AND DATA HANDLING: it runs where the supply rows are, like the batch, and holds no access the batch does not; it is not a build and does not change what the dashboard build may read.'
+    - 'OBSERVABILITY: every arrival and owed item it processes is recorded by the functions that already record them (qa.run, the decision log, the owed records); what it prints follows REQ-TEST-150''s aggregated report.'
+    - 'COST: no new infrastructure. When a scheduler calls it, the scheduler is the AWS MVP''s concern (plans/wider.md), not this requirement''s.'
+    dependencies:
+    - REQ-PIPE-086
+    - REQ-PIPE-061
+    - REQ-PIPE-083
+    - REQ-PIPE-105
+    - REQ-PIPE-120
+    - REQ-PIPE-121
+    - REQ-PIPE-140
+    - REQ-GHUB-082
+    decisions:
+    - 'SCOPED NOW, AS ITS OWN REQUIREMENT (Keith, 2026-10-04, Q3), because REQ-PIPE-121 criterion 16, REQ-PIPE-140 criterion 8 and REQ-PIPE-120 finish owed work ''on the next pipeline run'', REQ-GHUB-082 reconciles tickets there, and the only pipeline run today regenerates synthetic data and re-runs every arrival (cli/pipeline.py:33-50), which no real deployment can do. Thread L asked for exactly this to be ''its own requirement... rather than being folded into 069''. REJECTED having each kept terminal run finish its collection''s owed work before it ends: it makes a person''s one-file check pay for everybody''s backlog, and does nothing for an asset no person is running. REJECTED leaving it as an open question on 086: three signed requirements already lean on a run that does not exist.'
+    - THREAD L's BLOCKER 1 IS GONE. Run ids were positional, so a late arrival renumbered history. REQ-PIPE-105 made a run id the staged table's spelling at its receipt instant (hand_filing.py's own docstring, line 131-136), so processing new arrivals beside recorded ones renumbers nothing. run_id_guard's premise went with it.
+    - THREAD L's BLOCKER 2 IS CRITERION 9. Two orchestrators each make their own pass (run_pipeline, run_pipeline_cp), and the 2026-09-25 incident showed a shared marker advanced by one collection's pass skipping all eighteen Child Protection arrivals. The marker is gone (backlog.py, 2026-09-27), but the shape underneath - one pass per collection - is what this requirement replaces with one global pass dispatching per collection, which is 'a restructure of orchestration rather than a flag' in Thread L's own words.
+    - 'PROGRESS IS DERIVED, NEVER STORED (carried from REQ-PIPE-061 as amended by REQ-PIPE-089, Keith 2026-09-27: ''let''s ditch it and just derive from load records''). backlog.unprocessed() already answers it in one read of the load log and has no production caller - this is its caller. A stored marker fails in the dangerous direction: advanced past an arrival that was reached but not finished, it turns a crash into a silently skipped supply. WHAT CHANGES IN IT: unprocessed() counts an arrival processed once every file it attributed has a LOADED record (REQ-PIPE-060''s rule); criterion 18 changes that to checked AND gated.'
+    - THE FULL REBUILD IS A SEPARATE COMMAND, NOT A --rebuild FLAG. Thread L proposed making `mothman pipeline run` incremental with a mandatory --rebuild flag, so that regenerate-and-diff - the technique that proved 6563 verdicts unchanged across three refactors in a day - survives. Keith's 2026-10-04 framing is a command that NEVER generates data, and `pipeline run` exists to generate; so the rebuild stays where it is and this is new beside it (criterion 17). Same guarantee Thread L wanted, with no flag that could make a scheduler regenerate a production asset.
+    - 'THREAD L''s ''NOT A BLOCKER'' STILL HOLDS: reports/results_*.json is a whole-dataset document, and it is rebuilt from the recorded results rather than from what one pass processed, so incremental composes as ''run the tools on the new arrivals, then rebuild from the records''.'
+    - 'THREAD L''s EVIDENTLY-REFERENCE CONCERN IS RESOLVED ELSEWHERE: it worried that an incremental run would lack manifest[0]''s CSV under data/raw/. REQ-QAC-108 (built 2026-09-28) resolves the reference per supply from the last PROMOTED earlier period, from recorded value counts, so there is nothing to keep to hand.'
+    - 'WHAT A SCHEDULER CALLS (Keith, 2026-10-04): the command is the automated path''s unit of work rather than a terminal convenience, which is why it asks nothing and exits non-zero on failure (criteria 13 and 14). GitHub''s ''one pending run per concurrency group'' is why a pass DRAINS everything owed rather than only its trigger - REQ-PIPE-061''s reasoning, kept.'
+    - 'IN PIPE, NOT TEST: the thing being built is orchestration - which arrivals run, in what order, and what is owed - with the terminal and the scheduler as two callers of it.'
+    - 'PROCESSED MEANS CHECKED AND GATED (Keith, 2026-10-04, follow-up answer 3). An arrival can be loaded and then crash before its checks, or after them and before the gate - filed, staged, never judged - and under the loaded rule it would never be picked up again. DERIVED IN ONE READ, NO STORED MARKER: a completed qa.run for the arrival''s run key joined to the gate''s recorded outcome for that supply, read for every arrival at once. REJECTED keeping ''loaded'' and treating ''loaded but never checked'' as owed work of its own (two definitions of done to keep in step), and REJECTED keeping ''loaded'' as REQ-PIPE-061 defined it (the silent-skip failure).'
+    - THE COMMAND IS `mothman pipeline process` (Keith, 2026-10-04, follow-up answer 5), beside `run` and `bootstrap`.
+    - 'A SECOND PASS IS REFUSED AT ONCE, SAYING A PASS IS RUNNING AND SINCE WHEN (Keith, 2026-10-04, follow-up answer 6) - criterion 16. The pass works through one global order, so two at once would race for the same oldest arrival. REJECTED waiting for the running pass to finish: the next scheduled firing will pick up whatever this one would have, and a person at a terminal is better told than left hanging.'
+    - 'THREE SIGNED CLAUSES ARE RE-POINTED AT THIS COMMAND (Keith, 2026-10-04, follow-up answer 7): REQ-PIPE-121 criterion 16, REQ-PIPE-140 criterion 8 and REQ-PIPE-120''s interrupted-wait NFR now say ''the next run of the processing pass (REQ-PIPE-151)'' rather than ''the next pipeline run'', which read as `mothman pipeline run` regenerates data. The amendments are made by the main session, not drafted here.'
+    - 'THE GATE RECORDS EVERY OUTCOME IN THE DECISION LOG (Keith, 2026-10-04). Found while checking ''processed means checked and gated'' against the code: promotion.after_runs records a promotion, and a promotion-withheld entry only for an off-cycle arrival (promotion.py:703-708, 760-790); every other refusal went only into the in-memory `refused` dict and was printed, so ''the gate ran'' was not derivable for the commonest non-promotion. Keith chose the decision log, accepting more routine entries per run (at today''s scale about one per arrival: eighteen Child Protection arrivals of six datasets, one Birth Registrations arrival a day). REJECTED (a) a column on qa.run for when the gate ran and its outcome - it would split ''why is this supply not promoted'' across two places when the log already answers it for promotions and off-cycle withholdings. REJECTED (c) widening promotion-withheld to every refusal - see the next decision.'
+    - A NEW ACTION, `promotion-refused`, NOT A WIDENED promotion-withheld. promotion-withheld means something specific - automation stood back from a supply a person may still promote, because it arrived off-cycle (REQ-PIPE-077 criterion 6), and slot_state.py's `_decider()` and the off-cycle readers depend on exactly that meaning. Widening it to cover a red verdict or a filled slot would make one label mean several cases, the confusion REQ-PIPE-115's first decision rejected when it refused to widen the 'contested-file' item rather than add 'Two files, choose one'. Off-cycle stays promotion-withheld, unchanged; everything else is promotion-refused with its case as the reason. A closed set of reasons rather than free prose, because the dashboard and the queue need to group them.
+    - 'THE ACTOR IS THE RULE''S NAME. A refusal entry is the rule''s, like inheritance''s ''inheritance rule'' (inheritance.py:47), and REQ-PIPE-074 decided a rule''s actor id is its name. Worth saying because the existing promote and promotion-withheld entries get this WRONG today - they carry the git identity of whoever ran the pipeline (plans/post-build-review.md #81). A new action written correctly beside two written wrongly would make the log disagree with itself, so #81''s fix and this belong in the same change or #81''s first.'
+    - 'EVERY READER OF DECISION-LOG ACTIONS HAS TO BE CHECKED (CLAUDE.md''s shape-change rule): a new action is a new value in a column several readers switch on - slot_state, filing_queue, the ticket reconciler, the arrival history, `mothman supply decisions`, the dashboard''s decision display, and REQ-PIPE-130''s slot view once built. Criterion 5 names the three where a refusal must NOT count as something; the rest should show it as the rule''s note, the way they show promotion-withheld.'
+    - 'A LAMBDA CRASH IS COVERED TWICE (Keith, 2026-10-04): the Lambda''s own retry is the first line, and this pass is the backstop. That is why criterion 1 builds arrivals from recorded deliveries as well as from the delivery tree - an S3-only delivery (REQ-PIPE-152) that was recorded but never gated has no directory under data/deliveries/ for recognition to find. REJECTED relying on the retry alone (a retry budget runs out and the arrival is lost silently) and on the pass alone (it would leave every crashed Lambda arrival waiting for the next scheduled pass when an immediate retry would usually finish it).'
+    - ONE ARRIVAL, ONE FINISHER, AND FINISHING TWICE IS HARMLESS (Keith, 2026-10-04) - criteria 6 and 7. Two finishers now exist for the same arrival by design, the Lambda retry and the pass, so without exclusion they would race to file and gate it; a filing is write-once, and two gate runs would write two outcomes. A per-arrival lock (an advisory lock on the arrival key is enough, since every finisher shares the one database) makes them take turns, and the already-checked-and-gated test makes the second turn a no-op. This is per ARRIVAL; criterion 16's refusal of a second whole PASS is a separate, coarser rule and both stand.
+    - REQ-PIPE-074 IS NOT AMENDED (2026-10-04). The scoper's draft amended 074 criterion 1's action list; that criterion lists FILING decisions (promote, reject, demote, re-file), which a gate refusal is not, and 074 criterion 2 already covers an automatic decision logged under the rule. Only the code's AUTOMATIC_ACTIONS gains the new action.
+    open_questions: []
+  - id: REQ-PIPE-152
+    title: The S3 Lambda handlers process each arriving object through the per-arrival lifecycle, and the S3 object is the delivery
+    date_written: '2026-10-04'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As whoever will eventually switch on the automated path, I want aws/'s Birth Registrations and Child Protection handlers to treat each arriving S3 object as a delivery and put it through exactly the steps the terminal and the batch use - recognise it, record its receipt, file it, check it, apply the promotion gate - so that the automation does what an engineer at the terminal did, rather than a stage-and-check shortcut that files nothing and promotes nothing.
+    moscow: must
+    status: not_started
+    source: 'Keith, 2026-10-04: his Q2 answer on the REQ-PIPE-086 refresh moved the Lambda handlers onto the shared per-arrival lifecycle now, and his follow-up the same day split them into their own requirement, chose the S3 object itself as the delivery, and added the failing-test-first criterion for the handler''s TypeError, which he verified himself. Drafted by delivery-scoper the same day.'
+    acceptance_criteria:
+    - WHEN an S3 event hands aws/'s Birth Registrations or Child Protection handler an object, THE SYSTEM SHALL treat that S3 object as the delivery, and SHALL NOT copy it to any other storage.
+    - THE SYSTEM SHALL record such a delivery only as REQ-PIPE-144's database rows - its qa.delivery row and one qa.delivery_file row per object, carrying that file's receipt - and SHALL NOT write a delivery directory or an on-disk receipt record.
+    - THE SYSTEM SHALL take each object's receipt from storage, as REQ-PIPE-105 criterion 3 requires, and SHALL NOT take it from the handler's own clock where storage gives one.
+    - THE SYSTEM SHALL decide which dataset an object belongs to by that dataset's declared pattern (REQ-PIPE-058), the same as the terminal and the batch, and SHALL take the arrival's run identity from recognition, never from the object's key.
+    - THE SYSTEM SHALL process each recognised object through REQ-PIPE-086's per-arrival function, which files it, overlays its period, runs its checks and applies the promotion gate, and SHALL NOT stage, check or record an object outside that function.
+    - THE SYSTEM SHALL build, from a delivery recorded only as database rows, an arrival the per-arrival function accepts on the same terms as one recognised from the delivery tree, reading the object from storage rather than from a local file.
+    - THE SYSTEM SHALL let a handler's invocation be retried by the platform, and WHEN a retry reaches an arrival already checked and gated SHALL do nothing to it, under REQ-PIPE-151's per-arrival lock.
+    - THE SYSTEM SHALL NOT call the single-run entry point from either handler.
+    - IF no dataset's pattern claims an object a handler receives, or more than one does, THEN THE SYSTEM SHALL report it as unplaceable on the same terms as the pipeline reports an unplaceable delivery (REQ-PIPE-057), and SHALL continue with the event's other objects.
+    - THE SYSTEM SHALL record a handler's delivery as received automatically, with no person and no hand-filing route (REQ-PIPE-147 criterion 5).
+    - WHEN the Birth Registrations handler is given one arriving object, THE SYSTEM SHALL process it without raising, and SHALL carry a regression test, confirmed failing against today's code before the fix, that reproduces today's TypeError - the handler passes `reference_csv=` to orchestrate_bdm.run_single, which no longer accepts it.
+    non_functional_requirements:
+    - 'CORRECTNESS BY CONSTRUCTION, the same as REQ-PIPE-086: the handler is an adapter from an S3 event to the per-arrival function, and nothing more. REQ-PIPE-086''s equivalence test names this route.'
+    - 'COMPATIBILITY: no EFS, no copy, no persistent disk assumed - a Lambda''s /tmp is scratch for the download and nothing outlives it. The design is a sketch (aws/ is ''not yet the live pipeline'', docs/components.md) and stays deployable without new storage.'
+    - 'RELIABILITY: one object failing does not stop the event''s others (criterion 7); a crash between recording the delivery and the gate is retried by the platform first, and picked up by REQ-PIPE-151''s pass as the backstop; the per-arrival lock stops the two racing.'
+    - 'SECURITY: the handlers keep the access they have - read the arriving bucket, write the database - and gain nothing; no write to any other S3 location, which criterion 1 rules out.'
+    - 'PRIVACY: the object''s key is recorded as the delivery''s file name, which is the same exposure every delivery''s file name already has (REQ-PIPE-103''s first NFR); its contents are never recorded outside the staged rows.'
+    - 'AUDITABILITY: receipts come from storage rather than our clock (criterion 3), so lateness is judged on when the supplier''s file actually landed - the ''small imprecision, not solved in this MVP'' bdm_ingest_handler.py''s own comment admits today is solved.'
+    - 'COST: no new storage and no copies; one database write per object for the delivery records.'
+    dependencies:
+    - REQ-PIPE-086
+    - REQ-PIPE-144
+    - REQ-PIPE-105
+    - REQ-PIPE-057
+    - REQ-PIPE-058
+    - REQ-PIPE-147
+    - REQ-PIPE-151
+    decisions:
+    - 'THE HANDLERS MOVE ONTO THE LIFECYCLE NOW, AND RUN_SINGLE IS FOR TRIALS ONLY FROM EVERY ROUTE (Keith, 2026-10-04, Q2). aws/lambda_handlers/bdm_ingest_handler.py:93 and cp_ingest_handler.py:95 call run_single, which files nothing and promotes nothing; they take the run id from the S3 key''s match groups and the Lambda''s clock as the run date. They are the sketch of the automated path, so leaving them there would build the divergence REQ-PIPE-086 forbids into the thing the terminal is meant to match. REJECTED marking them ''not the automated path'' until it is scoped: it keeps a second lifecycle alive under a label, and labels are what this project has found get read wrongly. REJECTED retiring them: they carry the S3 event shape and whole-key matching (qa_tools/common/file_arrival.py) the automated path will need.'
+    - SPLIT FROM REQ-PIPE-086 (Keith, 2026-10-04, follow-up answer 2), so 086 stays about terminal routes and each stays small.
+    - 'THE S3 OBJECT IS THE DELIVERY (Keith, 2026-10-04, follow-up answer 1): the handler writes only REQ-PIPE-144''s rows, each file''s receipt on qa.delivery_file. REJECTED copying the object into a deliveries prefix with a receipt object beside it, which mirrors the local tree at the cost of a second copy of every supply. REJECTED mounting EFS so data/deliveries/ exists as it does locally, which adds infrastructure to keep a directory shape alive. What this gives up, knowingly: REQ-PIPE-103''s 2026-10-04 decision keeps an on-disk receipt record so a rebuild from disk restores it; for an S3 delivery the receipt is storage''s own LastModified, which is still there to be re-read from the bucket, so nothing is lost that cannot be recovered from the source.'
+    - THE TYPEERROR IS A DEFECT, FIXED TEST-FIRST (Keith, 2026-10-04, follow-up answer 2, verified by him). bdm_ingest_handler.py passes `reference_csv=` to orchestrate_bdm.run_single (orchestrate_bdm.py:316), which no longer accepts it, so the handler raises on its first object. The CP handler does not pass it. It is a criterion here rather than a separate fix because the move rewrites that call anyway, and a test written first is what proves the move did not just delete the symptom.
+    - 'ONE PATTERN MEANING, NOT TWO: the handlers match whole keys with file_arrival.py''s BDM_ARRIVAL_PATTERNS/CP_ARRIVAL_PATTERNS, where the terminal and batch use each dataset''s own regex through arrival_patterns.py (REQ-PIPE-058 criterion 4 ended a split exactly like this). Criterion 4 puts the dataset decision on REQ-PIPE-058''s pattern; whole-key matching may still decide which objects are this handler''s at all, which is a transport concern.'
+    - A CRASH IS RETRIED BY THE LAMBDA FIRST, AND THE PROCESSING PASS IS THE BACKSTOP (Keith, 2026-10-04). Both can reach the same arrival, so both go through REQ-PIPE-151's per-arrival lock and its already-checked-and-gated no-op (criteria 6 and 7). An S3-only delivery becomes an arrival from its recorded rows (criterion 6 here, criterion 1 there), which is also what lets the pass see it at all. How the Arrival type carries a storage location instead of a local path is a build detail, not a decision - but it must be ONE arrival type, not a Lambda-only variant the per-arrival function has to branch on.
+    open_questions: []
