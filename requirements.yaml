@@ -20681,216 +20681,56 @@ requirements:
         and the public dashboard, which production probably does not
         want.
   - id: REQ-PIPE-093
-    title: "Every operation states which environment it acts against, and there is no default"
-    date_written: "2026-09-26"
-    story: >
-      As an operator who works across a local database, dev,
-      non-production and production, I want to have to say which one I
-      am acting against, so that a real operation never goes quietly
-      nowhere and a local habit never quietly reaches production.
+    title: Every connection needs a stated environment, there is no default, and production asks before a person changes anything
+    date_written: '2026-09-26'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As an operator who works across a local database, dev, non-production and production, I want every mothman command to refuse until I have said which environment I am in, and production to make me confirm deliberately before I change anything by hand, so that a local habit never quietly reaches production and a production change is never an accident.
     moscow: must
     status: not_started
-    source: >
-      Keith, plans/running-thoughts.md #45 (2026-09-26) - his own
-      question about an operator doing local development against their
-      own PostgreSQL versus being hooked into dev, non-prod or prod
-      Aurora, named there as "a requirement-shaped gap nothing owns".
+    source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - an operator doing local development against their own PostgreSQL versus being hooked into dev, non-prod or prod Aurora. Priority kept by Keith 2026-10-04 (plans/supply-model.md, ''Priority: REQ-PIPE-093 is queued''). Refreshed by delivery-scoper 2026-10-04 against what REQ-PIPE-089/092 and REQ-DASH-094 have since built, and narrowed: the PostgreSQL version gate moved to REQ-PIPE-146 and the write-time disclosure to REQ-TEST-114. Keith answered the refresh''s questions 1 and 2 on 2026-10-04 (both option A).'
     acceptance_criteria:
-      - >
-        THE SYSTEM SHALL require the environment to be stated for
-        every operation that connects to a database.
-      - >
-        IF no environment is stated, THEN THE SYSTEM SHALL refuse the
-        operation and say so, and SHALL NOT fall back to a default, a
-        last-used value or the local environment.
-      - >
-        THE SYSTEM SHALL refuse an environment name it does not know,
-        and SHALL NOT treat it as a new one.
-      - >
-        THE SYSTEM SHALL resolve connection details from the stated
-        environment, and SHALL NOT read them from anything committed
-        to this repository.
-      - >
-        THE SYSTEM SHALL name the stated environment in its own output
-        before doing anything that writes.
-      - >
-        WHERE the stated environment is production, THE SYSTEM SHALL
-        require a further deliberate confirmation before any filing
-        operation.
-      - >
-        THE SYSTEM SHALL declare, in a committed file, the PostgreSQL
-        major version this project targets.
-      - >
-        WHEN connecting, THE SYSTEM SHALL compare the server's own
-        reported version against that declaration, and SHALL fail when
-        the major disagrees.
-      - >
-        THE SYSTEM SHALL read that version from a setting every
-        PostgreSQL offers, and SHALL NOT call a function that exists
-        only on Aurora.
-      - >
-        THE SYSTEM SHALL record the environment on every QA run it
-        records.
+    - THE SYSTEM SHALL resolve the stated environment before it opens any database connection, for a read as well as a write, and SHALL NOT limit that to registering a QA run.
+    - IF no environment is stated, THEN THE SYSTEM SHALL refuse before connecting, naming the variable to set and the declared environment ids, and SHALL NOT fall back to a default, a last-used value or the local environment.
+    - IF the database cannot be reached, THEN THE SYSTEM SHALL fail naming the stated environment as well as the host it tried, and SHALL NOT include any credential in the message.
+    - WHERE an environment's entry in contract/environments.yaml declares that changes need confirming, THE SYSTEM SHALL require the person to type that environment's id before any person-initiated change to the database from the terminal - a filing decision, a hand-filing, or a re-marking under REQ-PIPE-107.
+    - THE SYSTEM SHALL decide whether that confirmation applies from the environment's declared property, and SHALL NOT compare the environment's name against the word production.
+    - THE SYSTEM SHALL NOT let --yes, or any other flag, environment variable or configuration key, skip that confirmation.
+    - IF the typed id does not match the stated environment exactly, THEN THE SYSTEM SHALL record nothing and say so.
+    - THE SYSTEM SHALL declare that property as true for production, and false for local, sandbox and ci, in contract/environments.yaml.
+    - THE SYSTEM SHALL NOT require that confirmation of an unattended rule-driven write - the pipeline's own filing and promotion, scripted playback under REQ-GEN-135, or a decision arriving through the GitHub route - and SHALL state each exemption in the code beside it.
+    - THE SYSTEM SHALL turn ticketing on only where the stated environment's entry in contract/environments.yaml declares it, and SHALL NOT infer it from GITHUB_REPOSITORY or any other variable a platform sets incidentally.
+    - THE SYSTEM SHALL declare ticketing off for the ci environment.
     non_functional_requirements:
-      - >
-        THE PRECEDENT IS THIS PROJECT'S OWN, twice over:
-        delivery_boundary.py treats a source stating nothing as a
-        FAILURE rather than a default, and git_identity.py hard-errors
-        on an unset identity rather than substituting a placeholder.
-        mothman is the single entry point, so that is where this
-        belongs.
-      - >
-        THE SHARP PART IS THE DEFAULT. Defaulting to production
-        invites a fat-fingered real change; defaulting to local is
-        WORSE, because an operator runs what they believe is a real
-        operation and nothing tells them it went nowhere.
-      - >
-        WHAT IS ACTUALLY PINNABLE, checked rather than assumed: Aurora
-        pins the engine version you choose and is THE ANCHOR; a CI
-        service container and a Dev Container pin exactly by image
-        tag; a local non-production install gets whatever its package
-        manager gives; a Claude Code cloud session gets whatever the
-        image shipped. Two of five pin exactly - and the MAJOR is
-        already aligned between the two that cannot, 16.13 here
-        against the runner's 16.15, both from Ubuntu 24.04's own
-        repository.
-      - >
-        THE ANCHOR IS AURORA POSTGRESQL 16.8 LTS, and one fact decides
-        it: Ubuntu 24.04 ships ONLY postgresql-16 - there is no
-        postgresql-17 package at all - and apt.postgresql.org, which
-        carries other majors, is blocked by this session's egress
-        policy. Anchoring on 17.7 would leave a cloud session
-        permanently a major behind, which destroys the alignment. The
-        counter-argument, recorded rather than waved off: 17 buys
-        roughly another year of runway before end of life.
-      - >
-        STAYING ON AN LTS MINOR REQUIRES AUTO MINOR VERSION UPGRADE TO
-        BE DISABLED, which is a setting rather than a default. And DO
-        NOT HARDCODE THE VERSION FROM THE DOCS - availability is
-        region-specific and AWS's own instruction is to query it with
-        `aws rds describe-db-engine-versions --engine
-        aurora-postgresql`.
-      - >
-        AURORA HAS TWO VERSION NUMBERS - the PostgreSQL engine version
-        and an Aurora version from aurora_version(). Gate on
-        current_setting('server_version_num'), which exists
-        everywhere; aurora_version() does NOT exist on vanilla
-        PostgreSQL, so a check must not call it unguarded.
-      - >
-        MINOR DRIFT WITHIN A MAJOR IS SAFE for what this design leans
-        on: catalogue-only SET SCHEMA, transactional DDL, schema
-        resolution and concurrent writers are all major-version
-        properties, and minors are bug and security fixes.
-      - >
-        SECURITY: three tools take credentials three ways, and IAM
-        database authentication is a ROTATING PASSWORD - the token IS
-        the password, is at least ~1 KB, and has a 15-minute lifetime.
-        It is only used at connection time, so long runs are fine, but
-        dbt, Soda and datacontract-cli each open their own connection,
-        so a static environment variable cannot serve them and
-        something has to mint per connection. AWS also flags that a
-        driver or tool truncating a ~1 KB password breaks
-        authentication.
-      - >
-        AURORA 16 IS NOT VANILLA 16, so the version gate establishes
-        alignment of the number and not of the behaviour. That remains
-        a separate compatibility question.
-    dependencies: [REQ-PIPE-087]
-    open_questions:
-      - >
-        PART OF THIS IS ALREADY BUILT, under another requirement, and a
-        future session should not rebuild it (noticed 2026-09-28 while
-        checking REQ-DASH-094's dependencies). REQ-PIPE-092's follow-on
-        work shipped contract/environments.yaml, qa_tools/common/
-        environments.py and MOTHMAN_ENVIRONMENT, which between them
-        already satisfy criterion 3 (refuse an unknown name) and the
-        unset half of criterion 2. That code is now listed on
-        REQ-PIPE-092's own implemented_by, where it belongs. This
-        requirement stays not_started because seven of its ten criteria
-        are genuinely untouched - the version declaration, the
-        production confirmation, and recording the environment on every
-        QA run - and because it is unsigned.
-      - >
-        ANSWERED 2026-09-28 against AWS's own release calendar rather
-        than recalled - docs.aws.amazon.com/AmazonRDS/latest/
-        AuroraPostgreSQLReleaseNotes/aurorapostgresql-release-calendar,
-        fetched with curl. Worth knowing for the next session: the HTML
-        page is JavaScript-rendered and returns a stub, while the `.md`
-        variant of the same path returns the real tables.
-
-        THE EXTENSION ALLOWLIST DOES NOT CONSTRAIN THIS PROJECT, for a
-        simpler reason than the question assumed: this repository
-        issues NO `CREATE EXTENSION` at all - a grep over every .py and
-        .sql returns zero. Aurora PostgreSQL 16 does list the usual
-        suspects (pg_trgm, pgcrypto, uuid-ossp, pg_stat_statements,
-        postgis, pg_cron, hstore, tablefunc), so one is likely there if
-        ever wanted. Stated plainly because this repo DOES have a live
-        extension problem and it is a different one - DUCKDB's, for
-        reading an arriving file format - which Aurora has no bearing
-        on.
-
-        THE TIMELINE FAVOURS 17 BY EXACTLY ONE YEAR, which is the whole
-        of the counter-argument. Aurora PostgreSQL 16 reaches end of
-        standard support on 28 FEBRUARY 2029 (RDS Extended Support
-        pricing then runs from 1 March 2029, year-3 from 1 March 2031,
-        ending 28 February 2032; community EOL is 9 November 2028).
-        Aurora PostgreSQL 17 reaches end of standard support on 28
-        FEBRUARY 2030. Both have an LTS minor, which is what matters
-        for pinning: 16.8 (LTS), released 20 February 2025, supported
-        to 28 February 2029; 17.7 (LTS), released 13 November 2025,
-        supported to 28 February 2030.
-
-        SO THE ANCHOR HOLDS. Two years and five months of standard
-        support from today is well beyond this PoC's horizon, and the
-        fact that decided it is unchanged: Ubuntu 24.04 ships only
-        postgresql-16, so anchoring on 17.7 would leave a cloud session
-        permanently a major behind. One thing worth knowing for later -
-        Aurora PostgreSQL 18 exists (18.3 and higher, released 11 June
-        2026), so this is a two-major-old anchor rather than a
-        one-major-old one.
-      - >
-        HOW THE ENVIRONMENT IS STATED, and what production's extra
-        friction actually is - relayed as question set D. A mandatory
-        flag on every command, a mandatory environment variable, or
-        both with the flag winning; and typing the environment's name
-        back, a separate explicit flag, or a per-environment setting
-        that says which ones need confirming.
-      - >
-        Whether the decision log carries the environment on each entry
-        (question set D), and whether a minor-version mismatch warns
-        or is silent while only a major fails.
-      - >
-        Where the declared version lives - contract/data-asset.yaml, a
-        new committed file of its own, or alongside .python-version,
-        which is the precedent this borrows from.
+    - 'THE PRECEDENT IS THIS PROJECT''S OWN, twice over: delivery_boundary.py treats a source stating nothing as a FAILURE rather than a default, and git_identity.py hard-errors on an unset identity rather than substituting a placeholder. mothman is the single entry point, so that is where this belongs.'
+    - THE SHARP PART IS THE DEFAULT. Defaulting to production invites a fat-fingered real change; defaulting to local is WORSE, because an operator runs what they believe is a real operation and nothing tells them it went nowhere.
+    - 'PERFORMANCE: resolving the environment reads one environment variable and one committed YAML file, so it adds no database round trip and no visible delay to an interactive command.'
+    - A GATE THAT FIRES ON EVERY COMMAND GETS DISABLED. The typed confirmation is for a person changing production by hand, which is rare by design; anything that makes the pipeline's own unattended run stop for a person has misread the requirement.
+    - 'SECURITY, carried forward and NOT in scope here: Aurora IAM database authentication is a rotating ~1 KB password with a 15-minute lifetime, and dbt, Soda and datacontract-cli each open their own connection, so a static MOTHMAN_SUPPLY_DSN cannot serve a real Aurora deployment; something will have to mint a token per connection. Recorded so the AWS MVP work (plans/wider.md) inherits it rather than rediscovers it.'
+    - 'SCALE: two data assets in strictly separated environments means the same codebase is deployed twice with different environments.yaml answers. Nothing here may hardcode an environment id, which is why the confirmation keys off a declared property (REQ-DASH-094''s precedent - the page asks `publishes`, never the name).'
+    - 'PORTABILITY: works on a laptop with only `uv run mothman` and a .env, as today; the session-start hook (.claude/hooks/session-start.sh:66) and CI (.github/workflows/test.yml:199, :277) already state theirs.'
+    dependencies:
+    - REQ-PIPE-087
+    - REQ-PIPE-092
+    - REQ-GHUB-082
+    open_questions: []
     decisions:
-      - >
-        NO DEFAULT ENVIRONMENT, AND AN UNSTATED ONE IS AN ERROR
-        (Keith, 2026-09-26). FOUR things need the environment, not
-        one: the connection details, trivially; SAFETY, because an
-        operator promoting or demoting must know whether they are
-        touching prod, which deserves different friction from local;
-        the DASHBOARD saying which environment it shows, or a
-        screenshot of dev QA is indistinguishable from prod QA; and
-        the version assertion, which is per-environment by definition.
-      - >
-        DECLARE A MAJOR, ASSERT IT, ACCEPT MINOR DRIFT, AND ANCHOR ON
-        AURORA. Aurora's available engine versions lag upstream, so
-        the number is whatever Aurora offers and everything else
-        follows it - choosing 17 locally and finding Aurora on 16 is
-        the avoidable mistake.
-      - >
-        THE PRECEDENT FOR GATING IT is this repo's own
-        .python-version, added after a silent runner-versus-local
-        divergence burned eight commits of red CI. Identical failure
-        mode: a version difference nothing asserts, invisible locally.
-      - >
-        Worth doing anyway, and recorded here because it belongs with
-        the assertion: give CI a PINNED SERVICE CONTAINER rather than
-        the runner's preinstalled PostgreSQL, so CI and the Dev
-        Container are byte-identical and the cloud session is the only
-        outlier, aligned on major and asserted. That is REQ-TEST-095's
-        criterion.
+    - 'NO DEFAULT ENVIRONMENT, AND AN UNSTATED ONE IS AN ERROR (Keith, 2026-09-26). FOUR things need the environment, not one: the connection details; SAFETY, because promoting or demoting in prod deserves different friction from local; the DASHBOARD saying which environment it shows; and the version assertion, which is per-environment by definition.'
+    - ALREADY BUILT, AND REMOVED FROM THIS REQUIREMENT RATHER THAN LEFT TO BE REBUILT (refresh, 2026-10-04). Former criterion 3, refusing an unknown environment name, is environments.get() (qa_tools/common/environments.py:105-113), listed on REQ-PIPE-092's implemented_by. The no-default refusal itself is environments.current() (environments.py:116-132); what is NOT built is calling it everywhere - only qa_results_writer.open_run (qa_results_writer.py:509-515) and `mothman env current` (cli/env.py:44-59) do, so criteria 1 and 2 are now about reach, not mechanism.
+    - 'ALREADY BUILT: former criterion 4, never reading connection details from anything committed. supply_db.supply_db_dsn() reads only MOTHMAN_SUPPLY_DSN (qa_tools/common/supply_db.py:233-249), and .env is gitignored (.gitignore:64). Removed.'
+    - 'ALREADY BUILT: former criterion 10, recording the environment on every QA run. qa.run has an environment column (qa_tools/common/qa_store.py:173), open_run writes environments.current().id (qa_results_writer.py:515), and complete_run refuses to finish a run with no environment (qa_store.py:984-1005). Removed.'
+    - 'MOVED OUT, NOT DROPPED (refresh, 2026-10-04): former criteria 7 to 9, declaring and asserting the PostgreSQL major, are now REQ-PIPE-146, with every Aurora NFR and decision they carried. Keith''s standing call is small, self-contained requirements; the version gate shares nothing with how a person states an environment except that both happen at connect time.'
+    - 'MOVED OUT: former criterion 5, naming the environment before a write, is now REQ-TEST-114''s. That requirement already recorded that it widened criterion 5, and two requirements each saying the terminal should name the environment is how a builder satisfies one and believes both are done. This one now refuses and confirms; that one tells.'
+    - 'THE DECISION LOG DOES NOT CARRY THE ENVIRONMENT - ANSWERED (Keith, 2026-09-27, recorded on REQ-PIPE-091): a column makes a misrouted decision visible afterwards, and he wants it impossible, so the guard sits above the log as REQ-PIPE-107. The open question asking this is removed as answered.'
+    - 'NEW CRITERION 3 CLOSES A GAP REQ-PIPE-087 LEFT: its criterion says an unreachable database fails ''naming the environment and the host'', and supply_db.connect names only the host (supply_db.py:350-353); plans/supply-model.md records the environment half as waiting on this requirement.'
+    - 'READS NEED THE ENVIRONMENT TOO (refresh, 2026-10-04), because REQ-PIPE-107 checks a database''s identity on every connection and has nothing to compare against without one. One visible consequence: a dashboard build with MOTHMAN_ENVIRONMENT unset, which today embeds an unknown environment (dashboard/embed_dashboard_data.py:351, environments.current_or_none), will refuse instead. REQ-DASH-094 criterion 6''s ''environment unknown'' rendering stays, for archived artifacts that predate this.'
+    - 'THE CONFIRMATION KEYS OFF A DECLARED PROPERTY, NOT THE NAME (Keith, 2026-10-04, question 2 option A), following REQ-DASH-094''s decision that the page asks `publishes` and never the environment''s name. Noted, not reopened: REQ-PIPE-144''s reset-synthetic refusal is worded against the name production; if this lands, that refusal could key off the same property.'
+    - THE PRODUCTION CONFIRMATION MUST LEAVE UNATTENDED WRITES ALONE (Keith, 2026-10-04, question 2 option A). REQ-GEN-135 records that the published PoC is built in `production` from synthetic data, so a bootstrap there plays back scripted decisions; a typed prompt on those would make production unbootstrappable. The friction is for a person's hand, which is what Keith's 'make changes to the wrong environment' was about.
+    - 'THE PIN DECISIONS STAY WITH THE VERSION GATE: declare a major, assert it, accept minor drift, anchor on Aurora PostgreSQL 16.8 LTS - carried to REQ-PIPE-146 verbatim with their reasoning.'
+    - 'THE ENVIRONMENT IS STATED BY TWO ENVIRONMENT VARIABLES, AS TODAY (Keith, 2026-10-04, question 1 option A): MOTHMAN_ENVIRONMENT beside MOTHMAN_SUPPLY_DSN, from the shell or the gitignored .env. If the two disagree, REQ-PIPE-107''s identity check stops the command before it does anything. REJECTED: B, a mandatory --env flag on every command with the flag winning - a flag cannot move the DSN, so it is one more value to agree with the DSN, and noisy to type; C, the environment name selecting a per-environment DSN variable - a mismatch becomes impossible by construction, but every machine then carries one DSN variable per environment.'
+    - 'PRODUCTION FRICTION IS A TYPED ENVIRONMENT ID, FOR A PERSON''S HAND ONLY (Keith, 2026-10-04, question 2 option A): only where contract/environments.yaml declares the property (production today); only for person-initiated changes from the terminal; --yes cannot skip it; the pipeline''s own runs, scripted playback and the GitHub route are exempt. REJECTED: B, keying the confirmation to the name production - it breaks the first time a deployment names its environments differently; C, confirming every write in production including pipeline run, with a flag for unattended runs - production''s own bootstrap and scheduled runs would need the flag every time, and a flag everyone always passes protects nothing.'
+    - 'TICKETING IS SWITCHED ON BY THE ENVIRONMENT, NOT BY AN INCIDENTAL VARIABLE (Keith, sign-off 2026-10-04, accepting the proposal from plans/post-build-review.md #78). ticket_reconciler.service_from_env() turned ticketing on whenever GITHUB_REPOSITORY was set, which GitHub Actions sets on every run, so CI''s bootstrap would have written real GitHub tickets had its job held a token. REJECTED leaving the switch as it was.'
   - id: REQ-DASH-094
     title: "The dashboard says which environment's QA it is showing"
     date_written: "2026-09-26"
@@ -24926,118 +24766,57 @@ requirements:
         side rather than being guessed now.
 
   - id: REQ-PIPE-107
-    title: "A checkout refuses to act against a database belonging to another data asset or environment"
-    date_written: "2026-09-27"
-    story: >
-      As a data engineer with access to more than one environment, I
-      want the tool to stop me the moment I point it at the wrong
-      database, so that I find out before I have changed somebody
-      else's data rather than afterwards from the record of what I did.
+    title: A checkout refuses to act against a database belonging to another data asset or environment
+    date_written: '2026-09-27'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As a data engineer with access to more than one environment, I want the tool to stop me the moment I point it at the wrong database, so that I find out before I have changed somebody else's data rather than afterwards from the record of what I did.
     moscow: must
     status: not_started
-    source: >
-      Keith, 2026-09-27, answering REQ-PIPE-091's question set D - "no,
-      protect this higher up so you can't mistakenly make changes to
-      the wrong environment". Drafted in the same conversation, from
-      his answer rather than from a plans thread. NOT through
-      delivery-scoper.
+    source: Keith, 2026-09-27, answering REQ-PIPE-091's question set D - 'no, protect this higher up so you can't mistakenly make changes to the wrong environment'. Drafted in that conversation without delivery-scoper; refreshed by delivery-scoper 2026-10-04. Keith answered the refresh's questions 3 and 4 on 2026-10-04 (both option A).
     acceptance_criteria:
-      - >
-        THE SYSTEM SHALL record, in the database itself, which data
-        asset and which environment that database belongs to, written
-        once when its schema is created.
-      - >
-        THE SYSTEM SHALL verify that recorded identity against the
-        identity the checkout is configured for before issuing any
-        statement that reads or writes supply rows or recorded QA
-        metadata, and SHALL refuse where they differ.
-      - >
-        IF the two differ, THEN THE SYSTEM SHALL say which identity it
-        found and which it expected, and SHALL NOT include any part of
-        the connection string in that message.
-      - >
-        IF a database carries no recorded identity, THEN THE SYSTEM
-        SHALL refuse to act against it, and SHALL NOT adopt, infer or
-        default the identity from the configuration it was invoked
-        with.
-      - >
-        THE SYSTEM SHALL refuse before performing any part of the
-        requested work, such that a refused invocation leaves the
-        database exactly as it found it.
-      - >
-        THE SYSTEM SHALL apply this check to every connection the
-        system opens, including a test worker's own database and every
-        connection a QA tool opens on the system's behalf, and SHALL
-        NOT exempt any route.
-      - >
-        THE SYSTEM SHALL change a database's recorded identity only
-        through an explicit, separate re-marking operation, and SHALL
-        NOT change it as a side effect of any ordinary command.
+    - THE SYSTEM SHALL record, in the database itself, the data asset id (contract/data-asset.yaml's data_asset_id) and the environment id that database belongs to.
+    - THE SYSTEM SHALL write that identity only through one explicit marking command, which SHALL require the person to type the environment id being written.
+    - IF a database already carries an identity, THEN THE SYSTEM SHALL refuse to mark it again unless the person also types the identity being replaced.
+    - THE SYSTEM SHALL NOT write or change a database's identity as a side effect of any other command.
+    - WHEN a connection is opened, THE SYSTEM SHALL compare the database's recorded identity with the data asset id and environment the checkout is configured for, before any other statement runs on that connection.
+    - IF the two differ, THEN THE SYSTEM SHALL refuse, saying which identity it found and which it expected, and SHALL NOT include any part of the connection string in that message.
+    - IF a database carries no recorded identity, THEN THE SYSTEM SHALL refuse every command except the marking command, and SHALL NOT adopt, infer or default the identity from the configuration it was invoked with.
+    - IF the identity cannot be read, THEN THE SYSTEM SHALL refuse.
+    - THE SYSTEM SHALL refuse before performing any part of the requested work, so that a refused invocation leaves the database exactly as it found it.
+    - THE SYSTEM SHALL apply the check on every route - a test worker's own database included - and SHALL run it against the same connection details before handing them to dbt, Soda Core or datacontract-cli.
+    - WHEN mothman env reset-synthetic (REQ-PIPE-144) clears a database's QA history, THE SYSTEM SHALL leave its recorded identity in place.
+    - THE SYSTEM SHALL mark the sandbox's database in the session-start hook, CI's database in its workflow, and each test worker's database in its fixture, in the same change that adds the check.
+    - IF the qa schema's recorded SCHEMA_VERSION is newer than the checkout's, THEN THE SYSTEM SHALL refuse, naming both versions, and SHALL NOT run its own schema definitions or rewrite the recorded version.
+    - WHEN the newer-schema refusal is built, THE SYSTEM SHALL first add a test that reproduces today's downgrade and fails against the current code, and SHALL confirm it fails before the fix.
     non_functional_requirements:
-      - >
-        THIS IS A GUARD, SO ITS COST IS PAID ON EVERY CONNECTION. One
-        round trip at connect time is acceptable; a check per statement
-        is not.
-      - >
-        A CONNECTION STRING IS A CREDENTIAL. The refusal message is the
-        one place a session is most likely to paste into a chat or a
-        ticket, which is exactly why criterion 3 forbids the DSN
-        appearing in it.
-      - >
-        THE FAILURE MODE THIS PREVENTS IS SILENT AND IRREVERSIBLE, so
-        the guard must fail closed. A check that cannot determine the
-        answer refuses; there is no permissive path, in line with this
-        project's standing stance against permissive fallbacks.
-      - >
-        IT MUST NOT BECOME THE THING PEOPLE TURN OFF. If the check is
-        awkward on a developer's own machine it will be bypassed, and a
-        bypassed guard is worse than none because it is trusted. Making
-        the sandbox setup mark its own database is part of the work,
-        not a follow-up.
-    dependencies: [REQ-PIPE-087, REQ-PIPE-089]
+    - THIS IS A GUARD, SO ITS COST IS PAID ON EVERY CONNECTION. One round trip at connect time is acceptable; a check per statement is not. The identity, the schema version and REQ-PIPE-146's server version can share that one round trip.
+    - A CONNECTION STRING IS A CREDENTIAL. The refusal message is the one place a session is most likely to paste into a chat or a ticket, which is exactly why it must not carry the DSN.
+    - THE FAILURE MODE THIS PREVENTS IS SILENT AND IRREVERSIBLE, so the guard fails closed. A check that cannot determine the answer refuses; there is no permissive path.
+    - IT MUST NOT BECOME THE THING PEOPLE TURN OFF. If the check is awkward on a developer's own machine it will be bypassed, and a bypassed guard is worse than none because it is trusted - hence marking the sandbox, CI and test databases is part of the work, not a follow-up.
+    - 'SCALE: the asset is a deployment''s identity (CLAUDE.md), and two assets will share this codebase and possibly a person''s laptop. Comparing the asset as well as the environment is what stops a quarterly-asset checkout writing to the daily asset''s dev database.'
+    - 'COMPLIANCE, hypothetically: in a real multi-agency deployment the strongest boundary is network and credentials, which this does not replace. This is the last line for the case where a person legitimately holds credentials for two environments.'
+    - 'REGENERATE, NEVER MIGRATE: an existing database carries no identity, so after this lands it refuses until marked - one command, or a rebuild from empty, per Keith''s standing rule.'
+    dependencies:
+    - REQ-PIPE-087
+    - REQ-PIPE-089
+    - REQ-PIPE-093
+    - REQ-PIPE-144
+    open_questions: []
     decisions:
-      - >
-        A COLUMN ON EACH DECISION RECORDING ITS ENVIRONMENT WAS
-        REJECTED IN FAVOUR OF THIS (Keith, 2026-09-27). He raised the
-        column himself in plans/running-thoughts.md #45 and then turned
-        it down when it came back as REQ-PIPE-091's question set D. The
-        reasoning is the part to keep: a column makes a misrouted
-        decision VISIBLE after the fact, and he wants it to be
-        IMPOSSIBLE. A guard above the log also covers every other write
-        - staged rows, promotions, recorded results - which a column on
-        one table cannot.
-      - >
-        THE GUARD IS ABOUT THE DATABASE'S OWN IDENTITY, NOT THE DSN.
-        Comparing connection strings would be the obvious cheap
-        version and it does not work: the same environment is reached
-        by different hostnames from inside and outside, and two
-        environments can legitimately differ only by a hostname a
-        person mistypes. Asking the database who it is answers the
-        actual question.
-      - >
-        EXEMPTING TESTS WAS CONSIDERED AND REJECTED (criterion 6). Test
-        workers create and drop databases constantly, so exempting them
-        is the obvious convenience - and the suite is precisely where a
-        misconfigured DSN has already caused real damage in this
-        project: Soda Core reloading .env moved a worker onto the real
-        supply database mid-run (plans/tooling.md #26), and a
-        benchmarking script truncated a real bootstrap's results.
-        Both are exactly what this guard is for.
-    open_questions:
-      - >
-        WHETHER "ENVIRONMENT" IS A NAME A PERSON CHOOSES OR SOMETHING
-        DERIVED. A chosen name is simple and can be typed wrong twice
-        in the same way; something derived from the deployment is
-        harder to get wrong and harder to explain. Not resolved, and it
-        changes what criterion 1 writes.
-      - >
-        WHETHER THIS SHOULD ALSO REFUSE A DATABASE WHOSE SCHEMA VERSION
-        IS NEWER THAN THE CHECKOUT EXPECTS. It is the same class of
-        mistake - a tool acting on something it does not understand -
-        and REQ-PIPE-089's own SCHEMA_VERSION marker already makes the
-        answer cheap to reach. Deliberately not folded in without
-        Keith's say, because it widens this from "wrong place" to
-        "wrong version" and those may deserve different treatment.
+    - A COLUMN ON EACH DECISION RECORDING ITS ENVIRONMENT WAS REJECTED IN FAVOUR OF THIS (Keith, 2026-09-27). A column makes a misrouted decision VISIBLE after the fact; he wants it IMPOSSIBLE. A guard above the log also covers every other write - staged rows, promotions, recorded results - which a column on one table cannot.
+    - THE GUARD IS ABOUT THE DATABASE'S OWN IDENTITY, NOT THE DSN. The same environment is reached by different hostnames from inside and outside, and two environments can legitimately differ only by a hostname a person mistypes. Asking the database who it is answers the actual question.
+    - 'EXEMPTING TESTS WAS CONSIDERED AND REJECTED. The suite is precisely where a misconfigured DSN has already caused real damage: Soda Core reloading .env moved a worker onto the real supply database mid-run (plans/tooling.md #26), and a benchmarking script truncated a real bootstrap''s results.'
+    - 'NOTHING OF THIS IS BUILT (checked 2026-10-04): no table, comment or setting in the database records an asset or environment, and supply_db.connect (qa_tools/common/supply_db.py:322-362) runs only lock_timeout and read-only setup.'
+    - THE ENVIRONMENT IS A NAME A PERSON CHOOSES, FROM A CLOSED LIST - proposed answer to the old open question (refresh, 2026-10-04). contract/environments.yaml shipped after this was drafted, and environments.get() already refuses any name not on it, so a typo cannot become a new environment. The remaining failure - choosing the wrong declared name twice - is what the typed confirmation in criterion 2 is for. Confirmed by Keith's answer to question 3, 2026-10-04. Nothing in a deployment offers a fact to derive an environment from that is not itself configured by a person.
+    - THE QA TOOLS' OWN CONNECTIONS ARE COVERED BY CHECKING FIRST, not by intercepting them (refresh, 2026-10-04). dbt, Soda and datacontract-cli connect themselves and cannot run our check; REQ-PIPE-087 already fixes a run's connection details for its whole length, so checking those same details before handing them over covers the tools without wrapping them.
+    - THE IDENTITY SURVIVES REQ-PIPE-144's RESET (refresh, 2026-10-04). That command clears QA history 'in effect rebuild-from-empty made explicit'; if it also cleared the identity, the next command would refuse and the obvious fix would be re-marking from whatever .env happens to say - the very adoption criterion 7 forbids.
+    - THE NEWER-SCHEMA CASE IS A REAL HAZARD TODAY, NOT A HYPOTHETICAL (found 2026-10-04 reading qa_store.ensure_schema, qa_tools/common/qa_store.py:816-829). _is_current tests only equality, so an older checkout against a newer database re-runs its own older DDL and overwrites schema_version with its lower number. REQ-PIPE-144 (signed, unbuilt) adds a refusal of an OLDER schema; nothing refuses a NEWER one.
+    - THE ASSET'S SYNTHETIC DECLARATION (REQ-GEN-135, REQ-PIPE-122) IS NOT PART OF THE IDENTITY. That declaration is configuration about the asset and is read from the checkout; recording it in the database as well would be a second copy that can disagree.
+    - 'A NEW DATABASE GETS ITS IDENTITY ONLY FROM AN EXPLICIT `mothman env mark` (Keith, 2026-10-04, question 3 option A), with the environment id typed; the sandbox session-start hook, CI''s workflow and the test fixtures mark their own databases. REJECTED: B, a bootstrap marking a completely empty database automatically from the configured identity - a wrong .env on a fresh database would mark it wrongly and silently, which is exactly the adoption from configuration criterion 7 forbids.'
+    - 'THE NEWER-SCHEMA REFUSAL IS FOLDED INTO THIS REQUIREMENT (Keith, 2026-10-04, question 4 option A) - criterion 13. Same class of mistake (a tool acting on something it does not understand) and the same connect-time round trip. REJECTED: B, its own small requirement - cleaner scope, one more id, for a check that shares this one''s moment and message; C, leaving it - REQ-PIPE-144 covers only the older direction, so the downgrade would stay a known hazard.'
+    - 'TODAY''S DOWNGRADE IS A DEFECT, AND ITS FIX FOLLOWS THE DEFECT RULE (Keith, 2026-10-04): plans/post-build-review.md #79 records it, a failing test comes first (the last criterion), and the fix is that test going green. Not yet reproduced; the finding is from reading qa_store.py:816-829.'
 
   - id: REQ-QAC-108
     title: >
@@ -25726,113 +25505,43 @@ requirements:
         never seen this ticket before.
 
   - id: REQ-TEST-114
-    title: "The terminal says which environment it is acting against"
-    date_written: "2026-09-28"
-    signed_off: null
-    story: >
-      As somebody driving the mothman CLI or TUI - often over a shared
-      screen, often on a machine that can reach more than one
-      environment - I want the terminal to say which environment I am
-      acting against without my asking, so that a development session
-      and a production one are never the same picture.
+    title: The terminal says which environment it is acting against
+    date_written: '2026-09-28'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As somebody driving the mothman CLI or TUI - often over a shared screen, often on a machine that can reach more than one environment - I want the terminal to say which environment I am acting against without my asking, so that a development session and a production one are never the same picture.
     moscow: must
     status: not_started
-    source: >
-      Keith, 2026-09-28: "this should also be expanded to the TUI and
-      CLI", said while signing REQ-DASH-094. The dashboard sibling of
-      this requirement carries the reasoning; this one carries it into
-      the terminal, which REQ-DASH-094 cannot because it is a page.
+    source: 'Keith, 2026-09-28: ''this should also be expanded to the TUI and CLI'', said while signing REQ-DASH-094. Refreshed by delivery-scoper 2026-10-04, absorbing REQ-PIPE-093''s former write-time disclosure criterion. Keith answered the refresh''s question 5 on 2026-10-04 (option A).'
     acceptance_criteria:
-      - >
-        THE SYSTEM SHALL state, in the terminal, which environment the
-        command or session is acting against.
-      - >
-        THE SYSTEM SHALL show that statement in the TUI's own standing
-        chrome, so that it is visible throughout a session rather than
-        only on a command that writes.
-      - >
-        WHERE the environment is not production, THE SYSTEM SHALL make
-        that distinct in the text itself and SHALL NOT rely on colour
-        alone, because a terminal may have colour disabled, be piped to
-        a file, or be screenshotted and printed in greyscale.
-      - >
-        THE SYSTEM SHALL take the statement from the environment that
-        was actually RESOLVED, and SHALL NOT echo back what a person
-        typed.
-      - >
-        IF no environment resolves, THEN THE SYSTEM SHALL refuse rather
-        than present an unlabelled session - deferring to
-        REQ-PIPE-093's own refusal rather than restating it.
-      - >
-        WHERE the terminal produces an artifact somebody else will read
-        - a recorded demo cast, a captured screenshot - THE SYSTEM
-        SHALL carry the statement into it, on the same reasoning
-        REQ-DASH-094 criterion 4 gives for the snapshot archive.
-      - >
-        THE SYSTEM SHALL use the same words for an environment that the
-        dashboard uses, so that one vocabulary covers both surfaces.
+    - THE SYSTEM SHALL show the environment's label at the top of the TUI's main menu and of every TUI screen that can change the database, for as long as that screen is shown.
+    - WHEN a one-off command that connects to a database runs, THE SYSTEM SHALL state the environment's label in one line before its own output.
+    - THE SYSTEM SHALL write that line to standard error, so that a command's standard output is unchanged when piped.
+    - WHEN the terminal asks a person to confirm a change to the database, THE SYSTEM SHALL name the environment in the same prompt.
+    - WHERE the environment's declared publishes property is false, THE SYSTEM SHALL append the words 'not production' to that statement, and SHALL NOT rely on colour alone.
+    - THE SYSTEM SHALL keep those words when colour is disabled, when NO_COLOR is set, and when output is not a terminal.
+    - THE SYSTEM SHALL take the label from contract/environments.yaml for the environment actually resolved, and SHALL NOT echo back what a person typed.
+    - IF no environment resolves when the TUI starts, THEN THE SYSTEM SHALL show REQ-PIPE-093's refusal in place of the main menu.
+    - WHEN the committed demo recording (dashboard/demos/qa_wizard.cast) is next re-recorded, THE SYSTEM SHALL show the environment statement in it.
     non_functional_requirements:
-      - >
-        UNMISSABLE IN A SCREENSHOT, QUIET IN DAILY USE - the same bar
-        REQ-DASH-094 sets, and harder to meet in a terminal, where
-        there is no chrome to hang a banner on and every line spent on
-        standing furniture is a line not spent on the work. The TUI
-        already has a banner (cli/banner.py); the answer is most likely
-        there rather than in a new element.
-      - >
-        A TERMINAL IS NOT A PAGE, and three of its constraints have no
-        dashboard equivalent: output is frequently PIPED or redirected,
-        colour may be off (NO_COLOR, a dumb terminal, CI), and width
-        may be 80 columns. Anything that only works in a wide,
-        colour-capable interactive terminal fails exactly where it
-        matters, which is somebody else's machine.
-      - >
-        NO PER-COMMAND COST. Resolving the environment is a read of
-        configuration and an environment variable, so stating it must
-        not add a database round trip to every command - the CLI is
-        used interactively and a visible delay on `mothman env list`
-        would be absurd.
-      - >
-        THIS IS HONESTY FURNITURE, NOT A GUARD. It tells a person where
-        they are; it does not stop them doing anything. The guard is
-        REQ-PIPE-093 criterion 6's deliberate confirmation before a
-        production filing operation, and conflating the two would give
-        a false sense that being told is the same as being stopped.
-    dependencies: [REQ-PIPE-093, REQ-DASH-094]
-    open_questions:
-      - >
-        Whether a one-off command (not the TUI) states the environment
-        on EVERY invocation or only on one that writes. Always is more
-        honest and risks becoming noise a person stops reading;
-        write-only is quieter and means a read command gives no clue
-        where it read from. REQ-PIPE-093 criterion 5 already requires
-        it before anything that writes, so the open part is genuinely
-        just the read case.
+    - UNMISSABLE IN A SCREENSHOT, QUIET IN DAILY USE - the bar REQ-DASH-094 sets, and harder to meet in a terminal. The TUI already has a banner (cli/banner.py); one line at the top is the expected answer, not a new element.
+    - 'A TERMINAL IS NOT A PAGE: output is frequently piped, colour may be off (NO_COLOR, a dumb terminal, CI), and width may be 80 columns. The statement must fit 80 columns and survive all three.'
+    - NO PER-COMMAND COST. Resolving the environment reads configuration and an environment variable, so stating it must not add a database round trip - a visible delay on `mothman env list` would be absurd.
+    - THIS IS HONESTY FURNITURE, NOT A GUARD. It tells a person where they are; the guards are REQ-PIPE-093's refusal and production confirmation and REQ-PIPE-107's identity check. Conflating them would suggest being told is the same as being stopped.
+    dependencies:
+    - REQ-PIPE-093
+    - REQ-DASH-094
+    open_questions: []
     decisions:
-      - >
-        A SEPARATE REQUIREMENT FROM REQ-DASH-094, NOT EXTRA CRITERIA ON
-        IT (2026-09-28). Same precedent REQ-DASH-085 set against
-        REQ-PIPE-084 and REQ-DASH-094 itself set against REQ-PIPE-093:
-        different surface, different owner, different toolchain. There
-        is also a register-mechanical reason - docs/components.md gives
-        `cli/` to TEST and the dashboard to DASH, so CLI criteria
-        inside a DASH requirement would make its own component tag
-        wrong, and the component tag is what a scoper reads to pick an
-        id.
-      - >
-        IT WIDENS REQ-PIPE-093 CRITERION 5 RATHER THAN DUPLICATING IT.
-        That criterion names the environment "before doing anything
-        that writes", which is a write-time disclosure. Keith's ask is
-        for the terminal to say where it is at all times, which is a
-        standing statement. Recorded because the two read similarly and
-        a builder could easily satisfy one and believe both are done.
-      - >
-        THE DEMO CAST IS A REAL CASE, NOT A HYPOTHETICAL. This repo
-        COMMITS a recorded terminal session - dashboard/demos/
-        qa_wizard.cast, rendered in the dashboard's own Demo tab - so a
-        terminal recording made in a development environment is already
-        published to whoever opens that tab. Criterion 6 exists because
-        of an artifact that exists.
+    - 'A SEPARATE REQUIREMENT FROM REQ-DASH-094, NOT EXTRA CRITERIA ON IT (2026-09-28): different surface, owner and toolchain, and docs/components.md gives cli/ to TEST and the dashboard to DASH.'
+    - 'WHAT IS ALREADY BUILT (checked 2026-10-04): `mothman env current` (cli/env.py:44-59) states the resolved environment and fails when unset, and `mothman env list` (cli/env.py:22-42) marks which declared one this is. Both answer only when asked; nothing states the environment unprompted - the TUI''s banner (cli/app.py:40-41, cli/banner.py) and the decision prompt (cli/filing_tui.py:190) do not mention it. So every criterion above is unbuilt; none is removed.'
+    - 'THE VOCABULARY ALREADY EXISTS, ON THE DASHBOARD, AND THIS REUSES IT RATHER THAN INVENTING ONE (refresh, 2026-10-04): the environment''s label from contract/environments.yaml, plus ''not production'' wherever publishes is false - renderBuildStamp, dashboard/qa-reporting-dashboard.template.html:6501-6550. That is the former criterion 7 (''the same words the dashboard uses'') made concrete.'
+    - ABSORBS REQ-PIPE-093's FORMER CRITERION 5 (refresh, 2026-10-04). That criterion asked for the environment to be named before anything that writes; criterion 4 here is it, sited on the confirmation prompt that every write already passes through (cli/filing_tui.py:190, the --yes-able confirms in cli/supply.py and cli/pipeline.py).
+    - 'STANDARD ERROR, NOT STANDARD OUTPUT (Keith, 2026-10-04, question 5 option A): several commands print tables a person may pipe into another tool, and a leading environment line would change their output. Standard error keeps it on screen and in a screenshot without polluting a pipe.'
+    - 'THE DEMO CAST IS A REAL CASE: dashboard/demos/qa_wizard.cast is committed and shown in the dashboard''s Demo tab, and today it contains no environment statement. Worded as ''when next re-recorded'' so this requirement does not by itself force a re-recording.'
+    - 'THE TUI REFUSES AT LAUNCH RATHER THAN AT THE FIRST WRITE (criterion 8): after REQ-PIPE-093 every connection needs an environment, so a TUI that opened with none would fail at the first menu item anyway, later and less clearly.'
+    - 'EVERY COMMAND THAT CONNECTS STATES THE ENVIRONMENT, ONE LINE ON STANDARD ERROR (Keith, 2026-10-04, question 5 option A). REJECTED: B, only commands that write - quieter, but a read then gives no clue which database it read; C, only the TUI and `mothman env current` - the least noise and the least protection.'
 
   - id: REQ-PIPE-110
     title: contract/calendar.yaml is the one place a delivery agreement lives
@@ -27363,3 +27072,40 @@ requirements:
     - 'THE ROUTE IS A CLOSED SET OF FOUR - the four routes REQ-PIPE-103 criterion 7 names - plus automated. REJECTED a free-text note from the person (Keith, 2026-09-27): nothing can aggregate it.'
     - 'THE 2026-09-27 PLAN TO REGENERATE THE EXISTING RECORDS STANDS in its current form: regenerate rather than migrate, and every synthetic delivery is truthfully automated.'
     open_questions: []
+
+  - id: REQ-PIPE-146
+    title: The checkout declares the PostgreSQL major it targets, and refuses a server on a different one
+    date_written: '2026-10-04'
+    signed_off:
+      by: Keith
+      date: '2026-10-04'
+    story: As whoever maintains this pipeline across a laptop, a dev container, CI, a cloud session and Aurora, I want one committed statement of which PostgreSQL major we target, checked every time we connect, so that a version difference nothing asserts cannot silently make local and production behave differently.
+    moscow: must
+    status: not_started
+    source: 'Keith, plans/running-thoughts.md #45 (2026-09-26), first drafted as REQ-PIPE-093 criteria 7 to 9; split out by delivery-scoper 2026-10-04 to keep each requirement small. Wording of the three criteria and every decision carried forward. Keith answered the refresh''s question 6 on 2026-10-04 (option B, contract/data-asset.yaml).'
+    acceptance_criteria:
+    - THE SYSTEM SHALL declare the PostgreSQL major version this data asset targets in contract/data-asset.yaml.
+    - WHEN connecting, THE SYSTEM SHALL compare the server's reported major against that declaration, and SHALL refuse when they differ, naming both.
+    - THE SYSTEM SHALL read the server's version from current_setting('server_version_num'), and SHALL NOT call aurora_version() or any other function that exists only on Aurora.
+    - WHILE the server's major matches the declaration, THE SYSTEM SHALL accept any minor version, and SHALL NOT warn about it.
+    - THE SYSTEM SHALL check, in its config-only gates, that the PostgreSQL image tags in .devcontainer/docker-compose.yml and .github/workflows/test.yml name the declared major.
+    - WHEN the repository's gates run, THE SYSTEM SHALL reject contract/data-asset.yaml if that declaration is missing or is not a whole-number major, in the gate that already validates that file.
+    non_functional_requirements:
+    - 'WHAT IS ACTUALLY PINNABLE, checked rather than assumed: Aurora pins the engine version you choose and is THE ANCHOR; a CI service container and a Dev Container pin by image tag (both postgres:16 today - .devcontainer/docker-compose.yml:23, .github/workflows/test.yml:149 and :263); a local install gets whatever its package manager gives; a Claude Code cloud session gets whatever the image shipped (16.13 here).'
+    - STAYING ON AN LTS MINOR REQUIRES AUTO MINOR VERSION UPGRADE TO BE DISABLED on Aurora, which is a setting rather than a default. DO NOT HARDCODE THE VERSION FROM THE DOCS - availability is region-specific; query it with `aws rds describe-db-engine-versions --engine aurora-postgresql`.
+    - AURORA 16 IS NOT VANILLA 16, so the gate establishes alignment of the number and not of the behaviour. That remains a separate compatibility question.
+    - 'MINOR DRIFT WITHIN A MAJOR IS SAFE for what this design leans on: catalogue-only SET SCHEMA, transactional DDL, schema resolution and concurrent writers are all major-version properties.'
+    - 'COST: one setting read, sharing REQ-PIPE-107''s connect-time round trip.'
+    dependencies:
+    - REQ-PIPE-087
+    open_questions: []
+    decisions:
+    - 'SPLIT FROM REQ-PIPE-093, 2026-10-04 (delivery-scoper, under Keith''s standing preference for small requirements). Nothing of it is built: no committed file declares a PostgreSQL version and no code reads server_version_num (grep, 2026-10-04); the only pins are the three postgres:16 image tags.'
+    - DECLARE A MAJOR, ASSERT IT, ACCEPT MINOR DRIFT, AND ANCHOR ON AURORA. Aurora's available engine versions lag upstream, so the number is whatever Aurora offers and everything else follows it.
+    - 'THE ANCHOR IS AURORA POSTGRESQL 16.8 LTS. Ubuntu 24.04 ships only postgresql-16, and apt.postgresql.org is blocked by this session''s egress policy, so anchoring on 17.7 would leave a cloud session permanently a major behind. Checked against AWS''s release calendar 2026-09-28: Aurora 16 standard support ends 28 February 2029, Aurora 17 on 28 February 2030 - 17 buys one year, which is the whole counter-argument. Aurora 18 (18.3+) exists since 11 June 2026, so this is a two-major-old anchor.'
+    - 'THE EXTENSION ALLOWLIST DOES NOT CONSTRAIN THIS PROJECT: the repository issues no CREATE EXTENSION at all (grep, 2026-09-28).'
+    - 'THE PRECEDENT FOR GATING IT is this repo''s own .python-version, added after a silent runner-versus-local divergence burned eight commits of red CI. Same failure mode: a version difference nothing asserts, invisible locally.'
+    - CI's PINNED SERVICE CONTAINER is REQ-TEST-095's and is built; criterion 5 here only checks that its tag agrees with the declaration, so the two cannot drift.
+    - AURORA HAS TWO VERSION NUMBERS - the engine version and aurora_version(). Gate on server_version_num, which exists everywhere; aurora_version() does not exist on vanilla PostgreSQL.
+    - 'THE DECLARATION LIVES IN contract/data-asset.yaml (Keith, 2026-10-04, question 6 option B). It is a fact about the asset''s deployment, and each asset''s own data-asset.yaml can state its own - a second asset is a second deployment, so a per-asset declaration costs nothing. REJECTED: A, a .postgres-version file beside .python-version - the precedent this check borrows its reasoning from, but a repository-wide file is a single answer for every asset sharing the codebase; C, per environment in contract/environments.yaml - it would allow a different major per environment, which undoes the point of the check.'
+    - 'A MINOR MISMATCH IS SILENT (delivery-scoper''s recommendation, kept 2026-10-04; Keith did not ask for a warning). Minors are bug and security fixes, and a warning on every CI run - 16.15 against Aurora''s 16.8 - would be noise a person learns to ignore. REJECTED: warning on standard error.'

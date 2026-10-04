@@ -358,7 +358,9 @@ A design thread is deleted WHOLE once its last dependent batch is built.
 Thread B's staging-and-promotion prose still feeds the unbuilt half of
 `REQ-QAC-108` and the operator routes, so it stays.
 
-**Priority: REQ-PIPE-093 is queued, Keith 2026-09-28 evening, his own
+**SIGNED 2026-10-04 (Keith), refreshed by delivery-scoper as one group:** REQ-PIPE-093 (state the environment; production asks for a typed name), REQ-PIPE-107 (a database knows whose it is, and refuses a newer schema), REQ-PIPE-146 (PostgreSQL major declared in data-asset.yaml) and REQ-TEST-114 (the terminal says where it is). Not yet placed in the build order. The paragraph below is the original queueing note.
+
+**Former priority, satisfied by that sign-off - REQ-PIPE-093 was queued, Keith 2026-09-28 evening, his own
 words: "let's not forget PIPE-093 either. We'll tackle it next or after
 the scoper comes back."** It is `not_started`, UNSIGNED, and has FIVE
 open questions - so the sign-off gate applies and at least three of the

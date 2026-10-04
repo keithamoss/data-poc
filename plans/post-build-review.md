@@ -4512,6 +4512,10 @@ twice. It deliberately did not re-find the `TypeError`.
     scoping) - ticketing switched on by the environment's own declared
     configuration. Not fixed; needs Keith.
 
+    **DECIDED 2026-10-04 (Keith):** carried by REQ-PIPE-093, signed -
+    ticketing is switched on only by the environment's declared
+    configuration, and the `ci` environment declares it off.
+
 79. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An older
     checkout can silently DOWNGRADE a database's schema marker.** Found
     by the delivery-scoper refreshing REQ-PIPE-107, not yet reproduced
@@ -4523,3 +4527,6 @@ twice. It deliberately did not re-find the `TypeError`.
     test comes before any fix and Keith signs it off; it is also the
     refresh's open question Q4 (fold the refusal into 107, or its own
     requirement).
+
+    **DECIDED 2026-10-04 (Keith):** folded into REQ-PIPE-107, signed - a
+    newer schema is refused, and the downgrade is fixed failing-test-first.
