@@ -12947,6 +12947,7 @@ requirements:
       - tests/test_cli_supply.py::TestReadingTheDecisionLog
       - tests/test_promotion.py
       - tests/test_promotion_actor.py
+      - tests/test_decision_log.py::TestRejectingAnotherSupplyLeavesTheSlotFilled
     implemented_by:
       - qa_tools/common/decision_log.py::apply_decision
       - qa_tools/common/decision_log.py::Decision
@@ -17600,6 +17601,7 @@ requirements:
       - tests/test_ticket_github.py::TestAnAbsentServiceRefusesCleanly
       - tests/test_cli_filing_tui.py::TestItCallsNoGitHub
       - tests/test_filing_from_github.py
+      - tests/test_slot_state.py::TestRejectingAnotherSupplyLeavesTheSlotPromoted
     evidence:
       - >
         2026-09-29. Criteria 14 and 15 were the only two outstanding and

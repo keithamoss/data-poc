@@ -598,6 +598,7 @@ one when this line suggests it matters.
 - **#83** `investigate` 2026-10-04 - The Birth Registrations Lambda handler would crash on its first file. Found by delivery-scoper refreshing REQ-PIPE-086,...
   - *touches:* `aws/lambda_handlers/bdm_ingest_handler.py`
 - **#84** `investigate` 2026-10-04 - Rejecting a supply filed as a resupply of a filled period empties that period. Found by delivery-scoper drafting the...
+  - *touches:* `tests/test_decision_log.py`, `tests/test_slot_state.py`
 
 ## plans/road-testing.md
 

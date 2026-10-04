@@ -217,3 +217,28 @@ class TestEveryStateNamesItsResponses:
                        slot_state.PROMOTED, slot_state.REJECTED,
                        slot_state.SUBSTITUTED, slot_state.INHERITED):
             assert state in slot_state.RESPONSES, state
+
+
+class TestRejectingAnotherSupplyLeavesTheSlotPromoted:
+    """post-build-review #84, seen from the queue. The slot's state came
+    from the LAST entry naming it, so rejecting an unpromoted resupply
+    filed to a promoted period made that period read REJECTED - asking a
+    person for a resupply of a period that already has one."""
+
+    def test_the_filled_period_still_reads_promoted(self, conn, dataset,
+                                                     due_yesterday):
+        from qa_tools.common import rejection
+        supply = _promote(conn, dataset, due_yesterday.name)
+        rejection.reject(
+            conn, agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
+            supply=f"{dataset}@resupply", physical_tables=[], actor="Sam",
+            reason="a bad file", effective_at="2026-09-29T10:00:00+08:00",
+            from_slot=due_yesterday.name)
+
+        got = _state(conn, dataset, due_yesterday)
+        assert got.state == slot_state.PROMOTED
+        assert got.supply == supply
+        assert got.needs_action is False
+        # Who decided and why are the PROMOTION's, not the rejection's.
+        assert got.decided_by == "Keith"
+        assert got.reason != "a bad file"

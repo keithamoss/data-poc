@@ -622,3 +622,51 @@ class TestNoTestAssumesTheNewestEntryIsItsOwn:
             f"{sorted(offenders)} assert on the NEWEST decision-log entry for "
             f"a dataset, which is routinely another module's - see this "
             f"class's docstring. Select by the period or supply under test.")
+
+
+class TestRejectingAnotherSupplyLeavesTheSlotFilled:
+    """post-build-review #84. A reject names the slot its supply was filed
+    to as `from_slot`, and promoted_into took the LAST entry naming the
+    slot as its answer - so rejecting an unpromoted RESUPPLY of a filled
+    period made the period read as empty while the promoted supply's
+    tables still sat in its schema. A reject or demote empties a slot only
+    where the supply it names is the one filling it."""
+
+    def test_rejecting_an_unpromoted_resupply(self, conn, dataset):
+        with dl.apply_decision(conn, a_decision(dataset, supply="first")):
+            pass
+        with dl.apply_decision(conn, a_decision(
+                dataset, action=dl.REJECT, supply="resupply", to_slot=None,
+                from_slot="2026-Q3", effective_at=LATER, reason="a bad file")):
+            pass
+
+        assert dl.promoted_into(conn, dataset, "2026-Q3") == "first"
+        assert dl.promoted_supply(conn, dataset)["supply"] == "first"
+
+    def test_rejecting_the_promoted_supply_itself_still_empties_it(
+            self, conn, dataset):
+        """REQ-PIPE-076 criterion 4 - one decision, even for a promoted
+        supply - must keep working."""
+        with dl.apply_decision(conn, a_decision(dataset, supply="first")):
+            pass
+        with dl.apply_decision(conn, a_decision(
+                dataset, action=dl.REJECT, supply="first", to_slot=None,
+                from_slot="2026-Q3", effective_at=LATER, reason="withdrawn")):
+            pass
+
+        assert dl.promoted_into(conn, dataset, "2026-Q3") is None
+
+    def test_withholding_an_off_cycle_resupply(self, conn, dataset):
+        """The same defect through a different entry: the gate records
+        `promotion-withheld` with the period as `to_slot`, so withholding
+        an off-cycle resupply of a filled period also read it as empty.
+        A refusal records that nothing changed; it never empties a slot."""
+        with dl.apply_decision(conn, a_decision(dataset, supply="first")):
+            pass
+        with dl.apply_decision(conn, a_decision(
+                dataset, action=dl.PROMOTION_WITHHELD, supply="resupply",
+                actor="promotion rule", actor_kind=dl.RULE,
+                effective_at=LATER, reason="arrived off-cycle")):
+            pass
+
+        assert dl.promoted_into(conn, dataset, "2026-Q3") == "first"

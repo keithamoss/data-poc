@@ -154,14 +154,25 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
     from qa_tools.common import slots as slots_mod
 
     latest = decision_log.latest_for_slot(conn, dataset_id, slot.name)
+    # THE LATEST ENTRY MAY BE ABOUT ANOTHER SUPPLY. A reject, demote or
+    # re-file names its own supply's slot whichever supply it is, and a
+    # refusal names the period automation stood back from - none of which
+    # changes what fills it (post-build-review #84). Where the slot is
+    # filled by a different supply, it reads as that supply's.
+    filler = decision_log.promoted_into(conn, dataset_id, slot.name)
+    if (latest and filler and latest[1] != filler
+            and latest[0] in (decision_log.MOVES_A_SUPPLY
+                              + decision_log.RECORDS_A_REFUSAL)):
+        latest = _filling_entry(conn, dataset_id, slot.name, filler) or latest
+    about = filler if latest and latest[1] == filler and filler else None
     if latest:
         state, supply = _state_from_decision(latest)
         if state:
             return SlotState(
                 dataset_id=dataset_id, period=slot.name, state=state,
                 supply=supply, stands_on=latest[2],
-                decided_by=_decider(conn, dataset_id, slot.name, state),
-                reason=_reason(conn, dataset_id, slot.name))
+                decided_by=_decider(conn, dataset_id, slot.name, state, about),
+                reason=_reason(conn, dataset_id, slot.name, about))
 
     filed = filings.get(slot.name)
     if held:
@@ -177,30 +188,53 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
     return SlotState(dataset_id=dataset_id, period=slot.name, state=NOT_YET_DUE)
 
 
-def _decider(conn, dataset_id: str, slot: str, state: str) -> str | None:
+def _latest_naming(columns: str, dataset_id: str, slot: str,
+                   supply: str | None):
+    """The query for the newest entry naming this slot - or, given the
+    supply that fills it, the newest entry that put THAT supply there, so
+    a later entry about another supply does not lend it its actor or
+    reason (post-build-review #84)."""
+    if supply:
+        return (f"SELECT {columns} FROM {decision_log.TABLE} "
+                "WHERE dataset_id = ? AND to_slot = ? AND supply = ? "
+                "ORDER BY effective_at DESC, id DESC LIMIT 1",
+                [dataset_id, slot, supply])
+    return (f"SELECT {columns} FROM {decision_log.TABLE} "
+            "WHERE dataset_id = ? AND (to_slot = ? OR from_slot = ?) "
+            "ORDER BY effective_at DESC, id DESC LIMIT 1",
+            [dataset_id, slot, slot])
+
+
+def _filling_entry(conn, dataset_id: str, slot: str, supply: str):
+    """`(action, supply, stands_on)` of the entry that put this supply in
+    this slot - what latest_for_slot() would have answered had nothing
+    about another supply been recorded since."""
+    rows = conn.execute(
+        f"SELECT action, supply, stands_on FROM {decision_log.TABLE} "
+        "WHERE dataset_id = ? AND to_slot = ? AND supply = ? "
+        "ORDER BY effective_at DESC, id DESC LIMIT 1",
+        [dataset_id, slot, supply]).fetchall()
+    return (rows[0][0], rows[0][1], rows[0][2]) if rows else None
+
+
+def _decider(conn, dataset_id: str, slot: str, state: str,
+             supply: str | None = None) -> str | None:
     """Who decided, where a person did.
 
     None for anything a RULE did - an automatic promotion, an
     inheritance - because naming the rule as though it were a person
     puts a decision on somebody who never made one.
     """
-    rows = conn.execute(
-        f"SELECT actor, actor_kind FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND (to_slot = ? OR from_slot = ?) "
-        "ORDER BY effective_at DESC, id DESC LIMIT 1",
-        [dataset_id, slot, slot]).fetchall()
+    rows = conn.execute(*_latest_naming(
+        "actor, actor_kind", dataset_id, slot, supply)).fetchall()
     if not rows:
         return None
     actor, kind = rows[0]
     return actor if kind == decision_log.PERSON else None
 
 
-def _reason(conn, dataset_id: str, slot: str) -> str:
-    rows = conn.execute(
-        f"SELECT reason FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND (to_slot = ? OR from_slot = ?) "
-        "ORDER BY effective_at DESC, id DESC LIMIT 1",
-        [dataset_id, slot, slot]).fetchall()
+def _reason(conn, dataset_id: str, slot: str, supply: str | None = None) -> str:
+    rows = conn.execute(*_latest_naming("reason", dataset_id, slot, supply)).fetchall()
     return (rows[0][0] or "") if rows else ""
 
 

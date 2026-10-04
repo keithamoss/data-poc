@@ -127,6 +127,10 @@ AUTOMATIC_ACTIONS = (PROMOTE, INHERIT, INHERIT_REFUSED)
 #: refuses while a later period stands on it.
 MOVES_A_SUPPLY = (REJECT, DEMOTE, REFILE)
 
+#: Entries that record automation standing back, and so never change what
+#: a slot resolves to (post-build-review #84).
+RECORDS_A_REFUSAL = (PROMOTION_WITHHELD, INHERIT_REFUSED)
+
 #: The decisions that make a period DEPEND on another period's supply.
 #: BOTH of them, and the second was missed for an hour: an inherited
 #: period stands on a supply just as hard as a substituted one - demote
@@ -277,12 +281,34 @@ def promoted_into(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
     rows = conn.execute(
         f"SELECT action, supply, from_slot, to_slot FROM {TABLE} "
         f"WHERE dataset_id = ? AND (to_slot = ? OR from_slot = ?) {window} "
-        "ORDER BY effective_at DESC, id DESC LIMIT 1", params).fetchall()
-    if not rows:
-        return None
-    action, supply, _from_slot, to_slot = rows[0]
-    if to_slot != slot:
-        return None
+        "ORDER BY effective_at, id", params).fetchall()
+    # WALKED OLDEST FIRST rather than "the last entry naming the slot",
+    # because a reject, demote or re-file names its supply's slot as
+    # `from_slot` WHICHEVER SUPPLY IT IS. Rejecting an unpromoted resupply
+    # filed to a promoted period is not a decision about what fills that
+    # period, and reading it as one made a filled period read as empty
+    # while its supply's tables still sat in the period schema
+    # (post-build-review #84). So such an entry empties the slot only
+    # where it names the supply that fills it.
+    # A REFUSAL IS NOT A CHANGE EITHER. `promotion-withheld` and
+    # `inherit-refused` name the period as `to_slot` to say which period
+    # automation stood back from; neither changes what fills it.
+    fills: str | None = None
+    for action, supply, _from_slot, to_slot in rows:
+        if action in RECORDS_A_REFUSAL:
+            continue
+        if to_slot == slot:
+            fills = _fills(action, supply)
+        elif (action in (REJECT, DEMOTE, REFILE) and supply and fills
+              and supply != fills):
+            continue
+        else:
+            fills = None
+    return fills
+
+
+def _fills(action: str, supply: str | None) -> str | None:
+    """What an entry INTO a slot leaves it resolving to."""
     # A SUBSTITUTED SLOT COUNTS AS FILLED (REQ-PIPE-084 criterion 4).
     # That is the point of it: the period answers, so nothing should
     # treat it as owed, and the next arrival for it is a supply landing

@@ -137,6 +137,13 @@ releases:
               When you keep a local file, folder or S3 supply and it is left
               waiting on a decision, the terminal now offers that decision
               straight away, as the synthetic route already did.
+          - headline: Rejecting a replacement file no longer empties its quarter
+            components: ["Pipeline & publishing"]
+            description: >
+              If a quarter was already filled and you rejected a second file
+              sent for it, the quarter read as empty and the queue asked for
+              a resupply. It now keeps showing the supply that fills it. The
+              same applied when an off-cycle resupply was held back.
       - category: Improved
         items:
           - headline: Requirements can be retired, and filtered by status

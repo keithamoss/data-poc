@@ -4633,5 +4633,24 @@ twice. It deliberately did not re-find the `TypeError`.
     criterion 9, REQ-PIPE-076).
 
     **DECIDED 2026-10-04 (Keith):** fix FIRST, failing test first, ahead
-    of the failed-load rejection requirement that depends on it. Not yet
-    built.
+    of the failed-load rejection requirement that depends on it.
+
+    **FIXED 2026-10-04 (Keith: "start now"), failing tests first.**
+    Reproduced as read, and it was WIDER: a `promotion-withheld` entry
+    (an off-cycle resupply automation stood back from) names the period
+    as `to_slot`, so it emptied a filled period the same way. Fixed in two
+    places, because the rule had two copies:
+    - `decision_log.promoted_into` walks the slot's entries oldest first;
+      a reject, demote or re-file empties the slot only where it names the
+      supply filling it, and `RECORDS_A_REFUSAL` (`promotion-withheld`,
+      `inherit-refused`) never changes what fills it.
+    - `slot_state.state_of` read the LAST entry too, so the queue and
+      tickets showed REJECTED. Where the latest entry is about another
+      supply, the slot reads as its filler's, with the filler's own
+      decider and reason.
+    Tests: `tests/test_decision_log.py::TestRejectingAnotherSupplyLeavesTheSlotFilled`
+    (3) and `tests/test_slot_state.py::TestRejectingAnotherSupplyLeavesTheSlotPromoted`,
+    each confirmed failing first. `latest_for_slot` itself is unchanged:
+    it answers "what was the last decision", which substitution's refusal
+    wording needs. REQ-PIPE-130's slot view (signed, build step 2) will
+    replace both readers with one.
