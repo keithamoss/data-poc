@@ -1553,3 +1553,60 @@ judgement about who reads the page rather than about the rule.
       overlap check is REQ-PIPE-134's; it keeps only where a due instant
       comes from. Still open: slaProperties' `frequency`, 111 point 2.
       Then all four go back to the scoper.
+    - **PARKED, 2026-10-04 afternoon (Keith): CHANGING A PAST DELIVERY
+      AGREEMENT.** "This calendar thing is doing my head in ... we'll come
+      back to it once we've built the stuff that we've been scoping today.
+      I need a clear head." NOT DECIDED - recorded so it is not re-derived
+      or quietly settled. Calendar drafts REQ-PIPE-110-113 are NOT sent to
+      the scoper until it is.
+
+      THE QUESTION: may a past date (or setting/timezone version) ever
+      change, given due instants are COMPUTED from config on every read, so
+      a change re-judges history (lateness flips, the previous period's
+      close moves, worst case a filed supply now "belongs" to another
+      period)?
+
+      WHERE EACH POSITION CAME FROM:
+      - REQ-PIPE-050 (built 2026-09-23): "say what you did" - a past date
+        may change if the change ADDS a changelog line.
+      - REQ-PIPE-111 (drafted 2026-09-28, Keith explicit): NO ESCAPE HATCH;
+        a correction is a new version from a date forward only.
+      - This morning Keith chose "match calendars" (= 050's rule) and "no
+        synthetic exception" on a framing that described 050's rule as how
+        calendars work WITHOUT saying 111 recorded his decision to drop it.
+        Owned as the main session's mistake; both answers are written into
+        signed REQ-PIPE-122 (its criterion protecting past setting versions,
+        and its 'NO SYNTHETIC EXCEPTION' decision) and are NOW IN QUESTION.
+        Resolve before building 122.
+
+      THE SCENARIO WALKED THROUGH: Q3 authored 1 Aug, agreement says 2 Aug.
+      Noticed ON 1 Aug: 111 allows it (the date has not passed), but it
+      quietly moves Q2's close a day into the past. Noticed ON 2 Aug: 111
+      refuses, a new version cannot reach Q3, and the files show LATE
+      forever with no way to say the calendar was wrong.
+
+      OPTIONS ON THE TABLE (none chosen):
+      (a) 111 strict, plus a recorded "excuse lateness" decision - config
+          never changes its past; a person corrects the JUDGEMENT.
+      (b) 111 strict by default plus a DECLARED CORRECTION route - Keith's
+          instinct ("we do need to offer an escape hatch, with the
+          acknowledgement that it will change history"): a changelog entry
+          `kind: correction` naming what it corrects; `mothman schedule
+          correction-impact` previews every consequence; the commit hook
+          and CI refuse a past change without one; the next pipeline run
+          records it in the decision log, re-judges, flags the dashboard,
+          and raises a re-file item for any supply now in the wrong period
+          (needs REQ-PIPE-141). BACKSTOP against bypassing git (--no-verify,
+          unprotected branch, force-push, edits on a server): the database
+          remembers what the calendar said about each judged period and the
+          pipeline refuses a dataset whose past changed undeclared.
+          Settings, timezone and synthetic eras would use the same route.
+      (c) 050's rule as built - correctable with any added changelog line.
+      Keith's lean when parked: strict by default with an escape hatch,
+      i.e. (b), but "not sure which way to go".
+
+      SETTLED THE SAME AFTERNOON AND NOT IN QUESTION: 110 - `participates`
+      replaces `delivery_months`, `not_expected` stays (one-off decisions);
+      `slaProperties` deleted entirely including `frequency`. 112 - the
+      timezone stays in data-asset.yaml and is versioned now. 113 -
+      deduplicated against REQ-PIPE-134.
