@@ -84,3 +84,26 @@ class TestBothCollectionsSupplyTheirHalf:
                 return {"run_id": self.run_id}
 
         assert orchestrate_bdm.entry_for(Contested())["csv_path"] == "/deliveries/run_x"
+
+
+class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
+    def test_child_protection_files_with_the_whole_pass_as_among(self, monkeypatch):
+        """A zip is filed whole (REQ-PIPE-105 criterion 5) only while CP's
+        half passes `among` through - nothing else would notice if it
+        stopped (delivery-critic, sprint 1)."""
+        seen = {}
+        monkeypatch.setattr(orchestrate_cp, "file_and_overlay",
+                            lambda arrival, among=None: seen.update(among=among))
+        orchestrate_cp.STEPS.file_and_overlay(A, [A, B])
+        assert seen["among"] == [A, B]
+
+    def test_each_half_reaches_its_own_orchestrators_functions(self, monkeypatch):
+        for module in (orchestrate_bdm, orchestrate_cp):
+            calls = []
+            monkeypatch.setattr(module, "_run_one",
+                                lambda *a, **k: calls.append("run") or [])
+            monkeypatch.setattr(module, "promote_after",
+                                lambda *a, **k: calls.append("gate"))
+            module.STEPS.run_one({"run_id": "r"}, "T", "x", on_step=None)
+            module.STEPS.promote_after(A, [], "x")
+            assert calls == ["run", "gate"], module.__name__

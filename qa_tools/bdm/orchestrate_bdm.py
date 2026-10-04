@@ -12,9 +12,12 @@ plans/performance.md #4). Promotion is what ended that: a supply is
 filed to the oldest slot no PROMOTION has filled, so arrival N's filing
 depends on arrival N-1's promotion, which depends on arrival N-1's
 checks. `--sequential` still exists and no longer changes anything.
-See parallel_orchestrate.run_manifest's own docstring for what the
-ordering cost and what it bought. Results still come back in manifest
-order, so output stays byte-for-byte reproducible for a given manifest.
+Each arrival goes through qa_tools/common/arrival_lifecycle.py, the one
+per-arrival lifecycle the hand-filed path shares (REQ-PIPE-086); the
+measurement of what the ordering cost is in
+parallel_orchestrate.run_manifest's docstring, which the batch used to
+call. Results come back in arrival order, so output stays byte-for-byte
+reproducible.
 
 Assumes data/raw/ (generator output) exists - run_pipeline() below builds
 its own data/duckdb_runs/*.duckdb per-run real warehouses itself (via
@@ -181,9 +184,9 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     # that as a check with NO REFERENCE and never as a pass, which is
     # criterion 5.
     #
-    # AFTER FILING, WHICH IS WHY THIS WORKS. parallel_orchestrate runs
-    # `before_each` (the filing) then the run then `after_each` (the
-    # promotion), one arrival at a time, so by the time this line runs
+    # AFTER FILING, WHICH IS WHY THIS WORKS. arrival_lifecycle.process()
+    # files the arrival, then runs this, then the gate, one arrival at a
+    # time, so by the time this line runs
     # the arrival has a period and every earlier arrival has been
     # promoted or refused.
     if reference_run_id is None:
@@ -586,8 +589,8 @@ def run_pipeline(sequential: bool = False,
 
     # Read back rather than threaded through _run_one's own return value -
     # the lifecycle's contract is a flat list of check results, shared
-    # with orchestrate_cp.py, not worth complicating for this. Also means this is the exact same code path build_results_
-    # from_history.py uses for the committed-history-only rebuild, so the
+    # with orchestrate_cp.py, not worth complicating for this. Also means
+    # this is the exact same code path build_results_from_history.py uses for the committed-history-only rebuild, so the
     # two can't drift on how dataset_stats gets assembled.
     dataset_stats_by_run = {}
     for arrival in found_arrivals:

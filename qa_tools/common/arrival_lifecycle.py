@@ -5,10 +5,11 @@ that order, for one arrival, and then the next. Every route that keeps a
 supply goes through `process()`: the batch, and the terminal's hand-filed
 routes. Before this module those steps were composed in five places - the
 two batches' before/after hooks and the two hand-filed `run_arrivals()`
-loops among them - and the copies had already drifted (a contested Birth
-Registrations file was checked by the batch and refused by the terminal;
-the batch stamped one timestamp per pass and the terminal one per
-arrival). Two copies of a lifecycle is how a supply someone filed by hand
+loops among them - and the copies had already drifted apart in code (the
+batch pointed a contested Birth Registrations arrival at its delivery
+while the hand-filed loop called path_for(), which refuses one - latent,
+since every kept Birth Registrations route passes a single file; and the
+batch stamped one timestamp per pass, the terminal one per arrival). Two copies of a lifecycle is how a supply someone filed by hand
 comes to be treated differently from one that arrived on its own, which
 is the whole of what REQ-PIPE-086 exists to prevent.
 

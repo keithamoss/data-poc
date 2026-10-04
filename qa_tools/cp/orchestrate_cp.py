@@ -7,10 +7,10 @@ reports/results_cp.json, same check-result record shape
 except dataset_id varies per result across the 6 CP tables instead of
 being one constant.
 
-Runs the manifest's runs IN PARALLEL by default (qa_tools/common/
-parallel_orchestrate.py, shared with orchestrate_bdm.py - see that
-file's docstring and plans/performance.md #4), with a --sequential flag
-for easier debugging.
+Runs one arrival at a time, in receipt order, through
+qa_tools/common/arrival_lifecycle.py (REQ-PIPE-086) - see
+orchestrate_bdm.py's docstring for why it stopped running in parallel.
+--sequential now only stops a run's tools overlapping.
 
 Assumes data/cp_raw/ (generator/generate_cp_runs.py's output) already
 exists - run that first if it doesn't. Builds data/cp_duckdb_runs/ itself

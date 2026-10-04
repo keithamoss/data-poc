@@ -1852,6 +1852,18 @@ judgement about who reads the page rather than about the rule.
         function (needed for the as-at parameter). NOTED for Keith: #89 -
         a withheld supply's slot now reads "awaiting a decision" instead
         of "returned".
+      - SPRINT 1 CRITIC (delivery-critic): criterion 2 MET; criterion 13
+        met in code, its one-off proof not re-runnable (the "before"
+        database was dropped after comparing - noted, not hidden). No
+        defects. Minor findings FIXED: stale comments naming run_manifest's
+        hooks; the lifecycle docstring overstated a drift that was latent
+        (every kept BDM route passes one file); a stronger structural test
+        (no batch or hand-filed path calls a step directly); CP's `among`
+        pass-through now tested. LEFT: parallel_orchestrate.run_manifest
+        and its hooks are dead in production (only their own tests use
+        them) - deleting them is a tidy-up for later. The critic also saw
+        3 intermittent failures in one of three runs of a CLI subset,
+        unattributed; the full suite since then ran clean (3,169 passed).
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

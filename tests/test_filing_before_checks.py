@@ -85,6 +85,21 @@ class TestTheFilingCallComesBeforeTheToolRuns:
             assert not _call_lines(module, function, "parallel_orchestrate.run_manifest"), \
                 f"{module} composes a second copy of the lifecycle"
 
+    def test_no_batch_or_hand_filed_path_composes_the_steps_itself(self):
+        """The guard criterion 2 actually needs: a second composition
+        written as a plain inline loop would pass the test above, so the
+        step functions must not be called directly outside the lifecycle
+        (delivery-critic, sprint 1)."""
+        for module, function in (("qa_tools.cp.orchestrate_cp", "run_pipeline_cp"),
+                                 ("qa_tools.bdm.orchestrate_bdm", "run_pipeline"),
+                                 ("qa_tools.cp.orchestrate_cp", "run_arrivals"),
+                                 ("qa_tools.bdm.orchestrate_bdm", "run_arrivals")):
+            assert _call_lines(module, function, "arrival_lifecycle.process_all"), \
+                f"{module}.{function} does not go through the lifecycle"
+            for step in ("file_and_overlay", "promote_after", "_run_one"):
+                assert not _call_lines(module, function, step), \
+                    f"{module}.{function} calls {step} itself - a second composition"
+
     def test_both_file_before_they_build_the_overlay(self):
         for module in ("qa_tools.cp.orchestrate_cp", "qa_tools.bdm.orchestrate_bdm"):
             filed = _call_lines(module, "file_and_overlay", "filing.file_arrivals")
