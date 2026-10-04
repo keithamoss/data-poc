@@ -1360,3 +1360,21 @@ judgement about who reads the page rather than about the rule.
       132, REQ-DASH-133, REQ-PIPE-134**, with the points above. All signed
       drafts go back to delivery-scoper for one final pass applying every
       sign-off change, then into requirements.yaml.
+    - **SCENARIOS FOR THIS BATCH, VISIBLE IN THE REPORTING UI** (Keith,
+      2026-10-04): little test cases showing each shape discussed - built
+      on the existing test-scenario register + generator injection +
+      SCENARIOS.md map (REQ-GEN-045), not a parallel mechanism. Candidate
+      shapes: clean resend superseding a failed one (and a same-zip pair
+      resolved by a later file); a correction before its partner, promoted
+      on re-check, and one whose re-check still fails (the shout); amber
+      held / promote-and-acknowledge awaiting acknowledgement; daily
+      replacement; red promoted; a late daily file closing the missed day
+      empty, and a Case Workers arrival in its gap held for a person; the
+      manifest showing promoted/inherited/substituted; and person
+      decisions (un-supersede, mark as not supplied, acknowledge,
+      substitute). **SCRIPTED HUMAN DECISIONS WILL BE BUILT** (Keith) - the
+      generator produces files only today, so synthetic history gains a
+      way to play back seeded decisions ("on <date> a person
+      un-supersedes X"). Its own requirement(s), via delivery-scoper after
+      the final pass on the batch. Open: whether the scenario map is also
+      shown inside the dashboard.
