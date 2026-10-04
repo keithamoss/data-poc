@@ -1630,3 +1630,10 @@ judgement about who reads the page rather than about the rule.
       dropped with a table declares it reads it): "we may or may not decide
       to keep dbt, but I would like to keep the shape of this check" -
       registered unsigned with a PARKED open question.
+    - **REQ-PIPE-081 JOINS THE BATCH, 2026-10-04 (Keith).** Build order
+      now: REQ-DOCS-143 -> slot view + withheld fix -> 134, 131, 144,
+      132, then **133 together with 081's page switch** (both replace
+      clipDatasetToAsOf; 081 reads the slot view's as-at form), 122, 118,
+      120, 128+129, **081's census**, re-file (140-142), the rest of 130,
+      123, 121, 126, 127, then **081's "In place on" rename** as a
+      standalone change; REQ-PIPE-115 alongside where it fits.

@@ -15547,6 +15547,7 @@ requirements:
         generated event sequences rather than only worked examples.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-DASH-041]
     decisions:
+      - "THE REMAINDER JOINS THE OPTION A AND PERIOD-CLOSING BATCH, IN THREE PLACES (Keith, 2026-10-04). (1) The page switch - criteria 1, 2, 5-8 and 11 - lands WITH REQ-DASH-133, because both replace the same template staleness path (clipDatasetToAsOf), and reads REQ-PIPE-130's one view of what a slot holds, whose as-at form is this requirement's engine. (2) The census - criteria 12-16 - lands after REQ-PIPE-128 and 129, which change the names it compares. (3) The 'In place on' rename - criteria 20-26, ~900 occurrences - is its own standalone change once the batch's template work is done, so it does not collide with every other template edit. REJECTED renaming first (later template work would build on churn) and REJECTED keeping 081 out of the batch (the same function would be rewritten twice)."
       - >
         AS-AT-T HAD NO HISTORY TO ANSWER OVER, found 2026-10-02 while
         wiring phase 2 and fixed in the same change - the requirement
