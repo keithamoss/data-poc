@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -627,7 +627,13 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
     CHECK (action IN ('promote', 'reject', 'demote', 'refile',
                       'substitute', 'de-substitute',
                       'inherit', 'inherit-refused', 'un-inherit',
-                      'promotion-withheld'));
+                      'promotion-withheld', 'mark-not-supplied'));
+-- A MARK AS NOT SUPPLIED names the period it accepts as missed and no
+-- supply (REQ-PIPE-132, version 20).
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_mark_not_supplied_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_mark_not_supplied_shape
+    CHECK (action <> 'mark-not-supplied'
+           OR (to_slot IS NOT NULL AND (supply IS NULL OR supply = '')));
 -- A withheld promotion names the period it stood back from, which is
 -- the same shape a promotion has - it is a record ABOUT that slot
 -- rather than a change to it (REQ-PIPE-077 criterion 6).
@@ -666,7 +672,8 @@ CREATE INDEX IF NOT EXISTS decision_stands_on
 ALTER TABLE "{SCHEMA}".decision ALTER COLUMN supply DROP NOT NULL;
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_supply_present;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_supply_present
-    CHECK (action = 'inherit-refused' OR (supply IS NOT NULL AND supply <> ''));
+    CHECK (action IN ('inherit-refused', 'mark-not-supplied')
+           OR (supply IS NOT NULL AND supply <> ''));
 
 --   WHEN A PERIOD WAS OPENED (REQ-PIPE-098 criterion 3). "First
 --   created" has to be a FACT rather than an inference from the schema

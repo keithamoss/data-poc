@@ -101,8 +101,10 @@ class TestTheEightAreOneList:
         for operation in fd.OPERATIONS:
             assert operation in dl.ACTIONS, operation
 
-    def test_there_are_eight_of_them(self):
-        assert len(set(fd.OPERATIONS)) == 8
+    def test_there_are_nine_of_them(self):
+        """Eight, and REQ-PIPE-132's mark as not supplied (2026-10-05)."""
+        assert len(set(fd.OPERATIONS)) == 9
+        assert fd.MARK_NOT_SUPPLIED in fd.PERIOD_SCOPED
 
     def test_supply_scoped_and_period_scoped_partition_them(self):
         """Criterion 31: none of the four period-scoped ones answers

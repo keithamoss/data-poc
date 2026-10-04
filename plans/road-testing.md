@@ -2024,6 +2024,65 @@ judgement about who reads the page rather than about the rule.
         per table - #91's invariant says per check); the reconciliation
         caught a REAL defect on its first bootstrap (#97, two checks
         silently missing when a contested table fell through).
+      - SPRINT 6 CRITICS (post-build-review #98 UX, #99 delivery). The
+        delivery critic found a CRITICAL false green, now FIXED: a hold on
+        one supply withheld the table from every later supply of that
+        dataset, so with 115's guard eight on-time Case Workers supplies
+        got NO QA and showed green. A hold now applies to its own arrival
+        only (re-bootstrapped, supply7). Also fixed: check panel showed the
+        last run's numbers as "current" for a blocked dataset; the queue's
+        lede said nothing in it changes a status; nine holds named as one;
+        "Latest arrival" naming the oldest hold. QUESTIONS FOR KEITH:
+        (1) should an open hold from 2023 blank out a later period's real,
+        checked results (115 c10-11 as signed say yes)? rec: no - keep the
+        dataset red with the reason, show the period's own verdicts;
+        (2) should a gap-rule red look different from a measured red? rec:
+        yes, same red, labelled at the check group; (3) 115 c2 - one
+        not-evaluated record per CHECK (as built, matching #91's invariant)
+        or per (check, table) as signed? rec: per check, amend c2; (4) 115
+        c17's reconciliation skips runs with no period (trials) - extend
+        unrunnable to them, or accept? rec: accept; (5) the sprint-5 critic's
+        three (#96): refuse a GitHub-Actions identity hand-filing (rec: yes),
+        amend the stated-time instant NFR (rec: yes), note schema 19 was
+        additive.
+      - SPRINT 7: REQ-PIPE-132 and REQ-DASH-133 BUILT; REQ-PIPE-081's page
+        switch NOT BUILT - held for you, see below. 132: a slot that closed
+        unfilled reads closed, and a person can accept it as not supplied
+        (`mothman supply decide --operation mark-not-supplied`, the TUI's
+        ninth filing decision, schema 20 additive); the queue lists
+        consecutive closed gaps of a dataset as ONE item; a mark changes no
+        data and is superseded by a later re-file or substitution. 133: an
+        unmarked gap is RED in words ("No supply - 2 periods with no
+        supply, 2025-Q2 to 2025-Q3"), rolls up, and is counted on the agency
+        card in one line broken out by kind; an accepted gap is quiet and
+        names its reason; both sit in supply history; all judged as at the
+        date on show from instants the build embeds. PROVISIONAL: a dataset
+        whose latest run is fine keeps its row and carries the gap beneath
+        its pill (it does not get the blocked-style reason row); a gap
+        outranks an ended schedule. Found and fixed while gating it
+        (post-build-review #100-#102): a mark crashed the outstanding queue
+        (it carries no supply); a period whose only supply was rejected
+        never read as unfilled; a new test promoted into the shared CP
+        fixture's period. The sprint-6 hold fix is confirmed on a fresh
+        bootstrap (supply7, 21 minutes): every filed Case Workers supply has
+        its 18 verdicts, every held one none; 10 promotions.
+        **NEEDS KEITH - 081's PAGE SWITCH (criteria 1, 2, 5-8, 11).** Built
+        as signed, the as-of view answers ONLY with what was PROMOTED. But
+        a red supply is never auto-promoted, so the newest supply of a
+        dataset - the one QA exists to judge - would vanish from the
+        dataset's verdict while it waits for a person, and the page would
+        show the older green one: a false green, the thing this project
+        guards hardest against. With the gap cascade above, 9 of ~150
+        supplies are promoted, so most dates would also read "nothing in
+        place". Options: (a) build as signed and add a red "waiting for a
+        decision" item per awaiting supply (needs a new outstanding kind
+        and its own requirement); (b) the verdict shows the newest supply
+        that is in place OR awaiting a decision, labelled which, and only
+        withdrawn ones (rejected, demoted, re-filed out) leave the view -
+        satisfies c2 and c6, bends c1 and c8; (c) wait for your answer on
+        the gap cascade first. Recommendation: (c) then (b). Left unbuilt
+        rather than taken on my recommendation because either answer
+        changes what every dataset page shows.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt

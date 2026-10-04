@@ -100,3 +100,16 @@ describe("a drift check compared across a gap", () => {
     expect(load().referenceNoteHtml({status: "green"})).toBe("");
   });
 });
+
+// UX critic, 2026-10-05: a dataset with nine held supplies says nine.
+describe("several blockers of one kind", () => {
+  it("are counted, and the oldest and newest receipts named", () => {
+    const w = load();
+    const second = {...HELD, supply: "cp-case-workers@k2", openedAt: "2026-03-15T02:00:00+00:00"};
+    const b = w.blockerOpenAsOf("cp-case-workers", "2026-04-01", {items: [], blockers: [second, HELD]});
+    expect(b.count).toBe(2);
+    expect(b.openedAt).toBe(HELD.openedAt);
+    expect(w.blockerReasonText(b)).toContain("(2 supplies)");
+    expect(w.blockerReceivedText(b)).toContain("oldest received");
+  });
+});

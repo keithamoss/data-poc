@@ -1419,7 +1419,7 @@ function referenceNoteHtml(h){
       <div style="font-size:13px;">${escHtml(ref.reason)}.</div>
       ${ref.measuredStatus ? `<div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">
         The measurement alone reads ${pill(ref.measuredStatus,"sm")}${gapRed
-          ? " — this check is red because of the gap, not because anything drifted." : "."}</div>` : ""}
+          ? " — this check is red because of the gap, not because anything drifted. Promote, substitute or accept as not supplied a missing period to clear it." : "."}</div>` : ""}
     </div>`;
 }
 
@@ -1997,6 +1997,9 @@ function buildRealDataset(d){
     // allowlist of copied fields drops a new one in silence, and the
     // silence reads as green.
     promotionState: d.promotionState,
+    // REQ-DASH-133: the instants that say whether a closed period had no
+    // supply on the date on show. Carried, never derived here.
+    closedSlots: d.closedSlots || [],
     arrivalHistory,
     rowCount: d.rowCount, prevRowCount: d.prevRowCount,
     columns,
@@ -2443,15 +2446,17 @@ function buildBirthRegistrations(asOfDateStr){
   if(!REAL_BIRTH_REG_DATA) return null;
   const clipped = clipDatasetToAsOf(REAL_BIRTH_REG_DATA, asOfDateStr);
   return clipped ? buildRealDataset(clipped)
-    : noDataDataset(REAL_BIRTH_REG_DATA.id, REAL_BIRTH_REG_DATA.name, REAL_BIRTH_REG_DATA.provider,
-                     REAL_BIRTH_REG_DATA.deliveryFormat, REAL_BIRTH_REG_DATA.sla);
+    : {...noDataDataset(REAL_BIRTH_REG_DATA.id, REAL_BIRTH_REG_DATA.name, REAL_BIRTH_REG_DATA.provider,
+                     REAL_BIRTH_REG_DATA.deliveryFormat, REAL_BIRTH_REG_DATA.sla),
+       closedSlots: REAL_BIRTH_REG_DATA.closedSlots || []};
 }
 function buildChildProtectionDatasets(asOfDateStr){
   if(!REAL_CP_DATA) return [];
   return REAL_CP_DATA.datasets.map(d => {
     const clipped = clipDatasetToAsOf(d, asOfDateStr);
     return clipped ? buildRealDataset(clipped)
-      : noDataDataset(d.id, d.name, d.provider, d.deliveryFormat, d.sla);
+      : {...noDataDataset(d.id, d.name, d.provider, d.deliveryFormat, d.sla),
+         closedSlots: d.closedSlots || []};
   });
 }
 // Phase 5j Stage 2: the RAW (unclipped, full-history) real dataset
@@ -2520,7 +2525,8 @@ function rollup(datasets){
   const counted = datasets.filter(d=>!inNoRollup(d));
   // A BLOCKED DATASET IS A RED like any other (REQ-PIPE-115 criterion
   // 10), whatever quiet state its runs alone would have put it in.
-  const live = counted.filter(d=> d.blocked || (!d.noDataAsOf && !d.scheduleExhausted));
+  const live = counted.filter(d=> d.blocked || d.noSupply
+    || (!d.noDataAsOf && !d.scheduleExhausted));
   if(!live.length){
     if(counted.some(d=>d.scheduleExhausted)) return "exhausted";
     return counted.length ? "nodata" : "green";
@@ -2528,7 +2534,7 @@ function rollup(datasets){
   // Both levels roll rather than order, for the same reason: a column
   // whose only check has no rule is `inactive`, and a collection of
   // those is inactive rather than green (post-build-review #4).
-  return rollupStatuses(live.map(d=> d.blocked ? "red"
+  return rollupStatuses(live.map(d=> (d.blocked || d.noSupply) ? "red"
     : rollupStatuses(d.columns.map(c=>c.status))));
 }
 // Same "don't let nodata silently win OR silently vanish" logic as
@@ -2778,12 +2784,21 @@ function buildData(asOfDateStr){
   // (empty) columns list must never be re-derived over the top of that,
   // since worstOf([]) would silently default it back to "green".
   data.agencies.forEach(ag=>{
-    ag.exhaustedCount = 0;
+    ag.exhaustedCount = 0; ag.noSupplyCount = 0; ag.acceptedCount = 0;
     ag.collections.forEach(col=>{
-      col.exhaustedCount = 0;
+      col.exhaustedCount = 0; col.noSupplyCount = 0; col.acceptedCount = 0;
       col.datasets.forEach(ds=>{
         const ended = runway.exhausted[ds.id];
         const blocked = blockerOpenAsOf(ds.id, asOfDateStr);
+        // CLOSED WITH NO SUPPLY (REQ-DASH-133 criteria 4, 5 and 9): an
+        // unmarked gap is RED and rolls up; an accepted one stays out of the
+        // red and is shown quieter. A held, contested or unloadable supply
+        // says THAT instead (criterion 1's exception), so it is checked first.
+        const gaps = closedGapsAsOf(ds.closedSlots, asOfDateStr);
+        ds.noSupply = gaps.open.length ? groupGaps(gaps.open) : null;
+        ds.acceptedGaps = gaps.accepted.length ? groupGaps(gaps.accepted) : null;
+        if(ds.noSupply){ col.noSupplyCount = (col.noSupplyCount||0) + 1; ag.noSupplyCount = (ag.noSupplyCount||0) + 1; }
+        if(ds.acceptedGaps){ col.acceptedCount = (col.acceptedCount||0) + 1; ag.acceptedCount = (ag.acceptedCount||0) + 1; }
         if(blocked){
           // RED, OUTRANKING EVERY QUIET STATE (REQ-PIPE-115 criterion
           // 10): a file is here and waiting on a person, which is never
@@ -2795,6 +2810,8 @@ function buildData(asOfDateStr){
             c.status = "nodata";
             c.checks = (c.checks||[]).map(ck=> ({...ck, blockedThisPeriod:true}));
           });
+        } else if(ds.noSupply){
+          ds.status = "red";
         } else if(ended){
           // An exhausted schedule OUTRANKS "no data as of" on the same
           // dataset, and that is the whole point: both render as a
@@ -4051,7 +4068,7 @@ function outstandingKindLabel(kind){ return OUTSTANDING_KIND_LABEL[kind] || kind
 const BLOCKER_LABEL = {held:"Held", contested:"Two files, choose one",
   refused:"Could not be loaded"};
 const BLOCKER_SAYS = {
-  held:"its supply is held, waiting for a person to place it",
+  held:"no open period to file its supply to; waiting for a person",
   contested:"two files claim its table, waiting for a person to choose one",
   refused:"its supply arrived and could not be loaded"};
 function assetDateStrOf(value){
@@ -4068,15 +4085,86 @@ function blockersFor(datasetId, source){
   const src = outstandingSource(source);
   return ((src && src.blockers) || []).filter(b=> b.datasetId === datasetId);
 }
-function blockerOpenAsOf(datasetId, asOfDateStr, source){
-  return blockersFor(datasetId, source).find(b=>
+function blockersOpenAsOf(datasetId, asOfDateStr, source){
+  return blockersFor(datasetId, source).filter(b=>
     assetDateStrOf(b.openedAt) <= asOfDateStr
-    && (!b.resolvedAt || assetDateStrOf(b.resolvedAt) > asOfDateStr)) || null;
+    && (!b.resolvedAt || assetDateStrOf(b.resolvedAt) > asOfDateStr));
+}
+// The first open one, carrying how many there are of its kind - a
+// dataset with nine held supplies says nine, not one (UX critic,
+// 2026-10-05).
+function blockerOpenAsOf(datasetId, asOfDateStr, source){
+  const open = blockersOpenAsOf(datasetId, asOfDateStr, source)
+    .sort((a,b)=> String(a.openedAt).localeCompare(String(b.openedAt)));
+  if(!open.length) return null;
+  const same = open.filter(b=> b.kind === open[0].kind);
+  return {...open[0], count: same.length, newestAt: same[same.length-1].openedAt};
 }
 // What a blocked dataset's status says in words beside the red - never
 // colour alone (REQ-DASH-133 criterion 11's rule, applied here).
 function blockerReasonText(b){
-  return `${BLOCKER_LABEL[b.kind] || b.kind} — ${BLOCKER_SAYS[b.kind] || "it cannot be read"}`;
+  const many = b.count > 1 ? ` (${b.count} supplies)` : "";
+  return `${BLOCKER_LABEL[b.kind] || b.kind}${many} — ${BLOCKER_SAYS[b.kind] || "it cannot be read"}`;
+}
+// A PERIOD THAT CLOSED WITH NO SUPPLY (REQ-DASH-133). The build embeds,
+// per dataset, every slot that was a gap when it closed and the instants
+// that decide what it reads as (pipeline/closed_slots.py); the page only
+// compares those instants with the date on show (criterion 10) - it never
+// re-derives closing, which is REQ-PIPE-131's rule and lives in Python.
+function closedGapsAsOf(slots, asOfDateStr){
+  const open = [], accepted = [];
+  (slots || []).forEach(s=>{
+    if(assetDateStrOf(s.closesAt) > asOfDateStr) return;          // not closed yet
+    if(s.filledAt && assetDateStrOf(s.filledAt) <= asOfDateStr) return;
+    if(s.filedAt && assetDateStrOf(s.filedAt) <= asOfDateStr) return;
+    // A supply filed here and rejected LATER was still waiting on this date.
+    if(s.rejected && assetDateStrOf(s.rejected.receivedAt) <= asOfDateStr
+       && assetDateStrOf(s.rejected.at) > asOfDateStr) return;
+    if(s.markedAt && assetDateStrOf(s.markedAt) <= asOfDateStr) accepted.push(s);
+    else open.push(s);
+  });
+  return {open, accepted};
+}
+// CONSECUTIVE GAPS ARE ONE ITEM (criterion 7), by the slot's position in
+// the dataset's own schedule.
+function groupGaps(slots){
+  const groups = [];
+  [...slots].sort((a,b)=> a.index - b.index).forEach(s=>{
+    // A PERIOD WHOSE SUPPLY WAS REJECTED IS ITS OWN ITEM (REQ-PIPE-153
+    // criterion 9): it says what happened to that supply, which a run of
+    // periods where nothing came cannot.
+    const last = groups[groups.length-1];
+    if(last && !last.rejected && !s.rejected && s.index === last.lastIndex + 1){ last.periods.push(s.period); last.lastIndex = s.index; }
+    else groups.push({periods:[s.period], lastIndex:s.index, marks:[], rejected:s.rejected || null});
+    if(s.mark) groups[groups.length-1].marks.push(s.mark);
+  });
+  return groups;
+}
+function gapText(group){
+  if(group.rejected){
+    const r = group.rejected;
+    return `${fmtPeriodOrDay(group.periods[0])}: a supply arrived${r.failedLoad ? ", could not be loaded" : ""} and was rejected by ${r.actor}, ${fmtInstant(r.at)}${r.reason ? ` ("${r.reason}")` : ""}`;
+  }
+  const daily = /^\d{4}-\d{2}-\d{2}$/.test(group.periods[0]);
+  const unit = daily ? "day" : "period";
+  const n = group.periods.length;
+  const span = n === 1 ? fmtPeriodOrDay(group.periods[0])
+    : `${fmtPeriodOrDay(group.periods[0])} to ${fmtPeriodOrDay(group.periods[n-1])}`;
+  return `${n} ${pluralize(n, unit)} with no supply, ${span}`;
+}
+// The gap, in words, beside a dataset whose current run is otherwise
+// fine - the red pill must never be left to say it alone (criterion 11).
+function noSupplyNote(ds){
+  if(!ds.noSupply) return "";
+  return `<div class="no-supply-note" data-no-supply="${ds.noSupply.length}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">No supply: ${escHtml(ds.noSupply.map(gapText).join("; "))}</div>`;
+}
+function fmtPeriodOrDay(name){
+  return /^\d{4}-\d{2}-\d{2}$/.test(name) ? fmtDay(name) : name;
+}
+function blockerReceivedText(b){
+  return b.count > 1
+    ? `oldest received ${fmtInstant(b.openedAt)}, newest ${fmtInstant(b.newestAt)}`
+    : `received ${fmtInstant(b.openedAt)}`;
 }
 
 function outstandingSource(source){
@@ -4102,15 +4190,40 @@ function outstandingItems(scope, id, source){
 // Unlike exhaustedMarker() there is no redundancy case to suppress:
 // this marker never says the same thing the status pill beside it
 // already said, because a status pill can never say any of this.
-function outstandingMarker(scope, id, source){
-  const items = outstandingItems(scope, id, source);
-  if(!items.length) return "";
+//
+// ONE LINE, BROKEN OUT BY KIND (REQ-DASH-133 criterion 6): "3 things
+// waiting for a person: 2 no supply, 1 held supply", never a line per
+// kind - at thirty datasets a line per kind is a list nobody reads.
+//
+// `noSupply`, when given, is the count of datasets with a closed,
+// unmarked period AS AT THE DATE ON SHOW (criterion 9), and replaces the
+// queue's own closed-period items, which are judged as at the build. A
+// reader looking at last month sees last month's gaps, not today's.
+function outstandingMarker(scope, id, source, noSupply){
+  let items = outstandingItems(scope, id, source);
+  if(typeof noSupply === "number") items = items.filter(i=> i.kind !== "closed-unfilled-slot");
+  const gaps = typeof noSupply === "number" ? noSupply : 0;
+  const total = items.length + gaps;
+  if(!total) return "";
   const blocking = items.filter(i=>i.blocking).length;
-  const severity = blocking ? "needs-action"
+  const severity = (blocking || gaps) ? "needs-action"
     : items.some(i=>i.severity==="warning") ? "warning" : "informational";
-  const words = `${items.length} ${pluralize(items.length,"thing")} waiting for a person`;
-  return `<div style="margin-top:6px; font-size:12px; color:var(--ink); display:flex;
-    align-items:center; gap:5px;">${eventSeverityPill(severity,"sm")}<span>${words}${blocking? ` (${blocking} blocking)` : ""}</span></div>`;
+  const byKind = {};
+  items.forEach(i=>{ const k = outstandingKindLabel(i.kind).toLowerCase(); byKind[k] = (byKind[k]||0) + 1; });
+  const parts = [...(gaps ? [`${gaps} no supply`] : []),
+    ...Object.entries(byKind).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).map(([k,n])=>`${n} ${k}`)];
+  const breakdown = parts.length > 1 || gaps ? `: ${parts.join(", ")}` : "";
+  const words = `${total} ${pluralize(total,"thing")} waiting for a person${breakdown}`;
+  return `<div class="outstanding-marker" style="margin-top:6px; font-size:12px; color:var(--ink); display:flex;
+    align-items:center; gap:5px;">${eventSeverityPill(severity,"sm")}<span>${escHtml(words)}${blocking? ` (${blocking} blocking)` : ""}</span></div>`;
+}
+
+// AN ACCEPTED GAP STAYS VISIBLE, QUIETER THAN RED (REQ-DASH-133
+// criterion 5): out of the roll-up, still on the card, in words.
+function acceptedGapsMarker(n){
+  if(!n) return "";
+  return `<div class="accepted-gaps-marker" style="margin-top:4px; font-size:11.5px; color:var(--ink-faint);">
+    ${n} ${pluralize(n,"dataset")} with a period accepted as not supplied</div>`;
 }
 
 // CRITERION 8: NAME the responses, never offer them as controls. The
@@ -4187,8 +4300,10 @@ function outstandingQueue(scope, id, source){
   return `<div class="notice-queue" role="status">
     <b>${items.length} ${pluralize(items.length,"thing")} waiting for a person${where} — ${parts.join(", ")}</b>
     <div style="color:var(--ink-muted); font-size:13px; margin-bottom:2px;">
-      These are events in our own processing of a supply, not verdicts on anybody's data —
-      none of them changes a dataset's red/amber/green status.
+      A held supply, two files for one table, and a supply that could not be loaded each
+      turn their dataset red until someone resolves them (REQ-PIPE-115, REQ-DASH-148). The
+      rest are events in our own processing of a supply, not verdicts on anybody's data,
+      and change no status.
     </div>
     ${items.map(outstandingItemHtml).join("")}
   </div>`;
@@ -4287,7 +4402,8 @@ function renderExec(view){
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
       ${spark}
       ${exhaustedMarker(ag.exhaustedCount, ag.status)}
-      ${outstandingMarker("agency", ag.id)}
+      ${outstandingMarker("agency", ag.id, undefined, ag.noSupplyCount)}
+      ${acceptedGapsMarker(ag.acceptedCount)}
       <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
     </a>`;
   }).join("");
@@ -4355,7 +4471,8 @@ function renderAgency(view, agencyId){
   wrap.innerHTML = ag.collections.map(col=>`
     <div class="collection-block">
       <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}</div>
-      ${outstandingMarker("collection", col.id)}
+      ${outstandingMarker("collection", col.id, undefined, col.noSupplyCount)}
+      ${acceptedGapsMarker(col.acceptedCount)}
       ${collectionCrossTableSection(ag, col)}
       <div class="overflow-x">
       <table class="dataset-table">
@@ -4374,7 +4491,20 @@ function renderAgency(view, agencyId){
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
               <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">${escHtml(blockerReasonText(ds.blocked))}
-                — received ${fmtInstant(ds.blocked.openedAt)}; nothing is checked until it is resolved</td>
+                — ${blockerReceivedText(ds.blocked)}; nothing is checked until it is resolved</td>
+            </tr>`;
+          }
+          // CLOSED WITH NO SUPPLY (REQ-DASH-133 criteria 1, 7 and 10): one
+          // reason row, red and in words, in place of the neutral "no QA
+          // run" row - a period cannot read both as nothing-yet and as
+          // missing. A dataset WITH a current run keeps its row, and says
+          // the gap beneath its name instead (below).
+          if(ds.noSupply && ds.noDataAsOf){
+            return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}' data-no-supply="${ds.noSupply.length}">
+              <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
+              <td colspan="4" style="color:var(--ink); font-size:12.5px;">No supply — ${escHtml(ds.noSupply.map(gapText).join("; "))}.
+                The period has closed, so a person decides: substitute an earlier supply, re-file a late one, or accept it as not supplied</td>
             </tr>`;
           }
           if(ds.scheduleExhausted){
@@ -4400,7 +4530,7 @@ function renderAgency(view, agencyId){
           const dsSpark = aggregateSparkline(ds.columns, quietOf(ds.status));
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-            <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
+            <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}${noSupplyNote(ds)}</td>
             <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="When we received this supply">${fmtArrival(ds.lastArrival)}</span> ${waitedChip(ds.lastArrival)}</td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
@@ -4521,9 +4651,10 @@ function blockerHistoryRows(datasetId, asOfDateStr, source){
     .filter(b=> assetDateStrOf(b.openedAt) <= asOfDateStr)
     .sort((a,b)=> String(b.openedAt).localeCompare(String(a.openedAt)));
   if(!rows.length) return "";
+  const anyOpen = rows.some(b=> !(b.resolvedAt && assetDateStrOf(b.resolvedAt) <= asOfDateStr));
   return `
     <div class="supply-cycle" data-blocker-rows>
-      <div class="supply-cycle-label"><b>Waiting for a person</b>
+      <div class="supply-cycle-label"><b>${anyOpen ? "Waiting for a person" : "Needed a person"}</b>
         <span style="color:var(--ink-faint);">supplies with no period yet, two files for one table, or a file that could not be loaded</span></div>
       <div class="overflow-x">
       <table class="dataset-table">
@@ -4545,12 +4676,43 @@ function blockerHistoryRows(datasetId, asOfDateStr, source){
       </div>
     </div>`;
 }
+// EVERY CLOSED UNFILLED PERIOD, MARKED OR NOT (REQ-DASH-133 criterion
+// 8), in the supply history whatever cycle is on show - an old gap is
+// exactly what scrolling back to the current cycle would hide. Grouped
+// into runs (criterion 7), judged as at the date on show (criterion 9),
+// and newest first like the rest of the history.
+function gapHistoryRows(ds, asOfDateStr){
+  const gaps = closedGapsAsOf(ds.closedSlots, asOfDateStr);
+  const groups = [...groupGaps(gaps.open).map(g=>({...g, accepted:false})),
+                  ...groupGaps(gaps.accepted).map(g=>({...g, accepted:true}))]
+    .sort((a,b)=> b.lastIndex - a.lastIndex);
+  if(!groups.length) return "";
+  return `
+    <div class="supply-cycle" data-gap-rows>
+      <div class="supply-cycle-label"><b>Periods with no supply</b>
+        <span style="color:var(--ink-faint);">closed with nothing in them</span></div>
+      <div class="overflow-x">
+      <table class="dataset-table">
+        <thead><tr><th>Periods</th><th>Status</th><th>What happened</th></tr></thead>
+        <tbody>${groups.map(g=>{
+          const mark = g.marks[g.marks.length-1];
+          return `<tr data-gap="${g.accepted ? "accepted" : "open"}">
+            <td class="mono">${escHtml(g.periods.length === 1 ? fmtPeriodOrDay(g.periods[0]) : `${fmtPeriodOrDay(g.periods[0])} to ${fmtPeriodOrDay(g.periods[g.periods.length-1])}`)}</td>
+            <td>${g.accepted ? pill("nodata","sm") : pill("red","sm")}</td>
+            <td>${g.accepted
+              ? `<b>Not supplied (accepted)</b>${mark ? ` <span style="color:var(--ink-faint);">— ${escHtml(mark.actor)}, ${fmtInstant(mark.at)}</span><div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(mark.reason)}</div>` : ""}`
+              : `<b>No supply</b> <span style="color:var(--ink-faint);">— ${escHtml(gapText(g))}; waiting for a person</span>`}</td>
+          </tr>`;}).join("")}</tbody>
+      </table>
+      </div>
+    </div>`;
+}
 function renderBlockedSupplyHistoryOnly(ds){
   const wrap = document.getElementById("supply-history-wrap");
   if(wrap) wrap.innerHTML = renderSupplyHistorySection(ds, [], null);
 }
 function renderSupplyHistorySection(ds, cycles, currentCycleStart){
-  const waiting = blockerHistoryRows(ds.id, CURRENT_AS_OF);
+  const waiting = blockerHistoryRows(ds.id, CURRENT_AS_OF) + gapHistoryRows(ds, CURRENT_AS_OF);
   if(!cycles.length){
     return waiting ? `<div class="supply-history"><div class="supply-history-head"><h3>Supply history</h3></div>${waiting}</div>` : "";
   }
@@ -4599,7 +4761,7 @@ function wireSupplyHistorySection(container){
     });
     toggle.dataset.collapsedLabel = toggle.textContent;
   }
-  container.querySelectorAll(".supply-history tbody tr").forEach(tr=>
+  container.querySelectorAll(".supply-history tbody tr[data-run-date]").forEach(tr=>
     tr.addEventListener("click", ()=> applyAsOf(tr.dataset.runDate)));
 }
 
@@ -4687,12 +4849,49 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <b>${escHtml(BLOCKER_LABEL[ds.blocked.kind] || ds.blocked.kind)} — nothing is checked for this dataset until a person resolves it.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
           ${escHtml(ds.blocked.reason)}<br><br>
-          Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>. Every
+          ${ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
           check below reads <b style="display:inline">No data</b> for this period: none of
           them ran, and no earlier supply's result stands in for it.
         </div>
       </div>` : "";
+  // CLOSED WITH NO SUPPLY, and accepted gaps (REQ-DASH-133 criteria 1,
+  // 2, 7 and 11): in words, red for an unmarked gap, quiet for one a
+  // person accepted - each naming its periods as grouped runs.
+  const noSupplyBanner = ds.noSupply && !ds.blocked ? `
+      <div class="notice-exhausted" role="status" data-no-supply="${ds.noSupply.length}">
+        <b>No supply — ${escHtml(ds.noSupply.map(gapText).join("; "))}.</b>
+        <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
+          ${ds.noSupply.length === 1 && ds.noSupply[0].periods.length === 1 ? "This period has" : "These periods have"}
+          closed with nothing in ${ds.noSupply.length === 1 && ds.noSupply[0].periods.length === 1 ? "it" : "them"}, so a file arriving
+          now is filed to the open period instead. A person decides: substitute an earlier
+          period's supply, re-file a late file into it, or accept it as not supplied
+          (<code>mothman supply decide --operation mark-not-supplied --dataset ${escHtml(ds.id)} --period &lt;period&gt;</code>).
+        </div>
+      </div>` : "";
+  const acceptedGapsNote = ds.acceptedGaps ? `
+      <div class="accepted-gaps-note" style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:70ch;">
+        ${ds.acceptedGaps.map(g=>`<div>Not supplied (accepted) — ${escHtml(gapText(g).replace(" with no supply", ""))}${g.marks.length ? `: “${escHtml(g.marks[g.marks.length-1].reason)}”, ${escHtml(g.marks[g.marks.length-1].actor)}, ${fmtInstant(g.marks[g.marks.length-1].at)}` : ""}</div>`).join("")}
+      </div>` : "";
   if(ds.noDataAsOf && !ds.columns.length){
+    if(ds.noSupply && !ds.blocked){
+      view.innerHTML = `
+      <div class="view-head">
+        <div>
+          <h2>${ds.name}</h2>
+          <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+      </div>
+      ${arrivalBanner(ds)}
+      ${noSupplyBanner}
+      ${acceptedGapsNote}
+      ${outstandingQueue("dataset", ds.id)}
+      <div id="supply-history-wrap"></div>
+      `;
+      renderBlockedSupplyHistoryOnly(ds);
+      wireArrivalContext(view);
+      return;
+    }
     if(ds.blocked){
       view.innerHTML = `
       <div class="view-head">
@@ -4705,7 +4904,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       ${blockedBanner}
       ${outstandingQueue("dataset", ds.id)}
       <div class="sla-strip">
-        <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono">${fmtInstant(ds.blocked.openedAt)}</div></div>
+        <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono">${fmtInstant(ds.blocked.openedAt)}</div></div>
         <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>
       </div>
       <div id="supply-history-wrap"></div>
@@ -4752,7 +4951,9 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     ${arrivalBanner(ds)}
     ${blockedBanner}
     ${exhaustedBanner}
-    ${ds.noDataAsOf && !ds.blocked ? `
+    ${noSupplyBanner}
+    ${acceptedGapsNote}
+    ${ds.noDataAsOf && !ds.blocked && !ds.noSupply ? `
     <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">
       As of <b>${fmtDay(CURRENT_AS_OF)}</b>, nothing has landed yet in this dataset's
       current expected cycle (started <b>${fmtDay(periodStartDate(ds.id, CURRENT_AS_OF))}</b>) -
@@ -4764,7 +4965,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     <div class="sla-strip">
       <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${cadenceLabel(ds.sla.cadence)}</div></div>
       ${ds.blocked ? `
-      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="When we received the supply that is waiting">${fmtInstant(ds.blocked.openedAt)} (${escHtml(BLOCKER_LABEL[ds.blocked.kind] || ds.blocked.kind)})</div></div>
+      <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono" title="When we received the supply that is waiting for a person">${fmtInstant(ds.blocked.openedAt)} (${escHtml(BLOCKER_LABEL[ds.blocked.kind] || ds.blocked.kind)})</div></div>
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>` : `
       <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)} <span title="${ARRIVAL_FOLLOWS_FILING}">${ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : ""}</span></div></div>
@@ -5001,7 +5202,8 @@ function openColumnDrawer(ag, col, ds, column, opts){
       <div class="thresholds">${[
         ck.warn==null ? null : `warn &gt; ${fmtMetric(ck.warn,ck.unit)}`,
         ck.fail==null ? null : `fail &gt; ${fmtMetric(ck.fail,ck.unit)}`,
-        notEvaluated((ck.history||[]).slice(-1)[0]) ? `<span class="not-evaluated-tag">not evaluated in the latest run</span>` : `current ${fmtMetric(ck.current,ck.unit)}`,
+        ck.blockedThisPeriod ? `<span class="not-evaluated-tag">not run for this period</span>`
+          : notEvaluated((ck.history||[]).slice(-1)[0]) ? `<span class="not-evaluated-tag">not evaluated in the latest run</span>` : `current ${fmtMetric(ck.current,ck.unit)}`,
       ].filter(Boolean).join(" · ")}${(ck.warn==null&&ck.fail==null) ? ` <span class="muted">(no single-sided threshold — status is this tool's own verdict)</span>` : ""}</div>
       ${ck.retired? `<div class="retired-note">Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?' — '+ck.retiredReason:''} — no longer part of current status.</div>` : ""}
       <div class="check-card-hint">View current &amp; historical run detail ›</div>
@@ -5270,7 +5472,18 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   const isDefaultCompare = compareIdx === defaultCompareIdx;
 
   let compareBlock;
-  if(notEvaluated(currentPoint)){
+  if(check.blockedThisPeriod){
+    // NOT RUN FOR THIS PERIOD (REQ-PIPE-115 criterion 11, REQ-DASH-148
+    // criterion 14): the dataset's own supply could not be read, so the
+    // last run's value is not this period's and is not shown as "current".
+    // The trend below is dated history, and says so by its dates.
+    compareBlock = `
+    <div class="drawer-section not-evaluated-section" data-not-run-this-period>
+      <h4>Not run for this period</h4>
+      <div class="not-evaluated-reason">${escHtml(ds.blocked ? blockerReasonText(ds.blocked) : "its dataset cannot be checked")}.</div>
+      <div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">No earlier run's result stands in for this period. The history below is each earlier run on its own date.</div>
+    </div>`;
+  } else if(notEvaluated(currentPoint)){
     // NOT EVALUATED IN THE CURRENT RUN (plans/post-build-review.md #77):
     // there is no value to compare, and a difference against an earlier
     // run would be invented. Say what happened and why, in the check's
@@ -5380,7 +5593,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       </div>`;
   })() : "";
 
-  const rowDetailBlock = (currentPoint.row_count_total!=null) ? `
+  const rowDetailBlock = (currentPoint.row_count_total!=null && !check.blockedThisPeriod) ? `
     <div class="drawer-section">
       <h4>Row-level detail</h4>
       <div class="stat-row">

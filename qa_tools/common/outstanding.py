@@ -104,9 +104,8 @@ CONTESTED_FILE = "contested-file"
 CONTESTED_TABLE = "contested-table"
 UNRECOGNISED_FILE = "unrecognised-file"
 IN_FLIGHT_DELIVERY = "in-flight-delivery"
-#: A slot that closed with nothing in it. Produced by REQ-PIPE-132
-#: (not built yet); the kind is kept so the dashboard's label for it
-#: and this name do not drift apart in the meantime.
+#: A slot that closed with nothing in it (REQ-PIPE-132): consecutive
+#: ones of a dataset are ONE item naming the count and the range.
 CLOSED_UNFILLED_SLOT = "closed-unfilled-slot"
 #: An inheritance that could not complete (REQ-PIPE-098 criterion 10).
 #: WARNING rather than needs-action: there is nothing for a person to
@@ -367,6 +366,34 @@ def _from_contested_tables(blockers) -> list[Item]:
     return items
 
 
+def _from_unfilled_periods(conn=None) -> list[Item]:
+    """REQ-PIPE-132 criteria 10 and 11: every closed, unfilled period
+    nobody has marked, grouped into consecutive runs per dataset - one
+    item each, at thirty datasets as at two."""
+    from qa_tools.common import filing_queue, slot_state
+
+    items: list[Item] = []
+    with delivery_log._db(conn) as db:
+        collections = sorted({e.collection_id for e in hierarchy.all_datasets()})
+        for collection_id in collections:
+            try:
+                gaps = filing_queue.closed_gaps(db, collection_id)
+            except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
+                print(f"note: could not read closed periods for {collection_id} "
+                      f"({type(exc).__name__}: {exc}).")
+                continue
+            for gap in gaps:
+                agency, collection = _scope_of(gap.dataset_id)
+                items.append(Item(
+                    kind=CLOSED_UNFILLED_SLOT, severity=NEEDS_ACTION, blocking=False,
+                    headline=f"{gap.dataset_id}: {gap.describe()}",
+                    detail=(f"{gap.describe()} - closed with nothing in it, and "
+                            f"{slot_state.CLOSED_NOTE}."),
+                    agency_id=agency, collection_id=collection, dataset_id=gap.dataset_id,
+                    responses=slot_state.CLOSED_RESPONSES))
+    return items
+
+
 def _from_loads(skip: frozenset = frozenset()) -> list[Item]:
     """REQ-PIPE-060's failed loads - the queue a person drains.
 
@@ -493,6 +520,7 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
               + _from_contested_tables(blockers)
               + _from_loads(dataset_blockers.refused_in_a_contest(conn))
               + _from_inheritance_refusals()
+              + _from_unfilled_periods(conn)
               + _from_in_flight(observations_dir))
     return Outstanding(items=tuple(sorted(items, key=_sort_key)),
                        blockers=tuple(b.as_record() for b in blockers))

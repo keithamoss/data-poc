@@ -164,7 +164,7 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
         res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
             conn, staging, [TABLE], arrival=key,
             loaded=load_log.loaded_tables(trial_scope)), source_schema=staging,
-            held=supply_holds.held_tables(conn))
+            held=supply_holds.held_tables(conn, arrival_key=key))
         # Recorded at staging time, which is the only moment this is an
         # observed fact rather than a re-derivation.
         supply_db.record_resolution(conn, res)

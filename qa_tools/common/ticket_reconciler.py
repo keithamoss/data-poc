@@ -121,7 +121,11 @@ def body_for(state: slot_state.SlotState) -> str:
     from qa_tools.common import display_time
 
     lines = [f"**{state.dataset_id}** — {display_time.format_period(state.period)}",
-             "", f"State: **{state.state}**"]
+             "", f"State: **{state.state}**"
+             + (" (closed)" if state.closed else "")]
+    if state.closed and state.state != slot_state.NOT_SUPPLIED_ACCEPTED:
+        # REQ-PIPE-132 criteria 1 and 12: closed, and what that means.
+        lines.append(f"This period has closed: {slot_state.CLOSED_NOTE}.")
     if state.supply:
         lines.append(f"Supply: `{state.supply}`")
     if state.stands_on:

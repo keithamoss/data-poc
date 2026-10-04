@@ -263,7 +263,7 @@ class TestARunReadsExactlyOnePeriod:
         monkeypatch.setattr(filing, "period_of", lambda dataset_id, at: "2026-Q2")
         monkeypatch.setattr(trial, "scope_for", lambda run_id: None)
         monkeypatch.setattr(load_log, "loaded_tables", lambda scope: frozenset())
-        monkeypatch.setattr(supply_holds, "held_tables", lambda conn: ())
+        monkeypatch.setattr(supply_holds, "held_tables", lambda conn, **kw: ())
         monkeypatch.setattr(supply_db, "connect", lambda **kw: type(
             "C", (), {"close": lambda self: None})())
         monkeypatch.setattr(period_overlay, "build",

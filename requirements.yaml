@@ -12472,8 +12472,10 @@ requirements:
     acceptance_criteria:
       - >
         THE SYSTEM SHALL record every filing decision - promote, reject,
-        demote and re-file - as an entry in one append-only log, and
-        SHALL NOT keep a second record of any of them anywhere else.
+        demote, re-file and mark as not supplied - as an entry in one
+        append-only log, and SHALL NOT keep a second record of any of
+        them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion
+        13.
       - >
         THE SYSTEM SHALL record, with each entry, the actor, the instant
         the decision took effect, the instant the entry was written, the
@@ -15397,6 +15399,19 @@ requirements:
         11 closes that by refusing the demotion while any later period
         stands on the supply. The move itself is unchanged; its
         PRECONDITION is not.
+      - 'THE PAGE SWITCH WAS HELD FOR KEITH, NOT BUILT, on the overnight build of
+        2026-10-05 (plans/road-testing.md, sprint 7). As signed, criteria 1 and
+        8 answer the as-of view only with what was PROMOTED; a red supply is never
+        auto-promoted, so the supply QA exists to judge would leave the dataset''s
+        verdict while it waits for a person and the older green one would show instead
+        - a false green. With REQ-QAC-108''s gap cascade only 9 of ~150 supplies
+        promote in a bootstrap, so most dates would also read ''nothing in place''.
+        Options put to him: (a) as signed plus a red ''waiting for a decision''
+        item per awaiting supply; (b) newest supply in place OR awaiting a decision,
+        labelled which, with only withdrawn supplies leaving the view; (c) settle
+        the gap cascade first. Recommendation (c) then (b). Not taken on the standing
+        ''take my recommendation'' because either answer changes what every dataset
+        page shows.'
   - id: REQ-GHUB-082
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
@@ -15420,13 +15435,14 @@ requirements:
     acceptance_criteria:
       - >
         THE SYSTEM SHALL accept promote, reject, demote, re-file,
-        substitute, de-substitute, inherit and un-inherit as structured
-        filing decisions raised on the GitHub ticket for the SLOT they
-        concern - one dataset in one period, per REQ-PIPE-083 - so that
-        the period a decision applies to comes from the ticket's own
-        identity rather than from anything stated in the body. Every
-        criterion below that says "a filing decision" SHALL mean any one
-        of those eight.
+        substitute, de-substitute, inherit, un-inherit and mark as not
+        supplied as structured filing decisions raised on the GitHub
+        ticket for the SLOT they concern - one dataset in one period,
+        per REQ-PIPE-083 - so that the period a decision applies to
+        comes from the ticket's own identity rather than from anything
+        stated in the body. Every criterion below that says "a filing
+        decision" SHALL mean any one of those nine. AMENDED 2026-10-05
+        by REQ-PIPE-132 criterion 13 (mark as not supplied).
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
@@ -15567,17 +15583,21 @@ requirements:
         reachability and the ticket is updated by whatever already has
         it.
       - >
-        THE SYSTEM SHALL reach substitute, de-substitute, inherit and
-        un-inherit per period and dataset rather than from the supply
-        queue, because none of them answers "what do I do with this
-        arriving supply" - each is a decision about how a period is
-        filled when a supply for it never arrives.
+        THE SYSTEM SHALL reach substitute, de-substitute, inherit,
+        un-inherit and mark as not supplied per period and dataset rather
+        than from the supply queue, because none of them answers "what
+        do I do with this arriving supply" - each is a decision about
+        how a period is filled, or accepted as unfilled, when a supply
+        for it never arrives. AMENDED 2026-10-05 by REQ-PIPE-132
+        criterion 13.
       - >
-        THE SYSTEM SHALL record substitute, de-substitute, inherit and
-        un-inherit in the decision log on the same terms as every other
-        filing decision - actor, reason, allowlist, refusal, GitHub
-        parity - so that the un-inherit an operator performs to unblock
-        a refused demotion is as accountable as the demotion itself.
+        THE SYSTEM SHALL record substitute, de-substitute, inherit,
+        un-inherit and mark as not supplied in the decision log on the same
+        terms as every other filing decision - actor, reason, allowlist,
+        refusal, GitHub parity - so that the un-inherit an operator
+        performs to unblock a refused demotion is as accountable as the
+        demotion itself. AMENDED 2026-10-05 by REQ-PIPE-132 criterion
+        13.
       - >
         WHERE a period schema is created automatically by an arriving
         supply, THE SYSTEM SHALL perform the inheritance the cadence
@@ -24061,17 +24081,6 @@ requirements:
       with 2026-08-26, not 2026-08-28: 2026-08-27, 2026-08-28 have no accepted
       supply''), and promoted 9 supplies where the same corpus promoted 67 before
       - see the decision on the cascade.'
-    unmet_criteria:
-    - criterion: Criterion 17, in part - a period ACCEPTED AS NOT SUPPLIED under
-        REQ-PIPE-132. A substituted period (which is how a person carries one
-        forward) is already treated as dealt with and is said rather than counted.
-      why: REQ-PIPE-132's 'accept as not supplied' decision does not exist yet,
-        so there is nothing to recognise. drift_reference._owed_earlier is the
-        one place that will read it.
-      owner: REQ-PIPE-132, which builds the decision (no delivery sprint owns it yet).
-      blocked_by:
-        requirements:
-        - REQ-PIPE-132
     decisions:
     - 'BUILT IN TWO HALVES, and this records which is which on 2026-09-29. `in_progress` rather than `built` because the register''s gate forbids evidence on anything not built, and a status that overclaims is worse than one that cannot carry the detail.
   
@@ -24231,6 +24240,9 @@ requirements:
       where it promoted 67 before (Birth Registrations'' daily feed stops after
       its first red day). Built as signed. The options for Keith are in plans/road-testing.md''s
       morning report.'
+    - 'CRITERION 17 COMPLETE 2026-10-05 (overnight batch 7): REQ-PIPE-132''s mark
+      as not supplied exists, and drift_reference treats a period marked so as
+      dealt with - said in the reason, never a gap (tests/test_drift_reference_gap.py::TestTheGap::test_a_period_marked_not_supplied_is_said_but_not_red).'
   - id: REQ-GHUB-109
     title: >
       A ticket comment says something new, and REQ-GHUB-027's
@@ -24672,6 +24684,16 @@ requirements:
     story: As a data engineer operating this pipeline, I want a dataset whose own table cannot be read - held or contested - to read clearly red for that period, saying why through the outstanding item it already raises, and every other dataset's check that reads that table to be recorded once as not evaluated, while everything else in the run is checked as usual, so that a supply nobody could place costs me one honest, explained red rather than a whole collection's QA or a silent gap that reads as green.
     moscow: must
     status: built
+    unmet_criteria:
+    - criterion: 'Criterion 2, in part - one not-evaluated record per unreadable
+        table a check reads. unrunnable records ONE per check, naming the first
+        unreadable table, to keep the one-result-per-check-per-run invariant post-build-review
+        #91 fixed against (held_blast_radius still records one per held table).'
+      why: The two signed statements disagree; choosing between them is Keith's.
+        Put to him 2026-10-05 in the morning report.
+      owner: Keith's answer, then REQ-PIPE-115 itself.
+      blocked_by:
+        unowned: true
     evidence:
     - '2026-10-05 (overnight batch 6): a fresh bootstrap from an empty database
       (supply6, 150 runs, 20m19s) finished with every new guard live. The nine
@@ -24862,6 +24884,20 @@ requirements:
       Protection and its agency - RED from May 2023 onward. That is this requirement
       doing what it says; the generator sending supplies the schedule does not
       owe is plans/post-build-review.md #93''s neighbourhood and Keith''s to decide.'
+    - 'A DATASET-WIDE HOLD WAS A FALSE GREEN, FIXED 2026-10-05 (post-build-review
+      #99): supply_holds.held_tables() withheld a dataset''s table from every
+      run once any of its supplies was held, so this requirement''s own guard
+      left eight on-time Case Workers supplies unchecked and green. It now takes
+      the arrival key - a hold is about one supply. The ''what a reader sees''
+      decision above (Case Workers red from May 2023) still stands: nine holds
+      are still open and still red, but every filed supply between them is now
+      checked.'
+    - 'THE RECONCILIATION SKIPS RUNS WITH NO PERIOD (PROVISIONAL, 2026-10-05,
+      delivery-critic): unrunnable records nothing for a trial or an unfiled supply
+      that is not held - it has no period to judge slots in - so reconciling one
+      would refuse every such run whose tools left out a check over an absent
+      sibling. Criterion 17 is unconditional; put to Keith whether to extend unrunnable''s
+      recording to period-less runs or accept the exemption.'
     open_questions: []
   - id: REQ-TEST-116
     title: A bootstrap does in parallel what does not depend on order, and produces the same history either way
@@ -25610,7 +25646,37 @@ requirements:
       date: "2026-10-04"
     story: "As a data team leader, I want a period that closed with nothing in it to say plainly that it was not supplied, and to be able to record with a reason that we accept that, so that I resolve it - substitute, accept it as not supplied, or re-file a late file into it - rather than wait for something that cannot happen."
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 (overnight batch 7): tests/test_not_supplied.py against a real
+      database and the real quarterly schedule - a closed, unfilled slot reads
+      OVERDUE and closed with the three closed-period responses; an overdue slot
+      still open is not closed; a closed slot with a supply filed reads awaiting
+      a decision; a mark is refused while the slot is open, refused for a filled
+      slot (each refusal naming a command to paste), refused without a person
+      and a reason; a marked slot reads NOT SUPPLIED (ACCEPTED), leaves the needs-action
+      states, and changes nothing qa.slot_holds or promoted_into says; a later
+      substitution supersedes it; the route records it once and a second time
+      says ''already''. Consecutive gaps group into one item. On the supply6 bootstrap
+      the outstanding survey lists Birth Registrations'' three runs of closed,
+      unfilled days as three items (2, 1 and 8 days), in 3.1s.'
+    implemented_by:
+    - qa_tools/common/not_supplied.py::mark
+    - qa_tools/common/not_supplied.py::marked
+    - qa_tools/common/slot_state.py::state_of
+    - qa_tools/common/filing_queue.py::group_gaps
+    - qa_tools/common/filing_queue.py::closed_gaps
+    - qa_tools/common/filing_queue.py::operations_for
+    - qa_tools/common/filing_decisions.py::apply
+    - qa_tools/common/outstanding.py::_from_unfilled_periods
+    - qa_tools/common/ticket_reconciler.py::body_for
+    - cli/filing_tui.py::queue_flow
+    linked_tests:
+    - tests/test_not_supplied.py
+    - tests/test_outstanding.py::TestClosedUnfilledPeriodsAreOneItemPerRun
+    - tests/test_filing_queue.py::TestWhatASlotOffers
+    - tests/test_cli_filing_tui.py::TestEveryOperationIsReachableFromSomeDoor
+    - tests/test_filing_decisions.py::TestTheEightAreOneList
     source: "Keith, 2026-10-04 ('An unfilled period that closes is shown very clearly as red / no supply'; follow-up (3), 'A NINTH FILING DECISION, MARK AS NOT SUPPLIED', plans/road-testing.md #16). Carries REQ-PIPE-063 criterion 4 forward. Scoped by delivery-scoper 2026-10-04; signed off by Keith 2026-10-04."
     acceptance_criteria:
       - "WHEN a slot closes with no supply promoted into it and no substitution or inheritance resolving it, THE SYSTEM SHALL report it as OVERDUE - or NEVER-SUPPLIED where the dataset has never had a delivery - and SHALL also report it as CLOSED."
@@ -25641,6 +25707,32 @@ requirements:
       - "ONLY A CLOSED, UNFILLED SLOT MAY BE MARKED (working assumption, consistent with Keith's wording 'the closed period then reads...'): while a slot is still open, a file arriving for it is still filed there, and a mark could not stop that."
       - "A MARK DOES NOT FILL THE SLOT AND DOES NOT BLOCK A LATER CORRECTION (working assumption): if a person later re-files a late file into the slot, or substitutes it, the slot reads as that new state and the mark stays in history. No separate 'unmark' decision is added."
       - "DECISIONS THAT CHANGE A SLOT AND DECISIONS THAT ANNOTATE IT ARE SEPARATE (Keith, 2026-10-04, architect review). Every reader of 'what does this slot hold' takes the latest decision on the slot, so the first annotating entry would make a filled slot read empty - possibly already true of promotion-withheld, which is being proven with a failing test separately. Lands no later than this requirement, the first annotating decision in the batch's order."
+      - 'BUILT 2026-10-05 overnight (batch 7). `mark-not-supplied` is a tenth decision-log
+        action and the ninth filing operation, period-scoped: it names the period
+        (to_slot) and NO supply, person only, reason required (decision_log._check_shape
+        and a CHECK constraint, schema version 20 - additive). It never changes
+        what a slot holds: qa.slot_holds already lists only the decisions that change
+        a slot (criterion 8 was satisfied by REQ-PIPE-130''s view). not_supplied.mark()
+        refuses a slot that is not closed and unfilled, or that has a supply awaiting
+        a decision, each refusal naming a command; marked() returns the mark only
+        while no later decision has changed the slot, so a later re-file or substitution
+        supersedes it without an unmark.'
+      - 'CLOSED IS A FIELD ON SlotState, NOT A STATE (criteria 1 and 2): derived
+        in state_of() from slots.is_closed(slot, now) for an unfilled slot, so OVERDUE
+        and NEVER-SUPPLIED keep their meaning and a ticket says ''(closed)'' with
+        the note that a file arriving now goes to the open period. The responses
+        of a closed, unfilled slot are criterion 12''s three. NOT SUPPLIED (ACCEPTED)
+        is the one new state and is not in NEEDS_ACTION.'
+      - 'GROUPED ONCE, USED TWICE (criterion 11): filing_queue.group_gaps() turns
+        consecutive closed, unfilled, unmarked slots of a dataset into one Gap,
+        and both the terminal''s standing queue and the outstanding survey''s `closed-unfilled-slot`
+        item read it, so the two cannot group differently. The survey''s producer
+        is named _from_unfilled_periods because tests/test_outstanding.py pins that
+        the retired _from_closed_slots (REQ-PIPE-063''s monotonic closing) stays
+        gone.'
+      - 'REQ-QAC-108 CRITERION 17''s OTHER HALF lands here: drift_reference treats
+        a period marked as not supplied as dealt with - said in the reason, never
+        counted as a gap.'
     open_questions: []
 
   - id: REQ-DASH-133
@@ -25651,7 +25743,33 @@ requirements:
       date: '2026-10-04'
     story: As a data team leader glancing at the register, I want a period that closed with no supply to be unmistakable, so that a gap downstream users will hit is seen and resolved rather than discovered by them.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05: tests-js/closed-no-supply.test.js (9 tests) green - closedGapsAsOf
+      judges closed, filed, filled and marked as at the date on show (c9); groupGaps/gapText
+      group consecutive periods by schedule position (c7); rollup counts an unmarked
+      gap red and an accepted one not (c4, c5); outstandingMarker gives one line
+      broken out by kind with the as-of gap count replacing the queue''s own closed-period
+      items (c3, c6).'
+    - '2026-10-05: tests/test_dashboard_e2e.py::TestClosedWithNoSupply (5 real-browser
+      tests) green against a bootstrapped corpus with gaps injected - agency card
+      ''1 no supply'' and the quiet accepted line, one grouped row on the agency
+      page, the dataset banner naming the mark-not-supplied command and the accepted
+      reason, both kinds in supply history, and the as-of view before the mark
+      reading it red.'
+    - '2026-10-05: tests/test_not_supplied.py::TestWhatTheBuildEmbeds (3) green
+      - the build embeds every slot that was a gap when it closed, with its closing,
+      filed, filled and marked instants (c10), from the decision log and filings
+      only.'
+    implemented_by:
+    - pipeline/closed_slots.py::for_dataset
+    - pipeline/build_dashboard_data.py::build
+    - pipeline/build_cp_dashboard_data.py::build_one_table
+    - dashboard/qa-reporting-dashboard.template.html
+    linked_tests:
+    - tests-js/closed-no-supply.test.js
+    - tests/test_dashboard_e2e.py::TestClosedWithNoSupply
+    - tests/test_not_supplied.py::TestWhatTheBuildEmbeds
     source: 'Keith, 2026-10-04 (''shown very clearly as red / no supply'', plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-04; signed off by Keith 2026-10-04.'
     acceptance_criteria:
     - WHERE a dataset's slot for the period on show is closed and unfilled (REQ-PIPE-132), THE SYSTEM SHALL show that period on the dataset's page as red and 'no supply', distinctly from a period that is overdue but still open - except WHERE a supply for that slot arrived and could not be loaded, was rejected after failing to load, or is contested, where THE SYSTEM SHALL say that instead (REQ-DASH-148 criterion 4, REQ-PIPE-153 criterion 9, REQ-PIPE-115 criterion 8).
@@ -25681,6 +25799,35 @@ requirements:
     - '''NO SUPPLY'' IS NOT SAID WHERE A SUPPLY ARRIVED (Keith, 2026-10-04), reconciling this criterion with REQ-DASH-148 criterion 4 and REQ-PIPE-153 criterion 9, signed the same day, which both forbid wording such a period as no supply. The period is still red and still counted.'
     - 'CRITERION 10 REPLACES THE DATASET-LEVEL ''no data'', NOT THE PER-CHECK GREY (Keith, 2026-10-04): REQ-DASH-148 and REQ-PIPE-115 now use the per-check grey ''No data'' for a blocked dataset''s own checks.'
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - THE INSTANTS TRAVEL, NOT THE RULE (2026-10-05). pipeline/closed_slots.py
+      embeds, per dataset, each slot that was a gap when it closed with closesAt,
+      filedAt, filledAt and markedAt; the page only compares them with the date
+      on show. Closing is REQ-PIPE-131's rule and stays in Python. A slot filled
+      or filed before it closed was never a gap and is not embedded, so a daily
+      feed's ordinary slots do not ride along.
+    - 'A DATASET WITH A CURRENT RUN KEEPS ITS ROW (PROVISIONAL, 2026-10-05). The
+      reason row replaces a dataset''s row only when it has nothing current to
+      show (c10''s case); a dataset whose latest run is fine but has an older
+      unmarked gap keeps its row, red, with the gap in words beneath the pill.
+      REJECTED replacing the row outright as a blocked dataset does: a blocked
+      dataset''s own checks did not run, while a gap says nothing about the checks
+      of the run that did.'
+    - 'AN UNMARKED GAP OUTRANKS AN ENDED SCHEDULE (PROVISIONAL, 2026-10-05), the
+      same reasoning as a hold: it is red work for a person, so ''no supply expected''
+      would hide it. A held, contested or unloadable supply outranks the gap (c1''s
+      exception), so the dataset says the most specific thing.'
+    - THE AGENCY CARD'S COUNT IS AS AT THE DATE ON SHOW (c3, c9), and replaces
+      the outstanding queue's own closed-period items, which are judged as at
+      the build - otherwise a reader looking at a past date would see today's
+      gaps counted beside that date's statuses.
+    - 'A REJECTED SUPPLY LEAVES ITS PERIOD EMPTY (2026-10-05, post-build-review
+      #101). A filing counts toward ''something arrived'' only until a person
+      rejects that supply; from then the period is unfilled, and it says what
+      happened - ''a supply arrived, could not be loaded and was rejected by <who>,
+      <when>'' - as its own item rather than joining a run of periods where nothing
+      came. Between receipt and rejection it was waiting, not a gap. This is criterion
+      1''s exception carried past the failed load''s own blocker, which closes
+      on the rejection.'
     open_questions: []
 
   - id: REQ-PIPE-134
@@ -26367,18 +26514,6 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: Criterion 4 - a closed, unfilled slot whose supply could not
-        be loaded is worded as 'a supply arrived and could not be loaded', not
-        as no supply.
-      why: 'Nothing yet renders a closed, unfilled slot at all: that display is
-        REQ-DASH-133''s and the item behind it REQ-PIPE-132''s, neither built.
-        The failed load itself already reads red, with its reason, while its item
-        is open.'
-      owner: REQ-DASH-133.
-      blocked_by:
-        requirements:
-        - REQ-DASH-133
-        - REQ-PIPE-132
     - criterion: Criterion 12 - a reloaded supply records, in the same transaction
         as its new load record, that a re-check is owed, and the next processing
         pass runs it through REQ-PIPE-140's re-check.
@@ -26401,6 +26536,12 @@ requirements:
       and the other five datasets unblocked. The synthetic corpus has no unloadable
       file (REQ-GEN-044 deliberately injects none), so the bootstrap exercises
       none of this.'
+    - '2026-10-05: criterion 4 re-tested once REQ-DASH-133 and REQ-PIPE-132 shipped
+      - a period whose supply could not be loaded reads ''Could not be loaded''
+      with its reason, red, and the unmarked-gap ''no supply'' wording does not
+      appear: the blocker outranks the gap in the page''s wiring pass and in every
+      place the gap is rendered (tests/test_dashboard_e2e.py::TestASupplyThatCouldNotBeLoaded,
+      TestClosedWithNoSupply).'
     implemented_by:
     - qa_tools/common/load_log.py::own_words
     - qa_tools/common/dataset_blockers.py::all_blockers
@@ -26675,16 +26816,6 @@ requirements:
     story: As a data team leader, I want to reject a supply whose file could not be loaded, from the same queue where I decide on other supplies, and have that rejection settle it - its failed-load item closed, its dataset no longer red on its account, and nothing else in the period disturbed - so that I answer a bad file once, rather than being told my decision was recorded and then asked the same question again.
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 9 - a closed, unfilled period whose failed-load supply
-        was rejected says that a supply arrived, could not be loaded and was rejected,
-        naming who, when and why.
-      why: Closed, unfilled periods are not rendered yet (REQ-DASH-133). The rejection's
-        who, when and why already reach the supply-history row (criterion 16).
-      owner: REQ-DASH-133.
-      blocked_by:
-        requirements:
-        - REQ-DASH-133
     evidence:
     - '2026-10-05 (overnight batch 6): post-build-review #80''s reproduction,
       kept as tests/test_filing_decisions.py::TestRejectingASupplyThatNeverLoaded,
@@ -26695,6 +26826,11 @@ requirements:
       closed from it. The promote refusal was confirmed failing first (it was
       accepted). The queue, resupply and reload cases each have a test; the real-browser
       TestASupplyThatCouldNotBeLoaded covers criterion 15.'
+    - '2026-10-05: criterion 9 - a closed period whose supply was rejected says
+      ''a supply arrived, could not be loaded and was rejected by <who>, <when>
+      ("<why>")'' as its own item; pipeline/closed_slots.py stops counting a rejected
+      supply''s filing from the rejection on (tests/test_not_supplied.py::TestARejectedSupplyLeavesItsPeriodEmpty,
+      tests-js/closed-no-supply.test.js).'
     implemented_by:
     - qa_tools/common/load_log.py::failures
     - qa_tools/common/dataset_blockers.py::all_blockers
@@ -26711,6 +26847,7 @@ requirements:
     - tests/test_filing_decisions.py::TestRejectingAFailedResupplyOfAFilledPeriod
     - tests/test_filing_decisions.py::TestAReloadAfterARejectionIsNotPromotedAutomatically
     - tests/test_dashboard_e2e.py::TestASupplyThatCouldNotBeLoaded
+    - tests/test_not_supplied.py::TestARejectedSupplyLeavesItsPeriodEmpty
     source: 'Keith, 2026-10-04 - plans/post-build-review.md #80 (reproduced that day: a rejection of a failed load is accepted and clears nothing). First drafted by delivery-scoper as an amendment to REQ-DASH-148; split into its own requirement at Keith''s direction the same day, with his answers to the scoping questions (Q1-Q4, W1-W3) folded in.'
     acceptance_criteria:
     - WHEN a person rejects a supply whose current load record is failed, THE SYSTEM SHALL accept it through the existing reject decision (REQ-GHUB-082 criterion 13's one implementation), naming as its period the slot that supply was filed to (REQ-PIPE-062).

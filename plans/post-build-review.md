@@ -4978,3 +4978,138 @@ twice. It deliberately did not re-find the `TypeError`.
     `own_table`, which asks `ambiguous` directly).
     `tests/test_unreadable_own_table.py::TestAContestedTableThatFellThroughIsReadable`,
     confirmed failing first.
+
+98. **[in-progress, 2026-10-05]** **[Dashboard UI]** **delivery-dashboard-ux-critic
+    on the "dataset that cannot be checked" treatment and "Compared with"
+    (commit 578d193).** The reason rows, the could-not-be-loaded banner and
+    the as-of behaviour of the red itself hold up in a real browser (Green
+    the day before receipt, red from it; a rejected failed load red between
+    failure and rejection only). Findings, verified against the template:
+    - FIXED - the queue's lede said none of its items changes a dataset's
+      status, one line below a held dataset's red banner (REQ-DASH-070's own
+      decision said that copy would become false once 115 and 148 landed).
+      It now says which kinds turn a dataset red.
+    - FIXED - a dataset with nine held supplies named only the oldest. The
+      reason row and banner now count them and give the oldest and newest
+      receipts.
+    - FIXED - the blocked dataset's tile read "Latest arrival" while showing
+      the held supply's receipt, which is not the latest arrival. Now
+      "Waiting since".
+    - FIXED - a supply-history block whose rows were all resolved was still
+      headed "Waiting for a person"; it reads "Needed a person" then.
+    - FIXED (wording) - "Held — its supply is held, waiting for a person to
+      place it" now reads "Held — no open period to file its supply to;
+      waiting for a person"; the gap note in "Compared with" ends with what
+      clears it.
+    - NOT FIXED, logged: REQ-DASH-070 criterion 14 (the queue judged at the
+      same instant as the red) is not met for queue ITEMS - at an as-of date
+      before a hold, the queue still lists it, stamped with the bootstrap's
+      wall clock rather than the receipt. A gap against a built claim, so
+      it needs its own failing test and is queued for the next pass.
+    - NOT FIXED, logged: the supply-history CYCLE table shows a held
+      arrival as Green "not filed ... waiting 1253d" (counted from today,
+      not the as-of date) beside the Red waiting row for the same supply;
+      the reason row's text runs off screen at 390px; the queue stacks nine
+      near-identical held cards rather than grouping by dataset; the held
+      reason itself is machine text (supply keys, "claim window"); check
+      panels leave the document title and focus where they were.
+    - FOR KEITH: (a) should an old open hold blank out a later period's
+      real, checked results (criteria 10-11 as built say yes - Case Workers'
+      green 2026-Q3 supply reads No data because of holds from 2023)? (b)
+      should a gap-rule red be shown distinctly from a measured red (153 of
+      181 drift and volume results in the bootstrap are gap reds)? Both in
+      the morning report.
+
+99. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **delivery-critic
+    on REQ-PIPE-115, REQ-QAC-108's amendment, REQ-DASH-148 and REQ-PIPE-153
+    (commit 578d193).** Verified against supply6 and a clean export.
+    - FIXED, CRITICAL - **one held supply stopped every later supply of its
+      dataset being checked.** `supply_holds.held_tables()` returned every
+      dataset with ANY open hold, and both the staging builders and the
+      period overlay withheld that table from every run of the dataset;
+      REQ-PIPE-115's own-table guard then ran no tool for them. On supply6,
+      17 of 18 Case Workers runs had no results, eight of them on-time
+      supplies filed to real slots with no hold of their own - and supply
+      history showed them GREEN. A false green, the failure the requirement
+      exists to prevent, produced by the requirement's own guard meeting a
+      pre-existing over-broad helper. held_tables() now takes the arrival
+      key and returns only tables whose supply IN THAT ARRIVAL is held.
+      `tests/test_unreadable_own_table.py::TestAnUnrelatedHoldDoesNotStopAFiledSupplyBeingChecked`
+      (2), both confirmed failing first. Re-bootstrapped (supply7).
+    - FIXED - a blocked dataset's check panel still showed the last run's
+      value and row counts as "current"; it now says "Not run for this
+      period" and drops the current-run row detail (the column drawer row
+      too). e2e `TestAHeldOrContestedDatasetReadsRed::test_its_check_panel_does_not_show_an_earlier_run_as_current`.
+    - FIXED - the "Latest arrival" tile and the reason row named the oldest
+      of nine holds as if latest (also UX #98): "Waiting since", with the
+      count and oldest/newest receipts.
+    - FIXED - a contested pair's refused file was also listed by the
+      terminal queue as its own failed load; filing_queue.could_not_load
+      now excludes it as the outstanding items already did.
+    - RECORDED, NOT FIXED - criterion 2 (one not-evaluated record per
+      unreadable table) is not met as signed; REQ-PIPE-115 now carries it
+      as an unmet criterion rather than overclaiming, with the question for
+      Keith. Criterion 17's reconciliation skips runs with no period
+      (trials, unfiled-and-unheld supplies) because unrunnable records
+      nothing for them; recorded as a PROVISIONAL decision and a question.
+      load_log.own_words never names the column (criterion 13 lists it) -
+      the library's message is the only source of a column name and is
+      exactly what may not be recorded; logged. The e2e tests inject
+      blockers rather than driving a real hold through the pipeline -
+      which is how the critical one got past them.
+
+100. **[done, 2026-10-05]** **[Pipeline & publishing]** **A mark that a
+    period was not supplied took the outstanding queue down.** Found by the
+    sprint-7 gate run, not a critic. REQ-PIPE-132's mark is about a PERIOD,
+    so it records no supply, and `dataset_blockers._decided_keys` took the
+    arrival key of every decision's supply - a `TypeError` on the NULL,
+    raised from `outstanding.survey()`, so one mark anywhere emptied the
+    whole queue. Fixed (a supply-less decision decides nothing about an
+    arrival's files); failing test first:
+    `tests/test_not_supplied.py::TestAMarkCarriesNoSupply`. The other
+    readers that walk `qa.decision` by supply were checked: rejections are
+    REJECT-only and always carry one, `load_log._settled_by_rejection` the
+    same, and `slot_holds` excludes marks by construction.
+
+101. **[done, 2026-10-05]** **[Dashboard UI]** **A period whose only supply
+    was rejected never read as unfilled.** Found re-testing REQ-PIPE-153
+    criterion 9's deferral once REQ-DASH-133 shipped. The first cut of
+    `pipeline/closed_slots.py` counted ANY filing to a period as "something
+    arrived", so a supply filed then rejected left the period looking
+    filed for good: no red, no "no supply", and nothing saying what had
+    happened. Fixed before it was ever committed: from the rejection on,
+    the filing no longer counts, the period is its own item naming who
+    rejected it, when and why, and "could not be loaded" where the load
+    log says so. Tests: `TestARejectedSupplyLeavesItsPeriodEmpty` and the
+    JS pair in `tests-js/closed-no-supply.test.js`. SAID PLAINLY: this
+    test was written alongside the fix rather than before it, because the
+    defect was in code written the same hour and never shipped.
+
+102. **[done, 2026-10-05]** **[Testing & dev tooling]** **A new test
+    promoted into the shared CP fixture's period.** The sprint-7 drift test
+    for a marked period promoted cp-case-workers into 2026-Q1 - exactly
+    where `tests/conftest.py`'s module-scoped CP fixture promotes its
+    reference delivery on the same worker's append-only log - so every CP
+    module after it on that worker errored with "superseding ... needs a
+    reason" (16 errors). Its own docstring said 2027-Q1; moved to 2025,
+    with the reason in the docstring. The general hazard is the one the
+    fixture's own docstring already names: shared periods on an
+    append-only log are shared state.
+
+103. **[done, 2026-10-05]** **[Pipeline & publishing]** **A daily feed's
+    missed day reached the dashboard as "1 period with no supply,
+    2026-09-23".** Found by the real-browser display-standard test
+    (`TestTheDisplayStandardHoldsInARealBrowser`) the first time a daily
+    gap reached the outstanding queue: `filing_queue.Gap.describe()` wrote
+    the ISO period name and called a day a period, and the queue carries
+    that headline verbatim onto the page. Fixed - a daily run reads "2 days
+    with no supply, Tuesday, 22 September 2026 to Wednesday, 23 September
+    2026", the page's own form - failing test first
+    (`TestGrouping::test_a_daily_run_says_days_in_the_pages_own_date_form`).
+    The same gate run caught three TEST defects of this sprint's own,
+    fixed rather than waived: the supply-history drill-down test read
+    `data-run-date` from rows that now include gap rows without one; the
+    nodata-pill contrast test needed a page where something is still
+    nodata (every corpus dataset has an unmarked gap by 2027); and a
+    sprint-6 check-panel test compared against `innerText`, which carries
+    the heading's CSS upper-casing.

@@ -474,6 +474,7 @@ class TestEveryOperationIsReachableFromSomeDoor:
                              lambda: __import__("contextlib").nullcontext(None))
         monkeypatch.setattr(filing_queue, "awaiting", lambda *a, **k: [state])
         monkeypatch.setattr(filing_queue, "slots_of", lambda *a, **k: [state])
+        monkeypatch.setattr(filing_queue, "closed_gaps", lambda *a, **k: [])
         monkeypatch.setattr(filing_tui, "_pick_slot", lambda states, msg: state)
         monkeypatch.setattr(filing_tui, "_decide_on",
                              lambda s, offer: seen.setdefault("offer", offer))
@@ -502,15 +503,18 @@ class TestEveryOperationIsReachableFromSomeDoor:
         assert not offered & set(fd.PERIOD_SCOPED)
         assert fd.PROMOTE in offered
 
-    def test_between_the_two_doors_all_eight_are_reachable(self, monkeypatch):
+    def test_between_the_two_doors_all_nine_are_reachable(self, monkeypatch):
+        """Eight, and mark as not supplied on a CLOSED period (REQ-PIPE-132)."""
         reachable = set()
         for flow, states in (
-                (filing_tui.queue_flow, [slot_state.AWAITING_DECISION,
-                                          slot_state.REJECTED]),
-                (filing_tui.period_flow, [slot_state.PROMOTED, slot_state.OVERDUE,
-                                           slot_state.SUBSTITUTED,
-                                           slot_state.INHERITED])):
-            for name in states:
+                (filing_tui.queue_flow, [(slot_state.AWAITING_DECISION, False),
+                                          (slot_state.REJECTED, False)]),
+                (filing_tui.period_flow, [(slot_state.PROMOTED, False),
+                                           (slot_state.OVERDUE, False),
+                                           (slot_state.OVERDUE, True),
+                                           (slot_state.SUBSTITUTED, False),
+                                           (slot_state.INHERITED, False)])):
+            for name, closed in states:
                 reachable |= self._offered_by(
-                    flow, _state(name, supply="cp-carers@1"), monkeypatch)
+                    flow, _state(name, supply="cp-carers@1", closed=closed), monkeypatch)
         assert reachable == set(fd.OPERATIONS)

@@ -16,9 +16,9 @@ from qa_tools.common import (filing_decisions as fd, filing_queue, qa_store,
 
 
 def _state(state, *, dataset_id="cp-carers", period="2026-Q1", supply=None,
-           decided_by=None):
+           decided_by=None, closed=False):
     return slot_state.SlotState(dataset_id=dataset_id, period=period, state=state,
-                                 supply=supply, decided_by=decided_by)
+                                 supply=supply, decided_by=decided_by, closed=closed)
 
 
 class TestTheQueueUsesTheTicketPolicysOwnDefinition:
@@ -88,13 +88,15 @@ class TestWhatASlotOffers:
     """Criterion 2 read against criterion 31 - all eight are reachable,
     and the four period-scoped ones are never reached from the queue."""
 
-    def test_every_one_of_the_eight_is_offered_by_some_slot(self):
+    def test_every_one_of_the_nine_is_offered_by_some_slot(self):
+        """Mark as not supplied is offered on a CLOSED period (REQ-PIPE-132)."""
         offered = set()
-        for state in (slot_state.AWAITING_DECISION, slot_state.PROMOTED,
-                       slot_state.REJECTED, slot_state.SUBSTITUTED,
-                       slot_state.INHERITED, slot_state.OVERDUE):
+        for state, closed in ((slot_state.AWAITING_DECISION, False),
+                              (slot_state.PROMOTED, False), (slot_state.REJECTED, False),
+                              (slot_state.SUBSTITUTED, False), (slot_state.INHERITED, False),
+                              (slot_state.OVERDUE, False), (slot_state.OVERDUE, True)):
             supply_scoped, period_scoped = filing_queue.operations_for(
-                _state(state, supply="cp-carers@1"))
+                _state(state, supply="cp-carers@1", closed=closed))
             offered |= set(supply_scoped) | set(period_scoped)
         assert offered == set(fd.OPERATIONS)
 
@@ -242,7 +244,7 @@ class TestOnlyTheStatesADecisionProducedSayARuleDecidedThem:
         for state in filing_queue.FROM_A_DECISION:
             assert state in (slot_state.PROMOTED, slot_state.REJECTED,
                               slot_state.SUBSTITUTED, slot_state.INHERITED,
-                              slot_state.RETURNED)
+                              slot_state.RETURNED, slot_state.NOT_SUPPLIED_ACCEPTED)
 
     def test_a_supply_merely_filed_is_not_one_of_them(self):
         assert slot_state.AWAITING_DECISION not in filing_queue.FROM_A_DECISION

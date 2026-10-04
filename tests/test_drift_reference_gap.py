@@ -34,7 +34,8 @@ def _decide(conn, action, slot, ds=DS, **kw):
 #: ONE DATASET PER TEST - qa.decision is append-only, so a test cannot
 #: clear what an earlier one promoted. All five are quarterly.
 OWN = {"measured": "cp-carers", "gap": "cp-clients", "not_due": "cp-placements",
-       "dealt": "cp-investigations", "no_ref": "cp-notifications"}
+       "dealt": "cp-investigations", "no_ref": "cp-notifications",
+       "marked": "cp-case-workers"}
 
 
 def _conn_for(ds):
@@ -84,6 +85,27 @@ class TestTheGap:
         got = drift_reference.assess(conn, ds, "2027-Q3", AFTER_Q2_DUE)
         assert got.kind == drift_reference.MEASURED and got.dealt_with == ("2027-Q2",)
         assert "compared with 2027-Q1, not 2027-Q2" in got.reason
+
+    def test_a_period_marked_not_supplied_is_said_but_not_red(self, supply_dsn):
+        """Criterion 17, REQ-PIPE-132's half: cp-case-workers owes Q1 and Q3
+        only, so 2025-Q1 is promoted and 2025-Q3 marked, measured at 2026-Q1.
+
+        2025, NOT 2026: the shared CP fixture (tests/conftest.py) promotes
+        its reference delivery into cp-case-workers' 2026-Q1 on this same
+        worker's database, and qa.decision is append-only - a promotion of
+        a different supply there made every later module's fixture refuse
+        to supersede it without a reason."""
+        from qa_tools.common import not_supplied
+
+        ds = OWN["marked"]
+        conn = _conn_for(ds)
+        _decide(conn, decision_log.PROMOTE, "2025-Q1", ds)
+        not_supplied.mark(conn, agency_id="a", collection_id="c", dataset_id=ds,
+                          period="2025-Q3", actor="t@example.com",
+                          reason="supplier had nothing that quarter",
+                          effective_at="2027-01-01T09:00:00+08:00")
+        got = drift_reference.assess(conn, ds, "2026-Q1", AFTER_Q2_DUE)
+        assert got.kind == drift_reference.MEASURED and got.dealt_with == ("2025-Q3",)
 
     def test_no_reference_with_owed_periods_is_red_not_no_data(self, supply_dsn):
         """Criterion 9 - the owed periods are named. (Only where this

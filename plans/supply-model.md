@@ -2062,7 +2062,7 @@ comparisons against the expected-supply sequence.
 
     **Owns:** nothing yet - this sprint is unscoped.
 
-18. **[blocked, 2026-10-05]** **[QA checks & contract]** **Drift and trend
+18. **[done, 2026-10-05]** **[QA checks & contract]** **Drift and trend
     dependencies.** A declared temporal reference; missing-but-expected
     is red, no-prior-period is `nodata`. `REQ-PIPE-035` was rewritten
     2026-09-22 and now carries both cases as acceptance criteria, so

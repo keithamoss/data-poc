@@ -80,6 +80,8 @@ _WHAT_IT_DOES = {
     filing_decisions.DE_SUBSTITUTE: "de-substitute - remove the substitution",
     filing_decisions.INHERIT: "inherit - nothing was owed, so carry the last one forward",
     filing_decisions.UN_INHERIT: "un-inherit - remove the inheritance",
+    filing_decisions.MARK_NOT_SUPPLIED: ("mark as not supplied - accept that this closed "
+                                         "period was missed, with a reason"),
 }
 
 _HOW_IT_READS = {
@@ -93,6 +95,7 @@ _HOW_IT_READS = {
     slot_state.REJECTED: "[red]rejected[/red]",
     slot_state.SUBSTITUTED: "[blue]substituted[/blue]",
     slot_state.INHERITED: "[blue]inherited[/blue]",
+    slot_state.NOT_SUPPLIED_ACCEPTED: "[dim]not supplied (accepted)[/dim]",
     filing_queue.COULD_NOT_LOAD: "[red]could not be loaded[/red]",
 }
 
@@ -340,13 +343,29 @@ def queue_flow(collection_id: str) -> None:
     try:
         with open_log() as conn:
             waiting = filing_queue.awaiting(conn, collection_id)
+            gaps = filing_queue.closed_gaps(conn, collection_id)
     except filing_queue.LogUnreachable as exc:
         say_unreachable(exc)
         return
 
+    if gaps:
+        # PERIOD ITEMS, GROUPED (REQ-PIPE-132 criterion 11): consecutive
+        # closed, unfilled periods of one dataset are one line naming the
+        # count and the range, with what a person can do about them.
+        table = Table("Dataset", "No supply", "What you can do", box=None, pad_edge=False)
+        for gap in gaps:
+            table.add_row(gap.dataset_id, gap.describe(),
+                          "; ".join(slot_state.CLOSED_RESPONSES))
+        console.print(f"[bold]{len(gaps)}[/bold] closed period item(s) with no supply in "
+                       f"{_collection_name(collection_id)} - {slot_state.CLOSED_NOTE}.\n")
+        console.print(table)
+        console.print("[dim]Answer one from the period door, or `mothman supply decide "
+                       "--operation mark-not-supplied --dataset <id> --period <p> "
+                       "--reason <why>`.[/dim]\n")
     if not waiting:
-        console.print(f"Nothing is waiting on a person in "
-                       f"{_collection_name(collection_id)}.", style="green")
+        if not gaps:
+            console.print(f"Nothing is waiting on a person in "
+                           f"{_collection_name(collection_id)}.", style="green")
         return
     console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a "
                    f"decision in {_collection_name(collection_id)}\n")

@@ -132,6 +132,20 @@ releases:
               drift and volume checks go red and tell you which period they
               compared with instead - while still showing what the
               measurement itself found, so a gap is never mistaken for drift.
+          - headline: You can accept that a closed period was not supplied
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              A period that closed with nothing in it now says so, and you can
+              record - with a reason - that you accept it was not supplied.
+              It leaves your to-do list but stays in the record. Runs of
+              missed days or quarters show as one item, not one per period.
+          - headline: The dashboard shows a period with no supply in red
+            components: ["Dashboard UI"]
+            description: >
+              A dataset with a closed period that nothing arrived for reads
+              red and says "no supply", naming the periods. Each agency card
+              counts what is waiting for you in one line, by kind. Periods
+              you accepted show quietly with your reason.
           - headline: You can reject a supply that could not be loaded
             components: ["Pipeline & publishing"]
             description: >
@@ -146,6 +160,12 @@ releases:
               Held supplies were still having every check run against them and
               recorded. Now nothing runs until you decide which period they
               belong to.
+          - headline: One held supply no longer stops a dataset's later supplies being checked
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply waiting for a person used to stop every later supply of
+              the same dataset from being checked, and those showed as green.
+              Each supply is now checked on its own terms.
           - headline: No check silently drops out of a run
             components: ["Pipeline & publishing", "QA checks & contract"]
             description: >

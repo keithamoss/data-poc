@@ -21,6 +21,16 @@ from qa_tools.common import load_log, outstanding
 
 
 @pytest.fixture(autouse=True)
+def _no_closed_periods(monkeypatch, request):
+    """An empty database has every past slot CLOSED and unfilled, and
+    REQ-PIPE-132 turns each into a queue item - real, and not what these
+    tests are about. Its own tests are in tests/test_not_supplied.py and
+    the class below, which opts back in."""
+    if request.node.get_closest_marker("closed_periods") is None:
+        monkeypatch.setattr(outstanding, "_from_unfilled_periods", lambda conn=None: [])
+
+
+@pytest.fixture(autouse=True)
 def _a_database_nobody_else_writes_to(private_supply_dsn):
     """EVERY test here runs against a database OF ITS OWN, and each
     tightening was forced by a real failure rather than chosen.
@@ -463,3 +473,21 @@ class TestAHoldLeavesTheQueueWhenItIsResolved:
                        contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
         [item] = outstanding.survey(observations_dir=tmp_path).items
         assert item.responses and any("file" in r for r in item.responses)
+
+
+
+@pytest.mark.closed_periods
+class TestClosedUnfilledPeriodsAreOneItemPerRun:
+    """REQ-PIPE-132 criteria 10 and 11: every closed, unfilled, unmarked
+    period is in the queue, consecutive ones of a dataset as one item."""
+
+    def test_they_are_grouped_per_dataset(self):
+        items = [i for i in outstanding.survey().items
+                 if i.kind == outstanding.CLOSED_UNFILLED_SLOT]
+        assert items, "an empty history has closed, unfilled periods"
+        per_dataset = {}
+        for i in items:
+            per_dataset[i.dataset_id] = per_dataset.get(i.dataset_id, 0) + 1
+        # Nothing was ever supplied here, so each dataset's gaps are one run.
+        assert set(per_dataset.values()) == {1}
+        assert all("with no supply" in i.headline and not i.blocking for i in items)

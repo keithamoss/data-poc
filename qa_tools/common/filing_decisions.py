@@ -50,9 +50,12 @@ SUBSTITUTE = decision_log.SUBSTITUTE
 DE_SUBSTITUTE = decision_log.DE_SUBSTITUTE
 INHERIT = decision_log.INHERIT
 UN_INHERIT = decision_log.UN_INHERIT
+#: The ninth (REQ-PIPE-132 criterion 4): accept that a closed period was
+#: not supplied. Period-scoped, person only, changes no data.
+MARK_NOT_SUPPLIED = decision_log.MARK_NOT_SUPPLIED
 
 OPERATIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
-              INHERIT, UN_INHERIT)
+              INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED)
 
 #: The four that act on a SUPPLY - "what do I do with this thing that
 #: arrived" - and so belong in the queue of supplies awaiting a decision
@@ -62,7 +65,7 @@ SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE)
 #: The four that act on a PERIOD - how it is filled when a supply for it
 #: never came. None of them answers a question about an arriving supply,
 #: which is why criterion 31 puts them somewhere else entirely.
-PERIOD_SCOPED = (SUBSTITUTE, DE_SUBSTITUTE, INHERIT, UN_INHERIT)
+PERIOD_SCOPED = (SUBSTITUTE, DE_SUBSTITUTE, INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED)
 
 #: Which operations destroy something a reader depends on, and so need
 #: an explicit confirmation on every route (criteria 9 and 28, and
@@ -144,7 +147,7 @@ def offered(operation: str) -> str:
     """
     if operation not in OPERATIONS:
         raise NotOffered(
-            f"{operation!r} is not a filing decision. The eight are: "
+            f"{operation!r} is not a filing decision. The {len(OPERATIONS)} are: "
             f"{', '.join(OPERATIONS)}.")
     return operation
 
@@ -215,6 +218,13 @@ def _already(conn, request: Request) -> str | None:
             return (f"{period} holds no substitution for {request.dataset_id}. "
                     f"Either it was never substituted or somebody has already "
                     f"removed it.")
+    elif request.operation == MARK_NOT_SUPPLIED:
+        from qa_tools.common import not_supplied
+
+        already = not_supplied.marked(conn, request.dataset_id, period)
+        if already is not None:
+            return (f"{period} is already marked as not supplied for "
+                    f"{request.dataset_id}, by {already.actor}. Nothing to do.")
     elif request.operation == UN_INHERIT:
         if inheritance.inherited(conn, request.dataset_id, period) is None:
             # NOT where it holds a SUBSTITUTION - that is a real
@@ -266,6 +276,13 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> Non
     elif request.operation == INHERIT:
         inheritance.inherit_one(
             conn, dataset_id=request.dataset_id, period=request.period,
+            actor=request.actor_name, reason=reason, effective_at=effective_at)
+    elif request.operation == MARK_NOT_SUPPLIED:
+        from qa_tools.common import not_supplied
+
+        not_supplied.mark(
+            conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
+            dataset_id=request.dataset_id, period=request.period,
             actor=request.actor_name, reason=reason, effective_at=effective_at)
     elif request.operation == UN_INHERIT:
         inheritance.un_inherit(

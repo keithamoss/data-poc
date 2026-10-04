@@ -136,7 +136,10 @@ def _decided_keys(db) -> dict[tuple[str, str], str]:
     for dataset_id, supply, action, effective_at in db.execute(
             "SELECT dataset_id, supply, action, effective_at FROM qa.decision "
             "ORDER BY effective_at, id").fetchall():
-        if action in decision_log.RECORDS_A_REFUSAL:
+        # A DECISION WITH NO SUPPLY is about a period, not an arrival - a
+        # mark that a period was not supplied (REQ-PIPE-132) - so it
+        # decides nothing about any arrival's files.
+        if action in decision_log.RECORDS_A_REFUSAL or not supply:
             continue
         out.setdefault((dataset_id, _arrival_of(supply)), _iso(effective_at))
     return out

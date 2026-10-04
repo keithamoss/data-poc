@@ -122,8 +122,23 @@ UN_INHERIT = "un-inherit"
 #: automation stood back and why.
 PROMOTION_WITHHELD = "promotion-withheld"
 
+#: A PERSON'S ACCEPTANCE THAT A CLOSED PERIOD WAS NOT SUPPLIED
+#: (REQ-PIPE-132 criterion 4). It ANNOTATES a slot and never changes what
+#: it holds (criteria 7 and 8): qa.slot_holds lists only the decisions
+#: that change a slot, so this is ignored there by construction. The
+#: operational, after-the-fact counterpart of `not_expected` in
+#: configuration - that changes what was OWED; this records an obligation
+#: that was owed and NOT MET, and stays in the record as such. Like
+#: `inherit-refused` it names no supply, because what it is about is the
+#: supply that never came.
+MARK_NOT_SUPPLIED = "mark-not-supplied"
+
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
-           INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD)
+           INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
+           MARK_NOT_SUPPLIED)
+
+#: Actions that name no supply - each is about one that is not there.
+NO_SUPPLY = (INHERIT_REFUSED, MARK_NOT_SUPPLIED)
 
 #: The actions a RULE may take. Everything else is a person's, and
 #: rejection.py and substitution.py enforce that by not offering an
@@ -220,8 +235,23 @@ def _check_shape(decision: Decision) -> None:
         raise DecisionRefused(
             "a decision needs an actor - who or what decided this. There is no "
             "default and no 'unknown': record who it was, or do not record it.")
-    if decision.action != INHERIT_REFUSED and not (decision.supply or "").strip():
+    if decision.action not in NO_SUPPLY and not (decision.supply or "").strip():
         raise DecisionRefused("a decision needs the supply it acts on")
+    if decision.action == MARK_NOT_SUPPLIED:
+        if (decision.supply or "").strip():
+            raise DecisionRefused(
+                "marking a period as not supplied names no supply - it records "
+                "that none came.")
+        if decision.actor_kind != PERSON:
+            raise DecisionRefused(
+                "only a person marks a period as not supplied - it accepts a "
+                "missed obligation, which a rule must never do on its own.")
+        if not decision.to_slot:
+            raise DecisionRefused("marking as not supplied names the period it is about.")
+        if not (decision.reason or "").strip():
+            raise DecisionRefused(
+                "marking a period as not supplied needs a reason - somebody will "
+                "ask a year from now why nobody chased it.")
     if decision.action == INHERIT_REFUSED and (decision.supply or "").strip():
         raise DecisionRefused(
             "a refused inheritance names no supply - that is what it could not "

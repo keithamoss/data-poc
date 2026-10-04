@@ -365,7 +365,9 @@ class TestSupplyHistoryDrillDown:
         if toggle.count():
             toggle.click()
 
-        rows = clean_page.locator(".supply-history tbody tr")
+        # RUN ROWS ONLY: a period with no supply (REQ-DASH-133) and a supply
+        # waiting for a person sit in the same history with no run to set.
+        rows = clean_page.locator(".supply-history tbody tr[data-run-date]")
         assert rows.count() > 0, "no real supply-history rows rendered - fixture/test drifted from real committed history"
         # THE PAGE'S OWN DEFAULT, not `date.today()`. This read the
         # CONTAINER's date until 2026-09-25, and the two are different
@@ -1743,7 +1745,7 @@ class TestQuietStatesAreVisiblyBuilt:
 
     @pytest.mark.parametrize("theme", ["light", "dark"])
     def test_the_nodata_pills_border_is_at_least_as_visible_as_its_own_label(
-            self, clean_page, built_dashboard_html, theme):
+            self, clean_page, dashboard_html_without_blockers, theme):
         """`.pill.nodata` is distinguished from `.pill.exhausted` by a
         DASHED rather than solid border - the template's own comment
         says so. That distinction is only real if the border can be
@@ -1758,8 +1760,13 @@ class TestQuietStatesAreVisiblyBuilt:
         accessibility pass with #8/#9/#10/#55) - this test guards the
         narrower property that was actually signed off, and will keep
         holding when that pass raises the token.
+
+        ON THE PAGE WITHOUT BLOCKERS OR GAPS (2026-10-05): on the real
+        corpus every dataset now has a closed, unmarked period by 2027 and
+        reads red (REQ-DASH-133), so no nodata pill is left to measure.
+        This is about the pill's styling, not the corpus.
         """
-        _goto(clean_page, built_dashboard_html, as_of="2027-09-01")
+        _goto(clean_page, dashboard_html_without_blockers, as_of="2027-09-01")
         clean_page.evaluate(f"document.documentElement.setAttribute('data-theme', '{theme}')")
         pill = clean_page.locator(".pill.nodata").first
         pill.wait_for(state="attached")
@@ -3418,19 +3425,35 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         assert errors == []
 
 
-def _with_blockers(built: Path, out: Path, blockers: list) -> Path:
+def _rewrite_const(html: str, name: str, change) -> str:
+    start = html.index(f"const {name} = ") + len(f"const {name} = ")
+    end = html.index(";\n", start)
+    record = json.loads(html[start:end])
+    change(record)
+    return html[:start] + json.dumps(record, separators=(",", ":")) + html[end:]
+
+
+def _with_blockers(built: Path, out: Path, blockers: list,
+                   closed_slots: dict | None = None) -> Path:
     """The built page with its OUTSTANDING record's blockers replaced -
-    only that one const rewritten, every other byte the real build."""
+    only that one const rewritten, every other byte the real build.
+
+    `closed_slots`, when given, replaces every real dataset's closed,
+    unfilled periods (REQ-DASH-133) - the dataset ids it names get those
+    slots, every other dataset none."""
     root = Path(__file__).resolve().parent.parent / "dashboard"
     for name in ("fonts", "vendor"):
         if not (out.parent / name).exists():
             (out.parent / name).symlink_to((root / name).resolve())
-    html = built.read_text()
-    start = html.index("const OUTSTANDING = ") + len("const OUTSTANDING = ")
-    end = html.index(";\n", start)
-    record = json.loads(html[start:end])
-    record["blockers"] = blockers
-    out.write_text(html[:start] + json.dumps(record, separators=(",", ":")) + html[end:])
+    html = _rewrite_const(built.read_text(), "OUTSTANDING",
+                          lambda record: record.__setitem__("blockers", blockers))
+    if closed_slots is not None:
+        def _slots(record):
+            for d in record.get("datasets") or [record]:
+                d["closedSlots"] = closed_slots.get(d.get("id", "birth-registrations"), [])
+        html = _rewrite_const(html, "REAL_CP_DATA", _slots)
+        html = _rewrite_const(html, "REAL_BIRTH_REG_DATA", _slots)
+    out.write_text(html)
     return out
 
 
@@ -3447,9 +3470,15 @@ def dashboard_html_without_blockers(built_dashboard_html, tmp_path_factory) -> P
     untrue. Those tests are about the ended schedule alone, so they read
     a page where nothing is held; TestHeldOutranksAnEndedSchedule covers
     the two together.
+
+    NOR A PERIOD THAT CLOSED WITH NO SUPPLY (REQ-DASH-133, 2026-10-05):
+    an unmarked gap is red too and outranks an ended schedule for the
+    same reason, so this page carries none - TestClosedWithNoSupply
+    covers gaps on a page that has them.
     """
     tmp = tmp_path_factory.mktemp("noblockers")
-    return _with_blockers(built_dashboard_html, tmp / "dashboard_no_blockers.html", [])
+    return _with_blockers(built_dashboard_html, tmp / "dashboard_no_blockers.html", [],
+                          closed_slots={})
 
 
 @pytest.fixture(scope="class")
@@ -3525,6 +3554,23 @@ class TestAHeldOrContestedDatasetReadsRed:
         text = " ".join(page.locator("#view").inner_text().split())
         assert "nothing is checked for this dataset until a person resolves it" in text
         assert page.locator("#col-grid .pill.green").count() == 0
+
+    def test_its_check_panel_does_not_show_an_earlier_run_as_current(
+            self, page, dashboard_html_with_blockers):
+        """Criteria 11 and 26 in the check panel (delivery-critic, sprint 6):
+        the pill read No data while the panel still showed the last run's
+        value and row counts as "current"."""
+        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), as_of=self.AS_OF)
+        page.evaluate("""() => {
+          const ctx = resolveContext(STATE);
+          const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+          openCheckPanel(ctx.ag, ctx.col, ctx.ds, col, col.checks[0]);
+        }""")
+        # innerText carries the CSS text-transform, so the heading reads
+        # upper case here - compared case-insensitively for that reason.
+        text = " ".join(page.locator("body").inner_text().split()).lower()
+        assert "not run for this period" in text
+        assert "rows checked, current run" not in text
 
     def test_its_supply_history_lists_it(self, page, dashboard_html_with_blockers):
         _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), as_of=self.AS_OF)
@@ -3619,3 +3665,80 @@ class TestASupplyThatCouldNotBeLoaded:
         assert row.count() == 1
         assert "rejected by Keith Moss" in row.inner_text()
         assert "supplier is resending" in row.inner_text()
+
+
+class TestClosedWithNoSupply:
+    """REQ-DASH-133: a period that closed with nothing in it reads RED and
+    says 'no supply' at agency and dataset level, consecutive periods as
+    one item; a period a person accepted reads quietly with its reason and
+    stays out of the red; both are judged as at the date on show and both
+    stay in the supply history. Injected rather than taken from the corpus,
+    so the assertions do not depend on which gaps a bootstrap happened to
+    leave."""
+
+    CP = "child-protection-family-support"
+    DS = {"tier": "dataset", "agencyId": CP, "collectionId": "child-protection",
+          "datasetId": "cp-clients"}
+    MARKED = "2026-09-10T02:00:00+00:00"
+
+    def _slot(self, period, index, closes, **extra):
+        return {"period": period, "index": index, "closesAt": closes, "filledAt": None,
+                "filedAt": None, "markedAt": None, "mark": None, **extra}
+
+    def _page(self, built, tmp_path):
+        slots = [self._slot("2025-Q2", 5, "2025-08-15T16:00:00+00:00"),
+                 self._slot("2025-Q3", 6, "2025-11-15T16:00:00+00:00"),
+                 self._slot("2024-Q4", 2, "2025-02-15T16:00:00+00:00", markedAt=self.MARKED,
+                            mark={"at": self.MARKED, "actor": "Keith Moss",
+                                  "reason": "supplier had a system outage"})]
+        return _with_blockers(built, tmp_path / "gaps.html", [],
+                              closed_slots={"cp-clients": slots})
+
+    def _ds(self, page, dataset_id="cp-clients"):
+        return page.evaluate(f"""() => {{ const d = DATA.agencies.flatMap(a => a.collections)
+            .flatMap(c => c.datasets).find(d => d.id === "{dataset_id}");
+            return {{status: d.status, noSupply: d.noSupply, accepted: d.acceptedGaps}}; }}""")
+
+    def test_an_unmarked_gap_is_red_and_rolls_up_in_words(self, page, tmp_path,
+                                                         built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out, as_of="2026-09-23")
+        assert self._ds(page)["status"] == "red"
+        assert page.evaluate(f"""() => DATA.agencies.find(a => a.id === "{self.CP}").status""") == "red"
+        card = page.locator(f'a.card[href*="{self.CP}"]')
+        text = " ".join(card.inner_text().split())
+        assert "1 no supply" in text, text
+        assert "1 dataset with a period accepted as not supplied" in text, text
+
+    def test_consecutive_periods_are_one_item_on_the_agency_page(self, page, tmp_path,
+                                                                built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, as_of="2026-09-23")
+        note = page.locator("[data-no-supply]")
+        assert note.count() == 1
+        assert "2 periods with no supply, 2025-Q2 to 2025-Q3" in note.inner_text()
+
+    def test_the_dataset_page_says_no_supply_and_names_the_accepted_reason(
+            self, page, tmp_path, built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out, state=self.DS, as_of="2026-09-23")
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "No supply — 2 periods with no supply, 2025-Q2 to 2025-Q3" in text
+        assert "Not supplied (accepted)" in text and "supplier had a system outage" in text
+        assert "mark-not-supplied" in text, "and names the command that accepts it"
+
+    def test_the_supply_history_lists_every_closed_period(self, page, tmp_path,
+                                                        built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out, state=self.DS, as_of="2026-09-23")
+        assert page.locator("tr[data-gap=open]").count() == 1
+        assert page.locator("tr[data-gap=accepted]").count() == 1
+
+    def test_as_of_before_the_mark_the_accepted_period_was_still_red(
+            self, page, tmp_path, built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out, as_of="2025-06-01")
+        got = self._ds(page)
+        assert got["accepted"] is None, "not marked yet on this date"
+        assert [g["periods"] for g in got["noSupply"]] == [["2024-Q4"]], \
+            "and Q2/Q3 had not closed yet"

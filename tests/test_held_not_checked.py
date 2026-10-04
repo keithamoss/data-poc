@@ -144,10 +144,13 @@ class TestTheHoldStoreDecidesWhichTables:
 
     def test_a_held_dataset_becomes_its_table_name(self, conn):
         dataset = "cp-clients"
-        supply_holds.raise_hold(conn, dataset_id=dataset, supply_id=f"s-{uuid.uuid4().hex[:8]}",
+        key = f"k{uuid.uuid4().hex[:8]}"
+        supply_holds.raise_hold(conn, dataset_id=dataset, supply_id=f"{dataset}@{key}",
                                  kind=supply_holds.ASSIGNMENT_RULE,
                                  reason={"unavailable": []}, raised_by="r1")
-        assert "cp_clients" in supply_holds.held_tables(conn)
+        assert "cp_clients" in supply_holds.held_tables(conn, arrival_key=key)
+        # Scoped to the hold's own arrival since 2026-10-05.
+        assert "cp_clients" not in supply_holds.held_tables(conn, arrival_key="another")
 
     def test_a_dataset_the_tree_does_not_know_is_skipped(self, conn):
         """A hold outlives the schedule it was raised under, and a run
@@ -157,7 +160,7 @@ class TestTheHoldStoreDecidesWhichTables:
         supply_holds.raise_hold(conn, dataset_id=gone, supply_id="s1",
                                  kind=supply_holds.ASSIGNMENT_RULE,
                                  reason={"unavailable": []}, raised_by="r1")
-        assert supply_holds.held_tables(conn) is not None
+        assert supply_holds.held_tables(conn, arrival_key="s1") is not None
 
 
 HELD = {"cp_clients": "cp_clients__20260930010000000000"}

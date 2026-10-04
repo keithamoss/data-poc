@@ -382,8 +382,17 @@ def resolve_for_supply(conn, *, dataset_id: str, supply: str,
     return tuple(resolved)
 
 
-def held_tables(conn) -> frozenset[str]:
-    """The LOGICAL TABLE NAMES a run must not build a view for.
+def held_tables(conn, *, arrival_key: str) -> frozenset[str]:
+    """The LOGICAL TABLE NAMES a run of THIS ARRIVAL must not build a view
+    for - the tables whose supply in this arrival is held.
+
+    SCOPED TO THE ARRIVAL (found 2026-10-05 by the sprint-6
+    delivery-critic). It used to return every dataset with ANY open hold,
+    so one held supply withheld the table from every later run of that
+    dataset - and once REQ-PIPE-115 ran no tool for a withheld own table,
+    eight on-time, filed Case Workers supplies got no QA at all and read
+    green. A hold is about one supply; a dataset's next supply is checked
+    on its own terms (REQ-PIPE-078 criterion 9).
 
     The translation from dataset id to table name lives here rather
     than at each call site, because there are two warehouse builders
@@ -400,9 +409,11 @@ def held_tables(conn) -> frozenset[str]:
     from qa_tools.common import hierarchy
 
     tables = set()
-    for dataset_id in held_datasets(conn):
+    for held in outstanding(conn):
+        if arrival_key_of(held.supply_id) != arrival_key:
+            continue
         try:
-            tables.add(hierarchy.dataset(dataset_id).table)
+            tables.add(hierarchy.dataset(held.dataset_id).table)
         except Exception:
             continue
     return frozenset(tables)

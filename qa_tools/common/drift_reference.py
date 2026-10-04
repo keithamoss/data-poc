@@ -304,6 +304,13 @@ def _owed_earlier(conn, dataset_id: str, current_period: str, as_at, *,
         if h and h.held_as == decision_log.SUBSTITUTED:
             dealt.append(slot.name)
             continue
+        # ACCEPTED AS NOT SUPPLIED (REQ-PIPE-132) is the third way a person
+        # deals with the gap - said, never counted (criterion 17).
+        from qa_tools.common import not_supplied
+
+        if not_supplied.marked(conn, dataset_id, slot.name, as_at=as_at.isoformat()):
+            dealt.append(slot.name)
+            continue
         gap.append(slot.name)
     return gap, dealt
 

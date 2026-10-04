@@ -235,3 +235,57 @@ class TestAContestedTableThatFellThroughIsReadable:
                                    resolved={"cp_carers": "cp_carers__202605010100000000"},
                                    ambiguous={"cp_carers": ["a", "b"]}, absent=["cp_clients"])
         assert res.unreadable == ["cp_clients"]
+
+
+class TestAnUnrelatedHoldDoesNotStopAFiledSupplyBeingChecked:
+    """REAL DEFECT, found by the sprint-6 delivery-critic on supply6: an
+    open hold on ONE of a dataset's supplies withheld the table from EVERY
+    later run of that dataset (supply_holds.held_tables was dataset-wide),
+    and REQ-PIPE-115's guard then ran no tool for them - eight on-time,
+    filed Case Workers supplies with no QA at all, shown green in supply
+    history. A hold is about one supply: its own arrival."""
+
+    def test_held_tables_is_scoped_to_the_arrival(self, supply_dsn):
+        from qa_tools.common import supply_holds
+
+        with supply_db.connect(label="test-own-table") as conn:
+            conn.execute("DELETE FROM qa.hold WHERE dataset_id = 'cp-case-workers'")
+            supply_holds.raise_hold(conn, dataset_id="cp-case-workers",
+                                    supply_id="cp-case-workers@202305010100000000",
+                                    kind=supply_holds.ASSIGNMENT_RULE, reason={},
+                                    raised_by="t")
+            try:
+                assert OWN in supply_holds.held_tables(
+                    conn, arrival_key="202305010100000000")
+                assert OWN not in supply_holds.held_tables(
+                    conn, arrival_key="202308010100000000")
+            finally:
+                conn.execute("DELETE FROM qa.hold WHERE dataset_id = 'cp-case-workers'")
+
+    def test_the_overlay_does_not_withhold_a_filed_supplys_table(self, monkeypatch,
+                                                                  supply_dsn):
+        from qa_tools.common import filing, period_overlay, supply_holds
+
+        seen = {}
+        monkeypatch.setattr(filing, "period_of", lambda ds, at: "2023-Q3")
+        with supply_db.connect(label="test-own-table") as conn:
+            conn.execute("DELETE FROM qa.hold WHERE dataset_id = 'cp-case-workers'")
+            supply_holds.raise_hold(conn, dataset_id="cp-case-workers",
+                                    supply_id="cp-case-workers@202305010100000000",
+                                    kind=supply_holds.ASSIGNMENT_RULE, reason={},
+                                    raised_by="t")
+
+        def fake_build(conn, run_id, **kw):
+            seen["held"] = set(kw["held"])
+            raise RuntimeError("stop here")
+        monkeypatch.setattr(period_overlay, "build", fake_build)
+        arrival = SimpleNamespace(files_by_dataset={"cp-case-workers": ("f.csv",)},
+                                  received_at="2023-08-01T01:00:00+00:00",
+                                  run_id=f"{OWN}__202308010100000000", delivery_name="d")
+        try:
+            with pytest.raises(RuntimeError, match="stop here"):
+                period_overlay.rebuild_for_arrival(arrival, tables=[OWN])
+        finally:
+            with supply_db.connect(label="test-own-table") as conn:
+                conn.execute("DELETE FROM qa.hold WHERE dataset_id = 'cp-case-workers'")
+        assert OWN not in seen["held"]

@@ -29,7 +29,7 @@ import json
 import os
 from datetime import datetime
 
-from pipeline import recorded_arrival, slot_timeline
+from pipeline import closed_slots, recorded_arrival, slot_timeline
 from qa_tools.common import drift_reference
 from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
@@ -602,6 +602,11 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # each entry tied to the run that checked it.
         "slotTimeline": slot_timeline.with_runs(
             slot_timeline.for_dataset(dataset_id), dataset_id),
+        # EVERY PERIOD THAT CLOSED WITH NO SUPPLY, and the instants that
+        # decide what it reads as on any date (REQ-DASH-133 criteria 9 and
+        # 10) - see pipeline/closed_slots.py. The page compares instants;
+        # it never re-derives closing.
+        "closedSlots": closed_slots.for_dataset(dataset_id),
         "promotionState": promotion_state.state_for(dataset_id).as_record(),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,

@@ -34,6 +34,7 @@ and the reason this can be asked cheaply and often.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from qa_tools.common import filing_decisions, qa_store, slot_state, supply_db
@@ -60,7 +61,7 @@ assert set(WITH_A_SUPPLY) | set(WITHOUT_A_SUPPLY) == set(slot_state.NEEDS_ACTION
 #: automatic inheritance and something a person chose.
 FROM_A_DECISION = (slot_state.PROMOTED, slot_state.REJECTED,
                    slot_state.SUBSTITUTED, slot_state.INHERITED,
-                   slot_state.RETURNED)
+                   slot_state.RETURNED, slot_state.NOT_SUPPLIED_ACCEPTED)
 
 
 class LogUnreachable(Exception):
@@ -96,10 +97,15 @@ def could_not_load(conn: supply_db.SupplyConnection,
     (criterion 12): the decision log has no slot to record a rejection
     against.
     """
-    from qa_tools.common import filing, hierarchy, load_log
+    from qa_tools.common import dataset_blockers, filing, hierarchy, load_log
 
+    # A REFUSED FILE OF A CONTESTED PAIR is the contest's to report
+    # (REQ-PIPE-115 criterion 27), here as in the outstanding items.
+    in_contest = dataset_blockers.refused_in_a_contest(conn)
     out = []
     for record in load_log.failures(conn=conn):
+        if (record.dataset_id, record.physical) in in_contest:
+            continue
         try:
             entry = hierarchy.dataset(record.dataset_id)
         except hierarchy.UnknownDatasetError:
@@ -151,6 +157,83 @@ def periods_needing_a_person(conn: supply_db.SupplyConnection, collection_id: st
     states = [s for s in slot_state.states_for(conn, collection_id, now=now)
               if s.state in WITHOUT_A_SUPPLY]
     return sorted(states, key=lambda s: (s.period, s.dataset_id))
+
+
+@dataclass(frozen=True)
+class Gap:
+    """Consecutive CLOSED, unfilled, unmarked periods of one dataset, as
+    one item (REQ-PIPE-132 criterion 11, REQ-DASH-133 criterion 7) - so
+    seventeen missed days are one line, not seventeen."""
+
+    dataset_id: str
+    periods: tuple[str, ...]
+    state: str
+
+    @property
+    def count(self) -> int:
+        return len(self.periods)
+
+    def describe(self) -> str:
+        # A DAILY FEED'S SLOT IS A DAY, and reads as the page writes one
+        # (REQ-DASH-071's display standard) - never ISO, which the queue
+        # carries verbatim onto the dashboard.
+        daily = all(_is_day(p) for p in self.periods)
+        unit = "day" if daily else "period"
+        what = unit if self.count == 1 else f"{unit}s"
+        name = _day_text if daily else str
+        span = (name(self.periods[0]) if self.count == 1
+                else f"{name(self.periods[0])} to {name(self.periods[-1])}")
+        return f"{self.count} {what} with no supply, {span}"
+
+
+def _is_day(period: str) -> bool:
+    from datetime import date
+
+    try:
+        date.fromisoformat(period)
+    except ValueError:
+        return False
+    return len(period) == 10
+
+
+def _day_text(period: str) -> str:
+    from datetime import date
+
+    d = date.fromisoformat(period)
+    return f"{d:%A}, {d.day} {d:%B} {d.year}"
+
+
+def group_gaps(states) -> list[Gap]:
+    """Closed, unfilled, unmarked slot states grouped into runs of
+    consecutive periods per dataset. `states` is in each dataset's slot
+    order (states_for() returns them so); a slot in between that is not a
+    gap breaks the run."""
+    out: list[Gap] = []
+    run: list = []
+
+    def flush():
+        if run:
+            out.append(Gap(dataset_id=run[0].dataset_id,
+                           periods=tuple(s.period for s in run), state=run[0].state))
+            run.clear()
+
+    for s in states:
+        is_gap = s.closed and s.state in WITHOUT_A_SUPPLY + (slot_state.REJECTED,
+                                                             slot_state.RETURNED)
+        if is_gap and run and run[0].dataset_id == s.dataset_id:
+            run.append(s)
+            continue
+        flush()
+        if is_gap:
+            run.append(s)
+    flush()
+    return out
+
+
+def closed_gaps(conn: supply_db.SupplyConnection, collection_id: str, *,
+                now: datetime | None = None) -> list[Gap]:
+    """Every closed, unfilled, unmarked period in a collection, grouped."""
+    return group_gaps(slot_state.states_for(conn, collection_id, now=now))
 
 
 def arrival_key_of(supply: str) -> str:
@@ -217,8 +300,18 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
             supply_scoped = (filing_decisions.PROMOTE, filing_decisions.REJECT,
                              filing_decisions.REFILE)
 
-    if state.state == slot_state.SUBSTITUTED:
-        period_scoped: tuple[str, ...] = (filing_decisions.DE_SUBSTITUTE,)
+    if state.state == slot_state.NOT_SUPPLIED_ACCEPTED:
+        # Accepted - and a late file can still be re-filed in, or an
+        # earlier supply stood on, either of which supersedes the mark.
+        period_scoped: tuple[str, ...] = (filing_decisions.SUBSTITUTE,)
+    elif state.closed:
+        # A CLOSED, UNFILLED PERIOD (REQ-PIPE-132 criteria 5 and 12):
+        # substitute it, or accept it as not supplied. A late file is
+        # re-filed into it from that FILE's own slot.
+        period_scoped = (filing_decisions.SUBSTITUTE, filing_decisions.INHERIT,
+                         filing_decisions.MARK_NOT_SUPPLIED)
+    elif state.state == slot_state.SUBSTITUTED:
+        period_scoped = (filing_decisions.DE_SUBSTITUTE,)
     elif state.state == slot_state.INHERITED:
         period_scoped = (filing_decisions.UN_INHERIT,)
     elif state.state == slot_state.PROMOTED:

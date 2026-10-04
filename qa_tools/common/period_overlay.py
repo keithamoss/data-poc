@@ -251,7 +251,8 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
         out = build(conn, arrival.run_id, period=period, own_table=own_table,
                     arrival_key=supply_db.arrival_segment(arrival.received_at),
                     tables=agreed, loaded=loaded,
-                    held=supply_holds.held_tables(conn))
+                    held=supply_holds.held_tables(
+                        conn, arrival_key=supply_db.arrival_segment(arrival.received_at)))
         if sample:
             found = supply_db.candidates_in(conn, sample_data.SCHEMA, sample,
                                              loaded=loaded)

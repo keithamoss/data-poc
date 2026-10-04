@@ -51,6 +51,11 @@ REJECTED = "rejected"
 SUBSTITUTED = "substituted"
 #: The period stands on an earlier one because nothing was owed.
 INHERITED = "inherited"
+#: A closed period a PERSON has accepted as not supplied (REQ-PIPE-132
+#: criterion 9) - the one new state, because it records a decision. An
+#: unmarked closed period stays OVERDUE or NEVER-SUPPLIED, qualified by
+#: SlotState.closed (criterion 1).
+NOT_SUPPLIED_ACCEPTED = "not-supplied-accepted"
 
 #: The states that need a person, and so the ones the default
 #: `needs-action` ticket policy opens a ticket for (criterion 21).
@@ -64,7 +69,16 @@ NEEDS_ACTION = frozenset({
 #: to be NAMED on the ticket, and naming is all this does - the
 #: reconciler offers no buttons, because a route that does nothing is
 #: worse than no route.
+#: What a person can do about a period that CLOSED unfilled (REQ-PIPE-132
+#: criterion 12) - each available on both routes - and what they must
+#: know: a file arriving now goes to the open period, not to this one.
+CLOSED_RESPONSES = ("substitute an earlier period's supply",
+                    "mark it as not supplied",
+                    "re-file a late file into it")
+CLOSED_NOTE = "a file arriving now is filed to the open period, not to this one"
+
 RESPONSES = {
+    NOT_SUPPLIED_ACCEPTED: (),
     OVERDUE: ("chase the supplier", "record the period as not supplied",
                "substitute an earlier period's supply"),
     NEVER_SUPPLIED: ("chase the supplier",
@@ -93,6 +107,10 @@ class SlotState:
     #: Who decided, where a person did. None for anything a rule did.
     decided_by: str | None = None
     reason: str = ""
+    #: CLOSED, derived and never recorded (REQ-PIPE-132 criteria 1 and 2):
+    #: the next period's claim window has opened and nothing fills this
+    #: one, so it can no longer be filled automatically.
+    closed: bool = False
 
     @property
     def needs_action(self) -> bool:
@@ -100,6 +118,8 @@ class SlotState:
 
     @property
     def responses(self) -> tuple[str, ...]:
+        if self.closed and self.state in (OVERDUE, NEVER_SUPPLIED, REJECTED, RETURNED):
+            return CLOSED_RESPONSES
         return RESPONSES.get(self.state, ())
 
     @property
@@ -160,6 +180,7 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
     # (REQ-PIPE-130 criterion 9) - not the last one naming it, which can
     # be about another supply or a refusal (post-build-review #84).
     h = decision_log.held(conn, dataset_id, slot.name)
+    closed = slots_mod.is_closed(slot, now)
     if h:
         state, supply = _state_from(h)
         if supply is None:
@@ -167,24 +188,48 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
             supply = conn.execute(
                 f"SELECT supply FROM {decision_log.TABLE} WHERE id = ?",
                 [h.decision_id]).fetchall()[0][0]
+        unfilled = h.held_as is None
+        if unfilled and closed:
+            accepted = _accepted(conn, dataset_id, slot.name)
+            if accepted:
+                return accepted
         return SlotState(
             dataset_id=dataset_id, period=slot.name, state=state,
             supply=supply, stands_on=h.stands_on if h.held_as else None,
             decided_by=_decider(conn, h.decision_id),
-            reason=_reason(conn, h.decision_id))
+            reason=_reason(conn, h.decision_id), closed=unfilled and closed)
 
     filed = filings.get(slot.name)
     if held:
         return SlotState(dataset_id=dataset_id, period=slot.name, state=HELD,
                           supply=(filed or {}).get("supply_id"))
     if filed:
+        # AWAITING A DECISION, closed or not (REQ-PIPE-132 criterion 3): a
+        # supply is here, so the period is not unsupplied.
         return SlotState(dataset_id=dataset_id, period=slot.name,
                           state=AWAITING_DECISION, supply=filed.get("supply_id"))
 
     if slots_mod.is_overdue(slot, now, filled=False):
+        if closed:
+            accepted = _accepted(conn, dataset_id, slot.name)
+            if accepted:
+                return accepted
         return SlotState(dataset_id=dataset_id, period=slot.name,
-                          state=OVERDUE if ever_delivered else NEVER_SUPPLIED)
+                          state=OVERDUE if ever_delivered else NEVER_SUPPLIED,
+                          closed=closed)
     return SlotState(dataset_id=dataset_id, period=slot.name, state=NOT_YET_DUE)
+
+
+def _accepted(conn, dataset_id: str, period: str) -> SlotState | None:
+    """NOT SUPPLIED (ACCEPTED), where a person marked this closed,
+    unfilled slot (REQ-PIPE-132 criterion 9)."""
+    from qa_tools.common import not_supplied
+
+    m = not_supplied.marked(conn, dataset_id, period)
+    if m is None:
+        return None
+    return SlotState(dataset_id=dataset_id, period=period, state=NOT_SUPPLIED_ACCEPTED,
+                     decided_by=m.actor, reason=m.reason, closed=True)
 
 
 def _decider(conn, decision_id) -> str | None:

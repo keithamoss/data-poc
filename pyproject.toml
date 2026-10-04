@@ -151,6 +151,7 @@ pythonpath = ["."]
 markers = [
     "needs_deployment: needs a bootstrapped deployment database (and reports/ built from it)",
     "on_demand: deselected unless --run-on-demand is given (slow; run when its subject changes)",
+    "closed_periods: opts a test back in to REQ-PIPE-132's closed-period queue items (tests/test_outstanding.py)",
 ]
 
 [tool.coverage.run]
