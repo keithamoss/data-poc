@@ -151,6 +151,11 @@ def reset(conn: supply_db.SupplyConnection, typed: str,
         raise WouldReachOutside(
             f"{', '.join(outside)} depend(s) on what the reset would delete, so dropping it "
             f"would take them too. Nothing was deleted - remove or move them first.")
-    for name in dropped:
-        conn.execute(f'DROP SCHEMA "{name}" CASCADE')
+    # ONE STATEMENT, EVERY SCHEMA (#113): the database guard refuses a
+    # cascaded drop of a period's view unless its own schema goes in the
+    # same statement (REQ-PIPE-129 criterion 17), so dropping one at a time
+    # failed on the first period another stood on.
+    if dropped:
+        conn.execute("DROP SCHEMA " + ", ".join(f'"{name}"' for name in dropped)
+                     + " CASCADE")
     return dropped

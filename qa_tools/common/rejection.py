@@ -88,7 +88,36 @@ def reject(conn: supply_db.SupplyConnection, *,
         from_slot=from_slot, reason=reason)
     with decision_log.apply_decision(conn, decision):
         for physical in physical_tables:
-            supply_db.move_table(conn, physical, source, schema)
+            if promoted:
+                # OUT OF A PERIOD THROUGH THE ONE CODE PATH (REQ-PIPE-129
+                # criteria 3 and 9): its stamped name restored, refused if a
+                # period's view depends on it.
+                from qa_tools.common import period_tables
+
+                moved = period_tables.take_out(conn, period=from_slot,
+                                               logical=period_tables.logical_of(physical),
+                                               supply=supply, to_schema=schema)
+                _refuse_if_not_there(moved, from_slot, physical, supply)
+            else:
+                supply_db.move_table(conn, physical, source, schema)
+    if promoted:
+        # CHECKED WHEN IT IS TAKEN (REQ-PIPE-081 criterion 13).
+        from qa_tools.common import census
+
+        census.after_move(conn, trigger="reject", period=from_slot)
+
+
+def _refuse_if_not_there(moved, period: str, physical: str, supply: str) -> None:
+    """LOUD, NEVER SILENT (#113): the log says the period holds this supply
+    and it has no table to take out - recording the move anyway would leave
+    the log and the warehouse disagreeing. The decision is rolled back."""
+    from qa_tools.common import period_tables
+
+    if moved is None:
+        raise decision_log.DecisionRefused(
+            f"{period} has no {period_tables.logical_of(physical)} for {supply}, which the "
+            f"decision log says it holds - the table has been moved or dropped outside "
+            f"the decision log. Nothing was done; find out where it went first.")
 
 
 def decided_by_a_person(conn: supply_db.SupplyConnection,
@@ -149,18 +178,24 @@ def demote(conn: supply_db.SupplyConnection, *,
             "only a person demotes a supply - automation promotes, and pulling "
             f"something back is somebody's decision to own (actor_kind was {actor_kind!r})")
 
-    from qa_tools.common import period_schema
-
     decision = decision_log.Decision(
         agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
         action=decision_log.DEMOTE, supply=supply, actor=actor,
         actor_kind=actor_kind, effective_at=effective_at,
         from_slot=from_slot, reason=reason)
+    from qa_tools.common import period_tables
+
     with decision_log.apply_decision(conn, decision):
         for physical in physical_tables:
-            supply_db.move_table(conn, physical,
-                                 period_schema.period_schema(from_slot),
-                                 supply_db.STAGING_SCHEMA)
+            # THE ONE CODE PATH (REQ-PIPE-129 criteria 3 and 9).
+            moved = period_tables.take_out(conn, period=from_slot,
+                                           logical=period_tables.logical_of(physical),
+                                           supply=supply, to_schema=supply_db.STAGING_SCHEMA)
+            _refuse_if_not_there(moved, from_slot, physical, supply)
+    # CHECKED WHEN IT IS TAKEN (REQ-PIPE-081 criterion 13).
+    from qa_tools.common import census
+
+    census.after_move(conn, trigger="demote", period=from_slot)
 
 
 #: What a staged supply is waiting for (criterion 6).

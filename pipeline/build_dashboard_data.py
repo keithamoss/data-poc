@@ -30,7 +30,7 @@ import os
 from datetime import datetime
 
 from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
-from qa_tools.common import amber_setting, drift_reference
+from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import parse_cadence_from_contract
 from qa_tools.common import asset_time
@@ -513,6 +513,9 @@ def build() -> dict:
         # slot that was ever late while open, so the page can name today's
         # late file beside an older gap.
         "lateSlots": closed_slots.late_slots("birth-registrations"),
+        # REQ-PIPE-081 criteria 14 and 15: what the RECORDED census found,
+        # as change points - never the warehouse as it stands now.
+        "census": census.for_datasets({"birth-registrations"}),
         # REQ-PIPE-122 NFR 1: the amber setting in force over time, in
         # words, from configuration only - the page shows the one in force
         # on the date on show.
@@ -553,3 +556,6 @@ if __name__ == "__main__":
     with open(OUT_PATH, "w") as f:
         json.dump(data, f, indent=2, default=str)
     print(f"Wrote {OUT_PATH} ({len(data['columns'])} columns)")
+    # Criterion 16: a WARNING, and the build still publishes.
+    for line in census.build_warnings():
+        print(line)

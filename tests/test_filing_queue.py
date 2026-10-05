@@ -61,6 +61,8 @@ class TestTheQueueHoldsOnlySuppliesSomebodyMustDecideAbout:
         # period turned up here (2026-10-05, a full run on a fresh gate
         # database) - this class is about slot states alone.
         monkeypatch.setattr(filing_queue, "could_not_load", lambda conn, collection_id: [])
+        # Nor another version waiting in a promoted period - its own test.
+        monkeypatch.setattr(filing_queue, "waiting_over_promoted", lambda conn, states: [])
         return every
 
     def test_it_holds_the_supplies_and_not_the_empty_periods(self, states):
@@ -213,6 +215,12 @@ class TestTheOfferAfterARun:
 class TestWhereEveryPeriodStands:
     """Criterion 18 - the filing state the decisions resolve to,
     whichever route recorded each of them."""
+
+    @pytest.fixture(autouse=True)
+    def _no_waiting_versions(self, monkeypatch):
+        # Slot states alone; a version waiting in a promoted period has
+        # its own test (test_one_version_per_period).
+        monkeypatch.setattr(filing_queue, "waiting_over_promoted", lambda conn, states: [])
 
     def test_it_shows_every_slot_not_only_the_ones_needing_a_person(self, monkeypatch):
         monkeypatch.setattr(slot_state, "states_for", lambda c, cid, now=None: [

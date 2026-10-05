@@ -24,17 +24,17 @@ def test_the_capability_is_declared_rather_than_inferred():
 def test_a_real_move_carries_the_rows_and_leaves_nothing_behind(supply_dsn):
     with supply_db.connect(label="test-capabilities") as conn:
         supply_db.ensure_schemas(conn)
-        conn.execute('CREATE SCHEMA IF NOT EXISTS "period_2099q9"')
+        conn.execute('CREATE SCHEMA IF NOT EXISTS "capprobe_2099q9"')
         conn.execute(
             f'CREATE TABLE "{supply_db.STAGING_SCHEMA}".cap_move_probe (id integer)')
         conn.execute(
             f'INSERT INTO "{supply_db.STAGING_SCHEMA}".cap_move_probe VALUES (1), (2)')
 
         supply_db.move_table(conn, "cap_move_probe",
-                              supply_db.STAGING_SCHEMA, "period_2099q9")
+                              supply_db.STAGING_SCHEMA, "capprobe_2099q9")
 
         rows = conn.execute(
-            'SELECT count(*) FROM "period_2099q9".cap_move_probe').fetchone()[0]
+            'SELECT count(*) FROM "capprobe_2099q9".cap_move_probe').fetchone()[0]
         assert rows == 2, "the move lost rows"
         # AND IT IS GONE FROM STAGING, which is what makes promotion a
         # move rather than a copy - two versions of one supply in two
@@ -45,7 +45,7 @@ def test_a_real_move_carries_the_rows_and_leaves_nothing_behind(supply_dsn):
             [supply_db.STAGING_SCHEMA]).fetchone()[0]
         assert left == 0, "the table is still in staging - this was a copy, not a move"
 
-        conn.execute('DROP SCHEMA "period_2099q9" CASCADE')
+        conn.execute('DROP SCHEMA "capprobe_2099q9" CASCADE')
 
 
 def test_an_unsafe_schema_or_table_name_is_refused(supply_dsn):

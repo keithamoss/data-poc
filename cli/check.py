@@ -113,6 +113,11 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # the real risk rather than the effort.
     ("premise", ["uv", "run", "python3", "-m", "qa_tools.common.validate_premise"],
      "nothing still says CI builds the dashboard from committed files", False),
+    # REQ-PIPE-129 criterion 18. A WARNING: where the platform refuses the
+    # event triggers, the decision log and the move code path still guard
+    # a period table, and the gap is said rather than failed on.
+    ("guard", ["uv", "run", "python3", "-m", "qa_tools.common.period_tables"],
+     "whether the database guard on period tables is installed", True),
     ("npm test", ["npm", "test", "--silent"],
      "the dashboard template's own inline JS", False),
     ("pytest", ["uv", "run", "pytest"],

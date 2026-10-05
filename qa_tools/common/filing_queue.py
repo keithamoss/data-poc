@@ -85,6 +85,14 @@ class LogUnreachable(Exception):
 #: filled slot would never be reached that way.
 COULD_NOT_LOAD = "could-not-be-loaded"
 
+#: ANOTHER VERSION WAITING IN A PROMOTED PERIOD (Keith, 2026-10-05,
+#: post-build-review #112) - a newer file for a period already answered.
+#: Listed in the queue itself for the same reason as the state above: the
+#: slot's own state is "promoted", so the waiting file was reachable only
+#: through `supply decide`'s flags. Promoting it supersedes the holder,
+#: behind the warning REQ-PIPE-128 criterion 6 requires.
+ANOTHER_VERSION_WAITING = "another-version-waiting"
+
 #: Said beside reject, never offered as a control - it is a thing a
 #: person does outside this tool.
 REPROCESS = "fix the fault and reprocess the delivery"
@@ -140,10 +148,32 @@ def awaiting(conn: supply_db.SupplyConnection, collection_id: str, *,
     """
     failed = could_not_load(conn, collection_id)
     unloadable = {(f.dataset_id, arrival_key_of(f.supply)) for f in failed}
-    states = [s for s in slot_state.states_for(conn, collection_id, now=now)
+    every = slot_state.states_for(conn, collection_id, now=now)
+    states = [s for s in every
               if s.state in WITH_A_SUPPLY
               and (s.dataset_id, arrival_key_of(s.supply or "")) not in unloadable]
-    return sorted(states + failed, key=lambda s: (s.period, s.dataset_id))
+    over = [s for s in waiting_over_promoted(conn, every)
+            if (s.dataset_id, arrival_key_of(s.supply or "")) not in unloadable]
+    return sorted(states + failed + over, key=lambda s: (s.period, s.dataset_id))
+
+
+def waiting_over_promoted(conn: supply_db.SupplyConnection,
+                          states: list[slot_state.SlotState]) -> list[slot_state.SlotState]:
+    """A queue item for each version still waiting in a period that
+    already holds a promoted supply (ANOTHER_VERSION_WAITING)."""
+    from qa_tools.common import supersession
+
+    out = []
+    for s in states:
+        if s.state not in (slot_state.PROMOTED, slot_state.AWAITING_ACKNOWLEDGEMENT):
+            continue
+        for waiting in supersession.waiting_in(conn, s.dataset_id, s.period,
+                                               besides=s.supply):
+            out.append(slot_state.SlotState(
+                dataset_id=s.dataset_id, period=s.period, state=ANOTHER_VERSION_WAITING,
+                supply=waiting,
+                reason=f"{s.period} holds {s.supply}; promoting this one supersedes it"))
+    return out
 
 
 def periods_needing_a_person(conn: supply_db.SupplyConnection, collection_id: str, *,
@@ -284,6 +314,10 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
     what to show.
     """
     supply_scoped: tuple[str, ...] = ()
+    if state.state == ANOTHER_VERSION_WAITING:
+        # PROMOTE OVER, behind the warning; or set it aside.
+        return (filing_decisions.PROMOTE, filing_decisions.REJECT,
+                filing_decisions.SUPERSEDE), ()
     if state.state == COULD_NOT_LOAD:
         # REJECT ONLY (REQ-PIPE-153 criteria 5 and 6): promoting it is
         # refused on every route, and the other response - fix and
@@ -351,4 +385,6 @@ def slots_of(conn: supply_db.SupplyConnection, collection_id: str, *,
     states = slot_state.states_for(conn, collection_id, now=now)
     if dataset_id:
         states = [s for s in states if s.dataset_id == dataset_id]
+    # The period door reaches a waiting version in a promoted period too.
+    states = states + waiting_over_promoted(conn, states)
     return sorted(states, key=lambda s: (s.period, s.dataset_id), reverse=True)

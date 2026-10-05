@@ -130,14 +130,15 @@ def text_prompt(message: str, flag_hint: str) -> str | None:
     return (answer or "").strip() or None
 
 
-def confirm(message: str, *, yes: bool, default: bool = False) -> bool:
+def confirm(message: str, *, yes: bool, default: bool = False,
+            flag_hint: str = "pass --yes") -> bool:
     """Confirm-by-default on writes, with a --yes bypass (plans/
     tooling.md #1's own design requirement) - --yes skips the prompt
     entirely rather than answering it, so this never needs a real
     terminal when yes=True (the flag-invocable, scriptable path)."""
     if yes:
         return True
-    require_tty("pass --yes")
+    require_tty(flag_hint)
     answer = questionary.confirm(message, default=default, style=_QMARK_STYLE).ask()
     return bool(answer)
 

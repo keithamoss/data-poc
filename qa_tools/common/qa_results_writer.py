@@ -137,11 +137,19 @@ def _with_tables_read(verified: list[dict], run_id: str) -> list[dict]:
 
         conn = supply_db.connect(read_only=True)
         try:
-            resolved = supply_db.resolution_for(conn, run_id).resolved
+            resolution = supply_db.resolution_for(conn, run_id)
         finally:
             conn.close()
     except Exception:  # noqa: BLE001 - see the docstring on why this is quiet
         return verified
+    from qa_tools.common import period_tables
+
+    # A PERIOD TABLE IS RECORDED BY THE SUPPLY IT HELD (REQ-PIPE-129
+    # criterion 13), as the stamped name that supply's table carries
+    # everywhere but a period - its plain name there says nothing.
+    resolved = {logical: (period_tables.stamped_name(logical, resolution.supply_of[logical])
+                          if logical in resolution.supply_of else physical)
+                for logical, physical in resolution.resolved.items()}
     return tables_read_mod.attach(verified, resolved, declared)
 
 
@@ -502,7 +510,8 @@ def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp
         if tool == DATASET_STATS_TOOL:
             qa_store.record_dataset_stats(conn, run_id, RUN_LEVEL, raw_output)
         elif tool == TABLES_READ_TOOL:
-            qa_store.record_tables_read(conn, run_id, (raw_output or {}).get("resolved", {}))
+            qa_store.record_tables_read(conn, run_id, (raw_output or {}).get("resolved", {}),
+                                        (raw_output or {}).get("supply_of", {}))
         else:
             qa_store.record_tool_output(conn, run_id, tool, raw_output)
 
@@ -564,3 +573,12 @@ def finish_run(run_id: str) -> None:
 
     with supply_db.connect(label="mothman:qa-run-finish") as conn:
         qa_store.complete_run(conn, run_id)
+        # THE CENSUS ON EVERY QA RUN (REQ-PIPE-081 criterion 12), where a
+        # connection is legitimately open - never by the dashboard build.
+        from qa_tools.common import census
+
+        try:
+            census.take(conn, trigger="qa-run", run_key=run_id)
+        except Exception as exc:  # noqa: BLE001 - the run's results stand regardless
+            print(f"note: the census after {run_id} could not be taken "
+                  f"({type(exc).__name__}: {exc}).")

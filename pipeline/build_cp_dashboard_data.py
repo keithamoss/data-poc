@@ -30,7 +30,7 @@ import os
 from datetime import datetime
 
 from pipeline import acknowledgements, closed_slots, recorded_arrival, slot_timeline
-from qa_tools.common import amber_setting, drift_reference
+from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
@@ -616,6 +616,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # slot that was ever late while open, so the page can name today's
         # late file beside an older gap.
         "lateSlots": closed_slots.late_slots(dataset_id),
+        # REQ-PIPE-081 criteria 14 and 15 - see build_dashboard_data.py.
+        "census": census.for_datasets({dataset_id}),
         # REQ-PIPE-122 NFR 1: the amber setting in force over time, in
         # words, from configuration only - the page shows the one in force
         # on the date on show.
@@ -740,3 +742,6 @@ if __name__ == "__main__":
     with open(OUT_PATH, "w") as f:
         json.dump(data, f, indent=2, default=str)
     print(f"Wrote {OUT_PATH} ({len(data['datasets'])} datasets)")
+    # Criterion 16: a WARNING, and the build still publishes.
+    for line in census.build_warnings():
+        print(line)

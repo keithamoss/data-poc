@@ -157,6 +157,9 @@ class Consequences:
     criteria 6, 7 and 9). No lines means no panel."""
 
     lines: tuple[str, ...]
+    #: What the success message confirms was done, one per line above -
+    #: the thing the person was warned about, said back at the end.
+    done: tuple[str, ...] = ()
 
     @property
     def key(self) -> str:
@@ -169,16 +172,23 @@ class ConsequencesNotAcknowledged(decision_log.DecisionRefused):
     """A decision with consequences, not confirmed against the warning in
     force now - never shown, or shown and since changed (criterion 9)."""
 
-    def __init__(self, found: Consequences, *, changed: bool):
-        self.lines, self.key = found.lines, found.key
-        lead = ("Its consequences have changed since you were shown them, so nothing "
-                "was done. " if changed else "")
+    def __init__(self, found: Consequences, *, given: str | None):
+        self.lines, self.key, self.given = found.lines, found.key, given
+        # A WRONG KEY IS NOT NECESSARILY A CHANGE (post-build-review #112):
+        # it may be mistyped, and blaming something that did not happen
+        # sends the person looking for it. Both are said.
+        self.lead = (
+            f"The key {given} does not match this decision's warning - mistyped, or what "
+            f"the decision does has changed since it was shown. Nothing was done."
+            if given else "This decision does more than its own slot, so it needs that "
+            "confirmed. Nothing was done.")
+        self.instruction = (
+            f"To go ahead, confirm the current key {found.key}: add "
+            f"`--acknowledge {found.key}` to the same command, or on a ticket comment "
+            f"`acknowledge: {found.key}`.")
         super().__init__(
-            lead + "This decision does more than its own slot:\n"
-            + "\n".join(f"  - {line}" for line in found.lines)
-            + f"\nTo go ahead, raise it again confirming key {found.key} - in the "
-            f"terminal `--acknowledge {found.key}`, on a ticket `acknowledge: {found.key}` "
-            f"on the command line.")
+            self.lead + "\n" + "\n".join(f"  - {line}" for line in found.lines)
+            + "\n" + self.instruction)
 
 
 def consequences(conn, request: Request) -> Consequences:
@@ -191,21 +201,45 @@ def consequences(conn, request: Request) -> Consequences:
     processing pass, unbuilt, and a warning promising one would be false.
     """
     lines: list[str] = []
+    done: list[str] = []
     if request.operation == PROMOTE and request.period and request.supply:
-        h = decision_log.held(conn, request.dataset_id, request.period)
-        if h and h.held_as == decision_log.PROMOTED and h.holder != request.supply:
+        from qa_tools.common import promotion
+
+        ds, period, supply = request.dataset_id, request.period, request.supply
+        # REFUSED BEFORE THE PROMPT where it cannot happen (Keith,
+        # 2026-10-05, post-build-review #112): an inherited slot, or a
+        # displaced supply a later period stands on. Asking someone to
+        # confirm a decision about to be refused undoes the point of the yes.
+        h = promotion._refuse_what_the_slot_forbids(
+            conn, ds, supply, period, decision_log.PERSON, remove_substitution=True)
+        if h and h.held_as == decision_log.PROMOTED and h.holder != supply:
+            decision_log.refuse_if_stood_on(conn, ds, h.holder, decision_log.SUPERSEDE)
+            # THE UNDO, HONESTLY (Keith, 2026-10-05): un-supersede returns
+            # it to waiting only; putting it back takes a promotion too.
             lines.append(
-                f"{h.holder}, promoted into {request.period} now, moves to superseded - "
-                f"restore it with `mothman supply decide --operation un-supersede "
-                f"--dataset {request.dataset_id} --period {request.period} --supply "
-                f"{h.holder} --reason '<why>'`. {request.period} reads {request.supply} "
-                f"from this decision on.")
+                f"{h.holder}, the supply {period} holds now, moves to superseded. "
+                f"{period} reads {supply} from this decision on. To put {h.holder} back, "
+                f"un-supersede it (it returns to waiting), then promote it again:\n"
+                f"  mothman supply decide --operation un-supersede --dataset {ds} "
+                f"--period {period} --supply {h.holder} --reason '<why>' --yes\n"
+                f"  mothman supply decide --operation promote --dataset {ds} "
+                f"--period {period} --supply {h.holder} --reason '<why>'")
+            done.append(f"{h.holder} moved to superseded.")
         elif h and h.held_as == decision_log.SUBSTITUTED:
             lines.append(
-                f"The substitution of {request.period} onto {h.stands_on} ({h.holder}) is "
-                f"removed - substitute it again to restore it. {request.period} reads "
-                f"{request.supply} from this decision on.")
-    return Consequences(lines=tuple(lines))
+                f"The substitution of {period} onto {h.stands_on} ({h.holder}) is "
+                f"removed. {period} reads {supply} from this decision on. To restore the "
+                f"substitution, demote {supply}, then substitute again:\n"
+                f"  mothman supply decide --operation demote --dataset {ds} "
+                f"--period {period} --supply {supply} --reason '<why>' --yes\n"
+                # THE SUPPLY STOOD ON, NAMED (#112 re-check): left out, the
+                # command took the slot's own supply - the one just demoted -
+                # and the substitution was refused.
+                f"  mothman supply decide --operation substitute --dataset {ds} "
+                f"--period {period} --stands-on {h.stands_on} --supply {h.holder} "
+                f"--reason '<why>' --yes")
+            done.append(f"The substitution of {period} onto {h.stands_on} was removed.")
+    return Consequences(lines=tuple(lines), done=tuple(done))
 
 
 def offered(operation: str) -> str:
@@ -345,7 +379,11 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> Non
     elif request.operation == REJECT:
         rejection.reject(
             conn, supply=request.supply, from_slot=request.period,
-            physical_tables=_staged(conn, entry.table, request.supply),
+            # A promoted supply's table is in its period, not staging
+            # (post-build-review #112): looking only in staging left it there.
+            physical_tables=(_promoted_tables(conn, entry.table, request)
+                             if _is_promoted(conn, request)
+                             else _staged(conn, entry.table, request.supply)),
             promoted=_is_promoted(conn, request), **common)
     elif request.operation == DEMOTE:
         rejection.demote(
@@ -495,14 +533,15 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     # with the warning as it stands.
     found = consequences(conn, request)
     if found.lines and request.acknowledged != found.key:
-        raise ConsequencesNotAcknowledged(found, changed=request.acknowledged is not None)
+        raise ConsequencesNotAcknowledged(found, given=request.acknowledged)
 
     _apply_one(conn, request, reason, effective_at=effective_at)
     return Outcome(
         operation=request.operation, dataset_id=request.dataset_id,
         period=request.period, changed=True,
         message=(f"{request.operation} recorded for {request.dataset_id} "
-                 f"{request.period or ''}".strip() + f", by {request.actor_name}."))
+                 f"{request.period or ''}".strip() + f", by {request.actor_name}."
+                 + "".join(f" {line}" for line in found.done)))
 
 
 def reconcile_after(outcome: Outcome, collection_id: str) -> None:

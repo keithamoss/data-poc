@@ -54,8 +54,12 @@ def world(conn):
         return physical
 
     def promote(physical: str) -> None:
-        schema = period_schema.ensure_period_schema(conn, period)
-        supply_db.move_table(conn, physical, supply_db.STAGING_SCHEMA, schema)
+        from qa_tools.common import period_tables
+
+        period_schema.ensure_period_schema(conn, period)
+        # Through the one code path, under its plain base name (REQ-PIPE-129).
+        period_tables.bring_in(conn, physical=physical,
+                               source_schema=supply_db.STAGING_SCHEMA, period=period)
 
     def build(own_table: str, key: str, **kw):
         run_id = f"{own_table}__{key}"
@@ -239,6 +243,10 @@ class TestAnInheritedTableIsRead:
             assert out.source.get("cp_clients") == period_schema.FROM_PERIOD
             assert world.read(f"cp_placements__{own}", "cp_clients") == 9
         finally:
+            # The period's view first: a cascade that takes it as a side
+            # effect is refused by the database guard (REQ-PIPE-129).
+            conn.execute(f'DROP VIEW IF EXISTS '
+                         f'"{period_schema.period_schema(world.period)}"."cp_clients" CASCADE')
             conn.execute(f'DROP SCHEMA IF EXISTS "{source}" CASCADE')
 
 

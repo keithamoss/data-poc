@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 25
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -271,6 +271,11 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".tables_read (
     run_key        text NOT NULL REFERENCES "{SCHEMA}".run ON DELETE CASCADE,
     logical_table  text NOT NULL,
     physical_table text NOT NULL,
+    -- THE SUPPLY A PERIOD TABLE HELD WHEN IT WAS READ (REQ-PIPE-129
+    -- criterion 13): a period table carries its plain base name, so the
+    -- name alone no longer says which supply it was. NULL for a staged
+    -- table, whose stamped name says so itself.
+    supply         text,
     PRIMARY KEY (run_key, logical_table)
 );
 
@@ -548,6 +553,28 @@ HAVING count(*) > 1;
 -- must never take a decision with it. It is also why regenerating QA
 -- history leaves the log alone - the results can be recomputed, the
 -- decisions cannot.
+-- THE CENSUS (REQ-PIPE-081 criteria 12 to 16): the decision log and the
+-- warehouse compared, with only the DISCREPANCIES kept - normally none. A
+-- census row says one was taken, of which periods (NULL: all), and why;
+-- an "as at T" answer reads the last one taken on or before T, never the
+-- warehouse as it stands now (criterion 14).
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".census (
+    id        bigserial PRIMARY KEY,
+    taken_at  timestamptz NOT NULL DEFAULT now(),
+    trigger   text NOT NULL,
+    run_key   text,
+    periods   text[]
+);
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".census_discrepancy (
+    census_id  bigint NOT NULL REFERENCES "{SCHEMA}".census ON DELETE CASCADE,
+    kind       text NOT NULL CHECK (kind IN ('missing', 'wrong-kind', 'stray')),
+    period     text NOT NULL,
+    dataset_id text,
+    table_name text NOT NULL,
+    supply     text,
+    detail     text NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS "{SCHEMA}".decision (
     id             bigserial PRIMARY KEY,
     agency_id      text NOT NULL,
@@ -1019,6 +1046,11 @@ def ensure_schema(conn: supply_db.SupplyConnection) -> None:
         # than RESHAPED_AT would half-apply it.
         _refuse_another_version(_recorded_version(conn))
         conn.raw.execute(DDL)
+        # The period-table guard (REQ-PIPE-129 criterion 11) - installed
+        # with the schema it lives in, and reported rather than raised
+        # where the platform withholds the rights (criterion 18).
+        from qa_tools.common import period_tables
+        period_tables.install_guard(conn)
         conn.execute(
             f'INSERT INTO "{SCHEMA}".schema_version (version) VALUES (?) '
             "ON CONFLICT (only_row) DO UPDATE SET version = EXCLUDED.version",
@@ -1292,14 +1324,19 @@ def record_tool_output(conn: supply_db.SupplyConnection, run_key: str, tool: str
 
 
 def record_tables_read(conn: supply_db.SupplyConnection, run_key: str,
-                       resolved: Mapping[str, str]) -> None:
-    """Record which physical table each logical name resolved to."""
+                       resolved: Mapping[str, str],
+                       supplies: Mapping[str, str] | None = None) -> None:
+    """Record which physical table each logical name resolved to, and -
+    for a period table - which supply it held (REQ-PIPE-129 criterion 13)."""
+    supplies = supplies or {}
     for logical, physical in sorted(resolved.items()):
         conn.execute(
-            f'INSERT INTO "{SCHEMA}".tables_read (run_key, logical_table, physical_table) '
-            "VALUES (?, ?, ?) ON CONFLICT (run_key, logical_table) "
-            "DO UPDATE SET physical_table = EXCLUDED.physical_table",
-            [run_key, logical, physical])
+            f'INSERT INTO "{SCHEMA}".tables_read '
+            "(run_key, logical_table, physical_table, supply) "
+            "VALUES (?, ?, ?, ?) ON CONFLICT (run_key, logical_table) "
+            "DO UPDATE SET physical_table = EXCLUDED.physical_table, "
+            "supply = EXCLUDED.supply",
+            [run_key, logical, physical, supplies.get(logical)])
 
 
 def record_dataset_stats(conn: supply_db.SupplyConnection, run_key: str,

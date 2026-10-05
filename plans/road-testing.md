@@ -1616,6 +1616,26 @@ judgement about who reads the page rather than about the rule.
       Keith's lean when parked: strict by default with an escape hatch,
       i.e. (b), but "not sure which way to go".
 
+      **KEITH'S NEW LEAN, 2026-10-05 (logged mid-sprint, to pick up AFTER
+      sprints 9-14; not decided, not scoped):** make it STRICT with NO
+      escape hatch - REQ-PIPE-111 as drafted, dropping (b)'s correction
+      route. His reasoning, in his own words: "what's the worst that can
+      happen? Something legit gets demoted and we have to refile two
+      datasets and re-run QA on them?" The fix for a wrong calendar is
+      then not a config route at all but the ordinary decision tools:
+      "make sure that we're giving humans all of the tools they need to
+      set everything back to rights" - which points at re-file
+      (REQ-PIPE-141), re-run on demand (REQ-PIPE-140), demote/promote and
+      un-supersede, all being built in this run of sprints.
+      To walk through when it is picked up: the "noticed ON 2 Aug"
+      scenario above (a new version cannot reach Q3, so its files read
+      LATE forever) - does strict-plus-tools answer it, or does it still
+      want something like (a)'s recorded "excuse lateness" decision, since
+      re-filing moves a supply between periods but does not change when
+      the period was due? And confirm REQ-PIPE-050's built changelog
+      route is then removed, and what that means for REQ-PIPE-122/123's
+      settings rules, which were settled separately.
+
       SETTLED THE SAME AFTERNOON AND NOT IN QUESTION: 110 - `participates`
       replaces `delivery_months`, `not_expected` stays (one-off decisions);
       `slaProperties` deleted entirely including `frequency`. 112 - the

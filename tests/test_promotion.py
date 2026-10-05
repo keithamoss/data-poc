@@ -75,7 +75,8 @@ class TestPromotionMovesRatherThanCopies:
                           dataset_id=dataset, supply=physical, period=period,
                           physical_tables=[physical], actor="promotion-gate",
                           actor_kind=dl.RULE, effective_at=WHEN)
-        assert physical in tables_in(conn, period_schema.period_schema(period))
+        # Under its plain base name there (REQ-PIPE-129 criterion 2).
+        assert "clients" in tables_in(conn, period_schema.period_schema(period))
 
     def test_and_is_GONE_from_staging(self, conn, dataset, period):
         """The half that is easy to get wrong. A copy would pass the test
@@ -95,7 +96,7 @@ class TestPromotionMovesRatherThanCopies:
                           physical_tables=[physical], actor="promotion-gate",
                           actor_kind=dl.RULE, effective_at=WHEN)
         schema = period_schema.period_schema(period)
-        assert conn.execute(f'SELECT count(*) FROM "{schema}"."{physical}"').fetchall()[0][0] == 1
+        assert conn.execute(f'SELECT count(*) FROM "{schema}"."clients"').fetchall()[0][0] == 1
 
 
 class TestTheEntryIsWrittenLast:

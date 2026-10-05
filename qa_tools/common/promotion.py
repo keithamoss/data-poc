@@ -63,32 +63,24 @@ def promote(conn: supply_db.SupplyConnection, *,
     """
     # ALREADY DONE? Asked of the LOG rather than of the catalogue, for
     # the same reason filled_slots() does: a table in the schema that no
-    # decision put there is not a promotion.
+    # decision put there is not a promotion. Asked again under the lock.
     if decision_log.promoted_into(conn, dataset_id, period) == supply:
         return False
+    from qa_tools.common import supersession
 
-    # WHAT THE SLOT HOLDS DECIDES WHAT ELSE HAPPENS (REQ-PIPE-128).
-    h = decision_log.held(conn, dataset_id, period)
-    if h and h.held_as == decision_log.INHERITED:
-        # Criterion 5: nothing was expected for this period.
+    if not physical_tables and not supersession.is_superseded(conn, dataset_id, supply):
+        # (A superseded supply is refused by the decision log under the
+        # lock, naming un-supersede - a better answer than this one.)
+        # NOTHING TO MOVE IS NOT A PROMOTION (post-build-review #112): a
+        # rejected supply or a mistyped id has no staged tables, and
+        # recording it would supersede what the period holds while leaving
+        # that table in place - two answers, or none.
         raise decision_log.DecisionRefused(
-            f"nothing was expected from {dataset_id} for {period}: it is inherited, "
-            f"standing on an earlier period because the schedule owes nothing then. "
-            f"Un-inherit it first, as its own decision: `mothman supply decide "
-            f"--operation un-inherit --dataset {dataset_id} --period {period} "
-            f"--reason '<why>'`.")
-    substituted = bool(h and h.held_as == decision_log.SUBSTITUTED)
-    if substituted and actor_kind == decision_log.RULE:
-        # Criterion 10: no automatic rule promotes into a substitution.
-        raise decision_log.DecisionRefused(
-            f"{period} is substituted; no automatic rule promotes into it.")
-    if substituted and not remove_substitution:
-        # Criterion 4: the person is told first, and confirms.
-        raise decision_log.DecisionRefused(
-            f"{period} is substituted onto {h.stands_on}; promoting {supply} removes "
-            f"that substitution. Confirm the consequence to go ahead.")
-    displaced = (h.holder if h and h.held_as == decision_log.PROMOTED
-                 and h.holder != supply else None)
+            f"{supply} has no tables in "
+            f"{from_schema or supply_db.STAGING_SCHEMA} to promote, so nothing was done. "
+            "Check the supply id against `mothman supply queue`.")
+    _refuse_what_the_slot_forbids(conn, dataset_id, supply, period, actor_kind,
+                                  remove_substitution)
 
     # OPENED, NOT JUST CREATED (REQ-PIPE-098 criterion 4): a first
     # promotion is one of the two ways a period comes into existence,
@@ -97,7 +89,6 @@ def promote(conn: supply_db.SupplyConnection, *,
     # inheritance writes decisions of its own.
     period_schema.open_period(conn, period, opened_by=actor,
                                effective_at=effective_at)
-    schema = period_schema.period_schema(period)
     decision = decision_log.Decision(
         agency_id=agency_id,
         collection_id=collection_id,
@@ -123,8 +114,13 @@ def promote(conn: supply_db.SupplyConnection, *,
     source = from_schema or supply_db.STAGING_SCHEMA
 
     def move() -> None:
+        # INTO THE PERIOD THROUGH THE ONE CODE PATH, under its plain base
+        # name (REQ-PIPE-129 criteria 1, 2 and 9).
+        from qa_tools.common import period_tables
+
         for physical in physical_tables:
-            supply_db.move_table(conn, physical, source, schema)
+            period_tables.bring_in(conn, physical=physical, source_schema=source,
+                                   period=period)
 
     # ONE TRANSACTION, entry and move together - see this module's
     # docstring on why that is STRONGER than criterion 9's literal
@@ -136,7 +132,19 @@ def promote(conn: supply_db.SupplyConnection, *,
     # 3): removing a substitution, superseding what the slot held, and the
     # promotion itself - each its own entry, all or none. Nested
     # apply_decision blocks are savepoints inside this one.
-    with conn.raw.transaction():
+    with decision_log.decision_transaction(conn):
+        # THE SLOT IS JUDGED UNDER ITS LOCK (post-build-review #112). Read
+        # before it, two promotions at once each saw the slot as it was and
+        # neither displaced the other. The lock is re-entrant, so the
+        # decisions below take it again harmlessly.
+        decision_log.lock_slot(conn, dataset_id, period)
+        if decision_log.promoted_into(conn, dataset_id, period) == supply:
+            return False
+        h = _refuse_what_the_slot_forbids(conn, dataset_id, supply, period, actor_kind,
+                                          remove_substitution)
+        substituted = bool(h and h.held_as == decision_log.SUBSTITUTED)
+        displaced = (h.holder if h and h.held_as == decision_log.PROMOTED
+                     and h.holder != supply else None)
         if substituted:
             from qa_tools.common import hierarchy, substitution
 
@@ -155,7 +163,56 @@ def promote(conn: supply_db.SupplyConnection, *,
                 replacing=list(physical_tables))
         with decision_log.apply_decision(conn, decision):
             move()
+    # CHECKED WHEN IT IS TAKEN (REQ-PIPE-081 criterion 13), after the
+    # transaction - mid-way, a supersession is not a state to report.
+    from qa_tools.common import census
+
+    census.after_move(conn, trigger="promote", period=period)
     return True
+
+
+def _refuse_what_the_slot_forbids(conn, dataset_id: str, supply: str, period: str,
+                                  actor_kind: str, remove_substitution: bool):
+    """What the slot holds decides what else happens (REQ-PIPE-128
+    criteria 4, 5 and 10). Returns what it holds; raises where it forbids
+    this promotion."""
+    h = decision_log.held(conn, dataset_id, period)
+    if h and h.held_as == decision_log.INHERITED:
+        # Criterion 5: nothing was expected for this period.
+        raise decision_log.DecisionRefused(
+            f"Nothing was expected from {dataset_id} for {period}: it is inherited, "
+            f"standing on an earlier period because the schedule owes nothing then. "
+            f"Un-inherit it first, as its own decision:\n"
+            f"  mothman supply decide --operation un-inherit --dataset {dataset_id} "
+            f"--period {period} --reason '<why>' --yes")
+    if (actor_kind == decision_log.RULE and h and h.held_as == decision_log.PROMOTED
+            and h.holder != supply):
+        # A RULE NEVER DISPLACES (criterion 2 is a person's promotion). The
+        # gate's own filled-slot check is read before the lock; this is the
+        # same answer under it, so a person promoting at the same instant
+        # wins rather than being superseded (post-build-review #112).
+        raise decision_log.DecisionRefused(
+            f"{period} already holds {h.holder}; no automatic rule displaces a promoted "
+            f"supply. A person can:\n"
+            f"  mothman supply decide --operation promote --dataset {dataset_id} "
+            f"--period {period} --supply {supply} --reason '<why>'")
+    substituted = bool(h and h.held_as == decision_log.SUBSTITUTED)
+    if substituted and actor_kind == decision_log.RULE:
+        # Criterion 10: no automatic rule promotes into a substitution.
+        raise decision_log.DecisionRefused(
+            f"{period} is substituted onto {h.stands_on}; no automatic rule promotes "
+            f"into it. A person can, removing the substitution:\n"
+            f"  mothman supply decide --operation promote --dataset {dataset_id} "
+            f"--period {period} --supply {supply} --reason '<why>'")
+    if substituted and not remove_substitution:
+        # Criterion 4: the person is told first, and confirms.
+        raise decision_log.DecisionRefused(
+            f"{period} is substituted onto {h.stands_on}; promoting {supply} removes "
+            f"that substitution. Confirm it by promoting through the command, which "
+            f"shows the consequence first:\n"
+            f"  mothman supply decide --operation promote --dataset {dataset_id} "
+            f"--period {period} --supply {supply} --reason '<why>'")
+    return h
 
 
 def filled_slots(conn: supply_db.SupplyConnection, dataset_id: str) -> frozenset[str]:
@@ -566,10 +623,10 @@ def newest_promoted(conn: supply_db.SupplyConnection,
                     dataset_id: str, period: str) -> str | None:
     """The supply most recently PROMOTED into this period, or None.
 
-    REQ-PIPE-105 criterion 7, and it deliberately disagrees with
-    period_schema.newest(), which orders by the ARRIVAL key parsed out
-    of a physical table name. That is the right answer to a different
-    question.
+    REQ-PIPE-105 criterion 7. It orders by PROMOTION, never by the arrival
+    key in a table name (sample_data.newest's question, which is a
+    different one) - and since REQ-PIPE-128 a period holds one version
+    anyway, so within a period there is nothing to order.
 
     ARRIVAL ORDER AND PROMOTION ORDER COME APART the moment a person is
     involved. A supply that arrived on Tuesday and was held for a

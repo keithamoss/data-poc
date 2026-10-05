@@ -44,6 +44,12 @@ def _build_data() -> None:
         with open(module.OUT_PATH, "w") as f:
             json.dump(data, f, indent=2, default=str)
         console.print(f"Wrote {module.OUT_PATH}", style="green")
+    # THE CENSUS WARNING ON THE SANCTIONED PATH (REQ-PIPE-081 criterion 16,
+    # #113): a WARNING, and the build still publishes.
+    from qa_tools.common import census
+
+    for line in census.build_warnings():
+        console.print(line, style="yellow", markup=False)
 
 
 @dashboard_group.command("build-data")

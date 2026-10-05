@@ -123,11 +123,32 @@ def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
         # hold is about not knowing the period at all.
         promoted.pop(own_table, None)
     out = period_schema.create_overlay_views(conn, run_id, period, staged, promoted)
+    out.resolution.supply_of.update(_supplies_held(conn, period, out))
     if withheld is not None:
         out.resolution.held[own_table] = withheld
         if own_table in out.resolution.absent:
             out.resolution.absent.remove(own_table)
     return out
+
+
+def _supplies_held(conn, period: str, out: period_schema.PeriodResolution) -> dict[str, str]:
+    """The supply the decision log says each table read FROM THE PERIOD
+    resolves to (REQ-PIPE-129 criteria 7 and 13) - the plain name says
+    nothing, so the log answers."""
+    from qa_tools.common import decision_log, hierarchy
+
+    held = {}
+    for logical, source in out.source.items():
+        if source != period_schema.FROM_PERIOD:
+            continue
+        try:
+            dataset_id = hierarchy.dataset_for_table(logical).dataset_id
+        except Exception:  # noqa: BLE001 - a table no dataset claims has no supply
+            continue
+        h = decision_log.held(conn, dataset_id, period)
+        if h and h.holder:
+            held[logical] = h.holder
+    return held
 
 
 def name_held_siblings(conn, res: supply_db.Resolution, arrival) -> list[str]:

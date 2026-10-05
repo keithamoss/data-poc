@@ -38,6 +38,21 @@ class TestTheCommand:
             assert not bootstrap.holds_history(conn)
             assert synthetic_reset.schemas_to_drop(conn) == []
 
+    def test_a_period_standing_on_another_does_not_stop_it(self, private_supply_dsn):
+        """#113 H1: the database guard refuses a cascaded drop of a period's
+        view, and dropping schemas one at a time made the stood-on period's
+        drop exactly that. One statement drops them together."""
+        with supply_db.connect(label="test-reset") as conn:
+            qa_store.ensure_schema(conn)
+            _history(conn)
+            conn.execute('CREATE SCHEMA "period_2023_q1"')
+            conn.execute('CREATE TABLE "period_2023_q1"."cp_carers" (id int)')
+            conn.execute('CREATE SCHEMA "period_2023_q2"')
+            conn.execute('CREATE VIEW "period_2023_q2"."cp_carers" AS '
+                         'SELECT * FROM "period_2023_q1"."cp_carers"')
+            synthetic_reset.reset(conn, synthetic_reset.confirmation_phrase())
+            assert synthetic_reset.schemas_to_drop(conn) == []
+
     def test_a_wrong_phrase_deletes_nothing(self, private_supply_dsn):
         from cli.env import env_group
 

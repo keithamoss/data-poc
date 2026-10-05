@@ -5430,3 +5430,150 @@ twice. It deliberately did not re-find the `TypeError`.
         reshape-only refusal; the stricter rule lives in its decisions.
       - The wiring of `_version_added_on` inside `_amber_setting_errors`
         has no test of its own.
+
+112. **[done, 2026-10-05]** **[Pipeline & publishing]** **The delivery and CLI
+    UX critics on REQ-PIPE-128 (commit c66cf3c): three ways a period could
+    still hold two versions, undo text that did not undo, and a terminal
+    that asked before refusing.** Each finding was verified against the
+    code before it was written here. Keith answered the four that needed
+    him the same morning (2026-10-05).
+    - **H1, FIXED** (failing test first): `promote()` read what the slot
+      held before taking its lock, so two promotions at once each saw the
+      slot as it was. Two tables ended up in one period, or one supply was
+      superseded twice. The slot is now locked first and judged under the
+      lock (`decision_log.lock_slot`). Under the lock, a RULE meeting a
+      promoted holder is refused rather than displacing it, so a person
+      promoting at the same moment wins.
+    - **H2, FIXED** (failing test first): rejecting a PROMOTED supply
+      looked for its table only in staging, so the table stayed in the
+      period and the next promotion made two. REJECT now takes the
+      period's table when the supply is promoted.
+    - **H3, FIXED** (failing test first): a promotion with no tables (a
+      rejected supply, a mistyped id) superseded the holder in the log and
+      left its table in the period. It is now refused before anything is
+      written. `supersede_promoted` also fails loudly if the holder's table
+      is not there (criterion 12).
+    - **M1, FIXED on Keith's answer ("Honest two-step wording"):** the
+      undo text now says what each undo really takes. A displaced supply
+      is un-superseded (back to waiting) and then promoted again. A
+      removed substitution needs a demote and then a substitute. Each
+      command is on its own line.
+    - **CLI #3, FIXED on Keith's answer ("Refuse before asking"):**
+      `consequences()` runs the slot's refusals first: an inherited slot,
+      and a displaced supply that a later period stands on. A promotion
+      that cannot happen is now refused before the prompt, never after the
+      yes.
+    - **CLI product question A, BUILT on Keith's answer ("Yes, add it
+      now"):** a version waiting in a period that already holds a
+      promoted supply now appears in the queue and the period door, as
+      "another version waiting". It offers promote, which leads to the
+      displacement warning; before this it was reachable only through
+      `supply decide`.
+    - **FIXED, minor:**
+      - A mistyped `--acknowledge` key is no longer blamed on a change
+        that never happened. It says mistyped or changed, and gives the
+        current key.
+      - When the warning changes mid-decision, the terminal now says
+        somebody else's decision changed it and shows what is new. Being
+        changed twice now prints a message rather than exiting silently.
+      - Commands print below the panel, one per line and unwrapped, so a
+        copy picks up neither the border nor a line break.
+      - The refusal after a `--yes` with a shown warning no longer
+        repeats the warning.
+      - The success message says what else was done ("X moved to
+        superseded").
+      - `--yes` help and the non-interactive hint mention `--acknowledge`.
+      - The refusal on a rule into a substituted slot, and on an
+        unconfirmed person, now gives a command to paste.
+      - The stale `newest_promoted` docstring is fixed. The dead
+        `len(found) > 1` branches in substitution and inheritance are
+        gone.
+      - `scripts/dev/tui_drive.py` answers a cursor-position query with
+        the real cursor, not a fixed 1;1. The fixed answer made
+        prompt_toolkit redraw from the top and wipe anything printed
+        above a prompt, so a critic using the tool would wrongly report
+        "no panel".
+    - **LOGGED, not changed:**
+      - The success panel still reads "promote recorded for ..." in
+        lowercase.
+      - Supplies in the panel are still named by id rather than by arrival
+        date.
+      - Refusal output still goes to stdout.
+      - L3's window between the key check and the lock remains. It is
+        harmless now that the slot is judged again under the lock.
+
+113. **[done, 2026-10-05]** **[Pipeline & publishing]** **The delivery critic on
+    REQ-PIPE-129 and the 081 census, and the CLI UX critic re-checking
+    #112.** Each finding was verified against the code before it was written
+    here. Keith answered the four that needed him the same morning
+    ("Fix all three now"; "Narrow to move/rename").
+    - **H1, FIXED** (failing test first): `mothman env reset-synthetic` failed
+      on any database holding an inherited or substituted view. The new
+      drop guard refuses a cascaded drop of a period view unless its own
+      schema goes in the same statement, and the reset dropped schemas one
+      at a time. It now drops them all in one statement.
+    - **H2, FIXED** (failing test first): a demote naming a supply the period
+      does not hold took the period's real table out under that supply's
+      name. The decision log now refuses a demote of anything but the
+      period's holder. A demote or reject whose table is missing is now
+      loud and rolled back, as `supersede_promoted` already was.
+    - **H3, FIXED** (failing test first, shown to fail on the old code): a
+      substitution or inheritance was judged before taking its lock and
+      never again, so a promotion in the gap left a view reading the
+      newcomer under the old supply's name. Both are now judged again
+      under the lock: the person's substitute and inherit, and the rule's
+      inheritance at a period's birth. The rule's inheritance now records
+      its view and its entry in one transaction.
+    - **M1, FIXED on Keith's answer ("Narrow to move/rename"):** the event
+      trigger refused every `ALTER TABLE` on a stood-on table, including an
+      added column. That would have broken REQ-PIPE-130's schema bump once
+      its `_manifest` views exist. It now refuses only `SET SCHEMA` and
+      `RENAME TO`, read from the statement text, since the trigger cannot
+      see the sub-command.
+    - **M2, FIXED:** criterion 16's build warning printed only from the
+      builders' `__main__`, which no `mothman` path runs.
+      `census.build_warnings()` is now called by `mothman dashboard
+      build-data`, by `rebuild` and by `pipeline run`.
+    - **M3, FIXED** (failing test first): the census read the log and the
+      catalogue as two statements, so a promotion committing between them
+      was recorded as a stray. Both are now read in one REPEATABLE READ
+      transaction.
+    - **CLI re-check HIGH, FIXED** (failing test first): the substitution
+      undo printed by #112 had no `--supply`. Pasted, it took the
+      just-demoted supply and crashed with a traceback. It now names the
+      supply stood on. `SubstitutionRefused` and `InheritanceRefused` are
+      now shown as refusals, not tracebacks.
+    - **CLI re-check MEDIUM, FIXED** (failing test first): a supply
+      un-superseded after being displaced never showed as waiting, though
+      the undo text says it returns to waiting. `_accepted_into` now counts
+      a displacement's SUPERSEDE as leaving the period.
+    - **CLI re-check MEDIUM, FIXED:** in the "another version waiting"
+      state, "reject" and "supersede" now say the period keeps its promoted
+      supply. Every supply-scoped confirmation names the supply by its
+      arrival.
+    - **FIXED, minor:**
+      - The census banner compares dates on the asset's calendar, not UTC's.
+      - The guard gate no longer calls an empty database "installed", and
+        its column reads as a question, not a result.
+      - A missing guard now names a remedy, the new `mothman supply
+        install-guard`.
+      - The session-start hook checks the guard wherever a qa schema exists.
+      - A refusal that is certain now comes before the reason prompt.
+      - The non-interactive hint at the confirmation names `--acknowledge
+        KEY`.
+      - "Recording - this waits up to 15s ..." is said before a decision
+        that may wait on a lock.
+      - An unknown person's refusal uses the same panel as every other
+        refusal.
+      - The inherited refusal starts with a capital.
+    - **LOGGED, not changed:**
+      - Views are still created and dropped with no census of their own (L4
+        - criterion 13 says "wherever a table is moved").
+      - `promote` takes its slot lock outside `_lock`'s sorted discipline.
+        No deadlock pair was found (L5).
+      - The NFR 6 source test's argument heuristic stays weak; the run-time
+        refusal in `move_table` is the real guard.
+      - `mothman supply queue --collection cp` ends in a traceback rather
+        than accepting the shorthand.
+      - The queue takes about 3 seconds to render.
+      - "2 later period(s)" and "supply/supplies" pluralisation.

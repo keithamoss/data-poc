@@ -105,5 +105,19 @@ else
   say "(a few minutes), or pick it from the 'mothman' menu."
 fi
 
+# --- Is the period-table guard installed? (REQ-PIPE-129 criterion 18) ---
+# Asked wherever the qa schema exists - not only where tables are staged
+# (#113): a guard missing from a built schema is worth saying either way.
+HAS_QA=$(PGPASSWORD="${PGPASS}" psql -h localhost -U "${PGUSER_NAME}" -d supply -tAc \
+  "SELECT to_regclass('qa.schema_version') IS NOT NULL" 2>/dev/null)
+if [ "${HAS_QA}" = "t" ]; then
+  GUARDS=$(PGPASSWORD="${PGPASS}" psql -h localhost -U "${PGUSER_NAME}" -d supply -tAc \
+    "SELECT count(*) FROM pg_event_trigger WHERE evtname IN ('period_table_guard','period_view_drop_guard') AND evtenabled <> 'D'" 2>/dev/null)
+  if [ "${GUARDS:-0}" != "2" ]; then
+    say "WARNING: the database guard on period tables is NOT installed; the other two"
+    say "guards still run (REQ-PIPE-129). 'uv run mothman supply install-guard' puts it back."
+  fi
+fi
+
 echo "Ready."
 exit 0

@@ -587,6 +587,28 @@ def holds_command() -> None:
                 console.print(f"  [dim]- {response}[/dim]")
 
 
+@supply_group.command("install-guard")
+def install_guard_command() -> None:
+    """Install, or bring up to date, the database guard on period tables
+    (REQ-PIPE-129 criteria 11 and 18).
+
+    A schema built from empty installs it; this is for a database whose
+    guard was dropped, or one built before its definition last changed.
+    Where the platform refuses the event triggers it says so, and the
+    other two guards still run.
+    """
+    from qa_tools.common import period_tables, supply_db
+
+    with supply_db.connect(label="mothman:install-guard") as conn:
+        if period_tables.install_guard(conn) and period_tables.guard_installed(conn):
+            console.print("[green]The period-table guard is installed.[/green]")
+            return
+    console.print("[yellow]This database refused the event triggers[/yellow] - they need "
+                  "elevated rights. The decision log and the move code path still guard "
+                  "period tables; anything else issuing DDL against one is unguarded.")
+    raise SystemExit(1)
+
+
 @supply_group.command("tidy")
 @click.option("--yes", is_flag=True, help="Skip the confirmation.")
 def tidy_command(yes: bool) -> None:
@@ -867,7 +889,9 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
 @click.option("--reason", default=None,
                help="Why. Required - a decision nobody can explain is the "
                     "thing the log exists to prevent.")
-@click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
+@click.option("--yes", is_flag=True,
+               help="Skip the confirmation prompt. A decision whose warning lists "
+                    "consequences also needs --acknowledge KEY.")
 @click.option("--acknowledge", "acknowledged", default=None, metavar="KEY",
                help="Confirm a decision's consequences beyond its own slot, by the key "
                     "its warning showed - needed with --yes where there are any.")
@@ -894,7 +918,9 @@ def decide_command(operation: str, dataset_id: str, period: str,
             with filing_tui.open_log() as conn:
                 found = [s for s in filing_queue.slots_of(
                     conn, hierarchy.dataset(dataset_id).collection_id,
-                    dataset_id=dataset_id) if s.period == period]
+                    dataset_id=dataset_id) if s.period == period
+                    # The slot's own supply, never another version waiting in it.
+                    and s.state != filing_queue.ANOTHER_VERSION_WAITING]
         except filing_queue.LogUnreachable as exc:
             filing_tui.say_unreachable(exc)
             raise SystemExit(1) from exc

@@ -201,7 +201,9 @@ class TestSevenOfTheEightReallyWork:
         assert got.changed is True
         assert dl.promoted_into(conn, dataset.dataset_id, first) == supply
         held = period_schema.promoted_in(conn, first, [dataset.table])
-        assert physical in (held.get(dataset.table) or [])
+        # Held under the plain base name (REQ-PIPE-129 criterion 2).
+        assert held.get(dataset.table) == [dataset.table]
+        assert physical.startswith(dataset.table)
 
     def test_demote_puts_it_back_and_leaves_the_slot_unfilled(
             self, conn, dataset, actor, periods):

@@ -241,9 +241,8 @@ so in one line, and finishes normally.
 
 **PART-BUILT, `in_progress`, each with a decision saying which half:**
 `REQ-PIPE-079` is BUILT as of 2026-10-04 (see its decisions).
-`REQ-PIPE-105` is BUILT as of 2026-10-04, criterion 7 left
-unmet for `REQ-PIPE-128` to retire (one version per table per period) -
-see its decisions.
+`REQ-PIPE-105` is BUILT, its last criterion closed by `REQ-PIPE-128`
+on 2026-10-05 (one version per table per period) - see its decisions.
 
 **THE SWITCH-OVER BELOW LANDED 2026-10-02** as one piece, as this
 paragraph asked: `period_overlay.py` calls `create_overlay_views()` right

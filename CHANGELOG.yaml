@@ -133,6 +133,28 @@ releases:
               with --acknowledge; on a ticket you reply a second time with
               acknowledge and the key. If anything changed in between, you are
               shown the new warning instead.
+          - headline: Tables in a period carry their plain name
+            components: ["Pipeline & publishing"]
+            description: >
+              A promoted table is now called cp_clients in its period, not
+              cp_clients__ followed by an arrival key, so you query a period
+              like any ordinary schema. The database itself refuses to move a
+              table out from under a period's view, and a decision waiting on
+              a running check tells you to retry rather than hanging.
+          - headline: The dashboard tells you when the warehouse and the log disagree
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              After every check run and every decision that moves a table, the
+              decision log is compared with what each period actually holds.
+              A missing or stray table shows as a red notice on that dataset's
+              page, naming the period and the table, and the build warns.
+          - headline: A newer file waiting in a promoted period is in the queue
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              The terminal's queue and period view now list a newer version
+              waiting in a period that already has one promoted, and offer to
+              promote it - showing you first that the current one will be set
+              aside, and both commands it takes to put it back.
           - headline: A held, contested or unloadable supply turns its dataset red
             components: ["Dashboard UI", "Pipeline & publishing"]
             description: >
@@ -225,6 +247,20 @@ releases:
               before deciding anything.
       - category: Fixed
         items:
+          - headline: A period can no longer end up holding two versions of a table
+            components: ["Pipeline & publishing"]
+            description: >
+              Two people promoting into the same period at once, rejecting a
+              promoted supply, or promoting a supply with no tables could each
+              leave a period with two versions or none. Each is now refused or
+              handled in one step, and a pipeline rule never overrides a
+              person's promotion.
+          - headline: The terminal refuses before asking, and its undo steps work
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              A promotion that cannot happen is refused before you are asked to
+              confirm it. The warning's undo now lists every step it takes, and
+              each command prints on its own line so you can copy it whole.
           - headline: Child Protection pages say correctly what is in place
             components: ["Dashboard UI"]
             description: >

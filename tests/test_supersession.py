@@ -239,7 +239,7 @@ class TestAPersonSupersedesAndBringsBack:
         old, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         new, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
         _supersede(conn, period, new)
-        with pytest.raises(dl.DecisionRefused, match=f"superseded by {new}.*un-supersede"):
+        with pytest.raises(dl.DecisionRefused, match=f"(?s)superseded by {new}.*un-supersede"):
             fd.apply(_request(fd.PROMOTE, old, period), effective_at=WHEN, conn=conn)
 
     def test_un_supersede_names_its_version(self, conn, period):

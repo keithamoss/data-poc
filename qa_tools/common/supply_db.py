@@ -166,7 +166,12 @@ SAMPLE_SCHEMA = "sample"
 CAN_MOVE_TABLE_BETWEEN_SCHEMAS = True
 
 
-def move_table(conn, table: str, from_schema: str, to_schema: str) -> None:
+def _is_period(schema: str) -> bool:
+    return schema.startswith("period_") and not schema.endswith("_superseded")
+
+
+def move_table(conn, table: str, from_schema: str, to_schema: str, *,
+               through_period_tables: bool = False) -> None:
     """Move one table to another schema, as a catalogue operation.
 
     REFUSES RATHER THAN FALLS BACK where the capability is not
@@ -175,6 +180,13 @@ def move_table(conn, table: str, from_schema: str, to_schema: str) -> None:
     promotion from an instant rename into an operation whose cost
     scales with the data, and nobody would see it happen.
     """
+    if (_is_period(from_schema) or _is_period(to_schema)) and not through_period_tables:
+        # ONE CODE PATH INTO AND OUT OF A PERIOD (REQ-PIPE-129 criterion 9
+        # and NFR 6): it renames, locks and checks dependants, which a bare
+        # move does not.
+        raise SupplyDbError(
+            f"{from_schema}.{table} -> {to_schema}: a table moves into or out of a "
+            f"period schema only through period_tables.bring_in/take_out")
     if not CAN_MOVE_TABLE_BETWEEN_SCHEMAS:
         raise SupplyDbError(
             f"this engine does not declare that a table can be moved between "
@@ -898,6 +910,11 @@ class Resolution:
     #: rather than dropped, because "which supply is the one nobody has
     #: placed" is exactly what resolving the hold needs.
     held: dict[str, str] = field(default_factory=dict)
+    #: logical table -> the supply a PERIOD table held when it was
+    #: resolved (REQ-PIPE-129 criterion 13): a period table carries its
+    #: plain base name, so its name no longer says which supply it was.
+    #: Taken from the decision log, never from a name (criterion 7).
+    supply_of: dict[str, str] = field(default_factory=dict)
 
     @property
     def readable(self) -> list[str]:
@@ -928,7 +945,9 @@ class Resolution:
                 "resolved": dict(sorted(self.resolved.items())),
                 "ambiguous": {k: sorted(v) for k, v in sorted(self.ambiguous.items())},
                 "absent": sorted(self.absent),
-                "held": dict(sorted(self.held.items()))}
+                "held": dict(sorted(self.held.items())),
+                **({"supply_of": dict(sorted(self.supply_of.items()))}
+                   if self.supply_of else {})}
 
 
 def split_staged(physical: str) -> tuple[str, str, str] | None:
@@ -1437,16 +1456,20 @@ def record_resolution(conn, res: Resolution) -> None:
     schema = staging_schema_for(res.run_id)
     create_if_absent(
         conn, f'CREATE TABLE IF NOT EXISTS "{schema}"."{_RESOLUTIONS}" '
-        "(run_id VARCHAR, logical VARCHAR, physical VARCHAR, state VARCHAR)")
+        "(run_id VARCHAR, logical VARCHAR, physical VARCHAR, state VARCHAR, "
+        "supply VARCHAR)")
     conn.execute(
         f'DELETE FROM "{schema}"."{_RESOLUTIONS}" WHERE run_id = ?', [res.run_id])
-    rows = ([(res.run_id, k, v, "resolved") for k, v in res.resolved.items()]
-            + [(res.run_id, k, p, "ambiguous") for k, ps in res.ambiguous.items() for p in ps]
-            + [(res.run_id, k, None, "absent") for k in res.absent]
-            + [(res.run_id, k, v or None, "held") for k, v in res.held.items()])
+    rows = ([(res.run_id, k, v, "resolved", res.supply_of.get(k))
+             for k, v in res.resolved.items()]
+            + [(res.run_id, k, p, "ambiguous", None)
+               for k, ps in res.ambiguous.items() for p in ps]
+            + [(res.run_id, k, None, "absent", None) for k in res.absent]
+            + [(res.run_id, k, v or None, "held", None) for k, v in res.held.items()])
     for row in rows:
         conn.execute(
-            f'INSERT INTO "{schema}"."{_RESOLUTIONS}" VALUES (?, ?, ?, ?)', list(row))
+            f'INSERT INTO "{schema}"."{_RESOLUTIONS}" '
+            "(run_id, logical, physical, state, supply) VALUES (?, ?, ?, ?, ?)", list(row))
 
 
 def resolution_for(conn, run_id: str) -> Resolution:
@@ -1457,7 +1480,7 @@ def resolution_for(conn, run_id: str) -> Resolution:
     res = Resolution(run_id=run_id, schema=run_schema(run_id))
     try:
         rows = conn.execute(
-            f'SELECT logical, physical, state '
+            f'SELECT logical, physical, state, supply '
             f'FROM "{staging_schema_for(run_id)}"."{_RESOLUTIONS}" '
             "WHERE run_id = ? ORDER BY logical, physical", [run_id]).fetchall()
     except (psycopg.errors.UndefinedTable, psycopg.errors.InvalidSchemaName):
@@ -1466,9 +1489,11 @@ def resolution_for(conn, run_id: str) -> Resolution:
         # CatalogException, handled the same way - a caller asking is
         # reporting, and "nothing recorded" beats a traceback.
         return res
-    for logical, physical, state in rows:
+    for logical, physical, state, supply in rows:
         if state == "resolved":
             res.resolved[logical] = physical
+            if supply:
+                res.supply_of[logical] = supply
         elif state == "ambiguous":
             res.ambiguous.setdefault(logical, []).append(physical)
         elif state == "held":

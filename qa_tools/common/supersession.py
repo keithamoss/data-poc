@@ -103,14 +103,19 @@ def _accepted_into(conn, dataset_id: str, supply: str, period: str) -> bool:
 
     UNLESS A PERSON SINCE DEMOTED IT: a demote returns its tables to
     staging and makes it unaccepted again, superseded like any other
-    (decision 13)."""
+    (decision 13).
+
+    OR IT WAS DISPLACED (#113): since REQ-PIPE-128 a promoted supply
+    displaced by another's promotion LEAVES the period - its SUPERSEDE
+    names the period it left - so it is no longer accepted there, and once
+    un-superseded it waits like any other version."""
     rows = conn.execute(
         f"SELECT action FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
-        "AND ((to_slot = ? AND action IN (?, ?)) OR (from_slot = ? AND action = ?)) "
+        "AND ((to_slot = ? AND action IN (?, ?)) OR (from_slot = ? AND action IN (?, ?))) "
         "ORDER BY effective_at DESC, id DESC LIMIT 1",
         [dataset_id, supply, period, decision_log.PROMOTE, decision_log.REFILE,
-         period, decision_log.DEMOTE]).fetchall()
-    return bool(rows) and rows[0][0] != decision_log.DEMOTE
+         period, decision_log.DEMOTE, decision_log.SUPERSEDE]).fetchall()
+    return bool(rows) and rows[0][0] in (decision_log.PROMOTE, decision_log.REFILE)
 
 
 def _filed_to(conn, dataset_id: str, supply: str, period: str) -> bool:
@@ -182,24 +187,33 @@ def supersede_promoted(conn, *, agency_id: str, collection_id: str, dataset_id: 
     criterion 2). The caller holds the transaction the promotion is in, so
     the two are one; the decision log refuses it while a later period
     stands on `supply` (criterion 3)."""
-    source = period_schema.period_schema(period)
+    from qa_tools.common import period_tables
+
     target = superseded_schema(period)
     # WHAT IS DISPLACED IS WHAT THE PERIOD HOLDS FOR THE SAME TABLE - one
-    # version each (criterion 1) - so the incoming tables' logical names
-    # find it, with nothing parsed out of the displaced supply's id.
-    logical = {(supply_db.split_staged(t) or (t,))[0] for t in (replacing or [])}
-    tables = [t for (t,) in conn.execute(
-        "SELECT table_name FROM information_schema.tables WHERE table_schema = ? "
-        "AND table_type = 'BASE TABLE'", [source]).fetchall()
-        if (supply_db.split_staged(t) or (t,))[0] in logical]
+    # version each, under its plain base name (REQ-PIPE-129) - so the
+    # incoming tables' logical names find it.
+    logical = sorted({period_tables.logical_of(t) for t in (replacing or [])})
     with decision_log.apply_decision(conn, decision_log.Decision(
             agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
             action=decision_log.SUPERSEDE, supply=supply, actor=actor, actor_kind=actor_kind,
             effective_at=effective_at, from_slot=period, superseded_by=by,
             reason=f"{by} was promoted into {period} in its place")):
         supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{target}"')
-        for physical in tables:
-            supply_db.move_table(conn, physical, source, target)
+        moved = [period_tables.take_out(conn, period=period, logical=name, supply=supply,
+                                        to_schema=target)
+                 # OUT OF THE PERIOD THROUGH THE ONE CODE PATH, its stamped
+                 # name restored (REQ-PIPE-129 criteria 3 and 9).
+                 for name in logical]
+        if not any(moved):
+            # LOUD, NEVER SILENT (REQ-PIPE-128 criterion 12, #112): the log
+            # says the period holds this supply and the period has no table
+            # to take out - recording the supersession anyway would leave
+            # the log and the catalogue disagreeing.
+            raise decision_log.DecisionRefused(
+                f"{period} has no {', '.join(logical) or 'table'} for {supply}, which the "
+                f"decision log says it holds - the table has been moved or dropped outside "
+                f"the decision log. Nothing was done; find out where it went first.")
 
 
 def drop_if_empty(conn, period: str) -> bool:

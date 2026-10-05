@@ -506,10 +506,23 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
             raise DecisionRefused(
                 f"{decision.supply} has been superseded"
                 + (f" by {newer}" if newer else " by a person")
-                + f". To bring it back first: `mothman supply decide --operation "
+                + f". To bring it back first:\n  mothman supply decide --operation "
                 f"un-supersede --dataset {decision.dataset_id} --period "
-                f"{decision.to_slot} --supply {decision.supply} --reason '<why>'`.")
+                f"{decision.to_slot} --supply {decision.supply} --reason '<why>' --yes")
 
+    if decision.action == DEMOTE and decision.supply and decision.from_slot:
+        # ONLY WHAT THE PERIOD HOLDS IS DEMOTED (#113, REQ-PIPE-129 criteria 4
+        # and 7): a demote naming another supply took the period's real table
+        # out under that supply's name and left the log and the warehouse
+        # disagreeing.
+        holder = held(conn, decision.dataset_id, decision.from_slot)
+        holding = holder.holder if holder and holder.held_as == PROMOTED else None
+        if holding != decision.supply:
+            raise DecisionRefused(
+                f"{decision.from_slot} does not hold {decision.supply}"
+                + (f"; it holds {holding}" if holding else "; nothing is promoted there")
+                + ". Check the supply id - `mothman supply slots` shows what each period "
+                "holds.")
     if decision.action == DEMOTE and decision.supply and decision.from_slot:
         # ONE WAITING VERSION PER TABLE PER PERIOD (REQ-PIPE-118 criterion
         # 17, Keith 2026-10-05; post-build-review #109 F8). A newer version
@@ -565,27 +578,42 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
     # also the only useful answer: told about one, an operator
     # de-substitutes it and hits the next.
     if decision.action in MOVES_A_SUPPLY:
-        standing = _standing_on(conn, decision.dataset_id, decision.supply)
-        if standing:
-            # THE REMEDY, PER PERIOD (REQ-GHUB-082 criterion 25). "Clear
-            # them first" was true and not actionable: a substituted
-            # period is cleared by a de-substitution and an inherited
-            # one by an un-inheritance, and an operator told the wrong
-            # one is sent to a route that will refuse them.
-            how = ", ".join(f"{slot} ({UNBLOCKED_BY[action]} it)"
-                             for slot, action in standing)
-            # THE FIX AS A COMMAND TO PASTE (REQ-PIPE-128 NFR 4), one per
-            # blocking period.
-            commands = " ".join(
-                f"`mothman supply decide --operation {UNBLOCKED_BY[action]} --dataset "
-                f"{decision.dataset_id} --period {slot} --reason '<why>'`"
-                for slot, action in standing)
-            raise DecisionRefused(
-                f"{decision.supply!r} cannot be {decision.action}d while "
-                f"{len(standing)} later period(s) stand on it: {how}. Each of "
-                f"those resolves to this supply - by a substitution somebody "
-                f"decided, or because nothing was owed for it - so clear them "
-                f"first, or point them elsewhere: {commands}")
+        refuse_if_stood_on(conn, decision.dataset_id, decision.supply, decision.action)
+
+
+def refuse_if_stood_on(conn: supply_db.SupplyConnection, dataset_id: str, supply: str,
+                       action: str) -> None:
+    """Refuse moving `supply` while a later period stands on it (criterion
+    11), naming every blocking period and the command that unblocks each.
+    Public so a warning can refuse BEFORE the person is asked to confirm
+    something that cannot happen (post-build-review #112)."""
+    standing = _standing_on(conn, dataset_id, supply)
+    if standing:
+        # THE REMEDY, PER PERIOD (REQ-GHUB-082 criterion 25). "Clear
+        # them first" was true and not actionable: a substituted
+        # period is cleared by a de-substitution and an inherited
+        # one by an un-inheritance, and an operator told the wrong
+        # one is sent to a route that will refuse them.
+        how = ", ".join(f"{slot} ({UNBLOCKED_BY[by]} it)" for slot, by in standing)
+        # THE FIX AS A COMMAND TO PASTE (REQ-PIPE-128 NFR 4), one per
+        # blocking period and one per line, so each can be copied whole.
+        commands = "".join(
+            f"\n  mothman supply decide --operation {UNBLOCKED_BY[by]} --dataset "
+            f"{dataset_id} --period {slot} --reason '<why>' --yes"
+            for slot, by in standing)
+        raise DecisionRefused(
+            f"{supply!r} cannot be {action}d while "
+            f"{len(standing)} later period(s) stand on it: {how}. Each of "
+            f"those resolves to this supply - by a substitution somebody "
+            f"decided, or because nothing was owed for it - so clear them "
+            f"first, or point them elsewhere:{commands}")
+
+
+def lock_slot(conn: supply_db.SupplyConnection, dataset_id: str, slot: str) -> None:
+    """The same lock `_lock` takes for one slot, for a caller that must
+    judge the slot under it before deciding what to record (REQ-PIPE-128,
+    post-build-review #112). Transaction-scoped and re-entrant."""
+    conn.execute("SELECT pg_advisory_xact_lock(hashtext(?))", [f"{dataset_id}/{slot}"])
 
 
 def _lock(conn: supply_db.SupplyConnection, decision: Decision) -> None:
@@ -601,7 +629,10 @@ def _lock(conn: supply_db.SupplyConnection, decision: Decision) -> None:
     opposite orders and deadlock. Sorting makes that impossible rather
     than unlikely.
     """
-    for slot in sorted(decision.slots):
+    # AND THE PERIOD IT STANDS ON (REQ-PIPE-129 criterion 15): a
+    # substitution onto P1 and a promotion displacing P1's supply would
+    # otherwise each lock a different slot and race.
+    for slot in sorted(set(decision.slots) | ({decision.stands_on} - {None})):
         conn.execute("SELECT pg_advisory_xact_lock(hashtext(?))",
                       [f"{decision.dataset_id}/{slot}"])
 
@@ -619,6 +650,32 @@ def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
          decision.stands_on, decision.amber_setting, decision.amber_level,
          decision.amber_version, decision.superseded_by]).fetchall()
     return int(rows[0][0])
+
+
+#: How long a decision waits on a lock before it is refused (REQ-PIPE-129
+#: criterion 16) - long enough for another person's decision to finish,
+#: short enough that a person is never left looking at a hung terminal
+#: while a QA tool reads the table for minutes.
+LOCK_TIMEOUT = "15s"
+
+RUN_IN_PROGRESS = ("Something is using these tables right now - most often a QA run "
+                   "reading them, or another person's decision on the same period. "
+                   "Nothing was done; retry in a minute.")
+
+
+@contextmanager
+def decision_transaction(conn: supply_db.SupplyConnection) -> Iterator[None]:
+    """A transaction whose lock waits are bounded (criterion 16): a wait
+    past LOCK_TIMEOUT is refused as a run in progress, never a hang.
+    Nested, it is a savepoint inside the caller's."""
+    import psycopg
+
+    try:
+        with conn.raw.transaction():
+            conn.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
+            yield
+    except psycopg.errors.LockNotAvailable as exc:
+        raise DecisionRefused(RUN_IN_PROGRESS) from exc
 
 
 @contextmanager
@@ -651,8 +708,8 @@ def apply_decision(conn: supply_db.SupplyConnection,
     # A REAL TRANSACTION over an autocommit connection - see
     # supply_db.SupplyConnection, which anticipates exactly this caller.
     # `conn.raw.transaction()` issues its own BEGIN and rolls back on any
-    # exception escaping the block.
-    with conn.raw.transaction():
+    # exception escaping the block. Its lock waits are bounded.
+    with decision_transaction(conn):
         _lock(conn, decision)
         _judge(conn, decision)
         entry_id = _insert(conn, decision)

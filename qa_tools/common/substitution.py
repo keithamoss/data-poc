@@ -86,13 +86,16 @@ def _physical_in(conn, *, period: str, logical: str) -> str:
             f"{period} holds no table called {logical!r}, so there is nothing to "
             f"point at. The decision log says a supply was promoted into it - if "
             f"that is still true, the table has been moved or dropped since.")
-    if len(found) > 1:
-        # REQ-PIPE-068's rule, applied here: several versions with no
-        # basis to choose between them is absence, not a coin toss.
+    # ONE VERSION PER PERIOD (REQ-PIPE-128): promoted_in raises on more
+    # than one, so there is no second to choose between here.
+    from qa_tools.common import period_tables
+
+    # A TABLE, ASKED OF THE CATALOGUE (REQ-PIPE-129 criterion 8): under
+    # plain names a view and a table look alike, so the name cannot say.
+    if period_tables.is_view(conn, period_schema.period_schema(period), found[0]):
         raise SubstitutionRefused(
-            f"{period} holds {len(found)} versions of {logical!r} "
-            f"({', '.join(sorted(found))}) and nothing says which is the supply, "
-            f"so nothing can stand on it.")
+            f"{period}'s {logical} is a view, not a promoted table, so nothing can "
+            f"stand on it - a chain whose bottom nobody can see.")
     return found[0]
 
 
@@ -216,6 +219,14 @@ def substitute(conn: supply_db.SupplyConnection, *,
     physical = _physical_in(conn, period=stands_on, logical=logical_table)
 
     with decision_log.apply_decision(conn, decision):
+        # JUDGED AGAIN UNDER THE LOCK (#113, REQ-PIPE-129 criterion 15): the
+        # decision now holds both slots' locks, so a promotion that displaced
+        # the supply stood on in the meantime is seen here rather than the
+        # view quietly reading the newcomer under the old supply's name.
+        _refuse_unless_substitutable(
+            conn, dataset_id=dataset_id, period=period, stands_on=stands_on,
+            supply=supply, participates=participates)
+        physical = _physical_in(conn, period=stands_on, logical=logical_table)
         _view_sql(conn, period=period, logical=logical_table,
                   stands_on=stands_on, physical=physical)
     return Substitution(period=period, stands_on=stands_on, supply=supply)

@@ -322,7 +322,7 @@ button{font:inherit; color:inherit;}
    supply and a held, contested or unloadable supply each make their
    dataset red, and drawn in the same grey as an all-clear they did not
    stand out below the status pill. The words still carry the meaning. */
-.notice-exhausted[data-no-supply], .notice-exhausted[data-blocked], .notice-exhausted[data-waiting-blocker]{
+.notice-exhausted[data-no-supply], .notice-exhausted[data-blocked], .notice-exhausted[data-waiting-blocker], .notice-exhausted[data-census]{
   border-color:var(--bad); background:var(--bad-soft);}
 /* CODE CHIPS ARE NOT SCOPED TO ONE NOTICE any more
    (post-build-review #53). This rule used to sit on .notice-exhausted
@@ -2006,6 +2006,9 @@ function buildRealDataset(d){
     // supply on the date on show. Carried, never derived here.
     closedSlots: d.closedSlots || [],
     lateSlots: d.lateSlots || [],
+    // REQ-PIPE-081 criteria 14 and 15: the recorded census's change
+    // points. Carried, never recomputed here.
+    census: d.census || [],
     // REQ-PIPE-081 criterion 1 as amended: whether the verdict's supply is
     // in place or awaiting a decision, and what is in place if not it.
     verdictOf: d.verdictOf || null,
@@ -4253,6 +4256,26 @@ function verdictLine(ds){
     : "Nothing is in place for this period yet.";
   return `<div class="verdict-of" data-verdict-of="awaiting" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Awaiting a decision</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place yet. ${inPlace}</div>`;
 }
+// THE CENSUS AS AT THE DATE ON SHOW (REQ-PIPE-081 criteria 14 and 15): the
+// last recorded census taken on or before the end of that day - never the
+// warehouse as it stands now. Prominent, naming each period and table,
+// because a period whose table the warehouse does not hold is answering
+// nothing whatever the log says.
+function censusAsOf(ds, asOfDateStr){
+  const points = (ds && ds.census) || [];
+  let found = null;
+  // ON THE ASSET'S CALENDAR (#113): a census taken at 22:00 UTC is the
+  // next day in Perth, and the date on show is an asset date.
+  points.forEach(p=>{ if(assetDateStrOf(p.takenAt) <= asOfDateStr) found = p; });
+  return found;
+}
+function censusBanner(ds, asOfDateStr){
+  const c = censusAsOf(ds, asOfDateStr);
+  if(!c || !c.discrepancies.length) return "";
+  const items = c.discrepancies.map(d=> `<li><span class="mono">${escHtml(d.period)}</span> · <span class="mono">${escHtml(d.table)}</span> - ${escHtml(d.detail)}</li>`).join("");
+  return `<div class="notice-exhausted" data-census role="status"><b>The warehouse and the decision log disagree (census ${escHtml(fmtInstant(c.takenAt))})</b><ul style="margin:4px 0 0 18px; padding:0;">${items}</ul><div style="margin-top:6px;">Until this is put right, what this page says a period holds may not be what a query of that period reads.</div></div>`;
+}
+
 function amberSettingLine(ds, asOfDateStr){
   const a = amberSettingAsOf(ds, asOfDateStr);
   if(!a) return "";
@@ -5089,6 +5112,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
       ${amberSettingLine(ds, CURRENT_AS_OF)}
+      ${censusBanner(ds, CURRENT_AS_OF)}
       ${blockedBanner}
       ${outstandingQueue("dataset", ds.id)}
       <div class="sla-strip">
@@ -5138,6 +5162,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     </div>
     ${verdictLine(ds)}
     ${amberSettingLine(ds, CURRENT_AS_OF)}
+    ${censusBanner(ds, CURRENT_AS_OF)}
     ${arrivalBanner(ds)}
     ${blockedBanner}
     ${waitingBanner}

@@ -60,8 +60,8 @@ from rich.text import Text
 
 from cli import common
 from qa_tools.common import (asset_time, decision_log, filing_decisions,
-                             filing_queue, git_identity, hierarchy, people,
-                             qa_store, slot_state, supply_db)
+                             filing_queue, git_identity, hierarchy, inheritance, people,
+                             qa_store, slot_state, substitution, supply_db)
 
 console = Console()
 
@@ -70,7 +70,8 @@ _MENU_PERIOD = "Decide about a period - pick a dataset and a period"
 _MENU_STANDING = "Where every period stands"
 
 _FLAG_HINT = ("mothman supply decide --operation <op> --dataset <id> "
-              "--period <period> --reason '<why>'")
+              "--period <period> --reason '<why>' --yes (plus --acknowledge KEY where "
+              "the decision's warning gives one)")
 
 #: How each operation reads to somebody choosing one. The log's own
 #: action names are the vocabulary (`filing_decisions` keeps them
@@ -94,6 +95,25 @@ _WHAT_IT_DOES = {
                                     "checked again"),
 }
 
+#: The same operations on ANOTHER VERSION WAITING in a promoted period
+#: (#113): there the period keeps its promoted supply whatever is decided
+#: about this one, and the waiting one is usually the newer.
+_WHAT_IT_DOES_TO_ANOTHER_VERSION = {
+    filing_decisions.PROMOTE: ("promote - this version becomes the period's data; the "
+                               "promoted one is set aside as superseded"),
+    filing_decisions.REJECT: ("reject - this version is not fit; the period keeps the "
+                              "one already promoted"),
+    filing_decisions.SUPERSEDE: ("supersede - set this version aside without rejecting "
+                                 "it; the period keeps the one already promoted"),
+}
+
+#: The operations that act on one SUPPLY, so the confirmation names it -
+#: a period can hold one supply and have another waiting (#113).
+_NAMES_THE_SUPPLY = (filing_decisions.PROMOTE, filing_decisions.REJECT,
+                     filing_decisions.DEMOTE, filing_decisions.SUPERSEDE,
+                     filing_decisions.UN_SUPERSEDE, filing_decisions.ACKNOWLEDGE,
+                     filing_decisions.REFILE)
+
 #: How an operation reads as a NOUN in a prompt - "this acknowledge" was
 #: the verb doing a noun's job (#107).
 _NOUN = {filing_decisions.ACKNOWLEDGE: "acknowledgement"}
@@ -115,6 +135,8 @@ _HOW_IT_READS = {
     slot_state.AMBER_WAITING: "[yellow]amber, waiting for a person (amber setting: hold)[/yellow]",
     slot_state.AWAITING_ACKNOWLEDGEMENT: "[yellow]promoted, awaiting acknowledgement[/yellow]",
     filing_queue.COULD_NOT_LOAD: "[red]could not be loaded[/red]",
+    filing_queue.ANOTHER_VERSION_WAITING:
+        "[yellow]another version waiting - the period holds a promoted one[/yellow]",
 }
 
 
@@ -175,12 +197,30 @@ def say_unreachable(exc: Exception) -> None:
 
 def _consequences(request) -> "filing_decisions.Consequences":
     """The warning for this request, read now - or none where the log
-    cannot be read, in which case apply() refuses with it anyway."""
+    cannot be read, in which case apply() refuses with it anyway.
+
+    RAISES DecisionRefused where the decision cannot happen at all, so the
+    person is told before being asked (post-build-review #112)."""
     try:
         with open_log() as conn:
             return filing_decisions.consequences(conn, request)
+    except decision_log.DecisionRefused:
+        raise
     except Exception:  # noqa: BLE001 - apply() is the authority and says why
         return filing_decisions.Consequences(lines=())
+
+
+def _show(text: str, *, title: str, style: str) -> None:
+    """A panel of prose, with every command in it printed BELOW the panel,
+    one per line and never wrapped - inside a bordered panel a terminal
+    copy picks up the border and the line breaks (post-build-review #112)."""
+    prose, commands = [], []
+    for line in text.split("\n"):
+        (commands if line.strip().startswith("mothman ") else prose).append(line)
+    console.print(Panel(Text("\n".join(prose).rstrip()), title=title, border_style=style,
+                        expand=False))
+    for command in commands:
+        console.print(command.strip(), soft_wrap=True, highlight=False, markup=False)
 
 
 def apply_decision(*, operation: str, dataset_id: str, period: str,
@@ -209,7 +249,17 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
     try:
         actor = actor or actor_at_the_keyboard()
     except people.UnknownActor as exc:
-        console.print(f"[red]Refused:[/red] {exc}")
+        _show(str(exc), title=f"{operation} refused", style="red")
+        return None
+
+    # REFUSED BEFORE THE REASON IS ASKED FOR, where it cannot happen at all
+    # (#113): a reason typed for a decision about to be refused is wasted.
+    try:
+        _consequences(filing_decisions.Request(
+            operation=operation, dataset_id=dataset_id, actor=actor, reason="",
+            period=period, to_period=to_period, supply=supply, stands_on=stands_on))
+    except decision_log.DecisionRefused as exc:
+        _show(str(exc), title=f"{operation} refused", style="red")
         return None
 
     if reason is None:
@@ -221,6 +271,8 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
             return None
 
     where = f"{dataset_id} {period}" + (f" -> {to_period}" if to_period else "")
+    if supply and operation in _NAMES_THE_SUPPLY:
+        where += f" (the supply that arrived {arrived(supply)})"
     request = filing_decisions.Request(
         operation=operation, dataset_id=dataset_id, actor=actor, reason=reason,
         period=period, to_period=to_period, supply=supply, stands_on=stands_on,
@@ -231,19 +283,38 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
     # undone. None where it does nothing more. Confirming it IS the
     # acknowledgement - there is no second yes or no. A scripted `--yes`
     # does not acknowledge on its own: it needs `--acknowledge <key>`.
+    previous: tuple[str, ...] = ()
     for _attempt in range(2):
-        shown = _consequences(request)
+        try:
+            shown = _consequences(request)
+        except decision_log.DecisionRefused as exc:
+            _show(str(exc), title=f"{operation} refused", style="red")
+            return None
         if shown.lines:
-            console.print(Panel(Text("\n".join(f"- {line}" for line in shown.lines)),
-                                 title="This also does", border_style="yellow",
-                                 expand=False))
+            if previous:
+                # WHAT CHANGED, said rather than left to be spotted in a
+                # second panel identical but for one id (#112).
+                console.print("[yellow]Somebody else's decision changed what this one "
+                              "does while you were deciding. New:[/yellow]")
+                for line in shown.lines:
+                    if line not in previous:
+                        console.print(f"  [bold]{line.split(chr(10))[0]}[/bold]")
+            _show("\n".join(f"- {line}" for line in shown.lines),
+                  title="This decision also does", style="yellow")
+        previous = shown.lines
         if not common.confirm(f"Record {_NOUN.get(operation, operation)} for {where}, "
                               f"as {people.actor_name(actor)}?",
-                               yes=yes, default=False):
+                               yes=yes, default=False,
+                               flag_hint=("pass --yes --acknowledge " + shown.key
+                                          if shown.lines else "pass --yes")):
             console.print("Not recorded.", style="yellow")
             return None
         if shown.lines and not yes:
             request = dataclasses.replace(request, acknowledged=shown.key)
+        # NEVER A SILENT WAIT (#113): a decision waits up to the lock
+        # timeout for a run or another decision using the same tables.
+        console.print(f"Recording - this waits up to {decision_log.LOCK_TIMEOUT} if a QA "
+                      f"run or another decision is using these tables.", style="dim")
         try:
             outcome = filing_decisions.apply(
                 request, effective_at=asset_time.now().isoformat())
@@ -252,23 +323,28 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
             # CRITERION 9: the consequences changed between the warning and
             # the yes. Refused, and the new warning is shown to confirm.
             if yes or not shown.lines:
-                console.print(Panel(Text(str(exc)), title=f"{operation} refused",
-                                     border_style="red", expand=False))
+                # The warning is already on screen where it was shown, so
+                # the refusal says only what is wrong and how to go ahead.
+                body = (f"{exc.lead}\n{exc.instruction}" if shown.lines
+                        and shown.key == exc.key else str(exc))
+                _show(body, title=f"{operation} refused", style="red")
                 return None
-            console.print("[yellow]What this decision does changed while you were "
-                          "deciding - here it is again.[/yellow]")
             continue
         except (decision_log.DecisionRefused, filing_decisions.NotOffered,
-                people.UnknownActor) as exc:
+                people.UnknownActor, substitution.SubstitutionRefused,
+                inheritance.InheritanceRefused) as exc:
             # CRITERION 22: told why, on the route it was raised on. And
             # criterion 25's remedy comes through unchanged - the refusal
             # decision_log raises already names the de-substitute or
             # un-inherit that would unblock it, so repeating it here would
             # be a second copy of a sentence that must not drift.
-            console.print(Panel(Text(str(exc)), title=f"{operation} refused",
-                                 border_style="red", expand=False))
+            _show(str(exc), title=f"{operation} refused", style="red")
             return None
     else:
+        # Changed twice while being decided - said, never a silent exit.
+        console.print("Not recorded: what this decision does kept changing while you "
+                      "were deciding. Look at the period again before deciding.",
+                      style="yellow")
         return None
 
     if outcome.changed:
@@ -371,7 +447,10 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
         # The recorded reason, and the response that is not a control.
         console.print(f"{state.supply} could not be loaded: {state.reason}. Reject it "
                        f"here, or {filing_queue.REPROCESS}.", style="yellow")
-    by_label = {_WHAT_IT_DOES[op]: op for op in offer}
+    words = dict(_WHAT_IT_DOES)
+    if state.state == filing_queue.ANOTHER_VERSION_WAITING:
+        words.update(_WHAT_IT_DOES_TO_ANOTHER_VERSION)
+    by_label = {words[op]: op for op in offer}
     picked = common.select(f"{state.dataset_id} {state.period} - what are you "
                             f"recording?", list(by_label), flag_hint=_FLAG_HINT)
     if picked is None:

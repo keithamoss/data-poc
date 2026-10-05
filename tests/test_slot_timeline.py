@@ -118,10 +118,13 @@ class TestItNamesTheDecisionThatChangedAnEarlierAnswer:
     only useful if a reader can see WHICH decision did it."""
 
     def test_each_entry_carries_the_decision_that_produced_it(self, clean, dataset):
+        # Promoted first: only the period's holder can be demoted (#113).
+        _decide(clean, dataset, decision_log.PROMOTE, supply="s1",
+                at="2026-02-01T09:00:00+08:00", to_slot="2026-Q1")
         _decide(clean, dataset, decision_log.DEMOTE, supply="s1",
                 at="2026-08-01T09:00:00+08:00", from_slot="2026-Q1",
                 actor="keith", reason="the extract was truncated")
-        entry = slot_timeline.for_dataset(dataset, conn=clean)[0]
+        entry = slot_timeline.for_dataset(dataset, conn=clean)[-1]
         assert entry["action"] == decision_log.DEMOTE
         assert entry["actor"] == "keith"
         assert entry["reason"] == "the extract was truncated"
@@ -201,10 +204,13 @@ class TestEachEntryCanBeTiedToItsRun:
     def test_an_emptied_slot_names_no_run(self, clean, dataset):
         from pipeline import slot_timeline as st
 
+        # Promoted first: only the period's holder can be demoted (#113).
+        _decide(clean, dataset, decision_log.PROMOTE, supply="s1",
+                at="2026-02-01T09:00:00+08:00", to_slot="2026-Q1")
         _decide(clean, dataset, decision_log.DEMOTE, supply="s1",
                 at="2026-08-01T09:00:00+08:00", from_slot="2026-Q1")
         got = st.with_runs(st.for_dataset(dataset, conn=clean), dataset, conn=clean)
-        assert got[0]["supply"] is None and got[0]["run_id"] is None
+        assert got[-1]["supply"] is None and got[-1]["run_id"] is None
 
     def test_a_supply_no_run_checked_is_not_an_error(self, clean, dataset):
         """A real state rather than a fault - a supply promoted by hand

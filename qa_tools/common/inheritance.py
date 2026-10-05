@@ -202,13 +202,16 @@ def _physical_in(conn, *, period: str, logical: str) -> str:
             f"{period} holds no table called {logical!r}, so there is nothing "
             f"to stand on. The decision log says a supply was promoted into it "
             f"- if that is still true, the table has been moved or dropped.")
-    if len(found) > 1:
-        # REQ-PIPE-068's rule: several versions with no basis to choose
-        # between them is absence, not a coin toss.
+    # ONE VERSION PER PERIOD (REQ-PIPE-128): promoted_in raises on more
+    # than one, so there is no second to choose between here.
+    from qa_tools.common import period_tables
+
+    # A TABLE, ASKED OF THE CATALOGUE (REQ-PIPE-129 criterion 8): under
+    # plain names a view and a table look alike, so the name cannot say.
+    if period_tables.is_view(conn, period_schema.period_schema(period), found[0]):
         raise InheritanceRefused(
-            f"{period} holds {len(found)} versions of {logical!r} "
-            f"({', '.join(sorted(found))}) and nothing says which is the "
-            f"supply, so nothing can inherit from it.")
+            f"{period}'s {logical} is a view, not a promoted table, so nothing can "
+            f"inherit from it - a chain whose bottom nobody can see.")
     return found[0]
 
 
@@ -252,7 +255,20 @@ def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
 
         stands_on, supply = source
         try:
-            physical = _physical_in(conn, period=stands_on, logical=entry.table)
+            # UNDER BOTH SLOTS' LOCKS, judged again there (#113, REQ-PIPE-129
+            # criterion 15), and the view and its entry one transaction.
+            with decision_log.decision_transaction(conn):
+                for slot in sorted({period_name, stands_on}):
+                    decision_log.lock_slot(conn, entry.dataset_id, slot)
+                physical = _still_stands_on(conn, entry.dataset_id, stands_on, supply,
+                                            entry.table)
+                conn.execute(
+                    f'CREATE OR REPLACE VIEW "{schema}".'
+                    f'"{supply_db._ident(entry.table, "table name")}" AS SELECT * FROM '
+                    f'"{period_schema.period_schema(stands_on)}"."{physical}"')
+                _record(conn, entry, action=decision_log.INHERIT, supply=supply,
+                        period=period_name, stands_on=stands_on, reason=reason,
+                        effective_at=effective_at)
         except InheritanceRefused as exc:
             # THE LOG SAYS A SUPPLY IS THERE AND THE SCHEMA DOES NOT.
             # Recorded as a refusal rather than raised, on criterion
@@ -265,16 +281,9 @@ def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
                     period=period_name, stands_on=None, reason=str(exc),
                     effective_at=effective_at)
             continue
-        conn.execute(
-            f'CREATE OR REPLACE VIEW "{schema}".'
-            f'"{supply_db._ident(entry.table, "table name")}" AS SELECT * FROM '
-            f'"{period_schema.period_schema(stands_on)}"."{physical}"')
         outcome.inherited.append(Inherited(
             dataset_id=entry.dataset_id, period=period_name, stands_on=stands_on,
             supply=supply, reason=reason))
-        _record(conn, entry, action=decision_log.INHERIT, supply=supply,
-                period=period_name, stands_on=stands_on, reason=reason,
-                effective_at=effective_at)
     return outcome
 
 
@@ -282,10 +291,9 @@ def _record(conn, entry, *, action: str, supply: str, period: str,
             stands_on: str | None, reason: str, effective_at: str) -> None:
     """One decision-log entry, with THE RULE as the actor (criterion 8).
 
-    Written outside apply_decision's context manager because there is no
-    warehouse change to pair it with beyond the view already created -
-    and a nested transaction inside the one open_period() may itself be
-    called from is the kind of thing that works until it does not.
+    An INHERIT is recorded inside the transaction that created its view
+    (#113), so the two cannot be observed apart; nested in a caller's
+    transaction, apply_decision is a savepoint.
     """
     decision = decision_log.Decision(
         agency_id=entry.agency_id, collection_id=entry.collection_id,
@@ -410,12 +418,30 @@ def inherit_one(conn: supply_db.SupplyConnection, *, dataset_id: str,
         actor=actor, actor_kind=decision_log.PERSON, effective_at=effective_at,
         to_slot=period, stands_on=stands_on, reason=reason)
     with decision_log.apply_decision(conn, decision):
+        # JUDGED AGAIN UNDER THE LOCK (#113, REQ-PIPE-129 criterion 15).
+        physical = _still_stands_on(conn, dataset_id, stands_on, supply, entry.table)
         conn.execute(
             f'CREATE OR REPLACE VIEW "{schema}".'
             f'"{supply_db._ident(entry.table, "table name")}" AS SELECT * FROM '
             f'"{period_schema.period_schema(stands_on)}"."{physical}"')
     return Inherited(dataset_id=dataset_id, period=period, stands_on=stands_on,
                       supply=supply, reason=schedule_reason or reason)
+
+
+def _still_stands_on(conn, dataset_id: str, stands_on: str, supply: str,
+                     logical: str) -> str:
+    """Under the decision's lock on both slots: `stands_on` still holds
+    `supply` as a promoted table, and its physical name (#113, REQ-PIPE-129
+    criterion 15). A promotion that displaced it while this was being
+    decided is refused here, rather than the view quietly reading the
+    newcomer under the old supply's name."""
+    h = decision_log.held(conn, dataset_id, stands_on)
+    if not h or h.held_as != decision_log.PROMOTED or h.holder != supply:
+        raise InheritanceRefused(
+            f"{stands_on} no longer holds {supply} - "
+            + (f"it holds {h.holder} ({h.held_as})" if h and h.holder else "it holds nothing")
+            + ". Something changed while this was being decided; try again.")
+    return _physical_in(conn, period=stands_on, logical=logical)
 
 
 def un_inherit(conn: supply_db.SupplyConnection, *, dataset_id: str,

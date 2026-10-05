@@ -137,11 +137,12 @@ class TestADatasetThatOwesNothingInheritsWhatIsCurrent:
         """Criterion 15, proven the way REQ-PIPE-084's is: insert after
         the fact and watch it come through."""
         first, second = periods
-        physical = _promote_into(conn, annual, first)
+        _promote_into(conn, annual, first)
         period_schema.open_period(conn, second, opened_by="rule")
 
         source = period_schema.period_schema(first)
-        conn.execute(f'INSERT INTO "{source}"."{physical}" VALUES (4)')
+        # The plain base name in the period (REQ-PIPE-129 criterion 2).
+        conn.execute(f'INSERT INTO "{source}"."{annual.table}" VALUES (4)')
         schema = period_schema.period_schema(second)
         rows = conn.execute(
             f'SELECT id FROM "{schema}"."{annual.table}" ORDER BY id').fetchall()
@@ -700,9 +701,9 @@ class TestASupplyIdIsNotATableName:
         dataset's problem does not stop the rest of the period being
         born."""
         first, second = periods
-        _supply, physical = self._promote_with_distinct_names(conn, annual, first)
+        self._promote_with_distinct_names(conn, annual, first)
         conn.execute(
-            f'DROP TABLE "{period_schema.period_schema(first)}"."{physical}"')
+            f'DROP TABLE "{period_schema.period_schema(first)}"."{annual.table}"')
         period_schema.ensure_period_schema(conn, second)
 
         outcome = inheritance.inherit_into(conn, second, effective_at=WHEN)
