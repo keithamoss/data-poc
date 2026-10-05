@@ -196,6 +196,7 @@ class PassReport:
     gated_only: list[str] = field(default_factory=list)
     left_locked: list[str] = field(default_factory=list)
     left_behind_failure: list[str] = field(default_factory=list)
+    left_behind_locked: list[str] = field(default_factory=list)
     failures: list[tuple[str, str]] = field(default_factory=list)
     owed: list = field(default_factory=list)
     tickets: list[str] = field(default_factory=list)
@@ -204,7 +205,8 @@ class PassReport:
     @property
     def nothing_to_do(self) -> bool:
         return not (self.processed or self.gated_only or self.left_locked
-                    or self.left_behind_failure or self.failures or self.owed)
+                    or self.left_behind_failure or self.left_behind_locked
+                    or self.failures or self.owed)
 
     @property
     def exit_status(self) -> int:
@@ -258,6 +260,7 @@ def run_pass(*, run_by: str | None = None, say=print) -> PassReport:
     for arrival in found:
         by_collection.setdefault(arrival.collection_id, []).append(arrival)
     blocked: set[str] = set()
+    locked_out: set[str] = set()
 
     def fail_arrival(arrival, exc: Exception) -> None:
         # CRITERION 14: a failed arrival holds back every later one of its
@@ -289,9 +292,17 @@ def run_pass(*, run_by: str | None = None, say=print) -> PassReport:
             if arrival.collection_id in blocked:
                 report.left_behind_failure.append(arrival.run_id)
                 continue
+            if arrival.collection_id in locked_out:
+                report.left_behind_locked.append(arrival.run_id)
+                continue
             with arrival_lock(lock_conn, arrival.run_id) as mine:
                 if not mine:
+                    # RECEIPT ORDER HOLDS (Keith, 2026-10-06, #120 Q3): a
+                    # locked arrival holds back the later arrivals of its own
+                    # collection, as a failure does - each filing depends on
+                    # what the one before it promoted.
                     report.left_locked.append(arrival.run_id)
+                    locked_out.add(arrival.collection_id)
                     continue
                 try:
                     _one(arrival, by_collection[arrival.collection_id], run_timestamp,
@@ -320,6 +331,12 @@ def run_pass(*, run_by: str | None = None, say=print) -> PassReport:
             for collection_id in COLLECTIONS:
                 outcome = ticket_reconciler.after_runs(collection_id)
                 ticket_reconciler.report(outcome)
+                # A TICKET THAT COULD NOT BE RECONCILED IS A FAILED STAGE
+                # (criterion 20; Keith, 2026-10-06, #120 Q1), so a scheduler
+                # sees it. The slot state is durable and the next pass
+                # retries; the exit status is how anyone learns it is stuck.
+                for key, message in (outcome.failed or {}).items():
+                    report.failures.append((f"ticket for {key}", message))
     except Exception as exc:  # noqa: BLE001 - the slot state is durable; the next pass retries
         failed("ticket reconciliation", exc)
     return report

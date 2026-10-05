@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from qa_tools.common import backlog, delivery, load_log
+from qa_tools.common import backlog, delivery
 
 def _receipt(receipts, name):
     """The one per-file receipt of a one-file delivery (REQ-GEN-044
@@ -254,53 +254,49 @@ class TestTheMarkerIsGloballyCorrect:
 
 
 class TestHowFarProcessingGotIsDerived:
-    """REQ-PIPE-089 criteria 18-20: the stored marker is DROPPED, and
-    the same question is answered by asking the load records.
+    """REQ-PIPE-089 criteria 18-20: the stored marker is DROPPED, and the
+    same question is answered by asking what was recorded.
 
     KEITH'S CALL, 2026-09-27: "let's ditch it and just derive from load
     records - that's much easier now it's all going to be in a
-    database." The reason is sharper than convenience. The marker
-    existed to AVOID A SCAN - over a file tree the only way to bound
-    replay cost was to store the position - and in a database an
-    indexed query over the load outcomes gives the same bound for
-    nothing.
+    database." Deriving is strictly safer: a stored marker advanced past
+    an arrival that was reached but not finished turns a crash into a
+    silently skipped supply. There is nothing to advance here.
 
-    AND DERIVING IS STRICTLY SAFER. A stored marker can disagree with
-    the load records, and it fails in the dangerous direction:
-    advanced past an arrival that was reached but not finished, it
-    turns a crash into a silently skipped supply. There is nothing to
-    advance and nothing to disagree.
-
-    Found while removing it, and worth recording: the marker was
-    WRITE-ONLY. Both orchestrators called `advance_past_staged()` after
-    their fan-out and nothing in the pipeline ever read it back.
-
-    AMENDED BY REQ-PIPE-151 CRITERION 18 (2026-10-05): "processed" is
-    now CHECKED AND GATED, not loaded - so these tests feed the recorded
-    state the rule reads (processing_pass.recorded) rather than load
-    records, and one of them pins that a LOADED but unchecked arrival is
-    owed, which the old rule called done.
+    ASKED OF THE PROCESSING PASS since 2026-10-06 (Keith, post-build-review
+    #120 Q5). REQ-PIPE-151 criterion 18 had made backlog.unprocessed() read
+    the pass's own definition - checked AND gated, or held - after which it
+    had no caller and was a second door into the same rule, so it was
+    deleted. These are its tests, asked of processing_pass.unprocessed().
+    Two of the old ones did not survive the move, because the thing they
+    pinned no longer exists to go wrong: an arrival is now ONE dataset's
+    file (arrivals.arrivals_for), so there is no "covering note and
+    nothing else" arrival and no arrival spanning two collections.
     """
 
-    @staticmethod
-    def _arrival(name, files):
+    WHEN = __import__("datetime").datetime(2099, 1, 1,
+                                           tzinfo=__import__("datetime").timezone.utc)
+
+    @classmethod
+    def _arrival(cls, n, dataset="cp-clients", table="cp_clients"):
+        from datetime import timedelta
         from types import SimpleNamespace
-        return SimpleNamespace(name=name, files=tuple(files))
+
+        return SimpleNamespace(run_id=f"{table}__{n}", received_at=cls.WHEN + timedelta(hours=n),
+                               files_by_dataset={dataset: (f"{table}.csv",)})
 
     @staticmethod
-    def _done(monkeypatch, *physicals, gated=True, held=False):
-        """Record each staged file's arrival as checked and (by default) gated."""
-        from qa_tools.common import hierarchy, processing_pass
+    def _done(monkeypatch, *arrivals, gated=True, held=False, checked=True):
+        from qa_tools.common import processing_pass
 
         rec = processing_pass.Recorded()
-        for physical in physicals:
-            table, key = physical.split("__")[:2]
-            dataset = hierarchy.dataset_for_table(table).dataset_id
-            rec.completed_runs.add(f"{table}__{key}")
+        for a in arrivals:
+            if checked:
+                rec.completed_runs.add(a.run_id)
             if gated:
-                rec.gated.add((dataset, f"{dataset}@{key}"))
+                rec.gated.add(processing_pass.supply_of(a))
             if held:
-                rec.held.add((dataset, f"{dataset}@{key}"))
+                rec.held.add(processing_pass.supply_of(a))
         calls = {"n": 0}
 
         def recorded(conn):
@@ -309,85 +305,60 @@ class TestHowFarProcessingGotIsDerived:
         monkeypatch.setattr(processing_pass, "recorded", recorded)
         return calls
 
+    @staticmethod
+    def _owed(arrivals):
+        from qa_tools.common import processing_pass
+
+        return [a.run_id for a in processing_pass.unprocessed(arrivals, conn=object())]
+
     def test_an_arrival_checked_and_gated_is_processed(self, monkeypatch):
-        self._done(monkeypatch, "cp_clients__1", "cp_carers__1")
-        assert backlog.unprocessed(
-            [self._arrival("monday", ["cp_clients__1", "cp_carers__1"])]) == []
+        a = self._arrival(1)
+        self._done(monkeypatch, a)
+        assert self._owed([a]) == []
 
     def test_a_held_supply_counts_as_gated(self, monkeypatch):
-        """A supply filed to no slot: its open hold is the gate's outcome."""
-        self._done(monkeypatch, "cp_clients__1", gated=False, held=True)
-        assert backlog.unprocessed([self._arrival("monday", ["cp_clients__1"])]) == []
+        a = self._arrival(1)
+        self._done(monkeypatch, a, gated=False, held=True)
+        assert self._owed([a]) == []
 
     def test_checked_but_not_gated_is_still_owed(self, monkeypatch):
-        """REQ-PIPE-151 criterion 2: checked is not done until the gate ran."""
-        self._done(monkeypatch, "cp_clients__1", gated=False)
-        owed = backlog.unprocessed([self._arrival("monday", ["cp_clients__1"])])
-        assert [a.name for a in owed] == ["monday"]
+        a = self._arrival(1)
+        self._done(monkeypatch, a, gated=False)
+        assert self._owed([a]) == [a.run_id]
 
-    def test_loaded_alone_is_not_processed(self, monkeypatch, clean_load_log):
-        """THE AMENDMENT ITSELF (criterion 18): every file LOADED, nothing
-        checked - which the old rule called processed."""
-        load_log.record("monday", "cp-clients", "cp_clients__1", load_log.LOADED,
-                        "2026-09-01T09:00:00+08:00")
-        self._done(monkeypatch)
-        owed = backlog.unprocessed([self._arrival("monday", ["cp_clients__1"])])
-        assert [a.name for a in owed] == ["monday"]
-
-    def test_an_arrival_reached_but_not_finished_is_still_owed(self, monkeypatch):
-        """Criterion 20, and the whole reason for deriving. A stored
-        marker advanced optimistically over this arrival would turn a
-        crash into a supply nobody ever looks at again."""
-        self._done(monkeypatch, "cp_clients__1")
-        owed = backlog.unprocessed(
-            [self._arrival("monday", ["cp_clients__1", "cp_carers__1"])])
-        assert [a.name for a in owed] == ["monday"]
-
-    def test_an_arrival_that_attributed_nothing_is_not_owed_for_ever(self, monkeypatch):
-        """A covering note and nothing else - nothing will ever be checked,
-        so treating it as owed would block the queue permanently."""
-        self._done(monkeypatch)
-        assert backlog.unprocessed([self._arrival("just-a-note", [])]) == []
+    def test_gated_but_never_checked_is_still_owed(self, monkeypatch):
+        """Criterion 20: a run that never completed is owed, whatever else
+        was recorded about its supply - the crash a marker would skip."""
+        a = self._arrival(1)
+        self._done(monkeypatch, a, checked=False)
+        assert self._owed([a]) == [a.run_id]
 
     def test_a_gap_does_not_hide_the_arrivals_after_it(self, monkeypatch):
-        """Asking each arrival its own question has no gap to stop at - a
-        high-water mark had to stop at the first unfinished arrival."""
-        self._done(monkeypatch, "cp_clients__1", "cp_clients__3")
-        owed = backlog.unprocessed([
-            self._arrival("a", ["cp_clients__1"]),
-            self._arrival("b", ["cp_clients__2"]),
-            self._arrival("c", ["cp_clients__3"])])
-        assert [x.name for x in owed] == ["b"]
+        one, two, three = (self._arrival(n) for n in (1, 2, 3))
+        self._done(monkeypatch, one, three)
+        assert self._owed([one, two, three]) == [two.run_id]
 
     def test_everything_not_yet_processed_is_owed_not_just_the_newest(self, monkeypatch):
         """Criterion 6: GitHub holds only ONE pending run per concurrency
-        group, so three rapid triggers silently lose the middle one.
-        Draining needs no queueing guarantee from anybody."""
-        self._done(monkeypatch, "cp_clients__1")
-        owed = backlog.unprocessed([self._arrival(n, [f"cp_clients__{i}"])
-                                    for i, n in enumerate(("a", "b", "c", "d"), start=1)])
-        assert [x.name for x in owed] == ["b", "c", "d"]
-
-    def test_a_delivery_spanning_collections_waits_for_both_halves(self, monkeypatch):
-        """Half a delivery is not done."""
-        self._done(monkeypatch, "cp_clients__1")
-        owed = backlog.unprocessed(
-            [self._arrival("both", ["cp_clients__1", "birth_registrations__1"])])
-        assert [x.name for x in owed] == ["both"]
+        group, so three rapid triggers silently lose the middle one."""
+        found = [self._arrival(n) for n in (1, 2, 3, 4)]
+        self._done(monkeypatch, found[0])
+        assert self._owed(found) == [a.run_id for a in found[1:]]
 
     def test_the_answer_is_stable_across_repeated_asks(self, monkeypatch):
-        self._done(monkeypatch, "cp_clients__1")
-        arrivals = [self._arrival(n, [f"cp_clients__{i}"])
-                    for i, n in enumerate(("a", "b", "c"), start=1)]
-        first = [x.name for x in backlog.unprocessed(arrivals)]
-        second = [x.name for x in backlog.unprocessed(arrivals)]
-        assert first == second == ["b", "c"]
+        found = [self._arrival(n) for n in (1, 2, 3)]
+        self._done(monkeypatch, found[0])
+        assert self._owed(found) == self._owed(found) == [a.run_id for a in found[1:]]
 
     def test_the_whole_answer_is_one_read(self, monkeypatch):
         """Criterion 19's cost bound: one read, not one per arrival."""
         calls = self._done(monkeypatch)
-        backlog.unprocessed([self._arrival(f"d{n}", [f"cp_clients__{n}"]) for n in range(20)])
+        self._owed([self._arrival(n) for n in range(20)])
         assert calls["n"] == 1
+
+    def test_backlog_no_longer_answers_it(self):
+        """Keith, 2026-10-06: one definition of processed, not two."""
+        assert not hasattr(backlog, "unprocessed")
 
 
 class TestTheStoredMarkerIsGone:

@@ -469,3 +469,48 @@ class TestARefusalAfterTheSupplyMovedIsStillRecorded:
         assert len(_refusals(conn, ds)) == 1
         self._refuse(conn, ds, supply, "2099-01-05T00:00:00+08:00", reason="slot filled")
         assert len(_refusals(conn, ds)) == 2
+
+
+class TestKeithsAnswersToTheSprint14Critic:
+    """post-build-review #120, Keith 2026-10-06: Q1 a ticket that could not
+    be reconciled is a failed stage (exit 2); Q3 a locked arrival holds
+    back the later arrivals of its own collection, as a failure does."""
+
+    @pytest.fixture
+    def world(self, supply_dsn, monkeypatch):
+        return TestThePassItself.world.__wrapped__(self, supply_dsn, monkeypatch)
+
+    def test_a_ticket_that_could_not_be_reconciled_exits_2(self, world, monkeypatch):
+        from qa_tools.common import ticket_reconciler
+
+        world.tickets = object()
+        monkeypatch.setattr(ticket_reconciler, "after_runs",
+                            lambda c: ticket_reconciler.Outcome(failed={"slot-1": "403"}))
+        monkeypatch.setattr(ticket_reconciler, "report", lambda outcome: None)
+        report = pp.run_pass(run_by="me", say=lambda m: None)
+        assert report.exit_status == pp.EXIT_FAILED
+        assert any("403" in why for _, why in report.failures)
+
+    def test_reconciled_tickets_change_nothing(self, world, monkeypatch):
+        from qa_tools.common import ticket_reconciler
+
+        world.tickets = object()
+        monkeypatch.setattr(ticket_reconciler, "after_runs",
+                            lambda c: ticket_reconciler.Outcome())
+        monkeypatch.setattr(ticket_reconciler, "report", lambda outcome: None)
+        assert pp.run_pass(run_by="me", say=lambda m: None).exit_status == pp.EXIT_OK
+
+    def test_a_locked_arrival_holds_back_its_collection_only(self, world):
+        cp_one, bdm, cp_two = world.arrivals
+        with supply_db.connect(label="other") as other, pp.arrival_lock(other, cp_one.run_id):
+            report = pp.run_pass(run_by="me", say=lambda m: None)
+        assert report.left_locked == [cp_one.run_id]
+        assert world.processed == [bdm.run_id], "the other collection carried on"
+        assert cp_two.run_id in report.left_behind_locked
+
+    def test_the_summary_says_why_they_waited(self, capsys):
+        from cli import pipeline
+
+        pipeline._say_pass(pp.PassReport(left_locked=["a"], left_behind_locked=["b", "c"]))
+        out = capsys.readouterr().out
+        assert "2 later arrival(s)" in out and "receipt order" in out

@@ -197,6 +197,10 @@ def _say_pass(report) -> None:
     if report.left_behind_failure:
         console.print(f"{len(report.left_behind_failure)} later arrival(s) left for the next "
                       f"pass behind a failure in their collection.", style="yellow")
+    if report.left_behind_locked:
+        console.print(f"{len(report.left_behind_locked)} later arrival(s) left for the next "
+                      f"pass behind one being processed elsewhere, to keep receipt order.",
+                      style="yellow")
     for what, why in report.failures:
         console.print(f"FAILED {what}: {why}", style="red")
     for line in report.tickets:

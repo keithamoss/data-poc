@@ -10765,7 +10765,7 @@ requirements:
       - qa_tools/common/delivery.py::read_receipt_record
       - qa_tools/common/delivery.py::survey
       - qa_tools/common/backlog.py::Position
-      - qa_tools/common/backlog.py::unprocessed
+      - qa_tools/common/processing_pass.py::unprocessed
       - qa_tools/common/arrivals.py::Arrival
     evidence:
       - >
@@ -18213,7 +18213,7 @@ requirements:
     - IF a kept file is recognised as belonging to a collection other than the one the command names, THEN THE SYSTEM SHALL refuse it before writing any delivery or receipt, and SHALL say which collection it belongs to.
     - WHILE REQ-PIPE-140 is not built, THE SYSTEM SHALL NOT offer, in the terminal's synthetic source mode, to record a check of an arrival whose QA results are already recorded; it SHALL mark such an arrival 'recorded' in the picker, run it as a trial with one line saying why, and IF `--commit` is given for it, THEN SHALL refuse, naming `--trial`.
     - WHERE REQ-PIPE-140 is built, THE SYSTEM SHALL record a further check of an arrival whose QA results are already recorded only through REQ-PIPE-140's re-check, under a run identity of its own.
-    - THE SYSTEM SHALL NOT record results under an already-recorded arrival's own run identity a second time, and SHALL NOT replace or delete any result already recorded for it, from any route.
+    - THE SYSTEM SHALL NOT record results under an already-recorded arrival's own run identity a second time, and SHALL NOT replace or delete any result already recorded for it, from any route - EXCEPT the results of a run that never completed, which were never visible (only completed runs are) and are replaced when the arrival is processed again under its own run identity (AMENDED 2026-10-06, Keith, post-build-review item 120 Q2).
     - WHERE a person picks, in the terminal's synthetic source mode, an arrival recognised on disk that has no recorded QA, and keeps it, THE SYSTEM SHALL process it through the per-arrival function of criterion 1.
     - THE SYSTEM SHALL use the single-run entry point (orchestrate_bdm.run_single, orchestrate_cp.run_single) for trials only, from every route, and IF it is asked to record a run under a non-trial identity, THEN THE SYSTEM SHALL refuse and record nothing.
     - WHEN one delivery is kept through the terminal in one database and processed by the pipeline's batch in another, both starting from the same recorded state, THE SYSTEM SHALL produce the same filings, the same decision-log entries apart from their written instants and the identity that ran them, and the same check verdicts - and SHALL produce them for the Lambda route too, once REQ-PIPE-152 is built.
@@ -18283,6 +18283,17 @@ requirements:
       named.'
     - A KEPT FOLDER THAT FALLS BACK TO A TRIAL (filing refused a name) still needs
       all six and a reference - nobody was asked for one.
+    - AN INCOMPLETE RUN IS RE-RUN UNDER ITS OWN RUN ID (Keith, 2026-10-06, post-build-review
+      120 Q2, over re-running it under a new identity; criterion 8 amended). A
+      run that crashed part-way never completed, and only completed runs' results
+      are visible, so replacing them replaces nothing anyone saw. A new identity
+      would leave the arrival with two runs and a partial one to explain for ever.
+    - A KEPT FOLDER NAMES WHAT IT LEAVES BEHIND (Keith, 2026-10-06, 120 Q4, over
+      refusing the whole keep or staying silent). Files recognition places are
+      filed; every other file is named as left behind, with how to keep a renamed
+      extract. Not refused, because a covering note is an ordinary thing to find
+      in a delivery. Applies to the S3 delivery route too, which goes through
+      the same folder path.
     open_questions: []
   - id: REQ-PIPE-087
     title: "PostgreSQL is the one warehouse engine, and DuckDB keeps only the job of reading what arrives"
@@ -18860,7 +18871,7 @@ requirements:
       - qa_tools/common/qa_results_reader.py::read_raw
       - qa_tools/common/load_log.py::latest_for
       - qa_tools/common/delivery_log.py::records_carrying
-      - qa_tools/common/backlog.py::unprocessed
+      - qa_tools/common/processing_pass.py::unprocessed
       - qa_tools/common/trial.py::discard
       - qa_tools/common/changelog.py::build_changelog
       - cli/env.py::reset_synthetic_command
@@ -22429,7 +22440,7 @@ requirements:
     - 'THE SYSTEM SHALL call such a run a TRIAL, in its run id, in what it prints, and in this repository''s own prose, and SHALL NOT go on calling it ad-hoc.
   
       '
-    - 'THE SYSTEM SHALL leave nothing in the database that outlives a trial - no staged table, no resolution record, no load record, no schema of any kind - so that declining to keep a check costs nothing anywhere.
+    - 'THE SYSTEM SHALL leave nothing in the database that outlives a trial - no staged table, no resolution record, no load record, no recorded check result or run, no schema of any kind (the results and run made explicit 2026-10-06, Keith, post-build-review #120 Q6) - so that declining to keep a check costs nothing anywhere.
   
       '
     - 'THE SYSTEM SHALL apply this to every route by which a person supplies a file - a single file, a folder, one table on its own, and an object fetched from S3.
@@ -22562,6 +22573,16 @@ requirements:
       #96) was DROPPED as moot - Keith: ''why would it?''; nothing runs the hand-filing
       command unattended, and the critic produced it only by faking GITHUB_ACTIONS
       in a test.'
+    - 'A TRIAL''S OWN RECORDED RESULTS GO WITH IT (Keith, 2026-10-06, post-build-review
+      120 Q6: ''the criterion wins'', over keeping them as an audit and amending
+      criterion 6). trial.discard used to remove only what file screening added
+      and keep a trial''s checks on purpose, so a completed trial run and its
+      results outlived it - visible to anything reading recorded results, run_by
+      ''trial:not-recorded'' - while the terminal said nothing was recorded. It
+      now deletes the run (its results, raw output, tables read and stats cascade)
+      and any census naming it, in the same transaction as the schemas. Criterion
+      6 now names results and runs explicitly. The deployment database held no
+      leftover trial runs when this landed.'
     linked_tests:
     - tests/test_stated_original_arrival.py
     - tests/test_filing_delivery_link.py
@@ -28559,7 +28580,7 @@ requirements:
     - qa_tools/common/promotion.py::after_run
     - qa_tools/common/decision_log.py::apply_decision
     - qa_tools/common/qa_store.py::ensure_schema
-    - qa_tools/common/backlog.py::unprocessed
+    - qa_tools/common/processing_pass.py::unprocessed
     - qa_tools/common/bootstrap.py::bootstrap
     - qa_tools/bdm/build_per_run_warehouses.py::stage_arrival
     - qa_tools/cp/build_cp_warehouses.py::stage_arrival
@@ -28592,11 +28613,11 @@ requirements:
     - WHEN the command runs, THE SYSTEM SHALL complete every re-evaluation recorded as owed (REQ-PIPE-121 criterion 16) and every re-check recorded as owed (REQ-PIPE-140 criterion 8, including one an interrupted un-supersede left owed under REQ-PIPE-120, and one a successful reload of a failed load left owed under REQ-DASH-148), and SHALL clear each owed record only when its work completes.
     - WHEN the command has processed its arrivals and owed work, THE SYSTEM SHALL reconcile every slot's ticket through REQ-PIPE-083's pass, and WHERE no ticketing is configured SHALL say so in one line and finish normally.
     - THE SYSTEM SHALL offer the command from the TUI's main menu and as a flag-invocable command that asks nothing, so that a scheduler can call it unattended.
-    - IF an arrival fails, THEN THE SYSTEM SHALL leave it and every later arrival of the same collection owed for the next pass, continue with the other collections' arrivals and with owed items, and report each failure; IF an owed item fails, THEN THE SYSTEM SHALL leave it owed, continue with the others, and report it.
+    - IF an arrival fails, THEN THE SYSTEM SHALL leave it and every later arrival of the same collection owed for the next pass, continue with the other collections' arrivals and with owed items, and report each failure; IF an arrival is held by another process, THEN THE SYSTEM SHALL likewise leave it and every later arrival of the same collection for the next pass, so receipt order holds (AMENDED 2026-10-06, Keith, post-build-review item 120 Q3); IF an owed item fails, THEN THE SYSTEM SHALL leave it owed, continue with the others, and report it.
     - WHERE there is nothing to process and nothing owed, THE SYSTEM SHALL say so and exit with a zero status.
     - THE SYSTEM SHALL hold one pass lock per database, taken by `mothman pipeline process`, `mothman pipeline run`, `mothman pipeline bootstrap` and `mothman pipeline regenerate-history`, and IF any of them finds it held, THEN THE SYSTEM SHALL refuse at once, naming the command that holds it and since when, and change nothing.
     - THE SYSTEM SHALL keep `mothman pipeline run` and `mothman pipeline bootstrap` as the full rebuild from generated data, so that regenerate-and-diff remains available as a correctness check, and SHALL NOT give this command a mode that generates data.
-    - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-061 criterion 6's rule as implemented in qa_tools/common/backlog.py (unprocessed()), so that 'processed' means checked and gated rather than loaded.
+    - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-061 criterion 6's rule so that 'processed' means checked and gated rather than loaded, and SHALL answer it with this pass's own definition (processing_pass.unprocessed()) alone. AMENDED 2026-10-06 (Keith, post-build-review item 120 Q5): it was implemented in qa_tools/common/backlog.py's unprocessed(), which then had no caller and was a second door into the same rule, so it was deleted."
     - 'THE SYSTEM SHALL add `promotion-refused` to decision_log.AUTOMATIC_ACTIONS in the same change, and SHALL NOT change REQ-PIPE-074''s text: its criterion 1 lists the filing decisions a person makes, and its criterion 2 already records an automatic decision in the same log with the rule as actor.'
     - THE SYSTEM SHALL exit `mothman pipeline process` with status 0 when everything it attempted completed and no result it recorded is red, 1 when everything completed and at least one recorded result is red, 2 when any stage, arrival or owed item failed, and 75 when another pass holds the lock, 2 outranking 1, and SHALL state these codes in the command's help.
     non_functional_requirements:
@@ -28709,6 +28730,25 @@ requirements:
       for the same refusal again, a new entry after a move or a different refusal.
       The deployment database''s history was written under the old rule and was
       not rebuilt for this change.'
+    - 'A TICKET THAT COULD NOT BE RECONCILED IS A FAILED STAGE (Keith, 2026-10-06,
+      post-build-review 120 Q1, over ''print it, exit on the arrivals alone'').
+      Criterion 20 already read ''any stage'', so no amendment: each slot the
+      reconciler reports as failed is a pass failure, exit 2. The slot state is
+      durable and the next pass retries; the exit status is how a scheduler learns
+      ticketing is stuck. Cost accepted: while ticketing stays broken every pass
+      reads as failed.'
+    - A LOCKED ARRIVAL HOLDS BACK ITS COLLECTION (Keith, 2026-10-06, 120 Q3, criterion
+      14 amended). The later arrivals of the same collection wait for the next
+      pass, as they do after a failure, because each filing depends on what the
+      one before it promoted - letting them go ahead would file a later supply
+      before an earlier one. Other collections carry on. Reported as its own line,
+      so 'held behind a lock' is not read as 'held behind a failure'.
+    - backlog.unprocessed() DELETED (Keith, 2026-10-06, 120 Q5; criterion 18 amended).
+      Once criterion 18 made it read this pass's own definition it had no caller
+      and was a second door into the same rule. Its tests were moved onto processing_pass.unprocessed();
+      two did not survive because an arrival is now one dataset's file, so neither
+      a covering-note-only arrival nor one spanning two collections exists to
+      go wrong.
     open_questions: []
   - id: REQ-PIPE-152
     title: The S3 Lambda handlers process each arriving object through the per-arrival lifecycle, and the S3 object is the delivery

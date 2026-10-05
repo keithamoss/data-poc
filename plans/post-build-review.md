@@ -6025,3 +6025,9 @@ twice. It deliberately did not re-find the `TypeError`.
       contested keep; an owed re-check (as opposed to a re-evaluation); a
       configured ticket reconciliation succeeding; `--all-checks`; the
       dashboard's display of `promotion-refused`; CI for 827636e.
+    - **KEITH'S ANSWERS, 2026-10-06**: D3 -> exit 2 (a ticket failure is a
+      failed stage); D9 -> same run id, with c8 amended to except an
+      incomplete run; D12 -> a locked arrival holds back its collection;
+      D6 -> keep the recognised files and name each one left behind; D13's
+      backlog.unprocessed -> deleted; the trial finding -> REQ-PIPE-103 c6
+      stands, so a trial's run and results are discarded.

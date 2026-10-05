@@ -180,6 +180,17 @@ releases:
               tickets - now reads as a failure to a scheduler, not as red
               results. A file that cannot be staged now holds back only its
               own collection.
+          - headline: A trial really leaves nothing behind
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              A trial's own check results and run are now removed along with
+              everything else it used. Before, they stayed in the database,
+              even though the terminal told you nothing was recorded.
+          - headline: A kept folder tells you what it left behind
+            components: ["Testing & dev tooling"]
+            description: >
+              Keeping a folder now lists any file no dataset recognises, so a
+              renamed extract doesn't quietly go unchecked.
 
   - date: "2026-10-05"
     summary: >

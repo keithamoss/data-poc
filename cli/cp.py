@@ -298,6 +298,16 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
         # is; another collection's file is refused (criterion 5).
         paths = [p for p in _files_in(folder) if delivery.dataset_for_filename(
             os.path.basename(p)) is not None]
+        # WHAT IS LEFT BEHIND IS NAMED (Keith, 2026-10-06, #120 Q4): a renamed
+        # extract is a supply on the floor, and the batch already says so.
+        # Named, not refused - a covering note is an ordinary thing to find.
+        left = sorted(os.path.basename(p) for p in _files_in(folder) if p not in paths)
+        if paths and left:
+            console.print(
+                f"Not recognised as any dataset, so left behind: {', '.join(left)}. If one "
+                f"is a renamed extract, rename it to its dataset's file name and keep it "
+                f"again - it is not part of this delivery.", style="yellow", markup=False,
+                highlight=False)
         if not paths:
             raise click.ClickException(
                 f"nothing in {folder} matches any dataset's arrival pattern, so there is "

@@ -314,6 +314,33 @@ class TestARealTrialStagesAndVanishes:
                 [run_id]).fetchall()
             assert run_id not in qa_store.incomplete_runs(conn)
 
+    def test_a_completed_trials_own_results_go_with_it(self, supply_dsn):
+        """REQ-PIPE-103 criterion 6 - Keith, 2026-10-06 (post-build-review
+        #120 Q6): discard KEPT a trial's own recorded checks on purpose, so a
+        completed trial run and its results outlived it, visible to anything
+        reading recorded results, while the terminal said nothing was
+        recorded. The criterion wins: the run, its results and anything
+        else recorded under it go in the same transaction."""
+        from qa_tools.common import qa_store
+        from qa_tools.common.qa_results_writer import finish_run, write_qa_result
+
+        run_id = trial.trial_run_id()
+        when = "2026-01-01T00:00:00+00:00"
+        write_qa_result("civil-registration-agency", "civil-registration", run_id, when, "soda",
+                        {"hasErrors": False},
+                        [{"check_id": "x.y.civil-registration.birth-registrations.c.missing_soda",
+                          "dataset_id": "birth-registrations", "run_id": run_id,
+                          "status": "pass"}], run_by="trial:not-recorded")
+        finish_run(run_id)
+        with supply_db.connect(label="test-trial") as conn:
+            conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".census (trigger, run_key) '
+                         "VALUES ('run', ?)", [run_id])
+            trial.discard(conn, run_id)
+            for table in ("run", "check_result", "census"):
+                assert not conn.execute(
+                    f'SELECT 1 FROM "{qa_store.SCHEMA}".{table} WHERE run_key = ?',
+                    [run_id]).fetchall(), f"the trial's {table} rows outlived it"
+
 
 class TestATrialIsNeverSilentlyCheckedAgainstPromotedData:
     """A latent false green, found by Keith asking the right question

@@ -2469,6 +2469,15 @@ judgement about who reads the page rather than about the rule.
             while printing "nothing was recorded". `trial.discard` does this
             on purpose, but REQ-PIPE-103 c6 says nothing should outlive a
             trial. Which is right?
+        KEITH'S ANSWERS, 2026-10-06 morning (all six as recommended):
+        Q1 exit 2 - ticket reconciliation that fails is a failed stage.
+        Q2 same run id - c8 gains an explicit exception: an incomplete
+        run's results were never visible, so replacing them replaces
+        nothing anyone saw. Q3 hold back - a locked arrival holds back
+        later arrivals of its own collection, as a failure does. Q4 keep
+        the rest and NAME each file left behind. Q5 delete
+        backlog.unprocessed. Q6 the criterion wins - a trial's run and
+        its check results are discarded with everything else.
  All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.

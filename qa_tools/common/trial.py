@@ -194,18 +194,14 @@ def discard(conn, run_id: str) -> list[str]:
         conn.execute(
             f'DELETE FROM "{qa_store.SCHEMA}".load_outcome WHERE trial_run_id = ?',
             [run_id])
-        # ITS FILE-CHECK RESULTS GO TOO, and the run they registered when
-        # that is all the run holds (post-build-review #118 D-C): staging a
-        # reference run registered a qa.run that nothing ever completed, so
-        # it was listed among the crashed runs forever, its results pointing
-        # at load records deleted just above. A trial whose own checks were
-        # recorded keeps them - only what screening added is undone.
-        conn.execute(
-            f"DELETE FROM \"{qa_store.SCHEMA}\".check_result WHERE run_key = ? AND tool = 'file'",
-            [run_id])
-        conn.execute(
-            f'DELETE FROM "{qa_store.SCHEMA}".run r WHERE r.run_key = ? '
-            f"AND r.completed_at IS NULL AND NOT EXISTS (SELECT 1 FROM "
-            f'"{qa_store.SCHEMA}".check_result c WHERE c.run_key = r.run_key)',
-            [run_id])
+        # ITS RUN AND EVERYTHING RECORDED UNDER IT GO TOO (REQ-PIPE-103
+        # criterion 6; Keith, 2026-10-06, post-build-review #120 Q6). This
+        # used to remove only what screening added and KEEP a trial's own
+        # recorded checks, so a completed trial run and its results outlived
+        # it - visible to anything reading recorded results - while the
+        # terminal said nothing was recorded. The run's results, raw
+        # output, tables read and stats cascade from it; a census names the
+        # run without a foreign key, so it is removed by name.
+        conn.execute(f'DELETE FROM "{qa_store.SCHEMA}".census WHERE run_key = ?', [run_id])
+        conn.execute(f'DELETE FROM "{qa_store.SCHEMA}".run WHERE run_key = ?', [run_id])
     return mine

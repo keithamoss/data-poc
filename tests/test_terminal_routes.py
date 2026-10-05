@@ -98,6 +98,21 @@ class TestAKeptFolderIsWhateverRecognitionPlaces:
             cp.run_check_local_folder(str(folder), None, "me", keep=True)
         assert sorted(filed_paths) == ["cp_carers.csv", "cp_clients.csv"]
 
+    def test_what_is_left_behind_is_named(self, monkeypatch, tmp_path, capsys):
+        """Keith, 2026-10-06 (#120 Q4): a renamed extract is a supply on the
+        floor, so a kept folder names every file it leaves behind rather
+        than leaving them silently."""
+        folder = tmp_path / "d"
+        folder.mkdir()
+        _csv(folder, "cp_clients.csv")
+        _csv(folder, "CLIENTS_EXTRACT_FINAL.csv")
+        monkeypatch.setattr(common, "file_or_trial",
+                            lambda *a, **k: (_ for _ in ()).throw(click.ClickException("stop")))
+        with pytest.raises(click.ClickException):
+            cp.run_check_local_folder(str(folder), None, "me", keep=True)
+        out = _flat(capsys.readouterr().out)
+        assert "CLIENTS_EXTRACT_FINAL.csv" in out and "left behind" in out
+
     def test_a_trial_folder_still_needs_all_six(self, tmp_path):
         folder = tmp_path / "d"
         folder.mkdir()
