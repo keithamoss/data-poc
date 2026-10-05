@@ -171,8 +171,62 @@ releases:
               A file that failed to load now appears in the terminal's queue
               of supplies waiting on you. Rejecting it settles it everywhere;
               promoting it is refused, since there is nothing to promote.
+      - category: Improved
+        items:
+          - headline: A gap in earlier periods no longer holds a supply back
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              A drift or volume check compared across a period with nothing
+              accepted still reads red and says so, but it no longer stops
+              the supply being promoted - only a real drift does. One supply
+              left waiting no longer makes every later one wait too.
+          - headline: A dataset page shows the newest supply in place or waiting
+            components: ["Dashboard UI"]
+            description: >
+              On any date you pick, a dataset's results are the newest supply
+              that is in place or still waiting for a decision, and a line
+              under the heading says which. A supply that was rejected,
+              demoted or set aside no longer stands in as the answer.
+          - headline: An old held supply no longer hides later results
+            components: ["Dashboard UI"]
+            description: >
+              A dataset with a supply still waiting to be placed stays red
+              with the reason, but its later periods now show their own
+              checked results rather than "No data".
+          - headline: See which amber setting applies, and where it was set
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              Each dataset page, `mothman supply slots` and the new `mothman
+              supply amber-setting` say what happens to an amber supply - for
+              example "promote (set for the whole data asset, since 1 Jan
+              2023)" - so a setting nobody remembers choosing can be found.
+          - headline: A late file that is still expected is named
+            components: ["Dashboard UI"]
+            description: >
+              A dataset's row now says when a file is late but its period is
+              still open, beside any older period that closed with nothing in
+              it, and the no-supply notice asks you to chase the supplier
+              before deciding anything.
       - category: Fixed
         items:
+          - headline: A slip in the asset configuration no longer crashes every command
+            components: ["Testing & dev tooling"]
+            description: >
+              If contract/data-asset.yaml cannot be read, every mothman
+              command now stops with one line naming the file, the line and
+              the problem, instead of a page of Python error.
+          - headline: A file after the calendar runs out is held, not filed years back
+            components: ["Pipeline & publishing"]
+            description: >
+              The last period of a written-out calendar now closes, so a file
+              arriving after it waits for you to place it rather than being
+              filed into a period years earlier.
+          - headline: A demote that would leave two waiting versions is refused
+            components: ["Pipeline & publishing"]
+            description: >
+              Demoting a supply into a period where a newer version is
+              already waiting now says to reject or set aside the newer one
+              first, so one table never has two versions waiting.
           - headline: Bootstrapping both collections at once no longer fails at random
             components: ["Testing & dev tooling", "Pipeline & publishing"]
             description: >

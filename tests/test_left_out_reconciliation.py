@@ -128,3 +128,20 @@ class TestEachSlotStateRecordsItsOwnReason:
                 "WHERE run_key LIKE ? AND tool = 'left_out'", [f"%{run_id}"]).fetchone()
         assert compared and set(compared) <= {"dbt", "soda", "datacontract", "evidently"}
         assert {c for ids in compared.values() for c in ids} == {c for c, _, _ in unrunnable}
+
+
+class TestATrialIsReconciledToo:
+    """REQ-PIPE-115 criterion 17 as amended 2026-10-05 (Keith): a trial run
+    has no period, and used to skip the reconciliation entirely."""
+
+    def test_a_trial_is_reconciled(self):
+        from qa_tools.common import trial
+        from qa_tools.cp import orchestrate_cp
+
+        run_id = trial.trial_run_id()
+        assert orchestrate_cp._reconciles({"received_at": None}, run_id)
+
+    def test_a_run_naming_no_table_and_no_trial_is_not(self):
+        from qa_tools.cp import orchestrate_cp
+
+        assert not orchestrate_cp._reconciles({"received_at": None}, "run_001")

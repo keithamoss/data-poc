@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -423,6 +423,10 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".delivery_file (
 -- nobody was asked (criterion 18). Nothing orders, names, files, judges
 -- or promotes on it (criterion 11) - it is a note, not a fact we hold.
 ALTER TABLE "{SCHEMA}".delivery_file ADD COLUMN IF NOT EXISTS originally_received_stated text;
+-- AND ITS INSTANT BESIDE IT (NFR 6, built 2026-10-05, Keith; schema 24):
+-- the receipt's own text-plus-instant convention. NULL for 'not-known'
+-- and where nobody was asked. Still a note - nothing decides on it.
+ALTER TABLE "{SCHEMA}".delivery_file ADD COLUMN IF NOT EXISTS originally_received_stated_instant timestamptz;
 
 --   "when did this dataset last arrive", across all deliveries. Real
 --   columns rather than a JSONB document for the same reason
@@ -1043,12 +1047,17 @@ def _refuse_another_version(recorded: int | None) -> None:
             f"checkout's {SCHEMA_VERSION}. Refusing rather than applying older "
             f"definitions over it and rewriting the version down - update this "
             f"checkout, or point it at a database of its own version.")
-    if recorded < RESHAPED_AT:
-        raise SchemaVersionError(
-            f"this database's qa schema is version {recorded}, from before the "
-            f"version-{RESHAPED_AT} reshape of qa.filing and qa.delivery, which "
-            f"cannot be applied in place. Rebuild it from an empty database: "
-            f"`mothman env reset-synthetic`, then `mothman pipeline bootstrap`.")
+    # EVERY OLDER VERSION IS REFUSED, not only one from before a reshape
+    # (Keith, 2026-10-05: always wipe and rebuild). Regenerate, never
+    # migrate - schemas 19 to 23 had been applied in place as additive
+    # changes, which this rule never allowed.
+    why = (f"from before the version-{RESHAPED_AT} reshape of qa.filing and "
+           f"qa.delivery" if recorded < RESHAPED_AT else
+           f"older than this checkout's {SCHEMA_VERSION}")
+    raise SchemaVersionError(
+        f"this database's qa schema is version {recorded}, {why}, and a schema "
+        f"is never brought up to date in place. Rebuild it from an empty database: "
+        f"`mothman env reset-synthetic`, then `mothman pipeline bootstrap`.")
 
 
 def _is_current(conn: supply_db.SupplyConnection) -> bool:

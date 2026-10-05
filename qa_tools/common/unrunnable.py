@@ -139,9 +139,10 @@ def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
         # so it is left out here entirely rather than explained twice -
         # found on the first bootstrap under REQ-PIPE-131, the first to
         # produce real holds. Where several of its tables are unreadable,
-        # the first (by name) is the one named.
+        # the one record names them all (criterion 2 as amended).
         if (set(tables) | {home}) & set(resolution.held):
             continue
+        found = []
         for table in sorted((set(tables) | {home}) & missing):
             if table not in states and table in refused:
                 # COULD NOT BE LOADED WINS THE REASON (REQ-DASH-148
@@ -161,35 +162,43 @@ def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
             verdict = period_schema.check_readiness(
                 [table], wrapped,
                 supply_states={table: states[table]} if states[table] else {})
-            if verdict is None:
-                continue
-            meta = checks_by_id.get(check)
-            out.append({
-                "agency_id": parsed.agency,
-                "collection_id": parsed.collection,
-                "dataset_id": parsed.dataset,
-                "check_id": check,
-                "check_name": getattr(meta, "name", None) or parsed.check_name,
-                "column_name": table,
-                "dimension": "completeness",
-                "label": LABEL,
-                "run_id": run_id,
-                "run_timestamp": run_timestamp,
-                "status": "nodata" if verdict.status == period_schema.NODATA else "fail",
-                "metric_value": None,
-                "unit": None,
-                "warn_threshold": None,
-                "fail_threshold": None,
-                "row_count_total": None,
-                "row_count_invalid": None,
-                "on_fail_action": "flag",
-                "engine": getattr(meta, "tool", None) or parsed.tool,
-                "unrunnable_table": table,
-                "unrunnable_code": verdict.reason,
-                "unrunnable_reason": (f"{verdict.describe()}. This check did not fail - "
-                                      f"it could not be evaluated."),
-            })
-            break
+            if verdict is not None:
+                found.append((table, verdict))
+        if not found:
+            continue
+        # ONE RECORD NAMING EVERY UNREADABLE TABLE (REQ-PIPE-115 criterion
+        # 2 as amended 2026-10-05, Keith) - it used to name only the first.
+        # Red where any table's reason is red; no data only where every
+        # one is merely not yet due.
+        first_table, first = next(((t, v) for t, v in found
+                                   if v.status != period_schema.NODATA), found[0])
+        meta = checks_by_id.get(check)
+        out.append({
+            "agency_id": parsed.agency,
+            "collection_id": parsed.collection,
+            "dataset_id": parsed.dataset,
+            "check_id": check,
+            "check_name": getattr(meta, "name", None) or parsed.check_name,
+            "column_name": first_table,
+            "dimension": "completeness",
+            "label": LABEL,
+            "run_id": run_id,
+            "run_timestamp": run_timestamp,
+            "status": "nodata" if first.status == period_schema.NODATA else "fail",
+            "metric_value": None,
+            "unit": None,
+            "warn_threshold": None,
+            "fail_threshold": None,
+            "row_count_total": None,
+            "row_count_invalid": None,
+            "on_fail_action": "flag",
+            "engine": getattr(meta, "tool", None) or parsed.tool,
+            "unrunnable_table": first_table,
+            "unrunnable_tables": [t for t, _ in found],
+            "unrunnable_code": first.reason,
+            "unrunnable_reason": ("; ".join(v.describe() for _, v in found)
+                                  + ". This check did not fail - it could not be evaluated."),
+        })
     return out
 
 

@@ -127,7 +127,18 @@ class TestThePastIsFrozen:
         old = _doc()
         new = copy.deepcopy(old)
         new["amber_setting"]["versions"].append(_version("2026-10-01", "hold"))
-        assert any("before today" in p for _, p in self._check(old, new))
+        assert any("before the day it was added" in p for _, p in self._check(old, new))
+
+    def test_judged_by_the_day_it_was_added_not_the_day_the_gate_runs(self):
+        """Criterion 7 as amended 2026-10-05 (Keith): a version dated the
+        day it was committed stays fine when the gate runs after midnight."""
+        old = _doc()
+        new = copy.deepcopy(old)
+        new["amber_setting"]["versions"].append(_version("2026-10-04", "hold"))
+        assert amber_setting.past_change_problems(
+            old, new, self.TODAY, synthetic=False, added=date(2026, 10, 4)) == []
+        assert amber_setting.past_change_problems(
+            old, new, self.TODAY, synthetic=False, added=date(2026, 10, 5))
 
     def test_a_synthetic_asset_may_author_the_past_but_not_rewrite_it(self):
         old = _doc()
@@ -379,3 +390,23 @@ class TestRefusalsNameTheNextCommand:
             effective_at=WHEN)
         with pytest.raises(dl.DecisionRefused, match="--operation promote"):
             _ack(conn, supply, period)
+
+
+class TestTheSettingIsVisible:
+    """NFR 1, built 2026-10-05 (Keith): the resolved value and the level it
+    came from, per dataset, in words - so a value nobody remembers setting
+    is discoverable."""
+
+    def test_the_timeline_says_each_change_and_where_it_came_from(self):
+        doc = _doc(collection=[("2026-10-05", "promote-and-acknowledge")])
+        tl = amber_setting.timeline("cp-clients", doc=doc)
+        assert [(t["from"], t["value"], t["level"]) for t in tl] == [
+            ("2023-01-01", "promote", amber_setting.ASSET),
+            ("2026-10-05", "promote-and-acknowledge", amber_setting.COLLECTION)]
+
+    def test_in_words(self):
+        doc = _doc(collection=[("2026-10-05", "promote-and-acknowledge")])
+        text = amber_setting.describe("cp-clients", date(2026, 10, 6), doc=doc)
+        assert text == "promote and acknowledge (set for Child Protection, since 5 Oct 2026)"
+        assert amber_setting.describe("cp-clients", date(2026, 1, 1), doc=doc) == \
+            "promote (set for the whole data asset, since 1 Jan 2023)"

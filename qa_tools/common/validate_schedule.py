@@ -744,6 +744,27 @@ def _content_at(rel_path: str, ref: str) -> str | None:
     return result.stdout if result.returncode == 0 else None
 
 
+def _added_on(rel_path: str, ref: str) -> date | None:
+    """The day, on the asset's clock, the change to `rel_path` since `ref`
+    was ADDED - the earliest commit after `ref` that touched it - or None
+    where the working tree differs from HEAD, i.e. the change is not
+    committed yet and is being added today (REQ-PIPE-122 criterion 7 as
+    amended 2026-10-05, Keith). Author date, because a rebase rewrites
+    the committer's."""
+    from datetime import datetime
+
+    head = _content_at(rel_path, "HEAD")
+    path = ROOT / rel_path
+    if head is None or not path.exists() or path.read_text() != head:
+        return None
+    result = subprocess.run(["git", "log", "--format=%aI", f"{ref}..HEAD", "--", rel_path],
+                            cwd=ROOT, capture_output=True, text=True)
+    stamps = [line for line in result.stdout.split() if line] if result.returncode == 0 else []
+    if not stamps:
+        return None
+    return min(asset_time.local_date(datetime.fromisoformat(s)) for s in stamps)
+
+
 def _authored_dates(doc: dict) -> dict[tuple[str, str, str], str]:
     """{(calendar, effective_from, period): date} across every version.
 
@@ -900,13 +921,21 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
     if not isinstance(old_doc, dict):
         return standing
     synthetic = bool(old_doc.get("synthetic")) and bool(raw.get("synthetic"))
+    problems = amber_setting.past_change_problems(old_doc, raw, today, synthetic=synthetic)
+    if any("before the day it was added" in p for _, p in problems):
+        # ONLY NOW ask git when it was added (criterion 7 as amended): a
+        # version dated before today is the one case the commit's date can
+        # change, and every other run keeps to the single `git show`.
+        added = _added_on(str(src.asset_path.relative_to(ROOT)), ref)
+        if added is not None:
+            problems = amber_setting.past_change_problems(
+                old_doc, raw, today, synthetic=synthetic, added=added)
     return standing + [ConfigError(
         src.name, f"amber_setting ({where})", f"{problem}.",
         "A setting's past is frozen - add a NEW version, dated today or later, with the "
         "value you want from then on. Nothing judged under the old version changes, "
         "because each promotion recorded the setting it acted under.")
-        for where, problem in amber_setting.past_change_problems(
-            old_doc, raw, today, synthetic=synthetic)]
+        for where, problem in problems]
 
 
 # ---- the gate -------------------------------------------------------

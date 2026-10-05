@@ -56,6 +56,11 @@ class TestTheQueueHoldsOnlySuppliesSomebodyMustDecideAbout:
         ]
         monkeypatch.setattr(slot_state, "states_for",
                              lambda conn, collection_id, now=None: every)
+        # AND NO FAILED LOADS FROM THE SHARED DATABASE: awaiting() also
+        # reads the load log, and a parallel test's failed load in a 2099
+        # period turned up here (2026-10-05, a full run on a fresh gate
+        # database) - this class is about slot states alone.
+        monkeypatch.setattr(filing_queue, "could_not_load", lambda conn, collection_id: [])
         return every
 
     def test_it_holds_the_supplies_and_not_the_empty_periods(self, states):

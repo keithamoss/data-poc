@@ -790,6 +790,28 @@ def slots_command(collection_id: str, dataset_id: str | None) -> None:
     filing_tui.standing_view(collection_id, dataset_id)
 
 
+@supply_group.command("amber-setting")
+@click.option("--collection", "collection_id", default=None,
+               help="Narrow to one collection.")
+def amber_setting_command(collection_id: str | None) -> None:
+    """The amber setting in force for each dataset, and where it was set
+    (REQ-PIPE-122 NFR 1) - so a value nobody remembers setting can be found.
+
+    Plain lines, one per dataset, so the list can be read or grepped.
+    """
+    from qa_tools.common import amber_setting, asset_time, hierarchy
+
+    today = asset_time.local_date(asset_time.now())
+    entries = (hierarchy.datasets_in_collection(collection_id) if collection_id
+               else hierarchy.all_datasets())
+    for entry in entries:
+        try:
+            said = amber_setting.describe(entry.dataset_id, today)
+        except amber_setting.AmberSettingError as exc:
+            said = f"none in force - {exc}"
+        click.echo(f"{entry.dataset_id}  {said}")
+
+
 @supply_group.command("superseded")
 @click.option("--collection", "collection_id", required=True,
                help="Which collection's superseded supplies to list.")

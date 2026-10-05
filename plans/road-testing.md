@@ -2241,11 +2241,34 @@ judgement about who reads the page rather than about the rule.
             new filing decision on both routes; PERMISSION GIVEN to reset
             and rebuild the real `supply` database and to drop the seven
             scratch databases (supply131, supply131b, equiv144_before,
-            equiv144_after, equiv_after, supply6, supply7). THE DROP WAS
-            REFUSED by this session's permission classifier despite the yes,
-            and was not worked around - Keith runs it, or adds a permission
-            rule. Also left over and NOT in the yes: boot_par, boot_seq,
-            ov_overlap, ov_sequential, supply115.
+            equiv144_after, equiv_after, supply6, supply7). A batch drop
+            was refused by this session's permission classifier; Keith then
+            asked for them one at a time, and all seven are dropped. Also
+            left over and NOT in the yes: boot_par, boot_seq, ov_overlap,
+            ov_sequential, supply115 - and now supply8 and gate144, both on
+            a refused schema since schema 24 (gate24 replaces gate144).
+      - BUILT, 2026-10-05 MORNING, from those answers (amendments written
+        into the requirements first; REQ-QAC-108 c15 and REQ-PIPE-081 c1/c2/c8
+        in the wording Keith approved, the rest transcribed): a gap red no
+        longer blocks promotion (promotion._gating_status reads the
+        measurement); a demote beside a newer waiting version is refused;
+        an old hold no longer blanks later periods (only a contested or
+        unloadable supply newer than the latest checked run does); one
+        not-evaluated record per check NAMING EVERY unreadable table (it
+        named the first only - found while building); trial runs are
+        reconciled; any older schema is refused (schema 24 - the stated
+        original arrival's instant column); a malformed data-asset.yaml is
+        one line, exit 2; criterion 7 judged by the commit's date, looked up
+        only when a new version is back-dated (the gate keeps its single
+        `git show`); the amber setting shown on each dataset page, in
+        `supply slots` and in a new `supply amber-setting`; an authored
+        calendar's last slot closes; the banner says chase first and names
+        the filing wizard; a late-but-open slot is named on the row; and
+        081's PAGE SWITCH - the newest supply promoted or awaiting on the
+        date on show, labelled, a withdrawn one leaving the view. The real
+        `supply` database was reset and rebootstrapped on the final code.
+        SIGHTING, logged as #17: one trial gave 19 failures once, then 177
+        passes on four runs - not reproduced.
       STILL TO ASK: CLI Q5-Q8 (exit codes; check table for a big kept
       delivery; how "fix and reprocess" reaches a check; an S3 prefix's
       default arrival time), architect C Q1-Q7 (Lambda/backstop receipt
@@ -2270,3 +2293,18 @@ judgement about who reads the page rather than about the rule.
  All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.
+
+17. **[investigate, 2026-10-05]** **[Pipeline & publishing]** **The same
+    trial gave different verdicts once.** `mothman cp qa --trial --table
+    cp_clients --file "data/deliveries/Data Extract 01 Feb 2023/cp_clients.csv"`
+    against `supply8` reported **153 pass / 5 warn / 19 fail-or-error** (184
+    checks) the first time, and **177 pass / 0 / 0** on each of four runs
+    after it. The only code change between the first and second was the
+    trial reconciliation (REQ-PIPE-115 c17), which cannot change a verdict.
+    NOT REPRODUCED. One candidate, unconfirmed: the first run was the first
+    connection to `supply8` since the schema went from 22 to 23, so it
+    migrated the schema in place on that connection. Another: some
+    leftover state from an earlier session that the first run consumed.
+    The first run's per-check output was not kept, so which 19 failed is
+    unknown. Next step if it recurs: keep the full output (COLUMNS=250) and
+    compare the failing check ids against a stable run.

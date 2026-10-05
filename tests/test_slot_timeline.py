@@ -235,3 +235,40 @@ class TestTheTimelineIsTheViewsAnswers:
         assert slot_timeline.in_place_on(
             timeline, "2026-Q1", "2026-03-01T00:00:00+08:00") == "s1"
         assert [e["supply"] for e in timeline] == ["s1"]
+
+
+class TestEachSuppliesStateOverTime:
+    """REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05 (Keith): the
+    page's verdict comes from the newest supply PROMOTED or AWAITING A
+    DECISION on the date on show, and a withdrawn one - demoted, rejected,
+    re-filed out or superseded - leaves the view. The answers travel: each
+    supply's state after every decision about it; before the first, a
+    filed supply is waiting."""
+
+    def test_promoted_then_demoted_is_withdrawn_from_the_demote(self, clean, dataset):
+        _decide(clean, dataset, decision_log.PROMOTE, supply="s1",
+                at="2026-02-01T09:00:00+08:00", to_slot="2026-Q1")
+        _decide(clean, dataset, decision_log.DEMOTE, supply="s1",
+                at="2026-03-01T09:00:00+08:00", from_slot="2026-Q1")
+        got = slot_timeline.supply_states(dataset, conn=clean)["s1"]
+        assert [e["state"] for e in got] == ["promoted", "withdrawn"]
+        assert got[1]["at"].startswith("2026-03-01")
+
+    def test_a_withheld_note_leaves_it_waiting(self, clean, dataset):
+        _decide(clean, dataset, decision_log.PROMOTION_WITHHELD, supply="s2",
+                at="2026-02-01T09:00:00+08:00", to_slot="2026-Q1", kind=decision_log.RULE)
+        assert "s2" not in slot_timeline.supply_states(dataset, conn=clean)
+
+    def test_rejected_is_withdrawn(self, clean, dataset):
+        _decide(clean, dataset, decision_log.REJECT, supply="s3",
+                at="2026-02-01T09:00:00+08:00", from_slot="2026-Q1")
+        assert [e["state"] for e in slot_timeline.supply_states(dataset, conn=clean)["s3"]] == \
+            ["withdrawn"]
+
+    def test_keyed_by_the_run_that_checked_each(self, clean, dataset, monkeypatch):
+        from pipeline import slot_timeline as st
+
+        _decide(clean, dataset, decision_log.REJECT, supply="s4",
+                at="2026-02-01T09:00:00+08:00", from_slot="2026-Q1")
+        monkeypatch.setattr(st, "_run_for", lambda conn, d, supply: "run_007")
+        assert [e["state"] for e in st.run_states(dataset, conn=clean)["run_007"]] == ["withdrawn"]

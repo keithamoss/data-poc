@@ -153,3 +153,22 @@ describe("the queue is read as at the date on show (UX critic, 2026-10-05)", () 
     expect(kinds).not.toContain(LATER.observedAt);
   });
 });
+
+// REQ-DASH-133, Keith 2026-10-05 (#104): a daily feed's row names today's
+// late-but-open file beside an old gap.
+describe("a slot late but still open", () => {
+  const DS = {lateSlots: [{period: "2026-10-04", lateAt: "2026-10-04T02:00:00+00:00",
+                           filedAt: null, closesAt: "2026-10-05T00:00:00+00:00"}]};
+  it("is named on the day it is late and gone once it closes", () => {
+    const w = load();
+    expect(w.lateOpenAsOf(DS, "2026-10-04").period).toBe("2026-10-04");
+    expect(w.lateOpenAsOf(DS, "2026-10-03")).toBeNull();
+    expect(w.lateOpenAsOf(DS, "2026-10-05")).toBeNull();
+  });
+  it("is gone once a file arrives", () => {
+    const w = load();
+    const filed = {lateSlots: [{...DS.lateSlots[0], filedAt: "2026-10-04T05:00:00+00:00",
+                                closesAt: null}]};
+    expect(w.lateOpenAsOf(filed, "2026-10-04")).toBeNull();
+  });
+});

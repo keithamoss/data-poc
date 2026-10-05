@@ -7,6 +7,7 @@ flags duality the whole CLI is designed around."""
 from __future__ import annotations
 
 import rich_click as click
+import yaml
 from rich.console import Console
 
 # A DEVELOPER'S OWN .env, BEFORE ANYTHING READS THE ENVIRONMENT.
@@ -18,8 +19,37 @@ from qa_tools.common.local_env import load_local_env
 
 load_local_env()
 
-from . import (bdm, check, common, cp, dashboard, debug, env, filing_tui, github,
-               pipeline, plans, population, scenarios, schedule, supply)
+
+def _config_refusal(exc) -> str:
+    """One line for a configuration file that cannot be parsed - the file,
+    the line, what is wrong - never a traceback (REQ-PIPE-122 criterion 24,
+    Keith 2026-10-05; post-build-review #107)."""
+    import os
+
+    mark = getattr(exc, "problem_mark", None)
+    where = "a configuration file"
+    if mark is not None:
+        name = mark.name
+        try:
+            name = os.path.relpath(name)
+        except ValueError:
+            pass
+        where = f"{name} line {mark.line + 1}"
+    problem = getattr(exc, "problem", None) or str(exc).splitlines()[0]
+    return (f"{where}: {problem} - it cannot be read, so no command can run. "
+            f"Fix it, then `mothman check` validates the rest.")
+
+
+try:
+    from . import (bdm, check, common, cp, dashboard, debug, env, filing_tui, github,
+                   pipeline, plans, population, scenarios, schedule, supply)
+except yaml.YAMLError as _exc:
+    # READ AT IMPORT TIME by several command modules, so this is the only
+    # place that can catch it - before any command, `--help` included.
+    import sys as _sys
+
+    print(_config_refusal(_exc), file=_sys.stderr)
+    raise SystemExit(2) from None
 from .banner import print_banner
 
 click.rich_click.TEXT_MARKUP = "rich"
@@ -131,6 +161,9 @@ class _MothmanGroup(click.RichGroup):
             return super().invoke(ctx)
         except qa_store.SchemaVersionError as exc:
             raise click.ClickException(str(exc)) from None
+        except yaml.YAMLError as exc:
+            # The same refusal for a file read only once a command runs.
+            raise click.ClickException(_config_refusal(exc)) from None
 
 
 @click.group(cls=_MothmanGroup, invoke_without_command=True)

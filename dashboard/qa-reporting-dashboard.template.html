@@ -1425,7 +1425,7 @@ function referenceNoteHtml(h){
       <div style="font-size:13px;">${escHtml(ref.reason)}.</div>
       ${ref.measuredStatus ? `<div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">
         The measurement alone reads ${pill(ref.measuredStatus,"sm")}${gapRed
-          ? " — this check is red because of the gap, not because anything drifted. Promote, substitute or accept as not supplied a missing period to clear it." : "."}</div>` : ""}
+          ? " — this check is red because of the gap, not because anything drifted, and it does not hold the supply back from promotion. Promote, substitute or accept as not supplied a missing period to clear it." : "."}</div>` : ""}
     </div>`;
 }
 
@@ -2005,6 +2005,13 @@ function buildRealDataset(d){
     // REQ-DASH-133: the instants that say whether a closed period had no
     // supply on the date on show. Carried, never derived here.
     closedSlots: d.closedSlots || [],
+    lateSlots: d.lateSlots || [],
+    // REQ-PIPE-081 criterion 1 as amended: whether the verdict's supply is
+    // in place or awaiting a decision, and what is in place if not it.
+    verdictOf: d.verdictOf || null,
+    // REQ-PIPE-122 NFR 1: the amber setting over time, in words. Carried,
+    // never derived here - the page only picks the one in force.
+    amberSetting: d.amberSetting || [],
     arrivalHistory,
     rowCount: d.rowCount, prevRowCount: d.prevRowCount,
     columns,
@@ -2338,10 +2345,31 @@ function cycleLabel(cadence, cycleStartStr){
 function ranOnOrBeforeAsOf(runDateStr, asOfDateStr){
   return runDateStr <= asOfDateStr;
 }
+// A RUN'S SUPPLY ON THE DATE ON SHOW - promoted, awaiting or withdrawn
+// (REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05, Keith). The
+// build embeds the answers from the decision log; before its first entry a
+// supply that arrived is awaiting a decision. Looked up, never derived.
+function runStateAsOf(d, runId, asOfDateStr){
+  let state = "awaiting";
+  (((d.runStates || {})[runId]) || []).forEach(e=>{
+    if(assetDateStrOf(e.at) <= asOfDateStr) state = e.state;
+  });
+  return state;
+}
 function clipDatasetToAsOf(d, asOfDateStr){
-  const eligibleRuns = d.runs.filter(r => ranOnOrBeforeAsOf(r.run_date, asOfDateStr));
+  // THE NEWEST SUPPLY IN PLACE OR AWAITING A DECISION (criterion 1 as
+  // amended): one withdrawn by the date on show - demoted, turned down,
+  // re-filed out or superseded - is not the dataset's verdict, however
+  // recently it arrived.
+  const eligibleRuns = d.runs.filter(r => ranOnOrBeforeAsOf(r.run_date, asOfDateStr)
+    && runStateAsOf(d, r.run_id, asOfDateStr) !== "withdrawn");
   if(!eligibleRuns.length) return null; // never supplied yet as of this date
   const effectiveRun = eligibleRuns[eligibleRuns.length-1];
+  const verdictState = runStateAsOf(d, effectiveRun.run_id, asOfDateStr);
+  const inPlace = verdictState === "promoted" ? effectiveRun
+    : [...eligibleRuns].reverse().find(r=> runStateAsOf(d, r.run_id, asOfDateStr) === "promoted") || null;
+  const verdictOf = {state: verdictState,
+    inPlaceRunDate: inPlace && inPlace !== effectiveRun ? inPlace.run_date : null};
   // Phase 5j (plans/qa-pipeline.md, 2026-09-17 - replacing the flat
   // AS_OF_OFFSET_DAYS day-count tolerance this same rule used to be):
   // "no data" now means "nothing has landed yet in the CURRENT expected
@@ -2414,6 +2442,7 @@ function clipDatasetToAsOf(d, asOfDateStr){
     lastArrival,
     rowCount, prevRowCount,
     staleAsOf,
+    verdictOf,
   };
 }
 
@@ -2530,7 +2559,7 @@ function rollup(datasets){
   const counted = datasets.filter(d=>!inNoRollup(d));
   // A BLOCKED DATASET IS A RED like any other (REQ-PIPE-115 criterion
   // 10), whatever quiet state its runs alone would have put it in.
-  const live = counted.filter(d=> d.blocked || d.noSupply
+  const live = counted.filter(d=> d.blocked || d.waitingBlocker || d.noSupply
     || (!d.noDataAsOf && !d.scheduleExhausted));
   if(!live.length){
     if(counted.some(d=>d.scheduleExhausted)) return "exhausted";
@@ -2539,7 +2568,7 @@ function rollup(datasets){
   // Both levels roll rather than order, for the same reason: a column
   // whose only check has no rule is `inactive`, and a collection of
   // those is inactive rather than green (post-build-review #4).
-  return rollupStatuses(live.map(d=> (d.blocked || d.noSupply) ? "red"
+  return rollupStatuses(live.map(d=> (d.blocked || d.waitingBlocker || d.noSupply) ? "red"
     : rollupStatuses(d.columns.map(c=>c.status))));
 }
 // Same "don't let nodata silently win OR silently vanish" logic as
@@ -2804,12 +2833,23 @@ function buildData(asOfDateStr){
         ds.acceptedGaps = gaps.accepted.length ? groupGaps(gaps.accepted) : null;
         if(ds.noSupply){ col.noSupplyCount = (col.noSupplyCount||0) + 1; ag.noSupplyCount = (ag.noSupplyCount||0) + 1; }
         if(ds.acceptedGaps){ col.acceptedCount = (col.acceptedCount||0) + 1; ag.acceptedCount = (ag.acceptedCount||0) + 1; }
-        if(blocked){
+        const blanking = blocked && blockerWithoutARunOfItsOwn(ds, asOfDateStr);
+        if(blocked && !blanking){
+          // RED, BUT THE PERIOD'S OWN RESULTS STAND (REQ-PIPE-115
+          // criterion 11 as amended 2026-10-05, Keith): a held supply has
+          // no period, and one that arrived before the latest checked
+          // supply is not the period's own - so an unresolved 2023 hold no
+          // longer blanks every later period. The red and its reason stay
+          // (criterion 10).
+          ds.waitingBlocker = blocked;
+          ds.status = "red";
+        } else if(blocked){
           // RED, OUTRANKING EVERY QUIET STATE (REQ-PIPE-115 criterion
           // 10): a file is here and waiting on a person, which is never
           // "nothing expected" or "nothing yet". Every own check reads
-          // not run for the period (criterion 11).
-          ds.blocked = blocked;
+          // not run for the period (criterion 11) - this period's own
+          // supply is the one that could not be read.
+          ds.blocked = blanking;
           ds.status = "red";
           (ds.columns||[]).forEach(c=>{
             c.status = "nodata";
@@ -4105,6 +4145,20 @@ function blockerOpenAsOf(datasetId, asOfDateStr, source){
   const same = open.filter(b=> b.kind === open[0].kind);
   return {...open[0], count: same.length, newestAt: same[same.length-1].openedAt};
 }
+// THE OPEN BLOCKER THAT LEAVES THE PERIOD ON SHOW WITHOUT A RUN OF ITS
+// OWN, or null (REQ-PIPE-115 criterion 11 as amended 2026-10-05): one
+// filed to a period - contested or unloadable, never held, which has no
+// period - and received after the latest supply that was checked. Where
+// nothing was ever checked, any open blocker does.
+function blockerWithoutARunOfItsOwn(ds, asOfDateStr, source){
+  const latest = ds.lastArrival && ds.lastArrival.arrivedAt;
+  const open = blockersOpenAsOf(ds.id, asOfDateStr, source)
+    .filter(b=> !latest || (b.kind !== "held" && String(b.openedAt) > String(latest)))
+    .sort((a,b)=> String(a.openedAt).localeCompare(String(b.openedAt)));
+  if(!open.length) return null;
+  const same = open.filter(b=> b.kind === open[0].kind);
+  return {...open[0], count: same.length, newestAt: same[same.length-1].openedAt};
+}
 // What a blocked dataset's status says in words beside the red - never
 // colour alone (REQ-DASH-133 criterion 11's rule, applied here).
 function blockerReasonText(b){
@@ -4168,9 +4222,54 @@ function gapText(group){
 }
 // The gap, in words, beside a dataset whose current run is otherwise
 // fine - the red pill must never be left to say it alone (criterion 11).
+// THE AMBER SETTING IN FORCE ON THE DATE ON SHOW (REQ-PIPE-122 NFR 1):
+// the latest change dated on or before it, or null.
+function amberSettingAsOf(ds, asOfDateStr){
+  const list = (ds && ds.amberSetting) || [];
+  let found = null;
+  list.forEach(a=>{ if(String(a.from) <= asOfDateStr) found = a; });
+  return found;
+}
+// WHICH SUPPLY THE VERDICT IS ABOUT (REQ-PIPE-081 criterion 1 as amended
+// 2026-10-05): in place, or awaiting a decision - and then what is in
+// place, if anything. Said in words, never left to the reader to infer.
+function verdictLine(ds){
+  const v = ds && ds.verdictOf;
+  if(!v || !ds.lastArrival) return "";
+  if(v.state === "promoted"){
+    return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place, received ${fmtInstant(ds.lastArrival.arrivedAt)}.</div>`;
+  }
+  const inPlace = v.inPlaceRunDate
+    ? `The supply in place is the one received ${escHtml(fmtDay(String(v.inPlaceRunDate).slice(0,10)))}.`
+    : "Nothing is in place for this period yet.";
+  return `<div class="verdict-of" data-verdict-of="awaiting" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Awaiting a decision</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place yet. ${inPlace}</div>`;
+}
+function amberSettingLine(ds, asOfDateStr){
+  const a = amberSettingAsOf(ds, asOfDateStr);
+  if(!a) return "";
+  return `<div class="amber-setting-line" data-amber-setting="${escHtml(a.value)}" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 14px;" title="What happens to a supply whose checks come back amber, and where that was set">Amber supplies: ${escHtml(a.text)}</div>`;
+}
+// THE NEWEST SLOT LATE BUT STILL OPEN on the date on show (REQ-DASH-133,
+// Keith 2026-10-05): past its late instant, no file yet, not yet closed.
+// The build embeds the instants; the page only compares them.
+function lateOpenAsOf(ds, asOfDateStr){
+  const by = v => v && assetDateStrOf(v) <= asOfDateStr;
+  let found = null;
+  ((ds && ds.lateSlots) || []).forEach(s=>{
+    if(by(s.lateAt) && !by(s.filedAt) && !by(s.closesAt)) found = s;
+  });
+  return found;
+}
 function noSupplyNote(ds){
-  if(!ds.noSupply) return "";
-  return `<div class="no-supply-note" data-no-supply="${ds.noSupply.length}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">No supply: ${escHtml(ds.noSupply.map(gapText).join("; "))}</div>`;
+  const late = lateOpenAsOf(ds, CURRENT_AS_OF);
+  const lateNote = late
+    ? `<div class="late-open-note" data-late-open="${escHtml(late.period)}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">Late, still open: ${escHtml(fmtPeriodOrDay(late.period))} — no file yet</div>`
+    : "";
+  const waiting = ds.waitingBlocker
+    ? `<div class="waiting-blocker-note" data-waiting-blocker="${ds.waitingBlocker.kind}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">${escHtml(blockerReasonText(ds.waitingBlocker))} — ${blockerReceivedText(ds.waitingBlocker)}</div>`
+    : "";
+  if(!ds.noSupply) return waiting + lateNote;
+  return waiting + lateNote + `<div class="no-supply-note" data-no-supply="${ds.noSupply.length}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">No supply: ${escHtml(ds.noSupply.map(gapText).join("; "))}</div>`;
 }
 function fmtPeriodOrDay(name){
   return /^\d{4}-\d{2}-\d{2}$/.test(name) ? fmtDay(name) : name;
@@ -4904,6 +5003,19 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           them ran, and no earlier supply's result stands in for it.
         </div>
       </div>` : "";
+  // WAITING, BUT NOT THIS PERIOD'S OWN SUPPLY (REQ-PIPE-115 criteria 10
+  // and 11 as amended 2026-10-05): red and in words, with the checks below
+  // left showing what the latest checked supply found.
+  const waitingBanner = ds.waitingBlocker ? `
+      <div class="notice-exhausted" role="status" data-waiting-blocker="${ds.waitingBlocker.kind}">
+        <b>${escHtml(blockerReasonText(ds.waitingBlocker))}.</b>
+        <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
+          ${escHtml(ds.waitingBlocker.reason || "")}${ds.waitingBlocker.reason ? "<br><br>" : ""}
+          ${ds.waitingBlocker.count > 1 ? `${ds.waitingBlocker.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.waitingBlocker))}` : `Received <b style="display:inline">${fmtInstant(ds.waitingBlocker.openedAt)}</b>`}.
+          The dataset stays red until a person resolves it. The checks below are the
+          latest supply that could be checked, received ${fmtInstant(ds.lastArrival.arrivedAt)}.
+        </div>
+      </div>` : "";
   // CLOSED WITH NO SUPPLY, and accepted gaps (REQ-DASH-133 criteria 1,
   // 2, 7 and 11): in words, red for an unmarked gap, quiet for one a
   // person accepted - each naming its periods as grouped runs.
@@ -4913,10 +5025,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
           ${ds.noSupply.length === 1 && ds.noSupply[0].periods.length === 1 ? "This period has" : "These periods have"}
           closed with nothing in ${ds.noSupply.length === 1 && ds.noSupply[0].periods.length === 1 ? "it" : "them"}, so a file arriving
-          now is filed to the open period instead. A person decides: substitute an earlier
-          period's supply, re-file a late file into it, or accept it as not supplied
-          (<code>mothman supply decide --operation mark-not-supplied --dataset ${escHtml(ds.id)} --period &lt;period&gt; --reason '&lt;why&gt;'</code>,
-          with the period as the schedule names it${/^\d{4}-\d{2}-\d{2}$/.test(ds.noSupply[0].periods[0]) ? " - a day is written year, month, day, with hyphens" : ""}).
+          now is filed to the open period instead. <b style="display:inline">Chase the supplier first</b> -
+          most often the file is simply late. If it is not coming, decide in the filing wizard
+          (run <code>mothman</code> and choose <i>Filing decisions</i>), which offers all three:
+          substitute an earlier period's supply, re-file a late file into it, or accept it as
+          not supplied.
         </div>
       </div>` : "";
   const acceptedGapsNote = ds.acceptedGaps ? `
@@ -4952,6 +5065,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         </div>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
+      ${amberSettingLine(ds, CURRENT_AS_OF)}
       ${blockedBanner}
       ${outstandingQueue("dataset", ds.id)}
       <div class="sla-strip">
@@ -4999,8 +5113,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
+    ${verdictLine(ds)}
+    ${amberSettingLine(ds, CURRENT_AS_OF)}
     ${arrivalBanner(ds)}
     ${blockedBanner}
+    ${waitingBanner}
     ${exhaustedBanner}
     ${noSupplyBanner}
     ${acceptedGapsNote}

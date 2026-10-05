@@ -133,6 +133,48 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     return out
 
 
+def late_slots(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
+               now: datetime | None = None) -> list[dict]:
+    """[{period, lateAt, filedAt, closesAt}] for every slot of this dataset
+    that was ever LATE WHILE OPEN - past its late instant with no file
+    filed to it - oldest first (REQ-DASH-133, Keith 2026-10-05; #104).
+
+    So a daily feed's row can name today's late-but-open file beside an
+    older gap. The ANSWERS, never the rule: lateness is slots.py's
+    (`late_after`), and the page only compares these instants with the
+    date on show. A file is what ends lateness here, not a promotion - the
+    question is whether the supplier has sent it.
+    """
+    from qa_tools.common import asset_time
+    from qa_tools.common import slots as slots_mod
+
+    if conn is None:
+        with supply_db.connect(read_only=True, label="mothman:late-slots") as opened:
+            return late_slots(dataset_id, opened, now)
+    now = now or asset_time.now()
+    try:
+        own = slots_mod.slots_for_dataset(
+            dataset_id, until=slots_mod.claimable_until(dataset_id, now.date()))
+    except (ValueError, KeyError, FileNotFoundError):
+        return []
+    first_filed = {slot: at for slot, at in conn.execute(
+        "SELECT f.slot, min(r.received_instant) FROM qa.filing f "
+        "JOIN qa.supply_receipt r ON r.dataset_id = f.dataset_id AND r.supply_id = f.supply_id "
+        "WHERE f.dataset_id = ? AND f.slot IS NOT NULL GROUP BY f.slot",
+        [dataset_id]).fetchall()}
+    out = []
+    for slot in own:
+        if slot.late_after > now:
+            continue
+        filed = first_filed.get(slot.name)
+        if filed is not None and filed <= slot.late_after:
+            continue
+        out.append({"period": slot.name, "lateAt": slot.late_after.isoformat(),
+                    "filedAt": _iso(filed) if filed is not None else None,
+                    "closesAt": slot.closes_at.isoformat() if slot.closes_at else None})
+    return out
+
+
 def _failed_load_keys(conn, dataset_id: str) -> set[str]:
     """Arrival keys of this dataset's staged tables whose latest load
     record says they could not be loaded (REQ-PIPE-060) - recorded QA

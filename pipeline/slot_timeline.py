@@ -132,6 +132,69 @@ def _run_for(conn, dataset_id: str, supply: str) -> str | None:
     return drift_reference.run_for(conn, dataset_id, supply)
 
 
+#: What each decision does to the supply it names, for the page's verdict
+#: (REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05, Keith). A
+#: decision not listed - a withheld note, an acknowledgement, a refusal -
+#: changes nothing about whether the supply is in the view.
+_STATE_AFTER = {
+    decision_log.PROMOTE: "promoted",
+    decision_log.REFILE: "promoted",
+    decision_log.DEMOTE: "withdrawn",
+    decision_log.REJECT: "withdrawn",
+    decision_log.SUPERSEDE: "withdrawn",
+    decision_log.UN_SUPERSEDE: "awaiting",
+}
+
+
+def supply_states(dataset_id: str,
+                  conn: supply_db.SupplyConnection | None = None) -> dict[str, list[dict]]:
+    """{supply: [{at, state}]} - each supply's state after every decision
+    about it, oldest first, state one of promoted, awaiting or withdrawn.
+
+    Before its first entry a filed supply is AWAITING A DECISION, which is
+    why only decisions travel: the page already knows when each run
+    arrived. A withdrawn supply - demoted, turned down by a reject,
+    re-filed out of its slot or superseded (criterion 2) - leaves the
+    dataset's verdict; the
+    newest supply promoted or awaiting is the one shown (criterion 1).
+    The answers, not the rule: the page looks these up and never decides
+    for itself which action withdraws.
+    """
+    if conn is None:
+        with supply_db.connect(read_only=True, label="mothman:supply-states") as opened:
+            return supply_states(dataset_id, conn=opened)
+    actions = tuple(_STATE_AFTER)
+    out: dict[str, list[dict]] = {}
+    for supply, action, at in conn.execute(
+            f"SELECT supply, action, effective_at FROM {decision_log.TABLE} "
+            f"WHERE dataset_id = ? AND supply IS NOT NULL AND action IN "
+            f"({', '.join('?' * len(actions))}) ORDER BY effective_at, id",
+            [dataset_id, *actions]).fetchall():
+        state = _STATE_AFTER[action]
+        entries = out.setdefault(supply, [])
+        if entries and entries[-1]["state"] == state:
+            continue
+        entries.append({"at": at.isoformat() if hasattr(at, "isoformat") else str(at),
+                        "state": state})
+    return out
+
+
+def run_states(dataset_id: str,
+               conn: supply_db.SupplyConnection | None = None) -> dict[str, list[dict]]:
+    """supply_states() keyed by the run that checked each supply - what the
+    dashboard embeds, since the page knows runs. A supply no run read is
+    left out: there is nothing of it on the page to withdraw."""
+    if conn is None:
+        with supply_db.connect(read_only=True, label="mothman:run-states") as opened:
+            return run_states(dataset_id, conn=opened)
+    out: dict[str, list[dict]] = {}
+    for supply, states in supply_states(dataset_id, conn=conn).items():
+        run = _run_for(conn, dataset_id, supply)
+        if run:
+            out[run] = states
+    return out
+
+
 def with_runs(timeline: list[dict], dataset_id: str,
                conn: supply_db.SupplyConnection | None = None) -> list[dict]:
     """The same timeline, each entry naming the run that checked it.

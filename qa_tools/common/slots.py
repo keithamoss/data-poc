@@ -54,7 +54,10 @@ class Slot:
     next period - so a dataset delivering February and August on a
     quarterly calendar closes February when MAY's window opens, and has
     no open slot until August's does. None only where the calendar has
-    no next period at all (an authored calendar's last date).
+    no next period and none before it to measure by (a calendar of a
+    single date) - an authored calendar's LAST date closes as long after
+    it opened as the period before it stayed open (REQ-PIPE-131
+    criterion 16).
 
     This REVERSES the open-ended window this docstring used to defend
     ("NEVER CLOSES, because late is always allowed" - plans/supply-
@@ -190,6 +193,21 @@ def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
     # sequence per slot (NFR 1).
     sequence = _calendar_periods(dataset_id, until)
     following = {p.name: sequence[i + 1].date for i, p in enumerate(sequence[:-1])}
+    preceding = {p.name: sequence[i - 1].date for i, p in enumerate(sequence) if i > 0}
+
+    def closes(period, opens: datetime) -> datetime | None:
+        nxt = following.get(period.name)
+        if nxt is not None:
+            return claim_opens(nxt)
+        # AN AUTHORED CALENDAR'S LAST PERIOD CLOSES TOO (REQ-PIPE-131
+        # criterion 16, Keith 2026-10-05; post-build-review #93): it used
+        # to stay open for ever, so a 2030 file was filed to 2027-Q4. It
+        # stays open as long as the period before it did - the PROVISIONAL
+        # measure, there being no claim-window end to use - and a file
+        # after that finds no open slot and is held (criterion 10). A
+        # calendar of one date has nothing to measure by and stays open.
+        prev = preceding.get(period.name)
+        return opens + (opens - claim_opens(prev)) if prev is not None else None
 
     out = []
     for dataset_period in schedule.periods_for_dataset(dataset_id, until=until):
@@ -197,10 +215,9 @@ def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
             continue
         opens = claim_opens(dataset_period.date)
         due_at = asset_time.wall_clock(dataset_period.date, expected_time)
-        nxt = following.get(dataset_period.period.name)
         out.append(Slot(dataset_id=dataset_id, period=dataset_period.period,
                          due_at=due_at, grace=grace, claim_opens_at=opens,
-                         closes_at=claim_opens(nxt) if nxt is not None else None))
+                         closes_at=closes(dataset_period.period, opens)))
     return out
 
 

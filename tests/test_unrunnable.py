@@ -135,6 +135,22 @@ class TestOneRecordPerCheck:
             reads={PLACEMENTS_READS_BOTH: ["cp_clients", "cp_carers"]}, as_at=AS_AT)
         assert [r["check_id"] for r in out] == [PLACEMENTS_READS_BOTH]
 
+    def test_that_one_record_names_every_unreadable_table(self, states):
+        """REQ-PIPE-115 criterion 2 as amended 2026-10-05 (Keith): one
+        record for the check, naming EVERY unreadable table it reads and
+        the reason for each - it used to name only the first."""
+        states["cp-clients"] = period_schema.STAGED_AWAITING_DECISION
+        states["cp-carers"] = period_schema.PAST_DUE
+        (r,) = unrunnable.results_for(
+            None, run_id="r", run_timestamp="t", own_table="cp_placements",
+            own_dataset="cp-placements", period="2026-Q1",
+            resolution=_res(resolved={"cp_placements": "x"},
+                            absent=["cp_clients", "cp_carers"]),
+            reads={PLACEMENTS_READS_BOTH: ["cp_clients", "cp_carers"]}, as_at=AS_AT)
+        assert r["unrunnable_tables"] == ["cp_carers", "cp_clients"]
+        assert "cp_carers" in r["unrunnable_reason"] and "cp_clients" in r["unrunnable_reason"]
+        assert "awaiting a decision" in r["unrunnable_reason"]
+
 
 class TestCouldNotBeLoadedOutranksEverything:
     """REQ-DASH-148 criterion 6."""

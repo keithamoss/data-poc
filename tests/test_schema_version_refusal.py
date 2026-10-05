@@ -86,3 +86,20 @@ def test_a_command_on_an_old_schema_says_so_cleanly(private_supply_dsn):
     assert "reset-synthetic" in result.output
     assert not isinstance(result.exception, qa_store.SchemaVersionError), \
         "it escaped as an exception rather than a clean refusal"
+
+
+class TestEveryOlderSchemaIsRefused:
+    """ALWAYS WIPE AND REBUILD (Keith, 2026-10-05): a schema even one
+    version behind is refused, not brought up to date in place - schemas
+    19 to 23 had been additive in-place migrations, a departure from the
+    standing 'regenerate, never migrate' rule."""
+
+    def test_one_version_behind_is_refused(self, private_supply_dsn):
+        older = qa_store.SCHEMA_VERSION - 1
+        with supply_db.connect(label="test-one-behind") as conn:
+            qa_store.ensure_schema(conn)
+            _set_version(conn, older)
+            with pytest.raises(qa_store.SchemaVersionError) as caught:
+                qa_store.ensure_schema(conn)
+            assert _version(conn) == older, "it was migrated in place"
+        assert "reset-synthetic" in str(caught.value)

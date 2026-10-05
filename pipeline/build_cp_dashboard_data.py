@@ -30,7 +30,7 @@ import os
 from datetime import datetime
 
 from pipeline import acknowledgements, closed_slots, recorded_arrival, slot_timeline
-from qa_tools.common import drift_reference
+from qa_tools.common import amber_setting, drift_reference
 from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
@@ -602,11 +602,24 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # each entry tied to the run that checked it.
         "slotTimeline": slot_timeline.with_runs(
             slot_timeline.for_dataset(dataset_id), dataset_id),
+        # EACH RUN'S SUPPLY, PROMOTED, AWAITING OR WITHDRAWN OVER TIME
+        # (REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05): the
+        # page's verdict is the newest supply promoted or awaiting on the
+        # date on show. Answers from the decision log, looked up there.
+        "runStates": slot_timeline.run_states(dataset_id),
         # EVERY PERIOD THAT CLOSED WITH NO SUPPLY, and the instants that
         # decide what it reads as on any date (REQ-DASH-133 criteria 9 and
         # 10) - see pipeline/closed_slots.py. The page compares instants;
         # it never re-derives closing.
         "closedSlots": closed_slots.for_dataset(dataset_id),
+        # A SLOT LATE BUT STILL OPEN (REQ-DASH-133, Keith 2026-10-05): every
+        # slot that was ever late while open, so the page can name today's
+        # late file beside an older gap.
+        "lateSlots": closed_slots.late_slots(dataset_id),
+        # REQ-PIPE-122 NFR 1: the amber setting in force over time, in
+        # words, from configuration only - the page shows the one in force
+        # on the date on show.
+        "amberSetting": amber_setting.timeline(dataset_id),
         # WHICH PROMOTED AMBER SUPPLIES WERE ACKNOWLEDGED (REQ-PIPE-122
         # criterion 21), keyed by run - see pipeline/acknowledgements.py.
         "acknowledgements": acknowledgements.for_dataset(dataset_id),

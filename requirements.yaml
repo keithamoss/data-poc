@@ -14816,13 +14816,8 @@ requirements:
       by: Keith
       date: "2026-09-26"
     acceptance_criteria:
-      - >
-        THE SYSTEM SHALL answer "as at T" with the supply most recently
-        PROMOTED into that slot on or before T, and SHALL NOT answer it
-        with the supply that most recently ARRIVED on or before T.
-      - >
-        THE SYSTEM SHALL treat a supply demoted, rejected or re-filed
-        out of a slot on or before T as not occupying that slot at T.
+      - 'THE SYSTEM SHALL take a dataset''s verdict for the period on show at T from the NEWEST supply filed to that period on or before T that is, at T, either PROMOTED into it or AWAITING A DECISION, and SHALL label which of the two it is. WHERE the newest is awaiting a decision while an older one is promoted, THE SYSTEM SHALL also name the promoted one as what is in place. THE SYSTEM SHALL NOT answer it with a supply withdrawn at T (criterion 2), however recently it arrived. AMENDED 2026-10-05 (Keith): answering with promoted supplies alone hid the newest supply, the one QA exists to judge, while it waited, and showed the older green one - a false green.'
+      - 'THE SYSTEM SHALL treat a supply demoted, rejected, re-filed out of a slot or superseded on or before T as not occupying that slot at T. AMENDED 2026-10-05: ''or superseded'' added, a consequence of REQ-PIPE-118/120 rather than a new choice.'
       - >
         THE SYSTEM SHALL derive every "as at T" answer from the decision
         log alone, and SHALL NOT derive it from the warehouse's current
@@ -14850,9 +14845,7 @@ requirements:
       - >
         THE SYSTEM SHALL NOT treat a slot as claimable again because a
         later decision emptied it.
-      - >
-        THE SYSTEM SHALL stop filtering the as-of view on a run's
-        arrival date.
+      - 'THE SYSTEM SHALL NOT decide what the view shows from a run''s arrival date alone: a supply enters the view when it is filed on or before T, and leaves it only when it is withdrawn (criterion 2). AMENDED 2026-10-05 (Keith), with criterion 1.'
       - >
         WHEN a supply is demoted, THE SYSTEM SHALL return its physical
         table to the staging schema, so that a period schema holds
@@ -15396,6 +15389,34 @@ requirements:
         the gap cascade first. Recommendation (c) then (b). Not taken on the standing
         ''take my recommendation'' because either answer changes what every dataset
         page shows.'
+      - 'THE NEWEST SUPPLY IN PLACE OR AWAITING A DECISION (Keith, 2026-10-05, criteria
+        1, 2 and 8 amended; exact wording approved). As signed, a red supply - never
+        auto-promoted - vanished from its dataset''s verdict while it waited and
+        the page showed the older green one: a false green. REJECTED: build as signed
+        plus a red ''waiting for a decision'' item per awaiting supply (a new outstanding
+        kind and its own requirement); waiting for the gap-cascade answer first
+        (it was answered the same morning).'
+      - 'CRITERIA 1, 2 AND 8 AS AMENDED ARE BUILT, 2026-10-05 (the page switch).
+        The answers travel, as this requirement''s own decision on the slot timeline
+        set: pipeline/slot_timeline.py''s supply_states() reads each supply''s state
+        after every decision about it - promoted, awaiting or withdrawn - from the
+        decision log alone, and run_states() keys it by the run that checked it;
+        the build embeds it as `runStates`. The page''s clipDatasetToAsOf() only
+        looks it up (runStateAsOf), skips a run withdrawn on the date on show, takes
+        the newest of the rest, and verdictLine() says in words whether that supply
+        is in place or awaiting a decision and, if awaiting, which supply is in
+        place. Before its first decision a supply that arrived is awaiting - so
+        only decisions travel, never receipts the page already has.'
+      - 'THE LABEL IS ON THE DATASET''S PAGE, NOT THE AGENCY ROW (PROVISIONAL, 2026-10-05):
+        one line under the heading. The agency row keeps its pill and arrival columns;
+        adding a second marker to every row at thirty datasets is the noise this
+        project''s scale note warns about. Revisit if the dashboard critic finds
+        the row misleading.'
+      - 'A WITHDRAWN RUN LEAVES THE CHECKS'' HISTORY ON THAT DATE TOO (2026-10-05):
+        its results were real measurements, but they are not the period''s answer,
+        and keeping them as ''current'' or ''previous'' would put a demoted or superseded
+        supply''s numbers beside the verdict. The trend still shows them once the
+        date on show is before the withdrawal.'
   - id: REQ-GHUB-082
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
@@ -22197,6 +22218,12 @@ requirements:
     - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
     - 'CRITERIA 9-20 BUILT 2026-10-04 (overnight sprint 5). PROVISIONAL, each in the morning report: (1) `not known`, `not-known`, `notknown` and `unknown` are all accepted as the answer and recorded as `not-known`; (2) in flag mode with a TTY but no --originally-received, the prompt appears after the decision to keep and before the check runs, inside the check''s progress display; (3) the S3 offer is one confirm for the whole set, and declining asks ONE answer for every file (never per object).'
 
+    - 'NFR 6''S INSTANT COLUMN IS BUILT (Keith, 2026-10-05), chosen over my recommendation
+      to amend the NFR because nothing queries it: the stated text keeps its instant
+      beside it, as every receipt does. A service identity hand-filing (post-build-review
+      #96) was DROPPED as moot - Keith: ''why would it?''; nothing runs the hand-filing
+      command unattended, and the critic produced it only by faking GITHUB_ACTIONS
+      in a test.'
     linked_tests:
     - tests/test_stated_original_arrival.py
     - tests/test_filing_delivery_link.py
@@ -22235,32 +22262,45 @@ requirements:
     - qa_tools/cp/orchestrate_cp.py::_discard_this_runs_schemas
     - qa_tools/bdm/build_per_run_warehouses.py::build_one
     - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+    - qa_tools/common/delivery_log.py::_stated_instant
     evidence:
-    - >-
-      2026-10-04 (overnight sprint 5): criteria 9 to 20 built and tested in
-      tests/test_stated_original_arrival.py (21 tests). The statement is
-      written into each file's receipt under its own key, marked as a
-      person's, and onto qa.delivery_file.originally_received_stated
-      (schema 19); the receipt stays the moment the command ran. Refusals
-      tested: a time later than our receipt, `storage` for a supply not from
-      S3, nonsense, a kept supply with no answer, and a script keeping a
-      supply with no --originally-received (the flag named, nothing filed).
-      Shown beside the receipt in `mothman supply deliveries`, the
-      hand-filing command's closing message and the dashboard's arrival
-      detail (tests-js/filed-note.test.js).
-    - '2026-09-27: tests/test_trial_runs.py drives the REAL loader - a trial stages real rows into `trial_<stamp>`, its views resolve through `qa_trial_<stamp>`, shared staging is unchanged throughout, and after discard() no schema of the trial''s remains and orphan_schemas() is empty.
-  
-      '
-    - '2026-09-27: tests/test_hand_filing.py files real deliveries into an isolated tree - the run id comes back from recognition (`run_001`, `cp_run_001`), the receipt is written outside the delivery, the file is stored byte-for-byte, six files make ONE delivery, the delivery log gets its record immediately rather than at the next pipeline run, and an unplaceable name is refused with nothing written.
-  
-      '
-    - '2026-09-27: at the command level, test_qa_command_local_file_commit_files_a_real_delivery_and_promotes (BDM) and test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files (CP) drive the real four-tool chain end to end and check the filed delivery, the recognised id and what the command says it did; their trial counterparts assert nothing was filed and that the output never calls a filed run local-only.
-  
-      '
-    - '2026-09-27: qa_tools/common/local_check.py and its tests are deleted. `run_id_from_path()` was the only route by which a user-supplied filename could become a run id, which is criterion 4 enforced by absence rather than by a rule.
-  
-      '
+    - '2026-10-04 (overnight sprint 5): criteria 9 to 20 built and tested in tests/test_stated_original_arrival.py
+      (21 tests). The statement is written into each file''s receipt under its
+      own key, marked as a person''s, and onto qa.delivery_file.originally_received_stated
+      (schema 19); the receipt stays the moment the command ran. Refusals tested:
+      a time later than our receipt, `storage` for a supply not from S3, nonsense,
+      a kept supply with no answer, and a script keeping a supply with no --originally-received
+      (the flag named, nothing filed). Shown beside the receipt in `mothman supply
+      deliveries`, the hand-filing command''s closing message and the dashboard''s
+      arrival detail (tests-js/filed-note.test.js).'
+    - '2026-09-27: tests/test_trial_runs.py drives the REAL loader - a trial stages
+      real rows into `trial_<stamp>`, its views resolve through `qa_trial_<stamp>`,
+      shared staging is unchanged throughout, and after discard() no schema of
+      the trial''s remains and orphan_schemas() is empty.
 
+      '
+    - '2026-09-27: tests/test_hand_filing.py files real deliveries into an isolated
+      tree - the run id comes back from recognition (`run_001`, `cp_run_001`),
+      the receipt is written outside the delivery, the file is stored byte-for-byte,
+      six files make ONE delivery, the delivery log gets its record immediately
+      rather than at the next pipeline run, and an unplaceable name is refused
+      with nothing written.
+
+      '
+    - '2026-09-27: at the command level, test_qa_command_local_file_commit_files_a_real_delivery_and_promotes
+      (BDM) and test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files
+      (CP) drive the real four-tool chain end to end and check the filed delivery,
+      the recognised id and what the command says it did; their trial counterparts
+      assert nothing was filed and that the output never calls a filed run local-only.
+
+      '
+    - '2026-09-27: qa_tools/common/local_check.py and its tests are deleted. `run_id_from_path()`
+      was the only route by which a user-supplied filename could become a run
+      id, which is criterion 4 enforced by absence rather than by a rule.
+
+      '
+    - '2026-10-05: NFR 6''s instant - tests/test_stated_original_arrival.py::TestWhatAKeptSupplyRecords::test_a_stated_time_keeps_its_instant_beside_its_text
+      green (schema 24).'
   - id: REQ-PIPE-104
     title: "A filing is recorded in the database, never as a committed file"
     date_written: "2026-09-27"
@@ -23964,7 +24004,7 @@ requirements:
     - THE SYSTEM SHALL decide whether a period owed the dataset a supply from that dataset's own schedule, so that a period it owed nothing - an inherited period - neither makes the check red nor serves as its reference.
     - WHERE a check is red under criterion 8, THE SYSTEM SHALL record ONE result for that check and run, carrying the real metric, the period it was measured against, the verdict the measurement alone gives, and the reason it is red.
     - WHERE a check is red under criterion 8, THE SYSTEM SHALL show the measured verdict apart from the red - on the dashboard, in the terminal and in a ticket - and SHALL NOT describe the check as drift or as a change in volume unless the measurement itself crossed its band.
-    - THE SYSTEM SHALL count a red under criterion 8 or 9 against the supply's eligibility for automatic promotion exactly as criterion 7's red does (REQ-PIPE-075 criterion 3), so that the supply waits for a person.
+    - 'THE SYSTEM SHALL NOT count a red under criterion 8 or 9 against the supply''s eligibility for automatic promotion. For a check red under criterion 8, the promotion rule SHALL use the verdict its measurement alone gives (criterion 13), so that a real drift or volume failure still makes the supply wait for a person and a gap alone does not. For a check red under criterion 9, which has no measurement, the promotion rule SHALL treat it as having no reference - neither passing nor blocking. AMENDED 2026-10-05 (Keith): as signed, one supply left waiting made every later supply of its dataset wait too.'
     - THE SYSTEM SHALL apply criteria 8 to 15 and 17 to both collections' drift and volume checks, and SHALL carry their reds and reasons to both collections' dashboards.
     - WHERE a person has already dealt with the gap period's slot - substituted it, carried it forward, or accepted it as not supplied under REQ-PIPE-132 - THE SYSTEM SHALL measure against the older promoted supply, SHALL say which period it was compared with, and SHALL NOT report the check red or count it against automatic promotion on that gap's account.
     non_functional_requirements:
@@ -23998,6 +24038,7 @@ requirements:
     - qa_tools/common/drift_reference.py::judge
     - qa_tools/common/drift_reference.py::reference_note
     - cli/common.py::reference_suffix
+    - qa_tools/common/promotion.py::_gating_status
     linked_tests:
     - tests/test_drift_reference.py
     - tests/test_filing.py::TestWhichPeriodAnArrivalWasFiledTo
@@ -24009,6 +24050,7 @@ requirements:
     - tests/test_drift_reference.py::TestAnEntryAboutAnotherSupplyDoesNotHideTheReference
     - tests/test_drift_reference_gap.py
     - tests-js/blocked-dataset.test.js
+    - tests/test_promotion_status.py::TestAGapRedWarnsButDoesNotBlock
     evidence:
     - '2026-09-29. Verified against a `supply` database rebuilt from empty, twice
       - a re-bootstrap over an existing decision log cannot show criterion 5 at
@@ -24037,6 +24079,12 @@ requirements:
       with 2026-08-26, not 2026-08-28: 2026-08-27, 2026-08-28 have no accepted
       supply''), and promoted 9 supplies where the same corpus promoted 67 before
       - see the decision on the cascade.'
+    - '2026-10-05: criterion 15 as amended - tests/test_promotion_status.py::TestAGapRedWarnsButDoesNotBlock
+      green (a gap red over a passing measurement is green to the gate, over a
+      failing one still red, with no reference neither); measured on the real
+      `supply` database rebuilt from empty on this code: 82 promotions in a full
+      bootstrap, against 10 under the criterion as signed (supply8, 2026-10-05
+      overnight).'
     decisions:
     - 'BUILT IN TWO HALVES, and this records which is which on 2026-09-29. `in_progress` rather than `built` because the register''s gate forbids evidence on anything not built, and a status that overclaims is worse than one that cannot carry the detail.
   
@@ -24199,6 +24247,20 @@ requirements:
     - 'CRITERION 17 COMPLETE 2026-10-05 (overnight batch 7): REQ-PIPE-132''s mark
       as not supplied exists, and drift_reference treats a period marked so as
       dealt with - said in the reason, never a gap (tests/test_drift_reference_gap.py::TestTheGap::test_a_period_marked_not_supplied_is_said_but_not_red).'
+    - 'A GAP RED WARNS, IT DOES NOT BLOCK (Keith, 2026-10-05, criterion 15 amended).
+      Chosen after the full account: a supply AWAITING a decision leaves its period
+      with nothing promoted, so it counts as a gap; the next supply is then red
+      and waits; the period after has a gap too - one undecided supply froze every
+      later supply of its dataset (the bootstrap promoted 10 where it had promoted
+      67, Birth Registrations stopping at its first red day). And a person promoting
+      the waiting one later still leaves every later supply''s recorded red in
+      place until REQ-PIPE-151 re-judges, so the escape was a chain of manual,
+      reasoned promotions each overriding a red about one missed decision. REJECTED:
+      block until resolved then re-judge (waits on 151); count only an EMPTY period
+      as a gap; keep as signed with a simulated person in the corpus.'
+    - 'A GAP RED LOOKS LIKE ANY OTHER RED, LABELLED (Keith, 2026-10-05): same
+      colour, with ''compared across a gap, measured: <verdict>'' at the check
+      group, rather than a second red style.'
   - id: REQ-GHUB-109
     title: >
       A ticket comment says something new, and REQ-GHUB-027's
@@ -24673,6 +24735,13 @@ requirements:
       tests-js/blocked-dataset.test.js, and real-browser TestAHeldOrContestedDatasetReadsRed
       (criterion 13) and TestHeldOutranksAnEndedSchedule. Defect tests each confirmed
       failing first.'
+    - '2026-10-05: criteria 2, 11 and 17 as amended - tests/test_unrunnable.py::TestOneRecordPerCheck
+      (one record naming every unreadable table, which as first built named only
+      the first), tests-js/blocked-dataset.test.js (a held supply never blanks
+      a period; a contested one newer than the latest checked run does), tests/test_left_out_reconciliation.py::TestATrialIsReconciledToo,
+      and tests/test_dashboard_e2e.py''s held/contested classes in a real browser
+      against the rebuilt database - green. A real single-file trial of cp_clients
+      was reconciled and not refused.'
     implemented_by:
     - qa_tools/common/own_table.py::why_unreadable
     - qa_tools/common/period_overlay.py::name_held_siblings
@@ -24689,6 +24758,7 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::blockerOpenAsOf
     - dashboard/qa-reporting-dashboard.template.html::rollup
     - dashboard/qa-reporting-dashboard.template.html::blockerHistoryRows
+    - qa_tools/cp/orchestrate_cp.py::_reconciles
     linked_tests:
     - tests/test_unreadable_own_table.py
     - tests/test_dataset_blockers.py
@@ -24699,10 +24769,11 @@ requirements:
     - tests-js/blocked-dataset.test.js
     - tests/test_dashboard_e2e.py::TestAHeldOrContestedDatasetReadsRed
     - tests/test_dashboard_e2e.py::TestHeldOutranksAnEndedSchedule
+    - tests/test_unrunnable.py::TestOneRecordPerCheck
     source: 'Keith, 2026-09-30 (split out of REQ-PIPE-078 criteria 9 and 10, plans/post-build-review.md #72); hand-drafted that day without a scoper pass. REDRAFTED by delivery-scoper 2026-10-04 from the verification probe Keith approved that day (plans/post-build-review.md #77), his decisions on its gaps, and his answers to the scoper''s four questions, all given the same day, plus his correction that the dataset-level signal reuses REQ-DASH-070''s outstanding items.'
     acceptance_criteria:
     - WHERE a run cannot read a table, THE SYSTEM SHALL evaluate and record every check in that run's scope that does not read the table, exactly as it would had the table been readable.
-    - WHERE a check in a run's scope reads a table, other than the run's own, that the run cannot read, THE SYSTEM SHALL record that check as NOT EVALUATED - one record per unreadable table it reads - naming the table and the reason it could not be read, and SHALL NOT record a tool verdict for it.
+    - 'WHERE a check in a run''s scope reads one or more tables, other than the run''s own, that the run cannot read, THE SYSTEM SHALL record that check as NOT EVALUATED - ONE record for the check, naming every unreadable table it reads and the reason each could not be read - and SHALL NOT record a tool verdict for it. AMENDED 2026-10-05 (Keith): one record per check rather than per table, so a check keeps exactly one result per run (post-build-review #91).'
     - THE SYSTEM SHALL record every per-check not-evaluated result under the existing pseudo-tools 'unrunnable' or 'held', each carrying its own label, reason code and reason text, so that in the recorded result a check that was not evaluated is distinguishable from a check that failed.
     - THE SYSTEM SHALL NOT record a passing result for any check that was not evaluated.
     - WHILE a supply is held, THE SYSTEM SHALL NOT run any tool over its table and SHALL NOT record any tool verdict against it, whatever views were built for its run before filing raised the hold.
@@ -24711,13 +24782,13 @@ requirements:
     - WHERE a run's own table cannot be read because two files claim it (REQ-PIPE-105 criterion 6), THE SYSTEM SHALL raise a REQ-DASH-070 outstanding item scoped to that dataset, blocking, worded to say the table is contested, waiting for a person to choose a file, and naming both files - from recorded qa metadata only.
     - IF a run's own table cannot be read for any reason other than a hold, a contest, or a load that refused the file (REQ-DASH-148), THEN THE SYSTEM SHALL treat it as a failed run naming the table, rather than recording nothing.
     - WHILE a 'held-supply' or contested outstanding item is open for a dataset as at the instant on show, THE SYSTEM SHALL count that dataset's status as RED for the period on show, stating the item's reason in words, and SHALL roll that red up to the collection and the agency like any other red, as REQ-DASH-133 criterion 4 does for a closed period with no supply.
-    - WHILE criterion 10 applies, THE SYSTEM SHALL show each of that dataset's own checks as not run for that period, each reading the existing grey 'No data', and SHALL NOT show any of them as passing or carry an earlier run's verdict forward as that period's result.
+    - 'WHILE criterion 10 applies, THE SYSTEM SHALL show each of that dataset''s own checks for the period on show with that period''s OWN recorded result where it has one, SHALL show them as not run - the existing grey ''No data'' - where the period has no run of its own (as for a contested table of that period), and SHALL NOT carry an earlier period''s verdict forward as that period''s result. AMENDED 2026-10-05 (Keith): an open hold no longer blanks later periods'' real, checked results; the dataset stays red with the hold''s reason under criterion 10.'
     - THE SYSTEM SHALL judge whether such an item is open as at the instant on show - open from the held or contested supply's own receipt instant, not from the instant the hold was recorded or the wall clock, until it is resolved - so that the as-of view reproduces what a reader saw then.
     - THE SYSTEM SHALL have a real-browser test, against the built dashboard, in which one dataset has a held supply and another a contested table, asserting that each dataset reads red with its reason, that the red rolls up to its collection and agency, and that none of its own checks reads as passing for that period.
     - WHERE a cross-table check reads a table whose supply is held or contested, and the run reading it is of an arrival received with that supply (same delivery or same receipt instant) or finds that table contested for its own period, THE SYSTEM SHALL record that check as not evaluated, red, in the run of the dataset the check belongs to, giving held or contested as the reason and naming the supply.
     - WHERE criterion 14 applies, THE SYSTEM SHALL give held or contested as the reason, ahead of not yet due, overdue, awaiting a decision and the catch-all.
     - THE SYSTEM SHALL record each (check, unreadable table) pair at most once in any one run, and SHALL NOT record a cross-table check under the run of the held or contested supply it reads.
-    - WHEN a run's results are recorded, THE SYSTEM SHALL reconcile, for each tool, the checks it left out of that run's scope against the not-evaluated records written for that run, and IF the two disagree, THEN THE SYSTEM SHALL refuse the run, naming every check left out but not recorded or recorded but not left out, and SHALL stop the batch as it does for any failed run.
+    - 'WHEN a run''s results are recorded - a trial run''s included - THE SYSTEM SHALL reconcile, for each tool, the checks it left out of that run''s scope against the not-evaluated records written for that run, and IF the two disagree, THEN THE SYSTEM SHALL refuse the run, naming every check left out but not recorded or recorded but not left out, and SHALL stop the batch as it does for any failed run. AMENDED 2026-10-05 (Keith): trial runs reconciled too, so what a trial shows can be trusted equally.'
     - IF a tool fails for any reason during a run, THEN THE SYSTEM SHALL treat it as a failed run and SHALL NOT absorb the failure as a not-evaluated result.
     - THE SYSTEM SHALL apply criteria 1 to 18 to all four tools and both collections.
     - THE SYSTEM SHALL have a test that drives the real Child Protection orchestrator with an unreadable sibling whose slot for the run's period is, in turn, not yet due, overdue, and holding a supply awaiting a decision, and asserts at qa.check_result that each records its own reason code - nodata for not yet due, red for the other two - rather than the catch-all.
@@ -24854,6 +24925,18 @@ requirements:
       would refuse every such run whose tools left out a check over an absent
       sibling. Criterion 17 is unconditional; put to Keith whether to extend unrunnable''s
       recording to period-less runs or accept the exemption.'
+    - 'AN OPEN HOLD DOES NOT BLANK LATER PERIODS (Keith, 2026-10-05, criterion
+      11 amended): Case Workers'' May-2023 hold made every later period read ''No
+      data'' though its February and August supplies were filed and checked. The
+      dataset stays red with the hold''s reason (criterion 10 unchanged); each
+      period shows its own results.'
+    - 'ONE NOT-EVALUATED RECORD PER CHECK (Keith, 2026-10-05, criterion 2 amended),
+      naming every unreadable table it reads - as built, matching #91''s one-result-per-check
+      invariant. REJECTED: one per (check, table), which needed that invariant
+      reworked.'
+    - 'TRIAL RUNS ARE RECONCILED TOO (Keith, 2026-10-05, criterion 17 amended),
+      chosen over my recommendation to accept the gap: what a trial shows should
+      be trustworthy on the same terms as a real run.'
     open_questions: []
   - id: REQ-TEST-116
     title: A bootstrap does in parallel what does not depend on order, and produces the same history either way
@@ -25082,6 +25165,8 @@ requirements:
       for a contest in either, so this corpus no longer shows the pile-up the
       requirement was written for; staged tables 141 -> 113, the 28 earlier versions
       having moved to their periods'' _superseded schemas.'
+    - '2026-10-05: criterion 17 - tests/test_supersession_critic.py::TestADemoteBesideANewerWaitingVersionIsRefused
+      green: refused naming the waiting version, allowed once it is superseded.'
     implemented_by:
     - qa_tools/common/supersession.py::supersede_earlier
     - qa_tools/common/supersession.py::earlier_unaccepted
@@ -25100,6 +25185,7 @@ requirements:
     - qa_tools/common/promotion_state.py::_why_not
     - qa_tools/common/synthetic_reset.py::schemas_to_drop
     - pipeline/closed_slots.py::for_dataset
+    - qa_tools/common/decision_log.py::_judge
     linked_tests:
     - tests/test_supersession.py
     - tests/test_supersession_critic.py
@@ -25121,6 +25207,7 @@ requirements:
       - "THE SYSTEM SHALL NOT, by any automatic rule, return a superseded supply to staging or promote it."
       - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-105 criteria 6, 7 and 8 and REQ-PIPE-079 criteria 10 and 11 so that several staged versions of one table in one period can arise ONLY from one arrival carrying several files for it, and so that 'newest wins' on the staged side reads as this requirement's supersession by receipt instant."
       - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-076 criterion 8 to read that a red supply nobody has decided on stays in staging UNTIL a later version supersedes it, and SHALL NOT move to the rejected schema."
+      - 'IF a person demotes a promoted supply out of a period in which a newer version of the same table is waiting, THEN THE SYSTEM SHALL refuse the demote, naming the waiting version and saying to reject or supersede it first, so that a period never holds two waiting versions of one table. ADDED 2026-10-05 (Keith, post-build-review #109 F8), chosen over superseding the demoted supply.'
     non_functional_requirements:
       - "Every consumer of a supply's state is enumerated mechanically before this is called done (CLAUDE.md's shape-change rule): slot_state's states and NEEDS_ACTION, decision_log.ACTIONS and AUTOMATIC_ACTIONS, the TUI standing queue, REQ-PIPE-083's ticket policy, period_overlay, the dashboard builders and the template. A new state that one reader does not know is how a supply silently disappears from a screen."
       - "Each _superseded schema holds supply rows, so it is behind the same access as staging and rejected: the dashboard build and every read-committed-history path SHALL NOT be able to read it (REQ-PIPE-074 criterion 13)."
@@ -25188,6 +25275,10 @@ requirements:
         state, so the as-of history could turn a period red retroactively - no instance
         in the supply8 corpus, so latent) and F13 (a period whose own name normalises
         to end in _superseded is unreadable as a period).'
+      - 'A DEMOTE BESIDE A NEWER WAITING VERSION IS REFUSED (Keith, 2026-10-05,
+        criterion 17 added; post-build-review #109 F8). REJECTED: demote and then
+        supersede the demoted supply (my recommendation); allowing two versions
+        to wait, which made every sibling run read the table as contested.'
     open_questions: []
 
   - id: REQ-PIPE-120
@@ -25407,6 +25498,13 @@ requirements:
     - '2026-10-05: REQ-QAC-017 retired; acceptance_sync.py, its 236-line test
       module, `mothman github sync-acceptances` and the AMBER_DECISIONS embed
       removed; the one helper the leaderboard used moved into it.'
+    - '2026-10-05: criterion 7 as amended and criterion 24, and NFR 1 - tests/test_amber_setting.py,
+      tests/test_amber_setting_added_on.py (dated by a real temporary repository''s
+      commit), tests/test_cli_config_unreadable.py (one line, no traceback, `--help`
+      included), tests/test_cli_amber_setting.py and tests-js/amber-setting.test.js
+      green; tests/test_validate_schedule.py still holds the gate to one `git
+      show`. `mothman supply amber-setting` lists all seven datasets as ''promote
+      (set for the whole data asset, since 1 Jan 2023)''.'
     implemented_by:
     - qa_tools/common/amber_setting.py::resolve
     - qa_tools/common/amber_setting.py::past_change_problems
@@ -25423,12 +25521,22 @@ requirements:
     - qa_tools/common/filing_queue.py::operations_for
     - pipeline/acknowledgements.py::for_dataset
     - dashboard/qa-reporting-dashboard.template.html::acknowledgementBadge
+    - qa_tools/common/amber_setting.py::timeline
+    - qa_tools/common/amber_setting.py::describe
+    - qa_tools/common/validate_schedule.py::_added_on
+    - cli/app.py::_config_refusal
+    - cli/supply.py::amber_setting_command
+    - cli/filing_tui.py::_print_amber_settings
     linked_tests:
     - tests/test_amber_setting.py
     - tests/test_dashboard_e2e.py::TestAcknowledgementBadge
     - tests/test_filing_decisions.py
     - tests/test_filing_queue.py
     - tests/test_cli_filing_tui.py
+    - tests/test_amber_setting_added_on.py
+    - tests/test_cli_config_unreadable.py
+    - tests/test_cli_amber_setting.py
+    - tests-js/amber-setting.test.js
     source: "Keith, 2026-10-03 ('OPTION A, ROUND TWO') and the group 2 sign-off round 2026-10-04 (plans/road-testing.md #16 - 'Amber acknowledgement', 'AMBER: ONE SETTING, THREE VALUES', 'AMBER VALUE ORDER'). Redrafted by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL read one amber setting from contract/data-asset.yaml, taking exactly one of three values - hold, promote-and-acknowledge, promote - at data asset level and optionally at collection and dataset level."
@@ -25437,7 +25545,7 @@ requirements:
       - "THE SYSTEM SHALL hold the amber setting, at each level, as a series of versions, each with an effective date, in the same shape as a calendar's versions (REQ-PIPE-110), and SHALL resolve the value that applies to a supply from the version in effect at the instant the decision about it takes effect."
       - "THE SYSTEM SHALL derive every state shown for the past - an amber supply waiting under hold, a supply awaiting acknowledgement, an automatic replacement - from what was recorded on the decision at the time, and SHALL NOT recompute it from the setting in force now."
       - "THE SYSTEM SHALL refuse in CI a change that alters or removes a version of the setting whose effective date has passed, whatever changelog entry accompanies it - there is no correction route for a setting's past."
-      - "THE SYSTEM SHALL refuse in CI a new version of the setting whose effective date is earlier than the day it is added, on the data asset's own clock."
+      - 'THE SYSTEM SHALL refuse in CI a new version of the setting whose effective date is earlier than the day it was added - the date, on the data asset''s own clock, of the commit that introduced the version - so that when the gate runs does not matter. AMENDED 2026-10-05 (Keith): judged on the day the gate ran, a version added late at night and pushed after midnight went red.'
       - "WHERE a data asset's configuration declares it synthetic (the declaration REQ-GEN-135 already requires for scenario playback), THE SYSTEM SHALL allow a new version with a past effective date, and SHALL still refuse altering or removing an existing past version."
       - "IF the data asset level states no value, THEN THE SYSTEM SHALL refuse the configuration, and SHALL NOT assume a default."
       - "WHERE the resolved setting is hold, THE SYSTEM SHALL NOT promote an amber supply automatically, and SHALL leave it staged awaiting a person."
@@ -25454,6 +25562,7 @@ requirements:
       - "THE SYSTEM SHALL show on the dashboard whether a promoted amber supply is acknowledged or awaiting acknowledgement, carrying forward what REQ-QAC-017 criterion 1 asked of its per-run accept."
       - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-075 criterion 1 so that amber promotes itself only where this setting resolves to promote-and-acknowledge or promote, and REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1 to list acknowledge among the filing decisions."
       - "THE SYSTEM SHALL RETIRE REQ-QAC-017 (its one criterion) in the same change, and SHALL remove its per-run /accept and /reject-on-amber handling, so that ACKNOWLEDGE is the only acknowledgement mechanism."
+      - 'IF contract/data-asset.yaml cannot be parsed, THEN every mothman command SHALL stop with one line naming the file, the line and what is wrong, and a non-zero exit, and SHALL NOT show a traceback. ADDED 2026-10-05 (Keith, post-build-review #107): one indentation slip crashed every command before the validator could speak, and this requirement is the first to ask people to hand-edit nested levels there.'
     non_functional_requirements:
       - "Visible, not set-and-forget: the resolved value and the level it came from are shown per dataset on its dashboard page and in the terminal, so a value nobody remembers setting is discoverable - the exact failure REQ-PIPE-075's rejection of a per-dataset flag named."
       - "Auditability: the setting's history is git's (it is configuration); recording the resolved value on each automatic promotion means the decision log alone answers 'why did this amber go in' a year later."
@@ -25499,6 +25608,17 @@ requirements:
         per validation run, so the gate still makes one read. Synthetic must be
         declared BEFORE and AFTER the change, so the declaration cannot be added
         in the same edit that uses it.'
+      - 'CRITERION 7 IS JUDGED BY THE COMMIT THAT ADDED THE VERSION (Keith, 2026-10-05):
+        the gate already reads git history, so a late push no longer turns CI red.
+        REJECTED: a day''s grace; keep the gate''s own run date.'
+      - 'NFR 1, VISIBILITY, IS BUILT NOW IN BOTH PLACES (Keith, 2026-10-05): one
+        line on each dataset''s page (''Amber supplies: promote and acknowledge
+        (set for Child Protection, since 5 Oct 2026)''), the same in `mothman supply
+        slots`, and `mothman supply amber-setting` listing every dataset. REJECTED:
+        terminal only; deferring it.'
+      - 'A MALFORMED data-asset.yaml STOPS EVERY COMMAND WITH ONE LINE (Keith, 2026-10-05,
+        criterion 24 added; post-build-review #107), treated as a defect fix with
+        a failing test first.'
     open_questions: []
 
 
@@ -25751,54 +25871,58 @@ requirements:
     moscow: must
     status: built
     linked_tests:
-      - tests/test_assignment.py
-      - tests/test_slots.py
-      - tests/test_supply_holds.py
-      - tests/test_outstanding.py
-      - tests/test_unrunnable.py
-      - tests/test_withheld_does_not_empty_a_slot.py
-      - tests/test_cli_schedule.py
+    - tests/test_assignment.py
+    - tests/test_slots.py
+    - tests/test_supply_holds.py
+    - tests/test_outstanding.py
+    - tests/test_unrunnable.py
+    - tests/test_withheld_does_not_empty_a_slot.py
+    - tests/test_cli_schedule.py
+    - tests/test_calendar_end_closes.py
     implemented_by:
-      - qa_tools/common/assignment.py::assign
-      - qa_tools/common/assignment.py::open_slot
-      - qa_tools/common/assignment.py::current_slot
-      - qa_tools/common/assignment.py::_why_unavailable
-      - qa_tools/common/slots.py::Slot
-      - qa_tools/common/slots.py::slots_for_dataset
-      - qa_tools/common/slots.py::_calendar_periods
-      - qa_tools/common/slots.py::is_open
-      - qa_tools/common/slots.py::is_closed
-      - qa_tools/common/promotion.py::should_promote
-      - qa_tools/common/outstanding.py::survey
-      - qa_tools/common/unrunnable.py::results_for
-      - cli/supply.py::filings_command
-      - cli/schedule.py::_show_dataset
+    - qa_tools/common/assignment.py::assign
+    - qa_tools/common/assignment.py::open_slot
+    - qa_tools/common/assignment.py::current_slot
+    - qa_tools/common/assignment.py::_why_unavailable
+    - qa_tools/common/slots.py::Slot
+    - qa_tools/common/slots.py::slots_for_dataset
+    - qa_tools/common/slots.py::_calendar_periods
+    - qa_tools/common/slots.py::is_open
+    - qa_tools/common/slots.py::is_closed
+    - qa_tools/common/promotion.py::should_promote
+    - qa_tools/common/outstanding.py::survey
+    - qa_tools/common/unrunnable.py::results_for
+    - cli/supply.py::filings_command
+    - cli/schedule.py::_show_dataset
     evidence:
-      - >
-        2026-10-04, overnight sprint 3b: a full bootstrap from an EMPTY
-        database (scratch `supply131b`, on the code as committed in
-        beef8b2 - an earlier `supply131` predated the #91/#92 fixes and
-        gave the same counts) filed 150 supplies - 137
-        open-slot-unfilled, 4 resupply-of-open-slot, 9 held-no-open-slot
-        (all cp-case-workers, arriving in quarters it does not deliver
-        in, which the retired off-cycle gate used to withhold). Against
-        the pre-131 corpus 14 supplies moved, and the defect is visible
-        in real data: cp-case-workers' August 2024 file had been filed
-        to 2023-Q1, over a year BACKWARD, and now files to 2024-Q3.
-      - >
-        2026-10-04: every scenario the register rewrote (TS-1, 2, 5,
-        6a-c, 7, 10, 33a/b) is a test in tests/test_assignment.py
-        against the real rule; slots close against the REAL quarterly and
-        daily calendars, including a partially-participating dataset
-        closing with its CALENDAR period (tests/test_slots.py).
-      - >
-        2026-10-04: against `supply131b`, all 278 tests needing the
-        deployed database ran - 277 passed, and the one that failed was the
-        arrival-semantics characterization pin, whose verdicts moved for
-        exactly the 9 held cp-case-workers arrivals (late -> unfiled), the
-        intended effect of criterion 10; re-captured, 9 lines changed. No
-        check has two results in one run, and no hold reason carries a raw
-        instant.
+    - '2026-10-04, overnight sprint 3b: a full bootstrap from an EMPTY database
+      (scratch `supply131b`, on the code as committed in beef8b2 - an earlier
+      `supply131` predated the #91/#92 fixes and gave the same counts) filed 150
+      supplies - 137 open-slot-unfilled, 4 resupply-of-open-slot, 9 held-no-open-slot
+      (all cp-case-workers, arriving in quarters it does not deliver in, which
+      the retired off-cycle gate used to withhold). Against the pre-131 corpus
+      14 supplies moved, and the defect is visible in real data: cp-case-workers''
+      August 2024 file had been filed to 2023-Q1, over a year BACKWARD, and now
+      files to 2024-Q3.
+
+      '
+    - '2026-10-04: every scenario the register rewrote (TS-1, 2, 5, 6a-c, 7, 10,
+      33a/b) is a test in tests/test_assignment.py against the real rule; slots
+      close against the REAL quarterly and daily calendars, including a partially-participating
+      dataset closing with its CALENDAR period (tests/test_slots.py).
+
+      '
+    - '2026-10-04: against `supply131b`, all 278 tests needing the deployed database
+      ran - 277 passed, and the one that failed was the arrival-semantics characterization
+      pin, whose verdicts moved for exactly the 9 held cp-case-workers arrivals
+      (late -> unfiled), the intended effect of criterion 10; re-captured, 9 lines
+      changed. No check has two results in one run, and no hold reason carries
+      a raw instant.
+
+      '
+    - '2026-10-05: criterion 16 - tests/test_calendar_end_closes.py green against
+      the real configuration: cp-clients'' last authored slot closes, open as
+      long as the one before it, and a 2030 instant finds no open slot.'
     source: "Keith, 2026-10-04, group 3 sign-off round of option A, after finding backward filing while checking the since-dropped REQ-PIPE-124 (plans/road-testing.md #16, 'FOUND WHILE CHECKING THAT', 'KEITH'S PROPOSAL', 'PERIOD CLOSING SETTLED', 'SIGN-OFF ROUND, period closing'). Scoped by delivery-scoper 2026-10-04, separately from option A; signed off by Keith 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL treat a dataset's slot as OPEN from its claim-opening instant until the claim-opening instant that dataset would have for the NEXT PERIOD OF ITS CALENDAR - whether or not the dataset participates in that next period - and as CLOSED from then on."
@@ -25816,6 +25940,7 @@ requirements:
       - "THE SYSTEM SHALL allow a person to re-file a supply into a closed slot (REQ-GHUB-082 criterion 9), to substitute a closed slot (REQ-PIPE-084), to mark it as not supplied (REQ-PIPE-132), and to promote a supply already filed to it, and SHALL NOT refuse any of these because the slot is closed."
       - "THE SYSTEM SHALL RETIRE REQ-PIPE-077 (the off-cycle gate) in the same change, and SHALL amend, REQ-PIPE-062 criteria 2, 3 and 4 so the rule reads 'the open slot if unfilled, else a resupply of it'; RETIRE REQ-PIPE-063 (criteria 1 to 6) and REQ-PIPE-065 criteria 1 and 2; and amend REQ-PIPE-064 criterion 1 so its trigger reads 'no slot of the dataset is open at the receipt instant'."
       - "THE SYSTEM SHALL update, in the same change, the scenario map (SCENARIOS.md, REQ-GEN-045), the scenario injection and their tests wherever they describe the old filing rule - at least TS-4a, TS-5, TS-6a to 6c, TS-7 and the 22:00 Monday example."
+      - 'WHERE a dataset''s calendar has no next period - an authored calendar''s last date - THE SYSTEM SHALL close that last slot as long after its claim-opening instant as the period before it stayed open, so that a file arriving after the calendar runs out finds no open slot and is held under criterion 10 rather than filed backward. ADDED 2026-10-05 (Keith, post-build-review #93); ''as long as the period before it'' is the PROVISIONAL measure, and a calendar of a single date keeps its one slot open with the runway warning as the signal.'
     non_functional_requirements:
       - "Scale: the daily asset has thousands of slots (Birth Registrations alone has 495 today, generated to the end of 2027). Finding the open slot stays a bisection per arrival over the calendar's periods, as assignment.current_slot() already is over slots; a slot's closing instant is read from the next calendar period by index, never by walking the sequence."
       - "Derived, never recorded: whether a slot is open or closed is asked of the schedule and the instant, like overdue (slots.is_overdue), so it cannot be stale."
@@ -25845,6 +25970,12 @@ requirements:
       - "THE REAL `supply` DATABASE IS NOT REBUILT BY `bootstrap --force`: filings are write-once (REQ-PIPE-062 criterion 10), so a forced bootstrap kept every pre-131 filing. The evidence comes from a fresh scratch database; dropping the real one was refused by the session's permission classifier and is left for Keith."
       - "TWO LATENT DEFECTS SURFACED by the first real holds, both fixed with a failing test first: a check reading a held table AND a staged one got two records in one run (unrunnable.results_for now leaves a held-reading check to held_blast_radius, and records one result per check); and a hold's stored reason carried a raw ISO instant the queue showed verbatim (REQ-DASH-071)."
       - "LEFT FOR REQ-PIPE-132: the queue's closed-unfilled-slot item, whose producer read REQ-PIPE-063's monotonic filling, is removed rather than redefined - REQ-PIPE-132 brings it back grouped per dataset."
+      - 'AN AUTHORED CALENDAR''S LAST SLOT CLOSES (Keith, 2026-10-05, criterion
+        16 added; post-build-review #93): a 2030 file was filed to 2027-Q4. A later
+        file is held for a person. REJECTED: keep filing into the last period and
+        rely on the runway warning. ''As long as the period before it stayed open''
+        is the PROVISIONAL measure - the calendar has no claim-window end of its
+        own to use.'
     open_questions: []
 
   - id: REQ-PIPE-132
@@ -25976,15 +26107,20 @@ requirements:
       - the build embeds every slot that was a gap when it closed, with its closing,
       filed, filled and marked instants (c10), from the decision log and filings
       only.'
+    - '2026-10-05: the banner and the late-but-open slot - tests/test_not_supplied.py::TestALateDayStillOpenIsNamed,
+      tests-js/closed-no-supply.test.js and tests/test_dashboard_e2e.py::TestClosedWithNoSupply
+      green (''Chase the supplier first'', the filing wizard named).'
     implemented_by:
     - pipeline/closed_slots.py::for_dataset
     - pipeline/build_dashboard_data.py::build
     - pipeline/build_cp_dashboard_data.py::build_one_table
     - dashboard/qa-reporting-dashboard.template.html
+    - pipeline/closed_slots.py::late_slots
     linked_tests:
     - tests-js/closed-no-supply.test.js
     - tests/test_dashboard_e2e.py::TestClosedWithNoSupply
     - tests/test_not_supplied.py::TestWhatTheBuildEmbeds
+    - tests/test_not_supplied.py::TestALateDayStillOpenIsNamed
     source: 'Keith, 2026-10-04 (''shown very clearly as red / no supply'', plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-04; signed off by Keith 2026-10-04.'
     acceptance_criteria:
     - WHERE a dataset's slot for the period on show is closed and unfilled (REQ-PIPE-132), THE SYSTEM SHALL show that period on the dataset's page as red and 'no supply', distinctly from a period that is overdue but still open - except WHERE a supply for that slot arrived and could not be loaded, was rejected after failing to load, or is contested, where THE SYSTEM SHALL say that instead (REQ-DASH-148 criterion 4, REQ-PIPE-153 criterion 9, REQ-PIPE-115 criterion 8).
@@ -26060,6 +26196,14 @@ requirements:
       list, and anything else the build observed after the date is left out. Such
       an item is pilled ''Makes its dataset red'' - the queue''s copy used to
       say everything but holds, contests and failed loads changes no status.'
+    - 'THE NO-SUPPLY BANNER SAYS CHASE THE SUPPLIER FIRST (Keith, 2026-10-05;
+      post-build-review #104), then names the wizard (`mothman supply decide`),
+      which offers all three decisions - most closed gaps are a late supplier,
+      not a decision. REJECTED: all three commands in full; mark-not-supplied
+      alone.'
+    - 'A DAILY FEED''S ROW NAMES TODAY''S LATE-BUT-OPEN FILE BESIDE AN OLD GAP
+      (Keith, 2026-10-05; #104), so the more urgent thing is not hidden by the
+      older one.'
     open_questions: []
 
   - id: REQ-PIPE-134
@@ -26467,39 +26611,39 @@ requirements:
     - cli/env.py::reset_synthetic_command
     - cli/pipeline.py::run_command
     unmet_criteria:
-    - criterion: >-
-        Criteria 14 and 42 - when a person chooses which file of a contested
-        pair is the supply, take that file's own receipt and write a new
-        filing where it differs.
-      why: >-
-        Nothing lets a person choose a file of a contested pair yet: no
-        filing decision offers it, on either route. The receipt view already
-        reads per-file receipts from qa.delivery_file, so the choice has what
-        it needs to read once it exists; the decision itself is not this
-        requirement's to invent.
-      owner: >-
-        Keith - no requirement owns the contested-pair choice today
-        (REQ-GHUB-082's decisions do not list it), so it needs placing.
+    - criterion: Criteria 14 and 42 - when a person chooses which file of a contested
+        pair is the supply, take that file's own receipt and write a new filing
+        where it differs.
+      why: 'Nothing lets a person choose a file of a contested pair yet: no filing
+        decision offers it, on either route. The receipt view already reads per-file
+        receipts from qa.delivery_file, so the choice has what it needs to read
+        once it exists; the decision itself is not this requirement''s to invent.'
+      owner: 'REQ-PIPE-141 (sprint 9''s re-filing) - Keith, 2026-10-05: the choice
+        is a new filing decision on both routes, writing the new filing in 141''s
+        append-only shape.'
       blocked_by:
-        unowned: true
+        requirements:
+        - REQ-PIPE-141
     evidence:
-    - >-
-      2026-10-04 (overnight sprint 4): the criterion 30 comparison. Two
-      bootstraps from EMPTY databases, the same Perth day, the same server
-      - `equiv144_before` on 0a9ac43, `equiv144_after` on this change - then
-      both built dashboard data files, the outstanding queue, `mothman supply
-      deliveries`, `mothman supply filings` for all seven datasets and 125
-      composed ticket bodies compared field by field: ZERO differences in
-      content. What differed: `observedAt` on the nine held supplies (when
-      each hold was raised - clock), a decision_id interleave between the two
-      collections writing in parallel (surrogate), and the checkout's path
-      inside a Python warning. arrivedAt byte-identical (criterion 32).
-    - >-
-      2026-10-04: against equiv144_after, the 276 tests that need a deployed
-      database passed; the other 2,906 passed against per-worker databases.
-      The newer-schema downgrade was reproduced before the fix - a database
-      recorded at version 99 came back recorded at 17
-      (tests/test_schema_version_refusal.py, failing first).
+    - '2026-10-04 (overnight sprint 4): the criterion 30 comparison. Two bootstraps
+      from EMPTY databases, the same Perth day, the same server - `equiv144_before`
+      on 0a9ac43, `equiv144_after` on this change - then both built dashboard
+      data files, the outstanding queue, `mothman supply deliveries`, `mothman
+      supply filings` for all seven datasets and 125 composed ticket bodies compared
+      field by field: ZERO differences in content. What differed: `observedAt`
+      on the nine held supplies (when each hold was raised - clock), a decision_id
+      interleave between the two collections writing in parallel (surrogate),
+      and the checkout''s path inside a Python warning. arrivedAt byte-identical
+      (criterion 32).'
+    - '2026-10-04: against equiv144_after, the 276 tests that need a deployed
+      database passed; the other 2,906 passed against per-worker databases. The
+      newer-schema downgrade was reproduced before the fix - a database recorded
+      at version 99 came back recorded at 17 (tests/test_schema_version_refusal.py,
+      failing first).'
+    - '2026-10-05: always wipe and rebuild - tests/test_schema_version_refusal.py::TestEveryOlderSchemaIsRefused
+      green; the real `supply` database, on schema 23, was refused, reset with
+      `mothman env reset-synthetic` (34 schemas) and rebuilt with `mothman pipeline
+      bootstrap` in 1400s.'
     source: Keith, asked 2026-10-04 after an audit of the live qa schema; drafted by delivery-scoper the same day, reviewed by delivery-architect, and revised with Keith's answers of 2026-10-04 (receipt option A, pruning option E, considered slots kept as a column, placement straight after REQ-PIPE-131).
     acceptance_criteria:
     - THE SYSTEM SHALL NOT store a JSON document of the assignment on a qa.filing row; the record column SHALL be removed.
@@ -26601,6 +26745,18 @@ requirements:
     - "BUILT 2026-10-04 (overnight sprint 4). PROVISIONAL, each listed in the morning report: (1) the synthetic declaration is a top-level `synthetic: true` in contract/data-asset.yaml (schemas.DataAsset.synthetic, default False) - REQ-GEN-135 criterion 8 can reuse it; (2) reset-synthetic drops the qa schema AND every supply-row schema (staging, periods, rejected, run views, trials), because rebuild-from-empty means the warehouse too; (3) 'already holds QA history' means any row in qa.run, qa.delivery, qa.filing or qa.decision; (4) bootstrap without --force over history that has emptied staging is refused too, not only --force; (5) reset refuses BOTH a non-synthetic asset (criterion 43) AND a production checkout (criterion 22), rather than reading 43 as replacing 22."
     - "ALSO RETIRED IN THIS CHANGE: qa_store.delete_history(), the per-collection delete regenerate-history used - a second deletion path is what criterion 23 rules out. REQ-PIPE-067 criterion 5's trace of what caused a re-file now waits on REQ-PIPE-141's decision-log entry (criterion 8 took it off the filing; refile() has no production caller)."
     - "CONSEQUENCE FOR EXISTING DATABASES, stated rather than discovered: every database built before this (the real `supply`, the scratch `supply131`/`supply131b`) is at version 17 and is now REFUSED by ensure_schema, with the reset-synthetic remedy named - which is criterion 29 working."
+    - ALWAYS WIPE AND REBUILD ON A SCHEMA CHANGE (Keith, 2026-10-05), chosen over
+      my recommendation to allow additive changes in place. Schemas 19-23 were
+      additive in-place migrations, a departure from the standing 'regenerate,
+      never migrate' rule this requirement states; ensure_schema now refuses ANY
+      older version with the reset-then-bootstrap message. The ALTER ... ADD
+      COLUMN IF NOT EXISTS statements stay in the DDL, but can no longer reach
+      an older database, so they only ever build a fresh one; folding them into
+      the CREATE TABLE definitions is a tidy-up, not a behaviour change.
+    - 'THE CONTESTED-PAIR CHOICE GOES TO SPRINT 9 (Keith, 2026-10-05): criteria
+      14 and 42 are owned by REQ-PIPE-141''s append-only re-filing, as a new filing
+      decision on both routes, drafted as an amendment for sign-off when sprint
+      9 is scoped.'
     open_questions: []
 
   - id: REQ-QAC-145

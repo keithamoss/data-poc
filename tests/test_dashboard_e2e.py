@@ -3366,15 +3366,19 @@ class TestAHeldOrContestedDatasetReadsRed:
                                                                dashboard_html_with_blockers):
         _goto(page, dashboard_html_with_blockers, state={"tier": "agency", "agencyId": self.CP},
               as_of=self.AS_OF)
-        held = page.locator("tr[data-blocked=held]")
         contested = page.locator("tr[data-blocked=contested]")
-        assert held.count() == 1 and contested.count() == 1
-        assert "Carer Register" in held.inner_text() and "Held" in held.inner_text()
+        assert contested.count() == 1
         assert "Two files, choose one" in contested.inner_text()
-        for row in (held, contested):
-            assert row.locator(".pill.red").count() == 1
-            # One reason row: no row count, run date or sparkline beside it.
-            assert row.locator("svg").count() == 0
+        assert contested.locator(".pill.red").count() == 1
+        # One reason row: no row count, run date or sparkline beside it.
+        assert contested.locator("svg").count() == 0
+        # A HELD SUPPLY HAS NO PERIOD, so it no longer replaces the row
+        # (criterion 11 as amended 2026-10-05, Keith): the row keeps the
+        # latest checked supply's columns, red, with the hold beneath.
+        held = page.locator("tr", has=page.locator("[data-waiting-blocker=held]"))
+        assert held.count() == 1
+        assert "Carer Register" in held.inner_text() and "Held" in held.inner_text()
+        assert held.locator(".pill.red").count() == 1
 
     def test_the_red_rolls_up_to_the_collection_and_the_agency(self, page,
                                                                dashboard_html_with_blockers):
@@ -3386,7 +3390,7 @@ class TestAHeldOrContestedDatasetReadsRed:
         }}""")
         assert statuses == {"agency": "red", "collection": "red"}
 
-    @pytest.mark.parametrize("dataset_id", ["cp-carers", "cp-clients"])
+    @pytest.mark.parametrize("dataset_id", ["cp-clients"])
     def test_none_of_its_own_checks_reads_as_passing(self, page, dashboard_html_with_blockers,
                                                      dataset_id):
         _goto(page, dashboard_html_with_blockers, state=self._ds(dataset_id), as_of=self.AS_OF)
@@ -3403,12 +3407,29 @@ class TestAHeldOrContestedDatasetReadsRed:
         assert "nothing is checked for this dataset until a person resolves it" in text
         assert page.locator("#col-grid .pill.green").count() == 0
 
+    def test_a_held_supply_keeps_the_latest_checked_results(self, page,
+                                                            dashboard_html_with_blockers):
+        """Criterion 11 as amended 2026-10-05 (Keith): an open hold no
+        longer blanks later periods - red with its reason, the latest
+        checked supply's results shown."""
+        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), as_of=self.AS_OF)
+        got = page.evaluate("""() => {
+            const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+                           .find(d => d.id === "cp-carers");
+            return {status: ds.status,
+                    checks: [...new Set(ds.columns.flatMap(c => c.checks).map(checkStatus))]};
+        }""")
+        assert got["status"] == "red"
+        assert got["checks"] and got["checks"] != ["nodata"]
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "The dataset stays red until a person resolves it" in text
+
     def test_its_check_panel_does_not_show_an_earlier_run_as_current(
             self, page, dashboard_html_with_blockers):
         """Criteria 11 and 26 in the check panel (delivery-critic, sprint 6):
         the pill read No data while the panel still showed the last run's
         value and row counts as "current"."""
-        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), as_of=self.AS_OF)
+        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-clients"), as_of=self.AS_OF)
         page.evaluate("""() => {
           const ctx = resolveContext(STATE);
           const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
@@ -3445,7 +3466,9 @@ class TestHeldOutranksAnEndedSchedule:
              "reason": "could not be placed", "files": [], "loadFailures": []}])
         _goto(page, out, state={"tier": "agency", "agencyId": "child-protection-family-support"},
               as_of="2027-09-15")
-        row = page.locator("tr[data-blocked=held]")
+        # A held supply keeps the row (REQ-PIPE-115 criterion 11 as amended
+        # 2026-10-05), red, with the hold beneath its pill.
+        row = page.locator("tr", has=page.locator("[data-waiting-blocker=held]"))
         assert row.count() == 1 and "Case Workers" in row.inner_text()
         assert row.locator(".pill.red").count() == 1
 
@@ -3573,7 +3596,10 @@ class TestClosedWithNoSupply:
         text = " ".join(page.locator("#view").inner_text().split())
         assert "No supply — 2 periods with no supply, 2025-Q2 to 2025-Q3" in text
         assert "Not supplied (accepted)" in text and "supplier had a system outage" in text
-        assert "mark-not-supplied" in text, "and names the command that accepts it"
+        # Chase the supplier first, then the filing wizard, which offers all
+        # three decisions (Keith, 2026-10-05; post-build-review #104).
+        assert "Chase the supplier first" in text
+        assert "Filing decisions" in text, "and names where to decide it"
 
     def test_the_supply_history_lists_every_closed_period(self, page, tmp_path,
                                                         built_dashboard_html):

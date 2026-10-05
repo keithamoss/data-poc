@@ -355,7 +355,9 @@ def judge(results: list[dict], assessment: Assessment | None) -> list[dict]:
     reference period and the reason are carried - so the dashboard,
     terminal and ticket can say "the measurement was fine; the comparison
     skipped a period" rather than calling it drift (criterion 14). The
-    red counts against automatic promotion like any other (criterion 15).
+    red does NOT count against automatic promotion - the gate reads
+    `measured_status` (criterion 15 as amended 2026-10-05; promotion.
+    _gating_status).
     """
     if assessment is None:
         return results

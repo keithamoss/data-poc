@@ -365,6 +365,30 @@ class UnreadableVerdictError(RuntimeError):
     a new tool status nobody taught this about."""
 
 
+def _gating_status(record: dict) -> str | None:
+    """The verdict the gate reads for one result.
+
+    A GAP RED WARNS, IT DOES NOT BLOCK (REQ-QAC-108 criterion 15 as
+    amended 2026-10-05, Keith). A drift or volume check measured across
+    an owed period with nothing promoted is recorded red, with the
+    measurement's own verdict kept beside it as `measured_status`; the
+    gate reads that measurement, so a real drift still blocks and the gap
+    alone does not. As signed, one supply left waiting made every later
+    supply of its dataset wait too.
+
+    With NO REFERENCE AT ALL (criterion 9) there is no measurement, and
+    the check is read as having no reference - the same quiet status a
+    new dataset's drift check carries - so it neither passes nor blocks.
+    """
+    if record.get("reference_gap"):
+        if record.get("reference_not_evaluated"):
+            return "nodata"
+        measured = record.get("measured_status")
+        if measured:
+            return measured
+    return record.get("status")
+
+
 def status_of(dataset_id: str, results: Sequence[dict], *,
               reads: dict[str, list[str]]) -> str | None:
     """This dataset's status, from EVERY check that contributes to it
@@ -421,7 +445,7 @@ def status_of(dataset_id: str, results: Sequence[dict], *,
         # vocabulary, so EVERY real result raised. Found by writing a
         # test against the shape qa.check_result actually holds rather
         # than the shape the gate wished for.
-        verdict = dataset_status.dashboard_status(record.get("status"))
+        verdict = dataset_status.dashboard_status(_gating_status(record))
         if verdict is None:
             # AN UNREADABLE VERDICT IS NOT EVIDENCE OF HEALTH, and
             # dropping it would be exactly that - the supply would

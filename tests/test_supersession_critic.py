@@ -159,3 +159,35 @@ class TestAResetTakesThePeriodSchemas:
                 c.execute(f'CREATE SCHEMA IF NOT EXISTS "{name}"')
             dropping = synthetic_reset.schemas_to_drop(c)
         assert plain in dropping and aside in dropping
+
+
+class TestADemoteBesideANewerWaitingVersionIsRefused:
+    """REQ-PIPE-118 criterion 17 (Keith, 2026-10-05; #109 F8): demoting a
+    promoted supply into a period where a newer version is waiting would
+    leave two waiting versions of one table, so it is refused."""
+
+    def test_refused_naming_the_waiting_version(self, conn, period):
+        from qa_tools.common import filing_decisions as fd
+
+        old, old_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        promotion.promote(conn, agency_id="child-protection-family-support",
+                          collection_id="child-protection", dataset_id=DS, supply=old,
+                          period=period, physical_tables=[old_table], actor="promotion rule",
+                          actor_kind=dl.RULE, effective_at=WHEN, reason="green")
+        new, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
+        with pytest.raises(dl.DecisionRefused, match=new):
+            _apply(conn, fd.DEMOTE, old, period)
+        assert _schema_of(conn, old_table) != [supply_db.STAGING_SCHEMA]
+
+    def test_allowed_once_the_newer_one_is_dealt_with(self, conn, period):
+        from qa_tools.common import filing_decisions as fd
+
+        old, old_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        promotion.promote(conn, agency_id="child-protection-family-support",
+                          collection_id="child-protection", dataset_id=DS, supply=old,
+                          period=period, physical_tables=[old_table], actor="promotion rule",
+                          actor_kind=dl.RULE, effective_at=WHEN, reason="green")
+        new, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
+        _apply(conn, fd.SUPERSEDE, new, period)
+        _apply(conn, fd.DEMOTE, old, period)
+        assert _schema_of(conn, old_table) == [supply_db.STAGING_SCHEMA]

@@ -119,6 +119,25 @@ class TestWhatAKeptSupplyRecords:
             assert record["filed_by"] == d.filed_by
             assert record["files"][0]["originally_received_stated"] == delivery.NOT_KNOWN
 
+    def test_a_stated_time_keeps_its_instant_beside_its_text(self, tmp_path, tree):
+        """NFR 6, built 2026-10-05 (Keith): the receipt's own text-plus-
+        instant convention - the exact text, and the instant beside it;
+        'not known' has no instant."""
+        from datetime import datetime
+
+        deliveries, receipts = tree
+        stated = "2026-09-20T10:00:00+08:00"
+        filed = hand_filing.file_supply(
+            [_csv(tmp_path)], "civil-registration", "run_", received_at=NOW,
+            stated_original={"*": stated}, route="file", filed_by="analyst@example.org",
+            deliveries_dir=deliveries, receipts_dir=receipts)
+        with supply_db.connect(label="test-stated-instant") as conn:
+            ((text, instant),) = conn.execute(
+                "SELECT originally_received_stated, originally_received_stated_instant "
+                "FROM qa.delivery_file WHERE delivery = ?", [filed.delivery_name]).fetchall()
+        assert text == stated
+        assert instant == datetime.fromisoformat(stated)
+
     @pytest.mark.parametrize("second", [
         {"kind": "person", "route": "s3", "who": "mallory@example.org"},
         None,   # a receipt with the key missing reads as automated

@@ -286,7 +286,7 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # output, so a later reader can see what was compared rather than
     # only that it agreed. Nothing is written where nothing was left out.
     noted = left_out.take(run_id)
-    if _has_scope(entry, run_id):
+    if _reconciles(entry, run_id):
         compared = left_out.reconcile(run_id, noted, [*blast, *missing],
                                       scope_of_run(run_id))
         if compared:
@@ -313,6 +313,15 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # finished one.
     finish_run(run_id)
     return results
+
+
+def _reconciles(entry: dict, run_id: str) -> bool:
+    """Whether this run's left-out checks are reconciled (REQ-PIPE-115
+    criterion 17): a run with a scope, and - as amended 2026-10-05
+    (Keith) - a TRIAL, so what a trial shows is trustworthy on the same
+    terms as a real run. A trial's id names no table, so its scope is the
+    whole collection."""
+    return trial.is_trial(run_id) or _has_scope(entry, run_id)
 
 
 def _has_scope(entry: dict, run_id: str) -> bool:

@@ -178,12 +178,13 @@ def record(delivery, recognition,
                 f'INSERT INTO "{qa_store.SCHEMA}".delivery_file '
                 "(delivery, filename, dataset_id, contested_by, received_at, "
                 "received_instant, received_from, receipt_sequence, "
-                "originally_received_stated) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "originally_received_stated, originally_received_stated_instant) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [payload["delivery"], entry["filename"], entry["dataset_id"],
                  json.dumps(entry["contested_by"]) if entry["contested_by"] else None,
                  entry["received_at"], entry["received_instant"], entry["received_from"],
-                 entry["receipt_sequence"], entry["originally_received_stated"]])
+                 entry["receipt_sequence"], entry["originally_received_stated"],
+                 _stated_instant(entry["originally_received_stated"])])
     payload["contested"] = [{"dataset_id": h.dataset_id, "files": list(h.files)}
                             for h in holds.holds_in(recognition)]
     for entry in payload["files"]:
@@ -193,6 +194,19 @@ def record(delivery, recognition,
 
 def _stated(delivery, name: str) -> str | None:
     return (getattr(delivery, "stated_original", None) or {}).get(name)
+
+
+def _stated_instant(text: str | None):
+    """The instant a stated original arrival names, or None for 'not
+    known' or no statement (REQ-PIPE-103 NFR 6) - the text was validated
+    as an ISO instant with its offset when it was taken."""
+    from datetime import datetime
+
+    from qa_tools.common import delivery as delivery_mod
+
+    if not text or text == delivery_mod.NOT_KNOWN:
+        return None
+    return datetime.fromisoformat(text)
 
 
 def _file_source(delivery, name: str) -> str:

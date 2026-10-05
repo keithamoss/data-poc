@@ -329,3 +329,40 @@ class TestTheRefusalNamesTheRightUndo:
             pass
         with pytest.raises(dl.DecisionRefused, match="--operation de-substitute"):
             _mark(conn, "cp-notifications", "2025-Q2")
+
+
+class TestALateDayStillOpenIsNamed:
+    """REQ-DASH-133, Keith 2026-10-05 (#104): a daily feed's row names
+    today's late-but-open file beside an old gap. The build embeds every
+    slot that was ever late while open - when it went late, when a file
+    came, when it closed - and the page only compares those with the date
+    on show."""
+
+    def test_a_slot_with_nothing_filed_was_late_from_its_late_instant(self, conn):
+        from pipeline import closed_slots
+
+        got = {s["period"]: s for s in closed_slots.late_slots("cp-carers", conn, now=LATER)}
+        assert got["2025-Q1"]["filedAt"] is None
+        assert got["2025-Q1"]["lateAt"] and got["2025-Q1"]["closesAt"]
+
+    def test_a_slot_filed_on_time_was_never_late(self, conn):
+        from pipeline import closed_slots
+        from qa_tools.common import filing, slots
+
+        slot = next(s for s in slots.slots_for_dataset("cp-carers", until=LATER.date())
+                    if s.name == "2025-Q1")
+        on_time = (slot.claim_opens_at + (slot.late_after - slot.claim_opens_at) / 2).isoformat()
+        delivery = "pytest-on-time-2025q1"
+        conn.execute("INSERT INTO qa.delivery (name, received_at, received_instant) "
+                     "VALUES (?, ?, ?) ON CONFLICT DO NOTHING", [delivery, on_time, on_time])
+        conn.execute(
+            "INSERT INTO qa.delivery_file (delivery, filename, dataset_id, received_at, "
+            "received_instant, received_from, receipt_sequence) VALUES (?, 'cp_carers.csv', "
+            "'cp-carers', ?, ?, 'our-clock', 1) ON CONFLICT DO NOTHING",
+            [delivery, on_time, on_time])
+        conn.execute(
+            f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, delivery) "
+            "VALUES ('cp-carers', 'cp-carers@ontime', '2025-Q1', 'pytest', ?) "
+            "ON CONFLICT (dataset_id, supply_id) DO UPDATE SET slot = EXCLUDED.slot", [delivery])
+        got = {s["period"] for s in closed_slots.late_slots("cp-carers", conn, now=LATER)}
+        assert "2025-Q1" not in got

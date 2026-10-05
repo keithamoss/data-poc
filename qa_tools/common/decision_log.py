@@ -510,6 +510,26 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
                 f"un-supersede --dataset {decision.dataset_id} --period "
                 f"{decision.to_slot} --supply {decision.supply} --reason '<why>'`.")
 
+    if decision.action == DEMOTE and decision.supply and decision.from_slot:
+        # ONE WAITING VERSION PER TABLE PER PERIOD (REQ-PIPE-118 criterion
+        # 17, Keith 2026-10-05; post-build-review #109 F8). A newer version
+        # that arrived while this one was promoted was not superseded - a
+        # promoted supply is never superseded - so demoting this one back
+        # would leave two versions waiting, and every sibling run would read
+        # the table as contested. Judged here, inside the transaction.
+        from qa_tools.common import supersession
+
+        waiting = supersession.waiting_in(conn, decision.dataset_id, decision.from_slot,
+                                          besides=decision.supply)
+        if waiting:
+            raise DecisionRefused(
+                f"{waiting[0]} is a newer version of this table, waiting for "
+                f"{decision.from_slot}, so demoting {decision.supply} would leave two "
+                f"waiting. Reject or supersede {waiting[0]} first: `mothman supply decide "
+                f"--operation reject --dataset {decision.dataset_id} --period "
+                f"{decision.from_slot} --supply {waiting[0]} --reason '<why>'`, or the "
+                f"same with `--operation supersede`.")
+
     if decision.action == REJECT and decision.supply:
         # A SUPERSEDED SUPPLY IS NOT REJECTED (post-build-review #109, F7):
         # it is already out of staging, and rejecting it would let an

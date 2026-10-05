@@ -148,3 +148,33 @@ class TestACheckWithNoReferenceIsNotEvidenceOfHealth:
         assert got == "nodata"
         assert got not in promotion.PROMOTES_ITSELF, \
             "a supply nobody measured must not promote itself"
+
+
+class TestAGapRedWarnsButDoesNotBlock:
+    """REQ-QAC-108 criterion 15 as amended 2026-10-05 (Keith): a red that
+    only means 'compared across a gap' does not count against promotion.
+    The rule reads what the measurement alone gave; a real drift still
+    blocks."""
+
+    def _gap(self, measured):
+        rec = r("fail", dataset_id="cp-carers", check_id="drift")
+        rec.update(measured_status=measured, reference_gap=["2026-Q2"],
+                   reference_reason="compared with 2026-Q1, not 2026-Q2")
+        return rec
+
+    def test_a_gap_red_over_a_passing_measurement_is_green(self):
+        assert promotion.status_of("cp-carers", [r("pass", dataset_id="cp-carers"),
+                                                 self._gap("pass")], reads={}) == "green"
+
+    def test_a_gap_red_over_a_failing_measurement_is_still_red(self):
+        assert promotion.status_of("cp-carers", [r("pass", dataset_id="cp-carers"),
+                                                 self._gap("fail")], reads={}) == "red"
+
+    def test_no_reference_at_all_neither_passes_nor_blocks(self):
+        rec = r("fail", dataset_id="cp-carers", check_id="drift")
+        rec.update(measured_status=None, reference_gap=["2026-Q1"],
+                   reference_not_evaluated=True, metric_value=None)
+        assert promotion.status_of("cp-carers", [r("pass", dataset_id="cp-carers"), rec],
+                                   reads={}) == "green"
+        # On its own it is not evidence of health either.
+        assert promotion.status_of("cp-carers", [rec], reads={}) != "green"

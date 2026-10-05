@@ -477,6 +477,29 @@ def standing_view(collection_id: str, dataset_id: str | None = None) -> None:
                    f"{_collection_name(collection_id)}"
                    + (f", {dataset_id}" if dataset_id else "") + "\n")
     console.print(table)
+    _print_amber_settings(sorted({s.dataset_id for s in states}))
+
+
+def _print_amber_settings(dataset_ids: list[str]) -> None:
+    """What an amber supply does for each dataset shown, and where that
+    was set (REQ-PIPE-122 NFR 1) - one line where they all share it."""
+    from qa_tools.common import amber_setting, asset_time
+
+    today = asset_time.local_date(asset_time.now())
+    said = {}
+    for ds in dataset_ids:
+        try:
+            said[ds] = amber_setting.describe(ds, today)
+        except amber_setting.AmberSettingError as exc:
+            said[ds] = f"none in force - {exc}"
+    if not said:
+        return
+    if len(set(said.values())) == 1:
+        console.print(f"\nAmber supplies: {next(iter(said.values()))}")
+        return
+    console.print("\nAmber supplies:")
+    for ds, text in said.items():
+        console.print(f"  {ds}  {text}")
 
 
 def filing_menu() -> None:

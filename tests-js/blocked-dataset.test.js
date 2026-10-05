@@ -113,3 +113,39 @@ describe("several blockers of one kind", () => {
     expect(w.blockerReceivedText(b)).toContain("oldest received");
   });
 });
+
+// REQ-PIPE-115 criterion 11 as amended 2026-10-05 (Keith): an unresolved
+// hold no longer hides the results of supplies checked after it.
+describe("which open blocker leaves the period without a run of its own", () => {
+  const ds = arrivedAt => ({id: "cp-case-workers",
+                            lastArrival: arrivedAt ? {arrivedAt} : undefined});
+  const CONTESTED = {...HELD, kind: "contested"};
+
+  it("a held supply never does - it has no period", () => {
+    const w = load();
+    expect(w.blockerWithoutARunOfItsOwn(ds("2026-02-01T01:00:00+00:00"), "2026-04-01",
+                                        SOURCE(HELD))).toBeNull();
+  });
+
+  it("a contested table received after the latest checked supply does", () => {
+    const w = load();
+    expect(w.blockerWithoutARunOfItsOwn(ds("2026-02-01T01:00:00+00:00"), "2026-04-01",
+                                        SOURCE(CONTESTED))).not.toBeNull();
+  });
+
+  it("one received before a later checked supply does not", () => {
+    const w = load();
+    expect(w.blockerWithoutARunOfItsOwn(ds("2026-08-01T01:00:00+00:00"), "2026-09-01",
+                                        SOURCE(CONTESTED))).toBeNull();
+  });
+
+  it("where nothing was ever checked, any open blocker does", () => {
+    const w = load();
+    expect(w.blockerWithoutARunOfItsOwn(ds(null), "2026-04-01", SOURCE(HELD))).not.toBeNull();
+  });
+
+  it("a dataset waiting on such a blocker is still red in its collection", () => {
+    const w = load();
+    expect(w.rollup([{columns: [{status: "green", checks: []}], waitingBlocker: HELD}])).toBe("red");
+  });
+});
