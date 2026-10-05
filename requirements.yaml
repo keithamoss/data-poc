@@ -26809,6 +26809,23 @@ requirements:
     - 'RE-POINTED 2026-10-04 (Keith, wording approved): owed work completes on the next run of the processing pass (REQ-PIPE-151) rather than ''the next pipeline run'', because `mothman pipeline run` regenerates synthetic data and would never run in production.'
     - 'A RELOAD IS ALSO A TRIGGER (Keith, 2026-10-04): a fixed and reloaded failed file is checked through this re-check, and a reload is not a decision. Criterion 4''s ''the decision that caused it'' reads the reload''s load record for this case.'
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - 'A RE-RUN''S VERDICT IS THE SUPPLY''S VERDICT ON EVERY DATE IT IS IN PLACE
+      (Keith, 2026-10-05): the page''s date control already means ''everything
+      known today, applied to what was in place on that date'' (REQ-PIPE-081 criterion
+      21), so a re-check made after the date on show is part of what is known
+      today about a supply that was in place then. Showing the verdict as it was
+      checked on that date was offered and REJECTED by Keith as LESS true to ''in
+      place on'', not more - what the page itself said on a past date is the snapshot
+      archive''s job. Earlier runs stay recorded and readable from the terminal.'
+    - 'AN INTERRUPTED RE-RUN STAYS OWED UNTIL THE PROCESSING PASS EXISTS (Keith,
+      2026-10-05): no interim `finish-owed` command. The terminal runs the re-run
+      while the person waits, so only an interrupted one is left owed, and it
+      is shown as owed until REQ-PIPE-151''s pass completes it - criterion 8''s
+      second half stays blocked on 151.'
+    - 'A RE-FILE MADE ON GITHUB RECORDS THE DECISION AND AN OWED RE-RUN; THE PROCESSING
+      PASS RUNS IT (Keith, 2026-10-05). REJECTED: running QA from the GitHub route
+      itself - wherever that route runs would need the QA tools and the supply
+      rows, which REQ-PIPE-092 keeps away from it (criterion 6).'
     open_questions: []
 
   - id: REQ-PIPE-141
@@ -26861,6 +26878,12 @@ requirements:
       - "A PROMOTED VERSION IN THE TARGET PERIOD STAYS UNTIL THE RE-FILED ONE IS PROMOTED (Keith, 2026-10-04): 'we don't know if it will be promoted based on the settings and the outcomes and checks', so superseding at re-file time could leave the period empty. REJECTED following REQ-GHUB-082 criterion 9's signed wording (supersede at re-file time); criterion 9 is reworded instead. 'Re-file wins' is about versions WAITING in staging only."
       - "JUDGED UNDER TODAY'S SETTINGS (Keith, 2026-10-04): a re-filed supply is gated with the settings in force when it is checked in its new period, consistent with REQ-PIPE-122's version being picked by the instant the decision takes effect."
       - "BUILT AFTER REQ-PIPE-128 AND 129 (Keith, 2026-10-04, architect review), revising Keith's earlier order of re-file straight after REQ-PIPE-079: superseding a waiting version needs 118, and moving a promoted table out needs 128/129's one door and stamped-name restore. REJECTED building it first with displacing re-files refused in the meantime - two builds of one decision. Cost accepted: re-filing into a closed slot is unavailable while 131 and 132 are built."
+      - 'APPEND-ONLY MEANS UPDATE AND DELETE ARE REFUSED (Keith, 2026-10-05, NFR
+        3): a trigger refuses both on qa.filing; TRUNCATE is not refused, so the
+        test suite''s shared cleanup keeps working - the same terms qa.hold has
+        today. REJECTED: the decision log''s full strictness including TRUNCATE,
+        which would move the shared cleanup and six test modules onto per-test databases
+        for a guarantee no production path needs.'
     open_questions: []
 
   - id: REQ-GHUB-142
