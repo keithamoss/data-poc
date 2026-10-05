@@ -20671,7 +20671,46 @@ requirements:
       date: '2026-10-04'
     story: As whoever maintains this pipeline, I want the questions that can only be asked of a file as delivered - before loading answers or destroys them - asked on every file, recorded as real, named checks with history, and kept apart from the data checks, so that loading does not silently erase a whole class of QA.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 (sprint 12): tests/test_file_checks.py - the evaluator against
+      each fault (non-UTF-8, wrong delimiter, no header, an empty file, a repeated
+      header name, short and long rows alike, every row one field too many, a
+      reordered header only warning, a quoted comma and line break being one field,
+      a byte-order mark not being a fault), an evaluator bug raising as itself
+      naming the check, derived ids valid under the grammar and ''file'' absent
+      from every data-check tool list; and through the REAL staging path, against
+      a real database: each FAILURE-level fault refusing the file with no table,
+      a FAILED load record whose reason names the file and the check, results
+      in their own scope against the delivery, file and load attempt, no row value
+      in any finding; a column-order warning loading as usual; a clean file''s
+      six passes against its load record; a reprocessed file keeping both attempts;
+      an unchanged re-stage recording nothing new; an evaluator bug failing the
+      load and recording nothing; Child Protection screened too; and status_of
+      never counting a file check (a warning leaves a green supply green; file
+      checks alone are no active checks). tests/test_staging_loads.py''s ragged-row
+      reason updated to the file check''s. The lifecycle gate collects 42 derived
+      file checks (6 x 7 datasets) and passes them under the same rules as the
+      other 265.'
+    implemented_by:
+    - qa_tools/common/file_checks.py::evaluate
+    - qa_tools/common/file_checks.py::screen
+    - qa_tools/common/file_checks.py::record
+    - qa_tools/common/file_checks.py::check_id_for
+    - contract/file-checks.yaml
+    - qa_tools/common/check_id.py::parse
+    - qa_tools/common/check_lifecycle.py::parse_file_check_metadata
+    - qa_tools/common/qa_store.py::record_file_results
+    - qa_tools/common/qa_store.py::register_run_if_absent
+    - qa_tools/common/qa_results_reader.py::read_file_results
+    - qa_tools/common/load_log.py::record
+    - qa_tools/common/promotion.py::status_of
+    - qa_tools/bdm/build_per_run_warehouses.py::build_one
+    - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+    linked_tests:
+    - tests/test_file_checks.py
+    - tests/test_staging_loads.py
+    - tests/test_scenario_injection.py
     source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - the producing half of the gap he spotted in the load-first design. REFRESHED by delivery-scoper 2026-10-04 against what had since been built and signed (REQ-QAC-088, REQ-PIPE-089, REQ-PIPE-115, REQ-PIPE-144, gap 1 of post-build-review #77). Reshaped the same day when Keith chose that any failing file check refuses the whole file.'
     acceptance_criteria:
     - WHEN a file attributed to a dataset is staged, THE SYSTEM SHALL evaluate every active file check against that file's bytes as delivered, before its rows are loaded.
@@ -20728,6 +20767,37 @@ requirements:
     - HAND-FILED DELIVERIES GET NO EXEMPTION (criterion 15). REQ-PIPE-147 records who filed a delivery and by which route; that is provenance, and a person filing a file by hand does not make its bytes any better formed.
     - FILE-CHECK RESULTS KEEP EVERY ATTEMPT, TAGGED WITH THE LOAD ATTEMPT (Keith, 2026-10-04). A reprocessed file is evaluated again (criterion 16), and keyed by run alone the second attempt's results would replace the first's. REJECTED keeping only the latest attempt.
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - NODATA, NOT PASS, FOR A CHECK THAT CANNOT BE ASKED (2026-10-05). A header
+      that does not split has no names to compare, and a file with no header row
+      has nothing to count fields against, so the checks that depend on one record
+      the existing quiet status 'nodata' saying why - never 'pass', which would
+      be a false green, and never a new status value (REQ-DASH-097 criterion 10).
+    - A FILE THAT CANNOT BE OPENED IS NOT AN EVALUATOR BUG (2026-10-05, found
+      by the existing loader tests). A missing file has no bytes to ask anything
+      of; the evaluator lets the OSError through and the loader's existing load-failure
+      path records it in its own words, so criterion 13's 'our own bug fails the
+      run' does not turn every missing file into a failed run.
+    - A LOAD ATTEMPT IS A LOAD RECORD WRITTEN (2026-10-05). load_log.record_load
+      deliberately writes nothing when re-staging an unchanged file reaches the
+      same outcome, so no new results are recorded then either - criterion 16's
+      reprocessing of a fixed file changes the outcome, writes a record and so
+      keeps both attempts. Re-recording identical results on every re-stage would
+      be the unbounded repetition that function exists to stop.
+    - SKIPPED AT THE ONE STATUS FUNCTION (criteria 9 and 10, 2026-10-05, found
+      before the first commit). supply_status.latest_results and red_promoted
+      read every scope of a run, so promotion.status_of skips any record whose
+      check id carries the 'file' tool - one place, rather than a filter each
+      reader must remember.
+    - A LOADER GIVEN NO DATASET ID NOW FILES UNDER THE DATASET, NOT THE TABLE
+      NAME (2026-10-05). build_cp_warehouses fell back to the table name ('cp_carers'),
+      so the `mothman cp qa --commit` path wrote load records under a dataset
+      that does not exist, which no failed-load blocker keyed on 'cp-carers' could
+      see. Found because the file-check recorder could not resolve it; fixed with
+      a failing test first.
+    - THE PROSE FOR THE SIX CHECKS IS WRITTEN TO docs/check-authoring-rules.md
+      and NOT INDIVIDUALLY REVIEWED BY KEITH - writing a check's prose is ordinary
+      work under that file's own rule; only the rules are gated. Rule 13's file-check
+      exception is what lets them say 'file'.
   - id: REQ-DASH-097
     title: File-check results read as claims about the file, in their own section, and a failed one reads clearly on the dataset
     date_written: '2026-09-26'
@@ -26937,10 +27007,14 @@ requirements:
         unowned: true
     - criterion: Criteria 4 and 5 - a single-table correction promoted, or still
         failing, after its partner's promotion re-checks it (TS-48, TS-49).
-      why: Needs the Child Protection generator to place a partner's promotion
-        between two arrivals of one quarter, which its delivery shapes do not
-        yet express.
-      owner: Unplaced - generator work.
+      why: 'The ARRIVAL shape already occurs in the generated history - in 2024-Q3
+        cp-investigations was promoted on 08-01, its siblings arrived 08-13, and
+        it was re-evaluated three times (the sprint 11 critic found this, correcting
+        this entry''s first wording). What cannot be planted is the OUTCOME: a
+        correction that goes RED on a cross-table check and then green, or stays
+        red, needs the generator to aim for a verdict.'
+      owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
+        (Keith, 2026-10-05).'
       blocked_by:
         unowned: true
     - criterion: Criteria 6 and 7 - amber supplies held and promoted-awaiting-acknowledgement
@@ -26961,9 +27035,13 @@ requirements:
         unowned: true
     - criterion: Criterion 9 - a promoted supply turned red by a later sibling
         (TS-51).
-      why: Needs the Child Protection generator to place a sibling's arrival after
-        a promotion within one quarter, as TS-48.
-      owner: Unplaced - generator work.
+      why: The arrival shape exists (2024-Q3, as criteria 4 and 5 note); what
+        is missing is a RED cross-table outcome after the promotion, which needs
+        the generator to aim for a verdict. Corrected 2026-10-05 after the sprint
+        11 critic showed the first wording - 'the generator cannot place a sibling's
+        arrival after a promotion' - was wrong.
+      owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
+        (Keith, 2026-10-05).'
       blocked_by:
         unowned: true
     - criterion: Criterion 11 - Case Workers arriving in a period it does not
@@ -27151,6 +27229,18 @@ requirements:
     story: "As Keith walking someone through the PoC, I want the scenario map to be a destination of its own beside Plans and Demo, so that 'what was planted, and where do I see it' is one click from the top of the page rather than a side drawer."
     moscow: should
     status: built
+    unmet_criteria:
+    - criterion: Criterion 3, in part - 31 of the 66 entries show no requirement.
+      why: The page shows the requirements each entry's register text cites, and
+        the older entries (TS-1 to TS-40, written before REQ-GEN-136/137 asked
+        every entry to name what it demonstrates) mostly cite none - including
+        TS-38, which has data behind it. Found by the sprint 11 delivery critic;
+        the evidence's narrower wording ('requirements its register text cites')
+        hid the gap.
+      owner: Unplaced - a register pass adding the demonstrated requirement to
+        each older entry.
+      blocked_by:
+        unowned: true
     evidence:
     - '2026-10-05 (sprint 11): the scenario map is a top-level tab at /scenarios
       beside Plans and Demo; the drawer is gone and a saved ?panel=scenarios link
@@ -27181,6 +27271,13 @@ requirements:
     decisions:
       - "A TOP-LEVEL TAB REPLACES REQ-DASH-046's HEADER DRAWER (Keith, 2026-10-04, told the drawer already existed). The drawer was built 2026-09-22 when the map had almost nothing in it; with a whole batch of scenarios to walk through, it becomes a destination like Plans and Demo, with its own URL. REQ-DASH-046's criteria all survive - none of them says 'drawer' - so this replaces how it is presented, not what it promises; the drawer, its header button and its side-panel entry are removed in the same change, so there are never two ways in."
       - "LINKS ARE THE DASHBOARD'S, COORDINATES THE GENERATOR'S (REQ-GEN-045 criterion 5; REQ-DASH-046 criterion 3) - unchanged."
+      - 'NFR 2''s click-through test added after the sprint 11 critic found it had
+        only been done by hand: TestScenariosTab.test_a_coordinate_lands_on_the_right_page_and_date
+        drives TS-47''s entry to the Birth Registrations page at its recorded in-place-on
+        date.'
+      - 'A STALE ?panel=scenarios LINK IS DROPPED ONCE IT HAS OPENED THE TAB (sprint
+        11 critic, defect 2): left in the address bar it took over every later reload
+        and copied link. Rewritten on load, the way the old asof parameter is.'
     open_questions: []
 
   - id: REQ-PIPE-140

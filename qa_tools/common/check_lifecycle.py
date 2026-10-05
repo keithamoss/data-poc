@@ -583,6 +583,44 @@ def parse_contract_check_metadata(contract_yaml_path: Path | str) -> list[CheckM
     return out
 
 
+# ---- File checks (REQ-QAC-096) ---------------------------------------
+
+def parse_file_check_metadata(file_checks_yaml_path: Path | str) -> list[CheckMetadata]:
+    """One CheckMetadata per file check PER DATASET, from the one committed
+    definition of each (criterion 4) - so the lifecycle gate holds a file
+    check to exactly the rules every other check is held to (criterion 5):
+    an id that is unique and grammatical, a category, `failure_indicates`,
+    and a changelog entry for any change to what it does.
+
+    WHAT IT DOES is `severity` and `formats` - everything but the authored
+    and lifecycle fields - hashed per definition, so changing a definition
+    changes every dataset's copy at once and the gate asks for the entry
+    once per id, which is what a reader of any one dataset's history needs.
+
+    The datasets come from the CURRENT hierarchy even when this parses an
+    older ref's file: an id derived for a dataset that has since been
+    removed is a disappearance the hierarchy gate already reports.
+    """
+    from qa_tools.common import file_checks, hierarchy
+
+    with open(file_checks_yaml_path) as f:
+        doc = yaml.safe_load(f) or {}
+    source = str(file_checks_yaml_path)
+    out: list[CheckMetadata] = []
+    for meta in doc.get("checks") or []:
+        name = meta.get("check")
+        if not name:
+            raise MissingCheckIdError(f"{source}: a file check has no `check` name")
+        category = _require_category(meta, f"{source}: file check {name!r}")
+        config = {k: v for k, v in meta.items() if k not in _NON_CONFIG_FIELDS}
+        for dataset in hierarchy.all_datasets():
+            out.append(CheckMetadata(
+                check_id=file_checks.check_id_for(dataset, name), category=category,
+                tool=file_checks.TOOL, config_hash=_config_hash(config),
+                source_file=source, **_lifecycle_fields(meta)))
+    return out
+
+
 # ---- Evidently (plain Python dicts, no YAML) --------------------------
 
 def parse_evidently_check_metadata(check_lifecycle: dict, source: str) -> list[CheckMetadata]:

@@ -214,3 +214,18 @@ class TestTheGateTakesEffectWhenItsCauseDid:
         owed_id, _ = owed_one
         recheck.run(owed_id, run_by="pytest@example.org")
         assert seen["effective_at"].startswith("2026-04-02")
+
+
+class TestOnAFreshDatabase:
+    """Found by the sprint 12 gate (2026-10-05): every orchestrator's
+    promote_after ends by running what is owed, which read qa.owed_run over
+    a connection of its own without making sure the schema exists - so on a
+    database no earlier call had prepared it crashed with UndefinedTable,
+    and test_promotion_actor passed or failed by what ran before it on the
+    same worker."""
+
+    def test_nothing_owed_is_nothing_run(self, monkeypatch):
+        import dbsupport
+
+        dbsupport.use_empty_supply_db(monkeypatch)
+        assert recheck.run_all_owed() == []

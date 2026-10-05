@@ -3517,7 +3517,9 @@ The setting eras these need are synthetic versions in
 data says why.*
 
 **TS-41 `[INJECT]` A resend supersedes the failed supply before it.**
-*Config: daily, due 14:00 AWST - TS-1's own placement.*
+*Config: daily, due 14:00 AWST - TS-1's own placement. Settings in force
+where it lands (2026-09-15): amber setting promote-and-acknowledge,
+replacement setting never.*
 The 14:00 supply fails QA and waits; the 16:00 resend arrives for the same
 day.
 **Expect**: the resend supersedes the waiting 14:00 supply, which moves to
@@ -3596,7 +3598,8 @@ supply-history row says so (REQ-PIPE-123, REQ-DASH-127).
 **TS-47 `[INJECT]` A daily file arriving after the next day's window
 opened.**
 *Config: daily, due 14:00, 4-hour claim window - the next day's window opens
-at 10:00.*
+at 10:00. Settings in force where it lands (2026-09-07): amber setting hold,
+replacement setting never.*
 The day's supply never comes on the day; it arrives at 11:00 the next
 morning.
 **Expect**: it fills the NEXT day, the period open when it arrived; its own

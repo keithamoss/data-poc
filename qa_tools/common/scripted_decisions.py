@@ -191,7 +191,9 @@ class Player:
                 f"scripted decision for {s.scenario} - {s.operation} {s.dataset_id} - could "
                 f"not be played by the end of the replay: {why}. The replay stops here rather "
                 f"than finish with a history missing it.")
-        due = [t for t in ready if until is None or t.at < until]
+        # "At or after" (criterion 3): one timed exactly at the arrival plays
+        # before it.
+        due = [t for t in ready if until is None or t.at <= until]
         for t in due:
             _apply(t)
             self.pending.remove(t.script)

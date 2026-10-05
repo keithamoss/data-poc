@@ -103,6 +103,15 @@ class TestPlayback:
         assert row[:3] == (SYNTHETIC, dl.PERSON, "scripted")
         assert row[3] == datetime.fromisoformat("2026-05-01T01:00:00+00:00") + timedelta(hours=3)
 
+    def test_a_decision_at_an_arrivals_instant_plays_before_it(self, conn, period):
+        """Criterion 3's "at or after": a decision timed exactly at an
+        arrival's receipt is applied before that arrival (sprint 11 critic,
+        defect 4 - it used to wait until after)."""
+        a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        player = self._player([_script(after_hours=3)], a_table)
+        same = SimpleNamespace(received_at=datetime.fromisoformat("2026-05-01T04:00:00+00:00"))
+        assert player.before(same) == 1
+
     def test_it_waits_for_an_arrival_received_after_it(self, conn, period):
         a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         player = self._player([_script(after_hours=3)], a_table)
@@ -154,3 +163,41 @@ class TestASupplyNotYetFiled:
         assert player.before(early) == 0
         with pytest.raises(sd.ScriptRefused, match="TS-1"):
             player.finish()
+
+
+class TestTheDecisionPathItselfRefuses:
+    """Sprint 11 critic, defect 3: the "playback only" lock lived in the
+    person LOOKUP, so a caller holding the synthetic person's record could
+    call filing_decisions.apply() directly and have it accepted as a
+    person's decision. The one decision path now refuses it on its own
+    (NFR 2: each lock refuses on its own)."""
+
+    def test_outside_playback(self):
+        from qa_tools.common import filing_decisions as fd
+
+        config = people.parse_people_config()
+        actor = next(p for p in config["people"].values() if people.is_synthetic(p))
+        request = fd.Request(operation="mark-not-supplied", dataset_id=DS, actor=actor,
+                             reason="no", period="2026-09-09", confirmed=True)
+        with pytest.raises(people.UnknownActor, match="played back"):
+            fd.apply(request, effective_at="2026-09-09T00:00:00+00:00")
+
+
+class TestThePageShowsAName:
+    """Sprint 11 critic, defect 1 (REQ-GEN-135 criterion 12): the dataset
+    page printed a decision's actor as recorded - an email - so a scripted
+    decision read 'scripted-history@synthetic.invalid'. A decision's actor is
+    SHOWN by name, as REQ-PIPE-147 criterion 7 already does for who filed a
+    delivery, for every person alike."""
+
+    def test_a_mark_and_a_rejection_name_the_person(self):
+        from pipeline import closed_slots
+
+        shown = closed_slots._decision_entry("2026-09-08T05:00:00+00:00", SYNTHETIC, "why")
+        assert shown["actor"] != SYNTHETIC and "synthetic" not in shown["actor"]
+
+    def test_an_acknowledgement_names_the_person(self):
+        from pipeline import acknowledgements
+
+        shown = acknowledgements._acknowledged((SYNTHETIC, "looked", None))
+        assert shown["actor"] != SYNTHETIC and "synthetic" not in shown["actor"]

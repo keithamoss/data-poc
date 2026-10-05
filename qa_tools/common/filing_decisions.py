@@ -585,6 +585,16 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     if not request.actor:
         raise people.UnknownActor(
             "a filing decision needs an identified person. Nobody raised this.")
+    # THE PLAYBACK LOCK, HERE AS WELL AS AT THE LOOKUP (REQ-GEN-135 NFR 2:
+    # each lock refuses on its own). The lookup refused the synthetic actor
+    # outside playback, but a caller already holding its record could reach
+    # this path directly (sprint 11 critic, defect 3).
+    if (isinstance(request.actor, dict) and people.is_synthetic(request.actor)
+            and not people.in_playback()):
+        raise people.UnknownActor(
+            f"{request.actor.get('email')!r} is the scripted history's synthetic actor, "
+            f"which can raise a decision only while a synthetic history is being "
+            f"played back.")
     reason = _reason(request)
     if request.operation != REFILE:
         _confirmation(request)

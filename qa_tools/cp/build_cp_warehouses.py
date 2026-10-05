@@ -21,6 +21,7 @@ import sys
 
 from qa_tools.common import arrivals
 from qa_tools.common import asset_time
+from qa_tools.common import file_checks
 from qa_tools.common import hierarchy
 from qa_tools.common import load_log
 from qa_tools.common import supply_db
@@ -146,7 +147,10 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
     # the run built views over candidates that could never match.
     key = supply_db.arrival_segment(arrival)
     delivery_name = delivery_name or run_id
-    dataset_id = dataset_id or table
+    # THE DATASET, NEVER THE TABLE NAME in its place - a load record filed
+    # under 'cp_carers' belongs to no dataset, so no failed-load blocker
+    # keyed on 'cp-carers' ever saw it (found with REQ-QAC-096).
+    dataset_id = dataset_id or hierarchy.dataset_for_table(table).dataset_id
 
     conn = supply_db.connect(dsn=dsn)
     try:
@@ -165,6 +169,15 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
         # cross-table check across them has to read both (criterion 14).
         staging = sample_data.ensure_schema_for_table(conn, run_id, table)
         trial_scope = trial.scope_for(run_id)
+        # FILE CHECKS FIRST, on the bytes as delivered (REQ-QAC-096), and
+        # outside the catch-all below so an evaluator bug fails the run
+        # rather than reading as a fault in the supplier's file.
+        screening = file_checks.screen(
+            conn, csv_path, contract_path=contract_path, table=table, run_id=run_id,
+            dataset_id=dataset_id, delivery=delivery_name, staging=staging,
+            physical=physical, trial_scope=trial_scope)
+        if screening.refused is not None:
+            return None
         rows = None
         try:
             df = read_csv_explicit_nulls(csv_path,
@@ -195,9 +208,10 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
             # correct - the table failed to load, so a view onto it
             # resolves to nothing anyone should read.
             conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
-            load_log.record_load(delivery_name, dataset_id, physical, load_log.FAILED,
-                             asset_time.now().isoformat(),
-                             reason=load_log.own_words(exc), trial=trial_scope)
+            screening.record_against(load_log.record_load(
+                delivery_name, dataset_id, physical, load_log.FAILED,
+                asset_time.now().isoformat(), reason=load_log.own_words(exc),
+                trial=trial_scope), conn=conn)
             # THE LIBRARY'S OWN MESSAGE ONLY HERE, on standard error, for
             # whoever ran the load - it can quote a row, and the recorded
             # reason is published (REQ-DASH-148 criterion 13).
@@ -205,8 +219,9 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
                   f"- no table staged, recorded for human action", file=sys.stderr)
             return None
         # AFTER THE LOAD, NEVER BEFORE (criterion 14).
-        load_log.record_load(delivery_name, dataset_id, physical, load_log.LOADED,
-                         asset_time.now().isoformat(), row_count=rows, trial=trial_scope)
+        screening.record_against(load_log.record_load(
+            delivery_name, dataset_id, physical, load_log.LOADED,
+            asset_time.now().isoformat(), row_count=rows, trial=trial_scope), conn=conn)
         res = _build_run_views(conn, run_id, key, trial_scope)
         # Recorded at staging time, which is the only moment this is an
         # observed fact rather than a re-derivation.

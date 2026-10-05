@@ -156,6 +156,15 @@ releases:
               path you use, such as acknowledging an amber supply or marking a
               day not supplied. They run only on a synthetic asset, as a
               dedicated actor no route but the replay can use.
+          - headline: Each file is checked before any of it is loaded
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              Six checks now look at a file as it arrived - readable text, the
+              right separator, a header row, no repeated column names, every
+              row the same width, columns in the contract's order. A file that
+              fails one is refused and its dataset reads red naming the check;
+              columns out of order only warn. They are about the file, never
+              its data, so they do not change any data check's status.
           - headline: More awkward supplies in the sample data
             components: ["Testing & dev tooling"]
             description: >

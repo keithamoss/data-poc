@@ -408,7 +408,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 
 **What it would look like if the rule were wrong.** Two versions of one table waiting for one day, every reader contested.
 
-*Config: daily, due 14:00 AWST - TS-1's own placement.*
+*Config: daily, due 14:00 AWST - TS-1's own placement. Settings in force where it lands (2026-09-15): amber setting promote-and-acknowledge, replacement setting never.*
 
 | Where to look | |
 |---|---|
@@ -469,7 +469,7 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 
 **What it would look like if the rule were wrong.** Filed backward to its own day.
 
-*Config: daily, due 14:00, 4-hour claim window - the next day's window opens at 10:00.*
+*Config: daily, due 14:00, 4-hour claim window - the next day's window opens at 10:00. Settings in force where it lands (2026-09-07): amber setting hold, replacement setting never.*
 
 | Where to look | |
 |---|---|
@@ -1180,7 +1180,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
    "demonstrates": "The resend supersedes the waiting 14:00 supply, which moves to the period's superseded schema, named as superseded by the resend (REQ-PIPE-118).",
    "breaksAs": "Two versions of one table waiting for one day, every reader contested.",
-   "config": "Config: daily, due 14:00 AWST - TS-1's own placement.",
+   "config": "Config: daily, due 14:00 AWST - TS-1's own placement. Settings in force where it lands (2026-09-15): amber setting promote-and-acknowledge, replacement setting never.",
    "requirements": [
     "REQ-PIPE-118"
    ],
@@ -1270,7 +1270,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
    "demonstrates": "It fills the NEXT day, the period open when it arrived; its own day closes with no supply, overdue, and a scripted person marks it not supplied, so it reads \"not supplied (accepted)\" (REQ-PIPE-131, REQ-PIPE-132, REQ-DASH-133, REQ-GEN-137 criterion 3).",
    "breaksAs": "Filed backward to its own day.",
-   "config": "Config: daily, due 14:00, 4-hour claim window - the next day's window opens at 10:00.",
+   "config": "Config: daily, due 14:00, 4-hour claim window - the next day's window opens at 10:00. Settings in force where it lands (2026-09-07): amber setting hold, replacement setting never.",
    "requirements": [
     "REQ-PIPE-131",
     "REQ-PIPE-132",

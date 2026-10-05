@@ -121,6 +121,11 @@ def playback():
         _PLAYBACK.reset(token)
 
 
+def in_playback() -> bool:
+    """Whether a synthetic history is being played back right now."""
+    return _PLAYBACK.get()
+
+
 def synthetic_actor(config: dict | None = None) -> dict:
     """The synthetic person, for scripted playback (criterion 5)."""
     config = parse_people_config() if config is None else config

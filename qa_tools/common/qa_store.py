@@ -100,6 +100,11 @@ SCHEMA = "qa"
 #: reader moving between the two is not learning a second vocabulary.
 DATASET_SCOPE = "dataset"
 CROSS_TABLE_SCOPE = "_cross-table"
+#: File checks' own scope (REQ-QAC-096 criterion 7): a statement about the
+#: FILE as delivered, never about the dataset's data, so never in either
+#: scope above - which is what keeps every data-check reader from seeing it
+#: without each one having to remember to filter it out.
+FILE_SCOPE = "_file"
 
 #: Whether a result describes an agreed supply or a dataset still being
 #: developed against (criterion 24, decision 1). The second is excluded
@@ -139,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 28
+SCHEMA_VERSION = 29
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -266,6 +271,17 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".check_result (
 -- before check_name became a display string keeps its NOT NULL
 -- otherwise.
 ALTER TABLE "{SCHEMA}".check_result ALTER COLUMN check_name DROP NOT NULL;
+
+-- A FILE CHECK'S RESULT NAMES THE LOAD ATTEMPT, DELIVERY AND FILE it was
+-- about (REQ-QAC-096 criteria 7 and 8), schema 29. NULL for every other
+-- tool's result. The load attempt is qa.load_outcome's id, with no foreign
+-- key for the reason run.caused_by_load has none: load records are
+-- truncated by the test suite's cleanup, and a result must not vanish with
+-- them. Real columns rather than `extra`, because "which file was wrong"
+-- is the question a reader of a several-file delivery asks first.
+ALTER TABLE "{SCHEMA}".check_result ADD COLUMN IF NOT EXISTS load_attempt bigint;
+ALTER TABLE "{SCHEMA}".check_result ADD COLUMN IF NOT EXISTS delivery text;
+ALTER TABLE "{SCHEMA}".check_result ADD COLUMN IF NOT EXISTS filename text;
 
 -- Each index earns its place from a query that exists rather than from a
 -- guess about one that might.
@@ -1526,6 +1542,48 @@ def record_results(conn: supply_db.SupplyConnection, run_key: str,
             [run_key, *values, *keys, json.dumps(extra, default=str)])
         rows += 1
     return rows
+
+
+def register_run_if_absent(conn: supply_db.SupplyConnection, *, run_key: str,
+                           agency_id: str, collection_id: str, run_timestamp: str) -> None:
+    """Register a run that does not exist yet, and touch nothing about one
+    that does. For a writer that runs BEFORE the orchestrator opens the
+    run - file checks at staging - where record_run's update of the
+    timestamp would be wrong: the orchestrator's own is the one that
+    counts."""
+    conn.execute(
+        f'INSERT INTO "{SCHEMA}".run (run_key, agency_id, collection_id, run_timestamp, '
+        "run_instant) VALUES (?, ?, ?, ?, ?) ON CONFLICT (run_key) DO NOTHING",
+        [run_key, agency_id, collection_id, run_timestamp, run_timestamp])
+
+
+def record_file_results(conn: supply_db.SupplyConnection, run_key: str,
+                        results: Sequence[Mapping[str, Any]], *, agency_id: str,
+                        collection_id: str, supply_state: str, load_attempt: int,
+                        delivery: str, filename: str) -> int:
+    """Record one load attempt's file-check results (REQ-QAC-096).
+
+    APPENDS, NEVER REPLACES - the one writer here that does not delete
+    first, and deliberately: a reprocessed file is evaluated again and
+    both attempts' results are kept (criteria 7 and 16), told apart by
+    `load_attempt`. record_results() replaces by (run, tool, scope,
+    state), which would quietly keep only the latest attempt - the
+    alternative Keith rejected.
+    """
+    columns = ("run_key", *_RESULT_COLUMNS, *_KEY_COLUMNS, "load_attempt", "delivery",
+               "filename", "extra")
+    placeholders = ", ".join(["?"] * len(columns))
+    keys = (agency_id, collection_id, "file", FILE_SCOPE, supply_state)
+    ignored = set(_RESULT_COLUMNS) | set(_KEY_COLUMNS)
+    for record in results:
+        values = [record.get(name) for name in _RESULT_COLUMNS]
+        extra = {k: v for k, v in record.items() if k not in ignored}
+        conn.execute(
+            f'INSERT INTO "{SCHEMA}".check_result ({", ".join(columns)}) '
+            f"VALUES ({placeholders})",
+            [run_key, *values, *keys, load_attempt, delivery, filename,
+             json.dumps(extra, default=str)])
+    return len(results)
 
 
 def record_tool_output(conn: supply_db.SupplyConnection, run_key: str, tool: str,

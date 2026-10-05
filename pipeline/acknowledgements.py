@@ -24,6 +24,15 @@ def _iso(value) -> str | None:
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
 
 
+def _acknowledged(row) -> dict:
+    """An acknowledgement as the page shows it: the person by NAME
+    (REQ-PIPE-147 criterion 7, REQ-GEN-135 criterion 12)."""
+    from qa_tools.common import people
+
+    actor, reason, at = row
+    return {"actor": people.display_name(actor), "reason": reason or "", "at": _iso(at)}
+
+
 def for_dataset(dataset_id: str,
                 conn: supply_db.SupplyConnection | None = None) -> dict[str, dict]:
     """{run_id: {supply, period, promotedAt, acknowledged, lapsedAt}}."""
@@ -57,8 +66,7 @@ def for_dataset(dataset_id: str,
                        and e["supply"] != supply), None)
         out[run_id] = {
             "supply": supply, "period": slot, "promotedAt": promoted,
-            "acknowledged": ({"actor": ack[0][0], "reason": ack[0][1] or "",
-                              "at": _iso(ack[0][2])} if ack else None),
+            "acknowledged": _acknowledged(ack[0]) if ack else None,
             "lapsedAt": lapsed,
         }
     return out

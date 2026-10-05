@@ -129,7 +129,12 @@ class TestAFileThatCannotBeLoaded:
         """REQ-DASH-148 criterion 13: a loading library's message can
         quote a row, and the recorded reason is published. It is recorded
         in our own words - the kind of fault, the line, the field counts -
-        and the library's message goes only to standard error."""
+        and the library's message goes only to standard error.
+
+        SINCE REQ-QAC-096 a ragged row never reaches the parser: the
+        fields-per-row file check refuses the file first, and the reason
+        names the file and the check (its criterion 11). Still our own
+        words, still no value from the row."""
         path = staging / "bad.csv"
         path.write_text("registration_id,child_family_name\n"
                         "BR0001,SMITH\n"
@@ -137,7 +142,9 @@ class TestAFileThatCannotBeLoaded:
         bdm.build_one("run_001", str(path), "2026-09-25", received_at=_RECEIPT,
                       delivery_name="drop-1")
         (failed,) = load_log.failures()
-        assert failed.reason == "malformed row: line 3 has 4 fields where 2 were expected"
+        assert failed.reason == (
+            "bad.csv failed the file check fields_per_row: 1 row has a different number "
+            "of fields from the header; the first is line 3, with 4 where 2 were expected")
         assert "Error tokenizing" not in failed.reason, "the parser's own words"
         out, err = capfd.readouterr()
         assert "SECRETNAME" not in out

@@ -84,10 +84,16 @@ _SEGMENTS: tuple[tuple[str, bool], ...] = (
 # what makes the grammar parseable at all.
 _SEGMENT = r"[A-Za-z0-9_-]+"
 
-# The four real tools. The trailing segment is `<name>_<tool>`, and
-# anchoring on the tool suffix is what disambiguates a 5-segment id
-# (no column) from a 6-segment one without counting dots.
-TOOLS = ("dbt", "soda", "datacontract", "evidently")
+# The four real tools, and `file` (REQ-QAC-096): the file checks asked of a
+# file's bytes before it is loaded. The trailing segment is `<name>_<tool>`,
+# and anchoring on the tool suffix is what disambiguates a 5-segment id (no
+# column) from a 6-segment one without counting dots.
+#
+# A FIFTH SUFFIX EXTENDS A VOCABULARY AND MOVES NO SEGMENT, so no existing
+# id changes (criterion 4) and REQ-QAC-039's one-time exception is not
+# needed. It is NOT a fifth data-check tool: qa_results_reader's tool lists
+# deliberately leave it out (criterion 9).
+TOOLS = ("dbt", "soda", "datacontract", "evidently", "file")
 
 def _build_pattern() -> re.Pattern[str]:
     """Builds the grammar's regex from `_SEGMENTS`, so the segment list

@@ -529,6 +529,13 @@ def _gating_status(record: dict) -> str | None:
     return record.get("status")
 
 
+def _is_file_check(check_id: str | None) -> bool:
+    from qa_tools.common import check_id as cid, file_checks
+
+    parsed = cid.try_parse(check_id or "")
+    return bool(parsed and parsed.tool == file_checks.TOOL)
+
+
 def status_of(dataset_id: str, results: Sequence[dict], *,
               reads: dict[str, list[str]]) -> str | None:
     """This dataset's status, from EVERY check that contributes to it
@@ -572,6 +579,15 @@ def status_of(dataset_id: str, results: Sequence[dict], *,
 
     contributing = []
     for record in results:
+        # A FILE CHECK IS NEVER PART OF A STATUS (REQ-QAC-096 criteria 9 and
+        # 10): it is a statement about the file as delivered, and a refused
+        # file reaches its dataset only as a failed load. Skipped HERE, at
+        # the one status function, rather than at each reader - several
+        # read every scope of a run, and the first version of the file
+        # checks would have had a column-order warning turning a green
+        # supply amber.
+        if _is_file_check(record.get("check_id")):
+            continue
         mine = record.get("dataset_id") == dataset_id
         if not mine:
             declared = reads.get(record.get("check_id") or "")

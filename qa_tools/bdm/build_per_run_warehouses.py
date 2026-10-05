@@ -29,7 +29,7 @@ import os
 import sys
 
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
-from qa_tools.common import arrivals, asset_time, load_log, sample_data, supply_db, supply_holds, trial
+from qa_tools.common import arrivals, asset_time, file_checks, load_log, sample_data, supply_db, supply_holds, trial
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
@@ -102,6 +102,13 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
         # the dataset rather than of the run - see sample_data.schema_for().
         staging = sample_data.ensure_schema_for_table(conn, run_id, TABLE)
         trial_scope = trial.scope_for(run_id)
+        # FILE CHECKS FIRST (REQ-QAC-096) - see the Child Protection loader.
+        screening = file_checks.screen(
+            conn, csv_path, contract_path=contract_path, table=TABLE, run_id=run_id,
+            dataset_id=DATASET_ID, delivery=delivery_name, staging=staging,
+            physical=physical, trial_scope=trial_scope)
+        if screening.refused is not None:
+            return None
         rows = None
         try:
             null_values = load_null_values_by_column(contract_path).get(TABLE, {})
@@ -144,9 +151,10 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
             # correct - the table failed to load, so a view onto it
             # resolves to nothing anyone should read.
             conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
-            load_log.record_load(delivery_name, DATASET_ID, physical, load_log.FAILED,
-                             asset_time.now().isoformat(),
-                             reason=load_log.own_words(exc), trial=trial_scope)
+            screening.record_against(load_log.record_load(
+                delivery_name, DATASET_ID, physical, load_log.FAILED,
+                asset_time.now().isoformat(), reason=load_log.own_words(exc),
+                trial=trial_scope), conn=conn)
             # THE LIBRARY'S OWN MESSAGE ONLY HERE, on standard error, for
             # whoever ran the load - it can quote a row, and the recorded
             # reason is published (REQ-DASH-148 criterion 13).
@@ -156,8 +164,9 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
         # AFTER THE LOAD, NEVER BEFORE (criterion 14). A crash between
         # these two lines re-loads a table that was already fine; the
         # other order skips one that never loaded.
-        load_log.record_load(delivery_name, DATASET_ID, physical, load_log.LOADED,
-                         asset_time.now().isoformat(), row_count=rows, trial=trial_scope)
+        screening.record_against(load_log.record_load(
+            delivery_name, DATASET_ID, physical, load_log.LOADED,
+            asset_time.now().isoformat(), row_count=rows, trial=trial_scope), conn=conn)
         # A HELD SUPPLY GETS NO VIEW (REQ-PIPE-078 criterion 9) - see
         # build_cp_warehouses.py's identical call for why this extends
         # the ambiguity rule rather than adding a second mechanism.

@@ -5697,7 +5697,7 @@ twice. It deliberately did not re-find the `TypeError`.
       - The queue's silent pause (P5).
       - The re-file prompt offers no list of periods.
 
-116. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **The delivery
+116. **[done, 2026-10-05]** **[Pipeline & publishing]** **The delivery
     critic on sprint 10 (8040a69)**, which drove the dashboard built from a
     copy of the schema-27 deployment in a real browser. Every finding was
     checked against the code before it was written here.
@@ -5748,3 +5748,62 @@ twice. It deliberately did not re-find the `TypeError`.
       real-browser test of red promoted (REQ-DASH-126 NFRs 1 and 3); no
       cascade test; no test of an amber replacement owing an
       acknowledgement.
+
+117. **[in-progress, 2026-10-05]** **[Data generation]** **The delivery
+    critic on sprint 11 (8fb2229)**, which reviewed an exact archive of the
+    commit against a copy of the rebuilt deployment and drove the built page
+    in a real browser. Each finding below was checked against the code
+    before it was written here.
+    - **D1 (MEDIUM), FIXED** (failing test first): the dataset page printed
+      a decision's actor as recorded - an email - so a scripted decision
+      read `scripted-history@synthetic.invalid` (REQ-GEN-135 criterion 12).
+      Every person's mark, rejection and acknowledgement is now shown by
+      NAME from contract/people.yaml, as REQ-PIPE-147 criterion 7 already
+      does for who filed a delivery. tests/test_not_supplied.py asserted
+      the raw email and was updated on purpose.
+    - **D2 (MEDIUM), FIXED** (failing test first): an old `?panel=scenarios`
+      link stayed in the address bar and took over every later reload and
+      copied link. It is now dropped once it has opened the tab.
+    - **D3 (MEDIUM, security, latent), FIXED** (failing test first): the
+      "playback only" lock lived in the person lookup, so a caller holding
+      the synthetic record could reach `filing_decisions.apply()` directly
+      and be accepted. The decision path now refuses it on its own (NFR 2).
+    - **D4 (LOW), FIXED** (failing test first): a decision timed exactly at
+      an arrival's receipt played after it; criterion 3 says "at or after".
+    - **D5 (LOW, FOR KEITH)**: the replay applies scripts in PROCESSING
+      order, while rule promotions are stamped receipt + an invented lag of
+      one hour to three days (`promotion.effective_at_for`). Seven
+      decisions have an effective instant earlier than the row recorded
+      before them, and on TS-47's own day the late file's promotion takes
+      effect two days after the on-time file arrived, so 09-08 shows two
+      waiting versions for two days on the asset timeline. Harmless for the
+      one script planted; a hazard for parked TS-45/TS-53 shapes. Whether
+      the replay should order by asset time (and what the lag is for) is a
+      design question.
+    - **D6 (LOW-MEDIUM, FOR KEITH)**: two definitions of a supply's
+      "current" run disagree - `supply_status.runs_about` (asset time, the
+      #116 D1 fix) puts the stalest re-evaluation of cp-investigations
+      2024-Q3 last, `qa.supply_current_run` (run instant) the freshest. No
+      visible effect today (all pass). A load-caused re-check would also
+      sort at receipt, below every sibling re-evaluation (latent - nothing
+      owes one yet).
+    - **D7 (FOR KEITH)**: `recheck._cause_instant` stamps a gate promotion
+      at its cause decision's instant with no `min(now, ...)`, so in a live
+      deployment a re-check run hours later is recorded as in place before
+      the checks justifying it ran. Right for a replay, questionable live.
+    - **D8 (LOW), OPEN**: `redPromotedBadge` says "promoted while red" for a
+      supply promoted red, turned green, then red again, losing the
+      "turned red <date>" wording. No red promotion exists in the data;
+      read from code only.
+    - **RECORDS CORRECTED**: REQ-GEN-136 criterion 14's second clause (the
+      register names the settings in force where a planted scenario lands)
+      is now met for TS-41 and TS-47. Its TS-48/49/51 unmet entries named
+      the wrong blocker - the arrival shape already exists in 2024-Q3; what
+      is missing is a red outcome, the #63 blocker. REQ-DASH-139 now records
+      criterion 3's gap (31 of 66 entries name no requirement - the older
+      register entries cite none) and gained NFR 2's click-through test.
+    - **ALSO NOTED**: the history already holds two naturally occurring
+      "promoted, awaiting acknowledgement" BDM supplies (09-12, 09-13) -
+      TS-44's shape, unplanted. `load()` defaults a script's `supply` and
+      `after_hours` silently and `validate` crashes on a non-number (minor,
+      open). Determinism across two replays (criterion 7) was not verified.

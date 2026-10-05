@@ -2870,6 +2870,26 @@ class TestScenariosTab:
         assert "no data behind it" in panel.inner_text(), (
             "no entry says it has nothing behind it, and most still have nothing")
 
+    def test_a_coordinate_lands_on_the_right_page_and_date(
+            self, clean_page, built_dashboard_html):
+        """REQ-DASH-139 NFR 2 (sprint 11 critic: it was only done by hand).
+        TS-47 is planted, so its entry leads somewhere: the Birth
+        Registrations page, at the in-place-on date its placement records."""
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get("TS-47")
+        if placement is None or not placement.is_complete:
+            pytest.skip("TS-47 is not placed in this history")
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+        index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-47')")
+        assert index >= 0, "TS-47 is not in the embedded map"
+        clean_page.locator(f'button[data-scenario="{index}"]').click()
+        clean_page.wait_for_timeout(600)
+        assert f"in-place-on={placement.in_place_on}" in clean_page.url
+        assert "/dataset/birth-registrations" in clean_page.url
+
     def test_the_committed_map_carries_no_url_for_the_page_to_follow(
             self, clean_page, built_dashboard_html):
         """Criterion 3. The page constructs the link; a URL written into

@@ -29,7 +29,8 @@ import json
 import os
 from datetime import datetime
 
-from pipeline import acknowledgements, closed_slots, recorded_arrival, red_promoted, slot_timeline
+from pipeline import (acknowledgements, closed_slots, file_check_panel, recorded_arrival,
+                      red_promoted, slot_timeline)
 from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
@@ -612,6 +613,9 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # the page can say "red promoted" on the dates it was, and when and
         # after what it turned. See pipeline/red_promoted.py.
         "promotedHealth": red_promoted.for_dataset(dataset_id),
+        # REQ-DASH-097: the file checks, BESIDE `columns` - never inside
+        # them, which is what keeps them out of every roll-up.
+        "fileChecks": file_check_panel.for_dataset(dataset_id),
         # EVERY PERIOD THAT CLOSED WITH NO SUPPLY, and the instants that
         # decide what it reads as on any date (REQ-DASH-133 criteria 9 and
         # 10) - see pipeline/closed_slots.py. The page compares instants;

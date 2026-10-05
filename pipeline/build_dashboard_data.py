@@ -35,7 +35,8 @@ from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import parse_cadence_from_contract
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
-from pipeline import acknowledgements, closed_slots, recorded_arrival, red_promoted, slot_timeline
+from pipeline import (acknowledgements, closed_slots, file_check_panel, recorded_arrival,
+                      red_promoted, slot_timeline)
 from qa_tools.common import promotion_state
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
@@ -509,6 +510,8 @@ def build() -> dict:
         # the page can say "red promoted" on the dates it was, and when and
         # after what it turned. See pipeline/red_promoted.py.
         "promotedHealth": red_promoted.for_dataset("birth-registrations"),
+        # REQ-DASH-097 - see the Child Protection builder.
+        "fileChecks": file_check_panel.for_dataset("birth-registrations"),
         # EVERY PERIOD THAT CLOSED WITH NO SUPPLY, and the instants that
         # decide what it reads as on any date (REQ-DASH-133 criteria 9 and
         # 10) - see pipeline/closed_slots.py. The page compares instants;

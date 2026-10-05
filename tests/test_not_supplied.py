@@ -250,7 +250,12 @@ class TestARejectedSupplyLeavesItsPeriodEmpty:
             pass
         got = {s["period"]: s for s in closed_slots.for_dataset("cp-investigations", conn, now=LATER)}
         assert got["2025-Q1"]["rejected"]["reason"] == "supplier is resending"
-        assert got["2025-Q1"]["rejected"]["actor"] == REAL_PERSON
+        # SHOWN BY NAME, as every person's decision on the page is
+        # (REQ-PIPE-147 criterion 7; sprint 11 critic, defect 1).
+        from qa_tools.common import people
+
+        assert got["2025-Q1"]["rejected"]["actor"] == people.display_name(REAL_PERSON)
+        assert got["2025-Q1"]["rejected"]["actor"] != REAL_PERSON
         assert got["2025-Q1"]["filedAt"] is None
 
 

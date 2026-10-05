@@ -91,6 +91,10 @@ class LoadRecord:
     recorded_at: str
     reason: str | None = None
     row_count: int | None = None
+    #: The record's own id - which LOAD ATTEMPT this is (REQ-QAC-096
+    #: criterion 7 keys file-check results by it). Set on a record just
+    #: written; the reads below do not need it and leave it None.
+    id: int | None = None
 
     @property
     def loaded(self) -> bool:
@@ -134,15 +138,14 @@ def record(delivery: str, dataset_id: str, physical: str, outcome: str,
     """
     if outcome not in (LOADED, FAILED):
         raise ValueError(f"a load outcome is {LOADED!r} or {FAILED!r}, not {outcome!r}")
-    entry = LoadRecord(delivery, dataset_id, physical, outcome, recorded_at,
-                       reason, row_count)
     with _db(conn) as db:
-        db.execute(
+        (written,) = db.execute(
             f"INSERT INTO {_TABLE} ({', '.join(_FIELDS)}, trial_run_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
             [delivery, dataset_id, physical, outcome, recorded_at, reason,
-             row_count, trial])
-    return entry
+             row_count, trial]).fetchall()[0]
+    return LoadRecord(delivery, dataset_id, physical, outcome, recorded_at,
+                      reason, row_count, id=written)
 
 
 def record_load(delivery: str, dataset_id: str, physical: str, outcome: str,

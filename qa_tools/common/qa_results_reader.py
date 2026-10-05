@@ -459,6 +459,45 @@ def read_cross_table_results(agency: str, collection: str,
             conn.close()
 
 
+def read_file_results(agency: str, collection: str, dataset_id: str, conn=None, *,
+                      supply_state: str | None = qa_store.AGREED) -> list[dict]:
+    """Every recorded file-check result for one dataset (REQ-QAC-096,
+    REQ-DASH-097), oldest file first, each attempt's results together.
+
+    ITS OWN READER, NOT A FIFTH ENTRY IN RESULT_TOOLS (criterion 9): a file
+    check is a statement about the file as delivered and has no data-check
+    card to join, so every reader that walks the tool lists must go on not
+    seeing it - which this scope guarantees without any of them filtering.
+
+    Each result carries the FILE's own receipt, from qa.delivery_file
+    (REQ-PIPE-144), because that is the instant the reader's in-place-on
+    date is compared with - never when a pass happened to run.
+    """
+    conn, mine = _conn(conn)
+    try:
+        runs = set(list_run_ids(agency, collection, conn=conn))
+        sql = (f'SELECT cr.run_key, cr.check_id, cr.check_name, cr.status, '
+               "cr.extra->>'finding', cr.extra->>'severity', cr.delivery, cr.filename, "
+               "cr.load_attempt, df.received_at "
+               f'FROM "{qa_store.SCHEMA}".check_result_visible cr '
+               f'LEFT JOIN "{qa_store.SCHEMA}".delivery_file df '
+               "ON df.delivery = cr.delivery AND df.filename = cr.filename "
+               "WHERE cr.scope = ? AND cr.agency_id = ? AND cr.collection_id = ? "
+               "AND cr.dataset_id = ?")
+        params = [qa_store.FILE_SCOPE, agency, collection, dataset_id]
+        if supply_state is not None:
+            sql += " AND cr.supply_state = ?"
+            params.append(supply_state)
+        sql += " ORDER BY df.received_instant NULLS LAST, cr.load_attempt, cr.id"
+        keys = ("run_id", "check_id", "check_name", "status", "finding", "severity",
+                "delivery", "filename", "load_attempt", "received_at")
+        return [dict(zip(keys, row)) for row in conn.execute(sql, params).fetchall()
+                if row[0] in runs]
+    finally:
+        if mine:
+            conn.close()
+
+
 def _iso(value):
     """A timestamptz back as the ISO string every caller expects."""
     return value.isoformat() if hasattr(value, "isoformat") else value
@@ -500,7 +539,12 @@ _NOT_IN_A_RECORD = ("id", "run_key", "tool", "scope")
 #: run, which the other three have no concept of. A column because it is
 #: worth querying; conditional here because adding it as a null to a dbt
 #: record would be inventing a key that record never had.
-_OPTIONAL = ("reference_run_id",)
+_OPTIONAL = ("reference_run_id",
+             # A FILE CHECK's load attempt, delivery and file (schema 29,
+             # REQ-QAC-096) - NULL on every data check, where adding them
+             # would invent keys the record never had. Found by this
+             # module's own round-trip test the moment the columns landed.
+             "load_attempt", "delivery", "filename")
 
 
 def _records(cursor, run_id: str, run_timestamp=None) -> list[dict]:

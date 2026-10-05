@@ -633,6 +633,20 @@ button{font:inherit; color:inherit;}
 .scope-check .label .nm{font-weight:600; font-size:13px;}
 .scope-check .label .tr{font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace; margin-left:8px;}
 .scope-check .label .ds{font-size:12px; color:var(--ink-muted); margin-top:2px;}
+/* REQ-DASH-097: the file section. Told apart from data checks by LABEL as
+   well as look (criterion 9) - every row carries "File check". Its own
+   class, not .scope-section: it is not one of the data checks' sections. */
+.file-section{border:1px dashed var(--line-strong); border-radius:var(--radius-md); padding:14px 16px; margin-bottom:12px; background:var(--surface);}
+.file-section .head{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:2px;}
+.file-section .head h3{margin:0; font-size:14px;}
+.file-section .blurb{font-size:12px; color:var(--ink-muted); margin-bottom:10px;}
+.file-section .kind-tag{display:inline-block; font-size:10.5px; font-weight:600; letter-spacing:.02em; text-transform:uppercase; color:var(--ink-muted); border:1px solid var(--line-strong); border-radius:4px; padding:0 5px; margin-right:8px; vertical-align:1px;}
+.file-section .label .ds{display:block;}
+.file-section details.file-passed > summary{cursor:pointer; font-size:12.5px; color:var(--ink-muted); padding:6px 2px;}
+.file-section .file-refused-line, .file-section .file-warned-line{font-size:12.5px; margin-bottom:8px;}
+.file-section .file-refused-line{color:var(--bad); font-weight:600;}
+table.file-history{width:100%; border-collapse:collapse; font-size:12.5px;}
+table.file-history th, table.file-history td{text-align:left; padding:6px 6px; border-top:1px solid var(--line); vertical-align:top;}
 .check-card{display:block; color:inherit; text-decoration:none; border:1px solid var(--line); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px; cursor:pointer;}
 .check-card:hover, .check-card:focus-visible{border-color:var(--line-strong); background:var(--surface-alt);}
 .check-card:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
@@ -3814,6 +3828,103 @@ function collectionCrossTableSection(ag, col){
   </div>`;
 }
 
+// ---- File checks (REQ-DASH-097) -------------------------------------
+// Claims about the FILE as delivered, never about its data. They live in
+// `fileChecks` BESIDE the dataset's columns, never inside them, so nothing
+// that rolls a dataset up ever walks them (criterion 2) - a refused file
+// reaches the dataset's status only through REQ-DASH-148's failed-load red,
+// whose reason names the file and the check (criterion 6).
+const FILE_COLUMN_KEY = "_file";
+function fileColumnOf(ds){
+  const raw = ds && rawRealDatasetById(ds.id);
+  return (raw && raw.fileChecks && (raw.fileChecks.checks||[]).length) ? raw.fileChecks : null;
+}
+// The file attempt on show: the newest load attempt whose FILE was received
+// on or before the date on show (its own receipt, never when a pass ran),
+// and each check's result for that attempt.
+function fileAttemptInPlaceOn(fileColumn, inPlaceOnDateStr){
+  let latest = null;
+  for(const ck of fileColumn.checks){
+    for(const h of (ck.history||[])){
+      if(inPlaceOnDateStr && h.run_date && h.run_date > inPlaceOnDateStr) continue;
+      if(!latest || (h.receivedAt||"") > (latest.receivedAt||"")
+         || ((h.receivedAt||"") === (latest.receivedAt||"") && h.attempt > latest.attempt)) latest = h;
+    }
+  }
+  if(!latest) return null;
+  const results = fileColumn.checks.filter(ck=> !ck.retired_as_of).map(ck=> ({
+    check: ck, point: (ck.history||[]).find(h=> h.attempt === latest.attempt) || null,
+  })).filter(r=> r.point);
+  return {attempt: latest.attempt, filename: latest.filename, receivedAt: latest.receivedAt, results};
+}
+function sentenceCase(text){ return text ? text.charAt(0).toUpperCase() + text.slice(1) + (/[.!?]$/.test(text) ? "" : ".") : ""; }
+function fileSectionHtml(ds, inPlaceOnDateStr){
+  const fileColumn = fileColumnOf(ds);
+  const shown = fileColumn && fileAttemptInPlaceOn(fileColumn, inPlaceOnDateStr);
+  if(!shown || !shown.results.length) return "";
+  const notPassed = shown.results.filter(r=> r.point.status !== "green");
+  const refused = notPassed.some(r=> r.point.status === "red" && r.check.severity === "failure");
+  const row = r=> `
+    <button class="scope-check file-check" data-col="${FILE_COLUMN_KEY}" data-check="${escHtml(r.check.key)}"
+            data-file-status="${escHtml(r.point.status)}">
+      <span class="label"><span class="kind-tag">File check</span><span class="nm">${escHtml(r.check.name)}</span>
+        <span class="ds">${r.point.status === "green" ? "" : escHtml(sentenceCase(r.point.finding || ""))}</span></span>
+      ${pill(r.point.status,"sm")}
+    </button>`;
+  const passed = shown.results.filter(r=> r.point.status === "green");
+  const head = `<div class="head"><h3>About the file as delivered</h3></div>
+    <div class="blurb">Checks on <span class="mono">${escHtml(shown.filename||"the file")}</span> itself, received ${escHtml(fmtInstant(shown.receivedAt))}, made before any of it was loaded. They are about the file, not its data, and never change the status of the checks below.</div>`;
+  if(!notPassed.length){
+    // Criterion 5: every check passed - one line, the checks behind it.
+    return `<div class="file-section" data-scope="file" data-file-outcome="passed">${head}
+      <details class="file-passed"><summary>All ${passed.length} file checks passed</summary>
+        ${passed.map(row).join("")}</details></div>`;
+  }
+  return `<div class="file-section" data-scope="file" data-file-outcome="${refused ? "refused" : "warned"}">${head}
+    ${refused ? `<div class="file-refused-line">This file was refused: it failed a file check, so none of its data was loaded or checked.</div>`
+              : `<div class="file-warned-line">This file loaded as usual; a file check only warned, and the dataset's status is unchanged.</div>`}
+    ${notPassed.map(row).join("")}
+    ${passed.length ? `<details class="file-passed"><summary>${passed.length} other file ${pluralize(passed.length,"check")} passed</summary>${passed.map(row).join("")}</details>` : ""}
+  </div>`;
+}
+function wireFileSection(root, ag, col, ds){
+  const fileColumn = fileColumnOf(ds);
+  if(!fileColumn) return;
+  root.querySelectorAll(".file-check").forEach(btn=>{
+    const check = fileColumn.checks.find(ck=> ck.key === btn.dataset.check);
+    if(!check) return;
+    btn.setAttribute("aria-label", `File check ${check.name} — view its result for each file received`);
+    btn.addEventListener("click", ()=>{
+      STATE = {...STATE, columnName: FILE_COLUMN_KEY};
+      openCheckPanel(ag, col, ds, fileColumn, check);
+    });
+  });
+}
+// The check panel's body for a file check: the same authored prose and
+// history any other check gets (criterion 4), but its history is one row
+// per FILE received - there is no measured value to chart.
+function fileCheckPanelBody(check){
+  const failureIndicates =
+    String(check.failure_indicates || "").trim().toLowerCase() === "self-evident"
+      ? "" : check.failure_indicates;
+  const rows = (check.history||[]).slice().reverse().map(h=> `
+    <tr data-file-attempt="${h.attempt}"><td class="mono">${escHtml(fmtInstant(h.receivedAt))}</td>
+      <td class="mono">${escHtml(h.filename||"")}</td><td>${pill(h.status,"sm")}</td>
+      <td>${escHtml(h.finding||"")}</td></tr>`).join("");
+  return `
+    <div style="font-size:13px; color:var(--ink-muted); margin-bottom:18px;"><div class="dim-tag">File check</div>
+      Asked of the file as delivered, before any of it was loaded. ${check.severity === "failure"
+        ? "A failure refuses the whole file." : "A failure only warns; the file still loads."}</div>
+    ${check.description ? `<div class="drawer-section"><h4>What this checks</h4>
+      <div style="font-size:13px; color:var(--ink-muted);"${authoredSlot(check.description)}></div></div>` : ""}
+    ${failureIndicates ? `<div class="drawer-section"><h4>What a failure means</h4>
+      <div style="font-size:13px; color:var(--ink-muted);"${authoredSlot(failureIndicates)}></div></div>` : ""}
+    <div class="drawer-section"><h4>Each file received</h4>
+      ${rows ? `<table class="file-history"><thead><tr><th>Received</th><th>File</th><th>Result</th><th>Finding</th></tr></thead><tbody>${rows}</tbody></table>`
+             : `<div style="font-size:13px; color:var(--ink-muted);">No file has been checked yet.</div>`}
+    </div>`;
+}
+
 function stateToHash(state){ return "#" + stateToPath(state); }
 // The URL a real navigation lands on: today's path and query string,
 // plus the new hash, minus the arrival context. pushState() given a
@@ -3920,9 +4031,13 @@ function resolveContext(state){
 function renderFromState(){
   render();
   const ctx = STATE.columnName && resolveContext(STATE);
-  const column = ctx && ctx.ds.columns.find(c=>columnKey(c)===STATE.columnName);
+  // The file section's pseudo-column is not in `columns` (REQ-DASH-097),
+  // and opens no column drawer: its checks open straight into the panel.
+  const fileColumn = ctx && STATE.columnName === FILE_COLUMN_KEY ? fileColumnOf(ctx.ds) : null;
+  const column = fileColumn || (ctx && ctx.ds.columns.find(c=>columnKey(c)===STATE.columnName));
   if(column){
-    openColumnDrawer(ctx.ag, ctx.col, ctx.ds, column, {pushHistory:false});
+    if(fileColumn) hideDrawer();
+    else openColumnDrawer(ctx.ag, ctx.col, ctx.ds, column, {pushHistory:false});
     const check = STATE.checkKey && column.checks.find(c=>c.key===STATE.checkKey);
     if(check) openCheckPanel(ctx.ag, ctx.col, ctx.ds, column, check, {pushHistory:false});
     else {
@@ -5283,6 +5398,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <span><i class="green"></i>Green</span><span><i class="amber"></i>Amber</span><span><i class="red"></i>Red</span>
       <span style="color:var(--ink-faint);">— click a column for the full check-by-check breakdown, run-over-run comparison, and history</span>
     </div>
+    <div id="file-section-wrap"></div>
     <div id="scope-sections"></div>
     <div class="col-grid" id="col-grid"></div>
     <div id="supply-history-wrap"></div>
@@ -5345,6 +5461,12 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       ${rows}
     </div>`;
   }).join("");
+  // REQ-DASH-097: the file section, in a container of its OWN above the
+  // data checks' sections - it is about what arrived, before anything was
+  // checked of its data, and is not one of them.
+  const fileWrap = document.getElementById("file-section-wrap");
+  fileWrap.innerHTML = fileSectionHtml(ds, CURRENT_IN_PLACE_ON);
+  wireFileSection(fileWrap, ag, col, ds);
   // Authored prose set as text, never interpolated - same rule
   // REQ-DASH-026 established for the check card and its panel.
   scopeWrap.querySelectorAll(".scope-check").forEach(btn=>{
@@ -5750,6 +5872,18 @@ function openCheckPanel(ag, col, ds, column, check, opts){
     : pill(checkStatus(check), "sm");
   document.getElementById("check-panel-source-link").innerHTML = githubCheckLink(check);
   const body = document.getElementById("check-panel-body");
+  if(column && column.scope === "file"){
+    // The status of the file on show, not simply the newest file's.
+    const shown = fileAttemptInPlaceOn(column, CURRENT_IN_PLACE_ON);
+    const point = shown && shown.results.find(r=> r.check.key === check.key);
+    document.getElementById("check-panel-status").innerHTML = pill(point ? point.point.status : "nodata", "sm");
+    body.innerHTML = fileCheckPanelBody(check);
+    fillAuthored(body);
+    document.getElementById("check-backdrop").classList.add("open");
+    document.getElementById("check-panel").classList.add("open");
+    setDrawerHidden("check-panel", false);
+    return;
+  }
 
   // #45: which run is "current" is fixed (always the latest); which run
   // it's compared against used to be hardcoded to the immediately-prior
@@ -7299,7 +7433,12 @@ renderBuildStamp();
 // "exec"} default) up where it's declared. replaceState (not pushState)
 // so this first view IS the base history entry rather than a duplicate of
 // whatever the browser already had for this URL.
-history.replaceState(STATE, "", stateToHash(STATE));
+// A saved `?panel=scenarios` link has done its job once it opened the tab
+// (REQ-DASH-139): dropped here, the way the old `asof` parameter is
+// rewritten, or it would take over every later reload and copied link.
+const INITIAL_URL = new URL(location.href);
+if(INITIAL_URL.searchParams.get("panel") === "scenarios") INITIAL_URL.searchParams.delete("panel");
+history.replaceState(STATE, "", INITIAL_URL.pathname + INITIAL_URL.search + stateToHash(STATE));
 renderFromState();
 </script>
 </body>

@@ -38,6 +38,15 @@ def _iso(value) -> str | None:
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
 
 
+def _decision_entry(at, actor: str | None, reason: str | None) -> dict:
+    """One person's decision as the page shows it: the actor by NAME, from
+    contract/people.yaml, as REQ-PIPE-147 criterion 7 shows who filed a
+    delivery - never the recorded email (REQ-GEN-135 criterion 12)."""
+    from qa_tools.common import people
+
+    return {"at": _iso(at), "actor": people.display_name(actor), "reason": reason or ""}
+
+
 def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
                 now: datetime | None = None) -> list[dict]:
     """[{period, index, closesAt, changes, filedAt, marks, rejected}] for
@@ -88,11 +97,9 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
             "ORDER BY effective_at, id",
             [dataset_id, decision_log.REJECT, decision_log.MARK_NOT_SUPPLIED]).fetchall():
         if action == decision_log.REJECT and supply:
-            rejected.setdefault(supply, {"at": _iso(effective_at), "actor": actor,
-                                         "reason": reason or ""})
+            rejected.setdefault(supply, _decision_entry(effective_at, actor, reason))
         elif action == decision_log.MARK_NOT_SUPPLIED and to_slot:
-            marks.setdefault(to_slot, []).append(
-                {"at": _iso(effective_at), "actor": actor, "reason": reason or ""})
+            marks.setdefault(to_slot, []).append(_decision_entry(effective_at, actor, reason))
     # A SUPERSEDED SUPPLY IS NOT WAITING (REQ-PIPE-118): the newer version
     # that superseded it is filed to the same period and is what waits.
     from qa_tools.common import supersession

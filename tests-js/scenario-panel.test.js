@@ -125,6 +125,16 @@ describe("the panel", () => {
     const w = loadDashboard({url: "http://localhost/?panel=scenarios"}).window;
     expect(w.stateFromLocation()).toEqual({tier: "scenarios"});
   });
+
+  it("drops the old parameter once it has opened the tab", () => {
+    // Sprint 11 critic, defect 2: left in the address bar it took over
+    // every later reload and every copied link - click Plans, reload, and
+    // the page showed Scenarios.
+    const w = loadDashboard({url: "http://localhost/?panel=scenarios&theme=dark"}).window;
+    expect(new URLSearchParams(w.location.search).get("panel")).toBeNull();
+    expect(new URLSearchParams(w.location.search).get("theme")).toBe("dark");
+    expect(w.location.hash).toBe("#/scenarios");
+  });
 });
 
 describe("what the map may not contain", () => {

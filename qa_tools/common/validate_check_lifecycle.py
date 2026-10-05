@@ -50,6 +50,8 @@ _YAML_SOURCES = [
     ("contract/bdm-birth-registrations-contract-retired.yaml", cl.parse_contract_check_metadata),
     ("contract/child-protection-contract.yaml", cl.parse_contract_check_metadata),
     ("contract/child-protection-contract-retired.yaml", cl.parse_contract_check_metadata),
+    # REQ-QAC-096: written once, a check per dataset derived from each.
+    ("contract/file-checks.yaml", cl.parse_file_check_metadata),
 ]
 _EVIDENTLY_SOURCES = [
     "qa_tools/bdm/evidently_check_lifecycle.py",

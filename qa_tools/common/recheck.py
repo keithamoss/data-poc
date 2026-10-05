@@ -319,6 +319,10 @@ def run_all_owed(*, collection_id: str | None = None, kinds=(REEVALUATE,),
     tried: set[int] = set()
     while len(out) < limit:
         with supply_db.connect(label="mothman:recheck") as conn:
+            # Its own connection, so its own schema check: every
+            # promote_after ends here, and on a database nothing else has
+            # prepared, owed_run does not exist yet.
+            qa_store.ensure_schema(conn)
             pending = [o for o in owed(conn) if o.kind in kinds and o.id not in tried
                        and (collection_id is None
                             or _collection_of(hierarchy, o.dataset_id) == collection_id)]
