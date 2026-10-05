@@ -2478,6 +2478,43 @@ judgement about who reads the page rather than about the rule.
         the rest and NAME each file left behind. Q5 delete
         backlog.unprocessed. Q6 the criterion wins - a trial's run and
         its check results are discarded with everything else.
+      - KEITH'S ANSWERS TO THE STANDING PROVISIONALS, 2026-10-06 morning
+        (asked while 96813c1's gate ran):
+        - CHANGED: a database's identity moves from database-level settings
+          to a TABLE in the qa schema (REQ-PIPE-107's provisional, over
+          keeping settings). Follow-ups: `env reset-synthetic` KEEPS the
+          identity row; the table lives in the qa schema itself (over its
+          own owner-only schema), so anything that can write QA history can
+          relabel it - accepted. To scope as an amendment to REQ-PIPE-107.
+        - CHANGED: the kept-run report's inheritance lines come from a
+          RECORDED LINK (each inherit entry names the arrival whose
+          processing caused it), over the time window (REQ-TEST-150 c6's
+          provisional). A schema change.
+        - KEPT as built: `env mark --confirm` counts as typing for an
+          unmarked database only; the environment is named at a command's
+          first connection; the pass stages every unchecked arrival first;
+          a recorded arrival picked to keep is refused with --trial
+          (REQ-PIPE-086 c7).
+        - #119 D2: `supply tidy` and `supply discard-sample` need
+          production's typed id, and --yes cannot skip it.
+        - #119 D10: in production the typed id REPLACES hand-filing's
+          "Keep this check?" y/N; elsewhere the y/N stays.
+        - #118 D-E: a first line is a header only if it names a contract
+          column, repeats no name, and has no field shaped like a value of
+          its column's type; missing columns stay the data checks' job.
+        - #117 D1: someone not in people.yaml is still SHOWN BY THEIR
+          RECORDED IDENTITY (email) - Keith kept today's behaviour, over
+          "someone not on the people list" and refusing their action.
+        - #117 D7: a re-check's promotion is stamped when it ran in a live
+          deployment, at its cause instant only in a scripted replay.
+        - #117 D6: one definition of a supply's current run - asset time,
+          everywhere.
+        - #117 D5: a replayed rule promotion's invented lag is capped at the
+          next arrival of the same dataset.
+        BUILDING NEXT, in this order: these answers (the identity table and
+        the inheritance link are the two schema changes), then
+        REQ-TEST-117 (CI reuses a bootstrapped database), then REQ-PIPE-152
+        (the S3 Lambda handlers).
  All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.
