@@ -343,6 +343,30 @@ def list_run_ids(agency: str, collection: str,
             conn.close()
 
 
+def current_runs_only(run_ids: list[str], conn=None) -> list[str]:
+    """These run ids less any a newer run of the same supply has replaced
+    (REQ-PIPE-140 criterion 5): the dashboard shows a supply by its
+    current run - on every date it is in place (Keith, 2026-10-05) - and
+    the earlier runs stay recorded, readable from the terminal. A run that
+    belongs to no supply (a trial's, a fixture's) is kept as it is."""
+    conn, mine = _conn(conn)
+    try:
+        rows = conn.execute(
+            f'SELECT r.run_key FROM "{qa_store.SCHEMA}".run_visible r '
+            f'JOIN "{qa_store.SCHEMA}".supply_current_run c '
+            "USING (dataset_id, supply_id) WHERE r.scope <> 'readers' "
+            "AND r.run_key <> c.run_key").fetchall()
+        replaced = {row[0] for row in rows}
+        # A readers-only run is about other supplies, never a supply's own.
+        readers = {row[0] for row in conn.execute(
+            f'SELECT run_key FROM "{qa_store.SCHEMA}".run_visible '
+            "WHERE scope = 'readers'").fetchall()}
+    finally:
+        if mine:
+            conn.close()
+    return [r for r in run_ids if r not in replaced and r not in readers]
+
+
 def read_dataset_stats(agency: str, collection: str, run_id: str,
                        conn=None) -> dict | None:
     """The precomputed value-counts/arrival/check-aggregate/manifest-entry

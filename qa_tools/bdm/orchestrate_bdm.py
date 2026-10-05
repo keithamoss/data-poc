@@ -154,7 +154,8 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     # registers the run again, defensively, knowing nothing about who is
     # running it - which is why record_run coalesces rather than letting
     # the last writer win.
-    open_run(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, run_by)
+    open_run(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, run_by,
+             purpose=entry.get("purpose"))
 
     # NOTHING IT MAY READ, NOTHING IT MAY CHECK (2026-10-02). Birth
     # Registrations has one table, and since REQ-PIPE-105 a run's own
@@ -247,7 +248,9 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     # query rather than of what the run can reach.
     conn = supply_db.connect(read_only=True)
     conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
-    stats = dataset_stats.compute_dataset_stats(conn, run_id, entry)
+    # THE ROWS ARE THE ARRIVAL'S (REQ-PIPE-140): a re-run reads the same
+    # supply, whose rows carry the first run's id in their own column.
+    stats = dataset_stats.compute_dataset_stats(conn, entry.get("data_run_id", run_id), entry)
     resolution = supply_db.resolution_for(conn, run_id)
     tables_read = resolution.as_record()
     conn.close()

@@ -148,6 +148,10 @@ class Outcome:
     period: str | None
     changed: bool
     message: str
+    #: A re-check this decision left owed (REQ-PIPE-140 criterion 7) - run
+    #: by the terminal while the person waits, by the processing pass for
+    #: a decision made on GitHub (Keith, 2026-10-05).
+    owed: int | None = None
 
 
 @dataclass(frozen=True)
@@ -239,7 +243,61 @@ def consequences(conn, request: Request) -> Consequences:
                 f"--period {period} --stands-on {h.stands_on} --supply {h.holder} "
                 f"--reason '<why>' --yes")
             done.append(f"The substitution of {period} onto {h.stands_on} was removed.")
+    if request.operation == REFILE and request.supply and request.to_period:
+        lines, done = _refile_consequences(conn, request)
     return Consequences(lines=tuple(lines), done=tuple(done))
+
+
+def _refile_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
+    """A re-file's warning (REQ-GHUB-142), from the SAME plan that applies
+    it (criterion 2) - so what is confirmed is what happens. Refused here,
+    before anyone is asked, where the plan refuses.
+
+    IN PLAIN TERMS (criterion 5, NFR 2): periods and tables by name, dates
+    on the asset's own calendar, and supply ids only in the commands to
+    paste - "This removes 2026-Q3's accepted Clients and supersedes
+    2026-Q2's waiting Clients from 14 May"."""
+    from qa_tools.common import asset_time, refiling
+
+    p = refiling.plan(conn, dataset_id=request.dataset_id, supply=request.supply,
+                      to_period=request.to_period)
+    name = hierarchy.dataset(request.dataset_id).dataset_name
+
+    def day(iso: str) -> str:
+        return asset_time.local_date(iso).strftime("%-d %B %Y") if iso else "an unknown date"
+
+    lines: list[str] = []
+    done: list[str] = []
+    if p.promoted:
+        lines.append(
+            f"This removes {p.from_period}'s accepted {name} (received {day(p.received)}). "
+            f"{p.from_period} has no accepted {name} until another is promoted. To put it "
+            f"back, re-file it to {p.from_period}, then promote it there once checked:\n"
+            f"  mothman supply decide --operation refile --dataset {p.dataset_id} "
+            f"--period {p.to_period} --supply {p.supply} --to-period {p.from_period} "
+            f"--reason '<why>'\n"
+            f"  mothman supply decide --operation promote --dataset {p.dataset_id} "
+            f"--period {p.from_period} --supply {p.supply} --reason '<why>'")
+        done.append(f"{p.from_period}'s accepted {name} was taken out.")
+    # WHAT THE TARGET READS AFTERWARDS (post-build-review #114, D3): never
+    # the re-filed supply straight away - it waits to be checked, and a
+    # version already promoted there stays until it is (REQ-PIPE-141
+    # criteria 4 and 9).
+    if p.target_held_as in (decision_log.PROMOTED, decision_log.SUBSTITUTED):
+        after = (f"{p.to_period} keeps its accepted {name} until the re-filed one is "
+                 f"checked and promoted.")
+    else:
+        after = (f"{p.to_period} has no accepted {name}; the re-filed one waits there to "
+                 f"be checked, and the promotion gate decides.")
+    for d in p.displaced:
+        lines.append(
+            f"This supersedes {p.to_period}'s waiting {name} from {day(d.received)}. "
+            f"{after} To bring the superseded one back, un-supersede it once the re-filed "
+            f"one is out of the way:\n"
+            f"  mothman supply decide --operation un-supersede --dataset {p.dataset_id} "
+            f"--period {p.to_period} --supply {d.supply} --reason '<why>' --yes")
+        done.append(f"{p.to_period}'s waiting {name} from {day(d.received)} was superseded.")
+    return lines, done
 
 
 def offered(operation: str) -> str:
@@ -354,7 +412,7 @@ def _already(conn, request: Request) -> str | None:
     return None
 
 
-def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> None:
+def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> int | None:
     """Dispatch to the operation that owns this decision's effect.
 
     EVERY ONE OF THESE ALREADY EXISTS, and nothing here re-implements
@@ -424,28 +482,27 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> Non
 
         act = supersession.supersede if request.operation == SUPERSEDE \
             else supersession.un_supersede
-        act(conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
-            dataset_id=request.dataset_id, supply=request.supply, period=request.period,
-            actor=request.actor_name, reason=reason, effective_at=effective_at)
+        return act(conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
+                   dataset_id=request.dataset_id, supply=request.supply,
+                   period=request.period, actor=request.actor_name, reason=reason,
+                   effective_at=effective_at)
     elif request.operation == UN_INHERIT:
         inheritance.un_inherit(
             conn, dataset_id=request.dataset_id, period=request.period,
             actor=request.actor_name, reason=reason, effective_at=effective_at,
             confirmed=True)
-    else:
-        # REFILE, and it is UNBUILT rather than forgotten. The other
-        # seven each have a module that owns their warehouse change;
-        # filing.refile() moves the FILING RECORD and writes no
-        # decision-log entry at all, and what should happen to a
-        # PROMOTED supply's tables when it is re-filed belongs to
-        # REQ-PIPE-079's wiring. Inventing it in this dispatcher would
-        # put the answer in the one place nobody would look for it.
-        raise NotOffered(
-            f"{request.operation} is one of the eight and its effect is not "
-            f"built yet: filing.refile() moves the filing record and writes "
-            f"no decision-log entry. What happens to a promoted supply's "
-            f"tables on a re-file is REQ-PIPE-079's wiring. The other seven "
-            f"operations work.")
+    elif request.operation == REFILE:
+        # REQ-PIPE-141: refiling owns the effect, from one plan shared
+        # with the warning (REQ-GHUB-142 criterion 2).
+        from qa_tools.common import refiling
+
+        p = refiling.plan(conn, dataset_id=request.dataset_id, supply=request.supply,
+                          to_period=request.to_period)
+        return refiling.apply(conn, p, agency_id=entry.agency_id,
+                              collection_id=entry.collection_id,
+                              actor=request.actor_name, reason=reason,
+                              effective_at=effective_at)
+    return None
 
 
 def _staged(conn, logical: str, supply: str) -> list[str]:
@@ -515,11 +572,22 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
         raise people.UnknownActor(
             "a filing decision needs an identified person. Nobody raised this.")
     reason = _reason(request)
-    _confirmation(request)
+    if request.operation != REFILE:
+        _confirmation(request)
 
     if conn is None:
         with supply_db.connect(label="mothman:filing-decision") as opened:
             return apply(request, effective_at=effective_at, conn=opened)
+
+    if request.operation == REFILE:
+        # REFUSED BEFORE ANYONE IS ASKED TO CONFIRM (decision 13; post-build-
+        # review #114, D5): a re-file's refusals - rejected, contested,
+        # inherited, stood on - come from its plan, which needs the
+        # database, so on the GitHub route a rejected supply was asked to
+        # confirm first and refused only after. The terminal already asked
+        # in this order.
+        consequences(conn, request)
+        _confirmation(request)
 
     _refuse_promoting_what_never_loaded(conn, request)
     already = _already(conn, request)
@@ -535,10 +603,10 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     if found.lines and request.acknowledged != found.key:
         raise ConsequencesNotAcknowledged(found, given=request.acknowledged)
 
-    _apply_one(conn, request, reason, effective_at=effective_at)
+    owed = _apply_one(conn, request, reason, effective_at=effective_at)
     return Outcome(
         operation=request.operation, dataset_id=request.dataset_id,
-        period=request.period, changed=True,
+        period=request.period, changed=True, owed=owed,
         message=(f"{request.operation} recorded for {request.dataset_id} "
                  f"{request.period or ''}".strip() + f", by {request.actor_name}."
                  + "".join(f" {line}" for line in found.done)))

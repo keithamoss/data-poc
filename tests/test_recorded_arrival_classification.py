@@ -107,20 +107,27 @@ class TestTheClassificationIsRecordedWithTheFiling:
         assert filing.filing_for(DATASET, "held")["classification"] == classify_mod.UNFILED
 
 
+def _refile(dataset_id, supply_id, to_slot):
+    from qa_tools.common import supply_db
+
+    with supply_db.connect(label="test-refile") as conn:
+        return filing.refile(conn, dataset_id, supply_id, to_slot, decision_id=1)
+
+
 class TestItFollowsAReFile:
     """Criteria 5 and 8 - recorded, and still current."""
 
     def test_a_refile_rewrites_the_recorded_classification(self, clean):
         _file(slot=EARLY_SLOT)
         assert filing.filing_for(DATASET, "s")["classification"] == classify_mod.EARLY
-        filing.refile(DATASET, "s", LATE_SLOT, refiling_id="r1")
+        _refile(DATASET, "s", LATE_SLOT)
         assert filing.filing_for(DATASET, "s")["classification"] == classify_mod.LATE
 
     def test_the_receipt_instant_does_NOT_move_with_it(self, clean):
         """Criterion 8, and REQ-PIPE-067 criterion 3. When we received
         something is a fact; which period it was for is a decision."""
         _file()
-        filing.refile(DATASET, "s", LATE_SLOT, refiling_id="r1")
+        _refile(DATASET, "s", LATE_SLOT)
         assert filing.recorded_arrival(DATASET, "s").received_at == ARRIVED
 
     def test_it_is_never_recomputed_from_the_promotion_instant(self, clean):

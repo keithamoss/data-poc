@@ -32,6 +32,14 @@ SLOTS = {
 }
 
 
+def _refile(dataset_id, supply_id, to_slot, decision_id=1):
+    """A re-file as REQ-PIPE-141 makes one: a new filing, on a connection."""
+    from qa_tools.common import supply_db
+
+    with supply_db.connect(label="test-refile") as conn:
+        return filing.refile(conn, dataset_id, supply_id, to_slot, decision_id=decision_id)
+
+
 def _slot_by_name(name):
     return SLOTS.get(name)
 
@@ -66,7 +74,7 @@ class TestTheVerdictFollowsTheFiling:
             "nothing")
 
     def test_and_stops_reading_late_once_it_is_filed_correctly(self, filings):
-        filing.refile("d", "s", "2026-Q3", refiling_id="dec-1")
+        _refile("d", "s", "2026-Q3")
         got = filing.classification_of("d", "s", ARRIVED, _slot_by_name)
         assert got == classify_mod.EARLY, (
             "the record must never keep a verdict everybody knows to be untrue")
@@ -86,7 +94,7 @@ class TestTheArrivalInstantDoesNotMove:
 
     def test_refiling_changes_the_slot_and_nothing_about_the_arrival(self, filings):
         before = filing.filing_for("d", "s")
-        updated = filing.refile("d", "s", "2026-Q3", refiling_id="dec-1")
+        updated = _refile("d", "s", "2026-Q3")
         assert updated["slot"] == "2026-Q3"
         assert updated["supply_id"] == before["supply_id"]
         # The verdict is recomputed from the SAME instant.
@@ -104,8 +112,7 @@ class TestItIsTraceableToTheRefiling:
         reason belong to its decision-log entry (REQ-PIPE-074 criterion 9,
         REQ-PIPE-141), never on the filing - a second copy of a decision's
         facts is one that can disagree with the log."""
-        filing.refile("d", "s", "2026-Q3", refiling_id="dec-42",
-                      reason="supplier confirmed it was Q3")
+        _refile("d", "s", "2026-Q3")
         stored = filing.filing_for("d", "s")
         assert stored["slot"] == "2026-Q3"
         assert not {"refiled_by", "refiled_from", "refiling_reason"} & set(stored)
@@ -116,13 +123,13 @@ class TestItIsTraceableToTheRefiling:
         nothing can ever be traced."""
         import inspect
         signature = inspect.signature(filing.refile)
-        assert signature.parameters["refiling_id"].default is inspect.Parameter.empty
+        assert signature.parameters["decision_id"].default is inspect.Parameter.empty
 
     def test_a_refile_is_one_act_rather_than_a_demote_and_a_promote(self, filings):
         """Under the composed version a re-file appears in the decision
         log as TWO entries, and a reader a year later has to infer they
         were one act."""
-        filing.refile("d", "s", "2026-Q3", refiling_id="dec-1")
+        _refile("d", "s", "2026-Q3")
         stored = filing.filing_for("d", "s")
         assert stored["slot"] == "2026-Q3" and stored["branch"] == "refiled-by-a-person"
 
@@ -130,7 +137,7 @@ class TestItIsTraceableToTheRefiling:
         """REQ-PIPE-144 criterion 17: a re-filed supply still says which
         delivery it came from, so it is never refused for want of one."""
         before = filing.filing_for("d", "s")["delivery"]
-        filing.refile("d", "s", "2026-Q3", refiling_id="dec-1")
+        _refile("d", "s", "2026-Q3")
         assert before and filing.filing_for("d", "s")["delivery"] == before
 
 
@@ -138,14 +145,14 @@ class TestAnUnchangedFilingIsNotRecomputed:
     """Criterion 6."""
 
     def test_refiling_to_the_same_slot_does_nothing(self, filings):
-        assert filing.refile("d", "s", "2026-Q2", refiling_id="dec-1",) is None
+        assert _refile("d", "s", "2026-Q2") is None
 
     def test_an_unfiled_supply_cannot_be_refiled(self, filings):
-        assert filing.refile("d", "never-filed", "2026-Q3", refiling_id="dec-1",) is None
+        assert _refile("d", "never-filed", "2026-Q3") is None
 
     def test_the_record_is_untouched_by_a_no_op_refile(self, filings):
         before = filing.filing_for("d", "s")
-        filing.refile("d", "s", "2026-Q2", refiling_id="dec-1")
+        _refile("d", "s", "2026-Q2")
         assert filing.filing_for("d", "s") == before
 
 
@@ -158,7 +165,7 @@ class TestItIsLocalToTheSupplyThatMoved:
         filing_support.file(assignment.Assignment(
             dataset_id="d", supply_id="other", slot="2026-Q2",
             branch=assignment.OPEN_UNFILLED, considered=("2026-Q2",)))
-        filing.refile("d", "s", "2026-Q3", refiling_id="dec-1")
+        _refile("d", "s", "2026-Q3")
         assert filing.filing_for("d", "other")["slot"] == "2026-Q2"
 
     def test_it_reads_one_record_rather_than_the_whole_history(self):

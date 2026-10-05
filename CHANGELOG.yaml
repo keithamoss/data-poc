@@ -133,6 +133,22 @@ releases:
               with --acknowledge; on a ticket you reply a second time with
               acknowledge and the key. If anything changed in between, you are
               shown the new warning instead.
+          - headline: Re-file a supply to the period it belongs to
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              From the terminal or a ticket you can now move a supply to a
+              different period. It is checked again there and the normal rules
+              decide whether it is promoted. The earlier filing stays on
+              record, and you are shown first anything the move takes out or
+              sets aside.
+          - headline: A decision can check a supply again, as a run of its own
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Bringing back a superseded supply, or re-filing one, now runs its
+              checks again while you wait, under a run of its own. The new
+              verdict becomes the supply's verdict and the earlier run stays in
+              its history. If the check cannot finish, it is left owed and you
+              are told.
           - headline: Tables in a period carry their plain name
             components: ["Pipeline & publishing"]
             description: >

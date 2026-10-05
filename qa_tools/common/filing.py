@@ -50,6 +50,9 @@ from qa_tools.common import qa_store, supply_db
 from qa_tools.common.assignment import Assignment
 
 TABLE = f'"{qa_store.SCHEMA}".filing'
+#: A supply's CURRENT filing - its newest row (REQ-PIPE-141 criterion 2,
+#: NFR 6). Every reader reads this; only record() and refile() write TABLE.
+CURRENT = f'"{qa_store.SCHEMA}".filing_current'
 #: A supply's receipt, defined once (REQ-PIPE-144 criterion 12).
 RECEIPT = f'"{qa_store.SCHEMA}".supply_receipt'
 
@@ -116,7 +119,8 @@ def record(assignment: Assignment, delivery: str | None, conn=None) -> bool:
     rows = conn.execute(
         f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, "
         "delivery, classification) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO NOTHING "
+        "VALUES (?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT (dataset_id, supply_id) WHERE refiled_by IS NULL DO NOTHING "
         "RETURNING dataset_id",
         [assignment.dataset_id, assignment.supply_id, assignment.slot,
          assignment.branch, list(assignment.considered), delivery,
@@ -201,7 +205,7 @@ def filing_for(dataset_id: str, supply_id: str) -> dict | None:
     """This supply's filing, or None where it has not been filed."""
     with _connect("mothman:filing-read") as conn:
         rows = conn.execute(
-            f"SELECT {_SELECT} FROM {TABLE} WHERE dataset_id = ? AND supply_id = ?",
+            f"SELECT {_SELECT} FROM {CURRENT} WHERE dataset_id = ? AND supply_id = ?",
             [dataset_id, supply_id]).fetchall()
     return _as_dict(rows[0]) if rows else None
 
@@ -216,7 +220,7 @@ def filings_of(dataset_id: str) -> list[dict]:
     """
     with _connect("mothman:filing-read") as conn:
         return [_as_dict(row) for row in conn.execute(
-            f"SELECT {_SELECT} FROM {TABLE} WHERE dataset_id = ? "
+            f"SELECT {_SELECT} FROM {CURRENT} WHERE dataset_id = ? "
             "ORDER BY recorded_at, supply_id", [dataset_id]).fetchall()]
 
 
@@ -414,70 +418,46 @@ def _supply_id_for(arrival, dataset_id: str) -> str:
 #: which REQ-PIPE-141 builds. refile() below has no production caller.
 
 
-def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
-            reason: str = "") -> dict | None:
-    """Move one supply to a different slot, and let its verdict follow.
+def refile(conn, dataset_id: str, supply_id: str, to_slot: str, *,
+           decision_id: int) -> dict | None:
+    """File one supply to a different slot, as a NEW filing naming the
+    decision that made it (REQ-PIPE-141 criteria 1 and 2) - in the
+    caller's transaction, beside that decision.
 
-    THE VERDICT FOLLOWS THE FILING (REQ-PIPE-067). A supply reported
-    late purely because it was misfiled was never actually late, and
-    leaving a known-wrong verdict in place for the sake of immutability
-    is the one place this design would knowingly say something untrue.
+    THE EARLIER FILING STAYS, UNCHANGED, AS HISTORY (criterion 1, NFR 3):
+    qa.filing is append-only and the current filing is the newest row
+    (qa.filing_current), so nothing here edits what was recorded before.
 
-    THE ARRIVAL INSTANT DOES NOT MOVE (criterion 3). When we received
-    something is a fact; which period it was for is a decision, and
-    only the second one is being changed here.
+    THE VERDICT FOLLOWS THE FILING (REQ-PIPE-067): the new row's
+    classification is computed against the new slot, from the receipt
+    instant already recorded - when we received it is a fact, which
+    period it was for is the decision being changed.
 
-    ATOMIC, never a demote followed by a promote (criterion 5's
-    reasoning). One entry with a from-slot, a to-slot and one reason -
-    because under the composed version a re-file appears in the
-    decision log as two entries, and a reader a year later has to infer
-    they were one act. "Why is this supply in Q3?" should have a single
-    answer rather than being a correlation exercise.
-
-    `refiling_id` identifies the re-filing in the decision log. Nothing
-    resolves it yet - the log is sprint 12 - so it is recorded and
-    dangles, which is deliberate and is why this parameter is required
-    rather than optional.
-
-    Returns the updated record, or None where the supply was not filed
-    or is already in that slot (criterion 6 - an unchanged filing is
-    not recomputed).
+    Returns the new filing, or None where the supply was not filed or is
+    already filed to that slot (nothing to change).
     """
-    current = filing_for(dataset_id, supply_id)
-    if current is None or current.get("slot") == to_slot:
+    rows = conn.execute(
+        f"SELECT {_SELECT} FROM {CURRENT} WHERE dataset_id = ? AND supply_id = ?",
+        [dataset_id, supply_id]).fetchall()
+    if not rows:
         return None
-
-    updated = dict(current)
-    updated["slot"] = to_slot
-    # NO refiled_from / refiled_by / refiling_reason ON THE FILING
-    # (REQ-PIPE-144 criterion 8): a re-file's from-period, to-period and
-    # reason belong to its decision-log entry. The DELIVERY LINK is
-    # carried as it stands (criterion 17) - the row is updated in place.
-    # The branch that ORIGINALLY filed it no longer describes where it
-    # sits: a person put it here.
-    updated["branch"] = "refiled-by-a-person"
-
-    # THE VERDICT FOLLOWS, THE INSTANT DOES NOT (REQ-PIPE-080 criteria
-    # 5 and 8). Recomputed from the receipt instant already recorded
-    # against this supply - so a supply reported late purely because it
-    # was misfiled stops reading late the moment somebody moves it,
-    # without anything re-deriving when it turned up.
-    received_at = received_at_of(dataset_id, supply_id)
+    current = _as_dict(rows[0])
+    if current.get("slot") == to_slot:
+        return None
+    receipt = conn.execute(
+        f"SELECT received_instant FROM {RECEIPT} WHERE dataset_id = ? AND supply_id = ?",
+        [dataset_id, supply_id]).fetchall()
+    received_at = receipt[0][0] if receipt else None
     verdict = _classification_for(dataset_id, to_slot, received_at)
-    updated["classification"] = verdict
-
-    # AN UPDATE, AND THE ONLY ONE THIS TABLE TAKES. Write-once
-    # (REQ-PIPE-104 criterion 2) is about the RULE never re-deriving a
-    # filing against a schedule that has moved on; a person moving a
-    # supply is the other thing entirely, and REQ-PIPE-067 requires the
-    # verdict to follow it. That is why `qa.filing` has no append-only
-    # trigger while `qa.decision` does - see the DDL.
-    with _connect("mothman:filing-refile") as conn:
-        conn.execute(
-            f"UPDATE {TABLE} SET slot = ?, branch = ?, classification = ? "
-            "WHERE dataset_id = ? AND supply_id = ?",
-            [to_slot, updated["branch"], verdict, dataset_id, supply_id])
-    return updated
+    # The rule's branch no longer describes where it sits: a person put it
+    # here. The delivery link is carried as it stands (REQ-PIPE-144 c17).
+    conn.execute(
+        f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, "
+        "delivery, classification, refiled_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [dataset_id, supply_id, to_slot, "refiled-by-a-person", [to_slot],
+         current["delivery"], verdict, decision_id])
+    return {**current, "slot": to_slot, "branch": "refiled-by-a-person",
+            "classification": verdict}
 
 
 @dataclass(frozen=True)
@@ -568,7 +548,7 @@ def recorded_arrival(dataset_id: str, supply_id: str) -> RecordedArrival | None:
         rows = conn.execute(
             f"SELECT f.slot, r.received_instant, f.classification, "
             f"r.originally_received_stated, d.filed_by_kind, d.filing_route, d.filed_by "
-            f"FROM {TABLE} f "
+            f"FROM {CURRENT} f "
             f"LEFT JOIN {RECEIPT} r USING (dataset_id, supply_id) "
             f'JOIN "{qa_store.SCHEMA}".delivery d ON d.name = f.delivery '
             "WHERE f.dataset_id = ? AND f.supply_id = ?",
@@ -639,9 +619,11 @@ def _filled_at(conn, dataset_id: str, supply_id: str, slot: str | None):
     # every historical supply look as though it waited until today.
     rows = conn.execute(
         f"SELECT MIN(effective_at) FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND supply = ? AND to_slot = ? AND action IN (?, ?)",
-        [dataset_id, supply_id, slot,
-         decision_log.PROMOTE, decision_log.REFILE]).fetchall()
+        "WHERE dataset_id = ? AND supply = ? AND to_slot = ? AND action = ?",
+        # A RE-FILE NO LONGER FILLS ITS TARGET (REQ-PIPE-141 criterion 4):
+        # the supply is checked there and promoted, or not, by a later
+        # decision - which is when it is filled.
+        [dataset_id, supply_id, slot, decision_log.PROMOTE]).fetchall()
     return rows[0][0] if rows else None
 
 

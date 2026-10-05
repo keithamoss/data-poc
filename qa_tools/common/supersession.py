@@ -45,13 +45,21 @@ def is_superseded_schema(schema: str) -> bool:
 
 
 def _latest(conn, dataset_id: str, supply: str):
-    """The latest supersession or un-supersession of this supply, as
-    (action, superseded_by), or None."""
+    """The latest supersession, un-supersession or re-file of this supply,
+    as (action, superseded_by), or None.
+
+    A RE-FILE ENDS A SUPERSESSION (post-build-review #114, D1): it brings
+    the supply's tables back to staging for a different period, where it
+    waits to be checked and the gate decides (REQ-PIPE-141 criterion 4).
+    Read as still superseded, it was refused by every route there - and
+    the versions it superseded in the target were set aside for a supply
+    that could never win."""
     rows = conn.execute(
         f"SELECT action, superseded_by FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?) "
+        "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?, ?) "
         "ORDER BY effective_at DESC, id DESC LIMIT 1",
-        [dataset_id, supply, decision_log.SUPERSEDE, decision_log.UN_SUPERSEDE]).fetchall()
+        [dataset_id, supply, decision_log.SUPERSEDE, decision_log.UN_SUPERSEDE,
+         decision_log.REFILE]).fetchall()
     return rows[0] if rows else None
 
 
@@ -111,16 +119,18 @@ def _accepted_into(conn, dataset_id: str, supply: str, period: str) -> bool:
     un-superseded it waits like any other version."""
     rows = conn.execute(
         f"SELECT action FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
-        "AND ((to_slot = ? AND action IN (?, ?)) OR (from_slot = ? AND action IN (?, ?))) "
+        "AND ((to_slot = ? AND action = ?) OR (from_slot = ? AND action IN (?, ?, ?))) "
         "ORDER BY effective_at DESC, id DESC LIMIT 1",
-        [dataset_id, supply, period, decision_log.PROMOTE, decision_log.REFILE,
-         period, decision_log.DEMOTE, decision_log.SUPERSEDE]).fetchall()
-    return bool(rows) and rows[0][0] in (decision_log.PROMOTE, decision_log.REFILE)
+        # A RE-FILE INTO a period leaves the supply waiting there, and a
+        # re-file OUT leaves the period (REQ-PIPE-141 criterion 4).
+        [dataset_id, supply, period, decision_log.PROMOTE,
+         period, decision_log.DEMOTE, decision_log.SUPERSEDE, decision_log.REFILE]).fetchall()
+    return bool(rows) and rows[0][0] == decision_log.PROMOTE
 
 
 def _filed_to(conn, dataset_id: str, supply: str, period: str) -> bool:
     return bool(conn.execute(
-        "SELECT 1 FROM qa.filing WHERE dataset_id = ? AND supply_id = ? AND slot = ?",
+        "SELECT 1 FROM qa.filing_current WHERE dataset_id = ? AND supply_id = ? AND slot = ?",
         [dataset_id, supply, period]).fetchall())
 
 
@@ -142,7 +152,7 @@ def earlier_unaccepted(conn, dataset_id: str, period: str, newer: str) -> list[s
         return []
     out = []
     for (supply,) in conn.execute(
-            "SELECT supply_id FROM qa.filing WHERE dataset_id = ? AND slot = ? "
+            "SELECT supply_id FROM qa.filing_current WHERE dataset_id = ? AND slot = ? "
             "AND supply_id <> ?", [dataset_id, period, newer]).fetchall():
         at = _receipt(conn, dataset_id, supply)
         if at is None or at >= newer_at:
@@ -162,20 +172,32 @@ def supersede_earlier(conn, *, agency_id: str, collection_id: str, dataset_id: s
     (criterion 10); the caller wraps this with the filing."""
     done = []
     for supply in earlier_unaccepted(conn, dataset_id, period, newer):
-        target = superseded_schema(period)
-        tables = staged_tables(conn, dataset_id, supply)
-        decision = decision_log.Decision(
-            agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
-            action=decision_log.SUPERSEDE, supply=supply, actor=RULE_ACTOR,
-            actor_kind=decision_log.RULE, effective_at=effective_at, from_slot=period,
-            reason=f"a newer version of this table for {period} arrived: {newer}",
-            superseded_by=newer)
-        with decision_log.apply_decision(conn, decision):
-            supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{target}"')
-            for physical in tables:
-                supply_db.move_table(conn, physical, supply_db.STAGING_SCHEMA, target)
+        supersede_by_rule(conn, agency_id=agency_id, collection_id=collection_id,
+                          dataset_id=dataset_id, supply=supply, period=period, by=newer,
+                          effective_at=effective_at,
+                          reason=f"a newer version of this table for {period} arrived: {newer}")
         done.append(supply)
     return done
+
+
+def supersede_by_rule(conn, *, agency_id: str, collection_id: str, dataset_id: str,
+                      supply: str, period: str, by: str, effective_at: str,
+                      reason: str) -> None:
+    """One waiting version set aside by the rule in favour of `by` - its own
+    decision, its tables moved to the period's superseded schema in the
+    caller's transaction. Shared by receipt order (criterion 1) and by a
+    re-file, which wins whatever the receipts (REQ-PIPE-141 criterion 6)."""
+    target = superseded_schema(period)
+    tables = staged_tables(conn, dataset_id, supply)
+    decision = decision_log.Decision(
+        agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
+        action=decision_log.SUPERSEDE, supply=supply, actor=RULE_ACTOR,
+        actor_kind=decision_log.RULE, effective_at=effective_at, from_slot=period,
+        reason=reason, superseded_by=by)
+    with decision_log.apply_decision(conn, decision):
+        supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{target}"')
+        for physical in tables:
+            supply_db.move_table(conn, physical, supply_db.STAGING_SCHEMA, target)
 
 
 def supersede_promoted(conn, *, agency_id: str, collection_id: str, dataset_id: str,
@@ -238,7 +260,7 @@ def superseded_in(conn, dataset_id: str, period: str) -> list[dict]:
     first - each with what superseded it (criterion 7)."""
     out = []
     for (supply,) in conn.execute(
-            "SELECT f.supply_id FROM qa.filing f JOIN qa.supply_receipt r "
+            "SELECT f.supply_id FROM qa.filing_current f JOIN qa.supply_receipt r "
             "ON r.dataset_id = f.dataset_id AND r.supply_id = f.supply_id "
             "WHERE f.dataset_id = ? AND f.slot = ? ORDER BY r.received_instant DESC",
             [dataset_id, period]).fetchall():
@@ -253,7 +275,7 @@ def waiting_in(conn, dataset_id: str, period: str, *, besides: str | None = None
     not promoted, rejected or superseded (criterion 5's refusal)."""
     out = []
     for (supply,) in conn.execute(
-            "SELECT supply_id FROM qa.filing WHERE dataset_id = ? AND slot = ?",
+            "SELECT supply_id FROM qa.filing_current WHERE dataset_id = ? AND slot = ?",
             [dataset_id, period]).fetchall():
         if supply == besides:
             continue
@@ -296,7 +318,7 @@ def supersede(conn, *, agency_id: str, collection_id: str, dataset_id: str, supp
 
 
 def un_supersede(conn, *, agency_id: str, collection_id: str, dataset_id: str, supply: str,
-                 period: str, actor: str, reason: str, effective_at: str) -> None:
+                 period: str, actor: str, reason: str, effective_at: str) -> int:
     """A PERSON returns a superseded supply to staging for its period
     (criterion 3), refused while another version of the table is waiting
     there (criterion 5). Its QA is owed again; the gate then applies as for
@@ -329,7 +351,15 @@ def un_supersede(conn, *, agency_id: str, collection_id: str, dataset_id: str, s
     with dl.apply_decision(conn, dl.Decision(
             agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
             action=dl.UN_SUPERSEDE, supply=supply, actor=actor, actor_kind=dl.PERSON,
-            effective_at=effective_at, from_slot=period, reason=reason)):
+            effective_at=effective_at, from_slot=period, reason=reason)) as entry_id:
         for physical in tables:
             supply_db.move_table(conn, physical, source, supply_db.STAGING_SCHEMA)
+        # ITS QA IS OWED AGAIN (criterion 3; REQ-PIPE-140 criterion 7), in
+        # this decision's transaction - the executor runs it and the gate
+        # then applies as for a first arrival (criterion 4).
+        from qa_tools.common import recheck
+
+        owed_id = recheck.owe(conn, dataset_id=dataset_id, supply_id=supply,
+                              decision_id=entry_id)
     drop_if_empty(conn, period)
+    return owed_id

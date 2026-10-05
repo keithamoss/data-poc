@@ -250,9 +250,31 @@ def _scope_to_run(verified: list[dict], run_id: str) -> None:
     # carers arrived" rather than a verdict that changed with nobody
     # touching its dataset. reevaluation.mark() names it; each record is
     # replaced IN THE CALLER'S OWN LIST, for the reason the filter above is.
+    decision_id = _decision_behind(run_id)
     for i, record in enumerate(verified):
-        if record.get("dataset_id") != dataset_id:
+        if decision_id is not None:
+            # A DECISION'S RUN NAMES THE DECISION on every result, its own
+            # checks and its readers alike (REQ-PIPE-140 criterion 4) - it
+            # used to name the re-run's own key as an "arrival" (#114, D6).
+            verified[i] = reevaluation.mark_decision(record, decision_id=decision_id)
+        elif record.get("dataset_id") != dataset_id:
             verified[i] = reevaluation.mark(record, caused_by=run_id)
+
+
+def _decision_behind(run_id: str) -> int | None:
+    """The decision a re-run (`<first>__r<N>`) was made for, from its run
+    record; None for an arrival's own run."""
+    from qa_tools.common import qa_store, supply_db
+
+    if not supply_db.split_run(run_id)[1]:
+        return None
+    conn = supply_db.connect(read_only=True, label="mothman:run-cause")
+    try:
+        rows = conn.execute(f'SELECT caused_by_decision FROM "{qa_store.SCHEMA}".run '
+                            "WHERE run_key = ?", [run_id]).fetchall()
+    finally:
+        conn.close()
+    return rows[0][0] if rows and rows[0][0] is not None else None
 
 
 def scope_of_run(run_id: str):
@@ -535,7 +557,7 @@ def _record_in_database(agency: str, collection: str, run_id: str, run_timestamp
 
 
 def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
-             run_by: str) -> None:
+             run_by: str, purpose: dict | None = None) -> None:
     """Register a run before any of its tools write, with the identity
     only the orchestrator knows (REQ-PIPE-089 criteria 6 and 13).
 
@@ -559,6 +581,27 @@ def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
         # one had landed, which is the partial-run problem wearing the
         # one disguise the completeness marker does not catch.
         qa_store.reopen_run(conn, run_id)
+        # WHAT THE RUN IS FOR (REQ-PIPE-140). A re-run's executor states
+        # it; an arrival's run is the supply its id names, where filed.
+        qa_store.set_run_purpose(conn, run_id, **(purpose or _arrival_purpose(conn, run_id)))
+
+
+def _arrival_purpose(conn, run_id: str) -> dict:
+    """An arrival run's own supply and period, from its id and its
+    current filing - none for a trial's or a fixture's run."""
+    from qa_tools.common import filing, supply_db
+
+    owner = run_owner(run_id)
+    parts = supply_db.split_staged(run_id)
+    if owner is None or parts is None:
+        return {"dataset_id": None, "supply_id": None}
+    rows = conn.execute(
+        f"SELECT supply_id, slot FROM {filing.CURRENT} WHERE dataset_id = ? "
+        "AND (supply_id = ? OR supply_id LIKE ?) ORDER BY supply_id LIMIT 1",
+        [owner[0], f"{owner[0]}@{parts[1]}", f"{owner[0]}@{parts[1]}#%"]).fetchall()
+    if not rows:
+        return {"dataset_id": owner[0], "supply_id": None}
+    return {"dataset_id": owner[0], "supply_id": rows[0][0], "period": rows[0][1]}
 
 
 def finish_run(run_id: str) -> None:

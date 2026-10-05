@@ -79,7 +79,9 @@ def world(conn):
     for physical in made:
         conn.execute(f'DROP TABLE IF EXISTS "{supply_db.STAGING_SCHEMA}"."{physical}" CASCADE')
     conn.execute(f'DROP SCHEMA IF EXISTS "{period_schema.period_schema(period)}" CASCADE')
-    conn.execute(f"DELETE FROM {filing.TABLE} WHERE slot = ?", [period])
+    import filing_support
+
+    filing_support.forget(conn, "slot = ?", [period])
 
 
 class TestASiblingIsReadFromItsPeriod:

@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 26
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -189,8 +189,33 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".run (
     tool_versions  jsonb NOT NULL DEFAULT '{{}}',
     created_at     timestamptz NOT NULL DEFAULT now(),
     -- NULL while the run is in flight. Criterion 13 lives here.
-    completed_at   timestamptz
+    completed_at   timestamptz,
+    -- WHAT THIS RUN IS FOR (REQ-PIPE-140), stated rather than read off the
+    -- run id. `arrival` is a supply's first run, made by its arrival;
+    -- `full` a decision-triggered re-run of a supply's own checks and the
+    -- cross-table checks reading it; `readers` only the cross-table checks
+    -- reading `reads_table` in `period` (criterion 2). NULL supply for a
+    -- trial's or a fixture's run, which belongs to no supply.
+    dataset_id     text,
+    supply_id      text,
+    scope          text NOT NULL DEFAULT 'arrival'
+                   CHECK (scope IN ('arrival', 'full', 'readers')),
+    period         text,
+    reads_table    text,
+    -- THE CAUSE OF A RE-RUN (criterion 4): the decision, or the load
+    -- record of a failed load that has since loaded (REQ-DASH-148). No
+    -- foreign key on either: the decision log is never cascaded from a
+    -- run, and load records are truncated by the test suite's cleanup.
+    caused_by_decision bigint,
+    caused_by_load     bigint,
+    CHECK (scope = 'arrival'
+           OR (caused_by_decision IS NULL) <> (caused_by_load IS NULL)),
+    CHECK (scope <> 'readers' OR (reads_table IS NOT NULL AND period IS NOT NULL))
 );
+
+--   "this supply's runs, newest first" - criterion 5's read
+CREATE INDEX IF NOT EXISTS run_supply
+    ON "{SCHEMA}".run (dataset_id, supply_id, run_instant) WHERE supply_id IS NOT NULL;
 
 -- Self-healing for a database created before run_by became nullable.
 -- Harmless where it already is; DROP NOT NULL does not error on a
@@ -489,8 +514,37 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".filing (
     -- DECISION and can move, so the verdict derived from it has to move
     -- with it. NULL where there was nothing to judge with.
     classification text,
-    PRIMARY KEY (dataset_id, supply_id)
+    -- APPEND-ONLY (REQ-PIPE-141 NFR 3; Keith, 2026-10-05: UPDATE and
+    -- DELETE refused, TRUNCATE not). A re-file is a NEW row naming the
+    -- decision that made it; the rule's own filing is the one row with no
+    -- `refiled_by`, written once. A supply's CURRENT filing is its newest
+    -- row - qa.filing_current below, read by everything.
+    id          bigserial PRIMARY KEY,
+    refiled_by  bigint
 );
+
+--   the rule files a supply ONCE (REQ-PIPE-104 criterion 2)
+CREATE UNIQUE INDEX IF NOT EXISTS filing_once
+    ON "{SCHEMA}".filing (dataset_id, supply_id) WHERE refiled_by IS NULL;
+
+CREATE OR REPLACE FUNCTION "{SCHEMA}".filing_is_append_only()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION
+        'qa.filing is append-only: a % is not permitted. A re-file is a new row '
+        'naming its decision (REQ-PIPE-141)', TG_OP;
+END $$;
+DROP TRIGGER IF EXISTS filing_append_only ON "{SCHEMA}".filing;
+CREATE TRIGGER filing_append_only
+    BEFORE UPDATE OR DELETE ON "{SCHEMA}".filing
+    FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".filing_is_append_only();
+
+-- A SUPPLY'S CURRENT FILING, DEFINED ONCE (REQ-PIPE-141 criterion 2 and
+-- NFR 6): its newest row. Every reader of "the" filing reads this.
+CREATE OR REPLACE VIEW "{SCHEMA}".filing_current AS
+SELECT DISTINCT ON (dataset_id, supply_id) *
+FROM "{SCHEMA}".filing
+ORDER BY dataset_id, supply_id, id DESC;
 
 --   one dataset's filings, at a cost that does not grow with any other
 --   dataset's history - the per-dataset shape REQ-PIPE-034 established
@@ -518,7 +572,7 @@ SELECT DISTINCT ON (f.dataset_id, f.supply_id)
        df.received_at, df.received_instant, df.received_from, df.receipt_sequence,
        -- BESIDE the receipt, never it (REQ-PIPE-103 criterion 19).
        df.originally_received_stated
-FROM "{SCHEMA}".filing f
+FROM "{SCHEMA}".filing_current f
 JOIN "{SCHEMA}".delivery_file df
   ON df.delivery = f.delivery AND df.dataset_id = f.dataset_id
 ORDER BY f.dataset_id, f.supply_id, df.received_instant, df.receipt_sequence, df.filename;
@@ -870,6 +924,52 @@ CREATE TRIGGER decision_no_truncate
 CREATE OR REPLACE VIEW "{SCHEMA}".run_visible AS
     SELECT * FROM "{SCHEMA}".run WHERE completed_at IS NOT NULL;
 
+-- A SUPPLY'S CURRENT RUN, DEFINED ONCE (REQ-PIPE-140 criterion 5): its
+-- newest COMPLETED run of its own checks - an arrival's or a re-run's,
+-- never a readers-only one, which is not about the supply. The gate, the
+-- dashboard and the terminal read a supply's verdict from this run;
+-- every earlier run stays in qa.run as history.
+CREATE OR REPLACE VIEW "{SCHEMA}".supply_current_run AS
+SELECT DISTINCT ON (dataset_id, supply_id) *
+FROM "{SCHEMA}".run_visible
+WHERE supply_id IS NOT NULL AND scope <> 'readers'
+ORDER BY dataset_id, supply_id, run_instant DESC, run_key DESC;
+
+-- A RE-RUN THAT IS OWED (REQ-PIPE-140 criterion 7). Recorded in the
+-- transaction of the decision (or the load) that causes it, and cleared
+-- only once the run has completed AND the gate has been applied to it -
+-- so a crash between the two leaves it owed rather than lost.
+--
+-- IT CHANGES STATE ON PURPOSE, as qa.hold does: raised once, attempted,
+-- cleared once. It is a work item, not history - the history is the
+-- decision that caused it and the run that discharged it.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".owed_run (
+    id                 bigserial PRIMARY KEY,
+    -- `recheck` - a supply's own checks again (REQ-PIPE-140 criterion 1);
+    -- `reevaluate` - only the readers of `tables` in `period` (criterion 2).
+    kind               text NOT NULL CHECK (kind IN ('recheck', 'reevaluate')),
+    dataset_id         text NOT NULL,
+    supply_id          text,
+    period             text,
+    tables             text[] NOT NULL DEFAULT '{{}}',
+    caused_by_decision bigint,
+    caused_by_load     bigint,
+    owed_at            timestamptz NOT NULL DEFAULT now(),
+    -- The run id minted on the first attempt, so a retry completes the
+    -- same run rather than leaving a trail of half-runs.
+    run_key            text,
+    attempts           integer NOT NULL DEFAULT 0,
+    last_failure       text,
+    cleared_at         timestamptz,
+    cleared_by_run     text,
+    CHECK ((caused_by_decision IS NULL) <> (caused_by_load IS NULL)),
+    CHECK ((cleared_at IS NULL) = (cleared_by_run IS NULL))
+);
+
+--   "what is owed", the only question asked of it routinely
+CREATE INDEX IF NOT EXISTS owed_run_open
+    ON "{SCHEMA}".owed_run (owed_at) WHERE cleared_at IS NULL;
+
 CREATE OR REPLACE VIEW "{SCHEMA}".check_result_visible AS
     SELECT r.* FROM "{SCHEMA}".check_result r
     JOIN "{SCHEMA}".run ON run.run_key = r.run_key
@@ -942,6 +1042,10 @@ WITH RECURSIVE named AS (
       -- default.
       AND d.action IN ('promote', 'refile', 'substitute', 'inherit',
                        'reject', 'demote', 'de-substitute', 'un-inherit')
+      -- A RE-FILE NEVER FILLS THE SLOT IT GOES TO (REQ-PIPE-141 criteria
+      -- 4 and 9): the supply waits in staging there, checked again, and
+      -- the gate decides - so only its leaving the OLD slot is a step.
+      AND NOT (d.action = 'refile' AND s.slot = d.to_slot)
 ), step AS (
     -- What one entry does to a slot, given what the slot held before:
     -- `skips` where it is about a supply other than the one holding it.
@@ -954,7 +1058,7 @@ WITH RECURSIVE named AS (
 ), walk AS (
     SELECT n.dataset_id, n.slot, n.rn, n.id AS last_id,
            CASE WHEN n.into_slot THEN CASE n.action
-                WHEN 'promote' THEN 'promoted' WHEN 'refile' THEN 'promoted'
+                WHEN 'promote' THEN 'promoted'
                 WHEN 'substitute' THEN 'substituted' WHEN 'inherit' THEN 'inherited'
                 END END AS held_as,
            CASE WHEN n.into_slot THEN n.supply END AS holder
@@ -965,7 +1069,7 @@ WITH RECURSIVE named AS (
                      AND w.holder IS NOT NULL AND n.supply <> w.holder
                 THEN w.last_id ELSE n.id END,
            CASE WHEN n.into_slot THEN CASE n.action
-                WHEN 'promote' THEN 'promoted' WHEN 'refile' THEN 'promoted'
+                WHEN 'promote' THEN 'promoted'
                 WHEN 'substitute' THEN 'substituted' WHEN 'inherit' THEN 'inherited'
                 END
                 WHEN n.action IN ('reject', 'demote', 'refile')
@@ -1201,6 +1305,31 @@ def ensure_publisher_role(conn: supply_db.SupplyConnection, role: str,
 # ---------------------------------------------------------------------------
 # Writing
 # ---------------------------------------------------------------------------
+
+def set_run_purpose(conn: supply_db.SupplyConnection, run_key: str, *,
+                    dataset_id: str | None, supply_id: str | None,
+                    scope: str = "arrival", period: str | None = None,
+                    reads_table: str | None = None, caused_by_decision: int | None = None,
+                    caused_by_load: int | None = None) -> None:
+    """What a run is for (REQ-PIPE-140): whose supply, which scope, and -
+    for a re-run - what caused it. Stated on the run rather than read off
+    its id, which says whose table it is and nothing more."""
+    conn.execute(
+        f'UPDATE "{SCHEMA}".run SET dataset_id = ?, supply_id = ?, scope = ?, period = ?, '
+        "reads_table = ?, caused_by_decision = ?, caused_by_load = ? WHERE run_key = ?",
+        [dataset_id, supply_id, scope, period, reads_table, caused_by_decision,
+         caused_by_load, run_key])
+
+
+def current_run(conn: supply_db.SupplyConnection, dataset_id: str,
+                supply_id: str) -> str | None:
+    """The supply's current run (REQ-PIPE-140 criterion 5): its newest
+    completed run of its own checks. Earlier runs stay as history."""
+    rows = conn.execute(
+        f'SELECT run_key FROM "{SCHEMA}".supply_current_run '
+        "WHERE dataset_id = ? AND supply_id = ?", [dataset_id, supply_id]).fetchall()
+    return rows[0][0] if rows else None
+
 
 def record_run(conn: supply_db.SupplyConnection, *, run_key: str, agency_id: str,
                collection_id: str, run_timestamp: str, run_by: str | None = None,

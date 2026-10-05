@@ -73,7 +73,7 @@ def test_dbts_store_failures_audit_schema_goes_too(db):
     been quietly clearing all along.
     """
     run_id = "lifecycle_audit"
-    audit = supply_db.dbt_schema(run_id) + "_dbt_test__audit"
+    audit = supply_db.dbt_audit_schema(run_id)
     db.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.run_schema(run_id)}"')
     db.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.dbt_schema(run_id)}"')
     db.execute(f'CREATE SCHEMA IF NOT EXISTS "{audit}"')
@@ -97,6 +97,49 @@ def test_a_similarly_named_run_is_not_collateral(db):
     assert supply_db.dbt_schema("lifecycle_99") in remaining, \
         "dropping one run took a longer-named run's schema with it"
     supply_db.drop_run_schemas(db, "lifecycle_99")
+
+
+def test_a_rerun_of_the_same_supply_is_not_collateral(db):
+    """REQ-PIPE-140: a re-run's id is its supply's run id plus `__r<N>`,
+    so `<base>_` matched it - tidying the first run would have dropped the
+    re-run's dbt schema while it ran. Exact names only."""
+    first = "cp_carers__000000000000000042"
+    again = supply_db.rerun_id(first, 1)
+    for run_id in (first, again):
+        db.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.dbt_schema(run_id)}"')
+        db.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.dbt_audit_schema(run_id)}"')
+
+    supply_db.drop_run_schemas(db, first)
+
+    remaining = _schemas(db)
+    assert supply_db.dbt_audit_schema(first) not in remaining
+    assert supply_db.dbt_schema(again) in remaining
+    assert supply_db.dbt_audit_schema(again) in remaining
+    supply_db.drop_run_schemas(db, again)
+
+
+def test_a_rerun_id_round_trips_and_keeps_its_supply(db):
+    first = "cp_carers__000000000000000042"
+    again = supply_db.rerun_id(first, 3)
+    assert supply_db.split_run(again) == (first, 3)
+    assert supply_db.split_run(first) == (first, 0)
+    assert supply_db.split_staged(again)[:2] == ("cp_carers", "000000000000000042")
+
+
+def test_the_longest_real_run_id_has_room_for_a_rerun(db):
+    """dbt's audit schema is the longest name a run makes. Under dbt's
+    default `_dbt_test__audit` a Birth Registrations run id (20-digit key)
+    had no room for `__r<N>`; the short `_audit` set in dbt_project.yml
+    leaves it plenty."""
+    longest = "birth_registrations__" + "9" * 20
+    assert len(supply_db.dbt_audit_schema(supply_db.rerun_id(longest, 99))) <= 63
+
+
+def test_a_rerun_id_too_long_for_dbt_is_refused(db):
+    """PostgreSQL truncates silently past 63 bytes, so an id that would not
+    fit is refused rather than sharing a truncated name."""
+    with pytest.raises(supply_db.SupplyDbError, match="too long"):
+        supply_db.rerun_id("t" * 30 + "__" + "9" * 20, 1)
 
 
 def test_dropping_a_run_that_has_no_schemas_is_harmless(db):

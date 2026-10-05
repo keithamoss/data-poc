@@ -121,7 +121,7 @@ def run_dbt(command: str, select: list[str], target_path: str,
         # and free even sequentially - one run's target/ never lingers to
         # confuse the next.
         # --store-failures writes each failing test's own offending rows
-        # into a main_dbt_test__audit.<test> table in the same per-run
+        # into a <target>_audit.<test> table (dbt_project.yml) in the same per-run
         # warehouse - the source failing_sample_keys_* below query for
         # per-row samples (see plans/qa-pipeline.md #15).
         ["dbt", command, "--profiles-dir", profiles_dir, "--project-dir", project_dir, "--quiet",

@@ -5577,3 +5577,66 @@ twice. It deliberately did not re-find the `TypeError`.
         than accepting the shorthand.
       - The queue takes about 3 seconds to render.
       - "2 later period(s)" and "supply/supplies" pluralisation.
+
+114. **[done, 2026-10-05]** **[Pipeline & publishing]** **The delivery critic on
+    sprint 9 - REQ-PIPE-140 (a decision's own QA run), REQ-PIPE-141
+    (re-file) and REQ-GHUB-142 (its warning).** Each finding was checked
+    against the code before it was written here. None needed Keith: all are
+    defects in the built behaviour against signed criteria, not changes to
+    what was agreed. Fixed before sprint 9 was first committed.
+    - **D1 (HIGH), FIXED** (failing test first): re-filing a SUPERSEDED
+      supply moved its tables to staging but left it superseded. Every
+      route then refused to promote it, and the re-file had still
+      superseded the versions waiting in the target, so that period could
+      end with nothing promotable. A re-file now ends a supersession:
+      `supersession._latest` reads REFILE alongside supersede and
+      un-supersede.
+    - **D2, FIXED** (failing test first): a re-run's id was minted past
+      `qa.run` only. An attempt that broke before its run opened held its id
+      on `qa.owed_run` alone, so the next owed re-check took the same
+      `__r1`, and its results would have replaced the first's. Ids are now
+      minted past both, under an advisory lock.
+    - **D3, FIXED** (failing test first): the warning said the target
+      "reads the re-filed one from this decision on". A promoted version
+      there stays until the re-filed one is checked and promoted (criterion
+      9), and even an empty target only has it waiting. It now says which.
+    - **D4, FIXED** (failing test first): the re-file was planned before
+      the slot lock and never re-judged, so a version filed into the target
+      in between was neither superseded nor named. The plan is now worked
+      out again under both slots' locks, and a re-file whose consequences
+      changed is refused, with nothing done.
+    - **D5, FIXED** (failing test first): on the GitHub route a rejected,
+      contested or inherited re-file was asked to confirm before being
+      refused. Its refusals now come first, as on the terminal.
+    - **D6, FIXED** (failing test first): a decision-triggered run's
+      results named the run's own `__r1` key as the ARRIVAL that caused
+      them. Every result of such a run now carries
+      `reevaluated_after_decision`, and none carries the arrival key.
+    - **FIXED, minor:**
+      - An overlay that broke half-built left the re-run's view schema
+        behind.
+      - A held supply asked to be re-filed got an empty warning, then a
+        refusal about two slots. It is now told to place it instead
+        (failing test first).
+    - **RECORDED AS UNMET, not fixed:** criterion 5's terminal half on
+      REQ-PIPE-140. No terminal command shows a supply's verdict at all, so
+      there is no reader to point at the newest run.
+    - **LOGGED, not changed:**
+      - Owed re-checks can pile up when a supply is re-filed back and
+        forth: one per decision, each run against the current filing.
+        Harmless, since each completes as its own run. REQ-PIPE-151's pass
+        is where they are drained.
+      - NFR 2 (time one run on the largest Child Protection table) is not
+        yet measured.
+      - The Birth Registrations re-run path is exercised only through the
+        shared executor. The BDM fixture files nothing, so there is no
+        end-to-end test of it.
+    - **FOUND BY THE GATE, NOT THE CRITIC, FIXED** (failing test first):
+      `sprint_state` read an `**Owns:**` paragraph one line deep, so a
+      sprint whose list wrapped owned only its first line's requirements.
+      Two delivery-sprint tags in `plans/supply-model.md` were wrong
+      because of it. Sprint 11 was counted on four requirements of eleven.
+      Sprint 26 had read `done` since 2026-09-27, when its own register
+      says 96 of 112 criteria are met. Both now read `in-progress`, as
+      counted. Worth knowing: a "done" sprint tag before today was checked
+      against a short list.

@@ -156,7 +156,8 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
                     reference_run_id: str | None,
                     on_step: Callable[[str], None] | None) -> list[dict]:
     # Before any tool writes - see orchestrate_bdm.py's identical block.
-    open_run(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, run_by)
+    open_run(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, run_by,
+             purpose=entry.get("purpose"))
 
     # PER SUPPLY, NOT PER BATCH (REQ-QAC-108 criteria 2 and 4) - see
     # orchestrate_bdm.py's identical block for the full account, and

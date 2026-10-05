@@ -728,11 +728,10 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
         supply_id = f"{dataset_id}@{asset_time.arrival_key(arrival.received_at)}"
         with supply_db.connect(label="pytest:file-fixture") as conn:
             qa_store.ensure_schema(conn)
-            conn.execute(
-                f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, delivery) "
-                "VALUES (?, ?, ?, 'pytest-fixture', ?) ON CONFLICT (dataset_id, supply_id) "
-                "DO UPDATE SET slot = EXCLUDED.slot, delivery = EXCLUDED.delivery",
-                [dataset_id, supply_id, period, arrival.delivery_name])
+            import filing_support
+
+            filing_support.place(conn, dataset_id, supply_id, period, arrival.delivery_name,
+                                 branch="pytest-fixture")
 
     for arrival in [a for a in found if a.received_at == first]:
         file_to(arrival, "2026-Q1")

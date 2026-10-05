@@ -857,7 +857,7 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
     with supply_db.connect(read_only=True, label="mothman:supply-superseded") as conn:
         for ds in datasets:
             periods = [period] if period else [r[0] for r in conn.execute(
-                "SELECT DISTINCT slot FROM qa.filing WHERE dataset_id = ? AND slot IS NOT NULL "
+                "SELECT DISTINCT slot FROM qa.filing_current WHERE dataset_id = ? AND slot IS NOT NULL "
                 "ORDER BY slot", [ds]).fetchall()]
             for p in periods:
                 for v in supersession.superseded_in(conn, ds, p):

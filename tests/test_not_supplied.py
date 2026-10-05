@@ -225,7 +225,6 @@ class TestARejectedSupplyLeavesItsPeriodEmpty:
 
     def test_the_period_carries_the_rejection(self, conn):
         from pipeline import closed_slots
-        from qa_tools.common import filing
 
         supply = "cp-investigations@202502050100000000"
         delivery = "pytest-rejected-2025q1"
@@ -238,11 +237,9 @@ class TestARejectedSupplyLeavesItsPeriodEmpty:
             "received_instant, received_from, receipt_sequence) VALUES (?, "
             "'cp_investigations.csv', 'cp-investigations', '2025-02-05T01:00:00+00:00', "
             "'2025-02-05T01:00:00+00:00', 'our-clock', 1) ON CONFLICT DO NOTHING", [delivery])
-        conn.execute(
-            f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, delivery) "
-            "VALUES ('cp-investigations', ?, '2025-Q1', 'pytest', ?) "
-            "ON CONFLICT (dataset_id, supply_id) DO UPDATE SET slot = EXCLUDED.slot",
-            [supply, delivery])
+        import filing_support
+
+        filing_support.place(conn, "cp-investigations", supply, "2025-Q1", delivery)
         before = {s["period"] for s in closed_slots.for_dataset("cp-investigations", conn, now=LATER)}
         assert "2025-Q1" not in before, "a live filing before the close was never a gap"
         with dl.apply_decision(conn, dl.Decision(
@@ -292,7 +289,6 @@ class TestASupplyWaitingInAClosedPeriodIsNotAGap:
     (REQ-PIPE-132 criteria 3 and 6)."""
 
     def test_the_resupply_reads_awaiting_and_the_mark_is_refused(self, conn):
-        from qa_tools.common import filing
 
         with dl.apply_decision(conn, dl.Decision(
                 agency_id="a", collection_id="c", dataset_id="cp-investigations",
@@ -303,11 +299,10 @@ class TestASupplyWaitingInAClosedPeriodIsNotAGap:
         conn.execute("INSERT INTO qa.delivery (name, received_at, received_instant) VALUES "
                      "('pytest-resupply-s2', '2024-09-05T01:00:00+00:00', "
                      "'2024-09-05T01:00:00+00:00') ON CONFLICT DO NOTHING")
-        conn.execute(
-            f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, delivery) "
-            "VALUES ('cp-investigations', 'cp-investigations@s2', '2024-Q3', 'pytest', "
-            "'pytest-resupply-s2') "
-            "ON CONFLICT (dataset_id, supply_id) DO UPDATE SET slot = EXCLUDED.slot")
+        import filing_support
+
+        filing_support.place(conn, "cp-investigations", "cp-investigations@s2", "2024-Q3",
+                             "pytest-resupply-s2")
         filings = {"2024-Q3": {"supply_id": "cp-investigations@s2"}}
         got = _state(conn, "cp-investigations", "2024-Q3", filings=filings)
         assert got.state == slot_state.AWAITING_DECISION and not got.closed
@@ -347,7 +342,7 @@ class TestALateDayStillOpenIsNamed:
 
     def test_a_slot_filed_on_time_was_never_late(self, conn):
         from pipeline import closed_slots
-        from qa_tools.common import filing, slots
+        from qa_tools.common import slots
 
         slot = next(s for s in slots.slots_for_dataset("cp-carers", until=LATER.date())
                     if s.name == "2025-Q1")
@@ -360,9 +355,8 @@ class TestALateDayStillOpenIsNamed:
             "received_instant, received_from, receipt_sequence) VALUES (?, 'cp_carers.csv', "
             "'cp-carers', ?, ?, 'our-clock', 1) ON CONFLICT DO NOTHING",
             [delivery, on_time, on_time])
-        conn.execute(
-            f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, delivery) "
-            "VALUES ('cp-carers', 'cp-carers@ontime', '2025-Q1', 'pytest', ?) "
-            "ON CONFLICT (dataset_id, supply_id) DO UPDATE SET slot = EXCLUDED.slot", [delivery])
+        import filing_support
+
+        filing_support.place(conn, "cp-carers", "cp-carers@ontime", "2025-Q1", delivery)
         got = {s["period"] for s in closed_slots.late_slots("cp-carers", conn, now=LATER)}
         assert "2025-Q1" not in got

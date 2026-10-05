@@ -290,18 +290,25 @@ class TestAFilingIsRecordedInTheDatabase:
                 ["cp-clients", "cp-clients@2026", assignment.RESUPPLY,
                  "pytest-cp-clients-cp-clients@2026"])
 
-    def test_it_is_NOT_append_only_because_a_person_may_re_file(self, filings):
-        """The contrast with `qa.decision`, which IS append-only, and the
-        two tables protect different things. Write-once here means the
-        RULE never re-derives a filing against a schedule that has moved
-        on; a person moving a supply is REQ-PIPE-067, and the verdict has
-        to follow it. An append-only trigger would make that impossible.
-        """
+    def test_it_is_append_only_and_a_re_file_is_a_new_row(self, filings):
+        """REQ-PIPE-141 NFR 3 (Keith, 2026-10-05: UPDATE and DELETE
+        refused). A person moving a supply still moves it - REQ-PIPE-067's
+        verdict follows - but as a NEW filing naming its decision, so the
+        earlier filing stays as history (criterion 1)."""
+        import psycopg
+
         filing_support.file(_assignment())
-        moved = filing.refile("cp-clients", "cp-clients@2026", "2026-Q3",
-                               refiling_id="dec-1")
+        moved = filing.refile(filings, "cp-clients", "cp-clients@2026", "2026-Q3",
+                              decision_id=1)
         assert moved is not None and moved["slot"] == "2026-Q3"
         assert filing.filing_for("cp-clients", "cp-clients@2026")["slot"] == "2026-Q3"
+        slots = [r[0] for r in filings.execute(
+            f"SELECT slot FROM {filing.TABLE} WHERE dataset_id = ? AND supply_id = ? "
+            "ORDER BY id", ["cp-clients", "cp-clients@2026"]).fetchall()]
+        assert slots[-1] == "2026-Q3" and len(slots) == 2
+        for statement in (f"UPDATE {filing.TABLE} SET slot = 'x'", f"DELETE FROM {filing.TABLE}"):
+            with pytest.raises(psycopg.errors.RaiseException, match="append-only"):
+                filings.execute(statement)
 
     def test_a_filing_is_not_a_delivery_record_or_a_qa_verdict(self, filings):
         """Criterion 3. One delivery carries several datasets and each is

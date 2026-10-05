@@ -481,3 +481,24 @@ class TestRetiredCountsForNothing:
         path.write_text(yaml.safe_dump(data))
         s = ss.survey(_plan(tmp_path, [(1, "todo", ["REQ-X-001"])]), path)[0]
         assert s.total == 2
+
+
+class TestAnOwnsLineThatWraps:
+    """A real defect, found 2026-10-05: the `**Owns:**` paragraph was read
+    one line deep, so a sprint whose list wrapped owned only the first
+    line's requirements - sprint 11 read as `done` on four of its eleven,
+    with REQ-PIPE-151 and 152 not built."""
+
+    def test_every_line_of_the_paragraph_is_read(self, tmp_path):
+        path = tmp_path / "plan.md"
+        path.write_text(textwrap.dedent("""\
+            1. **[todo, 2026-01-01]** **[Pipeline & publishing]** **A sprint.**
+               Some prose.
+
+               **Owns:** `REQ-X-001`, `REQ-X-002`,
+               `REQ-X-003`, `REQ-X-004`
+
+               *A later paragraph naming `REQ-X-009`* is not ownership.
+            """))
+        assert ss.parse_sprints(path)[0][2] == ["REQ-X-001", "REQ-X-002", "REQ-X-003",
+                                                "REQ-X-004"]

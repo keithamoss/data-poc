@@ -1255,12 +1255,10 @@ def drop_run_schemas(conn, run_id: str) -> list[str]:
     # configuration: the first version of this dropped only the target
     # schema and left eighteen audit schemas behind.
     #
-    # EXACT, OR FOLLOWED BY AN UNDERSCORE. A bare prefix test would let
-    # `run_001` take `run_0011` with it, which is the kind of quiet
-    # collateral nobody would look for.
-    base = dbt_schema(run_id)
-    mine = {run_schema(run_id), base}
-    mine |= {s for s in present if s.startswith(base + "_")}
+    # EXACT NAMES ONLY. A bare prefix test would let `run_001` take
+    # `run_0011`, and `<base>_` - what this used before REQ-PIPE-140 -
+    # took a re-run's `<base>__r1` schema with its own supply's run.
+    mine = {run_schema(run_id), dbt_schema(run_id), dbt_audit_schema(run_id)}
     dropped = []
     for schema in sorted(mine):
         conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
@@ -1338,6 +1336,46 @@ DBT_SCHEMA_PREFIX = "dbt_"
 def dbt_schema(run_id: str) -> str:
     """Where dbt's models and audit tables go for ONE run."""
     return DBT_SCHEMA_PREFIX + _ident(run_id, "run id")
+
+
+#: dbt's `--store-failures` schema for a run is its target schema plus
+#: this - the LONGEST name a run makes, so the one a run id must fit. Set
+#: short in dbt_project.yml (`data_tests: +schema: audit`); dbt's default,
+#: `_dbt_test__audit`, left no room for a re-run's suffix (REQ-PIPE-140).
+DBT_AUDIT_SUFFIX = "_audit"
+
+#: A decision-triggered re-run of a supply (REQ-PIPE-140) is named for
+#: the supply's own run plus `__r<N>`. `split_staged` reads it as the same
+#: table and arrival, so everything that asks "whose run is this" keeps
+#: its answer; only `rerun_id` makes one and only `split_run` reads one.
+RERUN_MARK = "__r"
+
+
+def dbt_audit_schema(run_id: str) -> str:
+    """dbt's audit schema for ONE run - exactly, never by prefix."""
+    return dbt_schema(run_id) + DBT_AUDIT_SUFFIX
+
+
+def rerun_id(run_id: str, n: int) -> str:
+    """The id of re-run `n` (1, 2, ...) of the supply whose own run is
+    `run_id`. Refused where dbt's audit schema would not fit PostgreSQL's
+    63 bytes - it truncates silently, and two runs would share a name."""
+    if n < 1:
+        raise SupplyDbError(f"a re-run is numbered from 1, got {n}")
+    rid = f"{run_id}{RERUN_MARK}{n}"
+    if len(dbt_audit_schema(rid).encode()) > MAX_IDENTIFIER:
+        raise SupplyDbError(
+            f"re-run id {rid!r} is too long: dbt's audit schema for it would be "
+            f"{len(dbt_audit_schema(rid))} bytes, past PostgreSQL's {MAX_IDENTIFIER}")
+    return rid
+
+
+def split_run(run_id: str) -> tuple[str, int]:
+    """(the supply's own run id, re-run number) - 0 for the first run."""
+    head, sep, tail = run_id.rpartition(RERUN_MARK)
+    if sep and tail.isdigit() and head:
+        return head, int(tail)
+    return run_id, 0
 
 
 def dbt_schemas(conn) -> list[str]:

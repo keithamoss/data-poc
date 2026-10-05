@@ -127,16 +127,15 @@ def schemas_of(conn, run_id: str) -> list[str]:
         supply_db.dbt_schema(run_id),
     }
     # DBT MAKES TWO SCHEMAS PER RUN, not one - `--store-failures` puts
-    # each failing test's offending rows in `<target>_dbt_test__audit`.
-    # Matched by prefix-plus-underscore rather than by a bare prefix,
-    # so one trial cannot take a longer-named sibling's with it.
-    base = supply_db.dbt_schema(run_id)
+    # each failing test's offending rows in `<target>_audit`.
+    # Matched EXACTLY, so one trial cannot take a longer-named sibling's
+    # (or a re-run's, REQ-PIPE-140) with it.
+    mine.add(supply_db.dbt_audit_schema(run_id))
     present = supply_db.schemas_with_prefix(conn, supply_db.TRIAL_SCHEMA_PREFIX)
     present += supply_db.schemas_with_prefix(conn, supply_db.RUN_SCHEMA_PREFIX
                                              + supply_db.TRIAL_SCHEMA_PREFIX)
     present += supply_db.schemas_with_prefix(conn, supply_db.DBT_SCHEMA_PREFIX
                                              + supply_db.TRIAL_SCHEMA_PREFIX)
-    mine |= {s for s in present if s.startswith(base + "_")}
     return sorted(mine & set(present))
 
 

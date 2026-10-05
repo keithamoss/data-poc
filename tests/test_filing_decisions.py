@@ -269,22 +269,19 @@ class TestSevenOfTheEightReallyWork:
                            confirmed=True), effective_at=WHEN, conn=conn)
         assert inheritance.inherited(conn, dataset.dataset_id, second) is None
 
-    def test_refile_says_it_is_unbuilt_rather_than_doing_something_wrong(
+    def test_refile_is_built_and_owned_by_its_own_module(
             self, conn, dataset, actor, periods):
-        """The one of the eight with no effect written. filing.refile()
-        moves the FILING RECORD and writes no decision-log entry, and
-        what happens to a PROMOTED supply's tables on a re-file is
-        REQ-PIPE-079's wiring. Inventing it in the dispatcher would put
-        the answer in the one place nobody would look for it - so it
-        refuses, loudly, naming why."""
-        first, _ = periods
+        """REQ-PIPE-141: the eighth works now, through refiling - which owns
+        its effect, as every other operation's module owns its own. A
+        supply that is staged but filed nowhere has nothing to re-file, and
+        says so rather than inventing a filing. (The re-file itself is
+        tests/test_refile_decision.py's.)"""
+        first, second = periods
         supply, _ = _stage(conn, dataset)
-        with pytest.raises(fd.NotOffered) as exc:
-            fd.apply(_request(dataset, actor, fd.REFILE, period=first,
+        with pytest.raises(dl.DecisionRefused, match="not filed"):
+            fd.apply(_request(dataset, actor, fd.REFILE, period=first, to_period=second,
                                supply=supply, confirmed=True),
                       effective_at=WHEN, conn=conn)
-        assert "REQ-PIPE-079" in str(exc.value)
-        assert "other seven operations work" in str(exc.value)
 
 
 class TestADecisionThatChangesNothingSaysSo:

@@ -350,6 +350,8 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
     if outcome.changed:
         console.print(Panel(Text(outcome.message, style="bold green"),
                              title="Recorded", border_style="green", expand=False))
+        if outcome.owed:
+            _run_owed(outcome.owed)
         filing_decisions.reconcile_after(
             outcome, hierarchy.dataset(dataset_id).collection_id)
     else:
@@ -358,6 +360,25 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
         console.print(Panel(Text(outcome.message), title="Already so",
                              border_style="blue", expand=False))
     return outcome
+
+
+def _run_owed(owed_id: int) -> None:
+    """The decision's re-check, run while the person waits (REQ-PIPE-140;
+    Keith, 2026-10-05). A run that breaks leaves the decision recorded and
+    the re-check owed, and says so - the processing pass finishes it."""
+    from qa_tools.common import recheck
+
+    console.print("Checking it again against its period - this runs the four QA "
+                  "tools and takes a minute or so.", style="dim")
+    try:
+        got = recheck.run(owed_id, on_step=lambda label: console.print(f"  {label}",
+                                                                     style="dim"))
+    except recheck.RecheckRefused as exc:
+        console.print(f"Not checked again: {exc}. It stays owed.", style="yellow")
+        return
+    style = "green" if got.completed else "yellow"
+    console.print(Panel(Text(got.message), title="Checked again" if got.completed
+                        else "Check owed", border_style=style, expand=False))
 
 
 # ---------------------------------------------------------------------------

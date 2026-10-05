@@ -138,7 +138,9 @@ def _run_for(conn, dataset_id: str, supply: str) -> str | None:
 #: changes nothing about whether the supply is in the view.
 _STATE_AFTER = {
     decision_log.PROMOTE: "promoted",
-    decision_log.REFILE: "promoted",
+    # A RE-FILED SUPPLY WAITS IN ITS NEW PERIOD (REQ-PIPE-141 criterion
+    # 4) - checked there, and promoted or not by a later decision.
+    decision_log.REFILE: "awaiting",
     decision_log.DEMOTE: "withdrawn",
     decision_log.REJECT: "withdrawn",
     decision_log.SUPERSEDE: "withdrawn",

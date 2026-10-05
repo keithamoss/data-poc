@@ -26,6 +26,10 @@ from typing import Any, Mapping
 #: DDL - but only while the name stays off _RESULT_COLUMNS and
 #: _KEY_COLUMNS, which a test asserts rather than trusts.
 CAUSED_BY = "reevaluated_after_arrival_of"
+#: The decision a decision-triggered run was made for (REQ-PIPE-140
+#: criterion 4), a different key from an arrival's on purpose, so the two
+#: causes are distinguishable on every result (REQ-PIPE-079 criterion 7).
+CAUSED_BY_DECISION = "reevaluated_after_decision"
 
 
 @dataclass(frozen=True)
@@ -68,3 +72,12 @@ def mark(record: Mapping[str, Any], *, caused_by: str) -> dict:
     blaming the same arrival.
     """
     return {**record, CAUSED_BY: caused_by}
+
+
+def mark_decision(record: Mapping[str, Any], *, decision_id: int) -> dict:
+    """Name, on a result of a decision-triggered run, the decision that
+    caused it - never an arrival (post-build-review #114, D6). A new
+    record, for mark()'s reason."""
+    out = {k: v for k, v in record.items() if k != CAUSED_BY}
+    out[CAUSED_BY_DECISION] = str(decision_id)
+    return out

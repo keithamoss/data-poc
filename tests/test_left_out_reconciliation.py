@@ -84,8 +84,10 @@ def clean_q3(supply_dsn):
     sibling's reason into missing-table. No module writes 2027-Q3 for it."""
     def _clear():
         with supply_db.connect(label="test-left-out") as conn:
-            conn.execute("DELETE FROM qa.filing WHERE slot = '2027-Q3' AND dataset_id IN "
-                         "('cp-carers', 'cp-placements')")
+            import filing_support
+
+            filing_support.forget(conn, "slot = '2027-Q3' AND dataset_id IN "
+                                        "('cp-carers', 'cp-placements')")
     _clear()
     yield
     _clear()

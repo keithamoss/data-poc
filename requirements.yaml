@@ -12938,11 +12938,7 @@ requirements:
       - >
         WHEN a person promotes a supply into the period its QA was
         already run against, THE SYSTEM SHALL NOT re-run QA.
-      - >
-        WHEN a supply is promoted or re-filed into a DIFFERENT period
-        from the one its QA was run against, THE SYSTEM SHALL re-run QA
-        against that period, and SHALL re-evaluate the cross-table
-        checks that read it.
+      - 'WHEN a supply is promoted or re-filed into a DIFFERENT period from the one its QA was run against, THE SYSTEM SHALL re-run QA against that period, and SHALL re-evaluate the cross-table checks that read it. AMENDED 2026-10-05 by REQ-PIPE-141 criterion 19: met for a re-file by REQ-PIPE-141, whose re-filed supply is checked against its new period through REQ-PIPE-140; and for a promotion by criterion 8, since a supply is promoted only into the period its filing names, the one it was checked against.'
     non_functional_requirements:
       - >
         This is the keystone of the batch and it turns on two things
@@ -12987,39 +12983,6 @@ requirements:
         CLAUDE.md's shape-change rule was written after a status change
         was verified in reports/*.json and rendered a 14-violation check
         GREEN two transforms downstream.
-    unmet_criteria:
-      - criterion: >
-          Criterion 17 - re-running QA where a person's promotion puts a
-          supply into a period its verdicts were not computed against.
-          RE-POINTED 2026-09-29, not cleared: criterion 14 IS now met
-          and has come off this list, because the operator route exists
-          and promotes one supply per decision, each with its own entry,
-          reason and transaction. 17 is a different half and the route
-          landing did not supply it.
-        why: >
-          promotion.needs_requalification() answers WHETHER a promotion
-          needs QA running again, and it is built, tested and still
-          called by nothing. What the operator route added was a caller
-          for PROMOTE, not an executor for a re-run - `mothman supply
-          decide --operation promote` records the decision and moves the
-          tables, and there is nowhere for it to send "and now run the
-          checks again". That executor is REQ-PIPE-079's unbuilt half,
-          the same one REQ-PIPE-099 criterion 11 and REQ-GHUB-082's
-          re-file both wait on: reevaluation.plan() answers WHICH checks,
-          and nothing executes a plan. Wiring one here would build that
-          same thing a second time, in the place nobody would look for
-          it.
-        owner: >
-          REQ-PIPE-141 (re-file) and REQ-PIPE-140 (a decision-triggered
-          QA run). It was REQ-GHUB-082 and REQ-PIPE-099 until 2026-09-29,
-          then REQ-PIPE-079's wiring until 2026-10-04 - re-tested when 079
-          was built: 079 wired arrival-time re-evaluation only, and the
-          run a DECISION starts is 140's. REQ-PIPE-141 states this
-          criterion is met by re-file plus, for a person's promotion, by
-          construction (a supply is only promoted into the period it was
-          checked against).
-        blocked_by:
-          requirements: [REQ-PIPE-140, REQ-PIPE-141]
     dependencies: [REQ-PIPE-074, REQ-PIPE-062, REQ-PIPE-035, REQ-PIPE-064]
     decisions:
       - >
@@ -13207,6 +13170,11 @@ requirements:
         wrong on its quarterly row and has to be corrected, not left to
         contradict this.
 
+      - 'CRITERION 17 CLOSED BY REQ-PIPE-140 AND 141 (2026-10-05): a re-file is
+        checked against its new period through the re-run executor; a promotion
+        is only ever into the period its filing names, so it was already checked
+        there (criterion 8). The criterion was amended to say which half is met
+        how.'
   - id: REQ-PIPE-076
     title: Rejection and un-decide are a person's decisions, and automation defers to a person permanently
     date_written: "2026-09-26"
@@ -13290,7 +13258,7 @@ requirements:
       - >
         THE SYSTEM SHALL distinguish, among staged supplies, one nobody
         has decided on from one a person has looked at and returned.
-      - WHERE any decision has been recorded against a supply by a person, THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT un-supersede, the one person-decision after which the gate may still promote automatically, and the supersede it undoes (REQ-PIPE-120 criterion 4). AMENDED 2026-10-05 by REQ-PIPE-120 criterion 9.
+      - WHERE any decision has been recorded against a supply by a person, THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT un-supersede and re-file, the person-decisions after which the gate may still promote automatically, and the supersede un-supersede undoes (REQ-PIPE-120 criterion 4, REQ-PIPE-141 criterion 8). AMENDED 2026-10-05 by REQ-PIPE-120 criterion 9 and REQ-PIPE-141 criterion 19.
       - THE SYSTEM SHALL leave a red supply nobody has decided on in staging UNTIL a later version of its table for the same period supersedes it (REQ-PIPE-118), and SHALL NOT move it to the rejected schema. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 16.
       - >
         THE SYSTEM SHALL allow a rejection to be reversed by a later
@@ -16441,6 +16409,10 @@ requirements:
         operator who cannot do their job. So the menu errs towards
         offering.
 
+      - 'CRITERION 2 FOR RE-FILE CLOSED BY REQ-PIPE-141 (2026-10-05): re-file''s
+        effect is built (qa_tools/common/refiling.py), offered on both routes -
+        the GitHub route takes `to: <period>` - and confirmed against REQ-GHUB-142''s
+        warning.'
     implemented_by:
       - cli/filing_tui.py::filing_menu
       - cli/filing_tui.py::apply_decision
@@ -16506,37 +16478,20 @@ requirements:
         the real TUI in a real pty - 217 events, 58.1s, and zero
         occurrences of "Promote" where there were three.
     unmet_criteria:
-      - criterion: >
-          Criterion 1, in the part of it that is an ENTRY POINT rather
-          than a capability - a GitHub comment actually reaching
-          filing_from_github.handle().
-        why: >
-          The adapter is built and tested; nothing in production calls
-          it. ticket-sync.yml is disabled (REQ-PIPE-089) because a
-          workflow cannot reach the database, and its replacement
-          inverts the integration's direction.
-        owner: >
-          plans/running-thoughts.md #53, which is not scoped yet.
-        blocked_by:
-          unowned: true
-      - criterion: >
-          Criterion 2, for RE-FILE specifically - it is offered on both
-          routes and its effect is not built.
-        why: >
-          filing.refile() moves the filing record and writes no
-          decision-log entry; what happens to a PROMOTED supply's tables
-          on a re-file is REQ-PIPE-079's wiring. Both routes refuse it
-          by name, saying so, rather than half-doing it. The other seven
-          work.
-        owner: >
-          REQ-PIPE-141, re-file's effect (signed 2026-10-04), which
-          clears this criterion. It pointed at REQ-PIPE-079's unbuilt half
-          until 079 was built on 2026-10-04; re-tested then, re-file's
-          effect was never 079's and is now scoped on its own.
-        blocked_by:
-          requirements:
-            - REQ-PIPE-141
+    - criterion: 'Criterion 1, in the part of it that is an ENTRY POINT rather
+        than a capability - a GitHub comment actually reaching filing_from_github.handle().
 
+        '
+      why: 'The adapter is built and tested; nothing in production calls it. ticket-sync.yml
+        is disabled (REQ-PIPE-089) because a workflow cannot reach the database,
+        and its replacement inverts the integration''s direction.
+
+        '
+      owner: 'plans/running-thoughts.md #53, which is not scoped yet.
+
+        '
+      blocked_by:
+        unowned: true
   - id: REQ-PIPE-083
     title: >
       Every slot has a ticket that is reconciled to its current state,
@@ -25246,8 +25201,8 @@ requirements:
     - tests/test_supersession_critic.py
     source: "Keith, 2026-10-03 afternoon, option A (plans/road-testing.md #16, 'CHANGE OF DIRECTION' item 1, 2 and 5), replacing the shelved set-aside/re-gate design. Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
-      - "WHEN a file for a table is filed to a period, THE SYSTEM SHALL move every earlier UNACCEPTED version of that table filed to the same period - every version not promoted and not rejected, whatever its verdict - to the SUPERSEDED state, before any check runs over the new file."
-      - "THE SYSTEM SHALL decide which version is earlier by RECEIPT INSTANT, and SHALL NOT decide it by the order in which files happen to be processed."
+      - WHEN a file for a table is filed to a period, THE SYSTEM SHALL move every earlier UNACCEPTED version of that table filed to the same period - every version not promoted and not rejected, whatever its verdict - to the SUPERSEDED state, before any check runs over the new file. The one exception is a RE-FILE, which supersedes every unaccepted version waiting in its target period whatever their receipt instants (REQ-PIPE-141 criterion 6). AMENDED 2026-10-05 by REQ-PIPE-141 criterion 19.
+      - THE SYSTEM SHALL decide which version is earlier by RECEIPT INSTANT, and SHALL NOT decide it by the order in which files happen to be processed - except for a re-file, the one exception to supersession by receipt order (REQ-PIPE-141). AMENDED 2026-10-05 by REQ-PIPE-141 criterion 19.
       - "THE SYSTEM SHALL take 'newer' to mean received later by our own clock, and SHALL always process files in receipt order."
       - "THE SYSTEM SHALL hold a period's superseded supplies in a schema of their own for that period, named with the suffix _superseded after the period schema's own name (for example period_2026_q2_superseded beside period_2026_q2), separate from staging, every period schema and the rejected schema."
       - "THE SYSTEM SHALL create a period's superseded schema only when a first table needs it, and SHALL drop it when its last table leaves."
@@ -25345,27 +25300,6 @@ requirements:
     story: "As the person working a period's supplies, I want to pull an earlier good version back out of superseded and have it checked and gated like any arrival, so that when a newer file turns out to be the wrong one I can restore the right one without asking the supplier to send it again."
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 3 (the QA re-run half) - an un-superseded supply is
-        returned to staging, but its QA is not re-run against the period, so the
-        gate does not yet re-judge it.
-      owner: REQ-PIPE-151
-      why: 'Decision 7 (Keith, 2026-10-04): owed work completes on the next run
-        of the processing pass, REQ-PIPE-151, which is not built. The return to
-        staging and the gate''s eligibility (criterion 4) are built.'
-      blocked_by:
-        requirements:
-        - REQ-PIPE-151
-    - criterion: The NFR that the owed QA re-run is recorded in the un-supersede
-        decision's own transaction, and the NFR that the terminal waits for the
-        re-run and shows its outcome.
-      owner: REQ-PIPE-151
-      why: 'Both ride on the re-run itself (criterion 3), which REQ-PIPE-151''s
-        processing pass owns and which is not built. Found unlisted by the delivery
-        critic (post-build-review #109).'
-      blocked_by:
-        requirements:
-        - REQ-PIPE-151
     evidence:
     - '2026-10-05: tests/test_supersession.py''s REQ-PIPE-120 tests green against
       a real database - a person supersedes a waiting supply (tables to the period''s
@@ -25471,6 +25405,11 @@ requirements:
         newer version is waiting leaves two waiting versions of one table. Whether
         that demote should supersede the demoted supply or be refused is a product
         decision and is not built either way.'
+      - 'CRITERION 3''S RE-RUN AND ITS TWO NFRs CLOSED BY REQ-PIPE-140 (2026-10-05):
+        un-supersede owes the supply''s QA in its own decision''s transaction (recheck.owe),
+        the terminal runs it while the person waits and shows the outcome, and the
+        gate then applies as for a first arrival. Made on GitHub, it stays owed
+        for the processing pass (REQ-PIPE-151), Keith''s call the same day.'
     open_questions: []
 
   - id: REQ-PIPE-121
@@ -26785,7 +26724,68 @@ requirements:
       date: '2026-10-04'
     story: As the person working a period's supplies, I want a decision that changes what a supply is judged against - a re-file, an un-supersede - to run that supply's checks again there and then, so that the gate decides on verdicts computed against where the supply now sits, and the verdicts it earned before are kept rather than replaced.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 2 - a run of only the cross-table checks that read
+        a given table in a given period.
+      owner: REQ-PIPE-121
+      why: 'The executor and its schema carry the scope (qa.run.scope ''readers'',
+        qa.owed_run kind ''reevaluate''), but the run itself is refused as not
+        built: its only callers are REQ-PIPE-121''s knock-on re-evaluations, built
+        next sprint, and a readers-only run needs the one scope predicate the
+        architect review asked for so left_out.reconcile does not reject it.'
+      blocked_by:
+        requirements:
+        - REQ-PIPE-121
+    - criterion: Criterion 8's second half - completing an owed run on the next
+        run of the processing pass.
+      owner: REQ-PIPE-151
+      why: 'A broken run stays owed and reported; the processing pass that finishes
+        owed runs is REQ-PIPE-151 (Keith, 2026-10-05: no interim command).'
+      blocked_by:
+        requirements:
+        - REQ-PIPE-151
+    - criterion: Criterion 5's terminal half - the terminal reading a supply's
+        verdict from its most recent run.
+      owner: unowned
+      why: 'No terminal command shows a supply''s verdict at all (the queue and
+        the decide flow show states, not results), so there is no terminal reader
+        to point at the newest run. The gate and the dashboard read it (qa_store.current_run,
+        qa_results_reader.current_runs_only). Found by the sprint 9 critic, post-build-review
+        #114.'
+      blocked_by:
+        unowned: true
+    evidence:
+    - '2026-10-05: tests/test_recheck.py green against the real four tools (5
+      tests, ~14s): an owed re-check of the dirty Child Protection fixture''s
+      cp-placements supply runs as cp_placements__<key>__r1, records scope full,
+      its supply, its period and the decision that caused it, becomes the supply''s
+      current run, and leaves the first run''s results untouched; owing twice
+      for one cause is one record; a run that breaks stays owed with its failure
+      recorded and the earlier verdict standing; nothing on a build path imports
+      the executor.'
+    implemented_by:
+    - qa_tools/common/recheck.py::owe
+    - qa_tools/common/recheck.py::run
+    - qa_tools/common/recheck.py::owed
+    - qa_tools/common/recheck.py::first_run_id
+    - qa_tools/common/supply_db.py::rerun_id
+    - qa_tools/common/supply_db.py::split_run
+    - qa_tools/common/supply_db.py::dbt_audit_schema
+    - qa_tools/common/supply_db.py::drop_run_schemas
+    - qa_tools/common/qa_store.py::set_run_purpose
+    - qa_tools/common/qa_store.py::current_run
+    - qa_tools/common/qa_results_writer.py::open_run
+    - qa_tools/common/qa_results_reader.py::current_runs_only
+    - qa_tools/common/drift_reference.py::run_for
+    - qa_tools/common/supersession.py::un_supersede
+    - cli/filing_tui.py::_run_owed
+    linked_tests:
+    - tests/test_recheck.py
+    - tests/test_run_schema_lifecycle.py::test_a_rerun_of_the_same_supply_is_not_collateral
+    - tests/test_run_schema_lifecycle.py::test_a_rerun_id_round_trips_and_keeps_its_supply
+    - tests/test_run_schema_lifecycle.py::test_the_longest_real_run_id_has_room_for_a_rerun
+    - tests/test_refile_decision.py::TestANewFilingTheOldKept
     source: 'Found by delivery-scoper 2026-10-04 verifying what REQ-PIPE-079 still lacks for re-file (Keith: ''build it, after REQ-PIPE-079 is finished''). REQ-PIPE-075 criterion 17''s unmet entry already named it: ''reevaluation.plan() answers WHICH checks, and nothing executes a plan''. Scoped by delivery-scoper 2026-10-04.'
     acceptance_criteria:
     - THE SYSTEM SHALL offer one way to run QA for a supply that is already staged and filed, outside the processing of an arrival, evaluating the supply's own checks and the cross-table checks that read it against its filed period's overlay - the same scope an arrival's run has (REQ-PIPE-105 criterion 11).
@@ -26826,6 +26826,36 @@ requirements:
       PASS RUNS IT (Keith, 2026-10-05). REJECTED: running QA from the GitHub route
       itself - wherever that route runs would need the QA tools and the supply
       rows, which REQ-PIPE-092 keeps away from it (criterion 6).'
+    - 'RUN IDENTITY: `<the supply''s own run id>__r<N>` (supply_db.rerun_id /
+      split_run, the only two places that make or read one). split_staged still
+      reads the table and arrival off it, so every ''whose run is this'' caller
+      keeps its answer. REJECTED: an opaque id like rr_<owed id>, which would
+      break run_owner() at every call site. dbt''s audit schema was shortened
+      to `<target>_audit` (dbt_project.yml) so a Birth Registrations re-run fits
+      PostgreSQL''s 63 bytes, which it truncates silently; and run-schema tidy-up
+      matches exact names, since the old `<base>_` prefix would have dropped a
+      re-run''s schemas with its supply''s first run.'
+    - 'WHAT A RUN IS FOR IS STATED ON qa.run (schema 26): dataset, supply, scope,
+      period, and the causing decision or load. An arrival''s run fills its own
+      from its current filing at open_run. qa.supply_current_run is the one definition
+      of ''current'' (newest completed non-readers run per supply) - the gate
+      reads it through drift_reference.run_for, the dashboard through current_runs_only.'
+    - 'THE RE-RUN IS AN ARRIVAL''S RUN IN EVERY RESPECT BUT ITS ID: its overlay
+      is built by period_overlay.rebuild_for_arrival, its tools run through the
+      collection''s own orchestrator (_run_one), and the gate is promotion.after_runs
+      - so a re-checked supply cannot be judged differently from a first arrival.
+      BDM''s dataset statistics read the arrival''s rows by the first run''s id,
+      carried as entry[''data_run_id''].'
+    - 'CLEARED ONLY AFTER THE GATE: the owed record is cleared once the run has
+      completed AND the gate has run, so a crash between them leaves it owed rather
+      than lost. It changes state on purpose, like qa.hold - a work item, not
+      history.'
+    - 'CRITIC FIXES BEFORE FIRST COMMIT (post-build-review #114): a re-run id
+      is minted past the ids owed runs already hold as well as the runs recorded,
+      under an advisory lock, so two owed re-checks of one supply never share
+      one (D2); every result of a decision-triggered run carries reevaluated_after_decision,
+      a different key from an arrival''s, and never names the run''s own key as
+      an arrival (D6) - criterion 4 is met on each result, not only through qa.run.'
     open_questions: []
 
   - id: REQ-PIPE-141
@@ -26836,7 +26866,59 @@ requirements:
       date: "2026-10-04"
     story: "As the person working a period's supplies, I want to move a supply that landed in the wrong period to the right one, and have it checked there and promoted by the ordinary rules, so that correcting a filing is one decision rather than a demote, a re-check and a promote I have to stitch together."
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criteria 14 and 15 (NFR 5) - re-evaluating the cross-table checks
+        that read the table in the old period and the new, and re-applying the
+        gate to their waiting supplies.
+      owner: REQ-PIPE-121
+      why: The one knock-on handler for any table arriving in or leaving a period
+        is REQ-PIPE-121, next sprint; NFR 5 forbids a re-file-specific path. The
+        re-filed supply's OWN checks are re-run (criterion 7).
+      blocked_by:
+        requirements:
+        - REQ-PIPE-121
+    - criterion: Criterion 7's replacement-setting half, and criterion 9's question
+        of whether the gate may replace a promoted version in the target.
+      owner: REQ-PIPE-123
+      why: The gate applies the amber setting in force now; the replacement setting
+        is REQ-PIPE-123 (sprint 10). Until then the gate refuses a filled slot
+        and a person decides - which keeps the promoted version in place, as criterion
+        9 requires.
+      blocked_by:
+        requirements:
+        - REQ-PIPE-123
+    evidence:
+    - '2026-10-05: tests/test_refile_decision.py green against a real database
+      (14 tests): a re-file adds a new filing and keeps the old, the supply waits
+      in staging for its new period with a re-check owed to the one REFILE entry
+      naming both periods; a promoted supply leaves its period with its stamped
+      name and the slot unfilled, and the target is not filled; refused while
+      a later period stands on it, for a rejected supply, one file of a contested
+      pair, and into an inherited period, each naming what comes first; every
+      version waiting in the target is superseded by a rule-actor entry whatever
+      its receipt; a promoted version there stays; a re-file does not bar the
+      rule. qa.filing refuses UPDATE and DELETE (tests/test_filing.py), and slot_holds''
+      property test (40 seeds) agrees with the rule that a re-file never fills
+      its target.'
+    implemented_by:
+    - qa_tools/common/refiling.py::plan
+    - qa_tools/common/refiling.py::apply
+    - qa_tools/common/filing.py::refile
+    - qa_tools/common/supersession.py::supersede_by_rule
+    - qa_tools/common/supersession.py::_accepted_into
+    - qa_tools/common/rejection.py::decided_by_a_person
+    - qa_tools/common/filing_decisions.py::_apply_one
+    - qa_tools/common/filing_from_github.py::read
+    - qa_tools/common/qa_store.py::ensure_schema
+    - pipeline/slot_timeline.py::supply_states
+    linked_tests:
+    - tests/test_refile_decision.py
+    - tests/test_refiling.py
+    - tests/test_filing.py::TestAFilingIsRecordedInTheDatabase
+    - tests/test_slot_holds.py
+    - tests/test_slot_timeline.py::TestWhatASlotResolvedTo
+    - tests/test_filing_decisions.py::TestSevenOfTheEightReallyWork
     source: "Keith, 2026-10-04, 'RE-FILE MECHANICS SETTLED' and 'BUILD ORDER' (plans/road-testing.md #16); REQ-GHUB-082's unmet criterion 2 (re-file's effect) and REQ-PIPE-075 criterion 17. Scoped by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "WHEN a person re-files a supply, THE SYSTEM SHALL record a NEW filing of that supply to the target period, and SHALL keep its earlier filing unchanged as history."
@@ -26884,6 +26966,33 @@ requirements:
         today. REJECTED: the decision log''s full strictness including TRUNCATE,
         which would move the shared cleanup and six test modules onto per-test databases
         for a guarantee no production path needs.'
+      - 'ONE PLAN, TWO USES (REQ-GHUB-142 criterion 2): refiling.plan() judges every
+        consequence and refusal; apply() carries it out and filing_decisions.consequences()
+        words it. A refusal comes out of the plan, so it is raised before anyone
+        is asked to confirm.'
+      - 'A RE-FILE NEVER FILLS ITS TARGET: qa.slot_holds ignores a re-file''s to_slot,
+        and filing._filled_at, supersession._accepted_into, decision_log._judge
+        and slot_timeline all stopped treating REFILE as a promotion - the supply
+        waits, is checked again, and a later promotion fills the period. No re-file
+        had ever been written (it was refused as unbuilt), so there was nothing
+        to migrate.'
+      - THE REJECTED-SUPPLY REFUSAL names promoting it back as the reversal, since
+        that is the decision that reverses a rejection in this log; contested and
+        inherited refusals name resolving the contest and un-inheriting.
+      - 'GITHUB: `/refile supply: <id> to: <period> confirm: yes` - `to` joins the
+        argument names. The re-check it owes is run by the processing pass (Keith,
+        2026-10-05); the terminal runs it while the person waits.'
+      - 'A RE-FILE ENDS A SUPERSESSION (post-build-review #114, D1): criterion 4
+        moves a superseded supply back to staging for its new period, so it must
+        stop reading as superseded there - supersession reads REFILE beside supersede
+        and un-supersede. Left superseded, every route refused it and the target''s
+        own waiting versions were set aside for a supply that could never win.'
+      - 'RE-JUDGED UNDER THE LOCK (post-build-review #114, D4): the plan the person
+        confirmed is worked out again under both slots'' locks, and a re-file whose
+        consequences changed since is refused with nothing done - the same shape
+        REQ-PIPE-128''s promote has.'
+      - 'THE COST IN DECISION 10 IS LIFTED: with REQ-PIPE-131 and 132 built, re-filing
+        into a closed period is available; nothing refuses a closed target.'
     open_questions: []
 
   - id: REQ-GHUB-142
@@ -26894,7 +27003,24 @@ requirements:
       date: "2026-10-04"
     story: "As a person re-filing a supply, I want to be told before it happens exactly which accepted and waiting tables it will remove or set aside, in which periods, so that leaving an old period without its promoted table is never a surprise."
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05: tests/test_refile_decision.py::TestTheWarning green (4 tests):
+      a re-file that takes a promoted supply out and supersedes a waiting one
+      names both - ''This removes <period>''s accepted ...'' and ''This supersedes
+      <period>''s waiting ... from 1 June 2026'' - with no supply id in its prose,
+      only in the commands to paste; nothing displaced means no panel; unconfirmed
+      it is refused and nothing moves; and the GitHub route posts the same warning
+      the terminal shows, from the one consequences() function.'
+    implemented_by:
+    - qa_tools/common/filing_decisions.py::_refile_consequences
+    - qa_tools/common/filing_decisions.py::consequences
+    - qa_tools/common/filing_decisions.py::apply
+    - qa_tools/common/refiling.py::plan
+    - cli/filing_tui.py::apply_decision
+    - qa_tools/common/filing_from_github.py::read
+    linked_tests:
+    - tests/test_refile_decision.py::TestTheWarning
     source: "Keith, 2026-10-04, 'RE-FILE MECHANICS SETTLED' - 'A person making a re-file is WARNED AND MUST CONFIRM whenever it will displace another table, and the warning names EVERY consequence' (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "WHERE a re-file will move a promoted supply out of its period, or supersede any version waiting in the target period, THE SYSTEM SHALL show the person, before applying it, a warning naming every such consequence - each period, each table, whether it is accepted or waiting, and its receipt date."
@@ -26910,6 +27036,21 @@ requirements:
     decisions:
       - "EVERY CONSEQUENCE, NAMED (Keith, 2026-10-04): the point is that a person never learns afterwards that a period lost its promoted table. A generic 'this may affect other supplies' would be the warning people learn to click through."
       - "REFUSE IF THE CONSEQUENCES CHANGED (this draft, applying REQ-GHUB-082 criterion 20's append-time judgement): a resend landing between the warning and the confirmation would otherwise displace something the person never saw named."
+      - 'THE SAME PANEL AND KEY AS REQ-PIPE-128: a re-file''s consequences are one
+        more branch of filing_decisions.consequences(), so the single confirmation,
+        the key, the second GitHub comment and the ''changed since you were shown
+        it'' refusal (criterion 4) are the ones already built and tested - nothing
+        re-file-specific.'
+      - 'PLAIN TERMS (criterion 5, NFR 2): the dataset''s name and the period, receipt
+        dates on the asset''s calendar as ''1 June 2026'', and supply ids only in
+        the commands to paste. The undo (criterion 6) is every step: re-file back
+        then promote for a supply taken out, un-supersede for a version set aside.'
+      - 'THE WARNING SAYS WHAT THE TARGET READS AFTERWARDS (post-build-review #114,
+        D3): a promoted version there keeps it until the re-filed one is checked
+        and promoted; an empty one has the re-filed supply waiting, for the gate
+        to decide. It used to say the target read the re-filed one from the decision
+        on, which is never true. And a re-file''s refusals come before the request
+        to confirm on both routes (D5).'
     open_questions: []
 
   - id: REQ-DOCS-143

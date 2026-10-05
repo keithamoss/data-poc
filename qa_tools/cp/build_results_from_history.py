@@ -30,7 +30,8 @@ import os
 from qa_tools.common import hierarchy
 from qa_tools.common.qa_results_reader import canonical_order
 from qa_tools.common.qa_results_reader import read_cross_table_results  # noqa: F401
-from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_one, RESULT_TOOLS
+from qa_tools.common.qa_results_reader import (RESULT_TOOLS, current_runs_only, list_run_ids,
+                                              read_dataset_stats, read_one)
 from . import cp_common
 from qa_tools.common import asset_time
 
@@ -39,7 +40,8 @@ RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
 
 
 def build_results_from_history() -> dict:
-    run_ids = list_run_ids(cp_common.AGENCY_ID, cp_common.COLLECTION_ID)
+    # A SUPPLY BY ITS CURRENT RUN (REQ-PIPE-140 criterion 5).
+    run_ids = current_runs_only(list_run_ids(cp_common.AGENCY_ID, cp_common.COLLECTION_ID))
 
     manifest = []
     dataset_stats_by_run = {}

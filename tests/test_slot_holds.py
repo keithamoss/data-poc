@@ -19,7 +19,7 @@ import pytest
 from qa_tools.common import decision_log as dl
 from qa_tools.common import qa_store, supply_db
 
-HELD_AS = {dl.PROMOTE: dl.PROMOTED, dl.REFILE: dl.PROMOTED,
+HELD_AS = {dl.PROMOTE: dl.PROMOTED,
            dl.SUBSTITUTE: dl.SUBSTITUTED, dl.INHERIT: dl.INHERITED}
 CHANGES_A_SLOT = (dl.PROMOTE, dl.REFILE, dl.SUBSTITUTE, dl.INHERIT, dl.REJECT,
                   dl.DEMOTE, dl.DE_SUBSTITUTE, dl.UN_INHERIT)
@@ -35,6 +35,10 @@ def oracle(rows, slot):
     held_as, holder, last = None, None, None
     for r in rows:
         if r["action"] not in CHANGES_A_SLOT or slot not in (r["to_slot"], r["from_slot"]):
+            continue
+        if r["action"] == dl.REFILE and r["to_slot"] == slot:
+            # A RE-FILE NEVER FILLS ITS TARGET (REQ-PIPE-141 criteria 4 and
+            # 9): the supply waits there; only leaving the old slot counts.
             continue
         if r["to_slot"] == slot:
             held_as, holder, last = HELD_AS.get(r["action"]), r["supply"], r["id"]

@@ -16,3 +16,13 @@ models:
   birth_registrations:
     staging:
       +materialized: view
+
+# THE AUDIT SCHEMA, SHORT (REQ-PIPE-140): `--store-failures` puts each
+# failing test's rows in `<target schema>_<this>`. dbt's default is
+# `dbt_test__audit`, which left no room under PostgreSQL's 63-byte limit
+# for a re-run's `__r<N>` on a Birth Registrations run id - and PostgreSQL
+# truncates silently. Audit tables are found through each test's
+# relation_name in the manifest, never by schema name, so only the
+# tidy-up (supply_db.DBT_AUDIT_SUFFIX) needs to agree with this.
+data_tests:
+  +schema: audit

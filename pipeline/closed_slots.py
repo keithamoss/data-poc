@@ -70,7 +70,7 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     # (qa.supply_receipt, REQ-PIPE-144).
     filed: dict[str, list[tuple[str, str]]] = {}
     for slot, supply, at in conn.execute(
-            "SELECT f.slot, f.supply_id, min(r.received_instant) FROM qa.filing f "
+            "SELECT f.slot, f.supply_id, min(r.received_instant) FROM qa.filing_current f "
             "JOIN qa.supply_receipt r ON r.dataset_id = f.dataset_id "
             "AND r.supply_id = f.supply_id "
             "WHERE f.dataset_id = ? AND f.slot IS NOT NULL "
@@ -158,7 +158,7 @@ def late_slots(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     except (ValueError, KeyError, FileNotFoundError):
         return []
     first_filed = {slot: at for slot, at in conn.execute(
-        "SELECT f.slot, min(r.received_instant) FROM qa.filing f "
+        "SELECT f.slot, min(r.received_instant) FROM qa.filing_current f "
         "JOIN qa.supply_receipt r ON r.dataset_id = f.dataset_id AND r.supply_id = f.supply_id "
         "WHERE f.dataset_id = ? AND f.slot IS NOT NULL GROUP BY f.slot",
         [dataset_id]).fetchall()}

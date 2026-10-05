@@ -62,7 +62,7 @@ def staged_for_period(conn, period: str, logical_names: Sequence[str], *,
     wanted = set(logical_names)
     filed: set[tuple[str, str]] = set()
     for dataset_id, supply_id in conn.execute(
-            f"SELECT dataset_id, supply_id FROM {filing.TABLE} WHERE slot = ?",
+            f"SELECT dataset_id, supply_id FROM {filing.CURRENT} WHERE slot = ?",
             [period]).fetchall():
         try:
             logical = hierarchy.dataset(dataset_id).table

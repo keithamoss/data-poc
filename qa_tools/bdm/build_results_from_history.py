@@ -29,7 +29,8 @@ import os
 
 from . import bdm_common
 from qa_tools.common.qa_results_reader import canonical_order
-from qa_tools.common.qa_results_reader import (list_run_ids, read_cross_table_results,
+from qa_tools.common.qa_results_reader import (current_runs_only, list_run_ids,
+                                              read_cross_table_results,
                                                read_dataset_stats, read_qa_results)
 from qa_tools.common import asset_time
 
@@ -42,7 +43,8 @@ DATASET_ID = bdm_common.DATASET_ID
 
 
 def build_results_from_history() -> dict:
-    run_ids = list_run_ids(AGENCY_ID, COLLECTION_ID)
+    # A SUPPLY BY ITS CURRENT RUN (REQ-PIPE-140 criterion 5).
+    run_ids = current_runs_only(list_run_ids(AGENCY_ID, COLLECTION_ID))
 
     manifest = []
     dataset_stats_by_run = {}

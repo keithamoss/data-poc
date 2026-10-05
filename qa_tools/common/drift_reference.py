@@ -141,6 +141,13 @@ def run_for(conn: supply_db.SupplyConnection, dataset_id: str,
 
     if "@" not in (supply or ""):
         return None
+    # THE SUPPLY'S CURRENT RUN, WHERE ONE IS RECORDED (REQ-PIPE-140
+    # criterion 5): a re-run is the supply's verdict from then on, and the
+    # run records whose supply it checked - the table-name match below is
+    # for a run recorded before runs said so.
+    current = qa_store.current_run(conn, dataset_id, supply)
+    if current:
+        return current
     arrival = supply.rsplit("@", 1)[1]
     try:
         logical = hierarchy.dataset(dataset_id).table

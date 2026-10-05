@@ -1879,7 +1879,7 @@ comparisons against the expected-supply sequence.
    (the verdict follows the filing). Both signed 2026-09-23 and BUILT
    2026-09-25.
 
-11. **[blocked, 2026-10-04]** **[Pipeline & publishing]** **Promotion and
+11. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **Promotion and
     rejection.** Auto on green/amber into an EMPTY slot; red never;
     landing in a filled slot never (Thread B). Plus the **off-cycle
     arrival gate** - a supply arriving in a period its dataset does not
@@ -2316,7 +2316,7 @@ which is how `clipDatasetToAsOf()` ended up filtering on arrival rather
 than promotion (Thread H), correct only because promotion did not yet
 exist.
 
-26. **[done, 2026-09-27]** **[Pipeline & publishing]** **PostgreSQL is the
+26. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **PostgreSQL is the
     warehouse, and the publisher moves inside the environment.** One engine
     holding staging, rejected, the period schemas and a `sample` schema, with
     DuckDB kept only as a reader of arriving files; all four QA tools checking

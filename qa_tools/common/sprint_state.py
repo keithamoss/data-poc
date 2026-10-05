@@ -76,7 +76,9 @@ WARNING_EXIT_VAR = "MOTHMAN_GATE_WARNING_EXIT"
 #: rather than reuse of the existing `**Scoped <date>**:` blocks, which
 #: carry prose and parenthetical asides and routinely name requirements
 #: they do not own.
-_OWNS = re.compile(r"^\s*\*\*Owns:\*\*\s*(.*)$", re.M)
+#: The whole `**Owns:**` PARAGRAPH, to the next blank line - a list that
+#: wraps owned only its first line's requirements until 2026-10-05.
+_OWNS = re.compile(r"^\s*\*\*Owns:\*\*\s*(.*(?:\n[ \t]*\S.*)*)", re.M)
 _SPRINT = re.compile(r"^(\d+)\. \*\*\[([\w-]+), (\d{4}-\d{2}-\d{2})\]", re.M)
 _REQ_ID = re.compile(r"REQ-[A-Z]+-\d+")
 

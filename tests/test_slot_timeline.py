@@ -101,16 +101,17 @@ class TestWhatASlotResolvedTo:
                 at="2026-03-01T09:00:00+08:00", from_slot="2026-Q1")
         assert slot_timeline.for_dataset(dataset, conn=clean)[-1]["supply"] is None
 
-    def test_a_refile_empties_one_slot_and_fills_the_other(self, clean, dataset):
-        """One decision, two slots - which is why a timeline keyed on
-        the decision rather than on the slot would lose half of it."""
+    def test_a_refile_empties_one_slot_and_leaves_the_other_waiting(self, clean, dataset):
+        """One decision, two slots. Since REQ-PIPE-141 a re-filed supply
+        waits in its new period, checked again, so only the old slot
+        changes - the new one is filled by the promotion that follows."""
         _decide(clean, dataset, decision_log.PROMOTE, supply="s1",
                 at="2026-02-01T09:00:00+08:00", to_slot="2026-Q1")
         _decide(clean, dataset, decision_log.REFILE, supply="s1",
                 at="2026-03-01T09:00:00+08:00", from_slot="2026-Q1", to_slot="2026-Q2")
         got = slot_timeline.for_dataset(dataset, conn=clean)
         after = {(e["slot"], e["supply"]) for e in got if e["at"].startswith("2026-03")}
-        assert after == {("2026-Q1", None), ("2026-Q2", "s1")}
+        assert after == {("2026-Q1", None)}
 
 
 class TestItNamesTheDecisionThatChangedAnEarlierAnswer:

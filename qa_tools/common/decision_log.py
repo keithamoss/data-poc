@@ -479,7 +479,9 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
         needs_reason = "rejecting a supply"
     elif decision.action == PROMOTE and decision.supply_is_red:
         needs_reason = "promoting a supply whose checks came back red"
-    elif decision.action in (PROMOTE, REFILE) and decision.to_slot:
+    elif decision.action == PROMOTE and decision.to_slot:
+        # (A re-file no longer fills its target - REQ-PIPE-141 - so it
+        # supersedes nothing promoted there; it waits to be promoted.)
         # SUPERSESSION IS JUDGED, NOT DECLARED, and this is why the
         # judgement has to be inside the transaction: whether this slot
         # already holds a promoted supply is a fact about other rows, and
