@@ -5922,3 +5922,106 @@ twice. It deliberately did not re-find the `TypeError`.
       should replace the y/N is a choice (morning report).
     - **NOT VERIFIED by the critic**: nothing in a browser, CI for 91fbd85, and
       REQ-TEST-114 criterion 9 (the cast).
+
+120. **[in-progress, 2026-10-06]** **[Pipeline & publishing]** **The delivery
+    critic on sprint 14 (827636e)** - REQ-PIPE-151, REQ-PIPE-086, REQ-TEST-150,
+    REQ-PIPE-093 criterion 15 and #119's fixes. Reviewed from an exact archive,
+    with every write against copies of the deployment database (sandbox-,
+    production-marked and empty); the TUI was driven in a real pty. Each
+    finding was checked against the code before being written here, and each
+    fix had a failing test first, confirmed failing.
+    - **D1 (MEDIUM-HIGH), FIXED - against signed criteria (151 c6, 086 c8)**:
+      a terminal keep took no arrival lock, so a keep and a processing pass
+      could process one arrival at once. Reproduced by the critic: each run
+      dropped the other's run schemas, and both failed. Now every hand-filed
+      route (`run_arrivals`, both collections) processes each arrival under
+      its advisory lock. An arrival another process holds is refused BEFORE
+      filing, naming why. Once the lock is held the record is read again: an
+      arrival a pass finished while the person was answering prompts is
+      refused rather than recorded twice. Refused rather than waited for,
+      because the other process may be a whole pass long - PROVISIONAL.
+    - **D2 (MEDIUM), FIXED - against signed criteria (151 c14, c20)**: a
+      failure outside the per-arrival `try` was an uncaught traceback, which
+      exits 1 (criterion 20's "red"). The stages affected were setup, the
+      delivery record, owed work and tickets. A staging failure also aborted
+      the whole pass. Now: a setup failure ends the pass with exit 2. A staging
+      failure is that arrival's failure, holding back only its own collection.
+      Owed-work and ticket failures are recorded as failures (exit 2), and the
+      rest of the pass still completes. `run_pass` had no automated test; it
+      now has eight, covering order, both kinds of collection hold-back, a
+      locked arrival, every pass-level stage failing, and owed work.
+    - **D3 (MEDIUM), FOR KEITH**: tickets that could not be reconciled (as
+      opposed to the reconciler raising, now covered by D2) change neither the
+      exit status nor the summary. Criterion 20 reads "any stage failed", but
+      the slot state is durable and the next pass retries, so either reading
+      is defensible (morning report Q1).
+    - **D4 (MEDIUM), FIXED - REQ-TEST-150 c1/c2/c5 on a route 086 c9 makes
+      kept**: a kept synthetic arrival printed the check table and "Recorded
+      N results", but nothing the lifecycle decided. Both collections now end
+      on the lifecycle summary, interactive or not.
+    - **D5 (MEDIUM), FIXED - 086 c14**: in the TUI, a kept file that filing
+      refused, turned into a trial, stopped at once saying "pass
+      --reference-file". That is a trial offered and then not runnable, with a
+      flag named to a person in a menu. At a terminal the reference is now asked
+      for; with no answer, nothing is run and the message says so. Without a
+      terminal the flag is still the remedy. Covers both BDM files and CP folders.
+    - **D6 (MEDIUM-LOW), FOR KEITH**: a kept folder silently leaves behind files
+      no dataset recognises. A renamed extract is "a supply on the floor", which
+      the batch warns about and the terminal does not (morning report Q4).
+    - **D7 (LOW-MEDIUM), FIXED - 151 c3**: a refusal was skipped if the supply
+      had EVER been promoted or withheld. So a supply that was promoted,
+      demoted by a person, and refused on re-check left no entry, and the
+      kept-run report kept saying "promoted". It now looks at the LATEST gate
+      outcome or move for the supply: skip after a promote or a withheld, or
+      after the same refusal; record after a move (demote, re-file, reject,
+      supersede) or a different refusal. A refusal can therefore be recorded
+      again after an intervening different one. No rebuild was done for this
+      change; the deployment database's history was written under the old rule.
+    - **D8 (LOW), FIXED - 150 c1**: the aggregated report rewrote each dataset
+      as "its dataset", and "Kept." named only the first arrival. Shared lines
+      now list the datasets beside the count (eight named, then "and N more").
+      A multi-arrival keep names every arrival.
+    - **D9 (LOW), FOR KEITH**: an arrival whose run never completed is re-run
+      under its own run id, replacing its partial results. This is crash
+      recovery, but it reads against 086 c8's "SHALL NOT replace any result
+      already recorded" (morning report Q2).
+    - **D10 (LOW, security), FIXED**: #119 D8 scrubbed only the decoded password
+      and one canonical encoding of it. A partly-encoded or lowercase-hex
+      spelling went through. The scrub is now one pattern matching every
+      character either literally or percent-encoded in either case.
+    - **D11 (LOW), FIXED**: `--table` still said the other five tables
+      "auto-pull" from the last promoted run, which is now true only for a
+      trial. `--reference-run-id` still described a default that REQ-QAC-108
+      removed (that one predates this sprint).
+    - **D12 (LOW), FOR KEITH**: a locked arrival does not hold back later
+      arrivals of its collection, as a failure does. This is now reachable
+      through D1's fix: a person keeping one arrival while a pass runs (morning
+      report Q3).
+    - **D13 (LOW), FIXED, except one part**:
+      - Each arrival's `--- run ---` header printed twice; fixed.
+      - A synthetic keep of a run id recognition does not know raised a bare
+        `StopIteration`; it is now refused with the run named.
+      - NOT CHANGED: `backlog.unprocessed` has no caller. Criterion 18 required
+        amending it, and it now reads `processing_pass.recorded()`, so there is
+        one definition rather than two. Deleting a module owned by REQ-PIPE-061
+        is a separate call (morning report).
+      - NOT CHANGED: the pass's own output is not REQ-TEST-150's aggregated
+        report (151's observability NFR) - open, minor.
+    - **D14 (NFR note)**: every pass recognises the whole delivery tree and
+      records every delivery. That costs in proportion to history on disk
+      (about 5 seconds at 66 deliveries), not to what is unprocessed. Recorded
+      here, not changed.
+    - **OUTSIDE THIS SPRINT, FOR KEITH**: a trial leaves a completed `qa.run`
+      and its `check_result` rows behind (`run_by` `trial:not-recorded`, which
+      `check_result_visible` shows), while it prints "nothing was recorded".
+      `trial.discard` says so on purpose. That contradicts REQ-PIPE-103
+      criterion 6. It predates 827636e, and which one is right is a question
+      about a signed requirement (morning report).
+    - **WEAK TESTS NOTED, partly addressed**: the critic called out two tests:
+      `TestTheCommandGeneratesNothing` (a source grep) and the help-codes
+      substring match. Both stand. D1's and D2's new tests cover what the lock
+      tests never reached.
+    - **NOT VERIFIED by the critic**: the S3 routes live; a real held or
+      contested keep; an owed re-check (as opposed to a re-evaluation); a
+      configured ticket reconciliation succeeding; `--all-checks`; the
+      dashboard's display of `promotion-refused`; CI for 827636e.

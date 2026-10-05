@@ -171,10 +171,7 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
         # checked and gated - never a bare check outside it. A recorded one
         # never reaches here (common.decide_record refuses it).
         common.refuse_reference_for_kept(keep, reference_run_id, "--reference-run-id")
-        from qa_tools.common import arrivals
-
-        arrival = next(a for a in arrivals.arrivals_for("civil-registration", "run_")
-                       if a.run_id == run_id)
+        arrival = common.kept_arrival("civil-registration", "run_", run_id)
         common.record_delivery_of(arrival)
         build_per_run_warehouses.stage_arrival(arrival)
         return orchestrate_bdm.run_arrivals([arrival], run_by, on_step=on_step), run_id
@@ -276,8 +273,10 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     run_id = filed.run_id
     csv_path = filed.paths[0]
     # A KEPT FILE THAT FELL BACK TO A TRIAL (filing refused it) still needs
-    # the trial's reference, which nobody was asked for.
-    common.require_reference_for_trial(reference_csv, "--reference-file")
+    # the trial's reference, which nobody was asked for - so it is asked
+    # for now (#120 D5).
+    reference_csv = common.reference_for_fallback_trial(reference_csv, "--reference-file",
+                                                        "file")
     reference_run_id = common.reference_run_id()
 
     # THE REFERENCE IS STAGED TOO (REQ-PIPE-102, 2026-09-27), which is
@@ -396,6 +395,7 @@ def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
                        "nothing was recorded.", style="dim")
     elif interactive:
         common.report_recorded(recorded_run_id, len(results))
+        common.report_kept_arrival(COLLECTION_ID, "run_", recorded_run_id)
         # AND IF THIS RUN LEFT ITS SUPPLY WAITING ON A PERSON, OFFER THE
         # DECISION HERE (REQ-GHUB-082 criterion 17), through the same
         # implementation the standing queue uses. Before the publish
@@ -413,6 +413,7 @@ def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
         # panel it replaces kept its own: a panel is noise in a pipeline
         # and a blocking keypress would be a hang.
         console.print(f"Recorded {len(results)} results for {recorded_run_id}", style="green")
+        common.report_kept_arrival(COLLECTION_ID, "run_", recorded_run_id)
 
 
 def _finish_supply(results: list[dict], filed, all_checks: bool = False) -> None:
@@ -585,7 +586,8 @@ def generate_synthetic_data_command(yes: bool) -> None:
 @click.option("--run-id", default=None, help="Synthetic mode: an existing manifest run_id "
                                               "(e.g. run_005_2026-...). Omit to pick interactively.")
 @click.option("--reference-run-id", default=None,
-              help="Synthetic mode: defaults to the last Promoted run, or the manifest's own first (clean) entry.")
+              help="Synthetic mode, a trial's only: a run to compare distribution drift against. "
+                   "There is no default; a kept run is measured against the last promoted supply.")
 @click.option("--file", "file_path", default=None, type=click.Path(exists=True, dir_okay=False),
               help="Local files mode: an already-downloaded CSV to check (instead of --run-id).")
 @click.option("--reference-file", default=None, type=click.Path(exists=True, dir_okay=False),

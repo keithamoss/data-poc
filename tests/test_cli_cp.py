@@ -248,7 +248,8 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
     ])
 
     assert result.exit_code == 0, result.output
-    assert "is a real arrival" in _flat(result.output)
+    # SIX ARRIVALS, EACH NAMED (post-build-review #120 D8), not the first.
+    assert f"was filed as {len(cp.TABLES)} arrivals" in _flat(result.output)
     filed = list((tmp_path / "deliveries").iterdir())
     assert len(filed) == 1, f"expected ONE delivery, got {[d.name for d in filed]}"
     assert len(list(filed[0].iterdir())) == len(cp.TABLES)

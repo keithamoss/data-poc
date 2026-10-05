@@ -89,14 +89,29 @@ class TestOneOutcomeSharedIsSaidOnce:
         outs = [lr.Outcome(f"t{i}__1", f"cp-{i}", f"recognised as cp-{i}; filed to 2026-Q1, on time",
                            "promoted by the rule (r), not by you - ok") for i in range(6)]
         lines = list(lr._grouped(outs))
-        assert ("recognised as its dataset; filed to 2026-Q1, on time", "6 arrivals") in lines
+        # #120 D8: the line is shared, but each arrival's dataset is still
+        # named (criterion 1) - in the count, not lost to "its dataset".
+        assert ("recognised as its dataset; filed to 2026-Q1, on time",
+                "6 arrivals (cp-0, cp-1, cp-2, cp-3, cp-4, cp-5)") in lines
         assert len(lines) == 2
+
+    def test_thirty_are_named_up_to_a_point(self):
+        outs = [lr.Outcome(f"t{i}__1", f"cp-{i:02d}", "filed", "promoted") for i in range(30)]
+        who = dict((line, w) for line, w in lr._grouped(outs))["filed"]
+        assert who.startswith("30 arrivals (cp-00, cp-01") and who.endswith("and 22 more)")
+
+    def test_the_kept_line_names_every_arrival(self, capsys):
+        common.say_what_it_did("cp_clients__1", "handfiled-x",
+                               arrivals=["cp_clients__1", "cp_carers__1"])
+        out = capsys.readouterr().out
+        assert "cp_carers__1" in out and "2 arrivals" in out
 
     def test_one_that_differs_gets_its_own_line(self):
         outs = [lr.Outcome(f"t{i}__1", f"cp-{i}", "filed", "promoted") for i in range(3)]
         outs.append(lr.Outcome("t9__1", "cp-9", "filed", "left for a person"))
         lines = list(lr._grouped(outs))
-        assert ("left for a person", "t9__1") in lines and ("promoted", "3 arrivals") in lines
+        assert ("left for a person", "t9__1") in lines
+        assert ("promoted", "3 arrivals (cp-0, cp-1, cp-2)") in lines
 
 
 class TestAFailedStageIsNamed:
@@ -167,3 +182,52 @@ class TestSeveralArrivalsAreReportedCompactly:
                            run_id_prefix="cp_run_", all_checks=True,
                            table=lambda rows, run_id: shown.append(len(rows)) or "")
         assert shown == [3]
+
+
+class TestAKeptSyntheticArrivalIsReportedToo:
+    """REQ-TEST-150 criteria 1, 2 and 5 on the synthetic route, which
+    REQ-PIPE-086 criterion 9 makes a kept route (post-build-review #120 D4):
+    it printed the check table and "Recorded N results" and nothing the
+    lifecycle decided."""
+
+    @pytest.mark.parametrize("module, collection", [("bdm", "civil-registration"),
+                                                    ("cp", "child-protection")])
+    @pytest.mark.parametrize("interactive", [False, True])
+    def test_it_ends_on_the_lifecycle_summary(self, monkeypatch, module, collection,
+                                              interactive):
+        import importlib
+
+        from qa_tools.common import arrivals
+
+        mod = importlib.import_module(f"cli.{module}")
+        mine = _arrival()
+        monkeypatch.setattr(arrivals, "arrivals_for",
+                            lambda c, p: [mine] if c == collection else [])
+        shown = []
+        monkeypatch.setattr(lr, "report", lambda found, since=None: shown.append(
+            ([a.run_id for a in found], since)))
+        monkeypatch.setattr(mod, "report_table", lambda results, run_id: "")
+        monkeypatch.setattr(mod.filing_tui, "offer_after_run", lambda *a: None)
+        monkeypatch.setattr(common, "offer_to_publish", lambda: None)
+        monkeypatch.setattr(common, "report_recorded", lambda *a: None)
+        mod._report_synthetic([], mine.run_id, True, interactive=interactive)
+        assert shown == [([mine.run_id], WHEN)]
+
+    def test_a_trial_has_no_lifecycle_to_report(self, monkeypatch):
+        from cli import bdm
+
+        monkeypatch.setattr(lr, "report", lambda *a, **k: pytest.fail("a trial was reported"))
+        monkeypatch.setattr(bdm, "report_table", lambda results, run_id: "")
+        bdm._report_synthetic([], "trial_x", False, interactive=False)
+
+
+class TestAKeptRunIdNothingRecognisesIsRefusedPlainly:
+    """#120 D13: `next()` over the recognised arrivals raised a bare
+    StopIteration when the run id named none of them."""
+
+    def test_the_keep_branch_names_the_run(self, monkeypatch):
+        from qa_tools.common import arrivals
+
+        monkeypatch.setattr(arrivals, "arrivals_for", lambda c, p: [])
+        with pytest.raises(common.click.ClickException, match="run_404"):
+            common.kept_arrival("civil-registration", "run_", "run_404")

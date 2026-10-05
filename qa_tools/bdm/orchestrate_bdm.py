@@ -520,7 +520,8 @@ def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
     (REQ-PIPE-086), in receipt order - see orchestrate_cp.run_arrivals()."""
     return arrival_lifecycle.process_all(
         sorted(found_arrivals, key=lambda a: (a.sequence, a.run_index, a.run_id)),
-        steps=STEPS, run_by=run_by, on_step=on_step)
+        steps=STEPS, run_by=run_by, on_step=on_step,
+        exclusive=True)
 
 
 def run_pipeline(sequential: bool = False,

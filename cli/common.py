@@ -756,9 +756,32 @@ def finish_kept(results: list[dict], filed, *, collection_id: str, run_id_prefix
         _compact_results(results, table, filed.run_id)
     else:
         console.print(table(results, filed.run_id))
-    say_what_it_did(filed.run_id, filed.delivery_name)
+    say_what_it_did(filed.run_id, filed.delivery_name, [a.run_id for a in found])
     if found:
         lifecycle_report.report(found, since=filed.received_at)
+
+
+def kept_arrival(collection_id: str, run_id_prefix: str, run_id: str):
+    """The recognised arrival a synthetic keep names - refused plainly where
+    recognition finds none, rather than a bare StopIteration (#120 D13)."""
+    from qa_tools.common import arrivals
+
+    for arrival in arrivals.arrivals_for(collection_id, run_id_prefix):
+        if arrival.run_id == run_id:
+            return arrival
+    raise click.ClickException(
+        f"{run_id} isn't among the arrivals recognised on disk, so there is nothing to keep "
+        f"- run generate-synthetic-data first?")
+
+
+def report_kept_arrival(collection_id: str, run_id_prefix: str, run_id: str) -> None:
+    """REQ-TEST-150 criteria 1 to 9 for a kept SYNTHETIC arrival, which is as
+    much a kept route as a hand-filed one (REQ-PIPE-086 criterion 9) and
+    printed none of it until #120 D4."""
+    from cli import lifecycle_report
+
+    arrival = kept_arrival(collection_id, run_id_prefix, run_id)
+    lifecycle_report.report([arrival], since=arrival.received_at)
 
 
 def _compact_results(results, table, run_id) -> None:
@@ -775,10 +798,15 @@ def _compact_results(results, table, run_id) -> None:
                       f"(--all-checks lists them)", highlight=False)
 
 
-def say_what_it_did(run_id: str, delivery_name: str) -> None:
+def say_what_it_did(run_id: str, delivery_name: str, arrivals=None) -> None:
     """Criterion 8 - and its second half is the one worth keeping: a
     run that filed a delivery must never be described as local-only."""
-    if delivery_name:
+    if delivery_name and arrivals and len(arrivals) > 1:
+        # EVERY ARRIVAL THE DELIVERY BECAME, not the first (#120 D8).
+        console.print(
+            f"Kept. Delivery {delivery_name} was filed as {len(arrivals)} arrivals "
+            f"({', '.join(arrivals)}), and their results are recorded.", style="green")
+    elif delivery_name:
         console.print(
             f"Kept. {run_id} is a real arrival, filed as delivery "
             f"{delivery_name}, and its results are recorded.", style="green")
@@ -831,6 +859,26 @@ def require_reference_for_trial(reference, flag: str) -> None:
         raise click.ClickException(
             f"a trial is compared against a reference you name - pass {flag}. A kept "
             f"supply needs none: it is measured against the last promoted supply.")
+
+
+def reference_for_fallback_trial(reference, flag: str, what: str):
+    """The reference for a KEPT supply that filing refused and the person
+    turned into a trial (#120 D5). Nobody was asked for one - a kept supply
+    needs none - so at a terminal it is asked for now, rather than stopping
+    with a flag named to a person in a menu; without one the flag is the
+    remedy, as it is for any trial."""
+    if reference is not None:
+        return reference
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        require_reference_for_trial(reference, flag)
+    with paused_progress():
+        answer = path_prompt(f"A trial is compared against a reference - which {what} is "
+                             f"the known-good one?", flag)
+    if not answer:
+        raise click.ClickException(
+            "no reference was given, so the trial has nothing to compare against. "
+            "Nothing was run and nothing was filed.")
+    return answer
 
 
 def reference_suffix(result: dict) -> str:

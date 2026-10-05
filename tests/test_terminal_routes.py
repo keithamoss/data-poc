@@ -174,3 +174,51 @@ class TestARecordedArrivalIsNeverRecordedAgain:
     def test_an_unrecorded_arrival_may_be_kept(self, monkeypatch):
         monkeypatch.setattr(common, "recorded_runs", lambda ids: set())
         assert common.decide_record("cp_clients__1", keep=True) is True
+
+
+class TestAFallbackTrialAsksForItsReference:
+    """Criterion 14, post-build-review #120 D5: a kept file filing refused,
+    turned into a trial at the terminal, used to stop at once saying "pass
+    --reference-file" - a trial offered and then not runnable, and a flag
+    named to a person in a menu."""
+
+    def _tty(self, monkeypatch, on):
+        import sys
+
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: on)
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: on)
+
+    def test_at_a_terminal_it_is_asked_for(self, monkeypatch):
+        self._tty(monkeypatch, True)
+        asked = []
+        monkeypatch.setattr(common, "path_prompt",
+                            lambda m, flag_hint: asked.append(m) or "/x/ref.csv")
+        got = common.reference_for_fallback_trial(None, "--reference-file", "file")
+        assert got == "/x/ref.csv" and "reference" in asked[0].lower()
+
+    def test_one_already_given_is_used(self, monkeypatch):
+        monkeypatch.setattr(common, "path_prompt", lambda *a, **k: pytest.fail("asked"))
+        assert common.reference_for_fallback_trial("/r.csv", "--reference-file", "file") == \
+            "/r.csv"
+
+    def test_no_answer_runs_nothing_and_says_so(self, monkeypatch):
+        self._tty(monkeypatch, True)
+        monkeypatch.setattr(common, "path_prompt", lambda m, flag_hint: None)
+        with pytest.raises(click.ClickException, match="Nothing was run") as caught:
+            common.reference_for_fallback_trial(None, "--reference-file", "file")
+        assert "--reference-file" not in str(caught.value.message)
+
+    def test_without_a_terminal_it_names_the_flag(self, monkeypatch):
+        self._tty(monkeypatch, False)
+        with pytest.raises(click.ClickException, match="--reference-file"):
+            common.reference_for_fallback_trial(None, "--reference-file", "file")
+
+
+class TestTheHelpSaysWhatTheRoutesNowDo:
+    """#120 D11: two help texts still described defaults that criterion 14
+    and REQ-QAC-108 removed."""
+
+    @pytest.mark.parametrize("command", [bdm.qa_command, cp.qa_command])
+    def test_no_stale_default(self, command):
+        out = _flat(_runner.invoke(command, ["--help"]).output)
+        assert "auto-pull" not in out and "defaults to the last Promoted run" not in out

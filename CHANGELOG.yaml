@@ -167,6 +167,19 @@ releases:
               An untagged, pinned or differently named PostgreSQL image, or
               one set as a job's container, no longer slips past the check
               that CI and the dev container run the declared version.
+          - headline: Keeping a supply and a processing pass no longer collide
+            components: ["Pipeline & publishing"]
+            description: >
+              If a processing pass is already working on an arrival you keep
+              from the terminal, your keep is refused and you are told why.
+              Before, both ran and both failed.
+          - headline: A failed step makes processing exit 2
+            components: ["Pipeline & publishing"]
+            description: >
+              A failure anywhere in a pass - recording deliveries, owed work,
+              tickets - now reads as a failure to a scheduler, not as red
+              results. A file that cannot be staged now holds back only its
+              own collection.
 
   - date: "2026-10-05"
     summary: >

@@ -684,13 +684,18 @@ def _scrub(text: str, dsn: str) -> str:
         return "the connection string could not be parsed"
     if not password:
         return text
-    # BOTH FORMS (#119 D8): the decoded password and the URL's own encoding
-    # of it, which an error echoing the connection string would carry.
-    from urllib.parse import quote
+    # EVERY SPELLING OF IT (#119 D8, #120 D10): decoded, or with any of its
+    # characters percent-encoded in either case - a connection string can be
+    # written any of those ways, and an error echoes whichever it was given.
+    # One pattern rather than a list of forms, because the forms are
+    # combinatorial and a list only ever covers the ones somebody thought of.
+    import re
 
-    for form in {str(password), quote(str(password), safe="")}:
-        text = text.replace(form, "***")
-    return text
+    def spellings(char: str) -> str:
+        hexes = "".join(f"%{byte:02x}" for byte in char.encode())
+        return f"(?:{re.escape(char)}|(?i:{re.escape(hexes)}))"
+
+    return re.sub("".join(spellings(c) for c in str(password)), "***", text)
 
 
 def _ident(name: str, what: str) -> str:

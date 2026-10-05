@@ -969,19 +969,29 @@ def _record_refused(conn, *, agency_id: str, collection_id: str, dataset_id: str
     """The gate looked and did not promote, and says why (REQ-PIPE-151
     criterion 3): a promotion-refused entry, which changes no slot and ends
     no hold. NOT for an outcome already recorded as promotion-withheld,
-    which is the same fact in more detail. Once per supply and reason."""
+    which is the same fact in more detail. Once per supply and reason.
+
+    ONCE SINCE THE SUPPLY LAST MOVED, NOT ONCE EVER (post-build-review #120
+    D7): what decides is the LATEST gate outcome or move for this supply. A
+    gate re-run over a supply it promoted is no refusal - its own promotion
+    fills the slot (test_promotion_step's run-twice test) - but a supply a
+    person demoted or re-filed since is gated afresh, and a refusal then is
+    a new fact the record must carry.
+    """
     if not supply:
         return
-    if conn.execute(
-            f"SELECT 1 FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
-            "AND ((action = ? AND reason = ?) OR action IN (?, ?)) LIMIT 1",
-            [dataset_id, supply, decision_log.PROMOTION_REFUSED, reason,
-             decision_log.PROMOTION_WITHHELD,
-             # A SUPPLY THE GATE ALREADY PROMOTED is never "refused" by a gate
-             # run over it again - its own promotion is what fills the slot
-             # (found by test_promotion_step's run-twice test).
-             decision_log.PROMOTE]).fetchall():
-        return
+    actions = (decision_log.PROMOTE, decision_log.PROMOTION_WITHHELD,
+               decision_log.PROMOTION_REFUSED, *decision_log.MOVES_A_SUPPLY)
+    latest = conn.execute(
+        f"SELECT action, reason FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
+        f"AND action IN ({', '.join('?' for _ in actions)}) ORDER BY id DESC LIMIT 1",
+        [dataset_id, supply, *actions]).fetchall()
+    if latest:
+        action, said = latest[0]
+        if action in (decision_log.PROMOTE, decision_log.PROMOTION_WITHHELD):
+            return
+        if action == decision_log.PROMOTION_REFUSED and said == reason:
+            return
     with decision_log.apply_decision(conn, decision_log.Decision(
             agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
             action=decision_log.PROMOTION_REFUSED, supply=supply, actor=RULE_ACTOR,

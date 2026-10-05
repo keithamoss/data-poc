@@ -136,8 +136,17 @@ def _grouped(outcomes: list[Outcome]):
         if len(members) == 1 or len(outcomes) == 1:
             yield key.replace("{dataset}", members[0].dataset_id), members[0].run_id
         else:
+            # EACH ARRIVAL'S DATASET STILL NAMED (criterion 1, #120 D8): the
+            # line is shared, the datasets are listed beside the count - up
+            # to a point, because thirty names on one line is not a summary.
+            names = [m.dataset_id for m in members]
+            shown = ", ".join(names[:_NAMED]) + (
+                f" and {len(names) - _NAMED} more" if len(names) > _NAMED else "")
             yield (key.replace("{dataset}", "its dataset"),
-                   f"{len(members)} arrivals")
+                   f"{len(members)} arrivals ({shown})")
+
+
+_NAMED = 8
 
 
 def stage_failure(exc) -> None:

@@ -28687,6 +28687,28 @@ requirements:
       exist; the lock is taken by process, run and bootstrap, the three that do.
     - 'CRITERION 5''s ticket half holds by construction: ticket_reconciler builds
       from slot_state, which reads only slot-changing decisions.'
+    - 'A TERMINAL KEEP TAKES THE ARRIVAL LOCK TOO (post-build-review #120 D1,
+      2026-10-06). The decision above kept the per-arrival lock because a terminal
+      keep takes no pass lock, and then the keep took no arrival lock either -
+      the critic reproduced a keep and a pass processing one arrival at once,
+      each dropping the other''s run schemas. arrival_lifecycle.process_all(exclusive=True),
+      which both collections'' hand-filed run_arrivals use, takes each arrival''s
+      lock and re-reads the record once it holds it. PROVISIONAL (overnight):
+      an arrival another process holds is REFUSED before filing rather than waited
+      for, since the other process may be a whole pass long.'
+    - EVERY STAGE OF A PASS EXITS 2 WHEN IT FAILS (#120 D2). Setup, the delivery
+      record, owed work and ticket reconciliation were outside the per-arrival
+      try, so their failures were uncaught tracebacks - exit 1, which criterion
+      20 reserves for red. A staging failure is now its arrival's failure, holding
+      back its own collection only (criterion 14), rather than aborting the pass.
+    - 'A REFUSAL IS ONCE PER SUPPLY SINCE IT LAST MOVED, NOT ONCE EVER (#120 D7).
+      The once-only check skipped a refusal whenever the supply had ever been
+      promoted or withheld, so a supply promoted, demoted by a person and refused
+      on its re-check left no entry. It reads the latest gate outcome or move
+      for the supply instead: nothing after its own promotion or a withheld, nothing
+      for the same refusal again, a new entry after a move or a different refusal.
+      The deployment database''s history was written under the old rule and was
+      not rebuilt for this change.'
     open_questions: []
   - id: REQ-PIPE-152
     title: The S3 Lambda handlers process each arriving object through the per-arrival lifecycle, and the S3 object is the delivery

@@ -273,3 +273,199 @@ class TestATypedIdWhereTheEnvironmentAsksForIt:
     def test_an_environment_that_does_not_ask_never_asks(self, monkeypatch):
         asked, ran = self._run(monkeypatch, env="sandbox", tty=True)
         assert asked == [] and ran
+
+
+class TestATerminalKeepTakesTheArrivalLock:
+    """Criterion 6 and REQ-PIPE-086 criterion 8, post-build-review #120 D1: a
+    person keeping a supply at the terminal and a processing pass never
+    process the same arrival at once - the race the critic reproduced, where
+    each dropped the other's run schemas and both failed."""
+
+    def _fake_steps(self, called):
+        from qa_tools.common import arrival_lifecycle
+
+        return arrival_lifecycle.Steps(
+            file_and_overlay=lambda arrival, among: called.append("filed"),
+            entry_for=lambda arrival: {}, run_one=lambda *a, **k: called.append("ran") or [],
+            promote_after=lambda *a: called.append("gated"))
+
+    @pytest.mark.parametrize("module", ["qa_tools.bdm.orchestrate_bdm",
+                                        "qa_tools.cp.orchestrate_cp"])
+    def test_an_arrival_another_process_holds_is_refused_untouched(self, supply_dsn,
+                                                                   monkeypatch, module):
+        import importlib
+
+        from qa_tools.common import arrival_lifecycle
+
+        orchestrator = importlib.import_module(module)
+        called = []
+        monkeypatch.setattr(orchestrator, "STEPS", self._fake_steps(called))
+        a = _arrival(run_id=f"cp_clients__{uuid.uuid4().int % 10**16:016d}")
+        a.run_index = 0
+        with supply_db.connect(label="the-pass") as other:
+            with pp.arrival_lock(other, a.run_id) as held:
+                assert held
+                with pytest.raises(arrival_lifecycle.StageFailed) as caught:
+                    orchestrator.run_arrivals([a], run_by="me")
+        assert called == [], "nothing was filed, checked or gated"
+        assert caught.value.completed == ()
+        assert "another process" in str(caught.value.cause)
+
+    def test_an_arrival_it_holds_runs_and_the_lock_is_given_back(self, supply_dsn,
+                                                                 monkeypatch):
+        from qa_tools.bdm import orchestrate_bdm
+
+        called = []
+        monkeypatch.setattr(orchestrate_bdm, "STEPS", self._fake_steps(called))
+        a = _arrival(run_id=f"cp_clients__{uuid.uuid4().int % 10**16:016d}")
+        a.run_index = 0
+        orchestrate_bdm.run_arrivals([a], run_by="me")
+        assert called == ["filed", "ran", "gated"]
+        with supply_db.connect(label="after") as conn, pp.arrival_lock(conn, a.run_id) as got:
+            assert got
+
+    def test_one_another_process_finished_meanwhile_is_not_processed_twice(
+            self, supply_dsn, monkeypatch, clean_qa_history, finish_runs):
+        from qa_tools.bdm import orchestrate_bdm
+        from qa_tools.common import arrival_lifecycle
+
+        called = []
+        monkeypatch.setattr(orchestrate_bdm, "STEPS", self._fake_steps(called))
+        a = _arrival(run_id=f"cp_clients__{uuid.uuid4().int % 10**16:016d}")
+        a.run_index = 0
+        finish_runs(a.run_id, agency=AGENCY, collection=COLLECTION, when=WHEN, run_by="x")
+        with pytest.raises(arrival_lifecycle.StageFailed) as caught:
+            orchestrate_bdm.run_arrivals([a], run_by="me")
+        assert called == [] and "already" in str(caught.value.cause)
+
+
+class _FakeBuilder:
+    def __init__(self, fail_on=()):
+        self.fail_on, self.staged = set(fail_on), []
+
+    def stage_arrival(self, arrival):
+        if arrival.run_id in self.fail_on:
+            raise OSError("disk full")
+        self.staged.append(arrival.run_id)
+
+
+class TestThePassItself:
+    """run_pass end to end over fakes for each stage it composes - criteria
+    1, 9, 11, 12, 14 and 20, which the critic found had no automated test
+    (post-build-review #120 D2 and its coverage note)."""
+
+    @pytest.fixture
+    def world(self, supply_dsn, monkeypatch):
+        from qa_tools.common import delivery_log, recheck, ticket_reconciler
+
+        bdm = _arrival("birth_registrations", "birth-registrations",
+                       datetime(2099, 1, 1, 2, tzinfo=timezone.utc))
+        bdm.collection_id = "civil-registration"
+        cp_one = _arrival(when=datetime(2099, 1, 1, 1, tzinfo=timezone.utc))
+        cp_two = _arrival("cp_carers", "cp-carers", datetime(2099, 1, 1, 3, tzinfo=timezone.utc))
+        world = SimpleNamespace(arrivals=[cp_one, bdm, cp_two], builder=_FakeBuilder(),
+                                processed=[], owed=[], tickets=None, one_fails=set())
+        monkeypatch.setattr(delivery_log, "record_all", lambda: None)
+        monkeypatch.setattr(pp, "all_arrivals", lambda: list(world.arrivals))
+        monkeypatch.setattr(pp, "unprocessed", lambda found, conn=None: list(found))
+        monkeypatch.setattr(pp, "state_of", lambda arrival, rec: pp.UNCHECKED)
+        monkeypatch.setattr(pp, "_modules", lambda c: (None, world.builder))
+
+        def one(arrival, among, ts, run_by, report, say):
+            if arrival.run_id in world.one_fails:
+                raise RuntimeError("dbt fell over")
+            world.processed.append(arrival.run_id)
+            report.processed.append(arrival.run_id)
+        monkeypatch.setattr(pp, "_one", one)
+        monkeypatch.setattr(recheck, "run_all_owed", lambda **k: list(world.owed))
+        monkeypatch.setattr(ticket_reconciler, "service_from_env", lambda: world.tickets)
+        return world
+
+    def test_every_arrival_in_the_order_given(self, world):
+        report = pp.run_pass(run_by="me", say=lambda m: None)
+        assert world.processed == [a.run_id for a in world.arrivals]
+        assert report.exit_status == pp.EXIT_OK
+        assert "No ticketing is configured" in report.tickets[0]
+
+    def test_a_staging_failure_holds_back_only_its_collection(self, world):
+        cp_one, bdm, cp_two = world.arrivals
+        world.builder.fail_on = {cp_one.run_id}
+        report = pp.run_pass(run_by="me", say=lambda m: None)
+        assert world.processed == [bdm.run_id], "the other collection carried on"
+        assert report.left_behind_failure == [cp_two.run_id]
+        assert report.failures[0][0] == cp_one.run_id and "disk full" in report.failures[0][1]
+        assert report.exit_status == pp.EXIT_FAILED
+
+    def test_an_arrival_failure_holds_back_only_its_collection(self, world):
+        cp_one, bdm, cp_two = world.arrivals
+        world.one_fails = {cp_one.run_id}
+        report = pp.run_pass(run_by="me", say=lambda m: None)
+        assert world.processed == [bdm.run_id]
+        assert report.left_behind_failure == [cp_two.run_id]
+
+    def test_a_locked_arrival_is_left_for_the_next_pass(self, world):
+        cp_one = world.arrivals[0]
+        with supply_db.connect(label="other") as other, pp.arrival_lock(other, cp_one.run_id):
+            report = pp.run_pass(run_by="me", say=lambda m: None)
+        assert report.left_locked == [cp_one.run_id] and cp_one.run_id not in world.processed
+
+    @pytest.mark.parametrize("stage", ["record_all", "run_all_owed", "tickets", "all_arrivals"])
+    def test_a_failure_at_any_pass_level_stage_exits_2(self, world, monkeypatch, stage):
+        from qa_tools.common import delivery_log, recheck, ticket_reconciler
+
+        def boom(*a, **k):
+            raise RuntimeError("it broke")
+        target = {"record_all": (delivery_log, "record_all"),
+                  "run_all_owed": (recheck, "run_all_owed"),
+                  "tickets": (ticket_reconciler, "service_from_env"),
+                  "all_arrivals": (pp, "all_arrivals")}[stage]
+        monkeypatch.setattr(*target, boom)
+        report = pp.run_pass(run_by="me", say=lambda m: None)
+        assert report.exit_status == pp.EXIT_FAILED
+        assert any("it broke" in why for _, why in report.failures)
+
+    def test_owed_work_is_run_and_a_failure_stays_owed(self, world):
+        world.owed = [SimpleNamespace(owed_id=7, completed=False, message="no", status=None),
+                      SimpleNamespace(owed_id=8, completed=True, message="", status="red")]
+        report = pp.run_pass(run_by="me", say=lambda m: None)
+        assert report.failures == [("owed #7", "no")] and report.red
+
+
+class TestARefusalAfterTheSupplyMovedIsStillRecorded:
+    """Criterion 3, post-build-review #120 D7: the once-only check skipped a
+    refusal whenever the supply had EVER been promoted or withheld, so a
+    supply promoted, then demoted by a person and refused on its re-check
+    left no entry - and the kept-run report went on saying "promoted"."""
+
+    def _refuse(self, conn, ds, supply, when, reason="status is red"):
+        promotion._record_refused(conn, agency_id=AGENCY, collection_id=COLLECTION,
+                                  dataset_id=ds, supply=supply, period="2099-Q1",
+                                  reason=reason, effective_at=when)
+
+    def _apply(self, conn, ds, supply, action, when, **over):
+        fields = dict(agency_id=AGENCY, collection_id=COLLECTION, dataset_id=ds,
+                      action=action, supply=supply, actor="keith@example.gov.au",
+                      actor_kind=dl.PERSON, effective_at=when, to_slot="2099-Q1")
+        fields.update(over)
+        with dl.apply_decision(conn, dl.Decision(**fields)):
+            pass
+
+    def test_promoted_then_demoted_then_refused(self, conn):
+        ds = _dataset()
+        supply = f"{ds}@2099010100000000"
+        self._apply(conn, ds, supply, dl.PROMOTE, "2099-01-02T00:00:00+08:00")
+        self._refuse(conn, ds, supply, "2099-01-03T00:00:00+08:00")
+        assert _refusals(conn, ds) == [], "a re-gate over its own promotion is no refusal"
+        self._apply(conn, ds, supply, dl.DEMOTE, "2099-01-04T00:00:00+08:00", to_slot=None,
+                    from_slot="2099-Q1", reason="withdrawn by the supplier")
+        self._refuse(conn, ds, supply, "2099-01-05T00:00:00+08:00")
+        assert len(_refusals(conn, ds)) == 1
+
+    def test_the_same_refusal_again_is_still_once(self, conn):
+        ds = _dataset()
+        supply = f"{ds}@2099010100000000"
+        self._refuse(conn, ds, supply, "2099-01-03T00:00:00+08:00")
+        self._refuse(conn, ds, supply, "2099-01-04T00:00:00+08:00")
+        assert len(_refusals(conn, ds)) == 1
+        self._refuse(conn, ds, supply, "2099-01-05T00:00:00+08:00", reason="slot filled")
+        assert len(_refusals(conn, ds)) == 2

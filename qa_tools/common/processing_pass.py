@@ -233,32 +233,60 @@ def run_pass(*, run_by: str | None = None, say=print) -> PassReport:
 
     report = PassReport()
     run_by = run_by or get_run_by()
-    with supply_db.connect(label="mothman:process") as conn:
-        qa_store.ensure_schema(conn)
-    # The deliveries on disk, recorded with what recognition made of them -
-    # write-once, so recording an old one again changes nothing.
-    delivery_log.record_all()
-    found = all_arrivals()
-    todo = unprocessed(found)
+
+    def failed(what: str, exc: Exception) -> None:
+        # CRITERION 20: any stage that fails is 2, whichever stage it is -
+        # never an uncaught traceback, which a scheduler reads as 1, "red"
+        # (post-build-review #120 D2).
+        report.failures.append((what, f"{type(exc).__name__}: {exc}"))
+        say(f"{what}: FAILED - {type(exc).__name__}: {exc}")
+
+    try:
+        with supply_db.connect(label="mothman:process") as conn:
+            qa_store.ensure_schema(conn)
+        # The deliveries on disk, recorded with what recognition made of
+        # them - write-once, so recording an old one again changes nothing.
+        delivery_log.record_all()
+        found = all_arrivals()
+        todo = unprocessed(found)
+        with supply_db.connect(read_only=True, label="mothman:process") as conn:
+            rec = recorded(conn)
+    except Exception as exc:  # noqa: BLE001 - nothing can be processed without these
+        failed("the pass's setup", exc)
+        return report
     by_collection: dict[str, list] = {}
     for arrival in found:
         by_collection.setdefault(arrival.collection_id, []).append(arrival)
+    blocked: set[str] = set()
+
+    def fail_arrival(arrival, exc: Exception) -> None:
+        # CRITERION 14: a failed arrival holds back every later one of its
+        # own collection, which depend on what it would have filed - and no
+        # other collection's.
+        blocked.add(arrival.collection_id)
+        report.failures.append((arrival.run_id, f"{type(exc).__name__}: {exc}"))
+        say(f"{arrival.run_id}: FAILED - {type(exc).__name__}: {exc}; it and every "
+            f"later {arrival.collection_id} arrival are left for the next pass")
+
     # STAGED FIRST, as the batch stages first: a delivery's later files are
     # candidates the overlay sees when its first is checked. Only what is
-    # still owed its checks - a gated arrival's table has moved on.
-    with supply_db.connect(read_only=True, label="mothman:process") as conn:
-        rec = recorded(conn)
+    # still owed its checks - a gated arrival's table has moved on. A
+    # staging failure is that arrival's failure, not the pass's (D2).
     for arrival in todo:
-        if state_of(arrival, rec) == UNCHECKED:
+        if arrival.collection_id in blocked or state_of(arrival, rec) != UNCHECKED:
+            continue
+        try:
             _, builder = _modules(arrival.collection_id)
             builder.stage_arrival(arrival)
+        except Exception as exc:  # noqa: BLE001 - criterion 14: reported, left owed
+            fail_arrival(arrival, exc)
+    staged_failures = {run_id for run_id, _ in report.failures}
     run_timestamp = asset_time.now().isoformat()
-    blocked: set[str] = set()
     with supply_db.connect(label="mothman:process-arrival-locks") as lock_conn:
         for arrival in todo:
+            if arrival.run_id in staged_failures:
+                continue
             if arrival.collection_id in blocked:
-                # CRITERION 14: a failed arrival holds back every later one of
-                # its own collection, which depend on what it would have filed.
                 report.left_behind_failure.append(arrival.run_id)
                 continue
             with arrival_lock(lock_conn, arrival.run_id) as mine:
@@ -269,27 +297,31 @@ def run_pass(*, run_by: str | None = None, say=print) -> PassReport:
                     _one(arrival, by_collection[arrival.collection_id], run_timestamp,
                          run_by, report, say)
                 except Exception as exc:  # noqa: BLE001 - criterion 14: reported, left owed
-                    blocked.add(arrival.collection_id)
-                    report.failures.append((arrival.run_id, f"{type(exc).__name__}: {exc}"))
-                    say(f"{arrival.run_id}: FAILED - {type(exc).__name__}: {exc}; it and every "
-                        f"later {arrival.collection_id} arrival are left for the next pass")
+                    fail_arrival(arrival, exc)
     # OWED WORK (criterion 11): re-evaluations and re-checks alike, each
     # cleared only when its work completes; a failure stays owed.
-    for outcome in recheck.run_all_owed(kinds=(recheck.REEVALUATE, recheck.RECHECK),
-                                        run_by=run_by):
-        report.owed.append(outcome)
-        if not outcome.completed:
-            report.failures.append((f"owed #{outcome.owed_id}", outcome.message))
-        elif outcome.status == "red":
-            report.red = True
+    try:
+        for outcome in recheck.run_all_owed(kinds=(recheck.REEVALUATE, recheck.RECHECK),
+                                            run_by=run_by):
+            report.owed.append(outcome)
+            if not outcome.completed:
+                report.failures.append((f"owed #{outcome.owed_id}", outcome.message))
+            elif outcome.status == "red":
+                report.red = True
+    except Exception as exc:  # noqa: BLE001 - it stays owed for the next pass
+        failed("owed work", exc)
     # TICKETS LAST (criterion 12), and one line where none are configured.
-    if ticket_reconciler.service_from_env() is None:
-        report.tickets.append("No ticketing is configured for this environment, so no "
-                              "ticket was reconciled.")
-    else:
-        for collection_id in COLLECTIONS:
-            outcome = ticket_reconciler.after_runs(collection_id)
-            ticket_reconciler.report(outcome)
+    try:
+        service = ticket_reconciler.service_from_env()
+        if service is None:
+            report.tickets.append("No ticketing is configured for this environment, so no "
+                                  "ticket was reconciled.")
+        else:
+            for collection_id in COLLECTIONS:
+                outcome = ticket_reconciler.after_runs(collection_id)
+                ticket_reconciler.report(outcome)
+    except Exception as exc:  # noqa: BLE001 - the slot state is durable; the next pass retries
+        failed("ticket reconciliation", exc)
     return report
 
 
@@ -327,7 +359,7 @@ def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None
         if _red(results):
             report.red = True
     else:
-        say(f"--- {arrival.run_id} ---")
+        # The run step prints its own "--- <run> ---" header (#120 D13).
         got = arrival_lifecycle.process(arrival, steps=orchestrator.STEPS, among=among,
                                         run_timestamp=run_timestamp, run_by=run_by)
         report.processed.append(arrival.run_id)

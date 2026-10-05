@@ -2428,6 +2428,47 @@ judgement about who reads the page rather than about the rule.
         --yes unable to skip it (they now name the environment, nothing
         more)? (b) in production, should the typed id REPLACE hand-filing's
         "keep this?" y/N rather than follow it?
+      - THE SPRINT 14 CRITIC (post-build-review #120): nine findings FIXED,
+        each with a failing test first. The two that mattered:
+        - D1: a terminal keep and a processing pass could process the same
+          arrival at once. The critic reproduced it, and both failed. Hand
+          filing now takes the arrival's lock and refuses one that is held
+          or already finished. PROVISIONAL: it refuses rather than waits.
+        - D2: a failure outside the per-arrival step exited 1 ("red") instead
+          of 2. A staging failure stopped the whole pass instead of only its
+          own collection.
+        Also fixed: a kept synthetic run now reports what the lifecycle
+        decided; a TUI trial that filing refused now asks for its reference
+        instead of naming a flag; a refusal is now logged even if the supply
+        was promoted and later demoted; the report names datasets instead of
+        "its dataset"; every spelling of the password is now scrubbed; stale
+        help texts; a duplicate header.
+        QUESTIONS FOR YOU:
+        Q1. Tickets that could not be reconciled: should
+            `pipeline process` exit 2? Today it prints them and exits on the
+            arrivals alone. (a) yes, a failed stage per criterion 20; (b) no,
+            the slot state is durable and the next pass retries - amend
+            criterion 20.
+        Q2. An arrival whose run never completed (a crash) is re-run under its
+            own run id, which REPLACES its partial results. That reads against
+            REQ-PIPE-086 c8. (a) keep that, as an explicit crash exception;
+            (b) re-run it under a new identity and leave the partial run as an
+            incomplete one.
+        Q3. When another process holds an arrival, do later arrivals of
+            the same collection wait in that pass, as they do after a failure
+            (receipt order), or go ahead as today?
+        Q4. A kept folder holding files no dataset recognises (a renamed
+            extract): (a) keep the rest and NAME what was left behind, as the
+            batch's "supply on the floor" warning does; (b) refuse the whole
+            keep until they are renamed or removed; (c) silent, as today.
+        Q5. `backlog.unprocessed` has no caller left, and now reads the
+            pass's own definition of processed. Delete it (REQ-PIPE-061 owns
+            it), or keep it for the Lambda?
+        Q6 (predates this sprint). A TRIAL leaves a completed run and its
+            results in the database, which the visible-results view shows,
+            while printing "nothing was recorded". `trial.discard` does this
+            on purpose, but REQ-PIPE-103 c6 says nothing should outlive a
+            trial. Which is right?
  All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.

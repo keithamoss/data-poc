@@ -178,3 +178,17 @@ def test_a_ticket_repository_without_an_owner_is_refused_before_connecting(monke
     monkeypatch.setattr(environments, "ticket_repository", lambda: "foo")
     with pytest.raises(environments.EnvironmentError_, match="owner/repo"):
         environments.for_connection()
+
+
+@pytest.mark.parametrize("dsn, echoed", [
+    ("postgresql://u:p%40a!ss@h/db", "p%40a!ss"),   # partly encoded, as written
+    ("postgresql://u:p%2fw@h/db", "p%2fw"),          # lowercase hex
+    ("postgresql://u:p%2fw@h/db", "p%2Fw"),          # re-encoded upper case
+    ("postgresql://u:p%2fw@h/db", "p/w"),            # decoded
+])
+def test_every_spelling_of_the_password_is_scrubbed(dsn, echoed):
+    """#120 D10: #119 D8 replaced the decoded password and one canonical
+    encoding of it, and a connection string written any other way went
+    through untouched."""
+    out = supply_db._scrub(f"could not parse 'u:{echoed}@h'", dsn)
+    assert echoed not in out and "***" in out

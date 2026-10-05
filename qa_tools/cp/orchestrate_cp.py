@@ -485,7 +485,8 @@ def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
     # the same function the batch calls, so the two cannot drift.
     return arrival_lifecycle.process_all(
         sorted(found_arrivals, key=lambda a: (a.sequence, a.run_index, a.run_id)),
-        steps=STEPS, run_by=run_by, on_step=on_step)
+        steps=STEPS, run_by=run_by, on_step=on_step,
+        exclusive=True)
 
 
 #: Child Protection's half of the one per-arrival lifecycle

@@ -233,10 +233,7 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
         # A KEPT, UNRECORDED ARRIVAL GOES THROUGH THE PIPELINE'S OWN LIFECYCLE
         # (REQ-PIPE-086 criterion 9) - see cli/bdm.py's run_check().
         common.refuse_reference_for_kept(keep, reference_run_id, "--reference-run-id")
-        from qa_tools.common import arrivals
-
-        arrival = next(a for a in arrivals.arrivals_for("child-protection", "cp_run_")
-                       if a.run_id == run_id)
+        arrival = common.kept_arrival("child-protection", "cp_run_", run_id)
         common.record_delivery_of(arrival)
         build_cp_warehouses.stage_arrival(arrival)
         return orchestrate_cp.run_arrivals([arrival], run_by, on_step=on_step), run_id
@@ -333,7 +330,8 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
         # A KEPT FOLDER THAT FELL BACK TO A TRIAL (filing refused it): a
         # trial needs all six and its reference, which nobody was asked for.
         _require_all_six(folder)
-        common.require_reference_for_trial(reference_folder, "--reference-folder")
+        reference_folder = common.reference_for_fallback_trial(
+            reference_folder, "--reference-folder", "folder")
     reference_run_id = common.reference_run_id()
 
     _load_delivery_from_folder(reference_folder, reference_run_id)
@@ -571,6 +569,7 @@ def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
                        "nothing was recorded.", style="dim")
     elif interactive:
         common.report_recorded(recorded_run_id, len(results))
+        common.report_kept_arrival(COLLECTION_ID, "cp_run_", recorded_run_id)
         # AND IF THIS RUN LEFT ITS SUPPLY WAITING ON A PERSON, OFFER THE
         # DECISION HERE (REQ-GHUB-082 criterion 17), through the same
         # implementation the standing queue uses. Before the publish
@@ -585,6 +584,7 @@ def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
         common.offer_to_publish()
     else:
         console.print(f"Recorded {len(results)} results for {recorded_run_id}", style="green")
+        common.report_kept_arrival(COLLECTION_ID, "cp_run_", recorded_run_id)
 
 
 def _finish_supply(results: list[dict], filed, all_checks: bool = False) -> None:
@@ -801,7 +801,8 @@ def generate_synthetic_data_command(yes: bool) -> None:
 @click.option("--run-id", default=None, help="Synthetic mode: an existing manifest run_id "
                                               "(e.g. cp_run_05_2024-...). Omit to pick interactively.")
 @click.option("--reference-run-id", default=None,
-              help="Synthetic mode: defaults to the last Promoted run, or the manifest's own first (clean) entry.")
+              help="Synthetic mode, a trial's only: a run to compare distribution drift against. "
+                   "There is no default; a kept run is measured against the last promoted supply.")
 @click.option("--folder", "folder_path", default=None, type=click.Path(exists=True, file_okay=False),
               help="Local files mode: an already-downloaded delivery folder (instead of "
                    "--run-id). Kept, whatever recognition places in it is the delivery; a "
@@ -817,7 +818,8 @@ def generate_synthetic_data_command(yes: bool) -> None:
                    "A trial's only: a kept supply is measured against the last promoted one.")
 @click.option("--table", type=click.Choice(cp_common.TABLES), default=None,
               help="Single-table mode (plans/tooling.md #1 Phase 3.5): check just this one table (a real "
-                   "partial resupply) - the other 5 tables auto-pull from the last Promoted run. "
+                   "partial resupply). Kept, it is one arrival, read beside whatever is filed for its period; "
+                   "as a trial the other 5 tables come from the last promoted run. "
                    "Required together with --file or --s3-key.")
 @click.option("--file", "table_file", default=None, type=click.Path(exists=True, dir_okay=False),
               help="Single-table mode: an already-downloaded CSV for --table (instead of --folder/--run-id).")

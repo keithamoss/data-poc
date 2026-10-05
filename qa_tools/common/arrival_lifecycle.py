@@ -94,9 +94,13 @@ class StageFailed(RuntimeError):
         self.run_id, self.stage, self.completed, self.cause = run_id, stage, completed, cause
 
 
+class ArrivalBusy(RuntimeError):
+    """Another process has this arrival, or has already finished it."""
+
+
 def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
                 run_timestamp: str | None = None, on_step=None,
-                player=None) -> list[dict]:
+                player=None, exclusive: bool = False) -> list[dict]:
     """`process()` each arrival in the order given, one at a time.
 
     ONE AT A TIME BECAUSE THE CHAIN IS REAL: a supply fills its open slot,
@@ -110,6 +114,9 @@ def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
     whole pass, as it always has.
     """
     arrivals = list(arrivals)
+    if exclusive:
+        return _exclusively(arrivals, steps=steps, run_by=run_by,
+                            run_timestamp=run_timestamp, on_step=on_step)
     results: list[dict] = []
     for arrival in arrivals:
         # SCRIPTED DECISIONS BETWEEN ARRIVALS (REQ-GEN-135 criterion 3): every
@@ -124,4 +131,42 @@ def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
                                on_step=on_step))
     if player is not None:
         player.finish()
+    return results
+
+
+def _exclusively(arrivals, *, steps, run_by, run_timestamp, on_step) -> list[dict]:
+    """Each arrival under its own lock - the hand-filed path's half of
+    REQ-PIPE-151 criterion 6 (post-build-review #120 D1).
+
+    A processing pass takes the pass lock and then each arrival's; a person
+    keeping a supply at the terminal takes no pass lock, so without this the
+    two could process one arrival at once - which the critic reproduced:
+    each dropped the other's run schemas and both failed. Refused rather
+    than waited for, because the other process may be a whole pass long,
+    and refused BEFORE filing, so nothing is left half done. Once the lock
+    is held the record is read again: a pass that finished the arrival
+    while the person was answering questions has already recorded it, and a
+    second set of results under its run id is what REQ-PIPE-086 criterion 8
+    forbids.
+    """
+    from qa_tools.common import processing_pass, supply_db
+
+    results: list[dict] = []
+    with supply_db.connect(label="mothman:keep-arrival-locks") as conn:
+        for arrival in arrivals:
+            with processing_pass.arrival_lock(conn, arrival.run_id) as mine:
+                if not mine:
+                    raise StageFailed(arrival.run_id, FILING, (), ArrivalBusy(
+                        "another process is processing this arrival right now - nothing "
+                        "was done to it; run `mothman pipeline process` once that "
+                        "finishes, or keep it again"))
+                state = processing_pass.state_of(arrival, processing_pass.recorded(conn))
+                if state != processing_pass.UNCHECKED:
+                    raise StageFailed(arrival.run_id, FILING, (), ArrivalBusy(
+                        "another process has already checked this arrival, so its "
+                        "results stand and nothing was recorded again"))
+                stamp = run_timestamp or asset_time.now().isoformat()
+                results.extend(process(arrival, steps=steps, among=arrivals,
+                                       run_timestamp=stamp, run_by=run_by,
+                                       on_step=on_step))
     return results
