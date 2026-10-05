@@ -210,10 +210,20 @@ jobs:
       # The service container creates `postgres` and nothing else, so the
       # warehouse the DSN above names has to be made. A step rather than a
       # second POSTGRES_DB, because the image takes only one.
+      # AND QUIETENS THE SERVER'S OWN LOG. GitHub prints the container's
+      # log after every step, and the API returns only a job's last 5000
+      # lines - the QA tools' own sessions log tens of thousands of
+      # warnings ("there is no transaction in progress") and expected
+      # errors, which pushed pytest's summary out of reach (2026-10-05).
+      # The tests report their own failures; the server need not.
       - name: Create the warehouse database
         run: |
           PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
             -c 'CREATE DATABASE supply'
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
+            -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
+            -c 'SELECT pg_reload_conf()'
 
       - name: Install dbt_utils
         run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
@@ -285,10 +295,20 @@ jobs:
       - name: Sync dependencies
         run: uv sync --dev
 
+      # AND QUIETENS THE SERVER'S OWN LOG. GitHub prints the container's
+      # log after every step, and the API returns only a job's last 5000
+      # lines - the QA tools' own sessions log tens of thousands of
+      # warnings ("there is no transaction in progress") and expected
+      # errors, which pushed pytest's summary out of reach (2026-10-05).
+      # The tests report their own failures; the server need not.
       - name: Create the warehouse database
         run: |
           PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
             -c 'CREATE DATABASE supply'
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
+            -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
+            -c 'SELECT pg_reload_conf()'
 
       - name: Install dbt_utils
         run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
