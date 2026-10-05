@@ -98,10 +98,17 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
             raise click.ClickException(bootstrap_mod.HISTORY_REFUSAL[0].upper()
                                        + bootstrap_mod.HISTORY_REFUSAL[1:])
 
-    if collection in ("bdm", "all"):
-        _run_bdm(sequential)
-    if collection in ("cp", "all"):
-        _run_cp(sequential)
+    # THE PASS LOCK (REQ-PIPE-151 criterion 16), held while anything runs.
+    from qa_tools.common import processing_pass
+
+    try:
+        with processing_pass.pass_lock("run"):
+            if collection in ("bdm", "all"):
+                _run_bdm(sequential)
+            if collection in ("cp", "all"):
+                _run_cp(sequential)
+    except processing_pass.PassLockHeld as exc:
+        raise click.ClickException(str(exc)) from None
 
     console.print("Reshaping into dashboard JSON...", style="dim")
     dashboard_cli._build_data()
@@ -127,6 +134,75 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
         # to get content published. It rebuilds and re-embeds, which this
         # run has just done; paying that twice is worth one publish path.
         dashboard_cli.publish()
+
+
+@pipeline_group.command("process")
+def process_command() -> None:
+    """Process everything that has arrived and is not yet processed, finish
+    what is owed, then reconcile tickets - asking nothing, so a scheduler can
+    call it (REQ-PIPE-151).
+
+    Every collection's arrivals in one receipt order, each through the same
+    per-arrival lifecycle the pipeline's batch uses. It never generates,
+    regenerates or deletes anything: `mothman pipeline run` and `bootstrap`
+    stay the full rebuild.
+
+    \b
+    Exit status:
+      0   everything it attempted completed, and nothing it recorded is red
+      1   everything completed, and at least one recorded result is red
+      2   an arrival, an owed item or a stage failed - it is left for the next pass
+      75  another pass holds this database's lock; nothing was changed
+    """
+    from . import common
+
+    run_process(confirm=common.confirm_change)
+
+
+def run_process(*, confirm) -> None:
+    """The command's body, shared with the TUI's menu entry."""
+    import sys
+
+    from qa_tools.common import environments, processing_pass
+
+    # TYPED ID WHERE THE ENVIRONMENT ASKS FOR IT, FROM A PERSON AT A TERMINAL
+    # (REQ-PIPE-093 criterion 15) - and never from a scheduler, which has no
+    # terminal: a production pass that stopped for a person would never run.
+    env = environments.current()
+    if env.confirm_changes and sys.stdin.isatty():
+        if not confirm(f"Process everything not yet processed in {env.label}?", yes=False):
+            console.print("Nothing processed.", style="yellow")
+            return
+    try:
+        with processing_pass.pass_lock("process"):
+            report = processing_pass.run_pass(say=lambda m: console.print(m, style="dim"))
+    except processing_pass.PassLockHeld as exc:
+        console.print(str(exc), style="yellow")
+        raise SystemExit(processing_pass.EXIT_LOCKED) from None
+    _say_pass(report)
+    if report.exit_status:
+        raise SystemExit(report.exit_status)
+
+
+def _say_pass(report) -> None:
+    if report.nothing_to_do:
+        console.print("Nothing to process and nothing owed.", style="green")
+    else:
+        console.print(f"Processed {len(report.processed)} arrival(s); applied the gate to "
+                      f"{len(report.gated_only)} already checked; ran {len(report.owed)} owed "
+                      f"item(s).", style="green")
+    for what in report.left_locked:
+        console.print(f"{what}: being processed elsewhere - left for the next pass.",
+                      style="yellow")
+    if report.left_behind_failure:
+        console.print(f"{len(report.left_behind_failure)} later arrival(s) left for the next "
+                      f"pass behind a failure in their collection.", style="yellow")
+    for what, why in report.failures:
+        console.print(f"FAILED {what}: {why}", style="red")
+    for line in report.tickets:
+        console.print(line, style="dim")
+    if report.red and not report.failures:
+        console.print("At least one recorded result is red.", style="yellow")
 
 
 @pipeline_group.command("bootstrap")

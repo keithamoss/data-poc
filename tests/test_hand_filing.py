@@ -214,3 +214,27 @@ class TestTheDeliveryNameIsOurs:
             "civil-registration", "run_",
             deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
         assert filed.delivery_name.startswith(hand_filing.HAND_FILED_PREFIX)
+
+
+class TestAFileOfAnotherCollectionIsRefusedFirst:
+    """REQ-PIPE-086 criterion 5: refused BEFORE any delivery or receipt is
+    written, naming the collection it belongs to - and not offered as a
+    trial, since it is the wrong command rather than an unplaceable file."""
+
+    def test_it_is_refused_naming_its_collection_and_writes_nothing(self, tmp_path, tree):
+        deliveries, receipts = tree
+        path = _csv(tmp_path, "birth_registrations_2026-09-20.csv")
+        with pytest.raises(hand_filing.WrongCollection) as exc:
+            hand_filing.file_supply([path], "child-protection", "cp_run_",
+                                    deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
+        assert "civil-registration" in str(exc.value)
+        assert "birth_registrations_2026-09-20.csv" in str(exc.value)
+        assert not deliveries.exists() or not list(deliveries.iterdir())
+        assert not receipts.exists() or not list(receipts.iterdir())
+
+    def test_a_file_of_the_named_collection_is_unaffected(self, tmp_path, tree):
+        deliveries, receipts = tree
+        filed = hand_filing.file_supply(
+            [_csv(tmp_path, "birth_registrations_2026-09-20.csv")], "civil-registration",
+            "run_", deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
+        assert filed.delivery_name

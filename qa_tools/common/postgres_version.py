@@ -83,29 +83,47 @@ def check_number(num, declared: int | None = None) -> None:
             f"letting a version nobody targeted behave differently from production")
 
 
-_IMAGE = re.compile(r"^(?:[\w.\-/]+/)?postgres:(?P<tag>\S+)$")
+_TAGGED = re.compile(r"^(?:[\w.\-]+/)*postgres:(?P<tag>\d[\w.\-]*)$")
+
+
+def _is_postgres(image: str) -> bool:
+    """Any image whose name says PostgreSQL - `postgres`, a registry path to
+    it, or another publisher's `postgresql` - tagged, digest-pinned, templated
+    or not at all (post-build-review #119 D4: anything narrower passes the
+    shapes it does not recognise in silence)."""
+    name = image.split("@", 1)[0].split(":", 1)[0].rsplit("/", 1)[-1]
+    return name.startswith("postgres")
 
 
 def image_tags(compose=None, workflow=None) -> dict[str, str]:
     """`{where: image}` for every PostgreSQL image in the dev container and in
-    EVERY job of test.yml - every one, not the first (post-build-review #87)."""
+    EVERY job of test.yml - its services and its own `container` - every one,
+    not the first (post-build-review #87)."""
     found: dict[str, str] = {}
     compose_doc = yaml.safe_load(Path(compose or COMPOSE).read_text()) or {}
     for name, service in (compose_doc.get("services") or {}).items():
         image = str((service or {}).get("image") or "")
-        if _IMAGE.match(image):
+        if image and _is_postgres(image):
             found[f".devcontainer/docker-compose.yml service {name}"] = image
     wf = yaml.safe_load(Path(workflow or TEST_WORKFLOW).read_text()) or {}
     for job_name, job in (wf.get("jobs") or {}).items():
-        for svc_name, svc in ((job or {}).get("services") or {}).items():
-            image = str((svc or {}).get("image") or "")
-            if _IMAGE.match(image):
+        job = job or {}
+        for svc_name, svc in (job.get("services") or {}).items():
+            image = str((svc if isinstance(svc, str) else (svc or {}).get("image")) or "")
+            if image and _is_postgres(image):
                 found[f".github/workflows/test.yml job {job_name} service {svc_name}"] = image
+        container = job.get("container")
+        image = str((container if isinstance(container, str)
+                     else (container or {}).get("image")) or "")
+        if image and _is_postgres(image):
+            found[f".github/workflows/test.yml job {job_name} container"] = image
     return found
 
 
 def image_tag_errors(declared: int | None = None, compose=None, workflow=None) -> list[str]:
-    """Criterion 5: every image tag names the declared major."""
+    """Criterion 5: every image names the declared major - and one whose major
+    cannot be read off it (no tag, a digest only, a template, another
+    publisher's image) is an error, never a pass."""
     want = declared if declared is not None else declared_major()
     tags = image_tags(compose, workflow)
     if not tags:
@@ -113,8 +131,12 @@ def image_tag_errors(declared: int | None = None, compose=None, workflow=None) -
                 ".github/workflows/test.yml - nothing to hold to postgres_major"]
     errors = []
     for where, image in tags.items():
-        tag = _IMAGE.match(image).group("tag")
-        head = tag.split("-")[0].split(".")[0]
+        match = _TAGGED.match(image)
+        if not match:
+            errors.append(f"{where} runs {image}, whose PostgreSQL major cannot be read "
+                          f"from its tag - pin it as postgres:{want} (or a {want}.x tag)")
+            continue
+        head = match.group("tag").split("-")[0].split(".")[0]
         if head != str(want):
             errors.append(f"{where} runs {image}, but contract/data-asset.yaml declares "
                           f"postgres_major {want}")

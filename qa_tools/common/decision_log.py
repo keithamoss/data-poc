@@ -158,10 +158,17 @@ UN_SUPERSEDE = "un-supersede"
 #: reason and the decision in `caused_by_decision`, at the log's highest
 #: prominence - a person must look. Rule only; changes no slot.
 STILL_FAILING = "still-failing"
+#: The gate looked at a supply and did not promote it (REQ-PIPE-151
+#: criterion 3), naming why. A record and nothing more: it changes no slot,
+#: answers no hold and is the evidence that the gate RAN on an arrival
+#: (criterion 4) - which is how a processing pass knows an arrival is done
+#: without keeping a marker of its own.
+PROMOTION_REFUSED = "promotion-refused"
 
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
            INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
-           MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE, STILL_FAILING)
+           MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE, STILL_FAILING,
+           PROMOTION_REFUSED)
 
 #: Actions that name no supply - each is about one that is not there, or
 #: (STILL_FAILING) about several.
@@ -171,7 +178,7 @@ NO_SUPPLY = (INHERIT_REFUSED, MARK_NOT_SUPPLIED, STILL_FAILING)
 #: rejection.py and substitution.py enforce that by not offering an
 #: actor_kind at all.
 AUTOMATIC_ACTIONS = (PROMOTE, INHERIT, INHERIT_REFUSED, PROMOTION_WITHHELD, SUPERSEDE,
-                     STILL_FAILING)
+                     STILL_FAILING, PROMOTION_REFUSED)
 
 #: The decisions that move a supply, and so are the ones criterion 11
 #: refuses while a later period stands on it.
@@ -179,7 +186,7 @@ MOVES_A_SUPPLY = (REJECT, DEMOTE, REFILE, SUPERSEDE)
 
 #: Entries that record automation standing back, and so never change what
 #: a slot resolves to (post-build-review #84).
-RECORDS_A_REFUSAL = (PROMOTION_WITHHELD, INHERIT_REFUSED)
+RECORDS_A_REFUSAL = (PROMOTION_WITHHELD, INHERIT_REFUSED, PROMOTION_REFUSED)
 
 #: The decisions that make a period DEPEND on another period's supply.
 #: BOTH of them, and the second was missed for an hour: an inherited
@@ -325,7 +332,7 @@ def _check_shape(decision: Decision) -> None:
         raise DecisionRefused(
             "a refused inheritance names no supply - that is what it could not "
             "find. Recording one would say the opposite of what happened.")
-    if not decision.slots:
+    if not decision.slots and decision.action != PROMOTION_REFUSED:
         raise DecisionRefused(
             "a decision needs at least one slot - which period it acts on")
     if decision.action == REFILE and not (decision.from_slot and decision.to_slot):
@@ -345,6 +352,10 @@ def _check_shape(decision: Decision) -> None:
         raise DecisionRefused(
             "an inheritance names the period being filled and the period it "
             "takes the supply from.")
+    if decision.action == PROMOTION_REFUSED and not (decision.reason or "").strip():
+        raise DecisionRefused(
+            "a refused promotion names why - it is the record that the gate ran "
+            "and declined, and without a reason it says nothing.")
     if decision.action == PROMOTION_WITHHELD and not decision.to_slot:
         raise DecisionRefused(
             "a withheld promotion names the period the supply was filed to - "
@@ -801,9 +812,14 @@ def apply_decision(conn: supply_db.SupplyConnection,
         # IN THE SAME TRANSACTION as the entry, so the two cannot
         # disagree: a rollback takes both, and there is no window where
         # the log says resolved and the hold says waiting.
-        supply_holds.resolve_for_supply(
-            conn, dataset_id=decision.dataset_id, supply=decision.supply or "",
-            decision_id=entry_id)
+        #
+        # EXCEPT A REFUSAL (REQ-PIPE-151 criterion 5): the gate saying "held -
+        # no open period" is a record ABOUT the hold, and resolving the hold
+        # with it would close the very thing it reports.
+        if decision.action not in RECORDS_A_REFUSAL:
+            supply_holds.resolve_for_supply(
+                conn, dataset_id=decision.dataset_id, supply=decision.supply or "",
+                decision_id=entry_id)
         yield entry_id
         for slot, was in before.items():
             if _holding(conn, decision.dataset_id, slot) != was:

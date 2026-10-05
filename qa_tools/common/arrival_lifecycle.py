@@ -61,11 +61,37 @@ def process(arrival, *, steps: Steps, among: Sequence, run_timestamp: str,
     1 and 13): a promotion that fails must be retryable without re-running
     QA. tests/test_promotion_after_run.py holds the run step to that.
     """
-    steps.file_and_overlay(arrival, among)
-    got = steps.run_one(steps.entry_for(arrival), run_timestamp, run_by,
-                        on_step=on_step)
-    steps.promote_after(arrival, got, run_by)
+    done: list[str] = []
+    stage = FILING
+    try:
+        steps.file_and_overlay(arrival, among)
+        done.append(FILING)
+        stage = CHECKING
+        got = steps.run_one(steps.entry_for(arrival), run_timestamp, run_by,
+                            on_step=on_step)
+        done.append(CHECKING)
+        stage = GATING
+        steps.promote_after(arrival, got, run_by)
+    except StageFailed:
+        raise
+    except Exception as exc:
+        # WHICH ARRIVAL, WHICH STAGE, AND WHAT HAD COMPLETED (REQ-TEST-150
+        # criterion 7) - the original exception chained, nothing swallowed.
+        raise StageFailed(arrival.run_id, stage, tuple(done), exc) from exc
     return got
+
+
+FILING, CHECKING, GATING = "filing and overlay", "checks", "promotion gate"
+
+
+class StageFailed(RuntimeError):
+    """One arrival's lifecycle stopped at a named stage."""
+
+    def __init__(self, run_id: str, stage: str, completed: tuple[str, ...], cause):
+        super().__init__(f"{run_id}: the {stage} stage failed ({type(cause).__name__}: "
+                         f"{cause})" + (f" after {', '.join(completed)} completed"
+                                        if completed else " before anything completed"))
+        self.run_id, self.stage, self.completed, self.cause = run_id, stage, completed, cause
 
 
 def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,

@@ -72,6 +72,35 @@ def delivery_name(received_at: datetime) -> str:
     return f"{HAND_FILED_PREFIX}-{asset_time.isoformat(received_at)[:19]}".replace(":", "")
 
 
+class WrongCollection(CannotFile):
+    """A kept file belongs to another collection than the command names
+    (REQ-PIPE-086 criterion 5) - the wrong command, not an unplaceable file,
+    so no trial is offered for it."""
+
+
+def check_collection(paths, collection_id: str) -> None:
+    """Refuse any file recognition places in ANOTHER collection, naming it -
+    before anything is written (REQ-PIPE-086 criterion 5). A file nothing
+    places is check()'s to refuse."""
+    from qa_tools.common import hierarchy
+
+    wrong = []
+    for path in paths:
+        name = Path(path).name
+        dataset = delivery.dataset_for_filename(name)
+        if dataset is None:
+            continue
+        theirs = hierarchy.dataset(dataset).collection_id
+        if theirs != collection_id:
+            wrong.append(f"  {name}\n      belongs to {theirs} ({dataset}), not "
+                         f"{collection_id}")
+    if wrong:
+        raise WrongCollection(
+            "these files belong to another collection, so nothing was filed:\n"
+            + "\n".join(wrong)
+            + "\n\n  Check them with that collection's own command.")
+
+
 def check(paths) -> None:
     """Refuse, with a usable explanation, anything recognition could
     not place. Silent where every file is placeable.
@@ -204,6 +233,7 @@ def file_supply(paths, collection_id: str, run_id_prefix: str,
     `Filed.run_id` is the first, and arrivals_of() gives all of them.
     """
     check(paths)
+    check_collection(paths, collection_id)
     received_at = received_at or asset_time.now()
     # BOTH REQUIRED BEFORE ANYTHING IS WRITTEN - an answer to "when was it
     # originally received" (REQ-PIPE-103 criterion 13; `not known` is an

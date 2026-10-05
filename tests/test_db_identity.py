@@ -142,14 +142,19 @@ class TestMarking:
         again = _mark("--confirm", "test")
         assert again.exit_code == 0 and "already marked" in again.output
 
-    def test_another_identity_is_replaced_only_when_typed_out(self, unmarked_dsn):
+    def test_another_identity_is_replaced_only_when_typed_out(self, unmarked_dsn,
+                                                              monkeypatch):
+        """At a terminal, typing the identity being replaced - exactly."""
+        from cli import common
+
         assert _mark("--confirm", "sandbox", env="sandbox").exit_code == 0
-        refused = _mark("--confirm", "test")
-        assert refused.exit_code != 0 and "--replacing" in refused.output
-        assert _recorded(unmarked_dsn).environment == "sandbox"
-        wrong = _mark("--confirm", "test", "--replacing", "data-asset-1/local")
-        assert wrong.exit_code != 0
-        ok = _mark("--confirm", "test", "--replacing", "data-asset-1/sandbox")
+        monkeypatch.setattr(common, "require_tty", lambda hint: None)
+        answers = iter(["data-asset-1/local"])
+        monkeypatch.setattr(common, "_ask_text", lambda m: next(answers))
+        wrong = _mark("--confirm", "test")
+        assert wrong.exit_code != 0 and _recorded(unmarked_dsn).environment == "sandbox"
+        answers = iter(["data-asset-1/sandbox"])
+        ok = _mark("--confirm", "test")
         assert ok.exit_code == 0, ok.output
         assert _recorded(unmarked_dsn).environment == "test"
 
@@ -195,12 +200,50 @@ class TestEveryPlaceMarksItsOwn:
     def test_every_ci_job_with_a_database(self):
         import yaml
 
+        from qa_tools.common import postgres_version
+
         workflow = yaml.safe_load((ROOT / ".github/workflows/test.yml").read_text())
+        checked = 0
         for name, job in workflow["jobs"].items():
-            if "postgres" not in (job.get("services") or {}):
+            # BY IMAGE, whatever the service is called (#119 D7).
+            images = [str((s or {}).get("image") or "") for s in
+                      (job.get("services") or {}).values()]
+            if not any(postgres_version._is_postgres(i) for i in images if i):
                 continue
+            checked += 1
             runs = [s.get("run", "") for s in job["steps"]]
             mark = next(i for i, r in enumerate(runs) if "mothman env mark --confirm ci" in r)
             later = [i for i, r in enumerate(runs) if "mothman" in r and i != mark
                      and "env mark" not in r]
             assert all(i > mark for i in later), f"{name} uses the database before marking it"
+        assert checked >= 2, "no CI job with a database was found - this checked nothing"
+
+
+class TestReplacingAnIdentityNeedsAPerson:
+    """post-build-review #119 D1 (REQ-PIPE-093 criteria 4 and 6): a flag may
+    stand in for typing only to mark an UNMARKED database - the setup
+    scripts' case. Replacing an identity, production's or anyone's, needs a
+    person at a terminal, and no flag skips it."""
+
+    def test_flags_alone_cannot_replace_an_identity(self, unmarked_dsn):
+        assert _mark("--confirm", "sandbox", env="sandbox").exit_code == 0
+        out = _mark("--confirm", "production", env="production")
+        assert out.exit_code != 0 and "terminal" in out.output
+        assert _recorded(unmarked_dsn).environment == "sandbox"
+
+    def test_a_production_identity_cannot_be_relabelled_by_flags(self, unmarked_dsn):
+        assert _mark("--confirm", "production", env="production").exit_code == 0
+        out = _mark("--confirm", "sandbox", env="sandbox")
+        assert out.exit_code != 0
+        assert _recorded(unmarked_dsn).environment == "production"
+
+    def test_the_refusal_does_not_hand_over_the_answer(self, unmarked_dsn):
+        """Criterion 3 asks the person to TYPE the identity being replaced;
+        printing the exact flag turns that into a copy-paste."""
+        assert _mark("--confirm", "sandbox", env="sandbox").exit_code == 0
+        out = _mark("--confirm", "test")
+        import re
+
+        flat = re.sub(r"[\s\u2502\u256d\u256e\u2570\u256f\u2500]+", " ", out.output)
+        assert out.exit_code != 0 and "data-asset-1/sandbox" not in flat.replace(
+            "data asset 'data-asset-1', environment 'sandbox'", "")

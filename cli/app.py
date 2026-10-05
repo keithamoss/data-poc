@@ -61,6 +61,7 @@ _MAIN_MENU_QA = "Quality Assurance - run the real check chain against a dataset"
 _MAIN_MENU_GENERATE = "Generate synthetic data"
 _MAIN_MENU_DECIDE = "Filing decisions - what goes into a period"
 _MAIN_MENU_BOOTSTRAP = "Set up this environment - generate data and run the checks over it"
+_MAIN_MENU_PROCESS = "Process what has arrived - check and gate it, finish what is owed"
 _MAIN_MENU_EXIT = "Exit"
 
 _DATASET_BDM = "Birth Registrations"
@@ -72,9 +73,9 @@ def _main_menu_loop() -> None:
     while True:
         choice = common.select(
             "What would you like to do?",
-            [_MAIN_MENU_QA, _MAIN_MENU_DECIDE, _MAIN_MENU_GENERATE,
+            [_MAIN_MENU_QA, _MAIN_MENU_DECIDE, _MAIN_MENU_PROCESS, _MAIN_MENU_GENERATE,
              _MAIN_MENU_BOOTSTRAP],
-            flag_hint="mothman bdm qa / mothman supply queue / "
+            flag_hint="mothman bdm qa / mothman supply queue / mothman pipeline process / "
                        "mothman bdm generate-synthetic-data / "
                        "mothman pipeline bootstrap",
         )
@@ -83,7 +84,14 @@ def _main_menu_loop() -> None:
             return
         console.print()
         if choice == _MAIN_MENU_QA:
-            _qa_menu()
+            from qa_tools.common import arrival_lifecycle
+
+            try:
+                _qa_menu()
+            except arrival_lifecycle.StageFailed as exc:
+                from cli import lifecycle_report
+
+                lifecycle_report.stage_failure(exc)
         elif choice == _MAIN_MENU_DECIDE:
             # REQ-GHUB-082 criterion 16: reachable without doing a QA
             # run first. Second on the menu rather than last, because
@@ -96,6 +104,14 @@ def _main_menu_loop() -> None:
             _generate_menu()
         elif choice == _MAIN_MENU_BOOTSTRAP:
             _bootstrap_menu()
+        elif choice == _MAIN_MENU_PROCESS:
+            # REQ-PIPE-151 criterion 13: the same body the flag-invocable
+            # command runs. Its exit status is the command's business; here
+            # the menu simply carries on.
+            try:
+                pipeline.run_process(confirm=common.confirm_change)
+            except SystemExit:
+                pass
         console.print()
 
 
@@ -155,12 +171,19 @@ class _MothmanGroup(click.RichGroup):
     delivery-critic, overnight sprint 4). The message names the remedy."""
 
     def invoke(self, ctx):
-        from qa_tools.common import environments, qa_store, supply_db
+        from qa_tools.common import arrival_lifecycle, environments, qa_store, supply_db
 
         try:
             return super().invoke(ctx)
         except qa_store.SchemaVersionError as exc:
             raise click.ClickException(str(exc)) from None
+        except arrival_lifecycle.StageFailed as exc:
+            # REQ-TEST-150 criterion 7: the arrival, the stage and what had
+            # completed - never the message that describes a completed run.
+            from cli import lifecycle_report
+
+            lifecycle_report.stage_failure(exc)
+            raise SystemExit(2) from None
         except (supply_db.SupplyDbError, environments.EnvironmentError_) as exc:
             # A database this checkout must not act on, or no stated
             # environment (REQ-PIPE-107, REQ-PIPE-093): a refusal by design,

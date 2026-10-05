@@ -125,8 +125,13 @@ class TestTypingTheEnvironment:
 
         self._production(tmp_path, monkeypatch)
         monkeypatch.setattr(common, "require_tty", lambda hint: None)
-        monkeypatch.setattr(common, "_ask_text", lambda message: "production")
+        asked = []
+        monkeypatch.setattr(common, "_ask_text",
+                            lambda message: asked.append(message) or "production")
         assert common.confirm_change("Record it?", yes=True) is True
+        # The id was ASKED FOR - yes=True returning early would also be True
+        # (post-build-review #119 D7).
+        assert asked
 
     def test_a_mismatch_records_nothing(self, tmp_path, monkeypatch, capsys):
         from cli import common
@@ -151,3 +156,25 @@ class TestTypingTheEnvironment:
         from cli import common
 
         assert common.confirm_change("Record it?", yes=True) is True
+
+
+def test_a_percent_encoded_password_is_scrubbed_too():
+    """post-build-review #119 D8: the decoded password was replaced, but a
+    message echoing the URL's own form (p%40ss) went through."""
+    from qa_tools.common import supply_db
+
+    dsn = "postgresql://u:p%40ss@localhost:5432/db"
+    out = supply_db._scrub("could not parse 'u:p%40ss@localhost' or p@ss", dsn)
+    assert "p%40ss" not in out and "p@ss" not in out
+
+
+def test_a_ticket_repository_without_an_owner_is_refused_before_connecting(monkeypatch,
+                                                                         tmp_path):
+    """post-build-review #119 D9: for_connection accepted 'foo', which the
+    ticket service then refused mid-run."""
+    from qa_tools.common import environments
+
+    monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
+    monkeypatch.setattr(environments, "ticket_repository", lambda: "foo")
+    with pytest.raises(environments.EnvironmentError_, match="owner/repo"):
+        environments.for_connection()

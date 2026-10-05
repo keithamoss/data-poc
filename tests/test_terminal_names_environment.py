@@ -95,6 +95,7 @@ class TestAOneOffCommand:
 
     def test_a_command_that_never_connects_says_nothing(self):
         result = self._run("env", "list")
+        assert result.returncode == 0, result.stderr
         assert "Environment:" not in result.stderr
 
 

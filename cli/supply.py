@@ -48,6 +48,7 @@ import rich_click as click
 from rich.console import Console
 from rich.table import Table
 
+from cli import common
 from qa_tools.common import arrivals, delivery, filing_decisions, hierarchy
 
 console = Console()
@@ -652,7 +653,10 @@ def tidy_command(yes: bool) -> None:
         for schema in leftovers:
             console.print(f"  {schema}")
         if not yes and not click.confirm(
-                "Drop these? Anything still running will lose the schema it is reading through",
+                # The environment named in the prompt (REQ-TEST-114 criterion 4,
+                # post-build-review #119 D2).
+                common._named("Drop these? Anything still running will lose the schema "
+                              "it is reading through"),
                 default=False):
             console.print("[dim]Left alone.[/dim]")
             return
@@ -722,7 +726,8 @@ def discard_sample_command(dataset_id: str, yes: bool) -> None:
         for physical in found:
             console.print(f"  {physical}")
         if not yes and not click.confirm(
-                "Discard these? The data goes, the QA record made against it stays",
+                common._named("Discard these? The data goes, the QA record made against "
+                              "it stays"),
                 default=False):
             console.print("[dim]Left alone.[/dim]")
             return

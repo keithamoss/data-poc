@@ -28,7 +28,7 @@ from rich.table import Table
 from qa_tools.cp import build_cp_warehouses, cp_common, orchestrate_cp
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
-from qa_tools.common import hand_filing, hierarchy
+from qa_tools.common import delivery, hand_filing, hierarchy
 from qa_tools.common import supply_db
 from qa_tools.common import trial as trial_mod
 from qa_tools.common.qa_results_reader import list_run_ids
@@ -165,6 +165,12 @@ def _require_all_six(folder: str) -> None:
             f"a CP delivery needs all 6 real tables, the cross-table checks can't run on a partial set")
 
 
+def _files_in(folder: str) -> list[str]:
+    """Every file directly in a folder, sorted - what a person handed over."""
+    return sorted(os.path.join(folder, n) for n in os.listdir(folder)
+                  if os.path.isfile(os.path.join(folder, n)))
+
+
 def _load_delivery_from_folder(folder: str, run_id: str, received_at=None) -> None:
     """Loads all 6 real tables for one run_id from an arbitrary folder
     into that run's warehouse - the retired qa_tools/cp/check_delivery.py
@@ -223,7 +229,18 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
     # _load_delivery() had already staged under the manifest's own id left
     # dbt looking for six tables that did not exist under that name. The
     # identity has to be settled before the first thing that uses it.
-    recorded_run_id = run_id if keep else trial_mod.trial_run_id()
+    if keep:
+        # A KEPT, UNRECORDED ARRIVAL GOES THROUGH THE PIPELINE'S OWN LIFECYCLE
+        # (REQ-PIPE-086 criterion 9) - see cli/bdm.py's run_check().
+        common.refuse_reference_for_kept(keep, reference_run_id, "--reference-run-id")
+        from qa_tools.common import arrivals
+
+        arrival = next(a for a in arrivals.arrivals_for("child-protection", "cp_run_")
+                       if a.run_id == run_id)
+        common.record_delivery_of(arrival)
+        build_cp_warehouses.stage_arrival(arrival)
+        return orchestrate_cp.run_arrivals([arrival], run_by, on_step=on_step), run_id
+    recorded_run_id = trial_mod.trial_run_id()
     entry = {**entry, "run_id": recorded_run_id}
 
     # ONLY WHERE AN OPERATOR NAMED ONE. A resolved reference's
@@ -272,13 +289,33 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
     flow above and Thread B's Lambda handler call. Returns (results,
     tmp_results_dir) - same tmp-dir-first Promote pattern as run_check()."""
     run_date = run_date or asset_time.now().date().isoformat()
-    # THE WHOLE FOLDER IS ONE DELIVERY (REQ-PIPE-103). Its six files
-    # arrived together, and a delivery is the transport unit - filing
-    # one delivery per file would invent six arrivals out of one.
-    _require_all_six(folder)
+    # KEEP OR TRIAL FIRST (REQ-PIPE-086 criterion 14), before any reference
+    # is looked at: a reference is a trial's yardstick only, and a kept
+    # supply is measured against the last promoted supply (REQ-QAC-108).
+    keep = common.decide_keep(_files_in(folder), keep=keep)
+    common.refuse_reference_for_kept(keep, reference_folder, "--reference-folder")
+    if keep:
+        # BY RECOGNITION ALONE (criterion 4): whatever the folder holds that
+        # recognition places is the delivery - one table, three or six - the
+        # same set the pipeline would accept. A covering note stays where it
+        # is; another collection's file is refused (criterion 5).
+        paths = [p for p in _files_in(folder) if delivery.dataset_for_filename(
+            os.path.basename(p)) is not None]
+        if not paths:
+            raise click.ClickException(
+                f"nothing in {folder} matches any dataset's arrival pattern, so there is "
+                f"nothing to file. Pass --trial to check it without filing.")
+    else:
+        # A TRIAL STILL NEEDS ALL SIX - it stages them under one throwaway id
+        # with no period to read siblings from - and its reference.
+        _require_all_six(folder)
+        common.require_reference_for_trial(reference_folder, "--reference-folder")
+        paths = [os.path.join(folder, f"{t}.csv") for t in TABLES]
+    # THE WHOLE FOLDER IS ONE DELIVERY (REQ-PIPE-103). Its files arrived
+    # together, and a delivery is the transport unit - filing one delivery
+    # per file would invent several arrivals out of one.
     filed = common.file_or_trial(
-        [os.path.join(folder, f"{t}.csv") for t in TABLES],
-        "child-protection", "cp_run_", keep=keep, route=route, originally=originally,
+        paths, "child-protection", "cp_run_", keep=keep, route=route, originally=originally,
         storage_times=storage_times)
     if run_id is not None and not filed.delivery_name:
         filed = dataclasses.replace(filed, run_id=run_id)
@@ -292,6 +329,11 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
         return _check_filed_delivery(filed, run_by, on_step), filed
     run_id = filed.run_id
     folder = os.path.dirname(filed.paths[0])
+    if reference_folder is None or len(filed.paths) != len(TABLES):
+        # A KEPT FOLDER THAT FELL BACK TO A TRIAL (filing refused it): a
+        # trial needs all six and its reference, which nobody was asked for.
+        _require_all_six(folder)
+        common.require_reference_for_trial(reference_folder, "--reference-folder")
     reference_run_id = common.reference_run_id()
 
     _load_delivery_from_folder(reference_folder, reference_run_id)
@@ -326,10 +368,20 @@ def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_
     "download, then Local files mode", not a third parallel
     check-running code path. Returns (results, tmp_results_dir) - same
     tmp-dir-first Promote pattern as run_check_local_folder()."""
+    # DECIDED HERE, BEFORE ANY DOWNLOAD, so a missing or unwanted reference is
+    # named by the S3 flag the person typed (REQ-PIPE-086 criterion 14).
+    keep = common.decide_keep([delivery_prefix], keep=keep)
+    common.refuse_reference_for_kept(keep, reference_delivery_prefix, "--s3-reference-delivery")
+    if not keep:
+        common.require_reference_for_trial(reference_delivery_prefix, "--s3-reference-delivery")
     staging_dir = tempfile.mkdtemp(prefix="mothman-s3-")
-    reference_staging_dir = tempfile.mkdtemp(prefix="mothman-s3-ref-")
     s3_source.download_prefix(bucket, delivery_prefix, staging_dir, s3_client=s3_client)
-    s3_source.download_prefix(bucket, reference_delivery_prefix, reference_staging_dir, s3_client=s3_client)
+    # ONLY A TRIAL'S REFERENCE IS FETCHED (REQ-PIPE-086 criterion 14).
+    reference_staging_dir = None
+    if reference_delivery_prefix is not None:
+        reference_staging_dir = tempfile.mkdtemp(prefix="mothman-s3-ref-")
+        s3_source.download_prefix(bucket, reference_delivery_prefix, reference_staging_dir,
+                                  s3_client=s3_client)
     times = s3_source.last_modified(
         bucket, s3_source.list_keys(bucket, delivery_prefix, s3_client=s3_client),
         s3_client=s3_client)
@@ -367,22 +419,39 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
     default_reference()) - there's no "other 5 tables" to pull from
     otherwise, a real and clearly-reported limitation, not a silent
     wrong answer."""
-    manifest = load_manifest()
-    other_tables_run_id = default_reference(manifest)
-    if not has_arrival(other_tables_run_id):
-        raise click.ClickException(
-            f"No delivery on disk for run {other_tables_run_id!r} (the last Promoted/fallback run) - "
-            f"run generate-synthetic-data first? Single-table mode needs a known-good delivery "
-            f"already on disk to source the other 5 tables from.")
-
     run_date = run_date or asset_time.now().date().isoformat()
+    # A KEPT FILE IS THE TABLE RECOGNITION SAYS IT IS - the same rule the
+    # pipeline applies - so --table naming another is refused rather than
+    # staging one table's rows under another's name.
+    keep = common.decide_keep([file_path], keep=keep)
+    recognised = delivery.dataset_for_filename(os.path.basename(file_path))
+    if keep and recognised is not None and hierarchy.dataset(recognised).table != table:
+        raise click.ClickException(
+            f"{os.path.basename(file_path)} is recognised as "
+            f"{hierarchy.dataset(recognised).table}, not {table} - nothing was filed.")
     # ONE FILE IS A ONE-FILE DELIVERY (REQ-PIPE-103 criterion 7), which
     # is what a partial resupply actually is: the supplier re-sent one
     # table and nothing else.
     filed = common.file_or_trial([file_path], "child-protection", "cp_run_", keep=keep,
                                  route=route, originally=originally,
                                  storage_times=storage_times)
-    if run_id is not None and not filed.delivery_name:
+    if filed.delivery_name:
+        # KEPT: THE PIPELINE'S OWN LIFECYCLE (REQ-PIPE-086 criteria 1 and 3) -
+        # filed, overlaid on its period, checked and gated. Its five siblings
+        # are read from the period it was FILED to, as for any single-file
+        # arrival; nothing is borrowed from an earlier run's delivery.
+        return _check_filed_delivery(filed, run_by, on_step), filed
+
+    # A TRIAL BORROWS: it has no period to read siblings from, so it stands
+    # beside the last promoted run's other five tables, staging nothing.
+    manifest = load_manifest()
+    other_tables_run_id = default_reference(manifest)
+    if not has_arrival(other_tables_run_id):
+        raise click.ClickException(
+            f"No delivery on disk for run {other_tables_run_id!r} (the last Promoted/fallback run) - "
+            f"run generate-synthetic-data first? A single-table trial needs a known-good delivery "
+            f"already on disk to source the other 5 tables from.")
+    if run_id is not None:
         filed = dataclasses.replace(filed, run_id=run_id)
     run_id = filed.run_id
     file_path = filed.paths[0]
@@ -470,7 +539,11 @@ def has_failures(results: list[dict]) -> bool:
 
 def picker_choices(manifest: list[dict]) -> list[str]:
     # See cli/bdm.py's identical picker.
+    # MARKED 'recorded' WHERE ITS QA ALREADY IS (REQ-PIPE-086 criterion 6):
+    # picking one runs a trial, said before it starts.
+    recorded = common.recorded_runs(e["run_id"] for e in manifest)
     return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["delivery"]})'
+            + ("  - recorded" if e["run_id"] in recorded else "")
             for e in manifest]
 
 
@@ -514,13 +587,13 @@ def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
         console.print(f"Recorded {len(results)} results for {recorded_run_id}", style="green")
 
 
-def _finish_supply(results: list[dict], filed) -> None:
+def _finish_supply(results: list[dict], filed, all_checks: bool = False) -> None:
     """Report a hand-supplied check, and say what the operator already
     decided (REQ-PIPE-103 criterion 8) - see cli/bdm.py's counterpart for
     why there is no second question, and why the copy-into-the-tree step
     this used to end with is gone."""
-    console.print(report_table(results, filed.run_id))
-    common.say_what_it_did(filed.run_id, filed.delivery_name)
+    common.finish_kept(results, filed, collection_id="child-protection", run_id_prefix="cp_run_",
+                       table=report_table, all_checks=all_checks)
     # A KEPT run that left its supply waiting offers the decision here
     # (REQ-GHUB-082 criterion 17), as the synthetic route always did -
     # post-build-review #82 found the hand-filed routes never asking. A
@@ -595,22 +668,26 @@ def _run_qa_interactive_local_folder(run_by: str, commit_default: bool) -> None:
     run_check_local_folder() the flag-invocable --folder/--reference-folder
     form below also calls."""
     folder = common.path_prompt(
-        "Path to the delivery folder you've already downloaded (all 6 real CP tables):",
-        flag_hint="mothman cp qa --folder <dir> --reference-folder <dir>")
+        "Path to the delivery folder you've already downloaded:",
+        flag_hint="mothman cp qa --folder <dir> [--trial --reference-folder <dir>]")
     if folder is None:
         return
-    reference_folder = common.path_prompt(
-        "Path to a known-good reference delivery folder (for distribution-drift comparison):",
-        flag_hint="mothman cp qa --folder <dir> --reference-folder <dir>")
-    if reference_folder is None:
-        return
+    # KEEP OR TRIAL FIRST, AND A REFERENCE ONLY FOR A TRIAL (REQ-PIPE-086
+    # criterion 14): a kept supply is measured against the last promoted one.
+    keep = common.decide_keep(_files_in(folder), keep=True if commit_default else None)
+    reference_folder = None
+    if not keep:
+        reference_folder = common.path_prompt(
+            "Path to a known-good reference delivery folder (all 6 tables) to compare against:",
+            flag_hint="mothman cp qa --folder <dir> --trial --reference-folder <dir>")
+        if reference_folder is None:
+            return
 
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {folder}...",
                   style="dim")
     with common.chain_progress(os.path.basename(folder.rstrip("/"))) as on_step:
         results, filed = run_check_local_folder(
-            folder, reference_folder, run_by, on_step=on_step,
-            keep=True if commit_default else None)
+            folder, reference_folder, run_by, on_step=on_step, keep=keep)
     _finish_supply(results, filed)
 
 
@@ -634,16 +711,21 @@ def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
     delivery = common.select("Pick a delivery to check:", deliveries, flag_hint=flag_hint)
     if delivery is None:
         return
-    reference_delivery = common.select("Pick a known-good reference delivery:", deliveries, flag_hint=flag_hint)
-    if reference_delivery is None:
-        return
+    # KEEP OR TRIAL FIRST, AND A REFERENCE ONLY FOR A TRIAL (REQ-PIPE-086
+    # criterion 14).
+    keep = common.decide_keep([delivery], keep=True if commit_default else None)
+    reference_delivery = None
+    if not keep:
+        reference_delivery = common.select("Pick a known-good reference delivery:",
+                                           deliveries, flag_hint=flag_hint)
+        if reference_delivery is None:
+            return
 
     console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                   f"for s3://{bucket}/{delivery}...", style="dim")
     with common.chain_progress(delivery.rstrip("/").rsplit("/", 1)[-1]) as on_step:
         results, filed = run_check_s3_delivery(
-            bucket, delivery, reference_delivery, run_by, on_step=on_step,
-            keep=True if commit_default else None)
+            bucket, delivery, reference_delivery, run_by, on_step=on_step, keep=keep)
     _finish_supply(results, filed)
 
 
@@ -721,17 +803,18 @@ def generate_synthetic_data_command(yes: bool) -> None:
 @click.option("--reference-run-id", default=None,
               help="Synthetic mode: defaults to the last Promoted run, or the manifest's own first (clean) entry.")
 @click.option("--folder", "folder_path", default=None, type=click.Path(exists=True, file_okay=False),
-              help="Local files mode: an already-downloaded delivery folder, all 6 real tables "
-                   "(instead of --run-id).")
+              help="Local files mode: an already-downloaded delivery folder (instead of "
+                   "--run-id). Kept, whatever recognition places in it is the delivery; a "
+                   "trial needs all 6 tables.")
 @click.option("--reference-folder", default=None, type=click.Path(exists=True, file_okay=False),
               help="Local files mode: a known-good reference delivery folder to compare distribution drift "
-                   "against. Required together with --folder.")
+                   "against. A trial's only: a kept supply is measured against the last promoted one.")
 @click.option("--s3-delivery", default=None,
               help="S3 mode: a delivery prefix under the dataset's s3Source prefix to check "
                    "(instead of --run-id/--folder).")
 @click.option("--s3-reference-delivery", default=None,
               help="S3 mode: a known-good reference delivery prefix to compare distribution drift against. "
-                   "Required together with --s3-delivery.")
+                   "A trial's only: a kept supply is measured against the last promoted one.")
 @click.option("--table", type=click.Choice(cp_common.TABLES), default=None,
               help="Single-table mode (plans/tooling.md #1 Phase 3.5): check just this one table (a real "
                    "partial resupply) - the other 5 tables auto-pull from the last Promoted run. "
@@ -741,6 +824,10 @@ def generate_synthetic_data_command(yes: bool) -> None:
 @click.option("--s3-key", default=None,
               help="Single-table mode: an object key under the dataset's s3Source prefix for --table "
                    "(instead of --s3-delivery).")
+@click.option("--all-checks", is_flag=True,
+              help="List every check in full. By default a kept delivery that became "
+                   "several arrivals shows failing and warning checks in full and passing "
+                   "ones as a count per dataset.")
 @click.option("--commit", is_flag=True,
               help="Keep it: file the supply as a real delivery received now, and record "
                    "this run in the dataset's QA history.")
@@ -756,7 +843,7 @@ def generate_synthetic_data_command(yes: bool) -> None:
 def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: str | None,
                reference_folder: str | None, s3_delivery: str | None, s3_reference_delivery: str | None,
                table: str | None, table_file: str | None, s3_key: str | None, commit: bool,
-               originally_received: str | None, trial: bool) -> None:
+               originally_received: str | None, trial: bool, all_checks: bool) -> None:
     """Run the real QA check chain against a Child Protection run - Synthetic (--run-id),
     Local files (--folder/--reference-folder), S3 (--s3-delivery/--s3-reference-delivery), or
     single-table (--table plus --file or --s3-key) source mode."""
@@ -784,7 +871,7 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
                 results, filed = run_check_s3_single_table(
                     bucket, table, s3_key, run_by, on_step=on_step, keep=keep,
                     originally=originally_received)
-        _finish_supply(results, filed)
+        _finish_supply(results, filed, all_checks)
         sys.exit(1 if has_failures(results) else 0)
 
     if s3_delivery is not None:
@@ -792,31 +879,29 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
             raise click.ClickException(
                 "Pass exactly one of --run-id (Synthetic mode), --folder (Local files mode), "
                 "or --s3-delivery (S3 mode).")
-        if s3_reference_delivery is None:
-            raise click.ClickException(
-                "--s3-delivery requires --s3-reference-delivery (a known-good delivery prefix to compare against).")
+        # A REFERENCE IS A TRIAL'S ONLY (REQ-PIPE-086 criterion 14), checked
+        # once keep-or-trial is settled - see run_check_local_folder().
+        common.refuse_reference_for_kept(common.keep_from_flags(commit, trial),
+                                         s3_reference_delivery, "--s3-reference-delivery")
         bucket = common.raw_bucket_name()
         run_by = get_run_by() if commit else "trial:not-recorded"
         with common.chain_progress(s3_delivery.rstrip("/").rsplit("/", 1)[-1]) as on_step:
             results, filed = run_check_s3_delivery(
                 bucket, s3_delivery, s3_reference_delivery, run_by, on_step=on_step,
                 keep=common.keep_from_flags(commit, trial), originally=originally_received)
-        _finish_supply(results, filed)
+        _finish_supply(results, filed, all_checks)
         sys.exit(1 if has_failures(results) else 0)
 
     if folder_path is not None:
         if run_id is not None:
             raise click.ClickException(
                 "Pass either --run-id (Synthetic mode) or --folder (Local files mode), not both.")
-        if reference_folder is None:
-            raise click.ClickException(
-                "--folder requires --reference-folder (a known-good delivery folder to compare against).")
         run_by = get_run_by() if commit else "trial:not-recorded"
         with common.chain_progress(os.path.basename(folder_path.rstrip("/"))) as on_step:
             results, filed = run_check_local_folder(
                 folder_path, reference_folder, run_by, on_step=on_step,
                 keep=common.keep_from_flags(commit, trial), originally=originally_received)
-        _finish_supply(results, filed)
+        _finish_supply(results, filed, all_checks)
         sys.exit(1 if has_failures(results) else 0)
 
     if run_id is None:
@@ -825,7 +910,7 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         run_qa_interactive(commit_default=commit)
         return
 
-    keep = common.keep_from_flags(commit, trial)
+    keep = common.decide_record(run_id, keep=common.keep_from_flags(commit, trial))
     run_by = get_run_by() if keep else "trial:not-recorded"
     with common.chain_progress(run_id) as on_step:
         results, recorded_run_id = run_check(run_id, run_by, reference_run_id=reference_run_id,

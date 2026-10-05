@@ -18138,7 +18138,72 @@ requirements:
       date: '2026-10-04'
     story: As a data engineer who will be running this from a terminal long before any of it is automated, I want every way I can keep a supply from the terminal - a file, a folder, one table, an S3 object, or an arrival I picked from the ones on disk - to go through exactly the steps the pipeline takes for an arrival (file it, overlay its period, check it, apply the promotion gate), so that what I do by hand today is the thing the automation will do later, rather than a narrower version of it that quietly behaves differently.
     moscow: must
-    status: in_progress
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 10 - run_single used for trials only, refusing a non-trial
+        identity.
+      why: Every terminal route that keeps a supply now goes through the lifecycle,
+        so run_single is called from the terminal for trials only - but the Lambda
+        ingest handlers (aws/lambda_handlers/*_ingest_handler.py) still call it
+        with real ids, and a guard would break them before REQ-PIPE-152 moves
+        them onto the per-arrival function.
+      owner: REQ-PIPE-152.
+      blocked_by:
+        requirements:
+        - REQ-PIPE-152
+    - criterion: Criterion 11 - a test that one delivery kept through the terminal
+        in one database and processed by the batch in another produces the same
+        filings, decisions and verdicts.
+      why: 'Not written tonight: it needs two real runs of the tools in two databases
+        (tests/equiv_support.snapshot is the comparison to reuse). Every kept
+        route now calls the same per-arrival function, so the equivalence holds
+        by construction; the test that would prove it is the open work.'
+      owner: unowned - morning report.
+      blocked_by:
+        unowned: true
+    evidence:
+    - '2026-10-06 overnight (sprint 14): tests/test_terminal_routes.py 14 passed,
+      tests/test_hand_filing.py 13; tests/test_cli_bdm.py and tests/test_cli_cp.py
+      pass (58), several rewritten on purpose because they pinned the old behaviour
+      (a reference with --commit; a kept synthetic run re-recorded under its own
+      id via run_single). A reference with a kept supply is refused citing REQ-QAC-108,
+      a trial without one is refused naming its own flag (the S3 routes decide
+      before downloading so the S3 flag is named), and the TUI asks keep-or-trial
+      before any reference. A kept CP folder is whatever recognition places -
+      two tables and a covering note file the two; a trial still needs all six.
+      A Birth Registrations file kept through `mothman cp qa` is refused naming
+      civil-registration, before any question, with nothing written and no trial
+      offered. A kept single table goes through _check_filed_delivery and borrows
+      nothing; a file recognised as another table than --table is refused. A recorded
+      synthetic arrival is marked ''- recorded'' in both pickers, runs as a trial
+      saying why, and --commit is refused naming --trial; an unrecorded one, kept,
+      is recorded, staged and processed through the lifecycle (test_cli_bdm/test_cli_cp''s
+      kept tests now take that path).'
+    implemented_by:
+    - qa_tools/common/arrival_lifecycle.py::process
+    - qa_tools/common/hand_filing.py::check_collection
+    - cli/common.py::refuse_reference_for_kept
+    - cli/common.py::require_reference_for_trial
+    - cli/common.py::decide_record
+    - cli/common.py::recorded_runs
+    - cli/common.py::record_delivery_of
+    - cli/cp.py::run_check_local_folder
+    - cli/cp.py::run_check_single_table
+    - cli/cp.py::run_check_s3_delivery
+    - cli/cp.py::run_check
+    - cli/bdm.py::run_check
+    - cli/bdm.py::run_check_local_file
+    - cli/bdm.py::run_check_s3
+    linked_tests:
+    - tests/test_terminal_routes.py::TestAReferenceIsATrialsOnly
+    - tests/test_terminal_routes.py::TestAKeptFolderIsWhateverRecognitionPlaces
+    - tests/test_terminal_routes.py::TestAFileOfAnotherCollection
+    - tests/test_terminal_routes.py::TestAKeptSingleTableIsAnArrival
+    - tests/test_terminal_routes.py::TestARecordedArrivalIsNeverRecordedAgain
+    - tests/test_hand_filing.py::TestAFileOfAnotherCollectionIsRefusedFirst
+    - tests/test_cli_bdm.py
+    - tests/test_cli_cp.py
+    - tests/test_arrival_lifecycle.py
     source: 'Keith, 2026-09-26, mid sign-off of REQ-GHUB-082: "data engineers will start by using the TUI for QA and then we''ll wire in an automated path later", so "the TUI MUST offer 100% the same functionality end to end as the automated pathway - deliveries, matching files, running QA, and all of the automation logic around what goes where". Split out of REQ-GHUB-082 the same day at his own call. REFRESHED by delivery-scoper 2026-10-04 against everything built and signed since, and narrowed at Keith''s answers the same day (questions Q1-Q5): most of the original twelve criteria are now carried by REQ-PIPE-103 and by the shared per-arrival functions REQ-PIPE-105 introduced; what remains is every route that still goes round them. The Lambda handlers were added at Keith''s Q2 answer and then split out to REQ-PIPE-152 at his follow-up answer the same day.'
     acceptance_criteria:
     - THE SYSTEM SHALL process every arrival a person keeps from the terminal - through a single file, a folder, one table on its own, an S3 object or an S3 delivery prefix, from the TUI or from flags - by calling the same per-arrival function the pipeline calls for each arrival, which files it, overlays its period, runs its checks and applies the promotion gate.
@@ -18200,6 +18265,24 @@ requirements:
     - 'CRITERIA 2 AND 13 DELIVERED, 2026-10-04 (overnight sprint 1): qa_tools/common/arrival_lifecycle.py holds the one per-arrival lifecycle (file and overlay, check, gate); both batches and both hand-filed run_arrivals() call process_all(), and parallel_orchestrate.run_manifest''s before/after hooks are no longer used by either batch. PROOF (criterion 13): a full `mothman pipeline bootstrap` from an empty database at the commit before (worktree, database equiv_before) and after (equiv_after), compared by tests/equiv_support.snapshot - 7,210 check results, 82 decisions, 150 filings, 150 runs, 151 supply tables - ZERO differences. Both bootstraps 20m50s, run side by side.'
     - 'PROVISIONAL (overnight sprint 1, Keith''s ''take my recommendation''): STAGING STAYS OUTSIDE the per-arrival function for now. The batch stages every arrival before the first is checked (build_all), and that order is observable - an arrival staged later the same day is a candidate the overlay sees - so moving staging in would change what the batch records, which criterion 13 forbids. The architect recommended staging inside; that belongs with criterion 1''s terminal routes and REQ-PIPE-151, where the order is redefined anyway.'
     - 'PROVISIONAL (overnight sprint 1): THE HAND-FILED BIRTH REGISTRATIONS PATH NOW CHECKS A CONTESTED FILE AS THE BATCH DOES, through the shared entry_for(), where it used to call path_for() and refuse. A behaviour change on the hand-filed route only, in the direction REQ-PIPE-105 criterion 6 already took for the batch; the batch is unchanged (proven above).'
+    - 'BUILT 2026-10-06 overnight (sprint 14): criteria 1, 3-9, 12 and 14, on
+      top of 2 and 13 (sprint 1).'
+    - 'PROVISIONAL (overnight): criterion 7 is met by REFUSAL - a recorded arrival
+      kept from the picker is refused naming --trial, and a further recorded check
+      happens only through REQ-PIPE-140''s re-check, owed by the decision or reload
+      that calls for it, under its own run id. REJECTED for tonight: routing a
+      person''s ''keep'' straight into recheck.execute, which needs a cause the
+      owed-run record requires (a decision or a load) and a person asking is neither.
+      Keith to confirm.'
+    - 'PROVISIONAL: criterion 12 - the kept synthetic route now records its delivery
+      and stages it as the batch does; scripted playback (REQ-GEN-135''s Player)
+      stays the batch''s, as synthetic-history playback rather than a step of
+      an arrival.'
+    - 'A KEPT FILE RECOGNISED AS ANOTHER TABLE THAN --table IS REFUSED (found
+      by the route assessment): it used to be staged under the table the person
+      named.'
+    - A KEPT FOLDER THAT FALLS BACK TO A TRIAL (filing refused a name) still needs
+      all six and a reference - nobody was asked for one.
     open_questions: []
   - id: REQ-PIPE-087
     title: "PostgreSQL is the one warehouse engine, and DuckDB keeps only the job of reading what arrives"
@@ -20193,16 +20276,6 @@ requirements:
     story: As an operator who works across a local database, dev, non-production and production, I want every mothman command to refuse until I have said which environment I am in, and production to make me confirm deliberately before I change anything by hand, so that a local habit never quietly reaches production and a production change is never an accident.
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 15 - the typed id from a person starting `mothman pipeline
-        process` at a terminal.
-      why: '`mothman pipeline process` is REQ-PIPE-151, delivery sprint 14 tonight;
-        there is no such command to guard yet. cli/common.confirm_change is the
-        confirmation it will call.'
-      owner: Sprint 14 tonight (REQ-PIPE-151).
-      blocked_by:
-        requirements:
-        - REQ-PIPE-151
     evidence:
     - '2026-10-05 (sprint 13): tests/test_stated_environment.py - 17 tests: with
       MOTHMAN_ENVIRONMENT unset a connection is refused before any connect attempt,
@@ -20313,6 +20386,13 @@ requirements:
       added the same night: MOTHMAN_TEST_DB_TAG, so two test sessions on one server
       no longer drop each other''s per-worker databases - a critic''s run and
       the builder''s gate had done exactly that.'
+    - 'CRITERION 15 BUILT 2026-10-06 with REQ-PIPE-151: `mothman pipeline process`
+      asks a person at a terminal for the typed id where the environment confirms
+      changes, and never asks with no terminal attached (tests/test_processing_pass.py::TestATypedIdWhereTheEnvironmentAsksForIt).'
+    - 'RE-MARKING NEEDS A PERSON (post-build-review #119 D1, 2026-10-06): `mothman
+      env mark --confirm` stands in for typing only on an UNMARKED database; replacing
+      an identity needs a terminal and the identity typed out, and --replacing
+      is gone - criterion 6, which says no flag skips the typed id.'
   - id: REQ-DASH-094
     title: "The dashboard says which environment's QA it is showing"
     date_written: "2026-09-26"
@@ -27514,14 +27594,6 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: Criterion 8's second half - completing an owed run on the next
-        run of the processing pass.
-      owner: REQ-PIPE-151
-      why: 'A broken run stays owed and reported; the processing pass that finishes
-        owed runs is REQ-PIPE-151 (Keith, 2026-10-05: no interim command).'
-      blocked_by:
-        requirements:
-        - REQ-PIPE-151
     - criterion: Criterion 5's terminal half - the terminal reading a supply's
         verdict from its most recent run.
       owner: unowned
@@ -27642,6 +27714,9 @@ requirements:
       moved tables recorded on the run; the writer keeps only those tables'' reading
       checks of its dataset, and scope_of_run gives the left-out reconciliation
       the same answer.'
+    - 'CRITERION 8''s SECOND HALF DELIVERED 2026-10-06 by REQ-PIPE-151: `mothman
+      pipeline process` completes every owed re-check and re-evaluation, clearing
+      each only when its work completes.'
     open_questions: []
 
   - id: REQ-PIPE-141
@@ -28239,14 +28314,13 @@ requirements:
     - criterion: Criterion 12 - a reloaded supply records, in the same transaction
         as its new load record, that a re-check is owed, and the next processing
         pass runs it through REQ-PIPE-140's re-check.
-      why: The owed re-check is REQ-PIPE-140's record and the pass that runs it
-        is REQ-PIPE-151's; neither exists. A reload already closes the failed-load
-        item and makes the table readable.
-      owner: REQ-PIPE-140 and REQ-PIPE-151.
+      why: 'Both halves it waited on now exist - the owed re-check (REQ-PIPE-140)
+        and the pass that runs it (REQ-PIPE-151, 2026-10-06). What is missing
+        is the reload owing it: a load record that follows a failed one does not
+        yet call recheck.owe in its transaction.'
+      owner: unowned - morning report.
       blocked_by:
-        requirements:
-        - REQ-PIPE-140
-        - REQ-PIPE-151
+        unowned: true
     evidence:
     - '2026-10-05 (overnight batch 6): tests/test_staging_loads.py pins the own-words
       reason against a real malformed CSV (''malformed row: line 3 has 4 fields
@@ -28360,7 +28434,37 @@ requirements:
       date: '2026-10-04'
     story: As a data engineer running supplies from the terminal, I want to be told, for each arrival I keep, which period and slot it was filed to, whether it was early, on time or late, whether it was held and why, and what the promotion gate did with it - so that I can see the rules working rather than only a table of check results, and notice at once when an arrival went somewhere I did not expect.
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-06 overnight (sprint 14): tests/test_lifecycle_report.py 14 passed.
+      Each kept arrival reads its recognised dataset, the period it was filed
+      to and its arrival classification; a held one names every slot considered
+      and why each was unavailable and says no check ran; a contested one names
+      the other file; the gate line says promoted / withheld / left for a person
+      with the recorded reason and that the rule, not the person, decided; an
+      inheritance filing caused is the rule''s. All of it from three reads of
+      the record. Six arrivals with one outcome are one line naming how many;
+      the one that differs has its own. A stage failure names the arrival, the
+      stage and what completed, and never says ''Kept.''. A trial lists what recognition
+      would make of each file and goes on. Several arrivals: failing and warning
+      checks in full, passing ones counted per dataset, --all-checks lists every
+      one, and the lifecycle summary comes last. NOT DRIVEN IN A REAL TERMINAL
+      against a real kept delivery tonight.'
+    implemented_by:
+    - cli/lifecycle_report.py::outcome_of
+    - cli/lifecycle_report.py::report
+    - cli/lifecycle_report.py::stage_failure
+    - cli/lifecycle_report.py::trial_recognition
+    - cli/common.py::finish_kept
+    - cli/common.py::_as_trial
+    - qa_tools/common/arrival_lifecycle.py::StageFailed
+    - cli/app.py::_MothmanGroup
+    linked_tests:
+    - tests/test_lifecycle_report.py::TestEachOutcomeIsSaid
+    - tests/test_lifecycle_report.py::TestOneOutcomeSharedIsSaidOnce
+    - tests/test_lifecycle_report.py::TestAFailedStageIsNamed
+    - tests/test_lifecycle_report.py::TestATrialSaysWhatRecognitionWouldDo
+    - tests/test_lifecycle_report.py::TestSeveralArrivalsAreReportedCompactly
     source: 'Split out of REQ-PIPE-086 at its 2026-10-04 refresh by delivery-scoper: original criteria 5, 6 and 11 and its 30-dataset operability NFR, from Keith''s 2026-09-26 framing that the terminal is the first real path. Checked against the code the same day - filing.file_arrivals is silent (qa_tools/common/filing.py:246; its one print, line 297, is for a dataset with no slots), and a kept run ends with the check table and ''Kept. <run> is a real arrival'' (cli/common.py:458-468), so of every lifecycle stage only the promotion gate reports itself (qa_tools/common/promotion.py:888-905). Split and component confirmed by Keith 2026-10-04 (Q5, Q7).'
     acceptance_criteria:
     - WHEN a person keeps a supply from the terminal, THE SYSTEM SHALL report, for each arrival it became, the dataset recognition placed it in and the period and slot it was filed to.
@@ -28394,6 +28498,18 @@ requirements:
     - 'A TRIAL SAYS WHAT RECOGNITION WOULD MAKE OF ITS FILE - A DELIBERATE, DISPLAY-ONLY REVERSAL OF REQ-PIPE-103 (Keith, 2026-10-04, Q6). 103 decided a trial ''needs no recognition, because the command already says which dataset is being checked'', so a trial runs none (cli/common.py _as_trial). That stays true for RUNNING the trial - recognition still decides nothing about it. Criterion 10 adds only the telling, so a person who checks an emailed file as a trial learns before keeping it that its name would be refused. Rejected dropping it: the cost is a line of output, and the alternative is finding out at the moment of keeping.'
     - A BIG KEPT DELIVERY SHOWS FAILURES AND WARNINGS IN FULL, PASSES AS A COUNT (Keith, 2026-10-04), ending on the lifecycle summary so the last thing on screen is what was decided. REJECTED the full table per arrival, which buries the decision under hundreds of passing rows at thirty datasets.
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - BUILT 2026-10-06 overnight (sprint 14), in cli/lifecycle_report.py, called
+      from every hand-supplied route's finish (common.finish_kept).
+    - 'STAGE FAILURE COMES FROM THE LIFECYCLE ITSELF: arrival_lifecycle.process
+      raises StageFailed naming the arrival, the stage and what had completed,
+      the original exception chained; the CLI group and the TUI menu report it
+      and exit 2 rather than printing a kept run''s message.'
+    - 'PROVISIONAL: the gate line reads the RULE''s newest promote / promotion-withheld
+      / promotion-refused entry for the supply; with none it says the gate is
+      owed to the next processing pass rather than guessing.'
+    - 'PROVISIONAL: inheritances are attributed to the kept run by being recorded
+      at or after its receipt instant - the record carries no link from a filing
+      to the inheritance its opening caused.'
     open_questions: []
   - id: REQ-PIPE-151
     title: One processing pass handles what has arrived and finishes what is owed, never generates data, and is what a scheduler calls
@@ -28403,7 +28519,64 @@ requirements:
       date: '2026-10-04'
     story: As whoever runs this asset - a data engineer at a terminal today, a scheduler later - I want one command that processes every arrival not yet processed, finishes any re-check or re-evaluation a decision left owed, and brings the GitHub tickets up to date, without generating or regenerating anything, so that the work signed requirements defer to 'the next pipeline run' actually has a next run in a real deployment, and so that its cost depends on what is new rather than on all history.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 1's second half - an arrival built from a recorded
+        delivery (qa.delivery / qa.delivery_file rows) whose files exist only
+        in storage.
+      why: Reading a delivery that exists only as database rows needs read access
+        to the arriving S3 bucket and REQ-PIPE-152's handlers; the pass today
+        recognises arrivals from the delivery tree on disk only.
+      owner: REQ-PIPE-152.
+      blocked_by:
+        requirements:
+        - REQ-PIPE-152
+    evidence:
+    - '2026-10-06 overnight (sprint 14): tests/test_processing_pass.py 22 passed,
+      tests/test_backlog.py 22, tests/test_promotion_step.py 13. Every gate outcome
+      that is not a promotion records one promotion-refused entry with its reason,
+      by the rule, changing no slot and ending no hold - including a supply filed
+      to no period, which names no slot - and a gate run twice records nothing
+      more; nothing staged reads ''could not be loaded''. ''Processed'' is derived
+      in ONE statement (completed run + a gate entry, or an open hold), states
+      unchecked/ungated/processed. The pass lock refuses a second pass naming
+      the holder and since when; one arrival lock admits one process. Exit 0/1/2/75
+      with 2 outranking 1, stated in --help. A typed id is asked of a person at
+      a terminal in production and never of a scheduler. REAL PASS on a copy of
+      the deployment brought to schema 30 by hand (Keith''s dev-database permission):
+      150 arrivals, 87 already processed, 63 checked-but-ungated given their gate
+      - 51s, no promotion added, 63 refusals each with its reason, the 9 open
+      holds untouched; a second pass said ''Nothing to process and nothing owed.''
+      and exited 0.'
+    implemented_by:
+    - qa_tools/common/processing_pass.py::run_pass
+    - qa_tools/common/processing_pass.py::recorded
+    - qa_tools/common/processing_pass.py::state_of
+    - qa_tools/common/processing_pass.py::pass_lock
+    - qa_tools/common/processing_pass.py::arrival_lock
+    - qa_tools/common/processing_pass.py::all_arrivals
+    - qa_tools/common/promotion.py::_record_refused
+    - qa_tools/common/promotion.py::after_run
+    - qa_tools/common/decision_log.py::apply_decision
+    - qa_tools/common/qa_store.py::ensure_schema
+    - qa_tools/common/backlog.py::unprocessed
+    - qa_tools/common/bootstrap.py::bootstrap
+    - qa_tools/bdm/build_per_run_warehouses.py::stage_arrival
+    - qa_tools/cp/build_cp_warehouses.py::stage_arrival
+    - cli/pipeline.py::process_command
+    - cli/pipeline.py::run_process
+    - cli/pipeline.py::run_command
+    - cli/app.py::_main_menu_loop
+    linked_tests:
+    - tests/test_processing_pass.py::TestTheGateRecordsEveryRefusal
+    - tests/test_processing_pass.py::TestProcessedIsDerived
+    - tests/test_processing_pass.py::TestTheGateOnlyPathFeedsTheGateItsResults
+    - tests/test_processing_pass.py::TestTheLocks
+    - tests/test_processing_pass.py::TestExitStatus
+    - tests/test_processing_pass.py::TestTheCommandGeneratesNothing
+    - tests/test_processing_pass.py::TestATypedIdWhereTheEnvironmentAsksForIt
+    - tests/test_backlog.py::TestHowFarProcessingGotIsDerived
+    - tests/test_promotion_step.py::TestRunningTheStepTwiceIsSafe
     source: 'Keith, 2026-10-04, answering delivery-scoper''s Q3 on the REQ-PIPE-086 refresh: scope plans/supply-model.md Thread L (incremental processing, his own ask 2026-09-25) now, as a command that processes new arrivals, finishes owed work (REQ-PIPE-121 criterion 16, REQ-PIPE-140 criterion 8, REQ-PIPE-120) and reconciles tickets (REQ-GHUB-082), never generates data, is reachable from the TUI, and is what an automated scheduler would call. Drafted by delivery-scoper the same day from Thread L in full.'
     acceptance_criteria:
     - THE SYSTEM SHALL provide one command, `mothman pipeline process`, that processes, in receipt order across every collection, every arrival not yet processed - recognised from the delivery tree or built from a recorded delivery (REQ-PIPE-144's qa.delivery and qa.delivery_file rows) whose files exist only in storage - each through REQ-PIPE-086's per-arrival function.
@@ -28475,6 +28648,45 @@ requirements:
     - 'THE PROCESSING PASS GETS READ-ONLY ACCESS TO THE ARRIVING BUCKET (Keith, 2026-10-04), correcting this NFR''s ''holds no access the batch does not'': criterion 1 already builds arrivals from S3-only deliveries, which it cannot do without reading the bucket. REJECTED copying objects somewhere the pass can already reach (REQ-PIPE-152 decision 3 rejected copies).'
     - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
     - "CRITERION 3 AMENDED 2026-10-04, PROVISIONAL (overnight sprint 3b; listed in the morning report for Keith): it kept `promotion-withheld` 'for an off-cycle arrival, as today', and REQ-PIPE-131 retired that gate, so nothing writes it. Every outcome is now a `promotion-refused` with its reason, and a supply held for want of an open period joins the list it names. `promotion-withheld` stays in the vocabulary only as history."
+    - 'BUILT 2026-10-06 overnight (sprint 14), criteria 2-20 and the disk half
+      of criterion 1. Schema 30: promotion-refused added to the action list, and
+      the inline ''every decision names a slot'' CHECK replaced by the named decision_names_a_slot,
+      which exempts it - a refusal of a supply filed to no period has no slot
+      to name.'
+    - 'A REFUSAL NEVER ENDS A HOLD: apply_decision resolves a supply''s hold on
+      ANY decision (REQ-PIPE-078 c6), so every RECORDS_A_REFUSAL action now skips
+      it - otherwise ''held - no open period'' would close the hold it reports.
+      A decision-log reader audit (every module reading qa.decision) found no
+      other reader whose answer changes: slot_holds lists the slot-changing actions
+      rather than excluding refusals.'
+    - 'NO REFUSAL FOR A SUPPLY THE GATE PROMOTED: a gate re-run over a promoted
+      supply (a knock-on re-evaluation does exactly this) saw its own slot filled
+      and recorded ''refused''; found by test_promotion_step''s run-twice test
+      and fixed before the rebuild was trusted - the first sprint-14 rebuild was
+      killed and restarted because it carried that defect.'
+    - 'CHECKED BUT NOT GATED RUNS THE GATE ONLY, on the run''s recorded results
+      - re-checking would record a second result set under the same run id (REQ-PIPE-086
+      c8). DEFECT FOUND ON THE FIRST REAL PASS: recorded rows say run_key, the
+      gate matches results to arrivals by run_id, so every result was dropped
+      and a red supply read ''no active checks''; fixed with a failing test first.'
+    - 'THE PASS LOCK''S HOLDER IS READ FROM THE HOLDER''S OWN CONNECTION (application_name
+      and backend start) - no table to fall out of date. DEFECT FOUND BY ITS OWN
+      TEST while a rebuild ran against another database on the same server: pg_locks
+      spans databases, so the holder lookup named that bootstrap; now filtered
+      to the current database.'
+    - 'PROVISIONAL (overnight): an arrival another process holds is LEFT for the
+      next pass (try-lock), never waited on - a pass never hangs behind a Lambda
+      retry.'
+    - 'PROVISIONAL: the pass stages every still-unchecked arrival before the first
+      is checked, as the batch does - a delivery''s later files are candidates
+      the overlay sees.'
+    - 'PROVISIONAL: the pass never plays scripted decisions (REQ-GEN-135) - playback
+      belongs to regenerating synthetic history, which is run/bootstrap''s job
+      (criterion 17).'
+    - CRITERION 16 NAMES `mothman pipeline regenerate-history`, which does not
+      exist; the lock is taken by process, run and bootstrap, the three that do.
+    - 'CRITERION 5''s ticket half holds by construction: ticket_reconciler builds
+      from slot_state, which reads only slot-changing decisions.'
     open_questions: []
   - id: REQ-PIPE-152
     title: The S3 Lambda handlers process each arriving object through the per-arrival lifecycle, and the S3 object is the delivery

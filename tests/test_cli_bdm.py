@@ -106,7 +106,7 @@ def test_has_failures_true_on_fail_or_error_false_otherwise():
 
 
 def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
-        monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
+        monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir, private_supply_dsn):
     """Re-pointed from the retired `..._does_not_clobber_the_real_batch_
     manifest` test (REQ-GEN-043), which is worth spelling out rather than
     quietly deleting. The original guarded a real bug found live - a
@@ -158,7 +158,9 @@ def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
     assert len(before_arrivals) == 2, "test precondition - the fixture must recognise both arrivals"
     assert before_bytes, "test precondition - there must be real delivery files to fingerprint"
 
-    bdm.run_check(_ARRIVAL_REF_RUN_ID, "test@example.com", reference_run_id=_ARRIVAL_REF_RUN_ID)
+    # Kept, and so through the lifecycle with no reference (REQ-PIPE-086
+    # criteria 9 and 14) - the guarantee is unchanged: a read of the arrival.
+    bdm.run_check(_ARRIVAL_REF_RUN_ID, "test@example.com")
 
     assert bdm.load_manifest() == before_arrivals, \
         "run_check() must not change which arrivals are recognised on disk"
@@ -188,7 +190,7 @@ def test_qa_command_flag_mode_without_commit_is_a_trial(
 
 
 def test_qa_command_flag_mode_commit_records_the_run_under_its_own_id(
-        monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir, clean_qa_history):
+        monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir, clean_qa_history, private_supply_dsn):
     """The kept case: the run keeps the manifest's own identity and its
     results are readable afterwards, attributed to whoever ran it."""
     from qa_tools.common import qa_results_reader as reader
@@ -197,8 +199,7 @@ def test_qa_command_flag_mode_commit_records_the_run_under_its_own_id(
     monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(bdm.qa_command,
-                             ["--run-id", _ARRIVAL_REF_RUN_ID, "--reference-run-id", _ARRIVAL_REF_RUN_ID,
-                              "--commit"])
+                             ["--run-id", _ARRIVAL_REF_RUN_ID, "--commit"])
 
     assert result.exit_code == 0, result.output
     assert "Recorded" in result.output
@@ -324,7 +325,6 @@ def test_qa_command_local_file_commit_files_a_real_delivery_and_records_it(
 
     result = _runner.invoke(bdm.qa_command, [
         "--file", str(supplied),
-        "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
         "--commit", "--originally-received", "not-known",
     ])
 
@@ -359,7 +359,6 @@ def test_qa_command_local_file_commit_refuses_a_name_recognition_cannot_place(
 
     result = _runner.invoke(bdm.qa_command, [
         "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
-        "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
         "--commit", "--originally-received", "not-known",
     ])
 

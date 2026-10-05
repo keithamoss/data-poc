@@ -2316,7 +2316,7 @@ which is how `clipDatasetToAsOf()` ended up filtering on arrival rather
 than promotion (Thread H), correct only because promotion did not yet
 exist.
 
-26. **[blocked, 2026-10-05]** **[Pipeline & publishing]** **PostgreSQL is the
+26. **[done, 2026-10-06]** **[Pipeline & publishing]** **PostgreSQL is the
     warehouse, and the publisher moves inside the environment.** One engine
     holding staging, rejected, the period schemas and a `sample` schema, with
     DuckDB kept only as a reader of arriving files; all four QA tools checking
@@ -2362,7 +2362,7 @@ exist.
     (`plans/qa-pipeline.md` item 87 - genuinely blocked), and `qa_results/` is
     still a committed tree, so `REQ-PIPE-089` onwards is untouched.
 
-27. **[blocked, 2026-10-05]** **[QA checks & contract]** **Load-time file checks,
+27. **[in-progress, 2026-10-06]** **[QA checks & contract]** **Load-time file checks,
     and where their results go.** The small explicit set of checks that can
     only be made on the file as delivered - encoding, delimiter, header row,
     column order, ragged rows, duplicate headers - as a fifth tool with real

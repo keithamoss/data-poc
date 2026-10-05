@@ -5874,3 +5874,51 @@ twice. It deliberately did not re-find the `TypeError`.
     - **NOT VERIFIED BY THE CRITIC**: a refused BIRTH REGISTRATIONS file end
       to end (none exists in the history); the authoring-rules compliance
       of the six checks' prose; D3/D4 at runtime.
+
+119. **[in-progress, 2026-10-06]** **[Pipeline & publishing]** **The delivery
+    critic on sprint 13 (91fbd85)** - REQ-PIPE-093, 107, 146 and REQ-TEST-114,
+    #118's fixes and the TS-56 move. Reviewed from an exact archive against a
+    copy of the deployment database, the TUI driven in a real pty. Checked
+    against the code before it was written here; each fix had a failing test
+    first, confirmed failing.
+    - **D1 (MEDIUM-HIGH), FIXED - a defect against a signed criterion, so not
+      routed as a choice**: `mothman env mark --confirm <id> --replacing ...`
+      re-marked a database with no terminal at all, production included, in
+      both directions - REQ-PIPE-093 criterion 6 says no flag skips the typed id
+      for a re-marking. `--confirm` now stands in for typing ONLY on an unmarked
+      database (the setup scripts' whole need); replacing an identity needs a
+      person at a terminal typing out what is being replaced, and `--replacing`
+      is gone. The refusal no longer prints the exact text to copy back
+      (criterion 3).
+    - **D2 (MEDIUM), HALF FIXED, HALF FOR KEITH**: `supply tidy`, `supply
+      discard-sample`, `env reset-synthetic` and the "originally received"
+      prompt now name the environment in the prompt (REQ-TEST-114 criterion 4).
+      WHETHER tidy and discard-sample should also need production's typed id,
+      with `--yes` unable to skip it, is outside REQ-PIPE-093 criterion 4's
+      list - a question for Keith (morning report).
+    - **D3 (MEDIUM, test gap), FIXED**: the production confirmation was tested
+      only on `confirm_change` alone - swapping the flows' calls back to a plain
+      yes/no passed every test. Two flow-level tests now fail under exactly
+      those mutations (tests/test_cli_filing_tui.py).
+    - **D4 (LOW-MEDIUM), FIXED**: the image-tag gate passed an untagged,
+      digest-pinned, templated or `postgresql`-named image, and never looked at
+      a job's own `container`. Now every PostgreSQL image is found and one whose
+      major cannot be read is an error.
+    - **D5 (LOW), FIXED**: the version refusal appended a redacted DSN; it now
+      carries none, as the identity refusal already did.
+    - **D6 (LOW), PARTLY FIXED**: the press-any-key prompt carries the toolbar;
+      the "originally received" `click.prompt` names the environment in its
+      text instead (a click prompt has no toolbar). Progress printed with no
+      prompt showing still names nothing - open, minor.
+    - **D7 (LOW), FIXED**: four tests that could pass vacuously now assert what
+      they claim (the id was asked for; the command succeeded; at least two CI
+      jobs were checked, found by image; the PROBE statement itself).
+    - **D8 (LOW), FIXED**: the percent-encoded form of a password is scrubbed
+      too.
+    - **D9 (LOW), FIXED**: a ticket repository with no owner is refused before
+      connecting, as the ticket service would refuse it mid-run.
+    - **D10 (FOR KEITH)**: production hand-filing asks "keep this?" (y/N) and
+      then the typed id. A recorded decision accepts that; whether the typed id
+      should replace the y/N is a choice (morning report).
+    - **NOT VERIFIED by the critic**: nothing in a browser, CI for 91fbd85, and
+      REQ-TEST-114 criterion 9 (the cast).

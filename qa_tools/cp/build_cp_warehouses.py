@@ -241,41 +241,46 @@ def build_all(dsn: str | None = None,
     # run directory IS the delivery.
     for arrival in arrivals.arrivals_for("child-protection", "cp_run_",
                                           deliveries_dir, receipts_dir):
-        run_id = arrival.run_id
-        # WHAT IS IN THIS DELIVERY, not what we assumed would be
-        # (REQ-PIPE-058). This used to loop over the six table names and
-        # build `<table>.csv` for each, so Child Protection did not use
-        # pattern attribution at all - a supplier renaming an extract
-        # was a CODE change here while being a configuration change for
-        # Birth Registrations. It also meant a delivery missing a file
-        # failed on a path that did not exist rather than simply not
-        # staging that dataset.
-        staged = 0
-        for dataset_id, filenames in sorted(arrival.files_by_dataset.items()):
-            table = hierarchy.dataset(dataset_id).table
-            for ordinal, filename in enumerate(sorted(filenames), start=1):
-                # EVERY FILE THAT MATCHED IS STAGED, including both
-                # halves of a held supply (REQ-PIPE-059): the material
-                # to resolve the hold with has to be there. They get
-                # distinct physical names, and no view resolves the
-                # logical one - REQ-PIPE-068 refuses to choose between
-                # candidates - so nothing can read it, which is how
-                # "staged but not checked" is enforced by the mechanism
-                # rather than by remembering.
-                # AN ORDINAL, NOT THE FILENAME - a supplier's filename
-                # must never reach a SQL identifier, and the ordinal is
-                # ours.
-                if add_table_to_run(
-                        run_id, table, os.path.join(str(arrival.path), filename),
-                        dsn=dsn,
-                        ordinal=ordinal if len(filenames) > 1 else 0,
-                        received_at=arrival.received_at, dataset_id=dataset_id,
-                        delivery_name=arrival.delivery_name) is not None:
-                    staged += 1
-        run_ids.append(run_id)
-        print(f"{run_id}: staged {staged} table(s)")
-
+        run_ids.append(stage_arrival(arrival, dsn=dsn))
     return run_ids
+
+
+def stage_arrival(arrival, dsn: str | None = None) -> str:
+    """Stage ONE recognised arrival - build_all()'s loop body, shared with
+    the processing pass (REQ-PIPE-151). Returns its run id."""
+    run_id = arrival.run_id
+    # WHAT IS IN THIS DELIVERY, not what we assumed would be
+    # (REQ-PIPE-058). This used to loop over the six table names and
+    # build `<table>.csv` for each, so Child Protection did not use
+    # pattern attribution at all - a supplier renaming an extract
+    # was a CODE change here while being a configuration change for
+    # Birth Registrations. It also meant a delivery missing a file
+    # failed on a path that did not exist rather than simply not
+    # staging that dataset.
+    staged = 0
+    for dataset_id, filenames in sorted(arrival.files_by_dataset.items()):
+        table = hierarchy.dataset(dataset_id).table
+        for ordinal, filename in enumerate(sorted(filenames), start=1):
+            # EVERY FILE THAT MATCHED IS STAGED, including both
+            # halves of a held supply (REQ-PIPE-059): the material
+            # to resolve the hold with has to be there. They get
+            # distinct physical names, and no view resolves the
+            # logical one - REQ-PIPE-068 refuses to choose between
+            # candidates - so nothing can read it, which is how
+            # "staged but not checked" is enforced by the mechanism
+            # rather than by remembering.
+            # AN ORDINAL, NOT THE FILENAME - a supplier's filename
+            # must never reach a SQL identifier, and the ordinal is
+            # ours.
+            if add_table_to_run(
+                    run_id, table, os.path.join(str(arrival.path), filename),
+                    dsn=dsn,
+                    ordinal=ordinal if len(filenames) > 1 else 0,
+                    received_at=arrival.received_at, dataset_id=dataset_id,
+                    delivery_name=arrival.delivery_name) is not None:
+                staged += 1
+    print(f"{run_id}: staged {staged} table(s)")
+    return run_id
 
 
 if __name__ == "__main__":

@@ -202,26 +202,35 @@ def build_all(dsn: str | None = None,
     staged = []
     for arrival in arrivals.arrivals_for("civil-registration", "run_",
                                           deliveries_dir, receipts_dir):
-        run_date = asset_time.local_date(arrival.received_at).isoformat()
-        names = arrival.files_by_dataset.get("birth-registrations") or ()
-        # EVERY FILE THAT MATCHED IS STAGED, both halves of a held
-        # supply included (REQ-PIPE-059) - the material to resolve the
-        # hold with has to be there. They get distinct physical names
-        # and no view resolves the logical one, so nothing can read it.
-        for ordinal, filename in enumerate(sorted(names), start=1):
-            physical = build_one(
-                arrival.run_id, str(arrival.path / filename), run_date,
-                dsn=dsn,
-                # AN ORDINAL, NOT THE FILENAME. A supplier's filename
-                # must never reach a SQL identifier - DuckDB's
-                # parameter binding covers values, not identifiers -
-                # and the ordinal is ours. One file needs no suffix at
-                # all, which keeps the ordinary name readable.
-                ordinal=ordinal if len(names) > 1 else 0,
-                received_at=arrival.received_at,
-                delivery_name=arrival.delivery_name)
-            if physical is not None:
-                staged.append(physical)
+        staged.extend(stage_arrival(arrival, dsn=dsn))
+    return staged
+
+
+def stage_arrival(arrival, dsn: str | None = None) -> list[str]:
+    """Stage ONE recognised arrival - build_all()'s loop body, shared with
+    the processing pass (REQ-PIPE-151), which stages only the arrivals it
+    is about to process."""
+    staged = []
+    run_date = asset_time.local_date(arrival.received_at).isoformat()
+    names = arrival.files_by_dataset.get("birth-registrations") or ()
+    # EVERY FILE THAT MATCHED IS STAGED, both halves of a held
+    # supply included (REQ-PIPE-059) - the material to resolve the
+    # hold with has to be there. They get distinct physical names
+    # and no view resolves the logical one, so nothing can read it.
+    for ordinal, filename in enumerate(sorted(names), start=1):
+        physical = build_one(
+            arrival.run_id, str(arrival.path / filename), run_date,
+            dsn=dsn,
+            # AN ORDINAL, NOT THE FILENAME. A supplier's filename
+            # must never reach a SQL identifier - DuckDB's
+            # parameter binding covers values, not identifiers -
+            # and the ordinal is ours. One file needs no suffix at
+            # all, which keeps the ordinary name readable.
+            ordinal=ordinal if len(names) > 1 else 0,
+            received_at=arrival.received_at,
+            delivery_name=arrival.delivery_name)
+        if physical is not None:
+            staged.append(physical)
     return staged
 
 

@@ -170,7 +170,7 @@ def for_connection(path: Path | str | None = None) -> Environment:
     quietly running without tickets is how a production asset ends up with
     nobody told."""
     env = current(path)
-    if env.ticketing and not ticket_repository():
+    if env.ticketing and "/" not in (ticket_repository() or "").strip("/"):
         raise EnvironmentError_(
             f"the {env.id!r} environment turns ticketing on, but contract/data-asset.yaml "
             f"names no ticket_repository to open tickets in. Name it (owner/repo) or turn "

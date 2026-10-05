@@ -523,3 +523,38 @@ class TestEveryOperationIsReachableFromSomeDoor:
                 reachable |= self._offered_by(
                     flow, _state(name, supply="cp-carers@1", closed=closed), monkeypatch)
         assert reachable == set(fd.OPERATIONS)
+
+
+class TestProductionTypesItsIdIntoTheRealFlows:
+    """post-build-review #119 D3: REQ-PIPE-093 criteria 4, 6 and 7 tested on
+    the FLOWS, not only on confirm_change - a mutation that swapped the
+    flow's confirmation back to a plain yes/no passed every test before."""
+
+    def test_a_decision_in_production_needs_the_typed_id_even_with_yes(
+            self, monkeypatch, actor):
+        monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
+        monkeypatch.setattr(filing_tui.common, "require_tty", lambda hint: None)
+        typed = []
+        monkeypatch.setattr(filing_tui.common, "_ask_text",
+                            lambda m: typed.append(m) or "Production")
+        applied = []
+        monkeypatch.setattr(fd, "apply", lambda *a, **k: applied.append(1))
+        out = filing_tui.apply_decision(operation=fd.PROMOTE, dataset_id="cp-carers",
+                                        period="2026-Q1", reason="x", actor=actor, yes=True)
+        assert typed, "the typed id was never asked for"
+        assert out is None and applied == [], "a mistyped id must record nothing"
+
+    def test_hand_filing_in_production_needs_the_typed_id(self, monkeypatch):
+        import click
+
+        from cli import common
+
+        monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
+        monkeypatch.setattr(common, "decide_keep", lambda paths, keep: True)
+        monkeypatch.setattr(common, "require_tty", lambda hint: None)
+        typed = []
+        monkeypatch.setattr(common, "_ask_text", lambda m: typed.append(m) or "nope")
+        with pytest.raises(click.ClickException, match="not filed"):
+            common._file_or_trial(["x.csv"], "child-protection", "cp_run_", keep=True,
+                                  route="terminal", originally=None, storage_times=None)
+        assert typed

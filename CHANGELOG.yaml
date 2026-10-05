@@ -109,6 +109,65 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-06"
+    summary: >
+      One command now processes whatever has arrived and finishes what is
+      owed, and every route by which you keep a supply from the terminal goes
+      through the same steps the pipeline does.
+    changes:
+      - category: New
+        items:
+          - headline: One command processes what has arrived
+            components: ["Pipeline & publishing"]
+            description: >
+              mothman pipeline process checks and gates every arrival not yet
+              processed, in the order they were received, then runs what is
+              owed and reconciles tickets. It asks nothing, so a scheduler can
+              run it, and it never generates data.
+          - headline: The gate records why it did not promote
+            components: ["Pipeline & publishing"]
+            description: >
+              When the promotion rule leaves a supply for a person, the
+              decision log now says so and why - red, a filled slot, no open
+              period, could not be loaded. It changes nothing about what a
+              period holds.
+          - headline: A kept supply reports what happened to it
+            components: ["Testing & dev tooling"]
+            description: >
+              After you keep a supply from the terminal you see which dataset
+              each file became, the period and slot it was filed to, whether
+              it was early or late, and what the rule decided. A trial says
+              what recognition would make of each file.
+      - category: Improved
+        items:
+          - headline: Keeping a supply from the terminal follows the pipeline's own steps
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              A single table, part of a delivery or a run picked from the
+              synthetic data is now filed, checked against its period and
+              gated exactly as the pipeline would. A drift reference is asked
+              for only when you run a trial.
+          - headline: A file from the other collection is refused straight away
+            components: ["Testing & dev tooling"]
+            description: >
+              Keeping a Birth Registrations file through the Child Protection
+              command, or the reverse, is refused before anything is written,
+              naming the collection it belongs to.
+      - category: Fixed
+        items:
+          - headline: Relabelling a database needs a person
+            components: ["Pipeline & publishing"]
+            description: >
+              Replacing the environment a database is marked as - production
+              included - could be done with flags alone. It now needs someone
+              at a terminal typing out what is being replaced.
+          - headline: The version gate reads every image
+            components: ["Testing & dev tooling"]
+            description: >
+              An untagged, pinned or differently named PostgreSQL image, or
+              one set as a job's container, no longer slips past the check
+              that CI and the dev container run the declared version.
+
   - date: "2026-10-05"
     summary: >
       A dataset that cannot be checked - its supply held, claimed by two

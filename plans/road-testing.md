@@ -2397,6 +2397,37 @@ judgement about who reads the page rather than about the rule.
         The sprint 12 critic is written up as post-build-review #118: seven
         findings fixed, two for you (D-E's "what is a header row" and #117
         D1's email fallback for someone not in people.yaml).
+      - SPRINT 14 (2026-10-06 small hours): REQ-PIPE-151 (`mothman pipeline
+        process`), the rest of REQ-PIPE-086 and REQ-TEST-150 built; schema
+        30 (a `promotion-refused` decision-log entry for every gate outcome
+        that is not a promotion). Run against a hand-upgraded copy of the
+        deployment: 63 checked-but-ungated arrivals given their gate in 51s,
+        nothing promoted that the batch had not, then "Nothing to process"
+        on the second pass. THREE DEFECTS FOUND AND FIXED ON THE WAY, each
+        with a failing test: the gate-only path dropped every result (run_key
+        vs run_id); a gate re-run over a promoted supply recorded a refusal
+        (the first sprint-14 rebuild was KILLED and restarted for it); the
+        pass lock named a holder in another database.
+        UNMET, FOR YOU: REQ-PIPE-086 criterion 11 (the terminal-vs-batch
+        equivalence TEST - not written; holds by construction) and criterion
+        10 (guarding run_single waits on REQ-PIPE-152's Lambda move);
+        REQ-PIPE-151 criterion 1's storage-only half (REQ-PIPE-152);
+        REQ-DASH-148 criterion 12 is now only missing the reload OWING its
+        re-check.
+        PROVISIONALS: a recorded arrival kept from the picker is REFUSED
+        (pass --trial) rather than routed into a re-check - a person asking
+        is not a cause the owed-run record accepts; the pass leaves an
+        arrival another process holds rather than waiting; it stages every
+        unchecked arrival first, as the batch does; it never plays scripted
+        decisions; a kept run's inheritances are attributed by time.
+        THE SPRINT 13 CRITIC (post-build-review #119): D1 FIXED as a defect
+        - `env mark` could relabel a database, production included, with
+        flags alone; now --confirm only marks an UNMARKED database and a
+        replacement needs a person typing it. QUESTIONS: (a) should `supply
+        tidy` and `supply discard-sample` need production's typed id with
+        --yes unable to skip it (they now name the environment, nothing
+        more)? (b) in production, should the typed id REPLACE hand-filing's
+        "keep this?" y/N rather than follow it?
  All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.

@@ -94,38 +94,57 @@ def unprocessed(arrivals, conn=None) -> list:
     group, so three rapid triggers silently lose the middle one.
     Draining needs no queueing guarantee from any platform.
 
-    ONE READ OF THE LOAD LOG, whatever the number of arrivals - which
-    is the bound the marker used to provide and has to be provided
-    without it. Asking `delivery_is_processed` per arrival would be
-    one query each, which is the shape that breaks at the scale this
-    is a PoC for.
+    PROCESSED MEANS CHECKED AND GATED (REQ-PIPE-151 criterion 18,
+    amending REQ-PIPE-061 criterion 6's rule here). It used to mean
+    LOADED - every attributed file had a loaded record - which counted an
+    arrival done the moment its rows were in staging, before any check
+    had run or the gate had looked at it. A file's staged name is its
+    arrival's run id, so each file is processed once that run COMPLETED
+    and the gate RAN on its supply (or an open hold stands for it), read
+    from processing_pass.recorded() - the pass's own definition, so there
+    is one answer, not two.
 
-    PROCESSED MEANS REQ-PIPE-060'S RULE: every file this arrival
-    attributed to a dataset has a LOADED record. A failed load leaves
-    it owed, and so does a partial one - criterion 20, and the
-    dangerous direction to get wrong.
+    ONE READ, whatever the number of arrivals - the bound the retired
+    marker used to provide (REQ-PIPE-089 criterion 19).
 
     `arrivals` is assumed already in receipt order - survey() puts it
     there, and re-sorting here would be a second copy of the ordering
     rule to keep correct.
     """
-    from qa_tools.common import load_log
+    from qa_tools.common import processing_pass, supply_db
 
-    loaded_by_delivery: dict[str, set[str]] = {}
-    for entry in load_log.latest_by_table(conn=conn).values():
-        if entry.loaded:
-            loaded_by_delivery.setdefault(entry.delivery, set()).add(entry.physical)
+    if conn is None:
+        with supply_db.connect(read_only=True, label="mothman:backlog") as opened:
+            rec = processing_pass.recorded(opened)
+    else:
+        rec = processing_pass.recorded(conn)
 
     owed = []
     for arrival in arrivals:
         expected = set(getattr(arrival, "files", ()) or ())
         if not expected:
             # Nothing was attributed to any dataset - a covering note
-            # and nothing else. There is nothing to stage and no load
-            # record will ever appear, so treating it as owed would
-            # block the queue permanently on a delivery that can never
-            # satisfy it.
+            # and nothing else. Nothing will ever be checked, so treating
+            # it as owed would block the queue permanently on a delivery
+            # that can never satisfy it.
             continue
-        if not expected <= loaded_by_delivery.get(arrival.name, set()):
+        if not all(_file_processed(physical, rec) for physical in expected):
             owed.append(arrival)
     return owed
+
+
+def _file_processed(physical: str, rec) -> bool:
+    """One staged file's arrival: run completed, and its supply gated or held."""
+    from qa_tools.common import hierarchy, supply_db
+
+    parts = supply_db.split_staged(physical)
+    if not parts:
+        return False
+    table, key, _ = parts
+    try:
+        dataset_id = hierarchy.dataset_for_table(table).dataset_id
+    except hierarchy.UnknownDatasetError:
+        return False
+    supply = (dataset_id, f"{dataset_id}@{key}")
+    return (f"{table}__{key}" in rec.completed_runs
+            and (supply in rec.gated or supply in rec.held))

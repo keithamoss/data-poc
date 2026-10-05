@@ -277,8 +277,9 @@ def report_recorded(run_id: str, count: int) -> None:
     console.print(Panel(body, title="Recorded", border_style="green", expand=False))
 
     if sys.stdin.isatty() and sys.stdout.isatty():
-        questionary.press_any_key_to_continue(
-            "Press any key to return to the menu...", style=_QMARK_STYLE).ask()
+        # Through _ask, so the environment's toolbar shows here too (#119 D6).
+        _ask(questionary.press_any_key_to_continue(
+            "Press any key to return to the menu...", style=_QMARK_STYLE))
 
 
 def raw_bucket_name() -> str:
@@ -509,6 +510,21 @@ def decide_record(run_id: str, *, keep: bool | None) -> bool:
     re-run, and a recorded run that should not have been is a verdict in
     a dataset's permanent quality history that nobody chose.
     """
+    # AN ARRIVAL WHOSE QA IS ALREADY RECORDED IS NEVER RECORDED AGAIN UNDER
+    # ITS OWN ID (REQ-PIPE-086 criteria 6 to 8): a further recorded check is
+    # REQ-PIPE-140's re-check, owed by the decision or reload that calls for
+    # it, under a run id of its own. Here it runs as a trial, saying why, and
+    # --commit is refused naming --trial.
+    if run_id in recorded_runs([run_id]):
+        if keep:
+            raise click.ClickException(
+                f"{run_id} already has recorded QA, and an arrival is never recorded "
+                f"twice under its own id. A further recorded check is a re-check "
+                f"(REQ-PIPE-140), owed by the decision that calls for it. Pass --trial "
+                f"to check it again without recording.")
+        console.print(f"{run_id} already has recorded QA - running it as a TRIAL, "
+                      f"which records nothing.", style="yellow")
+        return False
     if keep is not None:
         return keep
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
@@ -519,6 +535,35 @@ def decide_record(run_id: str, *, keep: bool | None) -> bool:
         return False
     return confirm(f"Record this check of {run_id} in the dataset's QA history?",
                     yes=False, default=False)
+
+
+def record_delivery_of(arrival) -> None:
+    """Record the delivery an arrival came in - write-once, as the batch's
+    delivery_log.record_all() does for every delivery before it files one
+    (REQ-PIPE-086 criterion 12: every per-arrival step on every route)."""
+    from qa_tools.common import arrivals, delivery, delivery_log
+
+    for d in delivery.list_deliveries():
+        if d.name == arrival.delivery_name:
+            delivery_log.record(d, arrivals.recognise(d))
+            return
+
+
+def recorded_runs(run_ids) -> set[str]:
+    """Which of these arrivals' runs already have recorded QA - completed
+    runs under their own id. One read. Empty where nothing is set up, which
+    a picker over generated data that was never checked legitimately is."""
+    from qa_tools.common import qa_store, supply_db
+
+    ids = list(run_ids)
+    if not ids:
+        return set()
+    with supply_db.connect(read_only=True, label="mothman:picker") as conn:
+        if not conn.execute(f"SELECT to_regclass('{qa_store.SCHEMA}.run')").fetchone()[0]:
+            return set()
+        return {r[0] for r in conn.execute(
+            f'SELECT run_key FROM "{qa_store.SCHEMA}".run WHERE completed_at IS NOT NULL '
+            "AND run_key = ANY(?)", [ids]).fetchall()}
 
 
 def file_or_trial(paths, collection_id: str, run_id_prefix: str,
@@ -553,6 +598,13 @@ def _file_or_trial(paths, collection_id, run_id_prefix, *, keep, route, original
                    storage_times) -> hand_filing.Filed:
     if not decide_keep(paths, keep=keep):
         return _as_trial(paths)
+    # ANOTHER COLLECTION'S FILE IS REFUSED FIRST (REQ-PIPE-086 criterion 5) -
+    # before the typed id or any question about it, and with no trial on
+    # offer: it is the wrong command, not an unplaceable file.
+    try:
+        hand_filing.check_collection(paths, collection_id)
+    except hand_filing.WrongCollection as exc:
+        raise click.ClickException(str(exc)) from None
     # A HAND-FILING IN AN ENVIRONMENT THAT CONFIRMS CHANGES is typed for
     # (REQ-PIPE-093 criterion 4): --commit decides to keep it, and is not
     # allowed to be the confirmation too (criterion 6). yes=True because
@@ -639,13 +691,20 @@ def _ask_original(names, storage_times: dict | None) -> str:
         if confirm("Record these as when each was originally received?", yes=False,
                    default=True):
             return hand_filing.STORAGE
-    return click.prompt("When was this supply originally received? (e.g. 2026-09-20 14:30 "
-                        "on the asset's own clock, or `not known`)")
+    return click.prompt(_named("When was this supply originally received? (e.g. 2026-09-20 "
+                               "14:30 on the asset's own clock, or `not known`)"))
 
 
 def _as_trial(paths) -> hand_filing.Filed:
     """A trial reads the operator's own files where they are. Nothing
-    is copied, because nothing is being recorded as having arrived."""
+    is copied, because nothing is being recorded as having arrived.
+
+    It says what recognition WOULD make of each file if it were kept
+    (REQ-TEST-150 criterion 10), and never stops on the answer."""
+    from cli import lifecycle_report
+
+    console.print("If these were kept, recognition would place them like this:", style="dim")
+    lifecycle_report.trial_recognition(paths)
     return hand_filing.Filed(delivery_name="", run_id=trial.trial_run_id(),
                              paths=tuple(str(p) for p in paths), received_at=None)
 
@@ -678,6 +737,42 @@ def discard_reference(run_id: str) -> None:
         console.print(f"could not discard the reference run's schemas "
                        f"({type(exc).__name__}: {exc}) - `mothman supply tidy` "
                        f"clears leftovers.", style="yellow")
+
+
+def finish_kept(results: list[dict], filed, *, collection_id: str, run_id_prefix: str,
+                table, all_checks: bool = False) -> None:
+    """The report after a hand-supplied check (REQ-TEST-150).
+
+    ONE KEPT DELIVERY, SEVERAL ARRIVALS: every failing and warning check in
+    full and passing checks as a count per dataset, unless --all-checks
+    (criterion 11) - then what was said about it, and LAST, what the
+    lifecycle decided about each arrival, read from what it recorded
+    (criteria 1 to 9)."""
+    from cli import lifecycle_report
+
+    found = (hand_filing.arrivals_of(filed, collection_id, run_id_prefix)
+             if filed.delivery_name else [])
+    if len(found) > 1 and not all_checks:
+        _compact_results(results, table, filed.run_id)
+    else:
+        console.print(table(results, filed.run_id))
+    say_what_it_did(filed.run_id, filed.delivery_name)
+    if found:
+        lifecycle_report.report(found, since=filed.received_at)
+
+
+def _compact_results(results, table, run_id) -> None:
+    """Criterion 11: what needs reading in full, and a count of the rest."""
+    loud = [r for r in results if r.get("status") not in ("pass",)]
+    if loud:
+        console.print(table(loud, run_id))
+    passing: dict[str, int] = {}
+    for r in results:
+        if r.get("status") == "pass":
+            passing[r.get("dataset_id") or "?"] = passing.get(r.get("dataset_id") or "?", 0) + 1
+    for dataset_id, n in sorted(passing.items()):
+        console.print(f"  {dataset_id}: {n} check{'' if n == 1 else 's'} passed "
+                      f"(--all-checks lists them)", highlight=False)
 
 
 def say_what_it_did(run_id: str, delivery_name: str) -> None:
@@ -717,6 +812,25 @@ def keep_from_flags(commit: bool, trial_flag: bool) -> bool | None:
     if trial_flag:
         return False
     return None
+
+
+def refuse_reference_for_kept(keep: bool | None, reference, flag: str) -> None:
+    """A reference given for a KEPT supply is refused, not ignored
+    (REQ-PIPE-086 criterion 14): it would let a person believe they chose
+    the yardstick for a gating check."""
+    if keep and reference is not None:
+        raise click.ClickException(
+            f"a kept supply is measured against the last promoted supply (REQ-QAC-108), "
+            f"so it takes no reference - drop {flag}, or pass --trial to compare "
+            f"against one.")
+
+
+def require_reference_for_trial(reference, flag: str) -> None:
+    """A trial is compared against the reference a person names (criterion 14)."""
+    if reference is None:
+        raise click.ClickException(
+            f"a trial is compared against a reference you name - pass {flag}. A kept "
+            f"supply needs none: it is measured against the last promoted supply.")
 
 
 def reference_suffix(result: dict) -> str:

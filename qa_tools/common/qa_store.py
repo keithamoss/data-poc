@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 29
+SCHEMA_VERSION = 30
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -669,7 +669,6 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".decision (
     -- genuinely changing their mind twice.
     from_slot      text,
     to_slot        text,
-    CHECK (from_slot IS NOT NULL OR to_slot IS NOT NULL),
     CHECK (action <> 'refile' OR (from_slot IS NOT NULL AND to_slot IS NOT NULL)),
     -- NO DEFAULT, NO PLACEHOLDER, NO 'unknown' (criterion 6, and
     -- REQ-PIPE-074 criterion 5). The empty-string check is the half
@@ -723,13 +722,22 @@ ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS stands_on text;
 -- The generated name the inline CHECK used to carry, on every database
 -- created before it moved down here.
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_action_check;
+-- EVERY DECISION NAMES A SLOT, except a refused promotion of a supply
+-- filed to none (REQ-PIPE-151 criterion 3): "held - no open period" is a
+-- refusal with no period to name. Named since schema 30; it was the inline
+-- `decision_check`, which a CREATE TABLE IF NOT EXISTS could never relax.
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_check;
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_names_a_slot;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_names_a_slot
+    CHECK (action = 'promotion-refused' OR from_slot IS NOT NULL OR to_slot IS NOT NULL);
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_action_known;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
     CHECK (action IN ('promote', 'reject', 'demote', 'refile',
                       'substitute', 'de-substitute',
                       'inherit', 'inherit-refused', 'un-inherit',
                       'promotion-withheld', 'mark-not-supplied', 'acknowledge',
-                      'supersede', 'un-supersede', 'still-failing'));
+                      'supersede', 'un-supersede', 'still-failing',
+                      'promotion-refused'));
 -- WHICH NEWER SUPPLY SUPERSEDED THIS ONE (REQ-PIPE-118 criterion 10).
 -- Schema 22, additive. Schema 23 relaxed the shape for a PERSON's
 -- supersession (REQ-PIPE-120), which names no newer supply - shipped first

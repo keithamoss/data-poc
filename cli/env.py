@@ -88,7 +88,10 @@ def reset_synthetic_command() -> None:
         console.print(f"  {table}: {n} row(s)")
     console.print(f"  and {len(schemas)} schema(s): {', '.join(schemas) or 'none'}")
     phrase = synthetic_reset.confirmation_phrase()
-    typed = click.prompt(f'Type "{phrase}" to delete it', default="", show_default=False)
+    from cli import common
+
+    typed = click.prompt(common._named(f'Type "{phrase}" to delete it'), default="",
+                         show_default=False)
     with supply_db.connect(label="mothman:reset-synthetic") as conn:
         try:
             # EXACTLY THE SCHEMAS SHOWN, not a list read again afterwards -
@@ -109,9 +112,7 @@ def reset_synthetic_command() -> None:
 @click.option("--confirm", "typed", metavar="ENVIRONMENT_ID", default=None,
               help="The environment id, typed on the command line - for a setup script "
                    "with no terminal. Without it you are asked to type it.")
-@click.option("--replacing", metavar="ASSET/ENVIRONMENT", default=None,
-              help="The identity this database already carries, typed out, to replace it.")
-def mark_command(typed: str | None, replacing: str | None) -> None:
+def mark_command(typed: str | None) -> None:
     """Record in the database which data asset and environment it belongs to.
 
     Every other command refuses a database whose recorded identity is missing
@@ -151,14 +152,30 @@ def mark_command(typed: str | None, replacing: str | None) -> None:
                           style="green")
             return
         if found is not None or unreadable:
-            # ANOTHER IDENTITY IS NEVER OVERWRITTEN BY ACCIDENT (criterion 3):
-            # the person types out what is being replaced.
-            current = f"{found.data_asset_id}/{found.environment}" if found else "unreadable"
-            if (replacing or "").strip() != current:
-                what = (f"is already marked as {found}" if found
-                        else f"has an unreadable identity ({unreadable})")
+            # ANOTHER IDENTITY IS NEVER OVERWRITTEN BY ACCIDENT (criterion 3),
+            # AND NEVER BY FLAGS (REQ-PIPE-093 criteria 4 and 6; post-build-
+            # review #119 D1): --confirm stands in for typing only to mark an
+            # UNMARKED database, which is the setup scripts' whole need.
+            # Replacing one - a production database relabelled, or relabelled
+            # as production - needs a person at a terminal, typing out what is
+            # being replaced. The expected text is never printed for them to
+            # copy.
+            what = (f"is already marked as {found}" if found
+                    else f"has an unreadable identity ({unreadable})")
+            try:
+                common.require_tty("replacing a database's identity needs a person at a "
+                                   "terminal; no flag stands in for that")
+            except common.NotInteractive:
                 raise click.ClickException(
-                    f"this database {what}. To replace it, run this again with "
-                    f"--replacing {current}. Nothing was marked.")
+                    f"this database {what}. Replacing an identity needs a person at a "
+                    f"terminal; nothing was marked.") from None
+            current = f"{found.data_asset_id}/{found.environment}" if found else "unreadable"
+            console.print(f"This database {what}.", style="yellow")
+            said = (common._ask_text(
+                "Type the identity being replaced, as <data asset>/<environment> "
+                "(or 'unreadable')") or "").strip()
+            if said != current:
+                raise click.ClickException("that is not the identity being replaced, so "
+                                           "nothing was marked.")
         db_identity.mark(conn, want)
     console.print(f"Marked this database as {want}.", style="green")

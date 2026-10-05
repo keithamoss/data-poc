@@ -801,6 +801,15 @@ def after_run(conn: supply_db.SupplyConnection, *,
                                    f"({newer}), so this one is superseded" if newer else
                                    "a person superseded this supply")
             continue
+        # NOTHING STAGED IS "COULD NOT BE LOADED" (REQ-PIPE-151 criterion 3),
+        # said in those words rather than falling through to "no active
+        # checks": a run whose own table failed to load records no result
+        # (REQ-DASH-148 criterion 5), and the reason is the load, not the
+        # checks.
+        if not item.get("physical_tables") and not item.get("held") and period is not None:
+            refused[dataset_id] = ("its supply could not be loaded, so there is nothing "
+                                   "to promote")
+            continue
         try:
             status = status_of(dataset_id, results, reads=reads)
         except UnreadableVerdictError as exc:
@@ -886,6 +895,25 @@ def after_run(conn: supply_db.SupplyConnection, *,
                      "reason": reason, "amber": amber, "status": status,
                      "replacing": replacing})
 
+    # EVERY OUTCOME THAT IS NOT A PROMOTION IS RECORDED (REQ-PIPE-151
+    # criteria 3 and 4) - by the RULE only, since a person's own decision is
+    # already its record. Once per supply and reason, so a gate run twice
+    # over the same arrival records nothing more (criterion 7).
+    record_failures: dict[str, str] = {}
+    if actor_kind == decision_log.RULE:
+        by_dataset = {item["dataset_id"]: item for item in supplies}
+        for dataset_id, why in refused.items():
+            item = by_dataset[dataset_id]
+            # NOTHING HERE RAISES FOR ONE SUPPLY'S SAKE (the rule above): a
+            # record the log will not take is a failure of this supply, and
+            # its arrival stays ungated - owed to the next pass.
+            try:
+                _record_refused(conn, agency_id=agency_id, collection_id=collection_id,
+                                dataset_id=dataset_id, supply=item["supply"],
+                                period=item.get("period"), reason=why,
+                                effective_at=effective_at)
+            except decision_log.DecisionRefused as exc:
+                record_failures[dataset_id] = f"its refusal could not be recorded: {exc}"
     promoted, failed = promote_each(
         conn, work, agency_id=agency_id, collection_id=collection_id,
         # Each item carries its own; this is the fallback for a caller
@@ -893,7 +921,8 @@ def after_run(conn: supply_db.SupplyConnection, *,
         # item's every time.
         period="", actor=actor, actor_kind=actor_kind,
         effective_at=effective_at)
-    return AfterRun(promoted=tuple(promoted), refused=refused, failed=failed)
+    return AfterRun(promoted=tuple(promoted), refused=refused,
+                    failed={**failed, **record_failures})
 
 
 def _record_amber_waiting(conn, *, agency_id: str, collection_id: str, dataset_id: str,
@@ -932,6 +961,32 @@ def _record_withheld(conn, *, agency_id: str, collection_id: str, dataset_id: st
             action=decision_log.PROMOTION_WITHHELD, supply=supply, actor=RULE_ACTOR,
             actor_kind=decision_log.RULE, effective_at=effective_at, to_slot=period,
             reason=reason)):
+        pass
+
+
+def _record_refused(conn, *, agency_id: str, collection_id: str, dataset_id: str,
+                    supply: str, period, reason: str, effective_at: str) -> None:
+    """The gate looked and did not promote, and says why (REQ-PIPE-151
+    criterion 3): a promotion-refused entry, which changes no slot and ends
+    no hold. NOT for an outcome already recorded as promotion-withheld,
+    which is the same fact in more detail. Once per supply and reason."""
+    if not supply:
+        return
+    if conn.execute(
+            f"SELECT 1 FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
+            "AND ((action = ? AND reason = ?) OR action IN (?, ?)) LIMIT 1",
+            [dataset_id, supply, decision_log.PROMOTION_REFUSED, reason,
+             decision_log.PROMOTION_WITHHELD,
+             # A SUPPLY THE GATE ALREADY PROMOTED is never "refused" by a gate
+             # run over it again - its own promotion is what fills the slot
+             # (found by test_promotion_step's run-twice test).
+             decision_log.PROMOTE]).fetchall():
+        return
+    with decision_log.apply_decision(conn, decision_log.Decision(
+            agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
+            action=decision_log.PROMOTION_REFUSED, supply=supply, actor=RULE_ACTOR,
+            actor_kind=decision_log.RULE, effective_at=effective_at,
+            to_slot=period or None, reason=reason)):
         pass
 
 

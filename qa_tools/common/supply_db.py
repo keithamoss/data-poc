@@ -400,7 +400,10 @@ def connect(read_only: bool = False, dsn: str | None = None,
             db_identity.check(setconfig)
     except postgres_version.VersionMismatch as exc:
         raw.close()
-        raise SupplyDbError(f"{exc} ({_redact(target)})") from exc
+        # NO PART OF THE CONNECTION STRING (REQ-PIPE-107 NFR 2; #119 D5):
+        # the major names the server well enough, and a refusal is the
+        # message most likely to be pasted somewhere.
+        raise SupplyDbError(str(exc)) from exc
     except db_identity.IdentityRefused as exc:
         raw.close()
         # NO PART OF THE CONNECTION STRING (criterion 6).
@@ -679,7 +682,15 @@ def _scrub(text: str, dsn: str) -> str:
         password = conninfo_to_dict(dsn).get("password")
     except Exception:  # noqa: BLE001 - an unparseable DSN: say nothing of it
         return "the connection string could not be parsed"
-    return text.replace(str(password), "***") if password else text
+    if not password:
+        return text
+    # BOTH FORMS (#119 D8): the decoded password and the URL's own encoding
+    # of it, which an error echoing the connection string would carry.
+    from urllib.parse import quote
+
+    for form in {str(password), quote(str(password), safe="")}:
+        text = text.replace(form, "***")
+    return text
 
 
 def _ident(name: str, what: str) -> str:

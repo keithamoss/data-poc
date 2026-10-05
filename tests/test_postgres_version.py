@@ -66,6 +66,12 @@ class TestTheServerIsAsserted:
         pv.check_server(conn, declared=16)
         assert conn.sql == ["SELECT current_setting('server_version_num')"]
         assert "SELECT aurora_version" not in inspect.getsource(pv)
+        # THE REAL PATH (#119 D7): supply_db.connect runs db_identity.PROBE.
+        from qa_tools.common import db_identity
+
+        assert "current_setting('server_version_num')" in db_identity.PROBE
+        assert "aurora_version" not in db_identity.PROBE
+        assert "aurora_version" not in inspect.getsource(supply_db)
 
     def test_a_real_connection_is_refused_when_the_majors_differ(self, supply_dsn, monkeypatch):
         """Through supply_db.connect itself, against the real server."""
@@ -123,3 +129,41 @@ class TestEveryImageTagNamesTheDeclaredMajor:
 
 def test_major_of():
     assert pv.major_of("160013") == 16 and pv.major_of(170002) == 17
+
+
+class TestNoImageShapeSlipsPast:
+    """post-build-review #119 D4: an untagged, digest-pinned, templated,
+    differently-named or job-container PostgreSQL image passed silently."""
+
+    def _errors(self, tmp_path, compose_image="postgres:16", job_yaml=""):
+        c, w = tmp_path / "c.yml", tmp_path / "w.yml"
+        c.write_text(f"services:\n  db:\n    image: {compose_image}\n")
+        w.write_text("jobs:\n" + (job_yaml or
+                     "  a:\n    services:\n      postgres:\n        image: postgres:16\n"))
+        return pv.image_tag_errors(16, c, w)
+
+    @pytest.mark.parametrize("image", ["postgres", "postgres@sha256:abc",
+                                       "bitnami/postgresql:17",
+                                       "postgres:${{ matrix.v }}"])
+    def test_an_unreadable_or_other_tag_is_an_error(self, tmp_path, image):
+        assert self._errors(tmp_path, compose_image=image)
+
+    def test_a_job_container_is_checked(self, tmp_path):
+        job = "  a:\n    container:\n      image: postgres:17\n"
+        assert self._errors(tmp_path, job_yaml=job)
+
+    def test_a_job_container_given_as_a_string_is_checked(self, tmp_path):
+        assert self._errors(tmp_path, job_yaml="  a:\n    container: postgres:17\n")
+
+
+def test_the_version_refusal_carries_no_part_of_the_dsn(supply_dsn, monkeypatch):
+    """post-build-review #119 D5: REQ-PIPE-107 NFR 2 - a connection string
+    is a credential, and the version refusal appended a redacted one."""
+    import psycopg
+
+    monkeypatch.setattr(pv, "declared_major", lambda path=None: 9)
+    with pytest.raises(supply_db.SupplyDbError) as caught:
+        supply_db.connect(dsn=supply_dsn)
+    info = psycopg.conninfo.conninfo_to_dict(supply_dsn)
+    for part in ("dbname=", "host=", info["dbname"]):
+        assert part not in str(caught.value)

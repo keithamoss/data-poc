@@ -140,42 +140,56 @@ def bootstrap(collection: str = "all", force: bool = False,
                                staged_after=before, refused=True,
                                reason=HISTORY_REFUSAL[0].upper() + HISTORY_REFUSAL[1:])
 
-    # IMPORTED HERE, NOT AT MODULE LEVEL. cli/ imports this module, and
-    # the orchestrators pull in all four QA tools - several seconds of
-    # import time that a caller only checking `already_populated()`
-    # should not pay.
-    from cli import bdm, cp
+    # THE PASS LOCK (REQ-PIPE-151 criterion 16): a bootstrap and a
+    # processing pass against one database would each process the same
+    # arrivals. Refused at once, naming the holder, with nothing changed.
+    from qa_tools.common import processing_pass
 
-    started = time.monotonic()
-    names = [n for n in ("bdm", "cp") if collection in ("all", n)]
-    generate = {"bdm": bdm.generate_synthetic_data, "cp": cp.generate_synthetic_data}
+    try:
+        lock = processing_pass.pass_lock("bootstrap")
+        lock.__enter__()
+    except processing_pass.PassLockHeld as exc:
+        return BootstrapResult(populated=False, staged_before=before,
+                               staged_after=before, refused=True, reason=str(exc))
+    try:
+        # IMPORTED HERE, NOT AT MODULE LEVEL. cli/ imports this module, and
+        # the orchestrators pull in all four QA tools - several seconds of
+        # import time that a caller only checking `already_populated()`
+        # should not pay.
+        from cli import bdm, cp
 
-    if sequential or len(names) < 2:
-        # ONE AFTER THE OTHER - the reference REQ-TEST-116 criterion 4
-        # compares a parallel bootstrap against, and what a single
-        # collection always was.
-        timings = {}
-        for name in names:
-            say(f"Generating synthetic data ({_LABEL[name]})")
-            generate[name]()
-            say(f"Running the real checks against every {_LABEL[name]} supply")
-            timings[name] = _run_collection(name, sequential, record_deliveries=True)
-    else:
-        # SIDE BY SIDE (REQ-TEST-116 criterion 1). The two collections
-        # share no dataset, slot or promotion, so neither's order depends
-        # on the other's. GENERATION FIRST, both of it - 4.6s measured, not
-        # worth overlapping - so neither pipeline recognises a delivery
-        # tree the other generator is still writing. THEN THE DELIVERY LOG,
-        # once, for the reason run_pipeline's own comment gives.
-        for name in names:
-            say(f"Generating synthetic data ({_LABEL[name]})")
-            generate[name]()
-        _record_deliveries()
-        say("Running the real checks against every supply - "
-            + " and ".join(_LABEL[n] for n in names) + " side by side")
-        timings = _run_concurrently(names, sequential)
-    timings["total"] = time.monotonic() - started
-    say("Took " + ", ".join(f"{_LABEL.get(k, k)} {v:.0f}s" for k, v in timings.items()))
+        started = time.monotonic()
+        names = [n for n in ("bdm", "cp") if collection in ("all", n)]
+        generate = {"bdm": bdm.generate_synthetic_data, "cp": cp.generate_synthetic_data}
+
+        if sequential or len(names) < 2:
+            # ONE AFTER THE OTHER - the reference REQ-TEST-116 criterion 4
+            # compares a parallel bootstrap against, and what a single
+            # collection always was.
+            timings = {}
+            for name in names:
+                say(f"Generating synthetic data ({_LABEL[name]})")
+                generate[name]()
+                say(f"Running the real checks against every {_LABEL[name]} supply")
+                timings[name] = _run_collection(name, sequential, record_deliveries=True)
+        else:
+            # SIDE BY SIDE (REQ-TEST-116 criterion 1). The two collections
+            # share no dataset, slot or promotion, so neither's order depends
+            # on the other's. GENERATION FIRST, both of it - 4.6s measured, not
+            # worth overlapping - so neither pipeline recognises a delivery
+            # tree the other generator is still writing. THEN THE DELIVERY LOG,
+            # once, for the reason run_pipeline's own comment gives.
+            for name in names:
+                say(f"Generating synthetic data ({_LABEL[name]})")
+                generate[name]()
+            _record_deliveries()
+            say("Running the real checks against every supply - "
+                + " and ".join(_LABEL[n] for n in names) + " side by side")
+            timings = _run_concurrently(names, sequential)
+        timings["total"] = time.monotonic() - started
+        say("Took " + ", ".join(f"{_LABEL.get(k, k)} {v:.0f}s" for k, v in timings.items()))
+    finally:
+        lock.__exit__(None, None, None)
 
     with supply_db.connect(label="mothman:bootstrap") as conn:
         after = staged_table_count(conn)
