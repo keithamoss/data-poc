@@ -255,40 +255,21 @@ def period_schemas(conn) -> list[str]:
     return sorted(filter(None, (period_of(r[0]) for r in rows)))
 
 
-def newest(physical_names: Sequence[str]) -> str | None:
-    """The newest of several versions of one logical table (criterion 4).
-
-    A supply and its resupplies for the same period all sit in that
-    period's schema, and the newest is the one that counts. Ordered by
-    the ARRIVAL KEY the physical name carries, then by ordinal - not by
-    the raw string, because a name without an ordinal must sort before
-    the same name with one rather than lexically among them.
-
-    Returns None for no candidates at all, which callers must treat as
-    absence rather than as an error: absence is an ordinary state here
-    and has its own criterion.
-    """
-    best, best_key = None, None
-    for physical in physical_names:
-        parts = supply_db.split_staged(physical)
-        if parts is None:
-            # A name this project did not mint. It cannot be ordered
-            # against the others, so it never wins - being wrong about
-            # WHICH version is read is the one outcome worth avoiding.
-            continue
-        _logical, arrival, ordinal = parts
-        key = (arrival, ordinal or "")
-        if best_key is None or key > best_key:
-            best, best_key = physical, key
-    return best
+class MoreThanOneVersion(PeriodSchemaError):
+    """A period schema holds more than one version of a table - which
+    REQ-PIPE-128 says never happens, so it is a fault to report, never a
+    choice to make (criterion 12)."""
 
 
 def promoted_in(conn, period_name: str, logical_names: Sequence[str]) -> dict[str, list[str]]:
-    """Every version of these logical tables promoted into this period.
+    """The object each of these logical tables resolves to in this period,
+    as a list of at most one.
 
-    Returns a LIST per name rather than the newest, so the caller can
-    see that several versions exist. Deciding between them is
-    newest()'s job and is a different question from finding them.
+    ONE VERSION PER TABLE PER PERIOD (REQ-PIPE-128 criteria 1, 11 and
+    12): a person's promotion supersedes what was there in the same
+    transaction, so there is nothing to rank. A period found holding two
+    raises MoreThanOneVersion naming the period and the table - it is
+    never decided between, by arrival or by promotion.
     """
     schema = period_schema(period_name)
     rows = conn.execute(
@@ -301,7 +282,21 @@ def promoted_in(conn, period_name: str, logical_names: Sequence[str]) -> dict[st
         logical = parts[0] if parts else physical
         if logical in wanted:
             found[logical].append(physical)
+    for logical, versions in found.items():
+        if len(versions) > 1:
+            raise MoreThanOneVersion(
+                f"period {period_name} holds {len(versions)} versions of {logical} "
+                f"({', '.join(sorted(versions))}) - a period holds exactly one, so "
+                f"something put a table there outside the decision log. Nothing "
+                f"chooses between them; find out which is right and remove the other.")
     return found
+
+
+def the_one_in(conn, period_name: str, logical: str) -> str | None:
+    """The one object `logical` resolves to in this period, or None
+    (REQ-PIPE-128 criterion 11)."""
+    found = promoted_in(conn, period_name, [logical]).get(logical) or []
+    return found[0] if found else None
 
 
 #: Where the version a run read came from. Carried on the resolution
@@ -413,7 +408,8 @@ def create_overlay_views(conn, run_id: str, period_name: str,
             # the period's one answer for that table, and is read as such;
             # missing it left every check reading a non-participating
             # dataset red as "missing" (2026-10-02).
-            physical = newest(versions) or (logical if logical in versions else None)
+            # ONE OBJECT, never ranked (REQ-PIPE-128 criterion 11).
+            physical = versions[0] if versions else None
             source_schema, origin = period, FROM_PERIOD
             if physical is None:
                 res.absent.append(logical)

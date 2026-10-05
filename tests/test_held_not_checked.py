@@ -218,7 +218,9 @@ class TestACrossTableCheckReadingItGoesRed:
         out = held_blast_radius.results_for(
             held={"cp_clients": "a", "cp_carers": "b"}, reads=both,
             run_id="r1", run_timestamp="t")
-        assert sorted(r["held_table"] for r in out) == ["cp_carers", "cp_clients"]
+        # STILL REPORTS BOTH, in one record (REQ-PIPE-115 criterion 2 as
+        # amended 2026-10-05): one result per check per run.
+        assert len(out) == 1 and out[0]["held_tables"] == ["cp_carers", "cp_clients"]
 
     def test_no_holds_means_no_results(self):
         assert held_blast_radius.results_for(

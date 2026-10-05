@@ -202,13 +202,80 @@ def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
     return out
 
 
+#: A trial's reason (REQ-PIPE-115 criterion 17 as amended): it has no
+#: period, so none of the slot reasons apply.
+TRIAL_UNREADABLE = "not-readable-in-trial"
+
+
+def results_for_trial(*, run_id: str, run_timestamp: str, resolution: supply_db.Resolution,
+                      reads: dict[str, list[str]], checks_by_id: dict | None = None,
+                      left_out_ids=()) -> list[dict]:
+    """The not-evaluated records for a TRIAL - one per check reading a
+    table the trial could not read, naming every such table (criteria 2
+    and 17 as amended 2026-10-05; delivery critic on 8a942e7, H2).
+
+    A trial checks whatever files it was handed and is filed to no period,
+    so the reason is simply that the table was not readable in this trial -
+    not among its files, or its file could not be loaded. No data rather
+    than red: a trial decides nothing.
+    """
+    missing = ((set(resolution.absent) | set(resolution.ambiguous)) - set(resolution.held)
+               - set(resolution.resolved))
+    if not missing:
+        return []
+    from qa_tools.common import hierarchy
+
+    checks_by_id = checks_by_id or {}
+    out: list[dict] = []
+    # EVERY CHECK THAT READS AN UNREADABLE TABLE: what it declares it reads,
+    # and - for a check the tools LEFT OUT - its own dataset's table. A
+    # left-out check nothing unreadable explains gets no record here, so
+    # the reconciliation still refuses it.
+    candidates = {c: list(t) for c, t in reads.items()}
+    for check in left_out_ids:
+        candidates.setdefault(check, [])
+    for check, declared in sorted(candidates.items()):
+        parsed = check_id_mod.try_parse(check)
+        if parsed is None:
+            continue
+        tables = set(declared)
+        if check in left_out_ids:
+            try:
+                tables.add(hierarchy.dataset(parsed.dataset).table)
+            except Exception:  # noqa: BLE001 - not one of ours, nothing to say
+                pass
+        unreadable = sorted(tables & missing)
+        if not unreadable:
+            continue
+        meta = checks_by_id.get(check)
+        out.append({
+            "agency_id": parsed.agency, "collection_id": parsed.collection,
+            "dataset_id": parsed.dataset, "check_id": check,
+            "check_name": getattr(meta, "name", None) or parsed.check_name,
+            "column_name": unreadable[0], "dimension": "completeness", "label": LABEL,
+            "run_id": run_id, "run_timestamp": run_timestamp, "status": "nodata",
+            "metric_value": None, "unit": None, "warn_threshold": None,
+            "fail_threshold": None, "row_count_total": None, "row_count_invalid": None,
+            "on_fail_action": "flag", "engine": getattr(meta, "tool", None) or parsed.tool,
+            "unrunnable_table": unreadable[0], "unrunnable_tables": unreadable,
+            "unrunnable_code": TRIAL_UNREADABLE,
+            "unrunnable_reason": (f"{', '.join(unreadable)} could not be read in this trial - "
+                                  f"not among its files, or the file could not be loaded. "
+                                  f"This check did not fail - it could not be evaluated."),
+        })
+    return out
+
+
 def describe(results) -> str:
     """One line for the terminal, never one per result."""
     if not results:
         return ""
     by_code: dict[str, set[str]] = {}
     for r in results:
-        by_code.setdefault(r["unrunnable_code"], set()).add(r["unrunnable_table"])
+        # EVERY TABLE THE RECORD NAMES, not the first (delivery critic on
+        # 8a942e7) - the record carries them all since criterion 2's amendment.
+        by_code.setdefault(r["unrunnable_code"], set()).update(
+            r.get("unrunnable_tables") or [r["unrunnable_table"]])
     parts = "; ".join(f"{code}: {', '.join(sorted(t))}" for code, t in sorted(by_code.items()))
     return (f"{len(results)} check(s) could not be evaluated for want of a table - "
             f"{parts}. None of them is a verdict on anybody's data.")

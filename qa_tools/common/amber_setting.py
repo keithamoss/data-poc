@@ -207,7 +207,7 @@ def _versions(setting: dict) -> dict[str, dict]:
 
 
 def past_change_problems(old: dict, new: dict, today: date, *,
-                         synthetic: bool, added: date | None = None) -> list[tuple[str, str]]:
+                         synthetic: bool, added=None) -> list[tuple[str, str]]:
     """[(where, problem)] for every change that rewrites a setting's past.
 
     `today` is on the asset's clock. A version is PAST once its date is
@@ -219,8 +219,13 @@ def past_change_problems(old: dict, new: dict, today: date, *,
     introduced it (criterion 7 as amended 2026-10-05, Keith) - so a
     version committed late and checked after midnight is not refused for
     the gate's own timing. None means today: an edit not yet committed.
+    A callable is asked per version - `added(start)` - since each version
+    is dated by the commit that introduced IT (delivery critic on 8a942e7,
+    M1); its None likewise means today.
     """
-    added = added or today
+    def added_for(start: str) -> date:
+        found = added(start) if callable(added) else added
+        return found or today
     problems: list[tuple[str, str]] = []
     was, now = _settings(old), _settings(new)
     for where, setting in was.items():
@@ -249,8 +254,8 @@ def past_change_problems(old: dict, new: dict, today: date, *,
                 started = date.fromisoformat(start)
             except ValueError:
                 continue
-            if started < added and not synthetic:
+            if started < today and not synthetic and started < added_for(start):
                 problems.append((where, f"a new version is dated {start}, before the day "
-                                        f"it was added ({added.isoformat()})"))
+                                        f"it was added ({added_for(start).isoformat()})"))
     return problems
 

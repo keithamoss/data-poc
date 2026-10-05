@@ -312,3 +312,29 @@ class TestAnEntryAboutAnotherSupplyDoesNotHideTheReference:
             pass
         got = drift_reference.reference_for(conn, dataset, c)
         assert (got.period, got.supply) == (a, real)
+
+
+class TestASupplysRunIsItsOwnDatasetsRun:
+    """dashboard UX critic on 8a942e7, H1: every Child Protection run reads
+    its siblings' tables for cross-table checks, all at one instant, so
+    'the earliest run that read it' tied and the alphabetical tie-break
+    named cp_carers' run for every dataset's supply. The page then said
+    nothing was in place for five of six datasets, and a drift reference
+    could be taken from the wrong run."""
+
+    def test_the_run_named_for_the_table_wins_a_tie(self, supply_dsn):
+        import uuid
+
+        from qa_tools.common import drift_reference, qa_store, supply_db
+
+        key = "2090" + uuid.uuid4().hex[:14]
+        physical = f"cp_clients__{key}"
+        with supply_db.connect(label="test-run-for") as conn:
+            qa_store.ensure_schema(conn)
+            for run in (f"cp_carers__{key}", f"cp_clients__{key}"):
+                conn.execute(
+                    'INSERT INTO qa.run (run_key, agency_id, collection_id, run_timestamp, '
+                    "run_instant) VALUES (?, 'a', 'c', 't', '2026-08-01T01:00:00+00:00')", [run])
+                conn.execute("INSERT INTO qa.tables_read (run_key, logical_table, physical_table) "
+                             "VALUES (?, 'cp_clients', ?)", [run, physical])
+            assert drift_reference.run_for(conn, "cp-clients", f"cp-clients@{key}") == physical

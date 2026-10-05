@@ -121,6 +121,9 @@ class Request:
     #: The period a substitution stands on.
     stands_on: str | None = None
     confirmed: bool = False
+    #: The key of the consequences the person was shown and confirmed
+    #: (REQ-PIPE-128 criteria 6 and 9) - None where nothing was shown.
+    acknowledged: str | None = None
 
     @property
     def actor_name(self) -> str:
@@ -145,6 +148,64 @@ class Outcome:
     period: str | None
     changed: bool
     message: str
+
+
+@dataclass(frozen=True)
+class Consequences:
+    """What a decision does beyond the slot it names, as lines for one
+    warning panel, and the key a confirmation names (REQ-PIPE-128
+    criteria 6, 7 and 9). No lines means no panel."""
+
+    lines: tuple[str, ...]
+
+    @property
+    def key(self) -> str:
+        import hashlib
+
+        return hashlib.sha1("\n".join(self.lines).encode()).hexdigest()[:10] if self.lines else ""
+
+
+class ConsequencesNotAcknowledged(decision_log.DecisionRefused):
+    """A decision with consequences, not confirmed against the warning in
+    force now - never shown, or shown and since changed (criterion 9)."""
+
+    def __init__(self, found: Consequences, *, changed: bool):
+        self.lines, self.key = found.lines, found.key
+        lead = ("Its consequences have changed since you were shown them, so nothing "
+                "was done. " if changed else "")
+        super().__init__(
+            lead + "This decision does more than its own slot:\n"
+            + "\n".join(f"  - {line}" for line in found.lines)
+            + f"\nTo go ahead, raise it again confirming key {found.key} - in the "
+            f"terminal `--acknowledge {found.key}`, on a ticket `acknowledge: {found.key}` "
+            f"on the command line.")
+
+
+def consequences(conn, request: Request) -> Consequences:
+    """Everything this decision does beyond the slot it names, each with
+    how it is undone and what the affected period reads until then
+    (REQ-PIPE-128 criteria 6 and 7). Empty where it does nothing more.
+
+    Which OTHER supplies' checks read a moved table and will be re-checked
+    (criterion 8) is not said yet: the re-check itself is REQ-PIPE-151's
+    processing pass, unbuilt, and a warning promising one would be false.
+    """
+    lines: list[str] = []
+    if request.operation == PROMOTE and request.period and request.supply:
+        h = decision_log.held(conn, request.dataset_id, request.period)
+        if h and h.held_as == decision_log.PROMOTED and h.holder != request.supply:
+            lines.append(
+                f"{h.holder}, promoted into {request.period} now, moves to superseded - "
+                f"restore it with `mothman supply decide --operation un-supersede "
+                f"--dataset {request.dataset_id} --period {request.period} --supply "
+                f"{h.holder} --reason '<why>'`. {request.period} reads {request.supply} "
+                f"from this decision on.")
+        elif h and h.held_as == decision_log.SUBSTITUTED:
+            lines.append(
+                f"The substitution of {request.period} onto {h.stands_on} ({h.holder}) is "
+                f"removed - substitute it again to restore it. {request.period} reads "
+                f"{request.supply} from this decision on.")
+    return Consequences(lines=tuple(lines))
 
 
 def offered(operation: str) -> str:
@@ -274,10 +335,13 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> Non
               "reason": reason, "effective_at": effective_at}
 
     if request.operation == PROMOTE:
+        # A SUBSTITUTION IS REMOVED ONLY ONCE ITS CONSEQUENCE WAS CONFIRMED
+        # (REQ-PIPE-128 criterion 4) - apply() has already held the person
+        # to the warning, so reaching here is that confirmation.
         promotion.promote(
             conn, supply=request.supply, period=request.period,
             physical_tables=_staged(conn, entry.table, request.supply),
-            actor_kind=decision_log.PERSON, **common)
+            actor_kind=decision_log.PERSON, remove_substitution=True, **common)
     elif request.operation == REJECT:
         rejection.reject(
             conn, supply=request.supply, from_slot=request.period,
@@ -424,6 +488,14 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     if already is not None:
         return Outcome(operation=request.operation, dataset_id=request.dataset_id,
                         period=request.period, changed=False, message=already)
+
+    # ONE CONFIRMATION, AGAINST THE WARNING IN FORCE NOW (REQ-PIPE-128
+    # criteria 6 and 9): a decision with consequences goes ahead only
+    # where the person confirmed exactly these; anything else is refused
+    # with the warning as it stands.
+    found = consequences(conn, request)
+    if found.lines and request.acknowledged != found.key:
+        raise ConsequencesNotAcknowledged(found, changed=request.acknowledged is not None)
 
     _apply_one(conn, request, reason, effective_at=effective_at)
     return Outcome(

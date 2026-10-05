@@ -82,7 +82,8 @@ NEEDS_ACTION = frozenset({
 #: What a person can do about a period that CLOSED unfilled (REQ-PIPE-132
 #: criterion 12) - each available on both routes - and what they must
 #: know: a file arriving now goes to the open period, not to this one.
-CLOSED_RESPONSES = ("substitute an earlier period's supply",
+CLOSED_RESPONSES = ("chase the supplier first - most often the file is late",
+                    "substitute an earlier period's supply",
                     "mark it as not supplied",
                     "re-file a late file into it")
 CLOSED_NOTE = "a file arriving now is filed to the open period, not to this one"

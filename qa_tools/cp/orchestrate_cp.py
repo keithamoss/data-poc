@@ -337,6 +337,16 @@ def _has_scope(entry: dict, run_id: str) -> bool:
 def _unrunnable_results(entry: dict, run_id: str, run_timestamp: str,
                         resolution) -> list[dict]:
     """The could-not-run records for this run - see unrunnable.py."""
+    if trial.is_trial(run_id):
+        # A TRIAL IS RECONCILED, so it records what it could not read
+        # (delivery critic on 8a942e7, H2) - without these the
+        # reconciliation crashed on an ordinary trial with an unloadable
+        # sibling file.
+        noted = left_out.peek(run_id)
+        return unrunnable.results_for_trial(
+            run_id=run_id, run_timestamp=run_timestamp, resolution=resolution,
+            reads=promotion._declared_reads(),
+            left_out_ids=set().union(*noted.values()) if noted else set())
     owner = run_owner(run_id)
     if owner is None:
         return []

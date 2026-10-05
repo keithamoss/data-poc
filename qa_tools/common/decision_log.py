@@ -167,7 +167,7 @@ AUTOMATIC_ACTIONS = (PROMOTE, INHERIT, INHERIT_REFUSED, PROMOTION_WITHHELD, SUPE
 
 #: The decisions that move a supply, and so are the ones criterion 11
 #: refuses while a later period stands on it.
-MOVES_A_SUPPLY = (REJECT, DEMOTE, REFILE)
+MOVES_A_SUPPLY = (REJECT, DEMOTE, REFILE, SUPERSEDE)
 
 #: Entries that record automation standing back, and so never change what
 #: a slot resolves to (post-build-review #84).
@@ -523,7 +523,7 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
                                           besides=decision.supply)
         if waiting:
             raise DecisionRefused(
-                f"{waiting[0]} is a newer version of this table, waiting for "
+                f"{waiting[0]} is another version of this table, waiting for "
                 f"{decision.from_slot}, so demoting {decision.supply} would leave two "
                 f"waiting. Reject or supersede {waiting[0]} first: `mothman supply decide "
                 f"--operation reject --dataset {decision.dataset_id} --period "
@@ -574,12 +574,18 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
             # one is sent to a route that will refuse them.
             how = ", ".join(f"{slot} ({UNBLOCKED_BY[action]} it)"
                              for slot, action in standing)
+            # THE FIX AS A COMMAND TO PASTE (REQ-PIPE-128 NFR 4), one per
+            # blocking period.
+            commands = " ".join(
+                f"`mothman supply decide --operation {UNBLOCKED_BY[action]} --dataset "
+                f"{decision.dataset_id} --period {slot} --reason '<why>'`"
+                for slot, action in standing)
             raise DecisionRefused(
                 f"{decision.supply!r} cannot be {decision.action}d while "
                 f"{len(standing)} later period(s) stand on it: {how}. Each of "
                 f"those resolves to this supply - by a substitution somebody "
                 f"decided, or because nothing was owed for it - so clear them "
-                f"first, or point them elsewhere.")
+                f"first, or point them elsewhere: {commands}")
 
 
 def _lock(conn: supply_db.SupplyConnection, decision: Decision) -> None:

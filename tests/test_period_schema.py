@@ -17,6 +17,7 @@ import duckdb
 import pytest
 
 from qa_tools.common import period_schema as ps
+from qa_tools.common import sample_data
 from qa_tools.common import supply_db
 
 
@@ -120,38 +121,36 @@ class TestAPeriodNameIsNotAnIdentifier:
 
 
 class TestTheNewestVersionWithinAPeriod:
-    """Criterion 4: where a period's schema holds more than one version
-    of a table - a supply and its resupplies - read the newest."""
+    """Criterion 4, as REQ-PIPE-128 left it: a period holds ONE version of
+    each table, so ranking survives only for the SAMPLE schema, where every
+    version a run staged is kept (NFR 6 - moved to sample_data)."""
 
     def test_the_latest_arrival_wins(self):
-        assert ps.newest(["t__20260824010000", "t__20260826010000",
+        assert sample_data.newest(["t__20260824010000", "t__20260826010000",
                            "t__20260825010000"]) == "t__20260826010000"
 
     def test_an_ordinal_breaks_a_tie_within_one_arrival(self):
-        assert ps.newest(["t__20260824010000", "t__20260824010000__2"]) \
+        assert sample_data.newest(["t__20260824010000", "t__20260824010000__2"]) \
             == "t__20260824010000__2"
 
     def test_a_name_this_project_did_not_mint_never_wins(self):
         """It cannot be ordered against the others, and being wrong
         about WHICH version was read is the one outcome worth
         avoiding."""
-        assert ps.newest(["t__20260824010000", "some_hand_made_table"]) \
+        assert sample_data.newest(["t__20260824010000", "some_hand_made_table"]) \
             == "t__20260824010000"
 
     def test_no_candidates_is_absence_rather_than_an_error(self):
-        assert ps.newest([]) is None
+        assert sample_data.newest([]) is None
 
-    def test_the_newest_promoted_version_is_what_a_run_reads(self, conn):
+    def test_two_versions_in_a_period_are_refused_not_ranked(self, conn):
+        """REQ-PIPE-128 criteria 11 and 12: nothing chooses between two
+        versions in a period - it fails loudly, naming both."""
         _promote(conn, "2026-Q3", "carers__20260801010000", [1])
         _promote(conn, "2026-Q3", "carers__20260815010000", [2, 3])
 
-        res = ps.create_overlay_views(
-            conn, "run_1", "2026-Q3", staged={},
-            promoted=ps.promoted_in(conn, "2026-Q3", ["carers"]))
-
-        assert res.resolution.resolved["carers"] == "carers__20260815010000"
-        rows = conn.execute(f'SELECT COUNT(*) FROM "{res.resolution.schema}"."carers"').fetchone()
-        assert rows[0] == 2
+        with pytest.raises(ps.MoreThanOneVersion, match="carers__20260815010000"):
+            ps.promoted_in(conn, "2026-Q3", ["carers"])
 
 
 class TestTheStagedDeliveryIsOverlaid:

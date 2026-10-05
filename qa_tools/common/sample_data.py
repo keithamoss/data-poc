@@ -29,7 +29,7 @@ missing one makes a fixture silently test the real asset.
 """
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from qa_tools.common import hierarchy, qa_store, schedule, supply_db
 
@@ -211,3 +211,33 @@ def discard(conn, dataset_id: str) -> list[str]:
     for physical in dropped:
         conn.execute(f'DROP TABLE IF EXISTS "{SCHEMA}"."{physical}" CASCADE')
     return dropped
+
+
+def newest(physical_names: Sequence[str]) -> str | None:
+    """The newest of several versions of one SAMPLE table (REQ-PIPE-106).
+
+    MOVED HERE FROM period_schema (REQ-PIPE-128 NFR 6): a period holds one
+    version of each table and ranks nothing, but the sample schema keeps
+    every version a run staged, and the newest is the one a check
+    developed against it should read. Ordered by
+    the ARRIVAL KEY the physical name carries, then by ordinal - not by
+    the raw string, because a name without an ordinal must sort before
+    the same name with one rather than lexically among them.
+
+    Returns None for no candidates at all, which callers must treat as
+    absence rather than as an error: absence is an ordinary state here
+    and has its own criterion.
+    """
+    best, best_key = None, None
+    for physical in physical_names:
+        parts = supply_db.split_staged(physical)
+        if parts is None:
+            # A name this project did not mint. It cannot be ordered
+            # against the others, so it never wins - being wrong about
+            # WHICH version is read is the one outcome worth avoiding.
+            continue
+        _logical, arrival, ordinal = parts
+        key = (arrival, ordinal or "")
+        if best_key is None or key > best_key:
+            best, best_key = physical, key
+    return best

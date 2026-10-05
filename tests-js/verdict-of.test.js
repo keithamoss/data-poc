@@ -40,3 +40,18 @@ describe("the verdict's supply", () => {
     expect(w.clipDatasetToAsOf(d, "2026-02-11").runs.map(r=>r.run_id)).toEqual(["r1", "r2"]);
   });
 });
+
+// dashboard UX critic on 8a942e7, H2: a past date kept each check's NEWEST
+// status, so a check red on the run being shown read green - a false green.
+describe("a check's status on a past date", () => {
+  it("is the status of the run on show, not the newest", () => {
+    const w = loadDashboard().window;
+    const d = {id: "cp-clients", runs: RUNS, runStates: {},
+      columns: [{name: "c", stats: {}, checks: [{id: "k", current_status: "green", history: [
+        {run_id: "r1", value: 20, status: "red"},
+        {run_id: "r2", value: 0, status: "green"}]}]}]};
+    const clipped = w.clipDatasetToAsOf(d, "2026-01-15");
+    const check = clipped.columns[0].checks[0];
+    expect(w.checkStatus(check)).toBe("red");
+  });
+});

@@ -170,3 +170,63 @@ class TestCouldNotBeLoadedOutranksEverything:
             reads=READS, as_at=AS_AT)
         assert r["unrunnable_code"] == period_schema.COULD_NOT_LOAD
         assert "could not be loaded" in r["unrunnable_reason"]
+
+
+class TestATrialRecordsWhatItCouldNotRead:
+    """delivery critic on 8a942e7, H2: trials became reconciled
+    (REQ-PIPE-115 criterion 17 as amended) but still wrote no not-evaluated
+    records, so a trial with an unloadable sibling crashed on the
+    reconciliation instead of saying which checks it could not run."""
+
+    def test_one_record_per_check_reading_an_unreadable_table(self):
+        out = unrunnable.results_for_trial(
+            run_id="trial_x", run_timestamp="t",
+            resolution=_res(resolved={"cp_placements": "x"}, absent=["cp_clients", "cp_carers"]),
+            reads={PLACEMENTS_READS_BOTH: ["cp_clients", "cp_carers"],
+                   PLACEMENTS_READS_CLIENTS: ["cp_clients"]})
+        assert sorted(r["check_id"] for r in out) == sorted(
+            [PLACEMENTS_READS_BOTH, PLACEMENTS_READS_CLIENTS])
+        both = next(r for r in out if r["check_id"] == PLACEMENTS_READS_BOTH)
+        assert both["unrunnable_tables"] == ["cp_carers", "cp_clients"]
+        assert "trial" in both["unrunnable_reason"]
+        assert both["status"] == "nodata"
+
+    def test_nothing_unreadable_records_nothing(self):
+        assert unrunnable.results_for_trial(
+            run_id="trial_x", run_timestamp="t",
+            resolution=_res(resolved={"cp_placements": "x", "cp_clients": "y"}),
+            reads={PLACEMENTS_READS_CLIENTS: ["cp_clients"]}) == []
+
+
+class TestATrialExplainsItsOwnTablesChecksToo:
+    """The same finding, on the reproduction: the unloadable dataset's OWN
+    checks were left out with nothing recorded. A left-out check whose own
+    dataset's table is unreadable is explained; one with no unreadable table
+    to explain it is not recorded, so the reconciliation still catches it."""
+
+    CARERS_OWN = f"{P}.cp-carers.carer_id.not_null_dbt"
+    CLIENTS_OWN = f"{P}.cp-clients.cp_client_id.not_null_dbt"
+
+    def test_explained_left_out_checks_are_recorded_and_others_are_not(self):
+        out = unrunnable.results_for_trial(
+            run_id="trial_x", run_timestamp="t",
+            resolution=_res(resolved={"cp_clients": "y"}, absent=["cp_carers"]),
+            reads={}, left_out_ids={self.CARERS_OWN, self.CLIENTS_OWN})
+        assert [r["check_id"] for r in out] == [self.CARERS_OWN]
+
+
+class TestAHeldTableIsOneRecordPerCheckToo:
+    """REQ-PIPE-115 criterion 2 as amended 2026-10-05 (Keith), applied to
+    held_blast_radius, which recorded one result per (check, held table) -
+    two results for one check in one run where it read two held tables."""
+
+    def test_one_record_naming_both(self):
+        from qa_tools.common import held_blast_radius
+
+        out = held_blast_radius.results_for(
+            held={"cp_clients": "c", "cp_carers": "k"},
+            reads={PLACEMENTS_READS_BOTH: ["cp_clients", "cp_carers"]},
+            run_id="r", run_timestamp="t")
+        assert [r["check_id"] for r in out] == [PLACEMENTS_READS_BOTH]
+        assert out[0]["held_tables"] == ["cp_carers", "cp_clients"]
+        assert "cp_carers" in out[0]["held_reason"] and "cp_clients" in out[0]["held_reason"]

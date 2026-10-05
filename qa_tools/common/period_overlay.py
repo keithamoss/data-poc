@@ -256,9 +256,9 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
         if sample:
             found = supply_db.candidates_in(conn, sample_data.SCHEMA, sample,
                                              loaded=loaded)
-            newest = {logical: [period_schema.newest(versions)]
+            newest = {logical: [sample_data.newest(versions)]
                       for logical, versions in found.items()
-                      if period_schema.newest(versions) is not None}
+                      if sample_data.newest(versions) is not None}
             supply_db.add_run_views(conn, arrival.run_id, newest,
                                      sample_data.SCHEMA, out.resolution)
         name_held_siblings(conn, out.resolution, arrival)

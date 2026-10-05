@@ -11,6 +11,8 @@ for.
 """
 from __future__ import annotations
 
+import dataclasses
+
 import uuid
 
 import pytest
@@ -417,11 +419,14 @@ class TestTheFilingRulesAreJudgedWhenTheEntryIsAppended:
             actor_kind=dl.PERSON, effective_at=WHEN)
         mine, _ = _stage(conn, dataset)
 
-        got = fd.apply(
-            fd.Request(operation=fd.PROMOTE, dataset_id=dataset.dataset_id,
-                        actor=actor, period=first, supply=mine,
-                        reason="theirs was the wrong extract"),
-            effective_at=WHEN, conn=conn)
+        request = fd.Request(operation=fd.PROMOTE, dataset_id=dataset.dataset_id,
+                             actor=actor, period=first, supply=mine,
+                             reason="theirs was the wrong extract")
+        # REQ-PIPE-128: displacing a promoted supply is a consequence the
+        # person confirms - once, against the warning shown.
+        key = fd.consequences(conn, request).key
+        got = fd.apply(dataclasses.replace(request, acknowledged=key),
+                       effective_at=WHEN, conn=conn)
 
         assert got.changed is True
         assert dl.promoted_into(conn, dataset.dataset_id, first) == mine

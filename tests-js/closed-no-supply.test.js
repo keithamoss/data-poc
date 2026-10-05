@@ -172,3 +172,17 @@ describe("a slot late but still open", () => {
     expect(w.lateOpenAsOf(filed, "2026-10-04")).toBeNull();
   });
 });
+
+// Keith 2026-10-05 (UX critic #110 M2): on the build's own day the late
+// slot is judged at the build instant, so yesterday's slot - closing at
+// 10am today - still reads late and open at 8:52am.
+describe("a late slot on the build's own day", () => {
+  const SLOT = {period: "2026-10-04", lateAt: "2026-10-04T07:00:00+00:00", filedAt: null,
+                closesAt: "2026-10-05T02:00:00+00:00"};
+  it("is open before it closes and gone after", () => {
+    const w = load();
+    expect(w.lateOpenAsOf({lateSlots: [SLOT]}, "2026-10-05", "2026-10-05T00:52:00+00:00").period)
+      .toBe("2026-10-04");
+    expect(w.lateOpenAsOf({lateSlots: [SLOT]}, "2026-10-05", "2026-10-05T03:00:00+00:00")).toBeNull();
+  });
+});

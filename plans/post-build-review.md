@@ -5334,3 +5334,99 @@ twice. It deliberately did not re-find the `TypeError`.
       `_superseded`) is an edge case. All three are recorded on the
       requirements' decisions. The critic also found two REQ-PIPE-120 NFRs
       riding on REQ-PIPE-151 that were not listed as unmet; they are now.
+
+110. **[in-progress, 2026-10-05]** **[Dashboard UI]** **The dashboard UX critic
+    on 8a942e7 (Keith's morning answers): the new verdict line was wrong for
+    five of six Child Protection datasets, and past dates showed today's
+    check colours.**
+    - **H1, FIXED** (failing test first; Keith signed the fix off):
+      `drift_reference.run_for()` took the earliest run that read a
+      supply's table. Every Child Protection run reads its siblings' tables
+      at one instant, so the alphabetical tie-break named cp_carers' run for
+      every dataset's supply. The page said "Nothing is in place" on
+      datasets whose supplies were promoted, and a drift reference could
+      come from the wrong run. The run named for the table now wins; all
+      107 run keys across the seven datasets map to their own dataset on
+      the real database. `tests/test_drift_reference.py::
+      TestASupplysRunIsItsOwnDatasetsRun`.
+    - **H2, FIXED** (pre-existing; failing test first; Keith signed the fix
+      off): `clipDatasetToAsOf()` overrode each check's value but kept its
+      NEWEST `current_status`, which `checkStatus()` reads first. So a past
+      date rendered today's colours - 96 of 227 checks as of 2 May 2026, a
+      check red on that day's run reading green. The clipped check now takes
+      the shown run's own status. `tests/test_dashboard_e2e.py::
+      TestStatusMatchesEachToolsOwnVerdict::test_on_every_past_date_too`
+      compares every check on every run date against the run it shows, and
+      failed against the unfixed template. This also resolves M5, where a
+      gap-red note sat beside a green pill.
+    - **FIXED, minor:**
+      - H3: the verdict line no longer appears on a page whose checks are
+        blanked.
+      - M1: the held and unloadable banner is now red, like the contested
+        one.
+      - M6: the queue's closed-period advice now leads with "chase the
+        supplier first".
+      - The held reason's "its supply" wording.
+      - The mixed dashes in the held banner.
+      - The gap-red note now names the filing wizard.
+      - "Amber supplies:" is now "Amber setting:", on the page and in the
+        terminal.
+    - **KEITH'S ANSWERS, 2026-10-05:**
+      - M2: judge "late, still open" against the build instant for today.
+        BUILT: on the build's own day the page compares instants with
+        BUILT_AT; past dates still compare days.
+      - M3: LEAVE IT. The bold "Awaiting a decision" on nearly every Birth
+        Registrations date comes from the bootstrap's invented promotion
+        lag (one hour to three days, Keith's own choice of 2026-10-02).
+        In production the rule promotes minutes after QA, so this is a
+        demo-corpus artefact, not worth a second wording.
+    - **LOGGED, pre-existing, not fixed:** M4. The "what is in the
+      warehouse is not the latest file" banner and the supply history are
+      not clipped to the date on show, so a past date shows supplies from
+      later months. A real as-of gap, older than this commit.
+    - Not a defect: the lowercase "unloadable" label came from the critic's
+      own injected variant page. Real blockers are kind `refused`,
+      labelled "Could not be loaded".
+
+111. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **The delivery
+    critic on 8a942e7: the same wrong-run defect as #110's H1, a trial
+    crash, and a too-permissive commit date.** Each finding was verified
+    against the code before it was written here.
+    - **H1**: the same root cause as #110's H1, fixed there.
+    - **H2, FIXED** (failing test first): reconciling trials (REQ-PIPE-115
+      criterion 17 as amended) while a trial wrote no not-evaluated
+      records crashed an ordinary trial on LeftOutMismatch when a sibling
+      file would not load. Before the amendment those checks were silently
+      absent (157 of 184). `unrunnable.results_for_trial()` now records
+      them, explained by an unreadable table; a left-out check nothing
+      explains still trips the reconciliation. The critic's exact
+      reproduction now exits 0 with 27 not evaluated and 184 total.
+    - **M1, FIXED** (failing test first): REQ-PIPE-122 criterion 7 dated a
+      change by the earliest commit in the push that touched the file, so
+      an unrelated edit let a back-dated version pass.
+      `_version_added_on()` dates each version by the commit that
+      introduced it.
+    - **M2, FIXED**: REQ-PIPE-115's `unmet_criteria` still carried
+      criterion 2 after Keith had answered it. While closing it,
+      `held_blast_radius` was found recording one result per (check, held
+      table) - two results for one check in one run. Now one, naming
+      every held table (failing test first).
+    - **M3, BUILT on Keith's answer (2026-10-05):** on a day a daily feed
+      has no file at all, its row took the "no QA run within tolerance"
+      branch and skipped the late-but-open note. That row now shows it
+      too.
+    - **FIXED, minor:**
+      - The demote refusal now says "another version", not "a newer
+        version".
+      - `unrunnable.describe()` names every table.
+      - REQ-PIPE-081 now lists its tests and implementing functions.
+      - REQ-PIPE-115 now lists `blockerWithoutARunOfItsOwn`.
+      - REQ-DASH-133's decision now names the wizard the way the banner
+        does.
+    - **LOGGED:**
+      - `lateOpenAsOf` and `runStateAsOf` are date-granular, not
+        instant-granular. Part of #110's M2 question.
+      - REQ-PIPE-144 criterion 29's text still describes the
+        reshape-only refusal; the stricter rule lives in its decisions.
+      - The wiring of `_version_added_on` inside `_amber_setting_errors`
+        has no test of its own.

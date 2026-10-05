@@ -322,7 +322,7 @@ button{font:inherit; color:inherit;}
    supply and a held, contested or unloadable supply each make their
    dataset red, and drawn in the same grey as an all-clear they did not
    stand out below the status pill. The words still carry the meaning. */
-.notice-exhausted[data-no-supply], .notice-exhausted[data-blocked]{
+.notice-exhausted[data-no-supply], .notice-exhausted[data-blocked], .notice-exhausted[data-waiting-blocker]{
   border-color:var(--bad); background:var(--bad-soft);}
 /* CODE CHIPS ARE NOT SCOPED TO ONE NOTICE any more
    (post-build-review #53). This rule used to sit on .notice-exhausted
@@ -1425,7 +1425,7 @@ function referenceNoteHtml(h){
       <div style="font-size:13px;">${escHtml(ref.reason)}.</div>
       ${ref.measuredStatus ? `<div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">
         The measurement alone reads ${pill(ref.measuredStatus,"sm")}${gapRed
-          ? " — this check is red because of the gap, not because anything drifted, and it does not hold the supply back from promotion. Promote, substitute or accept as not supplied a missing period to clear it." : "."}</div>` : ""}
+          ? " — this check is red because of the gap, not because anything drifted, and it does not hold the supply back from promotion. To clear it, deal with the missing period in the filing wizard (run <code>mothman</code> and choose <i>Filing decisions</i>): promote its supply, substitute an earlier one, or accept it as not supplied." : "."}</div>` : ""}
     </div>`;
 }
 
@@ -2408,7 +2408,14 @@ function clipDatasetToAsOf(d, asOfDateStr){
         const history = ck.history.filter(h => eligibleRunIds.has(h.run_id));
         if(!history.length) return null;
         const last = history[history.length-1], prev = history.length>1 ? history[history.length-2] : last;
-        return {...ck, history, current: last.value, previous: prev.value};
+        // THE STATUS OF THE RUN ON SHOW, not the newest run's (dashboard UX
+        // critic on 8a942e7, H2): checkStatus() reads current_status first,
+        // so keeping the newest one coloured a past date by today's
+        // verdict - a check red on that run read green. Without a status
+        // of its own the point falls back to the threshold math.
+        const asOf = {...ck, history, current: last.value, previous: prev.value};
+        if(last.status) asOf.current_status = last.status; else delete asOf.current_status;
+        return asOf;
       })
       .filter(Boolean);
     const byRun = (col.stats && col.stats.byRun) || {};
@@ -4113,7 +4120,7 @@ function outstandingKindLabel(kind){ return OUTSTANDING_KIND_LABEL[kind] || kind
 const BLOCKER_LABEL = {held:"Held", contested:"Two files, choose one",
   refused:"Could not be loaded"};
 const BLOCKER_SAYS = {
-  held:"no open period to file its supply to; waiting for a person",
+  held:"no open period to file it to; waiting for a person",
   contested:"two files claim its table, waiting for a person to choose one",
   refused:"its supply arrived and could not be loaded"};
 function assetDateStrOf(value){
@@ -4235,7 +4242,9 @@ function amberSettingAsOf(ds, asOfDateStr){
 // place, if anything. Said in words, never left to the reader to infer.
 function verdictLine(ds){
   const v = ds && ds.verdictOf;
-  if(!v || !ds.lastArrival) return "";
+  // NOT ON A BLANKED PAGE (UX critic on 8a942e7, H3): there are no
+  // results below to be about, and the banner says so.
+  if(!v || !ds.lastArrival || ds.blocked) return "";
   if(v.state === "promoted"){
     return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place, received ${fmtInstant(ds.lastArrival.arrivedAt)}.</div>`;
   }
@@ -4247,12 +4256,26 @@ function verdictLine(ds){
 function amberSettingLine(ds, asOfDateStr){
   const a = amberSettingAsOf(ds, asOfDateStr);
   if(!a) return "";
-  return `<div class="amber-setting-line" data-amber-setting="${escHtml(a.value)}" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 14px;" title="What happens to a supply whose checks come back amber, and where that was set">Amber supplies: ${escHtml(a.text)}</div>`;
+  return `<div class="amber-setting-line" data-amber-setting="${escHtml(a.value)}" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 14px;" title="What happens to a supply whose checks come back amber, and where that was set">Amber setting: ${escHtml(a.text)}</div>`;
 }
 // THE NEWEST SLOT LATE BUT STILL OPEN on the date on show (REQ-DASH-133,
 // Keith 2026-10-05): past its late instant, no file yet, not yet closed.
 // The build embeds the instants; the page only compares them.
-function lateOpenAsOf(ds, asOfDateStr){
+function lateOpenAsOf(ds, asOfDateStr, builtAt){
+  // TODAY IS JUDGED AT THE BUILD INSTANT (Keith, 2026-10-05; UX critic
+  // #110 M2): compared by whole days, yesterday's slot - late at 3pm,
+  // closing at 10am today - read closed all morning, so the note never
+  // showed on the view people open. Past dates still compare days.
+  const built = builtAt === undefined ? (typeof BUILT_AT !== "undefined" ? BUILT_AT : null) : builtAt;
+  if(built && asOfDateStr === assetDateStrOf(built)){
+    const t = Date.parse(built), at = v => v ? Date.parse(v) : null;
+    let found = null;
+    ((ds && ds.lateSlots) || []).forEach(s=>{
+      const late = at(s.lateAt), filed = at(s.filedAt), closes = at(s.closesAt);
+      if(late !== null && late <= t && (filed === null || filed > t) && (closes === null || closes > t)) found = s;
+    });
+    return found;
+  }
   const by = v => v && assetDateStrOf(v) <= asOfDateStr;
   let found = null;
   ((ds && ds.lateSlots) || []).forEach(s=>{
@@ -4672,7 +4695,7 @@ function renderAgency(view, agencyId){
           if(ds.noDataAsOf && !ds.noSupply){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}${noSupplyNote(ds)}</td>
               <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance as of the selected date</td>
             </tr>`;
           }
@@ -5011,7 +5034,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <b>${escHtml(blockerReasonText(ds.waitingBlocker))}.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
           ${escHtml(ds.waitingBlocker.reason || "")}${ds.waitingBlocker.reason ? "<br><br>" : ""}
-          ${ds.waitingBlocker.count > 1 ? `${ds.waitingBlocker.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.waitingBlocker))}` : `Received <b style="display:inline">${fmtInstant(ds.waitingBlocker.openedAt)}</b>`}.
+          ${ds.waitingBlocker.count > 1 ? `${ds.waitingBlocker.count} supplies are waiting — ${escHtml(blockerReceivedText(ds.waitingBlocker))}` : `Received <b style="display:inline">${fmtInstant(ds.waitingBlocker.openedAt)}</b>`}.
           The dataset stays red until a person resolves it. The checks below are the
           latest supply that could be checked, received ${fmtInstant(ds.lastArrival.arrivedAt)}.
         </div>

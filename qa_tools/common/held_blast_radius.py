@@ -65,18 +65,18 @@ def _reason(logical: str, physical: str | None) -> str:
 def results_for(*, held: dict[str, str], reads: dict[str, list[str]],
                  run_id: str, run_timestamp: str,
                  checks_by_id: dict | None = None) -> list[dict]:
-    """One red result per (check, held table it reads).
+    """One red result per check that reads a held table, naming every held
+    table it reads (REQ-PIPE-115 criterion 2 as amended 2026-10-05).
 
     `held` is `Resolution.held` - logical table -> the physical table
     being withheld. `reads` is what
     `tables_read.declared_by_check_id()` returns.
 
-    ONE PER PAIR RATHER THAN ONE PER CHECK, because a check reading two
-    held tables is blocked by both and naming one of them would send a
-    reader to fix half the problem. They are distinguishable by
-    `column_name`, which carries the held table rather than a column -
-    the same field the dashboard already renders as "what this is
-    about", and a check that never ran has no column to report.
+    ONE PER CHECK, NAMING EVERY HELD TABLE. It was one per (check, held
+    table) so a check reading two held tables named both - but that is
+    two results for one check in one run. `held_tables` and the reason
+    name them all; `column_name` carries the first, the field the
+    dashboard renders as "what this is about".
 
     A CHECK BELONGING TO THE HELD DATASET ITSELF IS SKIPPED. Its
     supply has no period, and criterion 9 forbids recording a check
@@ -95,7 +95,9 @@ def results_for(*, held: dict[str, str], reads: dict[str, list[str]],
         own_table = _table_of(parsed.dataset)
         if own_table is not None and own_table in held:
             continue
-        for logical in sorted(set(tables) & set(held)):
+        blocked = sorted(set(tables) & set(held))
+        if blocked:
+            logical = blocked[0]
             meta = checks_by_id.get(check)
             out.append({
                 "agency_id": parsed.agency,
@@ -118,7 +120,11 @@ def results_for(*, held: dict[str, str], reads: dict[str, list[str]],
                 "on_fail_action": "flag",
                 "engine": getattr(meta, "tool", None) or parsed.tool,
                 "held_table": logical,
-                "held_reason": _reason(logical, held.get(logical) or None),
+                # ONE RECORD NAMING EVERY HELD TABLE (REQ-PIPE-115
+                # criterion 2 as amended 2026-10-05, Keith): a check keeps
+                # one result per run, and still names all it was blocked by.
+                "held_tables": blocked,
+                "held_reason": " ".join(_reason(t, held.get(t) or None) for t in blocked),
             })
     return out
 

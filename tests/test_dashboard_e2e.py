@@ -811,6 +811,46 @@ class TestStatusMatchesEachToolsOwnVerdict:
       return {compared, missingVerdict, disagreements};
     }"""
 
+    _AS_OF_JS = """() => {
+      let compared = 0;
+      const disagreements = [];
+      for (const raw of [REAL_BIRTH_REG_DATA, REAL_CP_DATA]) {
+        if (!raw) continue;
+        for (const d of (raw.datasets ? raw.datasets : [raw])) {
+          for (const r of d.runs) {
+            const date = String(r.run_date).slice(0, 10);
+            const clipped = clipDatasetToAsOf(d, date);
+            if (!clipped || !clipped.runs.length) continue;
+            const shown = clipped.runs[clipped.runs.length - 1].run_id;
+            const built = buildRealDataset(clipped);
+            built.columns.forEach(c => c.checks.forEach(ck => {
+              const h = ck.history.find(x => x.run_id === shown);
+              if (!h || !h.status) return;
+              compared++;
+              const got = checkStatus(ck);
+              if (got !== h.status && disagreements.length < 10) {
+                disagreements.push({dataset: d.id, asOf: date, check: ck.check_id || ck.id,
+                                    tool: h.status, rendered: got});
+              }
+            }));
+          }
+        }
+      }
+      return {compared, disagreements};
+    }"""
+
+    def test_on_every_past_date_too(self, clean_page, built_dashboard_html):
+        """dashboard UX critic on 8a942e7, H2: a past date kept each check's
+        NEWEST status, so 96 of 227 checks as of 2 May 2026 rendered a
+        colour their own run did not record - a check red that day read
+        green. This test only ever looked at the default date."""
+        _goto(clean_page, built_dashboard_html)
+        result = clean_page.evaluate(self._AS_OF_JS)
+        assert result["compared"] > 100, result
+        assert result["disagreements"] == [], (
+            "on a past date the page disagrees with the run it shows:\n"
+            + "\n".join(str(d) for d in result["disagreements"]))
+
     def test_every_rendered_status_matches_the_tool_that_produced_it(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
         result = clean_page.evaluate(self._COMPARE_JS)

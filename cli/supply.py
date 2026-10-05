@@ -868,9 +868,13 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
                help="Why. Required - a decision nobody can explain is the "
                     "thing the log exists to prevent.")
 @click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
+@click.option("--acknowledge", "acknowledged", default=None, metavar="KEY",
+               help="Confirm a decision's consequences beyond its own slot, by the key "
+                    "its warning showed - needed with --yes where there are any.")
 def decide_command(operation: str, dataset_id: str, period: str,
                     supply: str | None, stands_on: str | None,
-                    to_period: str | None, reason: str | None, yes: bool) -> None:
+                    to_period: str | None, reason: str | None, yes: bool,
+                    acknowledged: str | None) -> None:
     """Record one filing decision (REQ-GHUB-082 criteria 2, 3, 28).
 
     THE FLAG FORM OF THE WIZARD, calling the same implementation the
@@ -899,7 +903,7 @@ def decide_command(operation: str, dataset_id: str, period: str,
     outcome = filing_tui.apply_decision(
         operation=operation.lower(), dataset_id=dataset_id, period=period,
         supply=supply, stands_on=stands_on, to_period=to_period,
-        reason=reason, yes=yes)
+        reason=reason, yes=yes, acknowledged=acknowledged)
     # A REFUSAL FAILS AND A NO-OP DOES NOT (criterion 26). Both end with
     # nothing appended and a panel already saying which, but a script
     # that treats "already promoted" as an error is a script that stops

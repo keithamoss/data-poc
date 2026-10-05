@@ -173,6 +173,35 @@ def supersede_earlier(conn, *, agency_id: str, collection_id: str, dataset_id: s
     return done
 
 
+def supersede_promoted(conn, *, agency_id: str, collection_id: str, dataset_id: str,
+                       supply: str, period: str, by: str, actor: str, actor_kind: str,
+                       effective_at: str, replacing: list[str] | None = None) -> None:
+    """A promoted supply DISPLACED by the promotion of `by` into its period
+    moves to the superseded state - its tables out of the period schema to
+    the period's superseded schema - recorded naming `by` (REQ-PIPE-128
+    criterion 2). The caller holds the transaction the promotion is in, so
+    the two are one; the decision log refuses it while a later period
+    stands on `supply` (criterion 3)."""
+    source = period_schema.period_schema(period)
+    target = superseded_schema(period)
+    # WHAT IS DISPLACED IS WHAT THE PERIOD HOLDS FOR THE SAME TABLE - one
+    # version each (criterion 1) - so the incoming tables' logical names
+    # find it, with nothing parsed out of the displaced supply's id.
+    logical = {(supply_db.split_staged(t) or (t,))[0] for t in (replacing or [])}
+    tables = [t for (t,) in conn.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = ? "
+        "AND table_type = 'BASE TABLE'", [source]).fetchall()
+        if (supply_db.split_staged(t) or (t,))[0] in logical]
+    with decision_log.apply_decision(conn, decision_log.Decision(
+            agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
+            action=decision_log.SUPERSEDE, supply=supply, actor=actor, actor_kind=actor_kind,
+            effective_at=effective_at, from_slot=period, superseded_by=by,
+            reason=f"{by} was promoted into {period} in its place")):
+        supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{target}"')
+        for physical in tables:
+            supply_db.move_table(conn, physical, source, target)
+
+
 def drop_if_empty(conn, period: str) -> bool:
     """Drop a period's superseded schema once its last table has left
     (criterion 5). Returns True where it dropped one."""

@@ -49,7 +49,8 @@ def promote(conn: supply_db.SupplyConnection, *,
             reason: str | None = None,
             supply_is_red: bool = False,
             from_schema: str | None = None,
-            amber=None) -> bool:
+            amber=None,
+            remove_substitution: bool = False) -> bool:
     """Move this supply's tables into `period` and record the decision.
 
     Returns True where it promoted, False where the supply was already
@@ -65,6 +66,29 @@ def promote(conn: supply_db.SupplyConnection, *,
     # decision put there is not a promotion.
     if decision_log.promoted_into(conn, dataset_id, period) == supply:
         return False
+
+    # WHAT THE SLOT HOLDS DECIDES WHAT ELSE HAPPENS (REQ-PIPE-128).
+    h = decision_log.held(conn, dataset_id, period)
+    if h and h.held_as == decision_log.INHERITED:
+        # Criterion 5: nothing was expected for this period.
+        raise decision_log.DecisionRefused(
+            f"nothing was expected from {dataset_id} for {period}: it is inherited, "
+            f"standing on an earlier period because the schedule owes nothing then. "
+            f"Un-inherit it first, as its own decision: `mothman supply decide "
+            f"--operation un-inherit --dataset {dataset_id} --period {period} "
+            f"--reason '<why>'`.")
+    substituted = bool(h and h.held_as == decision_log.SUBSTITUTED)
+    if substituted and actor_kind == decision_log.RULE:
+        # Criterion 10: no automatic rule promotes into a substitution.
+        raise decision_log.DecisionRefused(
+            f"{period} is substituted; no automatic rule promotes into it.")
+    if substituted and not remove_substitution:
+        # Criterion 4: the person is told first, and confirms.
+        raise decision_log.DecisionRefused(
+            f"{period} is substituted onto {h.stands_on}; promoting {supply} removes "
+            f"that substitution. Confirm the consequence to go ahead.")
+    displaced = (h.holder if h and h.held_as == decision_log.PROMOTED
+                 and h.holder != supply else None)
 
     # OPENED, NOT JUST CREATED (REQ-PIPE-098 criterion 4): a first
     # promotion is one of the two ways a period comes into existence,
@@ -108,8 +132,29 @@ def promote(conn: supply_db.SupplyConnection, *,
     # record_automatic() says the same in as many words: "anything that
     # touches the warehouse uses the context manager, so that the entry
     # and the change stay one transaction". This touches the warehouse.
-    with decision_log.apply_decision(conn, decision):
-        move()
+    # ONE TRANSACTION FOR EVERYTHING (REQ-PIPE-128 criteria 2 and 4, NFR
+    # 3): removing a substitution, superseding what the slot held, and the
+    # promotion itself - each its own entry, all or none. Nested
+    # apply_decision blocks are savepoints inside this one.
+    with conn.raw.transaction():
+        if substituted:
+            from qa_tools.common import hierarchy, substitution
+
+            substitution.de_substitute(
+                conn, agency_id=agency_id, collection_id=collection_id,
+                dataset_id=dataset_id, logical_table=hierarchy.dataset(dataset_id).table,
+                period=period, actor=actor, effective_at=effective_at, confirmed=True,
+                reason=reason or f"{supply} promoted into {period}")
+        if displaced:
+            from qa_tools.common import supersession
+
+            supersession.supersede_promoted(
+                conn, agency_id=agency_id, collection_id=collection_id,
+                dataset_id=dataset_id, supply=displaced, period=period, by=supply,
+                actor=actor, actor_kind=actor_kind, effective_at=effective_at,
+                replacing=list(physical_tables))
+        with decision_log.apply_decision(conn, decision):
+            move()
     return True
 
 

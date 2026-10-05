@@ -131,9 +131,11 @@ def run_for(conn: supply_db.SupplyConnection, dataset_id: str,
     table it did not stage when it BORROWS one (REQ-PIPE-068's
     borrow_views, for the partial-resupply case), and a borrow always
     happens after the staging - so the first run to read a physical
-    table is the one that brought it. No physical table in this
-    deployment's 150 is read by more than one run today, which makes
-    this rule dormant rather than wrong.
+    table is the one that brought it. THE RUN NAMED FOR THE TABLE COMES
+    FIRST, though: every Child Protection run reads its siblings' tables
+    at the same instant, so "earliest" alone tied (post-build-review
+    #110, H1) - the earlier claim here that no table was read by more
+    than one run was wrong for Child Protection.
     """
     from qa_tools.common import hierarchy, qa_store
 
@@ -149,8 +151,13 @@ def run_for(conn: supply_db.SupplyConnection, dataset_id: str,
         f'SELECT t.run_key FROM "{qa_store.SCHEMA}".tables_read t '
         f'JOIN "{qa_store.SCHEMA}".run r ON r.run_key = t.run_key '
         "WHERE t.logical_table = ? AND t.physical_table LIKE ? "
-        "ORDER BY r.run_instant, t.run_key LIMIT 1",
-        [logical, f"{logical}__{arrival}%"]).fetchall()
+        # THE RUN NAMED FOR THIS TABLE FIRST (dashboard UX critic on
+        # 8a942e7, H1): a Child Protection run reads every sibling's table
+        # for its cross-table checks, all at one instant, so the earliest
+        # reader tied and the alphabetical tie-break named cp_carers' run
+        # for every dataset's supply.
+        "ORDER BY (t.run_key NOT LIKE ?), r.run_instant, t.run_key LIMIT 1",
+        [logical, f"{logical}__{arrival}%", f"{logical}__{arrival}%"]).fetchall()
     return rows[0][0] if rows else None
 
 

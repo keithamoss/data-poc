@@ -55,7 +55,7 @@ _COMMAND = re.compile(r"^\s*/(?P<name>[a-z-]+)(?P<rest>.*)$", re.MULTILINE)
 #: Only these three, and each is a NAME the system already knows rather
 #: than free text: the supply being acted on, the period a substitution
 #: stands on, and the confirmation criteria 9 and 28 require.
-_ARGUMENT = re.compile(r"\b(?P<key>supply|stands-on|confirm)\s*[:=]\s*"
+_ARGUMENT = re.compile(r"\b(?P<key>supply|stands-on|confirm|acknowledge)\s*[:=]\s*"
                        r"(?P<value>\S+)", re.IGNORECASE)
 
 #: Everything after the command line, which is the reason. A person
@@ -140,6 +140,11 @@ def read(comment: Comment) -> filing_decisions.Request:
         supply=arguments.get("supply"),
         stands_on=arguments.get("stands-on"),
         confirmed=(arguments.get("confirm", "").lower() in _AFFIRMATIVE),
+        # A DECISION WITH CONSEQUENCES TAKES A SECOND COMMENT (REQ-PIPE-128
+        # criterion 9): the first is refused with the warning and its key,
+        # and raising it again with `acknowledge: <key>` confirms exactly
+        # what was shown.
+        acknowledged=arguments.get("acknowledge"),
     )
 
 

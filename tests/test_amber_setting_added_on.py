@@ -18,30 +18,37 @@ def _git(repo, *args, when=None):
     subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, env=env)
 
 
-def test_a_committed_change_is_dated_by_its_commit(tmp_path, monkeypatch):
+def test_a_version_not_yet_committed_is_added_today(tmp_path, monkeypatch):
     repo = tmp_path
     _git(repo, "init", "-q")
     f = repo / "contract" / "data-asset.yaml"
     f.parent.mkdir()
-    f.write_text("a: 1\n")
+    f.write_text("data_asset_id: x\n")
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "base", when="2026-10-01T09:00:00+08:00")
-    f.write_text("a: 2\n")
-    _git(repo, "add", ".")
-    # 11:30pm Perth on the 4th - already the 4th in UTC too.
-    _git(repo, "commit", "-qm", "late", when="2026-10-04T23:30:00+08:00")
+    f.write_text("data_asset_id: x\namber_setting:\n  versions:\n"
+                 "    - effective_from: '2026-10-02'\n      value: hold\n")
     monkeypatch.setattr(validate_schedule, "ROOT", repo)
-    assert validate_schedule._added_on("contract/data-asset.yaml", "HEAD~1") == date(2026, 10, 4)
+    assert validate_schedule._version_added_on(
+        "contract/data-asset.yaml", "HEAD", "2026-10-02") is None
 
 
-def test_an_uncommitted_change_is_added_today(tmp_path, monkeypatch):
+def test_a_version_is_dated_by_the_commit_that_added_it_not_the_push(tmp_path, monkeypatch):
+    """delivery critic on 8a942e7, M1: an unrelated edit earlier in the same
+    push dated the change - so a version back-dated to the 2nd, added on
+    the 10th, passed because the file was first touched on the 1st."""
     repo = tmp_path
     _git(repo, "init", "-q")
     f = repo / "contract" / "data-asset.yaml"
     f.parent.mkdir()
-    f.write_text("a: 1\n")
+    base = "data_asset_id: x\namber_setting:\n  versions:\n    - effective_from: '2023-01-01'\n      value: promote\n"
+    f.write_text(base)
     _git(repo, "add", ".")
-    _git(repo, "commit", "-qm", "base", when="2026-10-01T09:00:00+08:00")
-    f.write_text("a: 2\n")
+    _git(repo, "commit", "-qm", "base", when="2026-09-01T09:00:00+08:00")
+    f.write_text(base + "# an unrelated edit\n")
+    _git(repo, "commit", "-qam", "unrelated", when="2026-10-01T09:00:00+08:00")
+    f.write_text(base.replace("value: promote\n", "value: promote\n    - effective_from: '2026-10-02'\n      value: hold\n") + "# an unrelated edit\n")
+    _git(repo, "commit", "-qam", "the version", when="2026-10-10T09:00:00+08:00")
     monkeypatch.setattr(validate_schedule, "ROOT", repo)
-    assert validate_schedule._added_on("contract/data-asset.yaml", "HEAD") is None
+    assert validate_schedule._version_added_on(
+        "contract/data-asset.yaml", "HEAD~2", "2026-10-02") == date(2026, 10, 10)

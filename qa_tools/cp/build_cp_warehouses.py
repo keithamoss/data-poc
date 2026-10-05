@@ -24,7 +24,7 @@ from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
 from qa_tools.common import load_log
 from qa_tools.common import supply_db
-from qa_tools.common import period_schema, sample_data, supply_holds, trial
+from qa_tools.common import sample_data, supply_holds, trial
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -62,7 +62,7 @@ def _build_run_views(conn, run_id: str, key: str, trial_scope) -> supply_db.Reso
     (criterion 18) - so the newest version of it is simply what a check
     developed against it should read, whichever run staged it.
 
-    `period_schema.newest()` decides between versions rather than a
+    `sample_data.newest()` decides between versions rather than a
     `max()` here, for the reason its own docstring gives: a physical name
     orders by its arrival key and ordinal, never lexically.
     """
@@ -85,9 +85,9 @@ def _build_run_views(conn, run_id: str, key: str, trial_scope) -> supply_db.Reso
     # one as a truncated staged table is.
     found = supply_db.candidates_in(conn, sample_data.SCHEMA, sample_tables,
                                     loaded=load_log.loaded_tables(trial_scope))
-    newest = {logical: [period_schema.newest(versions)]
+    newest = {logical: [sample_data.newest(versions)]
               for logical, versions in found.items()
-              if period_schema.newest(versions) is not None}
+              if sample_data.newest(versions) is not None}
     return supply_db.add_run_views(conn, run_id, newest, sample_data.SCHEMA, res)
 
 

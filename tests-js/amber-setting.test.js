@@ -19,7 +19,7 @@ describe("the amber setting on the date on show", () => {
   it("is said in words, naming where it was set", () => {
     const w = loadDashboard().window;
     const html = w.amberSettingLine(DS, "2026-10-06");
-    expect(html).toContain("Amber supplies: promote and acknowledge (set for Child Protection, since 5 Oct 2026)");
+    expect(html).toContain("Amber setting: promote and acknowledge (set for Child Protection, since 5 Oct 2026)");
     expect(w.amberSettingLine({}, "2026-10-06")).toBe("");
   });
 });

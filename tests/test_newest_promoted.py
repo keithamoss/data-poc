@@ -77,14 +77,19 @@ class TestNewestMeansMostRecentlyPROMOTED:
                           reason="checked by hand, this is the one we want")
 
         assert promotion.newest_promoted(conn, dataset, period) == arrived_first
+        # ONE VERSION PER PERIOD (REQ-PIPE-128 criterion 2): the one it
+        # displaced was superseded in the same decision.
+        from qa_tools.common import supersession
+
+        assert supersession.superseded_by(conn, dataset, arrived_second) == arrived_first
 
     def test_and_arrival_order_would_have_given_the_other_answer(self, conn):
         """Pinned so the difference is not theoretical. period_schema's
         own newest() is the arrival-ordered answer, and it is still the
         right answer to its own question."""
-        from qa_tools.common import period_schema
+        from qa_tools.common import sample_data
 
-        assert period_schema.newest(["clients__a20260201000000",
+        assert sample_data.newest(["clients__a20260201000000",
                                      "clients__a20260202000000"]) == \
             "clients__a20260202000000"
 

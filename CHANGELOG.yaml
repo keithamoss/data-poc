@@ -117,6 +117,22 @@ releases:
     changes:
       - category: New
         items:
+          - headline: A period holds exactly one version of each table
+            components: ["Pipeline & publishing"]
+            description: >
+              Promoting a supply into a period that already holds one now sets
+              the old one aside as superseded, in the same step, so anything
+              reading the period sees one table rather than several. If a
+              later period stands on the old one, you are told which and how
+              to clear it.
+          - headline: A decision that does more than its own period shows you first
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              Before you confirm, the terminal lists what else the decision
+              changes and how to undo each. A script passes the warning's key
+              with --acknowledge; on a ticket you reply a second time with
+              acknowledge and the key. If anything changed in between, you are
+              shown the new warning instead.
           - headline: A held, contested or unloadable supply turns its dataset red
             components: ["Dashboard UI", "Pipeline & publishing"]
             description: >
@@ -209,6 +225,24 @@ releases:
               before deciding anything.
       - category: Fixed
         items:
+          - headline: Child Protection pages say correctly what is in place
+            components: ["Dashboard UI"]
+            description: >
+              The line saying whether a dataset's results are in place or
+              waiting read "nothing is in place" for five of the six Child
+              Protection datasets. Each supply is now matched to its own run.
+          - headline: A past date shows each check as it was that day
+            components: ["Dashboard UI"]
+            description: >
+              Picking an earlier date coloured each check by its newest result,
+              so a check that was red that day could read green. It now shows
+              the result of the run on show.
+          - headline: A trial with a file that will not load no longer crashes
+            components: ["Pipeline & publishing"]
+            description: >
+              A trial now records the checks it could not run because a file
+              was missing or unreadable, and finishes, rather than stopping
+              with an error.
           - headline: A slip in the asset configuration no longer crashes every command
             components: ["Testing & dev tooling"]
             description: >

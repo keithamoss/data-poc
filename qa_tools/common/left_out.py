@@ -52,6 +52,14 @@ def note(run_id: str, tool: str, check_ids: Iterable[str]) -> None:
             c for c in check_ids if c)
 
 
+def peek(run_id: str) -> dict[str, set[str]]:
+    """What the tools have left out of this run so far, without taking it -
+    for a trial's not-evaluated records, which have to exist before the
+    reconciliation takes the set (delivery critic on 8a942e7, H2)."""
+    with _lock:
+        return {tool: set(ids) for tool, ids in _by_run.get(run_id, {}).items()}
+
+
 def take(run_id: str) -> dict[str, set[str]]:
     """Everything noted for this run, forgetting it."""
     with _lock:

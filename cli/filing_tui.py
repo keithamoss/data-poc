@@ -47,6 +47,8 @@ filing screen tells them and a stale one is worse than a blank one.
 """
 from __future__ import annotations
 
+import dataclasses
+
 import re
 
 import sys
@@ -171,11 +173,22 @@ def say_unreachable(exc: Exception) -> None:
 # cannot be missed by one screen.
 # ---------------------------------------------------------------------------
 
+def _consequences(request) -> "filing_decisions.Consequences":
+    """The warning for this request, read now - or none where the log
+    cannot be read, in which case apply() refuses with it anyway."""
+    try:
+        with open_log() as conn:
+            return filing_decisions.consequences(conn, request)
+    except Exception:  # noqa: BLE001 - apply() is the authority and says why
+        return filing_decisions.Consequences(lines=())
+
+
 def apply_decision(*, operation: str, dataset_id: str, period: str,
                    supply: str | None = None, stands_on: str | None = None,
                    to_period: str | None = None, reason: str | None = None,
                    actor: dict | None = None,
-                   yes: bool = False) -> filing_decisions.Outcome | None:
+                   yes: bool = False,
+                   acknowledged: str | None = None) -> filing_decisions.Outcome | None:
     """Collect what is missing, confirm, apply, and say what happened.
 
     RETURNS None WHERE NOTHING WAS APPENDED and an Outcome where the
@@ -208,28 +221,54 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
             return None
 
     where = f"{dataset_id} {period}" + (f" -> {to_period}" if to_period else "")
-    if not common.confirm(f"Record {_NOUN.get(operation, operation)} for {where}, "
-                          f"as {people.actor_name(actor)}?",
-                           yes=yes, default=False):
-        console.print("Not recorded.", style="yellow")
-        return None
-
     request = filing_decisions.Request(
         operation=operation, dataset_id=dataset_id, actor=actor, reason=reason,
         period=period, to_period=to_period, supply=supply, stands_on=stands_on,
-        confirmed=True)
-    try:
-        outcome = filing_decisions.apply(
-            request, effective_at=asset_time.now().isoformat())
-    except (decision_log.DecisionRefused, filing_decisions.NotOffered,
-            people.UnknownActor) as exc:
-        # CRITERION 22: told why, on the route it was raised on. And
-        # criterion 25's remedy comes through unchanged - the refusal
-        # decision_log raises already names the de-substitute or
-        # un-inherit that would unblock it, so repeating it here would
-        # be a second copy of a sentence that must not drift.
-        console.print(Panel(Text(str(exc)), title=f"{operation} refused",
-                             border_style="red", expand=False))
+        confirmed=True, acknowledged=acknowledged)
+
+    # ONE WARNING PANEL ABOVE THE ONE CONFIRMATION (REQ-PIPE-128 criterion
+    # 6): what this decision does beyond its own slot, and how each is
+    # undone. None where it does nothing more. Confirming it IS the
+    # acknowledgement - there is no second yes or no. A scripted `--yes`
+    # does not acknowledge on its own: it needs `--acknowledge <key>`.
+    for _attempt in range(2):
+        shown = _consequences(request)
+        if shown.lines:
+            console.print(Panel(Text("\n".join(f"- {line}" for line in shown.lines)),
+                                 title="This also does", border_style="yellow",
+                                 expand=False))
+        if not common.confirm(f"Record {_NOUN.get(operation, operation)} for {where}, "
+                              f"as {people.actor_name(actor)}?",
+                               yes=yes, default=False):
+            console.print("Not recorded.", style="yellow")
+            return None
+        if shown.lines and not yes:
+            request = dataclasses.replace(request, acknowledged=shown.key)
+        try:
+            outcome = filing_decisions.apply(
+                request, effective_at=asset_time.now().isoformat())
+            break
+        except filing_decisions.ConsequencesNotAcknowledged as exc:
+            # CRITERION 9: the consequences changed between the warning and
+            # the yes. Refused, and the new warning is shown to confirm.
+            if yes or not shown.lines:
+                console.print(Panel(Text(str(exc)), title=f"{operation} refused",
+                                     border_style="red", expand=False))
+                return None
+            console.print("[yellow]What this decision does changed while you were "
+                          "deciding - here it is again.[/yellow]")
+            continue
+        except (decision_log.DecisionRefused, filing_decisions.NotOffered,
+                people.UnknownActor) as exc:
+            # CRITERION 22: told why, on the route it was raised on. And
+            # criterion 25's remedy comes through unchanged - the refusal
+            # decision_log raises already names the de-substitute or
+            # un-inherit that would unblock it, so repeating it here would
+            # be a second copy of a sentence that must not drift.
+            console.print(Panel(Text(str(exc)), title=f"{operation} refused",
+                                 border_style="red", expand=False))
+            return None
+    else:
         return None
 
     if outcome.changed:
@@ -495,9 +534,9 @@ def _print_amber_settings(dataset_ids: list[str]) -> None:
     if not said:
         return
     if len(set(said.values())) == 1:
-        console.print(f"\nAmber supplies: {next(iter(said.values()))}")
+        console.print(f"\nAmber setting: {next(iter(said.values()))}")
         return
-    console.print("\nAmber supplies:")
+    console.print("\nAmber setting:")
     for ds, text in said.items():
         console.print(f"  {ds}  {text}")
 

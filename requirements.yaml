@@ -3289,12 +3289,12 @@ requirements:
     linked_tests:
       - tests/test_period_schema.py
     implemented_by:
-      - qa_tools/common/period_schema.py::create_overlay_views
-      - qa_tools/common/period_schema.py::check_readiness
-      - qa_tools/common/period_overlay.py::rebuild_for_arrival
-      - qa_tools/common/period_schema.py::newest
-      - qa_tools/common/drift_reference.py::reference_for
-      - qa_tools/common/period_schema.py::period_schema
+    - qa_tools/common/period_schema.py::create_overlay_views
+    - qa_tools/common/period_schema.py::check_readiness
+    - qa_tools/common/period_overlay.py::rebuild_for_arrival
+    - qa_tools/common/sample_data.py::newest
+    - qa_tools/common/drift_reference.py::reference_for
+    - qa_tools/common/period_schema.py::period_schema
     evidence:
       - >
         2026-09-25: the dangerous fallback is the one asserted hardest.
@@ -15417,6 +15417,30 @@ requirements:
         and keeping them as ''current'' or ''previous'' would put a demoted or superseded
         supply''s numbers beside the verdict. The trend still shows them once the
         date on show is before the withdrawal.'
+      - 'THE PAGE SWITCH WAS WRONG FOR FIVE OF SIX CHILD PROTECTION DATASETS AS
+        FIRST SHIPPED (8a942e7; both critics, H1; post-build-review #110): run_states()
+        keyed each supply by drift_reference.run_for(), which took the earliest
+        run that read the table - and every Child Protection run reads its siblings''
+        tables at one instant, so the tie went to cp_carers'' run. Fixed at run_for:
+        the run named for the table wins. All 107 run keys on the real database
+        now map to their own dataset.'
+      - 'A PAST DATE NOW SHOWS THE STATUS OF THE RUN IT SHOWS (dashboard UX critic,
+        H2; pre-existing): the clip kept each check''s newest current_status, a
+        false green on past dates; it takes the shown run''s own status, and tests/test_dashboard_e2e.py
+        compares every check on every run date against it.'
+      - 'THE ''AWAITING A DECISION'' WORDING STAYS ONE WORDING (Keith, 2026-10-05;
+        #110 M3), after being told the near-constant ''awaiting'' on Birth Registrations
+        comes from the bootstrap''s invented promotion lag (promotion.effective_at_for,
+        one hour to three days, his own choice of 2026-10-02) - in production the
+        rule promotes minutes after QA, so the window is a demo-corpus artefact.
+        REJECTED: a quieter wording for a supply the rule will promote.'
+      - 'WHERE CRITERIA 1, 2 AND 8 LIVE, while the requirement stays in progress
+        (the register forbids linked_tests and implemented_by before it is built):
+        pipeline/slot_timeline.py::supply_states and run_states, qa_tools/common/drift_reference.py::run_for,
+        and the template''s runStateAsOf, clipDatasetToAsOf and verdictLine; tested
+        by tests/test_slot_timeline.py::TestEachSuppliesStateOverTime, tests-js/verdict-of.test.js,
+        tests/test_drift_reference.py::TestASupplysRunIsItsOwnDatasetsRun and tests/test_dashboard_e2e.py::TestStatusMatchesEachToolsOwnVerdict.
+        Move them to the fields when the census and rename land.'
   - id: REQ-GHUB-082
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
@@ -15469,10 +15493,7 @@ requirements:
         compose an update of its own - so that a decision taken in the
         terminal appears there in the same way one raised on the ticket
         does, said once and in the same words.
-      - >
-        THE SYSTEM SHALL require explicit confirmation for a re-file
-        whether or not its target slot already holds a promoted supply,
-        and WHERE the slot is occupied SHALL supersede what is there.
+      - THE SYSTEM SHALL require explicit confirmation for a re-file whether or not its target slot already holds a promoted supply, and WHERE the slot is occupied SHALL leave the promoted version in place until the re-filed supply is promoted, which then supersedes it (REQ-PIPE-141). AMENDED 2026-10-05 by REQ-PIPE-128 criterion 13.
       - >
         THE SYSTEM SHALL collect a reason at the point a PERSON raises
         a decision, and SHALL refuse the decision without one.
@@ -22572,7 +22593,7 @@ requirements:
         the others as staged for the period - this being simultaneity, not
         waiting for another file under criterion 1.
       - 'THE SYSTEM SHALL RETIRE REQ-PIPE-059''s delivery-level hold. WHERE one arrival carries several files claiming one dataset, THE SYSTEM SHALL treat that dataset as CONTESTED for that arrival, running none of its own checks and promoting none of them. Several staged versions of one table in one period SHALL arise ONLY that way: a file from a LATER arrival supersedes every earlier unaccepted version of its table in the period (REQ-PIPE-118), so supplies of one dataset staged for one period never come from different arrivals. AMENDED TWICE ON 2026-10-02 (Keith) - see the decision "CRITERION 6 NARROWED AGAIN" - and AMENDED 2026-10-05 by REQ-PIPE-118 criterion 15.'
-      - THE SYSTEM SHALL apply "newest wins" among PROMOTED supplies by PROMOTION time rather than by arrival time; on the staged side, "newest wins" SHALL mean only REQ-PIPE-118's supersession by receipt instant. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 15.
+      - THE SYSTEM SHALL hold only one promoted version of a table in a period (REQ-PIPE-128), so 'newest wins' among promoted supplies no longer arises within a period; on the staged side, 'newest wins' SHALL mean only REQ-PIPE-118's supersession by receipt instant. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 15 and REQ-PIPE-128 criterion 13.
       - THE SYSTEM SHALL treat a table as ABSENT when an arrival that did not carry it finds either several staged versions for that period - which only one arrival carrying several files for it can produce (REQ-PIPE-118) - or one held under criterion 6, so that the run reads the period's promoted state rather than choosing between them. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 15.
       - >
         THE SYSTEM SHALL amend REQ-PIPE-035 criterion 3 AND REQ-PIPE-079
@@ -24702,16 +24723,6 @@ requirements:
     story: As a data engineer operating this pipeline, I want a dataset whose own table cannot be read - held or contested - to read clearly red for that period, saying why through the outstanding item it already raises, and every other dataset's check that reads that table to be recorded once as not evaluated, while everything else in the run is checked as usual, so that a supply nobody could place costs me one honest, explained red rather than a whole collection's QA or a silent gap that reads as green.
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: 'Criterion 2, in part - one not-evaluated record per unreadable
-        table a check reads. unrunnable records ONE per check, naming the first
-        unreadable table, to keep the one-result-per-check-per-run invariant post-build-review
-        #91 fixed against (held_blast_radius still records one per held table).'
-      why: The two signed statements disagree; choosing between them is Keith's.
-        Put to him 2026-10-05 in the morning report.
-      owner: Keith's answer, then REQ-PIPE-115 itself.
-      blocked_by:
-        unowned: true
     evidence:
     - '2026-10-05 (overnight batch 6): a fresh bootstrap from an empty database
       (supply6, 150 runs, 20m19s) finished with every new guard live. The nine
@@ -24742,6 +24753,11 @@ requirements:
       and tests/test_dashboard_e2e.py''s held/contested classes in a real browser
       against the rebuilt database - green. A real single-file trial of cp_clients
       was reconciled and not refused.'
+    - '2026-10-05: the delivery critic''s reproduction, `mothman cp qa --folder
+      <six files, cp_carers.csv unparseable> --reference-folder ... --trial`,
+      exits 0 with 27 checks recorded not evaluated and 184 checks total (it crashed
+      on LeftOutMismatch before the fix); tests/test_unrunnable.py''s trial and
+      held-table classes green.'
     implemented_by:
     - qa_tools/common/own_table.py::why_unreadable
     - qa_tools/common/period_overlay.py::name_held_siblings
@@ -24759,6 +24775,10 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::rollup
     - dashboard/qa-reporting-dashboard.template.html::blockerHistoryRows
     - qa_tools/cp/orchestrate_cp.py::_reconciles
+    - qa_tools/common/unrunnable.py::results_for_trial
+    - qa_tools/common/left_out.py::peek
+    - qa_tools/common/held_blast_radius.py::results_for
+    - dashboard/qa-reporting-dashboard.template.html::blockerWithoutARunOfItsOwn
     linked_tests:
     - tests/test_unreadable_own_table.py
     - tests/test_dataset_blockers.py
@@ -24770,6 +24790,9 @@ requirements:
     - tests/test_dashboard_e2e.py::TestAHeldOrContestedDatasetReadsRed
     - tests/test_dashboard_e2e.py::TestHeldOutranksAnEndedSchedule
     - tests/test_unrunnable.py::TestOneRecordPerCheck
+    - tests/test_unrunnable.py::TestATrialRecordsWhatItCouldNotRead
+    - tests/test_unrunnable.py::TestATrialExplainsItsOwnTablesChecksToo
+    - tests/test_unrunnable.py::TestAHeldTableIsOneRecordPerCheckToo
     source: 'Keith, 2026-09-30 (split out of REQ-PIPE-078 criteria 9 and 10, plans/post-build-review.md #72); hand-drafted that day without a scoper pass. REDRAFTED by delivery-scoper 2026-10-04 from the verification probe Keith approved that day (plans/post-build-review.md #77), his decisions on its gaps, and his answers to the scoper''s four questions, all given the same day, plus his correction that the dataset-level signal reuses REQ-DASH-070''s outstanding items.'
     acceptance_criteria:
     - WHERE a run cannot read a table, THE SYSTEM SHALL evaluate and record every check in that run's scope that does not read the table, exactly as it would had the table been readable.
@@ -24937,6 +24960,20 @@ requirements:
     - 'TRIAL RUNS ARE RECONCILED TOO (Keith, 2026-10-05, criterion 17 amended),
       chosen over my recommendation to accept the gap: what a trial shows should
       be trustworthy on the same terms as a real run.'
+    - 'CRITERION 2''S UNMET ENTRY IS CLOSED (2026-10-05): Keith chose one record
+      per check naming every unreadable table, and both writers now do it - unrunnable
+      named only the first and held_blast_radius wrote one record per (check,
+      held table), two results for one check in a run; it now writes one naming
+      every held table (held_tables).'
+    - 'A TRIAL RECORDS WHAT IT COULD NOT READ (delivery critic on 8a942e7, H2):
+      reconciling trials (criterion 17 as amended) while a trial wrote no not-evaluated
+      records crashed an ordinary trial with an unloadable sibling on LeftOutMismatch
+      - where before the checks were silently absent (157 of 184). unrunnable.results_for_trial()
+      records, as no data, every check that reads a table the trial could not
+      read, and every LEFT-OUT check whose own dataset''s table is unreadable;
+      a left-out check nothing unreadable explains gets no record, so the reconciliation
+      still catches it. Reproduced and fixed: the same six-file trial with an
+      unparseable cp_carers.csv now records 27 not evaluated and runs all 184.'
     open_questions: []
   - id: REQ-TEST-116
     title: A bootstrap does in parallel what does not depend on order, and produces the same history either way
@@ -25523,10 +25560,10 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::acknowledgementBadge
     - qa_tools/common/amber_setting.py::timeline
     - qa_tools/common/amber_setting.py::describe
-    - qa_tools/common/validate_schedule.py::_added_on
     - cli/app.py::_config_refusal
     - cli/supply.py::amber_setting_command
     - cli/filing_tui.py::_print_amber_settings
+    - qa_tools/common/validate_schedule.py::_version_added_on
     linked_tests:
     - tests/test_amber_setting.py
     - tests/test_dashboard_e2e.py::TestAcknowledgementBadge
@@ -25619,6 +25656,15 @@ requirements:
       - 'A MALFORMED data-asset.yaml STOPS EVERY COMMAND WITH ONE LINE (Keith, 2026-10-05,
         criterion 24 added; post-build-review #107), treated as a defect fix with
         a failing test first.'
+      - 'A VERSION IS DATED BY THE COMMIT THAT INTRODUCED IT, NOT THE PUSH (delivery
+        critic on 8a942e7, M1): the first build took the earliest commit after the
+        diff base that touched the file, so an unrelated edit earlier in the same
+        push let a back-dated version through. validate_schedule._version_added_on()
+        walks the push''s commits oldest first and dates each new version by the
+        first that holds it; still asked only for a version dated before today,
+        so the gate keeps its single `git show` otherwise. Not yet covered: the
+        wiring inside _amber_setting_errors has no test of its own - the two pieces
+        are tested separately.'
     open_questions: []
 
 
@@ -25721,7 +25767,56 @@ requirements:
       date: '2026-10-04'
     story: As a person or an external tool querying a period, I want each table in it to exist exactly once, so that I never have to work out which of several versions is the real one.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 8 - saying in the warning which other supplies' checks
+        read a moved table and will be re-checked.
+      owner: REQ-PIPE-151
+      why: The re-check itself is REQ-PIPE-151's processing pass, not built; a
+        warning promising a re-check that does not happen would be false, so it
+        is not said yet.
+      blocked_by:
+        requirements:
+        - REQ-PIPE-151
+    - criterion: Criterion 6's typed-id half - in an environment requiring typed
+        confirmation, the single confirmation is the typed id.
+      owner: REQ-PIPE-093
+      why: Typed confirmation per environment is REQ-PIPE-093 criterion 4, not
+        built; the single confirmation and the warning panel above it are.
+      blocked_by:
+        requirements:
+        - REQ-PIPE-093
+    evidence:
+    - '2026-10-05: tests/test_one_version_per_period.py green against a real database
+      (10 tests): a person''s promotion over a promoted supply supersedes it into
+      the period''s _superseded schema, recorded naming the newer one, in one
+      transaction; refused while a later period stands on it, naming the period
+      and pasting the de-substitute command; into a substituted slot, a de-substitute
+      then a promotion in one transaction once the consequence is confirmed; into
+      an inherited slot refused naming un-inherit; no panel where nothing more
+      happens; unconfirmed and stale-confirmed decisions refused with the warning;
+      the flag form needs `--acknowledge KEY` with --yes; the GitHub route takes
+      a second comment with `acknowledge: KEY`; a period holding two versions
+      raises MoreThanOneVersion. The old multi-version tests now assert the one-version
+      model.'
+    implemented_by:
+    - qa_tools/common/promotion.py::promote
+    - qa_tools/common/supersession.py::supersede_promoted
+    - qa_tools/common/period_schema.py::promoted_in
+    - qa_tools/common/period_schema.py::the_one_in
+    - qa_tools/common/period_schema.py::create_overlay_views
+    - qa_tools/common/sample_data.py::newest
+    - qa_tools/common/filing_decisions.py::consequences
+    - qa_tools/common/filing_decisions.py::apply
+    - qa_tools/common/decision_log.py::_judge
+    - qa_tools/common/filing_from_github.py::read
+    - cli/filing_tui.py::apply_decision
+    - cli/supply.py::decide_command
+    linked_tests:
+    - tests/test_one_version_per_period.py
+    - tests/test_period_schema.py::TestTheNewestVersionWithinAPeriod
+    - tests/test_newest_promoted.py
+    - tests/test_filing_decisions.py::TestTheFilingRulesAreJudgedWhenTheEntryIsAppended
     source: 'Keith, group 2 sign-off round 2026-10-04 (plans/road-testing.md #16 - ''REPLACED ACCEPTED FILES GO TO SUPERSEDED'' point (1), ''newest() FIX DROPPED''). Drafted by delivery-scoper 2026-10-04.'
     acceptance_criteria:
     - THE SYSTEM SHALL hold exactly one object for each dataset's table in each period schema, at every instant.
@@ -25757,6 +25852,43 @@ requirements:
     - 'RE-FILE DOES NOT DISPLACE A PROMOTED VERSION ON ITS OWN (Keith, 2026-10-04, at re-file''s sign-off): the re-filed supply is checked first and may never be promoted, so the promoted version stays until it is. This replaces this requirement''s earlier instruction to amend REQ-GHUB-082 criterion 9 to supersede at re-file time.'
     - 'ONE PROMPT HOLDS IN PRODUCTION (Keith, 2026-10-04): the warning panel sits above the typed id, which is the only confirmation. REJECTED a y/N for the warning followed by the typed id.'
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - 'THE DISPLACED SUPPLY IS SUPERSEDED BY ITS OWN ENTRY IN THE SAME TRANSACTION
+      (criterion 2, NFR 3 and 5): promote() opens one transaction, writes a SUPERSEDE
+      naming the newer supply (superseded_by) and moves the old tables to period_<p>_superseded,
+      then the PROMOTE - nested apply_decision blocks are savepoints inside it.
+      SUPERSEDE joined MOVES_A_SUPPLY, so the stands-on rule (criterion 3) judges
+      the displaced supply at its own entry: ''every displacing decision records
+      the supply it replaces and the decision-log rule checks both'' is met by
+      construction rather than by a second field on the promotion.'
+    - 'WHAT IS DISPLACED IS FOUND BY THE INCOMING TABLES'' LOGICAL NAMES, not
+      by parsing the displaced supply''s id: a period holds one version of each
+      table, so whatever base table shares a logical name with an incoming one
+      is the one displaced.'
+    - 'THE ONE CONFIRMATION IS A KEY (criteria 6 and 9): consequences() lists
+      what a decision does beyond its slot, each with how it is undone; its key
+      is a short hash of those lines. apply() refuses a decision with consequences
+      unless request.acknowledged equals the key in force NOW, so a warning that
+      changed between being shown and confirmed refuses with the new one. Terminal:
+      one panel above the one yes/no, and confirming is the acknowledgement; --yes
+      needs --acknowledge KEY. GitHub: the first comment is refused with the warning
+      and key, and a second comment carrying `acknowledge: KEY` confirms - the
+      ''second comment'' criterion 9 names.'
+    - 'THE PANEL TODAY COVERS A PROMOTION THAT DISPLACES A PROMOTED SUPPLY OR
+      REMOVES A SUBSTITUTION (PROVISIONAL, 2026-10-05): the decisions REQ-PIPE-128
+      introduces. Other decisions'' consequences beyond their slot - a demote
+      or reject of a promoted supply - can join it; criterion 8''s re-check line
+      waits on REQ-PIPE-151 (unmet).'
+    - 'THE MULTI-VERSION CODE PATH IS GONE (NFR 1, 2 and 6): period_schema.newest()
+      moved to sample_data.newest() for the sample schema alone; promoted_in()
+      returns at most one per table and raises MoreThanOneVersion otherwise (it
+      keeps its list shape so callers did not all change in this commit - a list
+      of one is the period''s one object); create_overlay_views reads that one
+      object; promotion.newest_promoted() already read qa.slot_holds and needed
+      no change. The old tests of newest-wins within a period were rewritten to
+      assert the new model rather than deleted.'
+    - AN AUTOMATIC RULE NEVER PROMOTES INTO A SUBSTITUTED OR INHERITED SLOT (criterion
+      10), refused in promote() itself, and a person promoting into an inherited
+      one is refused naming un-inherit (criterion 5).
     open_questions: []
 
   - id: REQ-PIPE-129
@@ -26197,13 +26329,22 @@ requirements:
       an item is pilled ''Makes its dataset red'' - the queue''s copy used to
       say everything but holds, contests and failed loads changes no status.'
     - 'THE NO-SUPPLY BANNER SAYS CHASE THE SUPPLIER FIRST (Keith, 2026-10-05;
-      post-build-review #104), then names the wizard (`mothman supply decide`),
-      which offers all three decisions - most closed gaps are a late supplier,
+      post-build-review #104), then names the filing wizard (run `mothman` and
+      choose Filing decisions), which offers all three decisions - most closed gaps are a late supplier,
       not a decision. REJECTED: all three commands in full; mark-not-supplied
       alone.'
     - 'A DAILY FEED''S ROW NAMES TODAY''S LATE-BUT-OPEN FILE BESIDE AN OLD GAP
       (Keith, 2026-10-05; #104), so the more urgent thing is not hidden by the
       older one.'
+    - 'TODAY''S LATE SLOT IS JUDGED AT THE BUILD INSTANT (Keith, 2026-10-05; post-build-review
+      #110 M2): compared by whole days, a daily slot late at 3pm and closing at
+      10am the next morning read closed all that morning, so the note never showed
+      on the view people open. On the build''s own day the page compares instants
+      with BUILT_AT; past dates still compare days. REJECTED: leave it to past
+      dates.'
+    - 'THE LATE NOTE SHOWS ON A ROW WITH NO RUN TOO (Keith, 2026-10-05; #111 M3):
+      a day a daily feed has no file at all - the commonest daily case - took
+      the ''no QA run within tolerance'' row, which did not render it.'
     open_questions: []
 
   - id: REQ-PIPE-134
