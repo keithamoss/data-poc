@@ -177,6 +177,9 @@ FILE_SHAPES: dict[str, str] = {
         "the six expected files plus two resupplies whose names match no pattern at "
         "all - a renamed extract from an upstream system. The danger is that the "
         "supply looks complete.",
+    "columns_reordered":
+        "cp_carers.csv arrives with its first two columns swapped, header and rows "
+        "alike - the same data, laid out differently by an upstream export.",
 }
 
 def unreadable(content: str) -> str:
@@ -201,6 +204,22 @@ def unreadable(content: str) -> str:
     keep = lines[:max(2, len(lines) // 2)]
     widest = max(line.count(",") for line in keep) + 3
     return "\n".join([*keep, ",".join(str(i) for i in range(widest))]) + "\n"
+
+
+def reordered(content: str) -> str:
+    """The same extract with its first two columns swapped, in the header
+    and in every row alike - which is what a changed export layout looks
+    like, and which loads correctly because columns are matched by name.
+    CSV-aware, so a quoted comma never moves a value between columns."""
+    import csv
+    import io
+
+    rows = list(csv.reader(io.StringIO(content)))
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\n")
+    for row in rows:
+        writer.writerow([row[1], row[0], *row[2:]] if len(row) >= 2 else row)
+    return out.getvalue()
 
 
 def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]:
@@ -228,6 +247,8 @@ def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]
         # changing its export looks like.
         out["CLIENTS_EXTRACT_FINAL.csv"] = files["cp_clients.csv"]
         out["placements (2).csv"] = files["cp_placements.csv"]
+    elif shape == "columns_reordered":
+        out["cp_carers.csv"] = reordered(files["cp_carers.csv"])
     return out
 
 
@@ -467,7 +488,13 @@ _ALSO: dict[str, tuple[str, ...]] = {}
 #: CARRY ALL SIX TABLES CANNOT BE QA'D AT ALL TODAY, whether a table is
 #: missing because it never came or because it could not be read.
 #:
-#: TS-12 IS NOT HERE EITHER, AND THE REASON IS THE MOST USEFUL THING
+#: TS-12 IS HERE SINCE 2026-10-05 (criterion 15), now that the file
+#: checks refuse a ragged file before it is loaded (REQ-QAC-096) and a
+#: refused own table reads red rather than failing its run (REQ-DASH-148).
+#: What follows is why it waited, kept because the reason is the most
+#: useful thing this requirement found:
+#:
+#: TS-12 WAS NOT HERE, AND THE REASON IS THE MOST USEFUL THING
 #: THIS REQUIREMENT HAS FOUND SO FAR. It was injected on 2026-09-28 and
 #: it worked exactly as written at the arrival layer - a real Child
 #: Protection extract going ragged partway, `cp_clients FAILED to load
@@ -598,6 +625,32 @@ INJECTIONS: tuple[Injection, ...] = (
                           "six matching files plus two whose names match no pattern "
                           "at all - the danger being that the supply looks complete",
                           file_shape="unmatched_resupply"),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-12",
+        dataset_id="cp-clients",
+        anchor=-6,
+        config="quarterly, Feb/May/Aug/Nov. One delivery of all six tables in which "
+               "cp_clients goes ragged partway - a row with more fields than its header.",
+        arrivals=(
+            ExtraArrival(0, "09:00", None,
+                          "all six tables, cp_clients ragged partway and refused by the "
+                          "fields-per-row file check; the other five load",
+                          file_shape="one_file_unreadable"),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-56",
+        dataset_id="cp-carers",
+        anchor=-9,
+        config="quarterly, Feb/May/Aug/Nov. cp_carers arrives with its columns in "
+               "another order than the contract's; everything else as usual.",
+        arrivals=(
+            ExtraArrival(0, "09:00", None,
+                          "all six tables, cp_carers' first two columns swapped - it "
+                          "loads with a column-order warning",
+                          file_shape="columns_reordered"),
         ),
     ),
 )

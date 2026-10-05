@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**6 of 30 scenarios marked for injection have data behind them today.** 66 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**8 of 31 scenarios marked for injection have data behind them today.** 67 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -181,7 +181,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it demonstrates.** - The five are staged, QA'd, green, and auto-promoted. Their August slots are **filled**, and their own checks are unaffected - they are not dragged down. - `cp_clients` is **red** (a supply that cannot be loaded is a red QA finding), rejected, and its August slot stays **unfilled**. - Every check declaring `depends_on: [cp_clients]` - including "Client reference", which is DEFINED on `cp_notifications` - **cannot run**, and reads **red with a qualifying chip naming `cp_clients` as the blocker**. - That red lands at **collection** level, since cross-table checks are lifted there. `cp_notifications` keeps its own green status and carries only an informational pointer: fully verified against its own data, unverified against its relationships.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202505010900000800` |
+| Period | 2025-Q2 |
+| Set the in-place-on date to | 2025-05-01 |
 
 ### TS-13 - Six tables landing seconds apart
 
@@ -526,6 +531,21 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 
 **not injected - nothing to look at yet**
 
+### TS-56 - A supply whose columns arrive in another order
+
+**What it demonstrates.** It loads as usual, because columns are matched by name; its column-order file check WARNS, shown in the dataset's file section, and the dataset's status is unchanged by it (REQ-QAC-096 criteria 12 and 18, REQ-DASH-097 criterion 7, REQ-GEN-044 criterion 16).
+
+**What it would look like if the rule were wrong.** Refused, or the dataset turned amber or red by a warning.
+
+*Config: quarterly, Feb/May/Aug/Nov.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-carers |
+| Supplies | `cp_carers__202408010900000800` |
+| Period | 2024-Q3 |
+| Set the in-place-on date to | 2024-08-01 |
+
 
 <!-- scenario-map-data
 {
@@ -783,8 +803,20 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "demonstrates": "- The five are staged, QA'd, green, and auto-promoted. Their August slots are **filled**, and their own checks are unaffected - they are not dragged down. - `cp_clients` is **red** (a supply that cannot be loaded is a red QA finding), rejected, and its August slot stays **unfilled**. - Every check declaring `depends_on: [cp_clients]` - including \"Client reference\", which is DEFINED on `cp_notifications` - **cannot run**, and reads **red with a qualifying chip naming `cp_clients` as the blocker**. - That red lands at **collection** level, since cross-table checks are lifted there. `cp_notifications` keeps its own green status and carries only an informational pointer: fully verified against its own data, unverified against its relationships.",
    "breaksAs": null,
    "config": null,
-   "requirements": [],
-   "coordinates": null
+   "requirements": [
+    "REQ-GEN-044",
+    "REQ-QAC-096",
+    "REQ-DASH-148",
+    "REQ-DASH-097"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202505010900000800"
+    ],
+    "period": "2025-Q2",
+    "inPlaceOn": "2025-05-01"
+   }
   },
   {
    "id": "TS-13",
@@ -1392,6 +1424,28 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
     "REQ-GEN-137"
    ],
    "coordinates": null
+  },
+  {
+   "id": "TS-56",
+   "mode": "INJECT",
+   "title": "A supply whose columns arrive in another order",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "It loads as usual, because columns are matched by name; its column-order file check WARNS, shown in the dataset's file section, and the dataset's status is unchanged by it (REQ-QAC-096 criteria 12 and 18, REQ-DASH-097 criterion 7, REQ-GEN-044 criterion 16).",
+   "breaksAs": "Refused, or the dataset turned amber or red by a warning.",
+   "config": "Config: quarterly, Feb/May/Aug/Nov.",
+   "requirements": [
+    "REQ-QAC-096",
+    "REQ-DASH-097",
+    "REQ-GEN-044"
+   ],
+   "coordinates": {
+    "dataset": "cp-carers",
+    "supplies": [
+     "cp_carers__202408010900000800"
+    ],
+    "period": "2024-Q3",
+    "inPlaceOn": "2024-08-01"
+   }
   }
  ]
 }

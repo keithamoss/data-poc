@@ -4495,3 +4495,41 @@ Belongs with batch 5's check work.
       (CI reuses an unchanged bootstrap) for the CI side.
     Pairs with #63: generating to the check rules would remove most of
     the trial and error these rebuilds were spent on.
+
+    THE COST IS NOT JUST THIS SANDBOX - measured the same night, at
+    Keith's question "why is GitHub so much faster?". It is not, any
+    more. The "about nine minutes" CI bootstrap that CLAUDE.md carries
+    was measured on 2026-09-29 and had been repeated since without
+    re-checking. CI run 37315439654 (commit 4305585, 2026-10-05):
+
+    | Step | GitHub runner | This sandbox |
+    |---|---|---|
+    | Bootstrap from empty | 23m 29s | 25m 56s (same commit) |
+    | Deployment-half tests | 7m 35s | ~5m |
+    | Tests needing no deployment | 17m 13s | ~5m 30s |
+    | Whole CI run | 33 min | - |
+
+    So both machines take about the same, and the bootstrap has grown
+    from ~9 to ~23 minutes in a week. Five things grew it: one arrival
+    at a time since 2026-09-28; more arrivals (150); knock-on
+    re-evaluations and re-checks adding runs; a census after every run;
+    and six file checks on every file. Each was a deliberate
+    correctness choice, and together they mean every push now costs
+    over half an hour of CI. That makes this item - and REQ-TEST-117,
+    CI reusing an unchanged bootstrap, signed but out of scope that
+    night - more pressing than it looked when it was only a sandbox
+    complaint. The four tools running one after another inside each
+    run is still the obvious first place to look.
+
+66. **[todo, 2026-10-05]** **[Testing & dev tooling]** **Bring a development
+    database's schema forward in place.** Keith, 2026-10-05 evening: "happy
+    for you to upgrade the database schema in place during development."
+    Scoped that night to an agent's own dev and scratch databases, done by
+    hand, with no code change - qa_store still refuses any older schema,
+    per his "regenerate, never migrate" of the same morning (REQ-PIPE-144).
+    The option he did not take that night, to scope later: a dev-only
+    `mothman` command, or a synthetic-asset exception in qa_store, that
+    applies the newer additive DDL and sets the version. It would save a
+    ~27-minute rebuild per schema bump while a feature is developed. It
+    stays refused for a reshape (anything below RESHAPED_AT) and for any
+    non-synthetic asset. Pairs with #65 (rebuilds too slow to iterate).

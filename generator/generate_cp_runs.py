@@ -83,6 +83,8 @@ about the model assumes BDM-only" - that file's own words, written
 before this was actually built).
 """
 from __future__ import annotations
+
+import dataclasses
 import json
 import os
 from datetime import date, datetime, timedelta
@@ -553,8 +555,18 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int):
 def _plan_injections(periods):
     """Where every Child Protection scenario lands, resolved BEFORE
     anything is written (REQ-GEN-044 criterion 4)."""
-    mine = scenario_injection.for_dataset(DATASET_ID)
-    scenario_injection.no_two_scenarios_share_a_period(mine, {DATASET_ID: periods})
+    # EVERY DATASET OF THE COLLECTION, not cp-clients alone: one delivery
+    # carries all six tables, so an injection about any of them is placed
+    # against the delivery's periods. Planning cp-clients' only skipped
+    # TS-56 (cp-carers) without a word - criterion 4's silent absence.
+    from qa_tools.common import hierarchy
+
+    ours = {d.dataset_id for d in hierarchy.datasets_in_collection("child-protection")}
+    mine = [i for i in scenario_injection.INJECTIONS if i.dataset_id in ours]
+    # ONE DELIVERY PER PERIOD, so two injections may not share one whatever
+    # their datasets: checked as if they were all one dataset's.
+    scenario_injection.no_two_scenarios_share_a_period(
+        [dataclasses.replace(i, dataset_id=DATASET_ID) for i in mine], {DATASET_ID: periods})
     resolved = [(injection, scenario_injection.resolve(injection, periods))
                 for injection in mine]
     by_period = {placement.period: (injection, placement)

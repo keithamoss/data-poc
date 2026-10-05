@@ -853,6 +853,16 @@ Rough layout:
   | `coverage` - combines both halves, enforces `fail_under` | 19s |
   | **run total** (the two halves are parallel) | **15m 03s** |
 
+  **STALE BY 2026-10-05 - re-measure before quoting any of this.** CI
+  run 37315439654 (commit 4305585): the bootstrap step took **23m29s**
+  (it was 8m32s here), the deployment half's tests 7m35s, the other
+  half 17m13s, the whole run **33 minutes**. This sandbox took 25m56s
+  for the same bootstrap, so the two machines are about level - the
+  "GitHub is much faster" impression was this table going out of date
+  as the history grew (one arrival at a time, 150 arrivals, knock-on
+  re-runs, a census per run, file checks). See
+  plans/running-thoughts.md #65.
+
   So a RED IN THE COMMON CASE reports in about SEVEN minutes rather
   than nineteen - 2,622 of 2,898 tests are in the fast half. The whole
   run is 15 minutes, not the ~10 an earlier estimate in #27 claimed;

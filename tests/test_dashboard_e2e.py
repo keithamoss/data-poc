@@ -3695,3 +3695,59 @@ class TestClosedWithNoSupply:
         assert page.locator("tr[data-no-supply]").count() == 0
         note = page.locator(".no-supply-note")
         assert note.count() == 1 and "9 September 2026" in note.inner_text()
+
+
+class TestFileChecksOnThePage:
+    """REQ-DASH-097 criterion 12, against the bootstrapped history rather
+    than a fixture (Keith's choice, 2026-10-04): TS-12 plants a Child
+    Protection delivery whose cp_clients goes ragged partway, refused by
+    the fields-per-row file check; TS-56 plants cp_carers with its columns
+    reordered, which only warns. Zero console errors comes from the page
+    fixture this suite runs under."""
+
+    CP = "child-protection-family-support"
+
+    def _placement(self, scenario):
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get(scenario)
+        if placement is None or not placement.is_complete:
+            pytest.skip(f"{scenario} is not placed in this history")
+        return placement
+
+    def _dataset(self, page, dataset_id):
+        return page.evaluate(f"""() => DATA.agencies.flatMap(a => a.collections)
+            .flatMap(c => c.datasets).find(d => d.id === "{dataset_id}")""")
+
+    def test_a_refused_file_reads_red_naming_the_check(self, clean_page, built_dashboard_html):
+        placement = self._placement("TS-12")
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "dataset", "agencyId": self.CP, "collectionId": "child-protection",
+                     "datasetId": "cp-clients"}, in_place_on=placement.in_place_on)
+        section = clean_page.locator(".file-section")
+        assert section.get_attribute("data-file-outcome") == "refused"
+        assert "fields per row" in section.inner_text().lower()
+        assert "file check" in section.inner_text().lower()
+        ds = self._dataset(clean_page, "cp-clients")
+        assert ds["status"] == "red"
+        assert ds["blocked"] and "fields_per_row" in ds["blocked"]["reason"]
+        assert clean_page.evaluate(
+            f"""() => DATA.agencies.find(a => a.id === "{self.CP}").status""") == "red"
+
+    def test_a_warned_file_leaves_the_status_alone(self, clean_page, built_dashboard_html):
+        placement = self._placement("TS-56")
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "dataset", "agencyId": self.CP, "collectionId": "child-protection",
+                     "datasetId": "cp-carers"}, in_place_on=placement.in_place_on)
+        section = clean_page.locator(".file-section")
+        assert section.get_attribute("data-file-outcome") == "warned"
+        assert "column order" in section.inner_text().lower()
+        ds = self._dataset(clean_page, "cp-carers")
+        assert not ds.get("blocked")
+        # Unchanged: the dataset's status is exactly its data checks' roll-up.
+        own = clean_page.evaluate("""() => {
+            const d = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+              .find(d => d.id === "cp-carers");
+            return rollupStatuses((d.columns||[]).map(c => c.status));
+        }""")
+        assert ds["status"] == own

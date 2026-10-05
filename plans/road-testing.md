@@ -2356,6 +2356,28 @@ judgement about who reads the page rather than about the rule.
         truncation into the row-count warn band still read red (it splits
         twins; consecutive days compound). PARKED at Keith's call
         (18:20) - the register says what planting them needs.
+      - OVERNIGHT 2026-10-05 -> 06, KEITH'S TERMS (21:50): carry on through
+        sprints 13 and 14, REQ-TEST-150 moved after REQ-PIPE-086 (it
+        depends on it). Forks: recommended option, PROVISIONAL, listed
+        here. And in his words: "happy for you to skip or batch the full
+        rebuilds that take half an hour" - so one rebuild per sprint at
+        most, verdict probes by trial or a one-collection scratch rebuild
+        in between, and any commit gated without a fresh rebuild says so
+        in its message. ALSO (21:55): "happy for you to upgrade the database
+        schema in place during development" - scoped, at his choice, to MY
+        dev and scratch databases only: brought forward by hand (the newer
+        DDL applied, the version set), no code change; the code still
+        refuses an older schema everywhere else, so this morning's
+        "regenerate, never migrate" holds for any real or shared database.
+        A proper dev command is plans/running-thoughts.md #66.
+      - SPRINT 12: REQ-QAC-096 and REQ-DASH-097 built; TS-12 (a ragged
+        cp_clients, refused) and TS-56 (cp_carers' columns reordered,
+        warned) planted. ONE COST, FOUND AFTER THE REBUILD, TO PUT RIGHT:
+        TS-56 replaced 2024-Q3's chain, and 2024-Q3 was the ONLY quarter
+        whose late siblings re-evaluated an already-promoted table - so
+        the generated history no longer contains a knock-on re-evaluation
+        (REQ-PIPE-121) at all. The fix is moving TS-56 to a quarter with
+        no resend, in the next batched rebuild (sprint 13's).
  All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.

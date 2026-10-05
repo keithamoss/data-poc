@@ -23,7 +23,7 @@ instead of an ad-hoc script.
 
   1. For REQ-GEN-042's rebuild, which renamed every run_id. The verdict
      distribution came back IDENTICAL - 131 onTime, 16 early, 3 late
-     over the same 150 arrivals and 7 datasets.
+     over the same 144 arrivals and 7 datasets.
 
   2. For REQ-GEN-043's, where 16 Birth Registrations runs came back
      with a DIFFERENT verdict under the same run_id, which is exactly
@@ -117,7 +117,7 @@ def _built_datasets():
 
 
 class TestEveryCommittedArrivalKeepsItsVerdict:
-    """The pin proper. 150 real arrivals across 7 datasets.
+    """The pin proper. 144 real arrivals across 7 datasets.
 
     IT WAS EXTENDED TO 162 ON 2026-09-27 AND THAT WAS WRONG, corrected
     2026-09-28 - and the correction is worth more than the pin, because
@@ -318,19 +318,28 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         early. The two 2026-09-06 resends moved off TS-47's quiet days and
         are early where they now land, as they were before. Six lines of
         the golden, all Birth Registrations, and nothing else.
+
+        AND FOR REQ-GEN-044 CRITERIA 15 AND 16 (TS-12, TS-56, the same
+        night), to 105 / 15 / 15 / 9 over 144. Procedure first: 59
+        deliveries, zero `handfiled-*`. Each scenario replaces its
+        Child Protection period's chain with one delivery of all six
+        tables at 09:00 - 2025-Q2 (TS-12) and 2024-Q3 (TS-56) - so their
+        six ordinary first arrivals are replaced by six injected ones of
+        the same status, and 2024-Q3's six-table resend of 13 August,
+        late, is gone. No arrival kept under the same id changed.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"on_time": 105, "early": 15, "late": 21, "unfiled": 9}
-        assert sum(counts.values()) == 150
+        assert counts == {"on_time": 105, "early": 15, "late": 15, "unfiled": 9}
+        assert sum(counts.values()) == 144
 
 
 class TestTheClassificationBoundaries:
     """The RULE, stated as boundary cases rather than inferred from the
-    150 real arrivals above - those happen to cluster, and none of them
+    144 real arrivals above - those happen to cluster, and none of them
     sits on a boundary. Written against aware instants only, since that
     is the half 048 must not move."""
 

@@ -117,7 +117,18 @@ def test_severity_counts_match_run_plan(manifest):
         first_by_slot.setdefault(e["slot_id"], e)
     assert len(first_by_slot) == len(generate_cp_runs.RUN_PLAN)
 
-    expected = [severity for (_, severity) in generate_cp_runs.RUN_PLAN]
+    # AN INJECTED SLOT FOLLOWS ITS INJECTION, not the run plan (REQ-GEN-044):
+    # the scenario replaces that period's chain with the arrivals it names.
+    # Found when TS-12 landed on a slot the plan had as red (2026-10-05);
+    # TS-38 had only agreed with the plan by coincidence.
+    from generator.anchor_date import get_anchor_date
+    schedule = generate_cp_runs.schedule
+
+    periods = schedule.periods_for_dataset(
+        generate_cp_runs.DATASET_ID, until=get_anchor_date())[-len(generate_cp_runs.RUN_PLAN):]
+    _, injected = generate_cp_runs._plan_injections(periods)
+    expected = [injected[p.name][0].arrivals[0].severity if p.name in injected else severity
+                for (_, severity), p in zip(generate_cp_runs.RUN_PLAN, periods)]
     # Sort by run_index (a real int, matching RUN_PLAN's own generation
     # order), not slot_id (a zero-padded string) - a plain string sort
     # broke for real once the count crossed a fixed padding width

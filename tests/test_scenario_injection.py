@@ -469,3 +469,63 @@ class TestQuietDays:
                 si.Injection("TS-b", "d", -6, "cfg", quiet=(0, 1))]
         with pytest.raises(si.CannotPlace):
             si.no_two_scenarios_share_a_period(both, {"d": _daily(30)})
+
+
+class TestTheFileCheckShapes:
+    """REQ-GEN-044 criteria 15 and 16: each shape is what the file checks
+    will see - TS-12's ragged extract refused, TS-56's reorder only warned.
+    Asked of the real evaluator, not assumed."""
+
+    _CARERS = ("carer_id,given_name,family_name,carer_type,approval_status,extract_timestamp\n"
+               'C1,Ann,"Smith, Jr",kin,approved,2026-01-01T00:00:00\n'
+               "C2,Bo,Jones,foster,approved,2026-01-01T00:00:00\n"
+               "C3,Cy,Lee,foster,pending,2026-01-01T00:00:00\n")
+
+    def _evaluate(self, tmp_path, content, table):
+        from qa_tools.common import file_checks, hierarchy
+
+        path = tmp_path / f"{table}.csv"
+        path.write_text(content)
+        contract = hierarchy.contract_path("child-protection")
+        return {f.check: f for f in file_checks.evaluate(
+            path, file_checks.expected_columns(contract, table))}
+
+    def test_ts12_is_refused_by_fields_per_row(self, tmp_path):
+        from qa_tools.common import file_checks
+
+        found = self._evaluate(tmp_path, si.unreadable(self._CARERS * 3), "cp_carers")
+        assert found[file_checks.FIELDS_PER_ROW].refuses
+
+    def test_ts56_only_warns(self, tmp_path):
+        from qa_tools.common import file_checks
+
+        found = self._evaluate(tmp_path, si.reordered(self._CARERS), "cp_carers")
+        assert found[file_checks.COLUMN_ORDER].status == file_checks.WARN
+        assert file_checks.refusal(list(found.values())) is None
+
+    def test_the_reorder_keeps_a_quoted_comma_in_its_field(self):
+        assert '"Smith, Jr"' in si.reordered(self._CARERS)
+
+
+class TestEveryChildProtectionInjectionIsPlanned:
+    """Found by the sprint 12 rebuild (2026-10-05): the Child Protection
+    generator planned only injections whose dataset was cp-clients, so
+    TS-56 (cp-carers) was skipped without a word - criterion 4's silent
+    absence. One delivery carries all six tables, so an injection for ANY
+    dataset of the collection is planned against the delivery's periods,
+    and two may never share one."""
+
+    def test_an_injection_on_another_dataset_is_planned(self):
+        from generator import generate_cp_runs as cp
+
+        resolved, by_period = cp._plan_injections(_daily(30))
+        assert "TS-56" in {inj.scenario_id for inj, _ in resolved}
+
+    def test_two_in_one_delivery_are_refused(self, monkeypatch):
+        from generator import generate_cp_runs as cp
+
+        both = (si.Injection("TS-a", "cp-clients", -5, "cfg"),
+                si.Injection("TS-b", "cp-carers", -5, "cfg"))
+        monkeypatch.setattr(si, "INJECTIONS", both)
+        with pytest.raises(si.CannotPlace):
+            cp._plan_injections(_daily(30))

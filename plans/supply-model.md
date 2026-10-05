@@ -2362,7 +2362,7 @@ exist.
     (`plans/qa-pipeline.md` item 87 - genuinely blocked), and `qa_results/` is
     still a committed tree, so `REQ-PIPE-089` onwards is untouched.
 
-27. **[in-progress, 2026-10-05]** **[QA checks & contract]** **Load-time file checks,
+27. **[blocked, 2026-10-05]** **[QA checks & contract]** **Load-time file checks,
     and where their results go.** The small explicit set of checks that can
     only be made on the file as delivered - encoding, delimiter, header row,
     column order, ragged rows, duplicate headers - as a fifth tool with real
@@ -3033,6 +3033,10 @@ re-filing exists as its own operation.
 ### Delivery and multi-table
 
 **TS-12 `[INJECT]` Five tables load, one is an invalid CSV.**
+*In the data since 2026-10-05 (REQ-GEN-044 criterion 15): the ragged
+`cp_clients` is refused by the fields-per-row file check before it is
+loaded (REQ-QAC-096), and reads red as could-not-be-loaded with the check
+named (REQ-DASH-148, REQ-DASH-097).*
 **Keith, 2026-09-22: "this is a really important one."** The canonical
 case, and the one he raised from real operational experience.
 Child Protection's August delivery arrives - all six tables. Five load
@@ -3649,6 +3653,16 @@ NOT IN THE DATA YET: the script has no field for the period stood on
 **TS-55 `[INJECT]` A period whose _manifest lists all three kinds.** NOT IN
 THE DATA YET: needs TS-54's substitution beside an inheritance in one
 period (REQ-PIPE-130, REQ-GEN-137 criterion 6).
+
+**TS-56 `[INJECT]` A supply whose columns arrive in another order.**
+*Config: quarterly, Feb/May/Aug/Nov.*
+`cp_carers` arrives with its first two columns swapped, header and rows
+alike - the same data, laid out differently by an upstream export.
+**Expect**: it loads as usual, because columns are matched by name; its
+column-order file check WARNS, shown in the dataset's file section, and the
+dataset's status is unchanged by it (REQ-QAC-096 criteria 12 and 18,
+REQ-DASH-097 criterion 7, REQ-GEN-044 criterion 16).
+**Breaks as**: refused, or the dataset turned amber or red by a warning.
 
 ### The activity feed
 

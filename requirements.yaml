@@ -6671,6 +6671,17 @@ requirements:
       of replacing it. Same root cause - the generator cannot aim for a verdict
       - and the same fix is wanted: plans/running-thoughts.md #63, generate to
       the check rules.'
+    - 'CRITERIA 15 AND 16 LANDED 2026-10-05 in a change of their own with its
+      own rebuild (criterion 17): TS-12 - cp_clients ragged partway, refused by
+      the fields-per-row file check in 2025-Q2 while the other five load - and
+      TS-56, newly registered, cp_carers with its first two columns swapped in
+      2024-Q3, loading with a column-order warning.'
+    - EVERY CHILD PROTECTION INJECTION IS PLANNED, NOT ONLY cp-clients' (2026-10-05,
+      found by that rebuild). The generator planned only injections whose dataset
+      was cp-clients, so TS-56 (cp-carers) was skipped without a word - criterion
+      4's silent absence. One delivery carries all six tables, so an injection
+      for any of them is placed against the delivery's periods, and two may not
+      share one whatever their datasets (tests written failing first).
   - id: REQ-GEN-045
     title: A generated scenario map says where each scenario can be seen
     date_written: "2026-09-22"
@@ -20806,7 +20817,29 @@ requirements:
       date: '2026-10-04'
     story: As a data team leader looking at a dataset, I want what was wrong with the file we were sent shown as a claim about the file - in its own place, in plain words - and a failure that is holding a supply back to read clearly on the dataset itself, so that I am neither misled into thinking the data was checked and failed nor left with a green that is quietly waiting on me.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 (sprint 12), against a full rebuild from empty carrying REQ-GEN-044''s
+      two new injections: tests/test_dashboard_e2e.py TestFileChecksOnThePage
+      drives the built page in a real browser - cp-clients at TS-12''s in-place-on
+      date shows its file section refused with the fields-per-row file check named,
+      the dataset red with that check in its reason, and its agency rolled up
+      red; cp-carers at TS-56''s date shows the column-order warning while its
+      status is exactly its data checks'' roll-up; zero console errors under the
+      suite''s page fixture. tests-js/file-checks.test.js - the file attempt in
+      force on the date on show, a refused file with the failed check open, the
+      all-passed case collapsed to one line, a warning saying the status is unchanged,
+      and nothing rendered where no file check is recorded.'
+    implemented_by:
+    - pipeline/file_check_panel.py::for_dataset
+    - dashboard/qa-reporting-dashboard.template.html::fileSectionHtml
+    - dashboard/qa-reporting-dashboard.template.html::fileAttemptInPlaceOn
+    - dashboard/qa-reporting-dashboard.template.html::fileCheckPanelBody
+    - dashboard/qa-reporting-dashboard.template.html::wireFileSection
+    - qa_tools/common/file_checks.py::reason_for
+    linked_tests:
+    - tests/test_dashboard_e2e.py
+    - tests-js/file-checks.test.js
     source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - yes, the load-time file checks reach the dashboard, as their own scope, never folded into the data checks'' status. REFRESHED by delivery-scoper 2026-10-04 to fit REQ-PIPE-115''s dataset-level red (signed that day) and REQ-DASH-070''s outstanding items, with the failed-load case moved out to REQ-DASH-148. Reshaped the same day when Keith chose that any failing file check refuses the whole file, so the red and the queue item became REQ-DASH-148''s.'
     acceptance_criteria:
     - THE SYSTEM SHALL show a dataset's file-check results, on its dataset page, in a section of their own labelled as being about the file as delivered, distinct from its data checks.
@@ -20841,6 +20874,14 @@ requirements:
     - 'THE PASSING CASE COLLAPSES (criterion 5, scoper''s proposal) for the 30-dataset NFR: six green rows on every dataset page, every day, is the noise that teaches a reader to skip the section.'
     - 'THE GENERATED HISTORY WILL CARRY BOTH CASES CRITERION 12 TESTS (Keith, 2026-10-04): REQ-GEN-044''s amendment injects a file refused by a file check and a file loaded with a column-order warning, so the real-browser test can drive the bootstrapped history as well as a fixture. REJECTED test-only fixtures, which leave the published dashboard never showing either.'
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - 'THE SECTION HAS A CONTAINER AND A CLASS OF ITS OWN, above the data checks''
+      sections and not one of them (criterion 1): the first version sat inside
+      the scope sections'' container with their class, and the supply/table-section
+      browser tests - which count every such section - went red, which was them
+      being right.'
+    - THE FILE ON SHOW IS THE NEWEST LOAD ATTEMPT OF A FILE RECEIVED ON OR BEFORE
+      THE DATE ON SHOW, by the file's own receipt (qa.delivery_file), never by
+      when a pass ran - the same rule every in-place-on judgement uses.
   - id: REQ-PIPE-098
     title: "A dataset that does not participate in a period stands on its most recent supply, by a view created when the period is born"
     date_written: "2026-09-26"
@@ -27007,12 +27048,14 @@ requirements:
         unowned: true
     - criterion: Criteria 4 and 5 - a single-table correction promoted, or still
         failing, after its partner's promotion re-checks it (TS-48, TS-49).
-      why: 'The ARRIVAL shape already occurs in the generated history - in 2024-Q3
-        cp-investigations was promoted on 08-01, its siblings arrived 08-13, and
-        it was re-evaluated three times (the sprint 11 critic found this, correcting
-        this entry''s first wording). What cannot be planted is the OUTCOME: a
-        correction that goes RED on a cross-table check and then green, or stays
-        red, needs the generator to aim for a verdict.'
+      why: 'The ARRIVAL shape - a quarter whose siblings arrive after one of its
+        tables was promoted, re-evaluating it - occurred only in 2024-Q3 (found
+        by the sprint 11 critic, correcting this entry''s first wording), and
+        TS-56 replaced that quarter''s chain on 2026-10-05, so the generated history
+        has no knock-on re-evaluation at present; moving TS-56 to a quarter with
+        no resend restores it (morning report). What cannot be planted at all
+        is the OUTCOME: a correction going RED on a cross-table check and then
+        green, or staying red, needs the generator to aim for a verdict.'
       owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
         (Keith, 2026-10-05).'
       blocked_by:
@@ -27035,11 +27078,11 @@ requirements:
         unowned: true
     - criterion: Criterion 9 - a promoted supply turned red by a later sibling
         (TS-51).
-      why: The arrival shape exists (2024-Q3, as criteria 4 and 5 note); what
-        is missing is a RED cross-table outcome after the promotion, which needs
-        the generator to aim for a verdict. Corrected 2026-10-05 after the sprint
-        11 critic showed the first wording - 'the generator cannot place a sibling's
-        arrival after a promotion' - was wrong.
+      why: The arrival shape exists, as criteria 4 and 5 note; what is missing
+        is a RED cross-table outcome after the promotion, which needs the generator
+        to aim for a verdict. Corrected 2026-10-05 after the sprint 11 critic
+        showed the first wording - 'the generator cannot place a sibling's arrival
+        after a promotion' - was wrong.
       owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
         (Keith, 2026-10-05).'
       blocked_by:
