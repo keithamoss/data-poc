@@ -155,11 +155,16 @@ class _MothmanGroup(click.RichGroup):
     delivery-critic, overnight sprint 4). The message names the remedy."""
 
     def invoke(self, ctx):
-        from qa_tools.common import qa_store
+        from qa_tools.common import environments, qa_store, supply_db
 
         try:
             return super().invoke(ctx)
         except qa_store.SchemaVersionError as exc:
+            raise click.ClickException(str(exc)) from None
+        except (supply_db.SupplyDbError, environments.EnvironmentError_) as exc:
+            # A database this checkout must not act on, or no stated
+            # environment (REQ-PIPE-107, REQ-PIPE-093): a refusal by design,
+            # whose message already says what to do - not a crash.
             raise click.ClickException(str(exc)) from None
         except yaml.YAMLError as exc:
             # The same refusal for a file read only once a command runs.
@@ -172,7 +177,28 @@ def cli(ctx: click.Context) -> None:
     """mothman - the unified CLI/TUI for this PoC's real pipeline."""
     if ctx.invoked_subcommand is None:
         common.require_tty("mothman <command> --help (see the available commands)")
+        # NO ENVIRONMENT, NO MENU (REQ-TEST-114 criterion 8): REQ-PIPE-093's
+        # refusal in place of a menu whose first item would fail anyway.
+        from qa_tools.common import environments
+        environments.current()
         _main_menu_loop()
+    else:
+        _state_the_environment_on_first_connection()
+
+
+def _state_the_environment_on_first_connection() -> None:
+    """One line naming the environment before a one-off command's own output
+    once it connects (REQ-TEST-114 criteria 2 and 3), on STANDARD ERROR so a
+    piped table is unchanged. At the first connection rather than at start,
+    so a command that never touches a database says nothing."""
+    from qa_tools.common import supply_db
+
+    def state() -> None:
+        statement = common.environment_statement()
+        if statement:
+            click.echo(statement, err=True)
+
+    supply_db.on_first_connection(state)
 
 
 cli.add_command(bdm.bdm_group)

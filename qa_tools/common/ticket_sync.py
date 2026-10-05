@@ -326,7 +326,14 @@ def sync_all(owner: str, repo: str, people_config: dict | None = None) -> list[s
 
 
 def main() -> None:
-    owner, repo = os.environ["GITHUB_REPOSITORY"].split("/", 1)
+    # THE ASSET'S TICKET REPOSITORY, never GITHUB_REPOSITORY (REQ-PIPE-093
+    # criterion 12): that names whichever repository a workflow runs in.
+    from qa_tools.common import environments
+
+    slug = environments.ticket_repository()
+    if not slug or "/" not in slug:
+        raise SystemExit("contract/data-asset.yaml names no ticket_repository (owner/repo)")
+    owner, repo = slug.split("/", 1)
     people_config = parse_people_config(PEOPLE_YAML)
     for line in sync_all(owner, repo, people_config):
         print(line)

@@ -204,7 +204,10 @@ def missing_tools(agency: str, collection: str, run_id: str,
         by_dataset: dict[str, set[str]] = {}
         for dataset_id, tool in conn.execute(
                 f'SELECT DISTINCT dataset_id, tool FROM "{qa_store.SCHEMA}".check_result '
-                "WHERE run_key = ? AND dataset_id IS NOT NULL", [run_id]).fetchall():
+                # NOT FILE CHECKS (post-build-review #118 D-H): a refused
+                # file records only those, and owes no data tool.
+                "WHERE run_key = ? AND dataset_id IS NOT NULL AND tool <> 'file'",
+                [run_id]).fetchall():
             by_dataset.setdefault(dataset_id, set()).add(tool)
         for dataset in sorted(by_dataset):
             missing += [f"{dataset}/{tool}" for tool in expected_tools_for(dataset)

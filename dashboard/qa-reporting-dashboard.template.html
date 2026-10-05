@@ -3847,8 +3847,10 @@ function fileAttemptInPlaceOn(fileColumn, inPlaceOnDateStr){
   for(const ck of fileColumn.checks){
     for(const h of (ck.history||[])){
       if(inPlaceOnDateStr && h.run_date && h.run_date > inPlaceOnDateStr) continue;
-      if(!latest || (h.receivedAt||"") > (latest.receivedAt||"")
-         || ((h.receivedAt||"") === (latest.receivedAt||"") && h.attempt > latest.attempt)) latest = h;
+      // INSTANTS, not text (#118 D-A): receipts carry different UTC offsets,
+      // and "11:00+08:00" sorts after "06:04+00:00" though it is earlier.
+      const at = Date.parse(h.receivedAt||"") || 0, was = latest ? (Date.parse(latest.receivedAt||"") || 0) : 0;
+      if(!latest || at > was || (at === was && h.attempt > latest.attempt)) latest = h;
     }
   }
   if(!latest) return null;
@@ -3870,10 +3872,13 @@ function fileSectionHtml(ds, inPlaceOnDateStr){
       <span class="label"><span class="kind-tag">File check</span><span class="nm">${escHtml(r.check.name)}</span>
         <span class="ds">${r.point.status === "green" ? "" : escHtml(sentenceCase(r.point.finding || ""))}</span></span>
       ${pill(r.point.status,"sm")}
+      <span class="sr-only"> — view its result for each file received</span>
     </button>`;
   const passed = shown.results.filter(r=> r.point.status === "green");
   const head = `<div class="head"><h3>About the file as delivered</h3></div>
-    <div class="blurb">Checks on <span class="mono">${escHtml(shown.filename||"the file")}</span> itself, received ${escHtml(fmtInstant(shown.receivedAt))}, made before any of it was loaded. They are about the file, not its data, and never change the status of the checks below.</div>`;
+    <div class="blurb">Checks on <span class="mono">${escHtml(shown.filename||"the file")}</span> itself, received ${escHtml(fmtInstant(shown.receivedAt))}, made before any of it was loaded. ${refused
+      ? "This file failed one, so it was not loaded and none of the checks below ran on it."
+      : "They are about the file, not its data, and never change the status of the checks below."}</div>`;
   if(!notPassed.length){
     // Criterion 5: every check passed - one line, the checks behind it.
     return `<div class="file-section" data-scope="file" data-file-outcome="passed">${head}
@@ -3893,7 +3898,8 @@ function wireFileSection(root, ag, col, ds){
   root.querySelectorAll(".file-check").forEach(btn=>{
     const check = fileColumn.checks.find(ck=> ck.key === btn.dataset.check);
     if(!check) return;
-    btn.setAttribute("aria-label", `File check ${check.name} — view its result for each file received`);
+    // NO aria-label (#118 D-D): it would replace the button's name, so the
+    // status pill and the finding went unheard. The hint is sr-only text.
     btn.addEventListener("click", ()=>{
       STATE = {...STATE, columnName: FILE_COLUMN_KEY};
       openCheckPanel(ag, col, ds, fileColumn, check);

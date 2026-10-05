@@ -146,6 +146,10 @@ class _Pass:
                 yield text
 
     def run(self) -> "_Pass":
+        # NO FIELD-SIZE CEILING OF OUR OWN (#118 D-F): Python's csv default is
+        # 128 KiB, and a legitimate longer field - which the loader reads -
+        # was refused as unsplittable. Still one row at a time (NFR 2).
+        csv.field_size_limit(max(csv.field_size_limit(), 2**31 - 1))
         reader = csv.reader(self._lines(), delimiter=self.delimiter)
         try:
             for row in reader:
@@ -194,6 +198,11 @@ def _header_row(p: _Pass, expected) -> tuple[str, str]:
         return FAIL, "the file is empty: it has no header row"
     if _delimiter(p, expected)[0] == FAIL:
         return NODATA, "not evaluated: the first line could not be split"
+    # ANY ONE OF THE CONTRACT'S COLUMNS makes it a header. A stricter rule
+    # was tried for post-build-review #118 D-E and reverted the same night: it
+    # refused a file for MISSING columns, which is a data check's question
+    # (criterion 2). The false green D-E found - a headerless first row
+    # holding a value equal to a column name - is with Keith.
     if expected and not set(p.header) & set(expected):
         return FAIL, ("the first line names none of the contract's columns, so it is a "
                       "row of data rather than a header")
@@ -215,8 +224,15 @@ def _header_names_unique(p: _Pass, expected) -> tuple[str, str]:
             repeated.append(name)
         seen.add(name)
     if repeated:
-        return FAIL, ("the header names " + ", ".join(f'"{n}"' for n in repeated)
-                      + " more than once")
+        # ONLY A NAME THE CONTRACT LISTS IS QUOTED (#118 D-E, criterion 14):
+        # anything else on that line may be a row value, so it is counted.
+        known = [n for n in repeated if n in expected]
+        unknown = len(repeated) - len(known)
+        parts = [", ".join(f'"{n}"' for n in known)] if known else []
+        if unknown:
+            parts.append(_count(unknown, "column name the contract does not list",
+                                "column names the contract does not list"))
+        return FAIL, "the header names " + " and ".join(parts) + " more than once"
     return PASS, "no column is named twice"
 
 
@@ -294,7 +310,12 @@ def refusal(findings: list[Finding]) -> Finding | None:
 def reason_for(finding: Finding, filename: str) -> str:
     """The recorded load-failure reason for a refused file: our own words,
     naming the file and the check (REQ-DASH-097 criterion 6)."""
-    return f"{filename} failed the file check {finding.check}: {finding.words}"
+    # BY ITS NAME, as the section and panel call it (#118 D-G), and a
+    # finished sentence, since the outstanding item appends another.
+    names = {d.check: d.name for d in definitions()}
+    words = finding.words.rstrip()
+    return (f"{filename} failed the file check {names.get(finding.check, finding.check)}: "
+            f"{words}{'' if words.endswith('.') else '.'}")
 
 
 def expected_columns(contract_path, table: str) -> list[str]:

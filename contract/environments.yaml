@@ -21,6 +21,19 @@
 # name and a URL. `publishes: true` marks the one environment whose
 # build is the published one; the rest build for their own readers.
 #
+# `confirm_changes: true` makes a person TYPE the environment's id before
+# any change they make to the database by hand from the terminal - no y/N,
+# and no flag skips it (REQ-PIPE-093 criteria 4 to 8). Keyed off this
+# property, never off the word "production", because a second data asset
+# is a second deployment of this same file. The pipeline's own unattended
+# writes never ask (criterion 9).
+#
+# `ticketing: true` is the only thing that turns ticketing on (criterion
+# 10) - never GITHUB_REPOSITORY, which GitHub Actions sets on every run.
+# The repository tickets go to is a fact about the data asset, so it is
+# contract/data-asset.yaml's `ticket_repository`, and an environment that
+# turns ticketing on where none is named is refused before it connects.
+#
 # `ci` WAS ADDED 2026-09-28, and the alternative is worth recording
 # because it looked cheaper: labelling a GitHub Actions runner `sandbox`.
 # That is a lie of exactly the kind this list exists to prevent - the
@@ -36,6 +49,8 @@ environments:
       A developer's own checkout and their own database. Builds a
       dashboard to look at, and never publishes.
     publishes: false
+    confirm_changes: false
+    ticketing: false
 
   - id: sandbox
     label: Claude Code sandbox
@@ -44,6 +59,8 @@ environments:
       does not survive the container, so a build here describes a
       moment rather than a system of record.
     publishes: false
+    confirm_changes: false
+    ticketing: false
 
   - id: ci
     label: Continuous integration
@@ -54,6 +71,8 @@ environments:
       nothing - the publisher runs where the data is (REQ-PIPE-092), and a
       runner has no route to any real database.
     publishes: false
+    confirm_changes: false
+    ticketing: false
 
   - id: production
     label: Production
@@ -63,3 +82,17 @@ environments:
       row in the data, so a second asset is a second deployment of this
       same configuration, not another entry here.
     publishes: true
+    confirm_changes: true
+    ticketing: true
+
+  # REQ-PIPE-093 criterion 16: a test worker's own scratch database. Set
+  # ONLY by the test suite's fixtures, so a worker is never labelled as
+  # the CI runner or the sandbox it happens to run in.
+  - id: test
+    label: Test suite
+    description: >
+      A test worker's own scratch database, created and dropped by the
+      suite. Publishes nothing, asks nothing, tickets nothing.
+    publishes: false
+    confirm_changes: false
+    ticketing: false

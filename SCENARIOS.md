@@ -542,9 +542,9 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 | Where to look | |
 |---|---|
 | Dataset | cp-carers |
-| Supplies | `cp_carers__202408010900000800` |
-| Period | 2024-Q3 |
-| Set the in-place-on date to | 2024-08-01 |
+| Supplies | `cp_carers__202411010900000800` |
+| Period | 2024-Q4 |
+| Set the in-place-on date to | 2024-11-01 |
 
 
 <!-- scenario-map-data
@@ -1441,10 +1441,10 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "coordinates": {
     "dataset": "cp-carers",
     "supplies": [
-     "cp_carers__202408010900000800"
+     "cp_carers__202411010900000800"
     ],
-    "period": "2024-Q3",
-    "inPlaceOn": "2024-08-01"
+    "period": "2024-Q4",
+    "inPlaceOn": "2024-11-01"
    }
   }
  ]

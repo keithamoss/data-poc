@@ -296,7 +296,10 @@ class TestWhereItRefusesToGuess:
         never falling back to anything else."""
         monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV,
                            "postgresql://nobody@127.0.0.1:1/absent")
-        with pytest.raises(supply_db.SupplyDbError, match="cannot reach the supply database"):
+        # NAMING THE ENVIRONMENT TOO since REQ-PIPE-093 criterion 3.
+        with pytest.raises(supply_db.SupplyDbError,
+                           match=r"cannot reach the 'test' environment's supply database"
+                                 r".*127\.0\.0\.1"):
             supply_db.connect()
 
     def test_a_password_never_reaches_the_error_message(self, monkeypatch):

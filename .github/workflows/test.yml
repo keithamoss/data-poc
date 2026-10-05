@@ -228,6 +228,12 @@ jobs:
       - name: Install dbt_utils
         run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
 
+      # EVERY CONNECTION CHECKS THE DATABASE'S RECORDED IDENTITY and refuses
+      # one with none (REQ-PIPE-107), so CI marks its own as `ci`, typing
+      # the environment id as anyone marking a database does.
+      - name: Mark the warehouse database as CI's
+        run: uv run mothman env mark --confirm ci
+
       - name: Install Playwright's Chromium
         run: uv run playwright install --with-deps chromium
 
@@ -312,6 +318,12 @@ jobs:
 
       - name: Install dbt_utils
         run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
+
+      # EVERY CONNECTION CHECKS THE DATABASE'S RECORDED IDENTITY and refuses
+      # one with none (REQ-PIPE-107), so CI marks its own as `ci`, typing
+      # the environment id as anyone marking a database does.
+      - name: Mark the warehouse database as CI's
+        run: uv run mothman env mark --confirm ci
 
       - name: Install Playwright's Chromium
         run: uv run playwright install --with-deps chromium

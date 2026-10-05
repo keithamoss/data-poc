@@ -20192,7 +20192,46 @@ requirements:
       date: '2026-10-04'
     story: As an operator who works across a local database, dev, non-production and production, I want every mothman command to refuse until I have said which environment I am in, and production to make me confirm deliberately before I change anything by hand, so that a local habit never quietly reaches production and a production change is never an accident.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 15 - the typed id from a person starting `mothman pipeline
+        process` at a terminal.
+      why: '`mothman pipeline process` is REQ-PIPE-151, delivery sprint 14 tonight;
+        there is no such command to guard yet. cli/common.confirm_change is the
+        confirmation it will call.'
+      owner: Sprint 14 tonight (REQ-PIPE-151).
+      blocked_by:
+        requirements:
+        - REQ-PIPE-151
+    evidence:
+    - '2026-10-05 (sprint 13): tests/test_stated_environment.py - 17 tests: with
+      MOTHMAN_ENVIRONMENT unset a connection is refused before any connect attempt,
+      for a read as well as a write, naming the variable and the declared ids;
+      an unreachable database fails naming the environment and the host and never
+      the password, in URL and keyword form and where the driver''s own error
+      repeats it; only production declares confirm_changes; ticketing is off for
+      ci and test and a platform''s GITHUB_REPOSITORY no longer turns it on; the
+      repository comes from contract/data-asset.yaml, and an environment turning
+      ticketing on with none named is refused before connecting; the suite states
+      `test`; and at the terminal, where the environment confirms changes, --yes
+      does not skip the typed id, a mismatch records nothing, and no terminal
+      means no change. tests/test_supply_db.py''s unreachable-database test now
+      asserts the environment is named.'
+    implemented_by:
+    - qa_tools/common/environments.py::for_connection
+    - qa_tools/common/environments.py::ticket_repository
+    - qa_tools/common/supply_db.py::connect
+    - qa_tools/common/supply_db.py::_scrub
+    - qa_tools/common/ticket_reconciler.py::service_from_env
+    - cli/common.py::confirm_change
+    - cli/filing_tui.py::apply_decision
+    - contract/environments.yaml
+    - contract/data-asset.yaml
+    - .devcontainer/devcontainer.json
+    - tests/conftest.py::stated_test_environment
+    linked_tests:
+    - tests/test_stated_environment.py
+    - tests/test_supply_db.py
     source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - an operator doing local development against their own PostgreSQL versus being hooked into dev, non-prod or prod Aurora. Priority kept by Keith 2026-10-04 (plans/supply-model.md, ''Priority: REQ-PIPE-093 is queued''). Refreshed by delivery-scoper 2026-10-04 against what REQ-PIPE-089/092 and REQ-DASH-094 have since built, and narrowed: the PostgreSQL version gate moved to REQ-PIPE-146 and the write-time disclosure to REQ-TEST-114. Keith answered the refresh''s questions 1 and 2 on 2026-10-04 (both option A).'
     acceptance_criteria:
     - THE SYSTEM SHALL resolve the stated environment before it opens any database connection, for a read as well as a write, and SHALL NOT limit that to registering a QA run.
@@ -20252,6 +20291,28 @@ requirements:
     - A PERSON STARTING A PROCESSING PASS IN PRODUCTION TYPES THE ID (Keith, 2026-10-04), chosen over the CLI reviewer's 'no typed id'. 'A person' is read as 'a terminal is attached', since a scheduler has none - the same test REQ-PIPE-103 decision 12 uses for 'nobody to ask'. REJECTED keying it to the TUI only, which a person bypasses by typing the flag form.
     - TEST DATABASES ARE THE `test` ENVIRONMENT (Keith, 2026-10-04), set only by fixtures, so a test worker is never labelled as the ci runner or the sandbox it happens to run in. REJECTED reusing `ci`, which describes a runner, not a worker's scratch database (environments.yaml's own note on why `ci` was added).
     - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
+    - TICKETING IS DECLARED ON FOR PRODUCTION ONLY - PROVISIONAL (overnight 2026-10-05,
+      Keith asleep, recommended option taken). Criterion 11 fixes ci and test
+      as off and says nothing of local and sandbox. Both were off in practice
+      (ticketing turned on only with GITHUB_REPOSITORY, which only a workflow
+      sets), so off keeps behaviour; production is where the published asset's
+      slots are ticketed.
+    - ticket_sync.py AND leaderboard.py ALSO READ GITHUB_REPOSITORY for the repository
+      tickets live in; both now take contract/data-asset.yaml's ticket_repository,
+      as criterion 12 says of the repository whatever reads it. git_identity's
+      use is provenance (which repository a build came from), not a ticket repository,
+      and is unchanged.
+    - 'A HAND-FILING ASKS AFTER KEEPING IS DECIDED: --commit (or the keep prompt)
+      decides to file, and where the environment confirms changes the typed id
+      follows - so --commit is never the confirmation itself (criterion 6). The
+      filing flow types the id at its FIRST confirmation; a second pass there
+      only re-confirms consequences that changed underneath it (criterion 4''s
+      once per flow).'
+    - 'THE SUITE STATES `test` FROM AN AUTOUSE SESSION FIXTURE (criterion 16),
+      and a test wanting another environment states it with monkeypatch. Also
+      added the same night: MOTHMAN_TEST_DB_TAG, so two test sessions on one server
+      no longer drop each other''s per-worker databases - a critic''s run and
+      the builder''s gate had done exactly that.'
   - id: REQ-DASH-094
     title: "The dashboard says which environment's QA it is showing"
     date_written: "2026-09-26"
@@ -24101,7 +24162,44 @@ requirements:
       date: '2026-10-04'
     story: As a data engineer with access to more than one environment, I want the tool to stop me the moment I point it at the wrong database, so that I find out before I have changed somebody else's data rather than afterwards from the record of what I did.
     moscow: must
-    status: in_progress
+    status: built
+    evidence:
+    - '2026-10-05 overnight (sprint 13): tests/test_db_identity.py 18 passed.
+      A worker''s database is marked `test` by its fixture and opens; acting as
+      another environment or another data asset is refused naming both identities,
+      and the message carries no database name, host, user, password or URL; connection_fields()
+      - the one path dbt, Soda Core and datacontract-cli take - refuses the same
+      way. A brand-new database is refused and stays unmarked; a refused command
+      leaves its schemas exactly as they were; a connection string carrying `options=-c
+      mothman.environment=test` cannot claim an identity; half an identity and
+      an unreadable one are refusals. `mothman env mark` refuses a mistyped id
+      and a non-terminal without --confirm, marks once typed, is a no-op when
+      already marked, and replaces another identity only with --replacing naming
+      it exactly. reset-synthetic leaves the identity in place. The session-start
+      hook, the dev container''s post-create script and every CI job with a database
+      mark their own, CI before any other mothman step. Real `supply` marked `sandbox`
+      with `mothman env mark --confirm sandbox`; acting as `local` against it
+      was refused at the terminal as a one-paragraph error, not a traceback. Criteria
+      13 and 14 were built and evidenced inside REQ-PIPE-144 (2026-10-04).'
+    implemented_by:
+    - qa_tools/common/db_identity.py::check
+    - qa_tools/common/db_identity.py::parse
+    - qa_tools/common/db_identity.py::mark
+    - qa_tools/common/supply_db.py::connect
+    - qa_tools/common/supply_db.py::connection_fields
+    - cli/env.py::mark_command
+    - cli/app.py::_MothmanGroup
+    - tests/conftest.py::mark_test_database
+    - .claude/hooks/session-start.sh
+    - .devcontainer/post-create.sh
+    - .github/workflows/test.yml
+    linked_tests:
+    - tests/test_db_identity.py::TestTheWorkersOwnDatabaseIsChecked
+    - tests/test_db_identity.py::TestAnUnmarkedDatabase
+    - tests/test_db_identity.py::TestMarking
+    - tests/test_db_identity.py::TestTheResetLeavesTheIdentity
+    - tests/test_db_identity.py::TestEveryPlaceMarksItsOwn
+    - tests/test_schema_version_refusal.py
     source: Keith, 2026-09-27, answering REQ-PIPE-091's question set D - 'no, protect this higher up so you can't mistakenly make changes to the wrong environment'. Drafted in that conversation without delivery-scoper; refreshed by delivery-scoper 2026-10-04. Keith answered the refresh's questions 3 and 4 on 2026-10-04 (both option A).
     acceptance_criteria:
     - THE SYSTEM SHALL record, in the database itself, the data asset id (contract/data-asset.yaml's data_asset_id) and the environment id that database belongs to.
@@ -24150,6 +24248,37 @@ requirements:
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
 
     - "CRITERIA 13 AND 14 BUILT 2026-10-04 inside REQ-PIPE-144 (its criterion 40, Keith's call): qa_store.ensure_schema refuses a NEWER recorded schema version naming both versions, and rewrites nothing. The downgrade was reproduced first - a database recorded at version 99 came back recorded at 17 - and tests/test_schema_version_refusal.py failed before the fix. The rest of this requirement is built after the batch."
+    - BUILT 2026-10-05 overnight (sprint 13), criteria 1 to 12.
+    - 'PROVISIONAL (overnight, Keith''s standing ''take the recommended option''):
+      THE IDENTITY IS TWO DATABASE-LEVEL SETTINGS, mothman.data_asset_id and mothman.environment,
+      written by ALTER DATABASE ... SET and read back from pg_db_role_setting
+      rather than current_setting(). Outside every schema, so the reset keeps
+      it with no special case (criterion 11); read from the catalogue, so a DSN''s
+      options= cannot claim one; and readable in the same statement as REQ-PIPE-146''s
+      version. REJECTED: a table in its own schema - a reset or a tidy that drops
+      schemas would have to be taught to spare it, and it costs a second statement
+      when absent (a missing table is an error, not a NULL). Keith to confirm.'
+    - 'PROVISIONAL: `--confirm <environment id>` COUNTS AS TYPING IT, for the
+      three setup scripts (session hook, CI, dev container) that have no terminal.
+      Without the flag the command asks at a terminal and refuses without one.
+      The id is still typed rather than defaulted; what a flag cannot do is replace
+      another identity - that also needs --replacing. Keith to confirm.'
+    - WHAT GETS WRITTEN IS THE CHECKOUT'S OWN IDENTITY - the data asset from contract/data-asset.yaml
+      and the STATED environment - and the person types the environment back.
+      So marking needs both sources to agree, and nothing can mark a database
+      as an environment the checkout is not acting as.
+    - AN UNREADABLE IDENTITY IS REPLACED WITH `--replacing unreadable` - the one
+      case where there is no identity to type out.
+    - THE CLI TURNS THE REFUSAL INTO ONE PARAGRAPH (cli/app.py's group handler,
+      like the schema-version refusal beside it) rather than a traceback, and
+      does the same for an unstated environment.
+    - 'TEST FIXTURES MARK BY ADMIN CONNECTION: conftest''s worker database, dbsupport''s
+      scratch database, private_supply_dsn and the bootstrap-equivalence databases
+      are marked `test` the moment they are created; tests that read the DEPLOYMENT''s
+      database act as the environment it is marked for (conftest remembers it
+      beside DEPLOYMENT_SUPPLY_DSN). Found while building: a test that switched
+      itself to `production` and then wrote to its `test` database was refused
+      - correctly - and was reordered so only the command under test acts as production.'
   - id: REQ-QAC-108
     title: 'Drift and volume are measured against the last supply actually PROMOTED, never against a view or an arrival nobody promoted
   
@@ -24660,7 +24789,37 @@ requirements:
       date: '2026-10-04'
     story: As somebody driving the mothman CLI or TUI - often over a shared screen, often on a machine that can reach more than one environment - I want the terminal to say which environment I am acting against without my asking, so that a development session and a production one are never the same picture.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 overnight (sprint 13): tests/test_terminal_names_environment.py
+      13 passed. The statement is the configured label plus ''(not production)''
+      wherever publishes is false - words, so it survives NO_COLOR and a pipe;
+      production reads its label alone; no environment states nothing. Every questionary
+      prompt type the TUI uses (select, text, confirm, path) carries the toolbar
+      row. A yes/no confirmation reads ''[Claude Code sandbox (not production)]
+      Record promote?'', and production''s typed confirmation asks for the id.
+      A real `mothman supply failures` subprocess writes ''Environment: Test suite
+      (not production)'' as the first line of standard error and nothing of it
+      to standard output; `mothman env list`, which never connects, writes nothing.
+      With no environment the TUI refuses before its menu. THE TOOLBAR SPIKE,
+      in a real pty (scripts/dev/tui_drive.py, 100x30): the main menu''s bottom
+      row read '' Environment: Claude Code sandbox (not production)''. Criterion
+      9 is not exercised - the cast has not been re-recorded.'
+    implemented_by:
+    - cli/common.py::environment_statement
+    - cli/common.py::_with_environment_toolbar
+    - cli/common.py::_named
+    - cli/common.py::confirm_change
+    - cli/app.py::_state_the_environment_on_first_connection
+    - cli/app.py::cli
+    - qa_tools/common/supply_db.py::on_first_connection
+    linked_tests:
+    - tests/test_terminal_names_environment.py::TestTheStatement
+    - tests/test_terminal_names_environment.py::TestTheToolbar
+    - tests/test_terminal_names_environment.py::TestAConfirmationNamesTheEnvironment
+    - tests/test_terminal_names_environment.py::TestAOneOffCommand
+    - tests/test_terminal_names_environment.py::TestTheTuiRefusesWithoutAnEnvironment
+    - tests/test_cli_common.py
     source: 'Keith, 2026-09-28: ''this should also be expanded to the TUI and CLI'', said while signing REQ-DASH-094. Refreshed by delivery-scoper 2026-10-04, absorbing REQ-PIPE-093''s former write-time disclosure criterion. Keith answered the refresh''s question 5 on 2026-10-04 (option A).'
     acceptance_criteria:
     - THE SYSTEM SHALL show the environment's label in a persistent bottom toolbar on the TUI's main menu and on every TUI screen and prompt, for as long as each is shown.
@@ -24695,6 +24854,28 @@ requirements:
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
     - 'IF THE TOOLBAR SPIKE FAILS, PREFIX THE PROMPTS (Keith, 2026-10-04): every prompt that can change the database starts with the environment''s label, e.g. ''[Production] Record promote for cp_clients 2026-Q2?''. The spike still comes first.'
 
+    - BUILT 2026-10-05 overnight (sprint 13).
+    - 'THE TOOLBAR SPIKE PASSED, so the prompt-prefix fallback was not needed
+      for the toolbar. One finding worth keeping: questionary''s select and checkbox
+      hand their keyword arguments to two PromptSessions, one of which already
+      sets bottom_toolbar, so passing bottom_toolbar raises. Every questionary
+      prompt''s root is an HSplit (checked for select, text, confirm, path and
+      checkbox), so the toolbar is one extra row appended to the layout, hidden
+      once the prompt is answered so the scrollback keeps answers and not toolbars.'
+    - 'PROVISIONAL: A ONE-OFF COMMAND STATES THE ENVIRONMENT AT ITS FIRST CONNECTION,
+      not at start - supply_db.on_first_connection, registered by the CLI for
+      any subcommand. So a command that never connects (`env list`, `plans`, the
+      validators) says nothing, which is criterion 2''s ''that connects to a database''
+      exactly, and the line still precedes the command''s database-derived output.
+      A command printing something before it first connects prints that first.
+      Keith to confirm.'
+    - 'EVERY yes/no CONFIRMATION NAMES THE ENVIRONMENT, not only those before
+      a database write: confirm() prefixes the label wherever an environment resolves.
+      Cheaper and safer than deciding per call site which confirmations are ''a
+      change to the database''.'
+    - 'CRITERION 9 IS SATISFIED BY CONSTRUCTION, NOT YET OBSERVED: scripts/dev/record_cast.py
+      drives the real TUI, so the next recording carries the toolbar. Recorded
+      here rather than claimed as evidence.'
   - id: REQ-PIPE-110
     title: contract/calendar.yaml is the one place a delivery agreement lives
     date_written: "2026-09-28"
@@ -27050,10 +27231,10 @@ requirements:
         failing, after its partner's promotion re-checks it (TS-48, TS-49).
       why: 'The ARRIVAL shape - a quarter whose siblings arrive after one of its
         tables was promoted, re-evaluating it - occurred only in 2024-Q3 (found
-        by the sprint 11 critic, correcting this entry''s first wording), and
-        TS-56 replaced that quarter''s chain on 2026-10-05, so the generated history
-        has no knock-on re-evaluation at present; moving TS-56 to a quarter with
-        no resend restores it (morning report). What cannot be planted at all
+        by the sprint 11 critic, correcting this entry''s first wording). TS-56
+        replaced that quarter''s chain on 2026-10-05 and was moved to 2024-Q4 the
+        same night (sprint 13), which restored it: three knock-on re-evaluation
+        runs in the rebuilt history. What cannot be planted at all
         is the OUTCOME: a correction going RED on a cross-table check and then
         green, or staying red, needs the generator to aim for a verdict.'
       owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
@@ -27978,7 +28159,31 @@ requirements:
       date: '2026-10-04'
     story: As whoever maintains this pipeline across a laptop, a dev container, CI, a cloud session and Aurora, I want one committed statement of which PostgreSQL major we target, checked every time we connect, so that a version difference nothing asserts cannot silently make local and production behave differently.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 overnight (sprint 13): tests/test_postgres_version.py 18 passed
+      - the committed asset declares 16; a missing, quoted, fractional, boolean
+      or zero declaration is rejected by the hierarchy gate; a server on 17 is
+      refused naming both majors, through supply_db.connect against the real server
+      as well as in isolation; any 16.x minor passes with nothing printed; the
+      statement run is current_setting(''server_version_num'') and nothing calls
+      aurora_version(); every PostgreSQL image tag is held to the declaration,
+      the SECOND CI job included (post-build-review #87), and a file with no image
+      at all is not a silent pass. `mothman dashboard validate-hierarchy` OK against
+      the committed tree (dev container and both CI jobs on postgres:16).'
+    implemented_by:
+    - qa_tools/common/postgres_version.py::check_number
+    - qa_tools/common/postgres_version.py::declaration_errors
+    - qa_tools/common/postgres_version.py::image_tag_errors
+    - qa_tools/common/supply_db.py::connect
+    - qa_tools/common/validate_hierarchy.py::validate
+    - qa_tools/common/schemas.py::DataAsset
+    - contract/data-asset.yaml
+    linked_tests:
+    - tests/test_postgres_version.py::TestTheDeclaration
+    - tests/test_postgres_version.py::TestTheServerIsAsserted
+    - tests/test_postgres_version.py::TestEveryImageTagNamesTheDeclaredMajor
+    - tests/test_devcontainer.py
     source: 'Keith, plans/running-thoughts.md #45 (2026-09-26), first drafted as REQ-PIPE-093 criteria 7 to 9; split out by delivery-scoper 2026-10-04 to keep each requirement small. Wording of the three criteria and every decision carried forward. Keith answered the refresh''s question 6 on 2026-10-04 (option B, contract/data-asset.yaml).'
     acceptance_criteria:
     - THE SYSTEM SHALL declare the PostgreSQL major version this data asset targets in contract/data-asset.yaml.
@@ -28008,6 +28213,19 @@ requirements:
     - 'A MINOR MISMATCH IS SILENT (delivery-scoper''s recommendation, kept 2026-10-04; Keith did not ask for a warning). Minors are bug and security fixes, and a warning on every CI run - 16.15 against Aurora''s 16.8 - would be noise a person learns to ignore. REJECTED: warning on standard error.'
     - 'EVERY IMAGE TAG, NOT THE FIRST (plans/post-build-review.md #87, recorded (Keith, 2026-10-04)): tests/test_devcontainer.py::_ci_postgres_image returns only the first job with a postgres service, and test.yml has two. Folded in here as #87 asked.'
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - BUILT 2026-10-05 overnight (sprint 13). The version is read in the SAME
+      statement as REQ-PIPE-107's identity (db_identity.PROBE), the first one
+      a connection runs, so the two guards cost one round trip between them as
+      both requirements' NFRs ask. A mismatch closes the connection having done
+      nothing.
+    - 'OPTIONAL IN THE CONFIG MODEL, REQUIRED BY THE GATE: schemas.DataAsset carries
+      postgres_major as optional so its own tests can build a minimal asset; presence
+      and shape are enforced by postgres_version.declaration_errors in the hierarchy
+      gate (criterion 6), the gate that already reads contract/data-asset.yaml.
+      A model-level `required` would have put the same rule in two places.'
+    - IMAGE TAGS ARE MATCHED ON THE LEADING MAJOR of the tag (16, 16.8, 16-alpine
+      and a registry-prefixed postgres:16.13 all pass), because criterion 5 is
+      about the major and a minor or variant tag is a legitimate pin.
   - id: REQ-DASH-148
     title: A dataset whose supply could not be loaded reads red for the period, saying so, through its existing failed-load item
     date_written: '2026-10-04'

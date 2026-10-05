@@ -411,19 +411,22 @@ def _from_loads(skip: frozenset = frozenset()) -> list[Item]:
     # A PERSON'S REJECTION SETTLES IT (REQ-PIPE-153 criterion 4), derived
     # from the decision log at read time - never by editing the load
     # record (criterion 3).
-    for record in dataset_blockers.unsettled_failures():
+    for record, opened_at in dataset_blockers.unsettled_failures_opened():
         if (record.dataset_id, record.physical) in skip:
             continue
         agency, collection = _scope_of(record.dataset_id)
+        reason = (record.reason or "").rstrip()
         items.append(Item(
             kind=FAILED_LOAD, severity=NEEDS_ACTION, blocking=True,
             headline=f"{record.physical} could not be loaded",
             detail=(f"The load of {record.physical} from delivery "
                      f"{record.delivery!r} failed"
-                     + (f": {record.reason}" if record.reason else ".")
+                     + (f": {reason}" + ("" if reason.endswith(".") else ".")
+                        if reason else ".")
                      + " Nothing can read the table, so this supply has no verdict."),
             agency_id=agency, collection_id=collection, dataset_id=record.dataset_id,
-            observed_at=record.recorded_at,
+            # FROM THE RECEIPT, as its blocker is (#118 D-B).
+            observed_at=opened_at,
             responses=("reject the supply",
                         "fix the fault and reprocess the delivery")))
     return items

@@ -78,6 +78,57 @@ class NotInteractive(click.ClickException):
         )
 
 
+def environment_statement() -> str | None:
+    """Which environment this terminal is acting against, in the dashboard's
+    own words (REQ-TEST-114 criteria 5 and 7): the label from
+    contract/environments.yaml for the environment actually resolved, plus
+    'not production' wherever it does not publish - words, never colour
+    alone, so they survive NO_COLOR, a pipe and a dumb terminal (criterion
+    6). None when no environment resolves. Reads configuration and one
+    variable, never the database (NFR: no per-command cost)."""
+    from qa_tools.common import environments
+
+    try:
+        env = environments.current_or_none()
+    except environments.EnvironmentError_:
+        return None
+    if env is None:
+        return None
+    return f"Environment: {env.label}" + ("" if env.publishes else " (not production)")
+
+
+def _with_environment_toolbar(question):
+    """A persistent bottom toolbar naming the environment, on every prompt
+    for as long as it is shown (REQ-TEST-114 criterion 1).
+
+    APPENDED TO THE LAYOUT rather than passed as `bottom_toolbar`: questionary's
+    select and checkbox hand their keyword arguments to two PromptSessions,
+    one of which already sets bottom_toolbar, so the keyword raises. Every
+    questionary prompt's root is an HSplit (checked 2026-10-05 for select,
+    text, confirm, path and checkbox), so one extra row works for all five.
+    It disappears once the prompt is answered, so the scrollback keeps the
+    answer and not a stack of toolbars."""
+    statement = environment_statement()
+    if statement is None:
+        return question
+    from prompt_toolkit.filters import IsDone
+    from prompt_toolkit.layout import ConditionalContainer, HSplit, Window
+    from prompt_toolkit.layout.controls import FormattedTextControl
+
+    application = getattr(question, "application", None)
+    root = application.layout.container if application is not None else None
+    if isinstance(root, HSplit):
+        root.children.append(ConditionalContainer(
+            Window(FormattedTextControl([("class:bottom-toolbar.text", f" {statement} ")]),
+                   height=1, style="class:bottom-toolbar"),
+            filter=~IsDone()))
+    return question
+
+
+def _ask(question):
+    return _with_environment_toolbar(question).ask()
+
+
 def require_tty(flag_hint: str) -> None:
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         raise NotInteractive(flag_hint)
@@ -95,7 +146,7 @@ def select(message: str, choices: list[str], flag_hint: str) -> str | None:
     prompt types, only Ctrl-C/Ctrl-Q; this docstring used to claim
     otherwise)."""
     require_tty(flag_hint)
-    answer = questionary.select(message, choices=[*choices, BACK], style=_QMARK_STYLE).ask()
+    answer = _ask(questionary.select(message, choices=[*choices, BACK], style=_QMARK_STYLE))
     if answer is None or answer == BACK:
         return None
     return answer
@@ -111,7 +162,7 @@ def path_prompt(message: str, flag_hint: str) -> str | None:
     this - same real gap as select()'s own docstring above, questionary
     never binds Escape in any of its prompt types."""
     require_tty(flag_hint)
-    answer = questionary.path(message, style=_QMARK_STYLE).ask()
+    answer = _ask(questionary.path(message, style=_QMARK_STYLE))
     return answer or None
 
 
@@ -126,8 +177,17 @@ def text_prompt(message: str, flag_hint: str) -> str | None:
     that as "go back" is both truer and kinder than refusing them.
     """
     require_tty(flag_hint)
-    answer = questionary.text(message, style=_QMARK_STYLE).ask()
+    answer = _ask(questionary.text(message, style=_QMARK_STYLE))
     return (answer or "").strip() or None
+
+
+def _named(message: str) -> str:
+    """A confirmation names the environment in the same prompt (REQ-TEST-114
+    criterion 4): `[Sandbox (not production)] Record promote ...?`."""
+    statement = environment_statement()
+    if statement is None:
+        return message
+    return f"[{statement.removeprefix('Environment: ')}] {message}"
 
 
 def confirm(message: str, *, yes: bool, default: bool = False,
@@ -139,8 +199,53 @@ def confirm(message: str, *, yes: bool, default: bool = False,
     if yes:
         return True
     require_tty(flag_hint)
-    answer = questionary.confirm(message, default=default, style=_QMARK_STYLE).ask()
+    answer = _ask(questionary.confirm(_named(message), default=default, style=_QMARK_STYLE))
     return bool(answer)
+
+
+def _ask_text(message: str) -> str | None:
+    """One line of free text from the person at the terminal."""
+    return _ask(questionary.text(message, style=_QMARK_STYLE))
+
+
+def confirm_change(message: str, *, yes: bool, default: bool = False,
+                   flag_hint: str = "pass --yes") -> bool:
+    """The ONE confirmation before a person changes the database by hand from
+    the terminal (REQ-PIPE-093 criteria 4 to 7).
+
+    WHERE THE STATED ENVIRONMENT DECLARES `confirm_changes` - production
+    today, decided from that property and never from the word - the person
+    TYPES the environment's id in place of the yes or no. Nothing skips it:
+    not --yes, not any other flag or variable (criterion 6), and with no
+    terminal there is nobody to type it, so the change is refused rather
+    than made. A mismatch records nothing and says so (criterion 7).
+    Everywhere else this is the ordinary confirm(), --yes and all.
+
+    ASKED ONCE PER FLOW: a caller making several changes in one flow asks
+    once, before the first.
+
+    WHAT NEVER ASKS, stated here because criterion 9 asks for each
+    exemption to be stated beside the code: the pipeline's own filing and
+    promotion (no person, no terminal - they never call this); scripted
+    playback (REQ-GEN-135, scripted_decisions._apply calls the decision path
+    directly, and a bootstrap in production must stay unattended); a decision
+    arriving through the GitHub route (its own confirmation is the ticket
+    reply); and a processing pass with no terminal attached (REQ-PIPE-151).
+    """
+    from qa_tools.common import environments
+
+    env = environments.current()
+    if not env.confirm_changes:
+        return confirm(message, yes=yes, default=default, flag_hint=flag_hint)
+    require_tty(f"type {env.id!r} at a terminal - in the {env.id!r} environment a change "
+                f"made by hand cannot be confirmed by a flag")
+    console.print(f"[bold]{message}[/bold]")
+    typed = (_ask_text(f"This changes the {env.label} database. Type {env.id} to confirm:")
+             or "").strip()
+    if typed != env.id:
+        console.print(f"Did not match {env.id!r} - nothing recorded.", style="yellow")
+        return False
+    return True
 
 
 def report_recorded(run_id: str, count: int) -> None:
@@ -448,6 +553,12 @@ def _file_or_trial(paths, collection_id, run_id_prefix, *, keep, route, original
                    storage_times) -> hand_filing.Filed:
     if not decide_keep(paths, keep=keep):
         return _as_trial(paths)
+    # A HAND-FILING IN AN ENVIRONMENT THAT CONFIRMS CHANGES is typed for
+    # (REQ-PIPE-093 criterion 4): --commit decides to keep it, and is not
+    # allowed to be the confirmation too (criterion 6). yes=True because
+    # everywhere else keeping was already confirmed above.
+    if not confirm_change("File this supply as a real delivery?", yes=True):
+        raise click.ClickException("not filed - the environment's id was not typed.")
     # WHO, AND WHEN IT WAS ORIGINALLY RECEIVED - both settled before
     # anything is written (REQ-PIPE-147 criterion 4, REQ-PIPE-103 criteria
     # 9-17). A refusal here files nothing and offers no trial: the supply

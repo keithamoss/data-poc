@@ -143,8 +143,8 @@ class TestAFileThatCannotBeLoaded:
                       delivery_name="drop-1")
         (failed,) = load_log.failures()
         assert failed.reason == (
-            "bad.csv failed the file check fields_per_row: 1 row has a different number "
-            "of fields from the header; the first is line 3, with 4 where 2 were expected")
+            "bad.csv failed the file check Fields per row: 1 row has a different number "
+            "of fields from the header; the first is line 3, with 4 where 2 were expected.")
         assert "Error tokenizing" not in failed.reason, "the parser's own words"
         out, err = capfd.readouterr()
         assert "SECRETNAME" not in out

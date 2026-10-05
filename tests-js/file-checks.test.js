@@ -33,6 +33,34 @@ describe("the file attempt on show", () => {
     expect(w.fileAttemptInPlaceOn(fc, "2026-01-01")).toBe(null);
   });
 
+  it("compares receipt INSTANTS, not their text, across UTC offsets (#118 D-A)", () => {
+    // 11:00 Perth stored +08:00, then 14:04 Perth stored +00:00, same day.
+    const early = {...point(37, "2026-09-08", "green"), receivedAt: "2026-09-08T11:00:00+08:00"};
+    const late = {...point(39, "2026-09-08", "green"), receivedAt: "2026-09-08T06:04:51+00:00"};
+    const two = fileChecks([[early, early, early], [late, late, late]]);
+    const w = withFileChecks(two);
+    expect(w.fileAttemptInPlaceOn(two, "2026-09-08").attempt).toBe(39);
+  });
+
+  it("lets a screen reader hear the status and the finding (#118 D-D)", () => {
+    const w = withFileChecks(fc);
+    const root = w.document.createElement("div");
+    root.innerHTML = w.fileSectionHtml({id: "cp-carers"}, "2026-01-20");
+    w.wireFileSection(root, {}, {}, {id: "cp-carers", fileChecks: fc});
+    const btn = root.querySelector('.file-check[data-check="fields_per_row_file"]');
+    // An aria-label REPLACES the button's name, hiding the pill and finding.
+    expect(btn.hasAttribute("aria-label")).toBe(false);
+    expect(btn.textContent).toContain("Line 3 has 2 fields.");
+    expect(btn.textContent).toContain("view its result for each file received");
+  });
+
+  it("does not say a refused file never changes the status below (#118 D-G)", () => {
+    const w = withFileChecks(fc);
+    const html = w.fileSectionHtml({id: "cp-carers"}, "2026-01-20");
+    expect(html).not.toContain("never change the status");
+    expect(html).toContain("was not loaded");
+  });
+
   it("shows a refused file with the failed check open and named", () => {
     const w = withFileChecks(fc);
     const html = w.fileSectionHtml({id: "cp-carers"}, "2026-01-20");

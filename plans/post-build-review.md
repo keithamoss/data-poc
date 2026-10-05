@@ -5807,3 +5807,70 @@ twice. It deliberately did not re-find the `TypeError`.
       TS-44's shape, unplanted. `load()` defaults a script's `supply` and
       `after_hours` silently and `validate` crashes on a non-number (minor,
       open). Determinism across two replays (criterion 7) was not verified.
+
+118. **[in-progress, 2026-10-05]** **[QA checks & contract]** **The delivery
+    critic on sprint 12 (4305585, f8f209e)** - file checks (REQ-QAC-096),
+    their page section (REQ-DASH-097), TS-12/TS-56, and #117's D1-D4. It
+    reviewed an exact archive against a copy of the rebuilt deployment and
+    drove the built page in a real browser. Each finding was checked
+    against the code before it was written here; every fix had a failing
+    test first, confirmed failing.
+    - **D-A (MEDIUM), FIXED**: the date page chose the newest file by
+      comparing receipt times AS TEXT, and receipts carry different UTC
+      offsets (injected supplies +08:00, the rest +00:00) - so on BDM
+      2026-09-08 it showed 11:00 Perth's file over 14:04's. Now compared as
+      instants (tests-js/file-checks.test.js), and the panel dates a receipt
+      on the asset's calendar rather than by slicing the stored string
+      (tests/test_file_check_panel.py, which is also the panel's first
+      Python test).
+    - **D-B (MEDIUM), FIXED**: on TS-12's own date the page said "could not
+      be loaded ... until a person resolves it" and directly below "Nothing
+      is waiting for a person here". The blocker opened at the supply's
+      receipt (REQ-DASH-148 criterion 3) but the outstanding ITEM was
+      stamped with the load record's wall clock - the night of the rebuild -
+      so the page dropped it as not yet observed. Both now take the instant
+      from one function, `dataset_blockers.refused_opened_at`. Not
+      re-routed to Keith: criterion 3 already says receipt, so this is the
+      item catching up with a signed criterion rather than a new decision.
+    - **D-C (LOW-MEDIUM), FIXED**: staging a trial or reference run screened
+      its file and registered a `qa.run` that nothing completed, so
+      `incomplete_runs()` listed it as crashed for ever. `trial.discard` now
+      removes the file-check rows it added and the run row when that is all
+      it holds; a trial whose own checks were recorded keeps them.
+    - **D-D (LOW, accessibility), FIXED**: each file-check row's aria-label
+      replaced its accessible name, so a screen reader heard neither the
+      status nor the finding. The hint is now sr-only text inside the
+      button. The DATA-check rows use the same aria-label pattern (template
+      ~5500) and were NOT changed tonight - same defect, older code; open.
+    - **D-E (LOW, privacy edge), HALF FIXED, HALF FOR KEITH**: (a) FIXED - a
+      repeated header name the contract does not list may be a row value,
+      so it is now counted ("1 column name the contract does not list"),
+      never quoted (criterion 14). (b) FOR KEITH - the header-row check
+      passes when the first line names ANY contract column, so a headerless
+      file whose first row holds a value equal to a column name passes, and
+      the loader takes that row for the names: a false green. A "more than
+      half" rule was tried and REVERTED the same night: it refused a file
+      for MISSING columns, which is a data check's question (REQ-QAC-096
+      criterion 2), and broke every test fixture whose header is a subset.
+      What makes a first line "a header" is a design question.
+    - **D-F (LOW), FIXED**: Python's csv field limit (128 KiB) refused a
+      file the loader would read, reported as "could not be split". The
+      limit is lifted; that branch now has a test.
+    - **D-G (LOW, wording), FIXED**: a refusal names the check as the page
+      does ("Fields per row", not `fields_per_row`) and ends its sentence,
+      so the item no longer reads "...were expected Nothing can read"; a
+      refused file's section no longer claims its checks "never change the
+      status of the checks below" beside a red dataset. FOLLOW-ON, caught by
+      the gate the same night: ending the reason's sentence made the
+      blocker, which adds its own full stop, read "were expected.. Nothing" -
+      fixed with a failing test first (tests/test_dataset_blockers.py).
+    - **D-H (LOW), FIXED**: `missing_tools` counted file-check rows, so a
+      refused file's dataset was reported missing every data tool.
+    - **#117 D1 CAVEAT, FOR KEITH (privacy)**: `people.display_name` falls
+      back to the RECORDED identity for anyone not in contract/people.yaml,
+      so an unlisted person's email would be published on the page. Not
+      changed: whether to show "someone not on the list", refuse, or keep
+      the identity is a privacy call.
+    - **NOT VERIFIED BY THE CRITIC**: a refused BIRTH REGISTRATIONS file end
+      to end (none exists in the history); the authoring-rules compliance
+      of the six checks' prose; D3/D4 at runtime.

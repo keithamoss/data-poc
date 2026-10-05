@@ -61,6 +61,11 @@ def _deployment_dsn():
     return getattr(conftest, "DEPLOYMENT_SUPPLY_DSN", None)
 
 
+def _deployment_environment():
+    import conftest
+    return getattr(conftest, "DEPLOYMENT_ENVIRONMENT", None)
+
+
 @pytest.fixture(autouse=True)
 def reads_the_deployments_history(supply_dsn, monkeypatch):
     """Point THIS FILE's own reads at the deployment's database.
@@ -80,6 +85,8 @@ def reads_the_deployments_history(supply_dsn, monkeypatch):
     dsn = _deployment_dsn()
     if dsn:
         monkeypatch.setenv("MOTHMAN_SUPPLY_DSN", dsn)
+        import conftest
+        conftest.use_deployment_environment(monkeypatch)
 
 
 @pytest.fixture(scope="session")
@@ -114,6 +121,9 @@ def built_dashboard_html(supply_dsn) -> Path:
             "longer enough.")
 
     env = {**os.environ, "MOTHMAN_SUPPLY_DSN": dsn}
+    # The environment the deployment's database is marked for (REQ-PIPE-107).
+    if _deployment_environment():
+        env["MOTHMAN_ENVIRONMENT"] = _deployment_environment()
     for module in _BUILD_STEPS:
         subprocess.run([sys.executable, "-m", *module], cwd=ROOT, check=True, env=env)
     assert DASHBOARD_HTML.exists()
@@ -3730,7 +3740,11 @@ class TestFileChecksOnThePage:
         assert "file check" in section.inner_text().lower()
         ds = self._dataset(clean_page, "cp-clients")
         assert ds["status"] == "red"
-        assert ds["blocked"] and "fields_per_row" in ds["blocked"]["reason"]
+        # By the check's NAME, in one sentence (post-build-review #118 D-G).
+        assert ds["blocked"] and "Fields per row" in ds["blocked"]["reason"]
+        assert ".." not in ds["blocked"]["reason"]
+        # Its waiting item shows on the scenario's own date too (#118 D-B).
+        assert "Nothing is waiting for a person here" not in clean_page.inner_text("body")
         assert clean_page.evaluate(
             f"""() => DATA.agencies.find(a => a.id === "{self.CP}").status""") == "red"
 

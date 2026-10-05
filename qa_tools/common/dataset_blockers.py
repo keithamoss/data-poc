@@ -240,17 +240,14 @@ def _failed_loads(db) -> list[Blocker]:
                 continue
             reloaded = next((r.recorded_at for r in history[i + 1:] if r.loaded), None)
             rejection = rejected.get((record.dataset_id, parts[1]))
-            received = db.execute(
-                "SELECT received_at FROM qa.delivery_file WHERE delivery = ? AND dataset_id = ? "
-                "ORDER BY received_instant, receipt_sequence LIMIT 1",
-                [record.delivery, record.dataset_id]).fetchall()
             resolved = _earlier(reloaded, rejection["at"] if rejection else None)
             out.append(Blocker(
                 kind=REFUSED, dataset_id=record.dataset_id,
                 supply=f"{record.dataset_id}@{parts[1]}",
-                opened_at=received[0][0] if received else record.recorded_at,
+                opened_at=refused_opened_at(db, record),
                 resolved_at=resolved,
-                reason=(f"The supply could not be loaded: {record.reason or 'no reason was recorded'}."
+                reason=(f"The supply could not be loaded: "
+                        f"{(record.reason or 'no reason was recorded').rstrip().rstrip('.')}."
                         f" Nothing can read the table, so nothing is checked."),
                 delivery=record.delivery,
                 rejected=(rejection if rejection and resolved == rejection["at"] else None)))
@@ -290,6 +287,28 @@ def refused_in_a_contest(conn=None) -> frozenset[tuple[str, str]]:
 
     with delivery_log._db(conn) as db:
         return frozenset(_refused_in_contests(db))
+
+
+def refused_opened_at(db, record) -> str:
+    """When a refused load's signal opens: the supply's own receipt
+    (REQ-DASH-148 criterion 3), falling back to the load record only where
+    no receipt was recorded. ONE answer for the blocker and the outstanding
+    item - two answers is how the item went missing on the scenario's own
+    date while the blocker showed (post-build-review #118 D-B)."""
+    received = db.execute(
+        "SELECT received_at FROM qa.delivery_file WHERE delivery = ? AND dataset_id = ? "
+        "ORDER BY received_instant, receipt_sequence LIMIT 1",
+        [record.delivery, record.dataset_id]).fetchall()
+    return received[0][0] if received else record.recorded_at
+
+
+def unsettled_failures_opened(conn=None) -> list[tuple]:
+    """unsettled_failures(), each with the instant its signal opens."""
+    from qa_tools.common import delivery_log
+
+    with delivery_log._db(conn) as db:
+        return [(record, refused_opened_at(db, record))
+                for record in unsettled_failures(conn=db)]
 
 
 def unsettled_failures(conn=None) -> list:

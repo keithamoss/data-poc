@@ -295,6 +295,26 @@ class TestARealTrialStagesAndVanishes:
             supply_db.drop_run_schemas(conn, "run_999")
 
 
+    def test_a_discarded_reference_run_is_not_left_as_a_crashed_run(
+            self, supply_dsn, bdm_delivery_dirs):
+        """post-build-review #118 D-C: staging screened the file and
+        registered a qa.run for its file-check results; discarding the
+        trial left that run - never completed - in the crashed-run list."""
+        from qa_tools.bdm import build_per_run_warehouses
+        from qa_tools.common import qa_store
+
+        run_id = trial.trial_run_id(reference=True)
+        build_per_run_warehouses.build_one(run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
+        with supply_db.connect(label="test-trial") as conn:
+            trial.discard(conn, run_id)
+            assert not conn.execute(
+                f'SELECT 1 FROM "{qa_store.SCHEMA}".run WHERE run_key = ?', [run_id]).fetchall()
+            assert not conn.execute(
+                f'SELECT 1 FROM "{qa_store.SCHEMA}".check_result WHERE run_key = ?',
+                [run_id]).fetchall()
+            assert run_id not in qa_store.incomplete_runs(conn)
+
+
 class TestATrialIsNeverSilentlyCheckedAgainstPromotedData:
     """A latent false green, found by Keith asking the right question
     (2026-09-27): "how do the trial schemas work with cross-table
@@ -411,3 +431,4 @@ class TestASingleTableRunRecordsAllSixTablesItRead:
             conn.execute(
                 f'DELETE FROM "{supply_db.STAGING_SCHEMA}"._resolutions '
                 f"WHERE run_id = '{earlier}'")
+

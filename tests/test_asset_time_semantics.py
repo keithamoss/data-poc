@@ -323,18 +323,26 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         night), to 105 / 15 / 15 / 9 over 144. Procedure first: 59
         deliveries, zero `handfiled-*`. Each scenario replaces its
         Child Protection period's chain with one delivery of all six
-        tables at 09:00 - 2025-Q2 (TS-12) and 2024-Q3 (TS-56) - so their
+        tables at 09:00 - 2025-Q2 (TS-12) and 2024-Q3 (TS-56, since moved) - so their
         six ordinary first arrivals are replaced by six injected ones of
         the same status, and 2024-Q3's six-table resend of 13 August,
         late, is gone. No arrival kept under the same id changed.
+
+        AND BACK TO 105 / 15 / 21 / 9 over 150 WHEN TS-56 MOVED (sprint 13,
+        2026-10-05). Procedure first: 60 deliveries, zero `handfiled-*`.
+        2024-Q3 was the only quarter whose late siblings re-evaluated a
+        promoted table (REQ-PIPE-121), so TS-56 moved one quarter later, to
+        2024-Q4, a quarter with no resend. 2024-Q3's six-table resend of 13
+        August is back - six late arrivals - and 2024-Q4's six ordinary first
+        arrivals are six injected ones of the same status.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"on_time": 105, "early": 15, "late": 15, "unfiled": 9}
-        assert sum(counts.values()) == 144
+        assert counts == {"on_time": 105, "early": 15, "late": 21, "unfiled": 9}
+        assert sum(counts.values()) == 150
 
 
 class TestTheClassificationBoundaries:

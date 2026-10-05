@@ -50,6 +50,7 @@ if command -v pg_isready >/dev/null 2>&1; then
         >/dev/null 2>&1 && say "Created the 'supply' database."
     fi
     say "PostgreSQL is up."
+    PG_UP=1
   else
     say "WARNING: no PostgreSQL. The suite will refuse to start - see CLAUDE.md."
   fi
@@ -93,6 +94,22 @@ if [ -e /opt/pw-browsers/chromium ]; then
 else
   uv run playwright install chromium >/dev/null 2>&1 && say "Installed Chromium." \
     || say "WARNING: no Chromium - the e2e module will error."
+fi
+
+# --- Is the warehouse marked as this sandbox's? (REQ-PIPE-107) --------
+# Every connection checks the database's recorded identity and refuses one
+# with none, so the sandbox marks its own - a no-op once it is. A database
+# marked as something else is reported, never re-marked: that is a person's
+# decision (`mothman env mark --replacing ...`).
+if [ "${PG_UP:-}" = "1" ]; then
+  if MOTHMAN_ENVIRONMENT=sandbox \
+     MOTHMAN_SUPPLY_DSN="postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/supply" \
+     uv run mothman env mark --confirm sandbox >/dev/null 2>&1; then
+    say "Warehouse is marked as this sandbox's."
+  else
+    say "WARNING: could not mark the warehouse as 'sandbox' - run"
+    say "'uv run mothman env mark' to see why."
+  fi
 fi
 
 # --- Is there any data here? ------------------------------------------

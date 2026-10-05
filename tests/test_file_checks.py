@@ -175,7 +175,8 @@ def test_each_failure_refuses_the_file_and_is_recorded(staging, fault, data):
     assert failed and failed[0][0].endswith(f".{fault}_file")
     assert {r[2] for r in rows} == {qa_store.FILE_SCOPE} and {r[3] for r in rows} == {"file"}
     (record,) = load_log.failures()
-    assert f"file check {fault}" in record.reason and "supply.csv" in record.reason
+    name = {d.check: d.name for d in fc.definitions()}[fault]
+    assert f"file check {name}:" in record.reason and "supply.csv" in record.reason
     # Against the delivery, the file and the attempt (criteria 7, 8).
     assert {(r[5], r[6]) for r in rows} == {("drop-1", "supply.csv")}
     assert len({r[4] for r in rows}) == 1 and rows[0][4] is not None
@@ -293,3 +294,38 @@ class TestNeverInAStatus:
 
         results = [self._record("encoding_file", "pass")]
         assert promotion.status_of("birth-registrations", results, reads={}) is None
+
+
+class TestCriticFindings118:
+    """post-build-review #118 D-E, D-F and D-G, each confirmed failing first."""
+
+    def test_a_header_with_one_renamed_column_is_still_a_header(self, tmp_path):
+        f = _by_check(fc.evaluate(_write(tmp_path, b"id,full_name,born\n1,Ann,2020\n"), COLUMNS))
+        assert f[fc.HEADER_ROW].status == fc.PASS
+
+    def test_a_repeated_name_outside_the_contract_is_never_quoted(self, tmp_path):
+        """D-E's privacy half: a repeated 'header' name the contract does not
+        know may be a row value, so it is counted, never quoted."""
+        f = _by_check(fc.evaluate(
+            _write(tmp_path, b"id,name,born,Citizen,Citizen\n1,Ann,2020,x,y\n"), COLUMNS))
+        assert f[fc.HEADER_NAMES_UNIQUE].status == fc.FAIL
+        assert "Citizen" not in f[fc.HEADER_NAMES_UNIQUE].words
+        assert "1 column name the contract does not list" in f[fc.HEADER_NAMES_UNIQUE].words
+
+    def test_a_long_legitimate_field_does_not_refuse_the_file(self, tmp_path):
+        """D-F: Python's csv field limit (128 KiB) refused what the loader loads."""
+        big = b"x" * 200_000
+        f = _by_check(fc.evaluate(_write(tmp_path, b"id,name,born\n1," + big + b",2020\n"),
+                                  COLUMNS))
+        assert f[fc.FIELDS_PER_ROW].status == fc.PASS
+
+    def test_an_unsplittable_line_is_named(self, tmp_path):
+        """The csv.Error branch had no test at all."""
+        f = _by_check(fc.evaluate(_write(tmp_path, b'id,name,born\n1,"Ann,2020\n'), COLUMNS))
+        assert f[fc.FIELDS_PER_ROW].status == fc.FAIL
+
+    def test_the_refusal_names_the_check_as_the_page_does(self):
+        """D-G: the reason said 'fields_per_row', the page 'Fields per row'."""
+        finding = fc.Finding(fc.FIELDS_PER_ROW, fc.FAILURE, fc.FAIL, "line 3 is short")
+        assert fc.reason_for(finding, "cp_clients.csv") == \
+            "cp_clients.csv failed the file check Fields per row: line 3 is short."

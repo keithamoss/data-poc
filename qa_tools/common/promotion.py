@@ -943,6 +943,10 @@ def after_runs(found_arrivals, results: Sequence[dict], *,
                effective_at: str) -> AfterRun:
     """Run the promotion step over a whole batch, one arrival at a time.
 
+    NEVER ASKS FOR A TYPED ENVIRONMENT ID (REQ-PIPE-093 criterion 9): the
+    pipeline's own filing and promotion are rule-driven and unattended, and
+    a production run that stopped for a person would never finish.
+
     The batch counterpart to after_run(), and the shape both
     orchestrators call. Returns the three lists MERGED across arrivals,
     because what an operator wants at the end of a run is "what got

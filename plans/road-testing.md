@@ -2378,6 +2378,25 @@ judgement about who reads the page rather than about the rule.
         the generated history no longer contains a knock-on re-evaluation
         (REQ-PIPE-121) at all. The fix is moving TS-56 to a quarter with
         no resend, in the next batched rebuild (sprint 13's).
+      - SPRINT 13: REQ-PIPE-093 (stated environment; criterion 15 waits on
+        REQ-PIPE-151), REQ-PIPE-107, REQ-PIPE-146 and REQ-TEST-114 built;
+        sprint 26 now reads `blocked` on REQ-PIPE-151. THREE PROVISIONALS
+        FOR YOU, each recorded in its requirement's decisions:
+        (1) a database's identity is two database-level settings read from
+        the catalogue, not a table - so a reset keeps it and a DSN cannot
+        fake it (REQ-PIPE-107);
+        (2) `mothman env mark --confirm <id>` counts as typing the id, for
+        the hook, CI and dev container, which have no terminal (107);
+        (3) a one-off command names its environment at its FIRST DATABASE
+        CONNECTION rather than at start, so commands that never connect stay
+        quiet (REQ-TEST-114).
+        THINGS THAT WILL BITE ONCE: every existing database now refuses until
+        marked - `mothman env mark` - and CI marks its own as a new step. The
+        TS-56 move is in: -9 -> -8, a clean quarter, giving the red chain at
+        -9 (the knock-on re-evaluation) back.
+        The sprint 12 critic is written up as post-build-review #118: seven
+        findings fixed, two for you (D-E's "what is a header row" and #117
+        D1's email fallback for someone not in people.yaml).
  All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.

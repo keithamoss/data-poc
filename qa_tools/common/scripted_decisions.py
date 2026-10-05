@@ -242,6 +242,9 @@ def _apply(t: Timed) -> None:
         try:
             with _connect() as conn:
                 key = fd.consequences(conn, ask()).key
+                # NO TYPED ENVIRONMENT ID (REQ-PIPE-093 criterion 9): scripted
+                # playback is unattended, and the published PoC is bootstrapped in
+                # production from synthetic data - a prompt would make it unbootable.
                 fd.apply(ask(key or None), effective_at=t.at.isoformat(), conn=conn)
         except Exception as exc:  # noqa: BLE001 - criterion 6: ANY failure stops the replay
             raise ScriptRefused(

@@ -385,3 +385,21 @@ class TestTheEvidentlyCheckRegistryAgreesWithTheHierarchy:
         for check_id in ROW_COUNT_GROWTH_CHECK_IDS.values():
             assert check_id in CHECK_LIFECYCLE, check_id
             assert CHECK_LIFECYCLE[check_id]["failure_indicates"]
+
+
+def test_a_dataset_with_only_file_checks_is_not_missing_its_data_tools(
+        recorded, clean_qa_history):
+    """post-build-review #118 D-H: a refused file records file-check rows
+    and nothing else, and the dataset was then reported as missing every
+    data tool - which is what refusing a file means, not a crashed run."""
+    from qa_tools.common import qa_store
+
+    qa_store.record_file_results(
+        clean_qa_history, "r1",
+        [{"dataset_id": "cp-placements", "status": "fail",
+          "check_id": "data-asset-1.child-protection-family-support.child-protection."
+                      "cp-placements.fields_per_row_file"}],
+        agency_id=AGENCY, collection_id=COLLECTION, supply_state="staged",
+        load_attempt=1, delivery="d", filename="cp_placements.csv")
+    missing = reader.missing_tools(AGENCY, COLLECTION, "r1")
+    assert not [m for m in missing if m.startswith("cp-placements/")], missing

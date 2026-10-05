@@ -91,13 +91,17 @@ class TestTheCommand:
         """Criterion 22."""
         from cli.env import env_group
 
-        monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
         with supply_db.connect(label="test-reset") as conn:
             qa_store.ensure_schema(conn)
             _history(conn)
+        # Only the command acts as production: this database is marked
+        # `test`, so anything else would be refused by the identity check
+        # (REQ-PIPE-107) before it got as far as the rule under test.
+        monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
         result = CliRunner().invoke(env_group, ["reset-synthetic"],
                                     input=synthetic_reset.confirmation_phrase() + "\n")
         assert result.exit_code != 0 and "production" in result.output
+        monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "test")
         with supply_db.connect(label="test-reset") as conn:
             assert bootstrap.holds_history(conn)
 

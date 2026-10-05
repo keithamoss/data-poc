@@ -643,7 +643,10 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-56",
         dataset_id="cp-carers",
-        anchor=-9,
+        # -8, a clean quarter (no resupply chain), MOVED FROM -9 on 2026-10-05:
+        # -9 is a red chain, and replacing it removed the only knock-on
+        # re-evaluation (REQ-PIPE-121) the generated history had.
+        anchor=-8,
         config="quarterly, Feb/May/Aug/Nov. cp_carers arrives with its columns in "
                "another order than the contract's; everything else as usual.",
         arrivals=(

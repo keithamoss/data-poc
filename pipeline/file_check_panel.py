@@ -17,7 +17,7 @@ own receipt so the page can pick the attempt in force on the date on show.
 """
 from __future__ import annotations
 
-from qa_tools.common import dataset_status, file_checks, hierarchy
+from qa_tools.common import asset_time, dataset_status, file_checks, hierarchy
 from qa_tools.common import qa_results_reader as reader
 
 #: The pseudo-column's key in a URL (`/column/_file/check/<key>`). A leading
@@ -39,7 +39,9 @@ def for_dataset(dataset_id: str, conn=None) -> dict:
         received = r["received_at"] or ""
         by_check.setdefault(r["check_id"], []).append({
             "run_id": r["run_id"],
-            "run_date": received[:10],
+            # THE ASSET'S DATE of the receipt, not the stored string's
+            # (#118 D-A): a +00:00 receipt after 16:00 UTC is the next day here.
+            "run_date": asset_time.local_date(received).isoformat() if received else "",
             "receivedAt": received,
             "status": dataset_status._DASHBOARD_STATUS_BY_TOOL_STATUS.get(r["status"], "red"),
             "finding": r["finding"],

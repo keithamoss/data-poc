@@ -302,6 +302,25 @@ releases:
               A file that failed to load now appears in the terminal's queue
               of supplies waiting on you. Rejecting it settles it everywhere;
               promoting it is refused, since there is nothing to promote.
+          - headline: The tool refuses a database that belongs somewhere else
+            components: ["Pipeline & publishing"]
+            description: >
+              Every database now records which data asset and environment it
+              belongs to, and every command checks that against yours before it
+              does anything. A new database is marked once with mothman env
+              mark, where you type the environment's name.
+          - headline: The terminal always says which environment you are in
+            components: ["Testing & dev tooling"]
+            description: >
+              The menu and every question show the environment along the
+              bottom, a confirmation names it, and a command prints it on its
+              first line, marked "not production" unless it is.
+          - headline: One declared PostgreSQL version, checked on every connection
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              The data asset now says which PostgreSQL major it runs on. A
+              server on a different one is refused, and the configuration gate
+              fails if the dev container or CI would test against another.
       - category: Improved
         items:
           - headline: A gap in earlier periods no longer holds a supply back
@@ -446,6 +465,25 @@ releases:
               now show properly, a bare date is refused rather than recorded as
               midnight, and receipts that disagree about who filed a delivery
               are refused.
+          - headline: A file refused on its own date shows its waiting item
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              On the date a supply could not be loaded, the dataset said it was
+              waiting for a person and then that nothing was. The item now
+              counts from when the file arrived, as the red does.
+          - headline: The date page shows the file that really arrived last
+            components: ["Dashboard UI"]
+            description: >
+              Two files received the same day could be shown in the wrong
+              order, because their times were compared as text. They are now
+              compared as times, and dated in the data asset's own timezone.
+          - headline: Smaller fixes to the file checks
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              A very long legitimate field no longer refuses a file, a repeated
+              name the contract does not list is counted rather than quoted, a
+              refusal names the check as the page does, and a screen reader
+              now hears each check's status and finding.
   - date: "2026-10-04"
     summary: >
       A check that could not run now shows on the dashboard as red and

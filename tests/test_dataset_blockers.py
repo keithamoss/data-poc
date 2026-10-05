@@ -140,3 +140,38 @@ class TestOpenFromTheReceiptInstant:
         (blocker,) = record["blockers"]
         assert blocker["kind"] == "contested" and blocker["resolvedAt"] is None
         assert blocker["datasetId"] == DATASET
+
+
+class TestTheFailedLoadItemOpensAtTheReceipt:
+    """post-build-review #118 D-B (REQ-DASH-148 criterion 3): the failed-load
+    ITEM is open from the supply's receipt, as its blocker is - not from when
+    the load record happened to be written, which on a replayed history is
+    the night of the rebuild and hid the item on the scenario's own date."""
+
+    def test_its_observed_instant_is_the_receipt(self, clean):
+        _pair(names=("cp_case_workers.csv",))
+        written = (RECEIVED + timedelta(days=200)).isoformat()
+        load_log.record(DELIVERY, DATASET, f"cp_case_workers__{_key()}",
+                        load_log.FAILED, written, reason="bad header")
+        (item,) = [i for i in outstanding.survey(clean).items
+                   if i.kind == outstanding.FAILED_LOAD]
+        assert datetime.fromisoformat(item.observed_at) == RECEIVED
+
+    def test_its_reason_ends_its_sentence(self, clean):
+        """D-G: '...were expected Nothing can read the table' ran together."""
+        _pair(names=("cp_case_workers.csv",))
+        load_log.record(DELIVERY, DATASET, f"cp_case_workers__{_key()}",
+                        load_log.FAILED, RECEIVED.isoformat(), reason="bad header")
+        (item,) = [i for i in outstanding.survey(clean).items
+                   if i.kind == outstanding.FAILED_LOAD]
+        assert "bad header. Nothing can read" in item.detail
+
+    def test_the_blockers_reason_has_one_full_stop(self, clean):
+        """#118 D-G's follow-on: a recorded reason now ends its own sentence,
+        and the blocker added another - 'were expected.. Nothing'."""
+        _pair(names=("cp_case_workers.csv",))
+        load_log.record(DELIVERY, DATASET, f"cp_case_workers__{_key()}",
+                        load_log.FAILED, RECEIVED.isoformat(), reason="bad header.")
+        (blocker,) = [b for b in dataset_blockers.all_blockers(clean)
+                      if b.kind == dataset_blockers.REFUSED]
+        assert ".." not in blocker.reason and "bad header. Nothing" in blocker.reason

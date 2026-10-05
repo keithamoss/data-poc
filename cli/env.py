@@ -103,3 +103,62 @@ def reset_synthetic_command() -> None:
     # publisher role set up on it can no longer read anything.
     console.print("If a publisher role was set up, grant it again afterwards: "
                   "`mothman supply grant-publisher`.", style="dim")
+
+
+@env_group.command("mark")
+@click.option("--confirm", "typed", metavar="ENVIRONMENT_ID", default=None,
+              help="The environment id, typed on the command line - for a setup script "
+                   "with no terminal. Without it you are asked to type it.")
+@click.option("--replacing", metavar="ASSET/ENVIRONMENT", default=None,
+              help="The identity this database already carries, typed out, to replace it.")
+def mark_command(typed: str | None, replacing: str | None) -> None:
+    """Record in the database which data asset and environment it belongs to.
+
+    Every other command refuses a database whose recorded identity is missing
+    or differs from this checkout's (REQ-PIPE-107), and none of them ever
+    writes it - this is the only way it gets there. The identity written is
+    this checkout's: the data asset in contract/data-asset.yaml and the
+    environment stated in MOTHMAN_ENVIRONMENT, which you type to confirm.
+    """
+    from cli import common
+    from qa_tools.common import db_identity, environments, supply_db
+
+    try:
+        want = db_identity.expected()
+    except environments.EnvironmentError_ as exc:
+        raise click.ClickException(str(exc)) from None
+    if typed is None:
+        try:
+            common.require_tty("pass --confirm <environment id>")
+        except common.NotInteractive as exc:
+            raise click.ClickException(str(exc)) from None
+        typed = common._ask_text(
+            f"Type the environment id to mark this database as {want}") or ""
+    # TYPED, NOT DEFAULTED (criterion 2): the stated environment is what gets
+    # written, and the person has to say it back.
+    if typed.strip() != want.environment:
+        raise click.ClickException(
+            f"that did not read {want.environment!r}, so nothing was marked.")
+    with supply_db.connect(label="mothman:env-mark", for_marking=True) as conn:
+        try:
+            _, found = db_identity.read(conn)
+        except db_identity.IdentityRefused as exc:
+            found, unreadable = None, str(exc)
+        else:
+            unreadable = None
+        if found == want:
+            console.print(f"This database is already marked as {want}. Nothing changed.",
+                          style="green")
+            return
+        if found is not None or unreadable:
+            # ANOTHER IDENTITY IS NEVER OVERWRITTEN BY ACCIDENT (criterion 3):
+            # the person types out what is being replaced.
+            current = f"{found.data_asset_id}/{found.environment}" if found else "unreadable"
+            if (replacing or "").strip() != current:
+                what = (f"is already marked as {found}" if found
+                        else f"has an unreadable identity ({unreadable})")
+                raise click.ClickException(
+                    f"this database {what}. To replace it, run this again with "
+                    f"--replacing {current}. Nothing was marked.")
+        db_identity.mark(conn, want)
+    console.print(f"Marked this database as {want}.", style="green")

@@ -301,12 +301,17 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
                         console.print(f"  [bold]{line.split(chr(10))[0]}[/bold]")
             _show("\n".join(f"- {line}" for line in shown.lines),
                   title="This decision also does", style="yellow")
+        # THE FIRST CONFIRMATION OF THE FLOW is the one where a production
+        # change is typed (REQ-PIPE-093 criterion 4); a second pass here only
+        # re-confirms consequences that changed underneath it, and asking for
+        # the id again would be asking twice in one flow.
+        ask = common.confirm if previous else common.confirm_change
         previous = shown.lines
-        if not common.confirm(f"Record {_NOUN.get(operation, operation)} for {where}, "
-                              f"as {people.actor_name(actor)}?",
-                               yes=yes, default=False,
-                               flag_hint=("pass --yes --acknowledge " + shown.key
-                                          if shown.lines else "pass --yes")):
+        if not ask(f"Record {_NOUN.get(operation, operation)} for {where}, "
+                   f"as {people.actor_name(actor)}?",
+                   yes=yes, default=False,
+                   flag_hint=("pass --yes --acknowledge " + shown.key
+                              if shown.lines else "pass --yes")):
             console.print("Not recorded.", style="yellow")
             return None
         if shown.lines and not yes:

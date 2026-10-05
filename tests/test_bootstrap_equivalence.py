@@ -39,6 +39,7 @@ import psycopg
 import pytest
 
 import equiv_support
+from conftest import mark_test_database
 
 #: ON DEMAND ONLY (Keith, 2026-10-04): about 3-4 minutes of two real
 #: bootstraps, so it is deselected from every ordinary run - CI included -
@@ -123,6 +124,7 @@ def _fresh_database(name: str) -> str:
         conn.execute(f'CREATE DATABASE "{name}"')
         conn.execute(f'ALTER DATABASE "{name}" '
                      "SET idle_in_transaction_session_timeout = '15s'")
+        mark_test_database(conn, name)
     info = psycopg.conninfo.conninfo_to_dict(admin)
     info["dbname"] = name
     return psycopg.conninfo.make_conninfo(**info)

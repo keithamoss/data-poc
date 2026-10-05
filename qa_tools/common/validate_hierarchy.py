@@ -55,7 +55,7 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import hierarchy, tables_read
+from qa_tools.common import hierarchy, postgres_version, tables_read
 
 CONTRACT_DIR = Path(__file__).resolve().parent.parent.parent / "contract"
 
@@ -181,6 +181,10 @@ def reserved_table_errors(tables: list[tuple[str, str]]) -> list[str]:
 
 def validate() -> list[str]:
     errors: list[str] = []
+    # REQ-PIPE-146 criteria 5 and 6: this is the gate that already reads
+    # contract/data-asset.yaml, so the PostgreSQL declaration and the image
+    # tags held to it are checked here rather than in a gate of their own.
+    errors.extend(postgres_version.errors())
     errors.extend(reserved_name_errors(
         [(d.agency_id, d.collection_id, d.dataset_id) for d in hierarchy.all_datasets()]))
     errors.extend(reserved_table_errors(

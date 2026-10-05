@@ -58,6 +58,11 @@ class Environment:
     label: str
     description: str = ""
     publishes: bool = False
+    #: A person TYPES this environment's id before any change they make by
+    #: hand from the terminal (REQ-PIPE-093 criteria 4-8).
+    confirm_changes: bool = False
+    #: The only switch for ticketing (criterion 10).
+    ticketing: bool = False
 
 
 def _load(path: Path | str | None = None) -> list[Environment]:
@@ -86,6 +91,8 @@ def _load(path: Path | str | None = None) -> list[Environment]:
             label=entry.get("label") or env_id,
             description=(entry.get("description") or "").strip(),
             publishes=bool(entry.get("publishes")),
+            confirm_changes=bool(entry.get("confirm_changes")),
+            ticketing=bool(entry.get("ticketing")),
         ))
 
     publishing = [e.id for e in out if e.publishes]
@@ -139,3 +146,34 @@ def current_or_none(path: Path | str | None = None) -> Environment | None:
         return current(path)
     except EnvironmentError_:
         return None
+
+
+def ticket_repository() -> str | None:
+    """`owner/repo` tickets go to, from contract/data-asset.yaml - a fact
+    about the data asset, one per deployment (REQ-PIPE-093 criterion 12).
+    Never GITHUB_REPOSITORY, which names whichever repository a workflow
+    happens to run in."""
+    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+
+    doc = yaml.safe_load(Path(DATA_ASSET_YAML).read_text()) or {}
+    repo = str(doc.get("ticket_repository") or "").strip()
+    return repo or None
+
+
+def for_connection(path: Path | str | None = None) -> Environment:
+    """The stated environment, checked BEFORE any database connection opens,
+    for a read as well as a write (REQ-PIPE-093 criteria 1, 2 and 13).
+
+    Raises where nothing is stated - naming the variable and the declared
+    ids, with no default - and where the stated environment turns ticketing
+    on while the asset names no ticket repository: refused loudly, because
+    quietly running without tickets is how a production asset ends up with
+    nobody told."""
+    env = current(path)
+    if env.ticketing and not ticket_repository():
+        raise EnvironmentError_(
+            f"the {env.id!r} environment turns ticketing on, but contract/data-asset.yaml "
+            f"names no ticket_repository to open tickets in. Name it (owner/repo) or turn "
+            f"ticketing off for {env.id!r} in contract/environments.yaml.")
+    return env
+

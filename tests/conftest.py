@@ -123,7 +123,42 @@ TEST_DSN_ENV = "MOTHMAN_TEST_DSN"
 
 
 @pytest.fixture(scope="session", autouse=True)
-def supply_dsn(worker_id):
+def stated_test_environment():
+    """THE SUITE IS THE `test` ENVIRONMENT, stated here and nowhere else
+    (REQ-PIPE-093 criterion 16): a test worker's scratch database is not
+    the CI runner or the sandbox it happens to run in, and since criterion
+    1 every connection needs a stated environment. A test that wants
+    another one states it with monkeypatch, which puts this back after."""
+    import os
+
+    from qa_tools.common import environments
+
+    before = os.environ.get(environments.ENVIRONMENT_ENV)
+    # THE DEPLOYMENT'S OWN ENVIRONMENT, remembered alongside its DSN: a test
+    # that reads the deployment's history must say it is acting as the
+    # environment that database is marked for (REQ-PIPE-107), or it is
+    # refused like any other mismatch.
+    globals()["DEPLOYMENT_ENVIRONMENT"] = before
+    os.environ[environments.ENVIRONMENT_ENV] = "test"
+    yield
+    if before is None:
+        os.environ.pop(environments.ENVIRONMENT_ENV, None)
+    else:
+        os.environ[environments.ENVIRONMENT_ENV] = before
+
+
+def mark_test_database(admin_conn, name: str) -> None:
+    """Record a scratch database's identity as this asset's `test`
+    environment (REQ-PIPE-107 criterion 12), from a connection to another
+    database - the one that just created it."""
+    from qa_tools.common import db_identity, hierarchy
+
+    db_identity.mark_by_admin(admin_conn, name,
+                              db_identity.Identity(hierarchy.data_asset_id(), "test"))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def supply_dsn(worker_id, stated_test_environment):
     """ONE SUPPLY DATABASE PER TEST WORKER, in a real PostgreSQL.
 
     WHY A WHOLE DATABASE rather than a schema set per worker: the code
@@ -156,7 +191,13 @@ def supply_dsn(worker_id):
             f"locally, point it at your own server, e.g. "
             f"{TEST_DSN_ENV}=postgresql://user:pass@localhost:5432/postgres")
 
-    name = f"mothman_test_{worker_id}"
+    # A SESSION TAG, so two test sessions on one server cannot drop each
+    # other's databases: the name was the worker id alone, dropped WITH
+    # (FORCE) at the start of every session, and on 2026-10-05 a critic's
+    # run and the builder's gate killed each other's databases mid-run
+    # ("database mothman_test_gw2 does not exist"). Unset is the old name.
+    tag = "".join(c for c in os.environ.get("MOTHMAN_TEST_DB_TAG", "") if c.isalnum())[:12]
+    name = f"mothman_test_{tag + '_' if tag else ''}{worker_id}"
     with psycopg.connect(admin, autocommit=True) as conn:
         # FORCE, because a leftover connection from a crashed run would
         # otherwise block the drop and fail the whole session with an
@@ -180,6 +221,11 @@ def supply_dsn(worker_id):
         # database rather than by the application.
         conn.execute(
             f'ALTER DATABASE "{name}" SET idle_in_transaction_session_timeout = \'15s\'')
+        # MARKED AS THE `test` ENVIRONMENT (REQ-PIPE-107 criterion 12): every
+        # connection checks the database's recorded identity, a test
+        # worker's included - the suite is where a misdirected DSN has
+        # already done real damage, so it is not exempt.
+        mark_test_database(conn, name)
 
     info = psycopg.conninfo.conninfo_to_dict(admin)
     info["dbname"] = name
@@ -251,6 +297,7 @@ def private_supply_dsn(supply_dsn, request):
     with psycopg.connect(admin, autocommit=True) as conn:
         conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
         conn.execute(f'CREATE DATABASE "{name}"')
+        mark_test_database(conn, name)
 
     info = psycopg.conninfo.conninfo_to_dict(admin)
     info["dbname"] = name
@@ -444,7 +491,15 @@ def deployment_history(supply_dsn, monkeypatch):
     if not dsn:
         pytest.skip("no deployment database configured (MOTHMAN_SUPPLY_DSN)")
     monkeypatch.setenv(supply_db_module().SUPPLY_DSN_ENV, dsn)
+    use_deployment_environment(monkeypatch)
     return dsn
+
+
+def use_deployment_environment(monkeypatch) -> None:
+    """Act as the environment the deployment's database is marked for."""
+    env = globals().get("DEPLOYMENT_ENVIRONMENT")
+    if env:
+        monkeypatch.setenv("MOTHMAN_ENVIRONMENT", env)
 
 
 def supply_db_module():

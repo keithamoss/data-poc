@@ -21,6 +21,12 @@ npm ci
 echo "==> Chromium for the real-browser tests"
 uv run playwright install --with-deps chromium
 
+echo "==> Marking the warehouse as this dev container's (REQ-PIPE-107)"
+# Every connection checks the database's recorded identity and refuses one
+# with none. MOTHMAN_ENVIRONMENT is `local` here (devcontainer.json).
+uv run mothman env mark --confirm local \
+  || echo "    Could not mark it - run 'uv run mothman env mark' once the database is up."
+
 echo
 echo "Ready. The warehouse is empty until you populate it:"
 echo "    uv run mothman pipeline bootstrap"

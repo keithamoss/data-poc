@@ -200,6 +200,9 @@ def handle(comment: Comment, *, collection_id: str, effective_at: str,
         return None
 
     try:
+        # NO TYPED ENVIRONMENT ID HERE (REQ-PIPE-093 criterion 9): a decision
+        # arriving through the GitHub route is confirmed by the ticket reply
+        # itself, and nobody is at a terminal to type anything.
         outcome = filing_decisions.apply(request, effective_at=effective_at)
     except (decision_log.DecisionRefused, people.UnknownActor,
             filing_decisions.NotOffered) as exc:

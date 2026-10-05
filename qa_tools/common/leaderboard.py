@@ -67,7 +67,6 @@ appear, by name/nickname.
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 
 from qa_tools.common.ticket_sync import TICKET_LABEL
@@ -286,7 +285,14 @@ def build_leaderboard(raw_tickets: list[dict], people_config: dict, dataset_agen
 
 
 def main() -> None:
-    owner, repo = os.environ["GITHUB_REPOSITORY"].split("/", 1)
+    # THE ASSET'S TICKET REPOSITORY, never GITHUB_REPOSITORY (REQ-PIPE-093
+    # criterion 12): that names whichever repository a workflow runs in.
+    from qa_tools.common import environments
+
+    slug = environments.ticket_repository()
+    if not slug or "/" not in slug:
+        raise SystemExit("contract/data-asset.yaml names no ticket_repository (owner/repo)")
+    owner, repo = slug.split("/", 1)
     print(json.dumps(fetch_all_ticket_resolutions(owner, repo)))
 
 

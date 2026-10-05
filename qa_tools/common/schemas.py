@@ -602,6 +602,15 @@ class DataAsset(_Strict):
     #: ticketing should not have to declare that it has not - and the
     #: default is the one that keeps the queue worth reading.
     ticket_policy: Literal["all", "needs-action"] = "needs-action"
+    #: `owner/repo` tickets go to (REQ-PIPE-093 criterion 12). Optional:
+    #: only an environment with ticketing on needs it, and that refuses
+    #: without one (environments.for_connection).
+    ticket_repository: NonEmptyStr | None = None
+    #: The PostgreSQL major this asset targets (REQ-PIPE-146). Optional
+    #: HERE so this model's own tests can build a minimal asset; its
+    #: presence and shape are gated by postgres_version.declaration_errors,
+    #: in the hierarchy gate, which refuses an asset without one.
+    postgres_major: int | None = None
     #: Whether this asset's history is SYNTHETIC - generated, and so safe
     #: to delete and regenerate (REQ-PIPE-144 criterion 43, REQ-GEN-135
     #: criterion 8). Defaults to False: an asset that never said it was

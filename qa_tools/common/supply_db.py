@@ -331,8 +331,19 @@ class SupplyConnection:
         self.close()
 
 
+_first_connection_hook = None
+
+
+def on_first_connection(hook) -> None:
+    """Run `hook()` once, after this process's first connection passes its
+    checks - how the CLI states the environment before a command's own
+    output (REQ-TEST-114 criterion 2). The library itself prints nothing."""
+    global _first_connection_hook
+    _first_connection_hook = hook
+
+
 def connect(read_only: bool = False, dsn: str | None = None,
-            label: str = "mothman") -> SupplyConnection:
+            label: str = "mothman", *, for_marking: bool = False) -> SupplyConnection:
     """Open the supply database.
 
     `read_only` NOW MEANS WHAT IT SAYS. Under the retired engine it was
@@ -357,12 +368,54 @@ def connect(read_only: bool = False, dsn: str | None = None,
     as identifiable. Cheap, and it turns a diagnosis that took three
     reproductions into reading one line.
     """
+    # THE STATED ENVIRONMENT FIRST (REQ-PIPE-093 criteria 1, 2 and 13): for
+    # a read as well as a write, refused with no default before a single
+    # byte goes to a server - a local habit must never quietly reach
+    # production, and nothing tells an operator a command went nowhere.
+    from qa_tools.common import environments
+
+    env = environments.for_connection()
     target = dsn if dsn is not None else supply_db_dsn()
     try:
         raw = psycopg.connect(target, autocommit=True, application_name=label)
     except psycopg.Error as exc:
+        # THE ENVIRONMENT AS WELL AS THE HOST (criterion 3), and the
+        # driver's own words with any credential they repeat taken out.
         raise SupplyDbError(
-            f"cannot reach the supply database at {_redact(target)}: {exc}") from exc
+            f"cannot reach the {env.id!r} environment's supply database at "
+            f"{_redact(target)}: {_scrub(str(exc), target)}") from exc
+    # THE FIRST STATEMENT, AND THE ONLY ONE BEFORE THE CHECKS PASS: the
+    # server's PostgreSQL major (REQ-PIPE-146 criterion 2) and the database's
+    # own recorded identity (REQ-PIPE-107 criteria 5 to 8), in one round trip.
+    # A refusal closes the connection having done nothing (criterion 9).
+    # `for_marking` is `mothman env mark` alone - the one command allowed to
+    # meet a database with no identity yet (criterion 7); it still gets the
+    # version check, and does its own identity checks before writing.
+    from qa_tools.common import db_identity, postgres_version
+
+    try:
+        num, setconfig = raw.execute(db_identity.PROBE).fetchone()
+        postgres_version.check_number(num)
+        if not for_marking:
+            db_identity.check(setconfig)
+    except postgres_version.VersionMismatch as exc:
+        raw.close()
+        raise SupplyDbError(f"{exc} ({_redact(target)})") from exc
+    except db_identity.IdentityRefused as exc:
+        raw.close()
+        # NO PART OF THE CONNECTION STRING (criterion 6).
+        raise SupplyDbError(str(exc)) from exc
+    except psycopg.Error as exc:
+        raw.close()
+        # CANNOT BE READ IS A REFUSAL (criterion 8, NFR 3). The driver's
+        # message is left out: it can repeat the connection's details.
+        raise SupplyDbError(
+            f"this database's identity could not be read ({type(exc).__name__}), so "
+            f"nothing says it is the one this checkout is configured for - refusing.") from exc
+    global _first_connection_hook
+    if _first_connection_hook is not None:
+        hook, _first_connection_hook = _first_connection_hook, None
+        hook()
     # NEVER WAIT FOREVER FOR A LOCK - see LOCK_TIMEOUT_ENV. Set before
     # anything else this connection does, so even the first statement is
     # covered.
@@ -525,6 +578,11 @@ def connection_fields() -> dict[str, str]:
     of the three wrong.
     """
     from psycopg import conninfo
+    # THE SAME CHECK BEFORE THE TOOLS GET THE DETAILS (REQ-PIPE-107 criterion
+    # 10): dbt, Soda Core and datacontract-cli connect themselves and cannot
+    # run our check, so these exact details are checked first, here, on the
+    # one path every one of them takes.
+    connect(read_only=True, label="mothman-identity-check").close()
     info = conninfo.conninfo_to_dict(supply_db_dsn())
     return {
         "host": str(info.get("host", "localhost")),
@@ -609,6 +667,19 @@ def _redact(dsn: str) -> str:
     if "password" in fields:
         shown["password"] = "***"
     return " ".join(f"{k}={v}" for k, v in shown.items()) or "<no host given>"
+
+
+def _scrub(text: str, dsn: str) -> str:
+    """A driver's error message with the connection string's password taken
+    out wherever it repeats it (REQ-PIPE-093 criterion 3) - psycopg's parse
+    errors can echo the fragment they choked on, and _redact only covers
+    the connection string this module formats itself."""
+    from psycopg.conninfo import conninfo_to_dict
+    try:
+        password = conninfo_to_dict(dsn).get("password")
+    except Exception:  # noqa: BLE001 - an unparseable DSN: say nothing of it
+        return "the connection string could not be parsed"
+    return text.replace(str(password), "***") if password else text
 
 
 def _ident(name: str, what: str) -> str:

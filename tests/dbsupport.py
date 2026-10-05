@@ -25,6 +25,7 @@ import os
 
 import psycopg
 
+from conftest import mark_test_database
 from qa_tools.common import supply_db
 
 
@@ -58,6 +59,7 @@ def use_empty_supply_db(monkeypatch) -> str:
         # conftest's own note for the real incident behind this.
         conn.execute(f'ALTER DATABASE "{scratch}" '
                      "SET idle_in_transaction_session_timeout = '15s'")
+        mark_test_database(conn, scratch)
 
     info["dbname"] = scratch
     dsn = psycopg.conninfo.make_conninfo(**info)

@@ -291,20 +291,32 @@ def report(outcome: Outcome) -> None:
 def service_from_env():
     """The real ticketing service this deployment talks to, or None.
 
-    None RATHER THAN A RAISE where `GITHUB_REPOSITORY` is not set,
+    None RATHER THAN A RAISE where the environment does not turn ticketing on,
     because a pipeline run on somebody's laptop is not a broken run - it
     is a run with no ticketing configured, which is the ordinary state
     of this repository for most of its life. Criterion 13 asks for the
     reconciler to be INVOKED after every QA run; it does not ask for
     every deployment to have a ticket service.
     """
-    import os
-
+    from qa_tools.common import environments
     from qa_tools.common.ticket_github import GitHubTickets
 
-    slug = os.environ.get("GITHUB_REPOSITORY") or ""
-    if "/" not in slug:
+    # THE ENVIRONMENT SWITCHES IT ON, NOTHING ELSE (REQ-PIPE-093 criteria 10
+    # and 12). This used to read GITHUB_REPOSITORY, which GitHub Actions
+    # sets on every run, so any workflow that ran the pipeline turned
+    # ticketing on whether or not anybody meant it to. The repository is
+    # the data asset's, from contract/data-asset.yaml.
+    env = environments.current_or_none()
+    if env is None or not env.ticketing:
         return None
+    slug = environments.ticket_repository() or ""
+    if "/" not in slug:
+        # Unreachable through supply_db.connect, which refuses this before
+        # connecting (criterion 13) - said again here for a caller that
+        # asks for the service without a connection.
+        raise environments.EnvironmentError_(
+            f"the {env.id!r} environment turns ticketing on, but contract/data-asset.yaml "
+            f"names no ticket_repository")
     owner, repo = slug.split("/", 1)
     return GitHubTickets(owner, repo)
 
