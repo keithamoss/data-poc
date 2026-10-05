@@ -2333,9 +2333,29 @@ judgement about who reads the page rather than about the rule.
         in a bootstrap replay EVERY decision is recorded after the date it
         took effect, so the plain reading would flag every past date on a
         synthetic asset. What should count as "changed"?
-        ALSO OPEN: #115 D4 (re-filing a promoted supply into a period that
-        already holds one left a re-check unable to read its own table) -
-        not reproduced into an empty period; to retry on the rebuilt database.
+        SPRINT 10 PUSHED (8040a69). #115 D4 retried on the rebuilt database
+        and not reproducible - closed as the critic's environment.
+        SPRINT 10 CRITIC (#116): a real HIGH - runs were ordered partly by
+        the batch's wall clock, so in a replay a re-evaluation never
+        outranked its arrival and a false "red promoted" showed - fixed with
+        D3-D6. TWO MORE FOR KEITH: (D2) for a promoted supply, should the
+        status pill on its history row be its arrival verdict or its newest
+        result per check? they disagree on screen; (D8) REQ-PIPE-123
+        criterion 3 says a replacement is "one decision" - it is two
+        entries (supersede + promote) in one transaction; amend the wording?
+      - SPRINT 11: REQ-GEN-135 (scripted person decisions, played back into
+        the synthetic history through the one decision path), REQ-DASH-139
+        (the scenario map as its own tab), REQ-GEN-138 (register rewritten,
+        TS-41..TS-56). THE PLAYBACK EARNED ITS KEEP ON ITS FIRST RUNS: its
+        loud refusal caught two scenarios that did not show what they said.
+        (a) TS-47 - an earlier day's resend landed on the "empty" day and
+        filled it, so the scripted mark-not-supplied was rightly refused.
+        Fixed: an injection can name QUIET days no other day's arrival may
+        land on. (b) TS-43/44/45 - the 'amber' dirtying preset makes a RED
+        supply (it trips checks that fail on one bad value), and a plain
+        truncation into the row-count warn band still read red (it splits
+        twins; consecutive days compound). PARKED at Keith's call
+        (18:20) - the register says what planting them needs.
  All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.

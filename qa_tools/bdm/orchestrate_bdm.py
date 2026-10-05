@@ -606,8 +606,14 @@ def run_pipeline(sequential: bool = False,
     # THROUGH THE ONE PER-ARRIVAL LIFECYCLE (REQ-PIPE-086 criterion 2),
     # the same function a hand-filed delivery goes through, so the two can
     # never compose these steps differently.
+    # SCRIPTED PERSON DECISIONS, PLAYED BACK BETWEEN ARRIVALS (REQ-GEN-135):
+    # the batch replay is the one place they are raised, and the player
+    # refuses unless the asset declares itself synthetic.
+    from qa_tools.common import scripted_decisions
+
     all_results = arrival_lifecycle.process_all(
-        found_arrivals, steps=STEPS, run_by=run_by, run_timestamp=run_timestamp)
+        found_arrivals, steps=STEPS, run_by=run_by, run_timestamp=run_timestamp,
+        player=scripted_decisions.Player(COLLECTION_ID))
 
     # THE TICKETS CATCH UP WITH THE SLOTS (REQ-PIPE-083 criteria 13 and
     # 16). After promotion rather than beside it, because a ticket that

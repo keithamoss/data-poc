@@ -78,3 +78,17 @@ describe("red promoted", () => {
     expect(w.redPromotedBadge("cp-carers", "r1", "2026-01-15")).toBe("");
   });
 });
+
+// post-build-review #116 D3: a supply promoted while already red got no
+// label, because every point before the promotion was skipped.
+describe("a supply promoted while red", () => {
+  it("is red promoted from the start", () => {
+    const w = withRaw({id: "x", runs: RUNS,
+      runStates: {r1: [{at: "2026-01-20T01:00:00+00:00", state: "promoted", action: "promote"}]},
+      promotedHealth: {r1: {promotedOn: "red", promotedAt: "2026-01-20T01:00:00+00:00",
+        timeline: [{at: "2026-01-10T01:00:00+00:00", status: "red", cause: "the arrival of X"}]}}});
+    const html = w.redPromotedBadge("x", "r1", "2026-02-01");
+    expect(html).toContain("data-red-promoted");
+    expect(html).toContain("promoted while red");
+  });
+});

@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 27
+SCHEMA_VERSION = 28
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -1135,7 +1135,9 @@ SELECT * FROM "{SCHEMA}".slot_holds(NULL, NULL);
 --
 -- SECURITY DEFINER, so a reader granted only a period schema reads its
 -- `_manifest` without any grant on this metadata schema (NFR 2), and sees
--- only these columns. search_path is pinned for the same reason.
+-- only these columns. search_path is pinned, with pg_temp LAST - left off,
+-- pg_temp is searched first and a caller's temporary pg_class could spoof
+-- the listing (post-build-review #116, D5; schema 28).
 --
 -- decided_by is ONLY 'rule' or 'person', never a name (criterion 5).
 -- promoted_status is what the supply was promoted on - for an inherited or
@@ -1145,7 +1147,7 @@ CREATE OR REPLACE FUNCTION "{SCHEMA}".manifest_for(for_period text, for_schema t
 RETURNS TABLE (table_name text, dataset_id text, kind text, supply text,
                received_at timestamptz, from_period text, decided_at timestamptz,
                decided_by text, acknowledged boolean, reason text, promoted_status text)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $fn$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
 WITH present AS (
     SELECT c.relname::text AS table_name
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace

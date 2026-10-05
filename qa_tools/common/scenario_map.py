@@ -229,6 +229,8 @@ def _data_block(scenarios: Iterable[scenarios_mod.Scenario],
             "demonstrates": _sentence(scenario.expect or scenario.body or ""),
             "breaksAs": _sentence(scenario.breaks_as) if scenario.breaks_as else None,
             "config": scenario.config,
+            # WHAT IT DEMONSTRATES, BY REQUIREMENT (REQ-DASH-139 criterion 3).
+            "requirements": scenario.requirements,
             # COORDINATES, NEVER A LINK (criterion 5 of REQ-GEN-045 and
             # criterion 3 of REQ-DASH-046). The dashboard builds the
             # link from these; nothing here knows a route.

@@ -81,3 +81,21 @@ def list_command(injected_only: bool) -> None:
             where = "-"
         table.add_row(scenario.id, scenario.mode, scenario.title, where)
     console.print(table)
+
+
+@scenarios_group.command("validate")
+def validate_command() -> None:
+    """Gate: the scripted decisions hold against configuration alone
+    (REQ-GEN-135 criterion 13) - every scenario registered, every decision
+    a filing decision, every reason present, every dataset real."""
+    from qa_tools.common import scripted_decisions
+
+    registered = {s.id for s in scenarios.parse_register()}
+    script = scripted_decisions.load()
+    found = scripted_decisions.problems(script, registered=registered)
+    if found:
+        for problem in found:
+            console.print(f"  - {problem}", style="red")
+        raise click.ClickException(
+            f"scripted decisions FAILED ({len(found)} problem(s)) - see above.")
+    console.print(f"scripted decisions OK - {len(script)} decision(s), zero errors.")

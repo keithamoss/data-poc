@@ -105,19 +105,25 @@ describe("turning coordinates into a target", () => {
 describe("the panel", () => {
   it("says nothing is embedded rather than rendering an empty panel", () => {
     const w = load();
-    w.renderScenariosPanel();
-    const body = w.document.getElementById("scenarios-panel-body").innerHTML;
+    const view = w.document.createElement("div");
+    w.renderScenarios(view);
+    const body = view.querySelector("#scenarios-panel-body").innerHTML;
     expect(body).toContain("No scenario map embedded");
   });
 
-  it("is registered as one of the page's side panels", () => {
+  // REQ-DASH-139 criterion 1: a top-level tab with a URL of its own, beside
+  // Plans and Demo, in place of REQ-DASH-046's drawer.
+  it("is a top-level tab with a route of its own, not a drawer", () => {
     const w = load();
-    // Asserted through the page's own mechanism rather than against a
-    // list written here: a panel the page does not know about cannot
-    // be opened, closed or deep-linked.
-    expect(w.document.getElementById("scenarios-panel")).not.toBeNull();
+    expect(w.stateToPath({tier: "scenarios"})).toBe("/scenarios");
+    expect(w.pathToState("/scenarios")).toEqual({tier: "scenarios"});
     expect(w.document.getElementById("scenarios-btn")).not.toBeNull();
-    expect(w.document.getElementById("scenarios-backdrop")).not.toBeNull();
+    expect(w.document.getElementById("scenarios-panel")).toBeNull();
+  });
+
+  it("opens from a saved ?panel=scenarios link", () => {
+    const w = loadDashboard({url: "http://localhost/?panel=scenarios"}).window;
+    expect(w.stateFromLocation()).toEqual({tier: "scenarios"});
   });
 });
 
@@ -137,5 +143,18 @@ describe("what the map may not contain", () => {
     expect(w.scenarioTarget(entry({
       coordinates: { dataset: "https://example.test/evil", period: "p", inPlaceOn: "2026-01-01" },
     }))).toBeNull();
+  });
+});
+
+// REQ-DASH-139 criterion 3: each scenario shows the requirements it
+// demonstrates and whether it has data behind it yet.
+describe("what each entry says", () => {
+  it("names the requirements it demonstrates, and says when nothing is behind it", () => {
+    const w = load();
+    const html = w.scenarioEntryHtml(entry({requirements: ["REQ-PIPE-118"]}), 0);
+    const view = w.document.createElement("div");
+    view.innerHTML = html;
+    expect(view.querySelector("[data-demonstrates]").textContent).toContain("REQ-PIPE-118");
+    expect(view.textContent).toContain("no data behind it yet");
   });
 });

@@ -436,3 +436,36 @@ class TestTheChildProtectionScenariosAreReallyThere:
                     claimed[owner] += 1
             duplicates = {k: v for k, v in claimed.items() if v > 1}
             assert not duplicates, f"{folder.name}: {duplicates}"
+
+
+class TestQuietDays:
+    """Found by the first scripted replay (2026-10-05): TS-47 says the
+    day's own supply never comes, and an EARLIER day's resend landed on it
+    at 10:11 and filled it - so the scripted person's mark-not-supplied
+    was rightly refused. A scenario can name days no OTHER period's
+    arrival may land on, without suppressing those periods' own supply."""
+
+    def test_quiet_days_are_resolved_by_name(self):
+        periods = _daily(30)
+        placed = si.resolve(si.Injection("TS-x", "d", -5, "cfg", quiet=(0, 1)), periods)
+        assert placed.quiet == (periods[-5].name, periods[-4].name)
+
+    def test_a_period_keeps_its_own_supply_on_a_quiet_day(self):
+        from generator import generate_runs as gr
+
+        avoid = gr._days_to_avoid("2026-09-08", suppressed={"2026-09-01"},
+                                  quiet={"2026-09-07", "2026-09-08"})
+        assert avoid == {"2026-09-01", "2026-09-07"}
+
+    def test_another_period_s_resend_is_moved_off_a_quiet_day(self):
+        from generator import generate_runs as gr
+
+        resend = gr.Delivery(received_date=date(2026, 9, 7), severity=None, payload=None)
+        (moved,) = gr._away_from_suppressed([resend], {"2026-09-07", "2026-09-08"}, set())
+        assert moved.received_date == date(2026, 9, 9)
+
+    def test_a_quiet_day_is_part_of_the_scenario_s_footprint(self):
+        both = [si.Injection("TS-a", "d", -5, "cfg"),
+                si.Injection("TS-b", "d", -6, "cfg", quiet=(0, 1))]
+        with pytest.raises(si.CannotPlace):
+            si.no_two_scenarios_share_a_period(both, {"d": _daily(30)})

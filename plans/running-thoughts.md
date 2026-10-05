@@ -4375,3 +4375,123 @@ Belongs with batch 5's check work.
     against real runs and could refuse good runs on day one for reasons
     nobody has met yet; worth doing once a clean run's real output has
     been measured.
+
+63. **[todo, 2026-10-05]** **[Data generation]** **Generate to the
+    check rules, not by trial and error.** Keith, after TS-43/44/45 had to
+    be parked: "we need to revisit how we do the generation and make sure
+    it doesn't run into situations like this. I don't think we can brute
+    force it. I think we actually need to have it follow the rules that
+    we've defined in the checks."
+
+    What prompted it: an injected scenario says which OUTCOME it needs
+    (amber - warnings, no failure), but the generator only has blunt
+    dials ('amber'/'red' dirtying presets, row truncation), so whether a
+    supply lands amber is found out by a 25-minute rebuild. Two rebuilds
+    showed the gap. The 'amber' preset trips checks that fail on one bad
+    value, so the supply reads red. A plain truncation splits
+    multiple-birth groups (three sibling checks fail) and compounds
+    across consecutive days (row count, drift). Neither dial knows what
+    the checks will say.
+
+    The direction he set: the generator should READ the committed check
+    definitions - each check's warn and fail thresholds, which checks are
+    single-tier (any violation fails), which relationships must hold
+    (siblings, ordering, uniqueness) - and produce a supply that is
+    amber BY CONSTRUCTION. For example: violate only checks that have a
+    warn band, stay inside it, and keep every invariant another check
+    relies on.
+
+    Open, and to scope with him rather than decide here:
+    - Is the target per check ("this check warns, every other check
+      passes") or per supply ("amber overall")?
+    - How a cross-supply check (row-count growth, drift against the
+      previous supply) is satisfied when the previous supply is itself a
+      scenario.
+    - Whether the generator should verify its own output against the
+      rules before writing, and fail at generation time rather than at
+      replay.
+
+    Unblocks TS-43, TS-44, TS-45 and TS-46 (parked the same evening for
+    the same reason - its "green" resend, churned from the supply before
+    it, read red on row count and drift against it; the register and
+    REQ-GEN-044's decisions say why each is parked), and very likely anything else
+    that needs a precise verdict. Sits with plans/data-generation.md once
+    scoped.
+
+64. **[todo, 2026-10-05]** **[Data generation]** **Walk through scenario injection
+    with Keith - no scenario-only code paths.** Keith, after the TS-47
+    explanation: once the file-check work (sprint 12) is finished, he
+    wants to go through how scenario injection is designed, to check it
+    works how he thinks it works, and to understand how it replicates
+    what a human can do through the mothman TUI and CLI and what the
+    rules do. His standing constraint, in his words: "I don't want any
+    scenarios running through special code that only runs for
+    scenarios. It should be running through the actual pipelines that
+    the humans and the automated machines use."
+
+    For the walkthrough, what exists today, stated plainly so it can be
+    checked against that constraint rather than assumed to meet it:
+    - ARRIVALS: an injection only changes what the generator WRITES - the
+      files, their names and receipt instants. Recognition, filing, QA,
+      promotion and the dashboard then treat them exactly as any other
+      delivery; nothing downstream knows a scenario exists (REQ-GEN-044
+      criteria 5 and 6).
+    - PERSON DECISIONS (REQ-GEN-135): each scripted decision is raised
+      through filing_decisions.apply(), the same function `mothman supply
+      decide`, the TUI and the GitHub route call, with the same
+      consequences check and the same refusals.
+    - THE PARTS THAT ARE SCENARIO-ONLY, and the ones to look at hardest:
+      (a) the Player hook in arrival_lifecycle.process_all(), which runs
+      only when the batch replay passes a player - it decides WHEN a
+      scripted decision is raised, between arrivals; (b)
+      people.playback() and the synthetic actor, which exist only so a
+      decision can be raised with no person behind it, refused on every
+      other route; (c) generator-only placement rules (anchors,
+      suppressed and quiet days). None of these computes a verdict,
+      filing or promotion, but (a) and (b) are code the real pipeline
+      carries only for scenarios, which is exactly what he wants
+      examined.
+
+    Pairs with #63 (generate to the check rules).
+
+65. **[todo, 2026-10-05]** **[Testing & dev tooling]** **Rebuilds take far too
+    long to iterate on a scenario.** Keith, 2026-10-05 evening, after four
+    ~27-minute rebuilds in one evening were spent finding out whether
+    TS-43..47 landed as planted: "these regens take an absolute bloody age.
+    So we need to solve that. But is there a way you can regenerate just
+    the failing slices, make sure they work, rather than rerun the entire
+    thing?"
+
+    WHERE THE TIME GOES: a bootstrap generates both collections, then runs
+    every arrival (~110) one at a time through all four tools. It has to be
+    one at a time: since 2026-09-28 each arrival's filing depends on what
+    the arrival before it promoted. The four tools within a run are also
+    run one after another (CLAUDE.md already names that as the obvious
+    place to get time back).
+
+    WHY A SLICE IS NOT FREE: a scenario's outcome depends on the history
+    before it - the row-count and drift checks compare against the
+    previous supply, and filing depends on what is already promoted. So a
+    slice is "replay from a point", not "replay these arrivals alone".
+
+    What exists today and was not used (a mistake on 2026-10-05, said
+    plainly): `mothman bdm qa --trial --file X --reference-file Y` runs
+    the real four tools on one file and records nothing - about a minute
+    each. It would have shown TS-43..46 reading red before any rebuild.
+    It does not exercise filing, promotion or the scripted decisions, so
+    it is a verdict probe, not a full test.
+
+    Options to scope with Keith:
+    - A STANDING HABIT, no build: probe an injected file's verdict with a
+      trial before rebuilding, and rebuild only the collection a change
+      touches (`--collection bdm` - TS-43..47 are all Birth Registrations).
+    - A CHECKPOINT: keep a database snapshot (PostgreSQL `CREATE DATABASE
+      ... TEMPLATE`) from just before the first arrival a change can
+      affect, and replay only the arrivals after it. Needs a "replay from
+      arrival N" mode the bootstrap does not have - it refuses over
+      existing history today - and a rule for knowing which arrival is
+      the first a change can affect.
+    - SPEED FOR EVERYONE: run a run's four tools in parallel; REQ-TEST-117
+      (CI reuses an unchanged bootstrap) for the CI side.
+    Pairs with #63: generating to the check rules would remove most of
+    the trial and error these rebuilds were spent on.

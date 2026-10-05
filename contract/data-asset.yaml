@@ -137,6 +137,22 @@ amber_setting:
       value: promote
       changelog:
         - "2023-01-01: amber promotes itself into an unfilled slot - unchanged from before the setting existed (REQ-PIPE-075)."
+    # SYNTHETIC ERAS (REQ-GEN-136 criterion 14): switched at dates inside the
+    # generated history so one history shows the behaviour before, during and
+    # after - and back-dated, which only a synthetic asset may do. Each
+    # scenario needing a setting is placed inside its era (criterion 15).
+    - effective_from: "2026-09-01"
+      value: hold
+      changelog:
+        - "2026-09-01: synthetic era - amber waits for a person (TS-43, parked; the era's own amber supplies show it)."
+    - effective_from: "2026-09-10"
+      value: promote-and-acknowledge
+      changelog:
+        - "2026-09-10: synthetic era - amber promotes and asks for an acknowledgement (TS-44 and TS-45, parked; the era's own amber supplies show it)."
+    - effective_from: "2026-09-18"
+      value: promote
+      changelog:
+        - "2026-09-18: synthetic era ends - amber promotes itself again."
 
 # WHETHER A RESUPPLY MAY REPLACE AN ALREADY-PROMOTED SUPPLY AUTOMATICALLY
 # (REQ-PIPE-123). One of:
@@ -153,6 +169,16 @@ replacement_setting:
       value: never
       changelog:
         - "2023-01-01: a filled slot waits for a person - unchanged from before the setting existed (REQ-PIPE-075 criterion 4)."
+    # SYNTHETIC ERA (REQ-GEN-136 criteria 7, 14 and 15): a green resend replaces
+    # the promoted supply for four days, then never again.
+    - effective_from: "2026-09-18"
+      value: green
+      changelog:
+        - "2026-09-18: synthetic era - a green resupply replaces the promoted supply (TS-46, parked; the era's own resends show it)."
+    - effective_from: "2026-09-22"
+      value: never
+      changelog:
+        - "2026-09-22: synthetic era ends - a filled slot waits for a person again."
 
 
 calendars:

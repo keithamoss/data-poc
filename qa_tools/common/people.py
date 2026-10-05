@@ -21,6 +21,9 @@ that file directly rather than duplicating it here.
 """
 from __future__ import annotations
 
+import contextvars
+from contextlib import contextmanager
+
 from pathlib import Path
 
 import yaml
@@ -93,6 +96,42 @@ def is_placeholder(person: dict) -> bool:
     return bool((person or {}).get("placeholder"))
 
 
+def is_synthetic(person: dict) -> bool:
+    """Whether this record is the scripted history's actor (REQ-GEN-135):
+    no GitHub username, never assigned a ticket, and able to raise a
+    decision only inside scripted playback (REQ-GHUB-082 criterion 29 as
+    amended)."""
+    return bool((person or {}).get("synthetic"))
+
+
+#: Whether scripted playback is running in this process (REQ-GEN-135
+#: criterion 10) - the one place the synthetic actor may act.
+_PLAYBACK: contextvars.ContextVar[bool] = contextvars.ContextVar("people_playback",
+                                                               default=False)
+
+
+@contextmanager
+def playback():
+    """Scripted playback, for its duration only. Used by
+    qa_tools/common/scripted_decisions.py and nothing else."""
+    token = _PLAYBACK.set(True)
+    try:
+        yield
+    finally:
+        _PLAYBACK.reset(token)
+
+
+def synthetic_actor(config: dict | None = None) -> dict:
+    """The synthetic person, for scripted playback (criterion 5)."""
+    config = parse_people_config() if config is None else config
+    found = [p for p in (config["people"] or {}).values() if is_synthetic(p)]
+    if len(found) != 1:
+        raise UnknownActor(
+            f"contract/people.yaml must hold exactly one entry marked `synthetic: true` "
+            f"for scripted playback; it holds {len(found)}")
+    return person_by_email(found[0]["email"], config)
+
+
 def person_by_email(email: str, config: dict | None = None) -> dict:
     """The person this email address names, or a refusal.
 
@@ -114,6 +153,11 @@ def person_by_email(email: str, config: dict | None = None) -> dict:
             f"{email!r} is a placeholder - a stand-in for somebody not yet "
             f"named - so it cannot raise a filing decision. Replace it with "
             f"the real person.")
+    if is_synthetic(person) and not _PLAYBACK.get():
+        # REQ-GEN-135 criterion 10: every route outside scripted playback.
+        raise UnknownActor(
+            f"{email!r} is the scripted history's synthetic actor, which can raise a "
+            f"decision only while a synthetic history is being played back.")
     return person
 
 
@@ -134,10 +178,11 @@ def person_by_github(username: str, config: dict | None = None) -> dict:
     for person in (config["people"] or {}).values():
         if (person.get("github") or "").strip().lower() != wanted or not wanted:
             continue
-        if is_placeholder(person):
+        if is_placeholder(person) or is_synthetic(person):
             raise UnknownActor(
-                f"the GitHub account {username!r} belongs to a placeholder in "
-                f"contract/people.yaml, which cannot raise a filing decision.")
+                f"the GitHub account {username!r} belongs to a placeholder or the "
+                f"synthetic actor in contract/people.yaml, which cannot raise a filing "
+                f"decision from GitHub.")
         return person
     raise UnknownActor(
         f"no person in contract/people.yaml has the GitHub username "

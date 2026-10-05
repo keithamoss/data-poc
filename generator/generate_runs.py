@@ -532,7 +532,15 @@ def _plan_injections(periods):
     by_period = {placement.period: (injection, placement)
                  for injection, placement in resolved}
     suppressed = {name for _, placement in resolved for name in placement.suppressed}
-    return resolved, by_period, suppressed
+    quiet = {name for _, placement in resolved for name in placement.quiet}
+    return resolved, by_period, suppressed, quiet
+
+
+def _days_to_avoid(period_name: str, suppressed: set[str], quiet: set[str]) -> set[str]:
+    """The days this period's arrivals must be moved off: every
+    suppressed day, and every QUIET day but its own - a quiet day keeps
+    its own supply and refuses everybody else's."""
+    return set(suppressed) | (set(quiet) - {period_name})
 
 
 def main() -> None:
@@ -559,7 +567,8 @@ def main() -> None:
 
     # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4) - see
     # _plan_injections()'s own docstring.
-    resolved_injections, injected_by_period, suppressed_periods = _plan_injections(periods)
+    (resolved_injections, injected_by_period, suppressed_periods,
+     quiet_periods) = _plan_injections(periods)
     #: Days a shifted arrival has already claimed - see
     #: _away_from_suppressed(). Shared across slots, because the
     #: collision it prevents is between them.
@@ -588,7 +597,8 @@ def main() -> None:
             deliveries = _away_from_suppressed(
                 list(run_slot_chain(provider, slot_date, seed, id_offset,
                                      n_rows, severity, previous_row_count)),
-                suppressed_periods, shifted_onto)
+                _days_to_avoid(period.name, suppressed_periods, quiet_periods),
+                shifted_onto)
         entries = _manifest_entries_for_slot(deliveries, slot_id, period.name,
                                               len(manifest), id_offset, seed)
 

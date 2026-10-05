@@ -98,6 +98,8 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "a sprint's written status matches what its criteria say", True),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
      "CHANGELOG.yaml's schema and component tags", False),
+    ("scenarios", ["uv", "run", "mothman", "scenarios", "validate"],
+     "every scripted decision names a registered scenario and a real decision", True),
     # REQ-GHUB-082 criterion 29. A person without a `github:` is shown
     # on the dashboard, assigned nothing, and discovers they cannot
     # raise a filing decision at the moment they try to raise one -

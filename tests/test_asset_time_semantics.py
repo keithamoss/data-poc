@@ -148,6 +148,14 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     debug capture-arrival-golden` is still the recorded procedure, and
     `ls data/deliveries | wc -l` is the question to ask first.
 
+    RE-CAPTURED 2026-10-05 FOR REQ-GEN-044's QUIET DAYS (sprint 11). The
+    procedure first: 60 deliveries, zero `handfiled-*`. What moved is
+    Birth Registrations' arrivals only, and NO VERDICT: TS-47 replaces
+    2026-09-07's own supply with one late file at 11:00 on 2026-09-08, and
+    keeps both days clear of other days' resends, so the two 2026-09-06
+    resends that landed on 09-07 and 09-08 now land on their next free
+    weekdays (09-11, 09-14). Three run ids out, three in, nothing changed.
+
     RE-CAPTURED 2026-10-02 FOR REQ-PIPE-080, which moved both axes this
     pin exists to hold still - so it failed, which is the pin working
     rather than a regression. Recorded here because "the golden
@@ -302,13 +310,21 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         them over a year back) and which are now HELD, because no period
         of theirs was open (criterion 10). Checked entry by entry: the
         golden's diff is those nine lines and nothing else.
+
+        AND FOR REQ-GEN-044's QUIET DAYS (TS-47, 2026-10-05), to 105 / 15 /
+        21 / 9: one on-time arrival became early. 2026-09-07's own on-time
+        supply is gone - TS-47 replaces it with one file at 11:00 on
+        2026-09-08, which fills 09-08 three hours before it is due, so it is
+        early. The two 2026-09-06 resends moved off TS-47's quiet days and
+        are early where they now land, as they were before. Six lines of
+        the golden, all Birth Registrations, and nothing else.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"on_time": 106, "early": 14, "late": 21, "unfiled": 9}
+        assert counts == {"on_time": 105, "early": 15, "late": 21, "unfiled": 9}
         assert sum(counts.values()) == 150
 
 

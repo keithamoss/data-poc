@@ -48,8 +48,10 @@ def problems(path: Path | str = PEOPLE_YAML) -> list[str]:
         return [f"{path} does not parse as YAML: {exc}"]
 
     found: list[str] = []
+    out = found
     seen: set[str] = set()
     usernames: dict[str, str] = {}
+    assigned = {(a or {}).get("person") for a in doc.get("assignments") or []}
     for entry in doc.get("people") or []:
         email = (entry or {}).get("email")
         if not email:
@@ -63,6 +65,22 @@ def problems(path: Path | str = PEOPLE_YAML) -> list[str]:
 
         placeholder = bool(entry.get("placeholder"))
         github = (entry.get("github") or "").strip()
+        if entry.get("synthetic"):
+            # REQ-GHUB-082 criterion 29 as amended by REQ-GEN-135 criterion 11:
+            # the scripted history's actor carries no GitHub username and is
+            # never assigned - so the GitHub route cannot reach it at all.
+            if github:
+                out.append(f"{email} is marked `synthetic: true` and carries a GitHub "
+                           f"username ({github!r}); the synthetic actor must have none, so "
+                           f"no GitHub comment can act as it.")
+            if placeholder:
+                out.append(f"{email} is marked both `synthetic: true` and `placeholder: "
+                           f"true`; the synthetic actor acts in scripted playback, which a "
+                           f"placeholder never may - it is one or the other.")
+            if email in assigned:
+                out.append(f"{email} is marked `synthetic: true` and is assigned to an "
+                           f"agency; the synthetic actor is never assigned a ticket.")
+            continue
         if placeholder and github:
             found.append(
                 f"{email} is marked `placeholder: true` and carries a GitHub "

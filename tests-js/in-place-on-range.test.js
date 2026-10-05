@@ -226,3 +226,14 @@ describe("the date's parameter and its notice", () => {
     expect(Object.keys(w).filter(k => /asof/i.test(k))).toEqual([]);
   });
 });
+
+// post-build-review #116 D4: honoured, but left in the address bar until the
+// reader changed the date.
+describe("a saved link with the previous parameter", () => {
+  it("is rewritten on arrival", () => {
+    const w = loadDashboard({url: "http://localhost/?asof=2026-02-01"}).window;
+    const params = new w.URLSearchParams(w.location.search);
+    expect(params.get("in-place-on")).toBe("2026-02-01");
+    expect(params.has("asof")).toBe(false);
+  });
+});

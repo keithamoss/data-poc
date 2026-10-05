@@ -87,8 +87,10 @@ def _now_holds(conn, table: str, period: str) -> str | None:
     from qa_tools.common import decision_log, hierarchy
 
     h = decision_log.held(conn, hierarchy.dataset_for_table(table).dataset_id, period)
-    return h.holder if h and h.held_as in (decision_log.PROMOTED,
-                                           decision_log.SUBSTITUTED) else None
+    # INHERITED TOO (#116, D6): an inherited period reads the earlier supply
+    # through its view, so a reader of it read that supply.
+    return h.holder if h and h.held_as in (decision_log.PROMOTED, decision_log.SUBSTITUTED,
+                                           decision_log.INHERITED) else None
 
 
 def _read_as(conn, run_key: str, table: str) -> str | None:

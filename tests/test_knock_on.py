@@ -223,3 +223,14 @@ class TestEndToEndOnTheRealFixture:
         assert done and all(o.completed for o in done)
         with supply_db.connect(label="test-knock-on") as c:
             assert _owed_for(c, period) == []
+
+
+class TestAnInheritedPeriodHoldsItsSupply:
+    """post-build-review #116 D6: an inherited table read as holding nothing,
+    so every reader of it looked stale and ran its tools again."""
+
+    def test_it(self, monkeypatch):
+        class Held:
+            held_as, holder = dl.INHERITED, "cp-carers@1"
+        monkeypatch.setattr(dl, "held", lambda c, d, p: Held())
+        assert knock_on._now_holds(None, "cp_carers", "P") == "cp-carers@1"

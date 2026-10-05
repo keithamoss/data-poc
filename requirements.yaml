@@ -6641,6 +6641,36 @@ requirements:
     - AND WITH A COLUMN-ORDER WARNING (Keith, 2026-10-04), the only WARNING-level file check (REQ-QAC-096 criterion 18).
     - 'ITS OWN REGENERATE (Keith, 2026-10-04): the injections change every bootstrap''s output, and both REQ-PIPE-144''s and REQ-PIPE-086''s before-and-after proofs need a corpus that only their own change moves.'
     - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
+    - 'QUIET DAYS, beside suppressed ones (2026-10-05, found by the first scripted
+      replay). TS-47 says the day''s own supply never comes, and an earlier day''s
+      resend landed on that day at 10:11 and filled it, so REQ-GEN-135''s playback
+      rightly refused the scripted mark-not-supplied and stopped the replay. An
+      injection can now name `quiet` periods: no OTHER period''s arrival may land
+      on them (it is shifted to the next free weekday, as for a suppressed day),
+      while each keeps its own supply. REJECTED suppressing the day after, because
+      the next day''s own supply is part of what TS-47 shows; REJECTED moving
+      the anchor until a lucky draw left the days empty, which is a placement
+      that holds only until the seed or the chain logic changes.'
+    - 'A SCENARIO NEEDING A PRECISE VERDICT CANNOT YET BE PLANTED, SO TS-43, TS-44, TS-45 AND TS-46 ARE PARKED (Keith,
+      2026-10-05, found by the scripted replay). They need an AMBER supply - warnings
+      and no failure - and the generator has no dial that makes one reliably. The ''amber''
+      dirtying preset trips single-tier checks (dbt''s not_null and unique fail on any
+      bad value, as generator/dirty.py''s own docstring says), so a supply generated at
+      ''amber'' reads RED as a whole: 36 failing checks on TS-45''s, and its scripted
+      acknowledgement was refused because nothing had been promoted. A second rebuild
+      tried a truncation into the row-count warn band, which still read red: it splits
+      multiple-birth groups (the three sibling checks fail) and, on consecutive days,
+      compounds into a row-count and drift failure. Planting them needs a truncation that
+      keeps whole multiple-birth groups, on a day whose previous supply was clean. REJECTED
+      relying on a clean supply''s natural warnings, which are amber on some days and
+      green on others by the draw.'
+    - 'TS-46 PARKED WITH THEM (Keith, 2026-10-05), on the clean rebuild after:
+      its ''green'' resend is churned from the supply before it, which moved its
+      row count and its distribution of sex far enough that both checks read it
+      red against the supply it was to replace, so it waited for a person instead
+      of replacing it. Same root cause - the generator cannot aim for a verdict
+      - and the same fix is wanted: plans/running-thoughts.md #63, generate to
+      the check rules.'
   - id: REQ-GEN-045
     title: A generated scenario map says where each scenario can be seen
     date_written: "2026-09-22"
@@ -15644,11 +15674,7 @@ requirements:
       - >
         THE SYSTEM SHALL require an explicit confirmation before
         applying any filing decision in the TUI.
-      - >
-        THE SYSTEM SHALL require a GitHub username on every person in
-        contract/people.yaml who is not marked as a placeholder, SHALL
-        gate that in CI, and SHALL NOT let a placeholder entry raise a
-        decision or be assigned a GitHub ticket.
+      - THE SYSTEM SHALL require a GitHub username on every person in contract/people.yaml who is not marked as a placeholder or as synthetic, SHALL gate that in CI, and SHALL NOT let a placeholder entry raise a decision or be assigned a GitHub ticket. An entry marked synthetic needs no GitHub username, is never assigned a ticket, and may raise decisions only through scripted playback; CI gates that a synthetic entry carries no GitHub username and is not also marked placeholder. AMENDED 2026-10-05 by REQ-GEN-135 criterion 11, in the same change, as that criterion requires.
       - >
         THE SYSTEM SHALL have the TUI write its decision to the
         decision log in the database alone, and SHALL NOT have it call
@@ -25822,6 +25848,11 @@ requirements:
         is asked with slot_filled false only where the setting permits, so every
         refusal ahead of it in the gate''s order still comes first, and the stood-on
         check runs only once the gate would otherwise promote.'
+      - 'CRITERION 3''s ''AS ONE DECISION'' IS TWO ENTRIES IN ONE TRANSACTION as
+        built - a rule-actor supersede of the replaced supply and the promotion
+        naming it in `replaces`, as REQ-PIPE-128''s displacing promotion does. Raised
+        with Keith (post-build-review #116 D8): amend the wording, or record one
+        entry.'
     open_questions: []
 
 
@@ -25834,6 +25865,16 @@ requirements:
     story: "As a data team leader, I want a supply that was promoted and has since gone red because a sibling changed to be shown unmistakably as red and promoted, so that I never read accepted-but-now-failing data as fine just because it was accepted."
     moscow: must
     status: built
+    unmet_criteria:
+    - criterion: Criterion 3 - not giving a red promoted supply a green supply's
+        treatment - as it reads beside the status pill.
+      owner: unowned
+      why: 'The pill on a supply-history row is the supply''s arrival verdict
+        and the label is its newest result per check; they can disagree on screen
+        (post-build-review #116 D2). Which the pill should be for a promoted supply
+        is a question for Keith, asked in the morning report.'
+      blocked_by:
+        unowned: true
     evidence:
     - '2026-10-05 (sprint 10): the build embeds promotedHealth per run - the status
       promoted on and the status after each run that read the supply, with its
@@ -25866,6 +25907,13 @@ requirements:
     decisions:
       - "NOTHING PROMOTED IS DEMOTED BY A RE-CHECK (Keith, 2026-10-03, REQ-PIPE-121) - so the system's answer to a promoted supply going red is to show it, very clearly, and leave the decision to a person."
       - "DASHBOARD ONLY - a red promoted supply does NOT enter REQ-PIPE-083's needs-action ticket policy or the terminal queue (working assumption, this draft, to be read to Keith at sign-off): what he asked for is display, and widening the queue's definition is a change to REQ-GHUB-082 criterion 16 and REQ-PIPE-083 that nobody has asked for."
+      - 'THE TIMELINE IS ON THE ASSET''S CLOCK (post-build-review #116 D1): each
+        step is dated, and runs ordered, by the arrival''s receipt or the causing
+        decision''s effective time - never the batch''s wall clock. A supply promoted
+        while already red is labelled from the start (''promoted while red'', D3).'
+      - NFRs 1 AND 3 (a real-browser test, and one either side of the instant) ARE
+        NOT YET MET - the label is tested in vitest against hand-built data and
+        in Python with its collaborators stood in (#116).
     open_questions: []
 
   - id: REQ-DASH-127
@@ -25902,6 +25950,10 @@ requirements:
     dependencies: [REQ-PIPE-118]
     decisions:
       - "SUPERSEDED IS SHOWN AS A STATE, NOT HIDDEN, because Keith made it reversible: a version a person might un-supersede has to be findable without the terminal."
+      - 'THE NFR IS NOT BUILT (post-build-review #116 D7): superseded versions are
+        listed as ordinary rows rather than collapsed under the version that superseded
+        them. Recorded here because an NFR has no unmet-criteria entry to carry
+        it.'
     open_questions: []
 
   - id: REQ-PIPE-128
@@ -26779,7 +26831,32 @@ requirements:
       date: "2026-10-04"
     story: "As Keith demonstrating the supply model, I want the synthetic history to contain people's decisions - an un-supersede, a mark as not supplied, an acknowledgement, a substitution - taken at a scripted moment, so that the dashboard shows what happens after a person acts and not only what the rules do on their own."
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 (sprint 11): tests/test_scripted_decisions.py - 13 tests: the
+      script validated against configuration alone; the synthetic actor refused
+      outside playback, acting inside it, unreachable by GitHub, and the people
+      gate refusing a synthetic entry with a GitHub username, an assignment or
+      a placeholder mark; playback against a real database raising a PERSON''s
+      decision as the synthetic actor at the scripted instant before a later arrival,
+      waiting for an arrival received after it, stopping loudly on a refusal,
+      and refusing a non-synthetic asset; and no writer of the decision log but
+      decision_log itself. `mothman scenarios validate` gates the committed script
+      in `mothman check` and CI.'
+    implemented_by:
+    - qa_tools/common/scripted_decisions.py::Player
+    - qa_tools/common/scripted_decisions.py::problems
+    - qa_tools/common/scripted_decisions.py::load
+    - qa_tools/common/people.py::playback
+    - qa_tools/common/people.py::synthetic_actor
+    - qa_tools/common/people.py::person_by_email
+    - qa_tools/common/people.py::person_by_github
+    - qa_tools/common/validate_people.py::problems
+    - qa_tools/common/arrival_lifecycle.py::process_all
+    - cli/scenarios.py::validate_command
+    - contract/scripted_decisions.yaml
+    linked_tests:
+    - tests/test_scripted_decisions.py
     source: "Keith, 2026-10-04, 'SCRIPTED HUMAN DECISIONS WILL BE BUILT' (plans/road-testing.md #16 - 'the generator produces files only today, so synthetic history gains a way to play back seeded decisions'). Scoped by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL read scripted decisions from a committed configuration file, each naming the scenario it belongs to, the filing decision, the dataset, the supply or period it acts on, the instant it takes effect, and a reason."
@@ -26814,6 +26891,29 @@ requirements:
       - "DETERMINISTIC BY PLACEMENT, NOT BY SEED, following REQ-GEN-044's injection module ('A seed would be a second thing that has to stay fixed for the placement to be reproducible'). Keith said 'deterministic from the seed'; placement-derived instants meet that and need nothing extra."
       - "THE SYNTHETIC ACTOR LIVES IN contract/people.yaml, MARKED SYNTHETIC (Keith, 2026-10-04, option a), so the ordinary allowlist check applies to it exactly as to anyone. REJECTED keeping it only in the decision script with playback accepting it on the asset's say-so - that skips the allowlist for one actor, which is the back door Keith ruled out. COST, ACCEPTED: REQ-GHUB-082 criterion 29 (every non-placeholder needs a GitHub username; a placeholder may not raise a decision) did not allow for a third kind of entry, and is amended to."
       - "THE SYNTHETIC DECLARATION GATES PLAYBACK ONLY (Keith, 2026-10-04). Distinct from REQ-PIPE-122's 'no synthetic exception': the asset's setting eras are ordinary dated versions and do not depend on the declaration; this declaration exists solely so scripted, person-less decisions can never act on a real asset. All three locks stay."
+      - 'THE ACTOR''S NAME IS AN ORDINARY FICTIONAL ONE, its EMAIL says synthetic
+        (PROVISIONAL, sprint 11): criterion 12 forbids labelling a scripted decision
+        on the dataset pages, which show a person''s name, while the NFR asks the
+        log and the terminal - which show the actor''s email - to name it. ''Robin
+        Hale'', scripted-history@synthetic.invalid.'
+      - 'WHEN AND ON WHAT, FROM THE PLACEMENT (criterion 2, NFR 4): a script names
+        its scenario, an index into that scenario''s recorded supplies, and hours
+        after that supply''s receipt; `period_from: placement` makes the decision
+        about the scenario''s own anchor period rather than where the supply was
+        filed (marking a day not supplied). A script whose supply has not arrived
+        yet waits for it; one still unplayable at the end of the replay stops it.'
+      - 'THE PLAYER IS PASSED ONLY BY THE BATCH (criterion 3, NFR 2): arrival_lifecycle.process_all
+        takes an optional player that the two batch pipelines construct; the terminal''s
+        hand-filed routes pass none.'
+      - 'ITS REFUSAL WORKED ON ITS FIRST REAL RUNS, which is the point of criterion
+        6 (2026-10-05). It refused TS-47''s mark-not-supplied because a resend had
+        filled the day (fixed in the generator with quiet days, REQ-GEN-044), and
+        TS-45''s acknowledgement because the supply meant to be amber was red (parked
+        with TS-43, TS-44 and TS-46). Each time the replay stopped naming the scenario
+        and the refusal rather than finishing with a history missing it. ALSO FOUND:
+        a script whose supply had not arrived yet crashed the player on the first
+        arrival - each script now waits for its own supply, and only the end of
+        the replay refuses one still waiting (tests/test_scripted_decisions.py TestASupplyNotYetFiled).'
     open_questions: []
 
   - id: REQ-GEN-136
@@ -26824,7 +26924,77 @@ requirements:
       date: "2026-10-04"
     story: "As Keith showing someone the supply model, I want each awkward shape we designed this batch for - a resend superseding a failure, a correction rescued by its partner, an amber supply held, a daily replacement, a red promoted supply, a late daily file, a Case Workers file in its gap - to exist in the real generated history, so that I can show the system handling it rather than describe it."
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 3 - a contested same-arrival pair of one Child Protection
+        table (TS-42).
+      why: Child Protection's arrival patterns are exact filenames, so two files
+        in one directory can never both match one table - the same finding TS-34
+        records. Planting it means widening a pattern, which is a behaviour change
+        with a gate of its own.
+      owner: Keith - whether to widen a pattern (morning report question).
+      blocked_by:
+        unowned: true
+    - criterion: Criteria 4 and 5 - a single-table correction promoted, or still
+        failing, after its partner's promotion re-checks it (TS-48, TS-49).
+      why: Needs the Child Protection generator to place a partner's promotion
+        between two arrivals of one quarter, which its delivery shapes do not
+        yet express.
+      owner: Unplaced - generator work.
+      blocked_by:
+        unowned: true
+    - criterion: Criteria 6 and 7 - amber supplies held and promoted-awaiting-acknowledgement
+        (TS-43, TS-44), and a green resend replacing a promoted supply (TS-46).
+      why: 'PARKED by Keith, 2026-10-05: the generator cannot aim for a verdict.
+        The ''amber'' preset reads red as a whole, a truncation into the warn
+        band still read red, and a churned resend read red against the supply
+        it was to replace. Each was tried on a real rebuild.'
+      owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
+        (Keith, 2026-10-05).'
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 8 - a reader re-checked against the newer version (TS-50).
+      why: Waits on TS-48's Child Protection placement and on TS-46's replacement,
+        both unplanted.
+      owner: Unplaced.
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 9 - a promoted supply turned red by a later sibling
+        (TS-51).
+      why: Needs the Child Protection generator to place a sibling's arrival after
+        a promotion within one quarter, as TS-48.
+      owner: Unplaced - generator work.
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 11 - Case Workers arriving in a period it does not
+        deliver (TS-52).
+      why: The Child Protection injection cannot yet express a placement with
+        no extra arrival of its own.
+      owner: Unplaced - generator work.
+      blocked_by:
+        unowned: true
+    evidence:
+    - '2026-10-05 (sprint 11), against a full rebuild from empty (26m22s, exit
+      0): TS-41 rides on TS-1 - on 2026-09-15 the red 14:00 supply was superseded
+      by the supersession rule when the 16:00 file came, and the 16:00 one promoted
+      (criterion 2). TS-47: 2026-09-07 received nothing, the 11:00 file of 2026-09-08
+      was filed to and promoted for 2026-09-08, and 2026-09-07 closed unfilled
+      (criterion 10). The amber and replacement eras are effective-dated versions
+      in contract/data-asset.yaml (criterion 14); every placement passes the share-a-period
+      gate, quiet days included (criterion 15); nothing is generated but shapes
+      (criterion 12) and nothing on the dashboard says scenario (criterion 16).
+      Each scenario not planted is registered and the committed SCENARIOS.md says
+      it has no data behind it (criterion 13): 6 of 30 marked for injection have
+      data. tests/test_scenario_injection.py - 33 tests, including the four for
+      quiet days, written failing first.'
+    implemented_by:
+    - generator/scenario_injection.py::INJECTIONS
+    - generator/scenario_injection.py::resolve
+    - generator/generate_runs.py::_days_to_avoid
+    - contract/data-asset.yaml
+    - plans/supply-model.md
+    linked_tests:
+    - tests/test_scenario_injection.py
     source: "Keith, 2026-10-04, 'SCENARIOS FOR THIS BATCH, VISIBLE IN THE REPORTING UI' (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL register each scenario below in the test scenario register as a new [INJECT] entry, stating its configuration, what it expects and how it would break, and naming the requirement or requirements it demonstrates."
@@ -26871,7 +27041,52 @@ requirements:
       date: "2026-10-04"
     story: "As Keith showing someone the supply model, I want the history to contain a person un-superseding a good file, marking a closed period as not supplied, acknowledging an amber supply and substituting a missing one - and a period whose _manifest lists a promoted, an inherited and a substituted table - so that the after-a-person-acts half of the model is visible too."
     moscow: should
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 2 - Keith's worked un-supersede case (TS-53).
+      why: Under the rules as built a good file is superseded only while WAITING,
+        and a green one waits only behind a filled slot or a hold - so after the
+        un-supersede the gate does not promote it without a further decision.
+        The planted shape needs Keith's answer.
+      owner: Keith (morning report question).
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 4 - an amber supply acknowledged beside one left awaiting
+        acknowledgement (TS-45 beside TS-44).
+      why: 'PARKED with TS-43/44 by Keith, 2026-10-05: no amber supply can be
+        planted reliably yet.'
+      owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
+        (Keith, 2026-10-05).'
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 5 - a period substituted onto an earlier promoted supply
+        (TS-54).
+      why: The script has no field for the period stood on.
+      owner: Unplaced - REQ-GEN-135's script format.
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 6 - a period whose _manifest lists promoted, inherited
+        and substituted tables together (TS-55).
+      why: Needs TS-54's substitution beside an inheritance in one period.
+      owner: Unplaced - follows criterion 5.
+      blocked_by:
+        unowned: true
+    evidence:
+    - '2026-10-05 (sprint 11), against the same rebuild: TS-47''s scripted mark-not-supplied
+      of 2026-09-07 was played back through REQ-GEN-135 as the synthetic person
+      two hours after the late file''s receipt, recorded in qa.decision and carried
+      to the dashboard data as a mark on the closed, unfilled slot - which the
+      page reads as ''not supplied (accepted)'' (criterion 3). Every decision
+      went through the one decision path (criterion 7); the scenarios whose requirements
+      or shapes are not ready stay registered and uninjected (criterion 8). tests/test_scripted_decisions.py
+      covers the playback itself.'
+    implemented_by:
+    - contract/scripted_decisions.yaml
+    - generator/scenario_injection.py::INJECTIONS
+    - qa_tools/common/scripted_decisions.py::Player
+    linked_tests:
+    - tests/test_scripted_decisions.py
+    - tests/test_scenario_injection.py
     source: "Keith, 2026-10-04, 'SCENARIOS FOR THIS BATCH' (person decisions; the manifest showing promoted/inherited/substituted), plans/road-testing.md #16. Scoped by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL register each scenario below as an [INJECT] entry naming the arrivals it needs, the scripted decisions it plays back and the requirements it demonstrates."
@@ -26901,7 +27116,18 @@ requirements:
       date: "2026-10-04"
     story: "As someone reading the scenario map, I want every scenario's stated expectation to match the rules as they now are, so that a planted scenario never 'fails' because the register still describes a rule the batch replaced."
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 (sprint 11): the register grepped for the retired vocabulary
+      (monotonic, oldest claimable, non-claimable, marked missed, ambiguity, hold);
+      TS-2, TS-4, TS-6c, TS-7, TS-11, TS-14, TS-27 and TS-28 rewritten or annotated,
+      each keeping a ''Used to expect'' sentence naming the requirement that changed
+      it; TS-5 already carried one. SCENARIOS.md regenerated in the same change.'
+    implemented_by:
+    - plans/supply-model.md
+    - SCENARIOS.md
+    linked_tests:
+    - tests/test_scenario_map.py
     source: "Found by delivery-scoper 2026-10-04 while drafting the batch's scenarios: several register entries in plans/supply-model.md assert the filing rule that REQ-PIPE-131 replaces. Scoped by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL re-check every entry in the test scenario register against the option A and period-closing requirements, and SHALL rewrite each expectation those requirements change in the same change that builds the requirement."
@@ -26924,7 +27150,24 @@ requirements:
       date: "2026-10-04"
     story: "As Keith walking someone through the PoC, I want the scenario map to be a destination of its own beside Plans and Demo, so that 'what was planted, and where do I see it' is one click from the top of the page rather than a side drawer."
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 (sprint 11): the scenario map is a top-level tab at /scenarios
+      beside Plans and Demo; the drawer is gone and a saved ?panel=scenarios link
+      opens the tab. Each entry names the requirements its register text cites
+      and says ''no data behind it yet'' where it has none. tests-js/scenario-panel.test.js
+      (11) and tests/test_dashboard_e2e.py''s TestScenariosTab (4, real browser)
+      cover the route, the back button, plain text with no coordinates, and no
+      URL in the committed map.'
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::renderScenarios
+    - dashboard/qa-reporting-dashboard.template.html::scenarioEntryHtml
+    - dashboard/qa-reporting-dashboard.template.html::stateFromLocation
+    - qa_tools/common/scenarios.py::Scenario
+    - qa_tools/common/scenario_map.py::build_map
+    linked_tests:
+    - tests-js/scenario-panel.test.js
+    - tests/test_dashboard_e2e.py
     source: "Keith, 2026-10-04, 'THE SCENARIO MAP IS ALSO SHOWN INSIDE THE DASHBOARD (e.g. a Scenarios tab beside Plans and Demo)', plans/road-testing.md #16. Scoped by delivery-scoper 2026-10-04, which found REQ-DASH-046 already renders the map in a side drawer with click-through links."
     acceptance_criteria:
       - "THE SYSTEM SHALL render the committed scenario map as a top-level tab with its own URL, alongside Plans and Demo, in place of REQ-DASH-046's side drawer."

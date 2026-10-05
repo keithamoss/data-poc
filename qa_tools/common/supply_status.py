@@ -38,11 +38,18 @@ def runs_about(conn, dataset_id: str, supply: str) -> list[str]:
     from qa_tools.common import hierarchy
 
     table = hierarchy.dataset(dataset_id).table
+    # ON THE ASSET'S OWN TIMELINE (post-build-review #116, D1): a run
+    # caused by a decision is ordered by when the decision took effect, an
+    # arrival's run by when ITS supply was received - never by the batch's
+    # wall clock, which a replay stamps years after either, so a
+    # re-evaluation could never outrank the arrival it re-evaluated.
     rows = conn.execute(
-        f'SELECT r.run_key, COALESCE(d.effective_at, r.run_instant) AS caused_at '
-        f'FROM "{qa_store.SCHEMA}".run_visible r '
+        f'SELECT r.run_key, COALESCE(d.effective_at, rc.received_instant, r.run_instant) '
+        f'AS caused_at FROM "{qa_store.SCHEMA}".run_visible r '
         f'JOIN "{qa_store.SCHEMA}".tables_read t ON t.run_key = r.run_key '
         f'LEFT JOIN "{qa_store.SCHEMA}".decision d ON d.id = r.caused_by_decision '
+        f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt rc '
+        "ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id "
         "WHERE t.logical_table = ? AND (t.supply = ? OR (t.supply IS NULL "
         "AND t.physical_table = ?)) ORDER BY caused_at, r.run_key",
         [table, supply, physical_of(dataset_id, supply)]).fetchall()

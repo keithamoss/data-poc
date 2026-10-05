@@ -141,6 +141,34 @@ releases:
               decide whether it is promoted. The earlier filing stays on
               record, and you are shown first anything the move takes out or
               sets aside.
+          - headline: The scenario map is a tab of its own
+            components: ["Dashboard UI"]
+            description: >
+              The list of deliberately awkward supplies moved from a side
+              drawer to a Scenarios tab beside Plans and Demo, with its own
+              address. Each entry names the requirements it demonstrates and
+              says when there is no data behind it yet.
+          - headline: The sample history now plays back a person's decisions too
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              The synthetic history can now include a person's decisions,
+              scripted in configuration and raised through the same decision
+              path you use, such as acknowledging an amber supply or marking a
+              day not supplied. They run only on a synthetic asset, as a
+              dedicated actor no route but the replay can use.
+          - headline: More awkward supplies in the sample data
+            components: ["Testing & dev tooling"]
+            description: >
+              The sample history now shows a daily file arriving a day late
+              that fills the next day, while its own day is marked not
+              supplied by a person.
+          - headline: Fresh re-checks now win over older results in replays
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A supply's results are now ordered by when each run's cause took
+              effect on the asset's own timeline, never by when the batch
+              happened to run. In a replay, older results had been outranking
+              newer ones, which could show a false "red promoted".
           - headline: Every period says what each of its tables is
             components: ["Pipeline & publishing"]
             description: >

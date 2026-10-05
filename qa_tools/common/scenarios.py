@@ -72,6 +72,17 @@ class Scenario:
     body: str
 
     @property
+    def requirements(self) -> list[str]:
+        """The requirements this entry says it demonstrates - every REQ id
+        its text names, in order of first mention (REQ-DASH-139 criterion 3)."""
+        seen: list[str] = []
+        for found in re.findall(r"REQ-[A-Z]+-\d+", " ".join(
+                filter(None, (self.title, self.config, self.expect, self.breaks_as, self.body)))):
+            if found not in seen:
+                seen.append(found)
+        return seen
+
+    @property
     def is_injected(self) -> bool:
         """Only the INJECT set can have data behind it. A `[unit]`
         scenario has nothing to navigate to, and the map says so

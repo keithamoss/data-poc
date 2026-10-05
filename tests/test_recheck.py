@@ -196,3 +196,21 @@ class TestAPromotedSupplyRefiledIsCheckedInItsNewPeriod:
             got = fd.apply(ask(key), effective_at="2026-04-03T00:00:00+00:00", conn=conn)
         done = recheck.run(got.owed, run_by="pytest@example.org")
         assert done.completed, done.message
+
+
+class TestTheGateTakesEffectWhenItsCauseDid:
+    """post-build-review #116: a re-check's promotion was stamped with the
+    wall clock, so a replayed un-supersede in 2024 promoted in 2026."""
+
+    def test_it(self, owed_one, monkeypatch):
+        from qa_tools.common import promotion
+
+        seen = {}
+        monkeypatch.setattr(recheck, "execute", lambda **k: (object(), []))
+        monkeypatch.setattr(promotion, "after_runs",
+                            lambda arrivals, results, **k: seen.update(k) or
+                            promotion.AfterRun(promoted=(), refused={}, failed={}))
+        monkeypatch.setattr(promotion, "report", lambda o: None)
+        owed_id, _ = owed_one
+        recheck.run(owed_id, run_by="pytest@example.org")
+        assert seen["effective_at"].startswith("2026-04-02")

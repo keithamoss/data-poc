@@ -69,7 +69,8 @@ def process(arrival, *, steps: Steps, among: Sequence, run_timestamp: str,
 
 
 def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
-                run_timestamp: str | None = None, on_step=None) -> list[dict]:
+                run_timestamp: str | None = None, on_step=None,
+                player=None) -> list[dict]:
     """`process()` each arrival in the order given, one at a time.
 
     ONE AT A TIME BECAUSE THE CHAIN IS REAL: a supply fills its open slot,
@@ -85,8 +86,16 @@ def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
     arrivals = list(arrivals)
     results: list[dict] = []
     for arrival in arrivals:
+        # SCRIPTED DECISIONS BETWEEN ARRIVALS (REQ-GEN-135 criterion 3): every
+        # one that takes effect before this arrival was received is played
+        # first - only by the batch replay of a synthetic history, which is
+        # the one caller that passes a player.
+        if player is not None:
+            player.before(arrival)
         stamp = run_timestamp or asset_time.now().isoformat()
         results.extend(process(arrival, steps=steps, among=arrivals,
                                run_timestamp=stamp, run_by=run_by,
                                on_step=on_step))
+    if player is not None:
+        player.finish()
     return results

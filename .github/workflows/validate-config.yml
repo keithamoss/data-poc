@@ -84,6 +84,10 @@ jobs:
 
       - name: Gate - schedule and asset config validation (REQ-PIPE-050)
         run: uv run mothman schedule validate
+      # REQ-GEN-135 criterion 13: the scripted decisions, against
+      # configuration alone.
+      - name: Scripted decisions
+        run: uv run mothman scenarios validate
 
       - name: Gate - check-lifecycle validation (Thread D)
         run: uv run mothman dashboard validate-check-lifecycle --require-explanations

@@ -189,3 +189,14 @@ class TestParityWithThePipeline:
                         assert (row["kind"], row["supply"]) == (h.held_as, h.holder), (p, d.table)
                     else:
                         assert row is None or row["kind"] is None, (p, d.table)
+
+
+class TestTheDefinersSearchPathIsSafe:
+    """post-build-review #116 D5: SECURITY DEFINER with search_path =
+    pg_catalog alone searches pg_temp FIRST, so a caller's temporary pg_class
+    could spoof the listing. pg_temp must come last."""
+
+    def test_it(self, conn):
+        (config,) = conn.execute(
+            "SELECT proconfig FROM pg_proc WHERE proname = 'manifest_for'").fetchall()[0]
+        assert any(c.replace(" ", "") == "search_path=pg_catalog,pg_temp" for c in config), config

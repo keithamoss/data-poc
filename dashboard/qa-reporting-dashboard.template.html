@@ -1019,17 +1019,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
      a worse motion than closing a panel over the page you are about to
      land on - and this is a reference list you consult, not a place
      you work. -->
-<div class="backdrop" id="scenarios-backdrop"></div>
-<aside class="drawer" id="scenarios-panel" aria-hidden="true" inert>
-  <div class="drawer-head">
-    <div>
-      <div class="legend-key" style="margin:0 0 4px;">Which red was on purpose</div>
-      <h3>Scenarios</h3>
-    </div>
-    <button class="drawer-close" id="scenarios-panel-close" aria-label="Close">✕</button>
-  </div>
-  <div class="drawer-body" id="scenarios-panel-body"></div>
-</aside>
+<!-- REQ-DASH-139: the scenario map is a top-level tab now (renderScenarios), not a drawer. -->
 
 <!-- running-thoughts.md #3 ("gamification MVP", 2026-09-18; redesigned
      the same day for the automation-tension follow-up to item #5 Thread
@@ -3710,6 +3700,7 @@ function stateToPath(state){
   if(!state || state.tier==="exec") return "/";
   if(state.tier==="plans") return "/plans";
   if(state.tier==="demo") return "/demo";
+  if(state.tier==="scenarios") return "/scenarios";
   if(state.tier==="agency") return `/agency/${pathSegment(state.agencyId)}`;
   if(state.tier==="dataset"){
     let p = `/agency/${pathSegment(state.agencyId)}/collection/${pathSegment(state.collectionId)}/dataset/${pathSegment(state.datasetId)}`;
@@ -3726,6 +3717,7 @@ function pathToState(raw){
   if(parts.length===0) return {tier:"exec"};
   if(parts[0]==="plans") return {tier:"plans"};
   if(parts[0]==="demo") return {tier:"demo"};
+  if(parts[0]==="scenarios") return {tier:"scenarios"};
   if(parts[0]!=="agency" || !parts[1]) return null;
   const state = {tier:"agency", agencyId:parts[1]};
   if(parts[2]==="collection" && parts[3] && parts[4]==="dataset" && parts[5]){
@@ -3853,7 +3845,7 @@ function hashToState(){
 
 // panel=/cmp= (see comment above): read from location.search, same
 // URLSearchParams pattern inPlaceOnFromUrl() already established.
-const SIDE_PANELS = ["activity","changelog","requirements","snapshots","leaderboard","scenarios"];
+const SIDE_PANELS = ["activity","changelog","requirements","snapshots","leaderboard"];
 function panelFromUrl(){
   const v = new URLSearchParams(location.search).get("panel");
   return SIDE_PANELS.includes(v) ? v : undefined;
@@ -3870,6 +3862,9 @@ function cmpFromUrl(){
 // the full correct STATE object (including panel/compareIdx), since
 // every pushState call below constructs STATE completely before pushing.
 function stateFromLocation(){
+  // THE SCENARIOS DRAWER BECAME A TAB (REQ-DASH-139 criterion 1): a saved
+  // `?panel=scenarios` link opens the tab rather than nothing.
+  if(new URLSearchParams(location.search).get("panel") === "scenarios") return {tier:"scenarios"};
   const base = hashToState() || {tier:"exec"};
   const panel = panelFromUrl();
   const cmp = cmpFromUrl();
@@ -3877,6 +3872,12 @@ function stateFromLocation(){
 }
 
 let STATE = stateFromLocation();
+// A SAVED LINK WITH THE PREVIOUS PARAMETER IS REWRITTEN ON ARRIVAL
+// (REQ-PIPE-081 criterion 24; post-build-review #116, D4): honoured where CURRENT_IN_PLACE_ON is read,
+// and replaced in the address bar now, not at the reader's next date change.
+if(new URLSearchParams(location.search).has(PREVIOUS_DATE_PARAM)){
+  setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON);
+}
 
 function navigate(next){
   STATE = next;
@@ -4003,6 +4004,7 @@ function render(){
   if(STATE.tier==="exec") return done(renderExec(view));
   if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return done(renderPlans(view)); }
   if(STATE.tier==="demo") return done(renderDemo(view));
+  if(STATE.tier==="scenarios") return done(renderScenarios(view));
   if(STATE.tier==="agency") return done(renderAgency(view, STATE.agencyId));
   if(STATE.tier==="dataset") return done(renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId));
 }
@@ -4861,16 +4863,24 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
   const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
   const st = runStateInPlaceOn(raw, runId, on);
   if(st !== "promoted") return "";
-  const promotedAt = h.promotedAt;
-  let now = null, later = null;
+  // EVERY POINT COUNTS, including before the promotion (#116, D3): a supply
+  // promoted while already red is red promoted from the start, and skipping
+  // the earlier points left it with no label at all.
+  let now = null, later = null, since = null;
   (h.timeline || []).forEach(t=>{
-    if(!t.at || (promotedAt && t.at < promotedAt)) return;
-    if(!on || assetDateStrOf(t.at) <= on) now = t;
-    else if(!later && t.status === "red") later = t;
+    if(!t.at) return;
+    if(!on || assetDateStrOf(t.at) <= on){
+      if(!(now && now.status === "red" && t.status === "red")) since = t;
+      now = t;
+    }
+    else if(!later && t.status === "red" && !(now && now.status === "red")) later = t;
   });
   if(now && now.status === "red"){
+    const wentRed = h.promotedOn === "red";
     const went = h.promotedOn ? `went in ${escHtml(h.promotedOn)}, ` : "";
-    return `<span class="pill tag sm" data-red-promoted style="border-color:var(--red); color:var(--red);"><span class="ico"></span>Red promoted - ${went}turned red ${fmtInstant(now.at)} after ${escHtml(now.cause)}</span>`;
+    const how = wentRed ? "promoted while red"
+      : `turned red ${fmtInstant(since.at)} after ${escHtml(since.cause)}`;
+    return `<span class="pill tag sm" data-red-promoted style="border-color:var(--red); color:var(--red);"><span class="ico"></span>Red promoted - ${wentRed ? "" : went}${how}</span>`;
   }
   if(later){
     return `<span class="pill tag sm" data-turns-red-later style="color:var(--ink-muted);"><span class="ico"></span>Turned red later - ${fmtInstant(later.at)}, after ${escHtml(later.cause)}</span>`;
@@ -6133,7 +6143,7 @@ function renderSnapshotsPanel(){
 // deliberately NOT one of these 4 - it keeps its own separate, no-
 // history-entry behaviour (openInPlaceOnPanel()/closeInPlaceOnPanel() below,
 // unchanged) since Thread C's own design already settled that.
-const PANEL_RENDER = {activity:renderActivityPanel, changelog:renderChangelogPanel, requirements:renderRequirementsPanel, snapshots:renderSnapshotsPanel, leaderboard:renderLeaderboardPanel, scenarios:renderScenariosPanel};
+const PANEL_RENDER = {activity:renderActivityPanel, changelog:renderChangelogPanel, requirements:renderRequirementsPanel, snapshots:renderSnapshotsPanel, leaderboard:renderLeaderboardPanel};
 function showPanelDom(name){
   document.getElementById(`${name}-backdrop`).classList.add("open");
   document.getElementById(`${name}-panel`).classList.add("open");
@@ -6536,7 +6546,6 @@ function goToScenario(index){
   const entry = SCENARIO_MAP[index];
   const target = scenarioTarget(entry);
   if(!target) return;
-  closePanel();
   // THE AS-OF DATE FIRST, then the navigation. applyInPlaceOn() rebuilds
   // DATA and re-renders, so navigating first would render the target
   // page at the old date and then replace it - a visible flash of the
@@ -6548,8 +6557,43 @@ function goToScenario(index){
 
 const SCENARIO_MODE_LABEL = {INJECT:"In the data", unit:"Unit test", both:"Unit test and data"};
 
-function renderScenariosPanel(){
-  const body = document.getElementById("scenarios-panel-body");
+// ONE SCENARIO ENTRY: what it demonstrates, by requirement, and where it is
+// in the data or that nothing is behind it yet (REQ-DASH-139 criterion 3).
+function scenarioEntryHtml(entry, index){
+  const target = scenarioTarget(entry);
+  const coords = entry.coordinates;
+  const where = target
+    ? `<button type="button" class="pill tag sm" data-scenario="${index}"
+         style="border:0; cursor:pointer; font:inherit;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · in place on ${escHtml(coords.inPlaceOn)}</button>`
+    : `<span style="font-size:11.5px; color:var(--ink-faint);">${
+         entry.mode==="INJECT" ? "no data behind it yet" : "no data behind it — a unit test"}</span>`;
+  return `<div style="border-top:1px solid var(--line); padding:9px 0;">
+    <div style="display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;">
+      <b style="font-weight:650;">${escHtml(entry.id)}</b>
+      <span>${escHtml(entry.title||"")}</span>
+      <span class="pill nodata sm"><span class="ico"></span>${escHtml(SCENARIO_MODE_LABEL[entry.mode]||entry.mode)}</span>
+      ${(entry.requirements||[]).map(r=>`<span class="pill tag sm" data-demonstrates><span class="ico"></span>${escHtml(r)}</span>`).join("")}
+    </div>
+    <div style="color:var(--ink-muted); font-size:12.5px; margin-top:3px;">${inlinePlansMd(escHtml(entry.demonstrates||""))}</div>
+    <div style="margin-top:5px;">${where}</div>
+  </div>`;
+}
+// A TOP-LEVEL TAB BESIDE PLANS AND DEMO (REQ-DASH-139 criterion 1), with a
+// URL of its own, in place of REQ-DASH-046's side drawer - every one of that
+// requirement's behaviours kept (criterion 2).
+function renderScenarios(view){
+  setRail([{tier:"Tier 1", label:"Scenarios", nav:{tier:"scenarios"}}]);
+  view.innerHTML = `
+    <div class="view-head">
+      <div>
+        <div class="legend-key" style="margin:0 0 4px;">Which red was on purpose</div>
+        <h2>Scenarios</h2>
+      </div>
+    </div>
+    <div id="scenarios-panel-body"></div>`;
+  renderScenariosPanel(view.querySelector("#scenarios-panel-body"));
+}
+function renderScenariosPanel(body){
   if(!SCENARIO_MAP.length){
     body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
       No scenario map embedded — this page renders the repo's own committed
@@ -6576,24 +6620,7 @@ function renderScenariosPanel(){
   });
 
   const sections = [...bySection.entries()].map(([section, entries])=>{
-    const rows = entries.map(({entry, index})=>{
-      const target = scenarioTarget(entry);
-      const coords = entry.coordinates;
-      const where = target
-        ? `<button type="button" class="pill tag sm" data-scenario="${index}"
-             style="border:0; cursor:pointer; font:inherit;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · in place on ${escHtml(coords.inPlaceOn)}</button>`
-        : `<span style="font-size:11.5px; color:var(--ink-faint);">${
-             entry.mode==="INJECT" ? "not in the data yet" : "no data behind it — a unit test"}</span>`;
-      return `<div style="border-top:1px solid var(--line); padding:9px 0;">
-        <div style="display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;">
-          <b style="font-weight:650;">${escHtml(entry.id)}</b>
-          <span>${escHtml(entry.title||"")}</span>
-          <span class="pill nodata sm"><span class="ico"></span>${escHtml(SCENARIO_MODE_LABEL[entry.mode]||entry.mode)}</span>
-        </div>
-        <div style="color:var(--ink-muted); font-size:12.5px; margin-top:3px;">${inlinePlansMd(escHtml(entry.demonstrates||""))}</div>
-        <div style="margin-top:5px;">${where}</div>
-      </div>`;
-    }).join("");
+    const rows = entries.map(({entry, index})=> scenarioEntryHtml(entry, index)).join("");
     return `<h4 style="margin:16px 0 0;">${escHtml(section)}</h4>${rows}`;
   }).join("");
 
@@ -6605,9 +6632,7 @@ function renderScenariosPanel(){
   });
 }
 
-document.getElementById("scenarios-btn").addEventListener("click", ()=> openPanel("scenarios"));
-document.getElementById("scenarios-backdrop").addEventListener("click", closePanel);
-document.getElementById("scenarios-panel-close").addEventListener("click", closePanel);
+document.getElementById("scenarios-btn").addEventListener("click", ()=> navigate({tier:"scenarios"}));
 document.getElementById("requirements-backdrop").addEventListener("click", closePanel);
 document.getElementById("requirements-panel-close").addEventListener("click", closePanel);
 

@@ -5641,7 +5641,7 @@ twice. It deliberately did not re-find the `TypeError`.
       counted. Worth knowing: a "done" sprint tag before today was checked
       against a short list.
 
-115. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **The CLI UX
+115. **[done, 2026-10-05]** **[Pipeline & publishing]** **The CLI UX
     critic on the re-file (11eb18e), driving it for real** against a copy of
     the deployment database. Each defect below was checked against the code
     and, where it could be, reproduced in a failing test before it was fixed.
@@ -5672,8 +5672,12 @@ twice. It deliberately did not re-find the `TypeError`.
       real-tools test of exactly that path, into an empty period, passes
       (`TestAPromotedSupplyRefiledIsCheckedInItsNewPeriod`). The critic's
       case had a target that already held a promoted version, and its tree
-      was an archive run without dbt on PATH. To be retried against a copy
-      of the schema-27 deployment once it is rebuilt.
+      was an archive run without dbt on PATH. RETRIED AND CLOSED, 2026-10-05:
+      on a copy of the schema-27 deployment, re-filing the promoted
+      cp-carers supply of 2026-Q2 into 2026-Q1, which already held one, ran
+      its owed re-check to completion (green, left waiting because the slot
+      is filled - the correct outcome under `never`). Not reproducible on
+      the real tree; taken as the critic's environment.
     - **FIXED, wording:**
       - The held-supply refusal now points at `mothman supply holds` (W1).
       - The supersede undo says what "out of the way" means (W3).
@@ -5692,3 +5696,55 @@ twice. It deliberately did not re-find the `TypeError`.
       - The Ctrl-C reason wording (P4).
       - The queue's silent pause (P5).
       - The re-file prompt offers no list of periods.
+
+116. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **The delivery
+    critic on sprint 10 (8040a69)**, which drove the dashboard built from a
+    copy of the schema-27 deployment in a real browser. Every finding was
+    checked against the code before it was written here.
+    - **D1 (HIGH), FIXED** (failing test first): "newest cause wins" ordered
+      a supply's runs by a mix of time scales. A decision's run was ordered
+      by the decision's historic effective time; an arrival's run by the
+      batch's WALL CLOCK, which a replay stamps years later. So in any
+      replay a re-evaluation could never outrank the arrival it
+      re-evaluated (REQ-PIPE-121 criteria 3 and 10). It showed a false "Red
+      promoted ... turned red 5 October 2026" on cp-investigations 2024-Q3.
+      An arrival's run is now ordered, and dated, by its supply's receipt
+      instant. The same fault stamped a re-check's gate decision with the
+      wall clock; it now takes effect when its cause did (failing test
+      first).
+    - **D3, FIXED** (failing test first): a supply promoted while already
+      red got no label, because every point before the promotion was
+      skipped. It now reads "Red promoted - promoted while red".
+    - **D4, FIXED** (failing test first): a legacy `?asof=` link was
+      honoured but stayed in the address bar until the date was changed.
+      It is now rewritten on arrival.
+    - **D5 (security), FIXED:** `manifest_for` is SECURITY DEFINER with
+      `search_path = pg_catalog` alone, so pg_temp was searched first and a
+      caller's temporary `pg_class` could spoof the listing (verified by the
+      critic). It is now `pg_catalog, pg_temp`. Schema 28.
+    - **D6, FIXED:** the knock-on read an INHERITED table as holding
+      nothing, so every reader of it looked stale and ran its tools again.
+    - **D2, FOR KEITH:** the status pill on a supply-history row and the
+      red-promoted label answer different questions, and they can
+      disagree on screen. The pill is the supply's arrival verdict; the
+      label is the newest result per check. One was a Green pill with
+      "Red promoted", and that one was D1's false red. Others were a Red
+      pill with no label, where later re-evaluations went green.
+      REQ-DASH-126 criterion 4 asks for the promoted-on verdict beside the
+      current one, but does not say which of the two the PILL is. Which
+      should it be, for a promoted supply?
+    - **D7, LOGGED:** REQ-DASH-127's NFR, which collapses superseded
+      versions under the version that superseded them, is not built. They
+      are flat rows. Recorded on the requirement.
+    - **D8, FOR KEITH (wording):** REQ-PIPE-123 criterion 3 says "as one
+      decision in one transaction". The build writes TWO entries, supersede
+      and promote, in one transaction, as REQ-PIPE-128's displacing
+      promotion does. Amend the criterion, or record the replacement as
+      one entry?
+    - **LOGGED, latent:** a move queued by a nested decision whose
+      savepoint later rolls back would still be owed. No caller today
+      catches inside an outer decision transaction.
+    - Coverage gaps the critic named and that are still open: no
+      real-browser test of red promoted (REQ-DASH-126 NFRs 1 and 3); no
+      cascade test; no test of an amber replacement owing an
+      acknowledgement.

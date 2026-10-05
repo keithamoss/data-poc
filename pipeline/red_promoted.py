@@ -25,10 +25,15 @@ def _cause(conn, run_key: str) -> tuple[str, str]:
     a re-evaluation followed (criterion 2)."""
     from qa_tools.common import hierarchy
 
+    # THE ASSET'S TIMELINE, as supply_status orders runs (#116, D1): an
+    # arrival's run is dated by its supply's receipt, never the batch clock.
     rows = conn.execute(
-        f'SELECT r.run_instant, r.dataset_id, d.action, d.dataset_id, d.effective_at '
-        f'FROM "{qa_store.SCHEMA}".run r LEFT JOIN "{qa_store.SCHEMA}".decision d '
-        "ON d.id = r.caused_by_decision WHERE r.run_key = ?", [run_key]).fetchall()
+        f'SELECT COALESCE(rc.received_instant, r.run_instant), r.dataset_id, d.action, '
+        f'd.dataset_id, d.effective_at FROM "{qa_store.SCHEMA}".run r '
+        f'LEFT JOIN "{qa_store.SCHEMA}".decision d ON d.id = r.caused_by_decision '
+        f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt rc '
+        "ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id "
+        "WHERE r.run_key = ?", [run_key]).fetchall()
     if not rows:
         return "", ""
     run_at, run_ds, action, cause_ds, cause_at = rows[0]

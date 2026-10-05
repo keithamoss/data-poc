@@ -2818,8 +2818,9 @@ class TestPerDatasetArrivals:
         assert text.strip(), "the cut-short dataset's own page rendered nothing"
 
 
-class TestScenariosPanel:
-    """REQ-DASH-046, in a real browser against the real built page.
+class TestScenariosTab:
+    """REQ-DASH-046's behaviours, kept, on REQ-DASH-139's top-level tab - in a
+    real browser against the real built page.
 
     The dashboard deliberately carries NO label on a deliberately
     broken supply - "this is still just a proof of concept", and the
@@ -2834,6 +2835,7 @@ class TestScenariosPanel:
         clean_page.locator("#scenarios-btn").click()
         clean_page.wait_for_timeout(400)
 
+        assert "/scenarios" in clean_page.url
         body = clean_page.locator("#scenarios-panel-body").inner_text()
         assert "which red was on purpose" in body.lower()
         assert "TS-1" in body, body[:300]
@@ -2860,7 +2862,7 @@ class TestScenariosPanel:
         clean_page.locator("#scenarios-btn").click()
         clean_page.wait_for_timeout(400)
 
-        panel = clean_page.locator("#scenarios-panel")
+        panel = clean_page.locator("#scenarios-panel-body")
         controls = panel.locator("a").count() + panel.locator("button[data-scenario]").count()
         assert controls <= len(placed), (
             f"the panel offers {controls} control(s) for {len(placed)} placed "
@@ -2878,18 +2880,18 @@ class TestScenariosPanel:
         assert "http" not in embedded
         assert "#/" not in embedded
 
-    def test_it_is_a_real_history_entry_that_the_back_button_closes(
+    def test_it_is_a_real_history_entry_that_the_back_button_leaves(
             self, clean_page, built_dashboard_html):
-        """The same behaviour every other side panel has - a panel that
-        swallowed the back button would be the one that felt broken."""
+        """A tab is navigation like Plans and Demo (REQ-DASH-139 criterion 1):
+        it has its own URL, and back returns to where the reader was."""
         _goto(clean_page, built_dashboard_html)
         clean_page.locator("#scenarios-btn").click()
         clean_page.wait_for_timeout(400)
-        assert "panel=scenarios" in clean_page.url
+        assert "/scenarios" in clean_page.url
 
         clean_page.go_back()
         clean_page.wait_for_timeout(400)
-        assert "panel=scenarios" not in clean_page.url
+        assert "/scenarios" not in clean_page.url
 
 
 class TestCrossTableChecks:

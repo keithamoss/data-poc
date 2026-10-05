@@ -105,6 +105,14 @@ class Injection:
     arrivals: tuple[ExtraArrival, ...] = ()
     #: Period offsets from the anchor that carry NO supply at all.
     suppress: tuple[int, ...] = ()
+    #: Period offsets from the anchor where no OTHER period's arrival may
+    #: land - a resend shifted off to the next weekday instead - while each
+    #: of these periods keeps its own supply. TS-47 needs its day's own
+    #: supply never to come, and on the first scripted replay an earlier
+    #: day's resend landed on it at 10:11 and filled it, which is not the
+    #: scenario. Suppressing the period would not do: the next day's own
+    #: supply is part of what TS-47 shows.
+    quiet: tuple[int, ...] = ()
     #: Other scenario ids this same placement demonstrates. TS-1's third
     #: file IS TS-4's already-filled-slot arrival; recording one
     #: placement under both is honest, where generating a second
@@ -123,6 +131,7 @@ class Placement:
     config: str
     arrivals: tuple[dict, ...] = field(default_factory=tuple)
     suppressed: tuple[str, ...] = ()
+    quiet: tuple[str, ...] = ()
 
     def as_record(self) -> dict:
         """The shape qa_tools/common/scenario_map.py reads.
@@ -256,6 +265,16 @@ def resolve(injection: Injection, periods: Sequence) -> Placement:
                 f"generated history")
         suppressed.append(periods[at].name)
 
+    quiet = []
+    for offset in injection.quiet:
+        at = index + offset
+        if not 0 <= at < len(periods):
+            raise CannotPlace(
+                f"{injection.scenario_id}: it needs the period {offset:+d} from "
+                f"{anchor.name} kept clear of other periods' arrivals, and that period "
+                f"is outside the generated history")
+        quiet.append(periods[at].name)
+
     arrivals = []
     for extra in injection.arrivals:
         day = anchor.date + timedelta(days=extra.day_offset)
@@ -273,7 +292,8 @@ def resolve(injection: Injection, periods: Sequence) -> Placement:
         period_date=anchor.date,
         config=injection.config,
         arrivals=tuple(arrivals),
-        suppressed=tuple(suppressed))
+        suppressed=tuple(suppressed),
+        quiet=tuple(quiet))
 
 
 def for_dataset(dataset_id: str, injections: Sequence[Injection] | None = None
@@ -296,7 +316,8 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
     seen: dict[tuple[str, str], str] = {}
     for injection in injections:
         placement = resolve(injection, periods_by_dataset[injection.dataset_id])
-        for name in (placement.period, *placement.suppressed):
+        for name in dict.fromkeys((placement.period, *placement.suppressed,
+                                   *placement.quiet)):
             key = (injection.dataset_id, name)
             if key in seen and seen[key] != injection.scenario_id:
                 raise CannotPlace(
@@ -506,7 +527,9 @@ INJECTIONS: tuple[Injection, ...] = (
                           "day, because tomorrow's window has not opened, so this day is "
                           "still the open period"),
         ),
-        also_demonstrates=("TS-4",),
+        # TS-41: the 16:00 resend supersedes the 14:00 supply that failed
+        # (REQ-PIPE-118) - the same placement, honestly recorded under both.
+        also_demonstrates=("TS-4", "TS-41"),
     ),
     Injection(
         scenario_id="TS-2",
@@ -527,6 +550,41 @@ INJECTIONS: tuple[Injection, ...] = (
             ExtraArrival(0, "14:00", None, "the on-time arrival, two days after the outage"),
         ),
         suppress=(-2, -1),
+    ),
+    # REQ-GEN-136 and 137 (sprint 11). Each is placed inside the setting era
+    # it needs (contract/data-asset.yaml's synthetic versions; criterion 15),
+    # and none shares a period with another. Shapes only: the severity is
+    # what the generator puts into the rows, and the QA tools decide.
+    #
+    # TS-43, TS-44, TS-45 AND TS-46 ARE PARKED (Keith, 2026-10-05). The
+    # first three each need an AMBER supply - warnings and no failure - and
+    # TS-46 a GREEN resend; no dial this generator
+    # has produces one reliably: the 'amber' preset trips single-tier checks
+    # and reads red as a whole, and a plain truncation into the row-count
+    # warn band splits multiple-birth groups (three sibling checks fail) and
+    # compounds across consecutive days (row count and drift fail). TS-46's
+    # resend is churned from the first supply, which moves its row count and
+    # its distribution enough that those two checks read it red against the
+    # supply it was to replace. All were tried on real rebuilds; the
+    # register says what planting needs (plans/running-thoughts.md #63).
+    Injection(
+        scenario_id="TS-47",
+        dataset_id="birth-registrations",
+        anchor=-16,
+        # QUIET ON ITS OWN DAY AND THE NEXT, so no earlier day's resend
+        # fills either before the late file comes (found by the first
+        # scripted replay, which refused the mark-not-supplied because a
+        # 10:11 resend had filled the day).
+        quiet=(0, 1),
+        config="daily, due 14:00 AWST, 4-hour claim window: the next day's window "
+               "opens at 10:00. The day's own supply never comes; it arrives at 11:00 "
+               "the NEXT day, after that window opened.",
+        # NO `suppress`: the injection already replaces this period's own
+        # chain with the one late arrival, and suppressing the day as well
+        # shifted an unrelated resend onto the next day, where it collided
+        # with another arrival's receipt instant.
+        arrivals=(ExtraArrival(1, "11:00", None,
+                               "the late file, which fills the next day rather than its own"),),
     ),
     Injection(
         scenario_id="TS-38",

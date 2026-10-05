@@ -2842,6 +2842,9 @@ day's window opened, read as overdue, and a human marks them not
 supplied with a reason (REQ-PIPE-132).
 **Breaks as**: files as Tuesday, two days late; the next as Wednesday;
 the feed sits permanently two days behind for ever.
+*Used to expect* the missed days marked missed under monotonic filling -
+REQ-PIPE-131 closes a slot by time and REQ-PIPE-132 has a person mark it
+not supplied.
 
 **TS-3 `[INJECT]` Arrival just OUTSIDE the claim window - four
 sub-tests.**
@@ -2897,11 +2900,16 @@ Label them as such, so a later session does not "fix" them.
 
 **TS-4 `[INJECT]` Arrival into an already-filled slot.**
 A supply arrives for a period that has already been accepted.
-**Expect**: never auto-promotes whatever its status; warns; the message
-names the context ("a supply arrived for Monday, which was already
-accepted at 16:00", plus the boundary detail where relevant); and the
-three genuinely different actions are reachable - **accept** as a
-correction, **re-file** to another slot, **reject** as a duplicate.
+**Expect**: does not auto-promote unless the replacement setting in
+force permits its status (REQ-PIPE-123 - `never` as shipped, so it waits);
+where it permits, it replaces the promoted supply, which is superseded,
+never rejected. Warns; the message names the context ("a supply arrived
+for Monday, which was already accepted at 16:00", plus the boundary detail
+where relevant); and the three genuinely different actions are reachable
+- **accept** as a correction (promoting it supersedes the one in place,
+REQ-PIPE-128), **re-file** to another slot, **reject** as a duplicate.
+*Used to expect* "never auto-promotes whatever its status" -
+REQ-PIPE-123 made that a setting (REQ-GEN-138).
 
 **TS-5 `[unit]` A missed slot must not absorb a later resupply.**
 *Config: MUST be stated per variant - Keith's correction.*
@@ -2953,13 +2961,17 @@ never held merely for being late.
 
 Split into three at Keith's request: as one test it hid exactly the
 ambiguity he asked about ("would it file to Tuesday or Wednesday?").
+*Used to expect* a late Tuesday backfill to be held as non-claimable -
+REQ-PIPE-131 files it to the open period and a person re-files it.
 
 **TS-7 `[unit]` No period open - hold, do not guess.**
 An arrival when no slot of its dataset is open: before its first claim
 window, or in a calendar period a partially-participating dataset is not
 in (REQ-PIPE-131 criterion 10).
 **Expect**: **held for a human**, never defaulted forward or backward.
-Defaulting forward is the forward cascade again.
+Defaulting forward is the forward cascade again. *Used to expect* a hold
+whenever the oldest claimable slot was ambiguous - REQ-PIPE-131 holds only
+when no period is open.
 
 **TS-8 `[unit]` Assignment must be order-independent.**
 Two files land in one batch with close arrival timestamps - a late
@@ -3008,7 +3020,11 @@ activity feed** for humans to check - see "The activity feed" below.
 A supply filed to Monday reads late; a human re-files it to Tuesday,
 where it was on time.
 **Expect**: the verdict **recomputes** - it now reads on time. A supply
-reported late only because it was misfiled was never actually late.
+reported late only because it was misfiled was never actually late. The
+re-filed supply returns to staging under a NEW filing (the old one kept),
+is checked again as a run of its own, and the gate decides (REQ-PIPE-140,
+REQ-PIPE-141). *Used to expect* the supply to move between slots and stay
+promoted - REQ-PIPE-141 made a re-file never fill its target directly.
 **Keith confirmed 2026-09-22 that he means RE-FILING** (moving a supply
 between slots), not just resupplies, and that it is in scope for these
 sprints - which **closes the open question** in Thread G about whether
@@ -3055,8 +3071,11 @@ is clients' own August slot - per-table slot sequences mean there is no
 "resupply of table X within delivery Y" concept to implement; it is just
 clients' August supply, arriving late. The previously blocked
 cross-table check now runs. If green, clients promotes and August's slot
-fills. `qa_results/` keeps **both** runs - the period's current state is
-the latest, its history is all of them.
+fills. The recorded QA history keeps **both** runs - the period's current
+state is the latest, its history is all of them. Clients arriving also
+re-evaluates the waiting placements' reading checks and re-gates them
+(REQ-PIPE-121). *Used to say* `qa_results/` kept both runs - REQ-PIPE-089
+moved the history into the database.
 
 **TS-15a `[unit]` An UNEXPECTED TABLE - recognised, but not owed.**
 A file that MATCHES a dataset's arrival pattern, for a dataset with no
@@ -3254,12 +3273,14 @@ quarterly to monthly, recorded as a new `effective_from` block.
 its own due date**. Periods that were met stay met; history does not
 move when a supplier changes.
 
-**TS-27 `[unit]` `not_expected` versus marked-missed.** **Expect**:
+**TS-27 `[unit]` `not_expected` versus marked not supplied.** **Expect**:
 `not_expected` yields **no slot** - nothing owed, nothing overdue,
-nothing red. A slot marked missed **keeps its slot**, unfilled, counted
+nothing red. A closed slot a person marks **not supplied** (REQ-PIPE-132)
+**keeps its slot**, unfilled, reading "not supplied (accepted)", counted
 as an obligation NOT MET, with a reason. The distinction protects
 supplier reliability from becoming whatever people were willing to
-excuse after the fact.
+excuse after the fact. *Used to say* "marked missed" - REQ-PIPE-132
+introduced mark as not supplied, which records the decision.
 
 ### Composition and as-at
 
@@ -3270,9 +3291,13 @@ Tue-Thu     nothing. Warehouse still holds the previous period's table.
 Fri         a human decides it is the best available and promotes it.
 ```
 Ask: as at **Wednesday**, what did the warehouse hold?
-**Expect**: the supply is **absent** from the as-at-Wednesday view.
-Keith, 2026-09-22: "it hadn't arrived and the human had not yet made the
-decision." Filtering is on **promotion**, not arrival.
+**Expect**: the supply is **absent** from the in-place-on-Wednesday view:
+it was rejected on Monday, so it was withdrawn on every day before Friday
+(REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05). *Used to expect*
+it absent because "filtering is on **promotion**, not arrival" (Keith,
+2026-09-22) - the amended criteria show the newest supply promoted OR
+awaiting, and a supply leaves the view only when withdrawn, so the answer
+stands for a different reason.
 **Why it needs a test rather than being obvious**: for auto-promoted
 supplies, arrival and promotion are minutes apart and the two filters
 are indistinguishable. The gap only opens on **human-decided** supplies -
@@ -3482,6 +3507,145 @@ withheld the whole delivery, which cost 45 healthy supplies a person's
 attention across the real corpus. Whether a slot is open is a fact about
 ONE dataset on ONE instant - so a sibling can neither earn a hold nor
 escape one.
+
+### The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)
+
+*Added 2026-10-05, sprint 11. Each names the requirement it demonstrates.
+The setting eras these need are synthetic versions in
+`contract/data-asset.yaml`; the person decisions are played back from
+`contract/scripted_decisions.yaml` (REQ-GEN-135). An entry not yet in the
+data says why.*
+
+**TS-41 `[INJECT]` A resend supersedes the failed supply before it.**
+*Config: daily, due 14:00 AWST - TS-1's own placement.*
+The 14:00 supply fails QA and waits; the 16:00 resend arrives for the same
+day.
+**Expect**: the resend supersedes the waiting 14:00 supply, which moves to
+the period's superseded schema, named as superseded by the resend
+(REQ-PIPE-118).
+**Breaks as**: two versions of one table waiting for one day, every reader
+contested.
+
+**TS-42 `[INJECT]` A contested pair of one Child Protection table,
+resolved by a later file.** NOT IN THE DATA, and not for want of a build:
+Child Protection's arrival patterns are exact filenames, so two files in one
+directory can never both match one table - the same finding TS-34 records.
+Planting it means widening a pattern, which is Keith's call (REQ-PIPE-118,
+REQ-PIPE-105 criterion 6).
+
+**TS-43 `[INJECT]` An amber supply held under hold.**
+PARKED, NOT IN THE DATA (Keith, 2026-10-05): it needs an AMBER supply -
+warnings and no failure - and the generator has no dial that makes one
+reliably. The 'amber' preset trips checks that fail on any single bad value,
+so the supply reads red as a whole (36 failures on the first rebuild); a
+plain truncation into the row-count warn band splits multiple-birth groups,
+failing the three sibling checks, and compounds across consecutive days.
+Planting it needs a truncation that keeps whole multiple-birth groups, on a
+day whose previous supply was clean.
+*Config: daily; the amber setting is HOLD from 2026-09-01.*
+**Expect**: the amber supply is not promoted; the rule records a
+promotion-withheld note naming the setting, and the slot reads amber,
+waiting for a person (REQ-PIPE-122).
+**Breaks as**: it promotes itself, as it would under promote.
+
+**TS-44 `[INJECT]` An amber supply promoted and awaiting acknowledgement.**
+PARKED, NOT IN THE DATA (Keith, 2026-10-05): it needs an AMBER supply -
+warnings and no failure - and the generator has no dial that makes one
+reliably. The 'amber' preset trips checks that fail on any single bad value,
+so the supply reads red as a whole (36 failures on the first rebuild); a
+plain truncation into the row-count warn band splits multiple-birth groups,
+failing the three sibling checks, and compounds across consecutive days.
+Planting it needs a truncation that keeps whole multiple-birth groups, on a
+day whose previous supply was clean.
+*Config: daily; PROMOTE-AND-ACKNOWLEDGE from 2026-09-10.*
+**Expect**: promoted by the rule, recorded with the setting, and shown as
+awaiting acknowledgement (REQ-PIPE-122).
+**Breaks as**: promoted with nothing asked, or held.
+
+**TS-45 `[INJECT]` The same, acknowledged by a person.**
+PARKED, NOT IN THE DATA (Keith, 2026-10-05): it needs an AMBER supply -
+warnings and no failure - and the generator has no dial that makes one
+reliably. The 'amber' preset trips checks that fail on any single bad value,
+so the supply reads red as a whole (36 failures on the first rebuild); a
+plain truncation into the row-count warn band splits multiple-birth groups,
+failing the three sibling checks, and compounds across consecutive days.
+Planting it needs a truncation that keeps whole multiple-birth groups, on a
+day whose previous supply was clean.
+*Config: as TS-44; a scripted acknowledgement three hours after receipt.*
+**Expect**: beside TS-44's, this one reads acknowledged, by the person, with
+their reason (REQ-PIPE-122, REQ-GEN-137 criterion 4).
+**Breaks as**: the acknowledgement refused, or written outside the decision
+path.
+
+**TS-46 `[INJECT]` A green resupply replaces the promoted supply.**
+PARKED, NOT IN THE DATA (Keith, 2026-10-05), for TS-43's reason: the
+generator cannot aim for a verdict. A resend is churned from the supply
+before it, which moved its row count and its distribution of `sex` far
+enough that both checks read it red against the supply it was to replace,
+so it waited for a person rather than replacing it. Planting it needs a
+resend built to stay green against its predecessor
+(plans/running-thoughts.md #63).
+*Config: daily; the replacement setting is GREEN from 2026-09-18 to
+2026-09-21.*
+Two green supplies for one day, at 14:00 and 16:00.
+**Expect**: the 16:00 supply is promoted by the rule, naming the supply it
+replaced and the setting; the 14:00 one is superseded, not rejected, and its
+supply-history row says so (REQ-PIPE-123, REQ-DASH-127).
+**Breaks as**: the resend waits for a person, as it would under never.
+
+**TS-47 `[INJECT]` A daily file arriving after the next day's window
+opened.**
+*Config: daily, due 14:00, 4-hour claim window - the next day's window opens
+at 10:00.*
+The day's supply never comes on the day; it arrives at 11:00 the next
+morning.
+**Expect**: it fills the NEXT day, the period open when it arrived; its own
+day closes with no supply, overdue, and a scripted person marks it not
+supplied, so it reads "not supplied (accepted)" (REQ-PIPE-131, REQ-PIPE-132,
+REQ-DASH-133, REQ-GEN-137 criterion 3).
+**Breaks as**: filed backward to its own day.
+
+**TS-48 `[INJECT]` A correction arriving before its partner is promoted.**
+NOT IN THE DATA YET. A single-table correction that goes red on a
+cross-table check and is promoted when its partner's promotion re-checks it
+(REQ-PIPE-121) needs the Child Protection generator to place a partner's
+promotion between two arrivals of one quarter, which its delivery shapes do
+not yet express.
+
+**TS-49 `[INJECT]` A correction still failing after its partner's
+promotion.** NOT IN THE DATA YET, for TS-48's reason. Would produce the
+decision log's still-failing record (REQ-PIPE-121 criterion 12).
+
+**TS-50 `[INJECT]` A reader re-checked against the newer version.** NOT IN
+THE DATA YET, for TS-48's reason (REQ-PIPE-118, REQ-PIPE-123 with a
+cross-table reader).
+
+**TS-51 `[INJECT]` A promoted supply turned red by a later sibling.** NOT IN
+THE DATA YET. Needs a Child Protection file shape that breaks a promoted
+sibling's referential check (REQ-DASH-126).
+
+**TS-52 `[INJECT]` Case Workers arriving in a period it does not deliver
+in.** NOT INJECTED: the ordinary history already produces it - Case Workers
+files arrive in every delivery and are held in the quarters it does not
+take part in (TS-33a, REQ-PIPE-131). An injection would record a placement
+for what is already there; it waits on the Child Protection injection
+supporting a placement with no extra arrival.
+
+**TS-53 `[INJECT]` Keith's worked un-supersede case.** NOT IN THE DATA -
+FOR KEITH. A good file superseded by a bad later one, the bad one rejected
+and the good one un-superseded, re-checked and promoted by the gate
+(REQ-PIPE-120). Under the rules as built a good file is superseded only
+while WAITING, and a green one waits only behind a filled slot or a hold -
+in either case the gate does not promote it after the un-supersede without
+a further decision. What should the planted shape be?
+
+**TS-54 `[INJECT]` A period substituted onto an earlier promoted supply.**
+NOT IN THE DATA YET: the script has no field for the period stood on
+(REQ-PIPE-084, REQ-GEN-137 criterion 5).
+
+**TS-55 `[INJECT]` A period whose _manifest lists all three kinds.** NOT IN
+THE DATA YET: needs TS-54's substitution beside an inheritance in one
+period (REQ-PIPE-130, REQ-GEN-137 criterion 6).
 
 ### The activity feed
 

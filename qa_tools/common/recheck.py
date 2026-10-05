@@ -213,7 +213,7 @@ def run(owed_id: int, *, run_by: str | None = None, on_step=None) -> Outcome:
     """Run one owed item: a re-check (a supply's own checks again, then the
     gate) or a re-evaluation (REQ-PIPE-121's knock-on, knock_on.complete) -
     and clear it."""
-    from qa_tools.common import asset_time, decision_log, hierarchy, promotion
+    from qa_tools.common import decision_log, hierarchy, promotion
 
     with supply_db.connect(label="mothman:recheck") as conn:
         item, cleared_at = _owed_item(conn, owed_id)
@@ -251,7 +251,7 @@ def run(owed_id: int, *, run_by: str | None = None, on_step=None) -> Outcome:
     gated = promotion.after_runs(
         [arrival], results, agency_id=entry_ds.agency_id,
         collection_id=entry_ds.collection_id, actor=promotion.RULE_ACTOR,
-        actor_kind=decision_log.RULE, effective_at=asset_time.now().isoformat())
+        actor_kind=decision_log.RULE, effective_at=_cause_instant(item))
     promotion.report(gated)
     from qa_tools.common import supply_status
 
@@ -270,6 +270,21 @@ def run(owed_id: int, *, run_by: str | None = None, on_step=None) -> Outcome:
     return Outcome(item.id, run_key, True,
                    f"Checked against {period}: {verdict or 'no verdict'}. {then}",
                    status=verdict)
+
+
+def _cause_instant(item) -> str:
+    """When the gate's decision takes effect: when the decision that owed
+    this re-check did - not now. A replay of four years must not stamp a
+    re-check's promotion with today (#116, the same rule knock_on follows)."""
+    from qa_tools.common import asset_time, decision_log
+
+    if item.caused_by_decision is not None:
+        with supply_db.connect(label="mothman:recheck") as conn:
+            rows = conn.execute(f"SELECT effective_at FROM {decision_log.TABLE} WHERE id = ?",
+                                [item.caused_by_decision]).fetchall()
+        if rows and rows[0][0]:
+            return rows[0][0].isoformat()
+    return asset_time.now().isoformat()
 
 
 def _filing_current() -> str:

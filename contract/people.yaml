@@ -87,6 +87,19 @@ people:
     nickname: Arthur
     roles: [manager]
     placeholder: true
+  # THE SCRIPTED HISTORY'S ACTOR (REQ-GEN-135). Raises the person decisions a
+  # synthetic history plays back, and nothing else: no GitHub username, never
+  # assigned, refused on every route outside scripted playback, and only on an
+  # asset that declares itself synthetic.
+  # Its NAME is an ordinary fictional one on purpose (REQ-GEN-135 criterion 12:
+  # the dataset pages show a scripted decision exactly as any person's, never
+  # labelled); its EMAIL is what names it as synthetic in the log and the
+  # terminal (NFR, auditability).
+  - email: scripted-history@synthetic.invalid
+    name: Robin Hale
+    nickname: Robin
+    roles: [qa]
+    synthetic: true
 
 assignments:
   - agency: registry-services
