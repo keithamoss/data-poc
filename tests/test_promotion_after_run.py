@@ -109,6 +109,7 @@ class TestRunningItTwiceIsSafe:
                 conn, work, agency_id=AGENCY, collection_id=COLLECTION, period=period,
                 actor="promotion-gate", actor_kind=dl.RULE, effective_at=WHEN)
         rows = conn.execute(
-            "SELECT count(*) FROM information_schema.tables WHERE table_schema = ?",
+            "SELECT count(*) FROM information_schema.tables WHERE table_schema = ? "
+            "AND table_name <> '_manifest'",
             [period_schema.period_schema(period)]).fetchall()
         assert rows[0][0] == 1

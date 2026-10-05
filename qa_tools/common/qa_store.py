@@ -139,7 +139,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 26
+SCHEMA_VERSION = 27
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -713,7 +713,7 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
                       'substitute', 'de-substitute',
                       'inherit', 'inherit-refused', 'un-inherit',
                       'promotion-withheld', 'mark-not-supplied', 'acknowledge',
-                      'supersede', 'un-supersede'));
+                      'supersede', 'un-supersede', 'still-failing'));
 -- WHICH NEWER SUPPLY SUPERSEDED THIS ONE (REQ-PIPE-118 criterion 10).
 -- Schema 22, additive. Schema 23 relaxed the shape for a PERSON's
 -- supersession (REQ-PIPE-120), which names no newer supply - shipped first
@@ -724,6 +724,39 @@ ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_supersede_sha
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_supersede_shape
     CHECK (action <> 'supersede'
            OR (from_slot IS NOT NULL AND (superseded_by IS NOT NULL OR actor_kind = 'person')));
+-- SPRINT 10's DECISION-LOG COLUMNS, ALL IN ONE VERSION (schema 27,
+-- REQ-PIPE-130 NFR 6: every column the batch needs arrives in one bump,
+-- because each bump costs a full regeneration).
+--   table_name - the dataset's table, beside dataset_id, on every entry
+--     (REQ-PIPE-130 criterion 10), so a period's _manifest needs no
+--     dataset-to-table mapping of its own.
+--   promoted_status - the supply's status at the moment it was promoted,
+--     rule or person (criterion 11): a fact about the decision, fixed
+--     when it was taken, never looked up later.
+--   replaces / replacement_* - the promoted supply a rule's promotion
+--     replaced, and the replacement setting it acted under, its level and
+--     its version (REQ-PIPE-123 criterion 5).
+--   caused_by_decision - the decision a rule's record follows from: the
+--     grouped "still failing" shout after a re-evaluation (REQ-PIPE-121
+--     criterion 12).
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS table_name text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS promoted_status text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS replaces text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS replacement_setting text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS replacement_level text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS replacement_version text;
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS caused_by_decision bigint;
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_promoted_status_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_promoted_status_shape
+    CHECK (promoted_status IS NULL OR action = 'promote');
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_replacement_known;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_replacement_known
+    CHECK (replacement_setting IS NULL
+           OR replacement_setting IN ('never', 'green', 'green-or-amber'));
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_still_failing_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_still_failing_shape
+    CHECK (action <> 'still-failing'
+           OR (actor_kind = 'rule' AND caused_by_decision IS NOT NULL AND reason IS NOT NULL));
 -- THE AMBER SETTING A RULE ACTED UNDER (REQ-PIPE-122 criteria 5, 11 and
 -- 19) - value, level and version - on every automatic promotion of an
 -- amber supply and on the withheld note under hold. Schema 21, additive.
@@ -786,7 +819,7 @@ CREATE INDEX IF NOT EXISTS decision_stands_on
 ALTER TABLE "{SCHEMA}".decision ALTER COLUMN supply DROP NOT NULL;
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_supply_present;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_supply_present
-    CHECK (action IN ('inherit-refused', 'mark-not-supplied')
+    CHECK (action IN ('inherit-refused', 'mark-not-supplied', 'still-failing')
            OR (supply IS NOT NULL AND supply <> ''));
 
 --   WHEN A PERIOD WAS OPENED (REQ-PIPE-098 criterion 3). "First
@@ -1093,6 +1126,57 @@ $fn$;
 
 CREATE VIEW "{SCHEMA}".slot_holds_now AS
 SELECT * FROM "{SCHEMA}".slot_holds(NULL, NULL);
+
+-- WHAT A PERIOD HOLDS AND HOW IT GOT THERE (REQ-PIPE-130), the one
+-- definition every period's `_manifest` view is a thin call on. WHAT is in
+-- the schema comes from the catalogue - one row per table or view actually
+-- present (criterion 2) - and WHY from qa.slot_holds, the filings' receipt
+-- view and the promotion entry (criterion 7): never a maintained table.
+--
+-- SECURITY DEFINER, so a reader granted only a period schema reads its
+-- `_manifest` without any grant on this metadata schema (NFR 2), and sees
+-- only these columns. search_path is pinned for the same reason.
+--
+-- decided_by is ONLY 'rule' or 'person', never a name (criterion 5).
+-- promoted_status is what the supply was promoted on - for an inherited or
+-- substituted table, the supply it stands on - and never its health since
+-- (criteria 11 and 12). acknowledged is NULL where none was owed (6).
+CREATE OR REPLACE FUNCTION "{SCHEMA}".manifest_for(for_period text, for_schema text)
+RETURNS TABLE (table_name text, dataset_id text, kind text, supply text,
+               received_at timestamptz, from_period text, decided_at timestamptz,
+               decided_by text, acknowledged boolean, reason text, promoted_status text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $fn$
+WITH present AS (
+    SELECT c.relname::text AS table_name
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = for_schema AND c.relkind IN ('r', 'v', 'm', 'p', 'f')
+      AND c.relname <> '_manifest'
+), held AS (
+    SELECT h.dataset_id, h.held_as, h.holder, d.table_name, d.effective_at,
+           d.actor_kind, d.reason, d.stands_on
+    FROM "{SCHEMA}".slot_holds(NULL, NULL) h
+    JOIN "{SCHEMA}".decision d ON d.id = h.decision_id
+    WHERE h.slot = for_period AND h.held_as IS NOT NULL
+)
+SELECT p.table_name, h.dataset_id, h.held_as, h.holder, r.received_instant,
+       CASE WHEN h.held_as = 'promoted' THEN NULL ELSE h.stands_on END,
+       h.effective_at, h.actor_kind,
+       CASE WHEN pr.acknowledgement_owed THEN EXISTS (
+           SELECT 1 FROM "{SCHEMA}".decision a
+           WHERE a.action = 'acknowledge' AND a.dataset_id = h.dataset_id
+             AND a.supply = h.holder AND a.to_slot = pr.to_slot) END,
+       h.reason, pr.promoted_status
+FROM present p
+LEFT JOIN held h ON h.table_name = p.table_name
+LEFT JOIN "{SCHEMA}".supply_receipt r
+       ON r.dataset_id = h.dataset_id AND r.supply_id = h.holder
+LEFT JOIN LATERAL (
+    SELECT x.promoted_status, x.acknowledgement_owed, x.to_slot
+    FROM "{SCHEMA}".decision x
+    WHERE x.action = 'promote' AND x.dataset_id = h.dataset_id AND x.supply = h.holder
+    ORDER BY x.effective_at DESC, x.id DESC LIMIT 1) pr ON true
+ORDER BY p.table_name
+$fn$;
 """
 
 

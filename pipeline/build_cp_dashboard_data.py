@@ -29,7 +29,7 @@ import json
 import os
 from datetime import datetime
 
-from pipeline import acknowledgements, closed_slots, recorded_arrival, slot_timeline
+from pipeline import acknowledgements, closed_slots, recorded_arrival, red_promoted, slot_timeline
 from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
@@ -607,6 +607,11 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # page's verdict is the newest supply promoted or awaiting on the
         # date on show. Answers from the decision log, looked up there.
         "runStates": slot_timeline.run_states(dataset_id),
+        # HOW EACH PROMOTED SUPPLY HAS DONE SINCE (REQ-DASH-126): the status
+        # it was promoted on and its status after each run that read it, so
+        # the page can say "red promoted" on the dates it was, and when and
+        # after what it turned. See pipeline/red_promoted.py.
+        "promotedHealth": red_promoted.for_dataset(dataset_id),
         # EVERY PERIOD THAT CLOSED WITH NO SUPPLY, and the instants that
         # decide what it reads as on any date (REQ-DASH-133 criteria 9 and
         # 10) - see pipeline/closed_slots.py. The page compares instants;

@@ -116,7 +116,7 @@ _NAMES_THE_SUPPLY = (filing_decisions.PROMOTE, filing_decisions.REJECT,
 
 #: How an operation reads as a NOUN in a prompt - "this acknowledge" was
 #: the verb doing a noun's job (#107).
-_NOUN = {filing_decisions.ACKNOWLEDGE: "acknowledgement"}
+_NOUN = {filing_decisions.ACKNOWLEDGE: "acknowledgement", filing_decisions.REFILE: "re-file"}
 
 _HOW_IT_READS = {
     slot_state.NOT_YET_DUE: "[dim]not yet due[/dim]",
@@ -352,6 +352,7 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
                              title="Recorded", border_style="green", expand=False))
         if outcome.owed:
             _run_owed(outcome.owed)
+        _follow_up(hierarchy.dataset(dataset_id).collection_id)
         filing_decisions.reconcile_after(
             outcome, hierarchy.dataset(dataset_id).collection_id)
     else:
@@ -360,6 +361,25 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
         console.print(Panel(Text(outcome.message), title="Already so",
                              border_style="blue", expand=False))
     return outcome
+
+
+def _follow_up(collection_id: str) -> None:
+    """The knock-on of what the decision moved (REQ-PIPE-121): every period
+    it moved a table into or out of re-evaluates its readers, and the gate
+    looks at each waiting one again. Said only where something happened; a
+    failure stays owed for the processing pass (criterion 14)."""
+    from qa_tools.common import knock_on
+
+    try:
+        done = knock_on.follow_up(collection_id)
+    except Exception as exc:  # noqa: BLE001 - the decision stands either way
+        console.print(f"The re-evaluation of the period's readers did not run ({exc}); "
+                      "it stays owed.", style="yellow")
+        return
+    for outcome in done:
+        if not outcome.completed:
+            console.print(Panel(Text(outcome.message), title="Re-evaluation owed",
+                                border_style="yellow", expand=False))
 
 
 def _run_owed(owed_id: int) -> None:
@@ -376,7 +396,10 @@ def _run_owed(owed_id: int) -> None:
     except recheck.RecheckRefused as exc:
         console.print(f"Not checked again: {exc}. It stays owed.", style="yellow")
         return
-    style = "green" if got.completed else "yellow"
+    # GREEN ONLY FOR A GREEN OR AMBER RESULT (post-build-review #115, D5): a
+    # red re-check that completed is not good news.
+    style = ("green" if got.completed and got.status in ("green", "amber")
+             else "red" if got.completed and got.status == "red" else "yellow")
     console.print(Panel(Text(got.message), title="Checked again" if got.completed
                         else "Check owed", border_style=style, expand=False))
 

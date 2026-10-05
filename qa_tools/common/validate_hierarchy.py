@@ -166,10 +166,25 @@ def reserved_name_errors(tree) -> list[str]:
     return errors
 
 
+def reserved_table_errors(tables: list[tuple[str, str]]) -> list[str]:
+    """[(dataset_id, table)] whose table takes a name every period schema
+    reserves for its own account of itself (REQ-PIPE-130 criterion 13):
+    `_manifest` would collide with the view, and the first promotion would
+    fail or the manifest would describe the wrong object."""
+    from qa_tools.common import period_schema
+
+    return [f"contract/data-asset.yaml: dataset {dataset_id!r} names its table "
+            f"{table!r}, which every period schema reserves for its _manifest view "
+            f"(REQ-PIPE-130). Rename the table."
+            for dataset_id, table in tables if table == period_schema.MANIFEST]
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     errors.extend(reserved_name_errors(
         [(d.agency_id, d.collection_id, d.dataset_id) for d in hierarchy.all_datasets()]))
+    errors.extend(reserved_table_errors(
+        [(d.dataset_id, d.table) for d in hierarchy.all_datasets()]))
     named = contracts()
     # A CONTRACT NOTHING NAMES is the one thing deriving the list could
     # have lost - and it was never checked before either, because

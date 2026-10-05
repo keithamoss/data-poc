@@ -240,6 +240,13 @@ def _scope_to_run(verified: list[dict], run_id: str) -> None:
 
     readers = reevaluation.plan(table=table, period=_period_of_run(dataset_id, run_id),
                                 reads=_declared_reads_tables()).check_ids
+    moved = _readers_scope(run_id)
+    if moved is not None:
+        # A READERS-ONLY RUN keeps only its dataset's checks that read a moved
+        # table (REQ-PIPE-121 criteria 1 and 2) - never its own table and
+        # column checks, which would be duplicate results that look like news.
+        keep = _readers_of(moved, dataset_id, run_id)
+        readers, contested = frozenset(keep), True
     verified[:] = [
         r for r in verified
         if (r.get("dataset_id") == dataset_id and not contested)
@@ -299,12 +306,53 @@ def scope_of_run(run_id: str):
         contested = False
     readers = reevaluation.plan(table=table, period=_period_of_run(dataset_id, run_id),
                                 reads=_declared_reads_tables()).check_ids
+    moved = _readers_scope(run_id)
+    if moved is not None:
+        # A READERS-ONLY RUN (REQ-PIPE-121 criterion 2): only its dataset's
+        # checks reading a moved table are this run's.
+        keep = _readers_of(moved, dataset_id, run_id)
+        return lambda check: check in keep
 
     def in_scope(check: str) -> bool:
         parsed = check_id_mod.try_parse(check)
         own = parsed is not None and parsed.dataset == dataset_id
         return (own and not contested) or check in readers
     return in_scope
+
+
+def _readers_scope(run_id: str) -> list[str] | None:
+    """The moved tables a READERS-ONLY run re-evaluates, from its run
+    record; None for any other run."""
+    from qa_tools.common import qa_store, supply_db
+
+    if not supply_db.split_run(run_id)[1]:
+        return None
+    conn = supply_db.connect(read_only=True, label="mothman:run-scope")
+    try:
+        rows = conn.execute(f'SELECT scope, reads_table FROM "{qa_store.SCHEMA}".run '
+                            "WHERE run_key = ?", [run_id]).fetchall()
+    finally:
+        conn.close()
+    if not rows or rows[0][0] != "readers":
+        return None
+    return [t for t in (rows[0][1] or "").split(",") if t]
+
+
+def _readers_of(tables: list[str], dataset_id: str, run_id: str) -> set[str]:
+    """`dataset_id`'s checks that read one of `tables` - reevaluation.plan(),
+    the one answer, per moved table."""
+    from qa_tools.common import check_id as check_id_mod
+    from qa_tools.common import reevaluation
+
+    reads = _declared_reads_tables()
+    period = _period_of_run(dataset_id, run_id)
+    out: set[str] = set()
+    for table in tables:
+        for check in reevaluation.plan(table=table, period=period, reads=reads).check_ids:
+            parsed = check_id_mod.try_parse(check)
+            if parsed is not None and parsed.dataset == dataset_id:
+                out.add(check)
+    return out
 
 
 def _period_of_run(dataset_id: str, run_id: str) -> str:

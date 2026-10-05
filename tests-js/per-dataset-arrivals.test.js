@@ -92,10 +92,10 @@ describe("each dataset's supply history comes from its own arrivals alone", () =
 describe("as-of viewing across datasets whose dates do not line up", () => {
   it("shows each dataset as at ITS OWN most recent arrival on or before the date", () => {
     const w = load();
-    const asOf = "2026-08-15";
+    const inPlaceOn = "2026-08-15";
 
-    const current = w.clipDatasetToAsOf(datasetArrivingOn("cp-clients", CURRENT), asOf);
-    const behind = w.clipDatasetToAsOf(datasetArrivingOn("cp-carers", BEHIND), asOf);
+    const current = w.clipDatasetToInPlaceOn(datasetArrivingOn("cp-clients", CURRENT), inPlaceOn);
+    const behind = w.clipDatasetToInPlaceOn(datasetArrivingOn("cp-carers", BEHIND), inPlaceOn);
 
     expect(current.lastArrival.run_date).toBe("2026-08-01");
     expect(behind.lastArrival.run_date).toBe("2026-05-01");
@@ -103,9 +103,9 @@ describe("as-of viewing across datasets whose dates do not line up", () => {
 
   it("clips each dataset's own runs, never the union of the collection's", () => {
     const w = load();
-    const asOf = "2026-05-15";
-    const current = w.clipDatasetToAsOf(datasetArrivingOn("cp-clients", CURRENT), asOf);
-    const behind = w.clipDatasetToAsOf(datasetArrivingOn("cp-carers", BEHIND), asOf);
+    const inPlaceOn = "2026-05-15";
+    const current = w.clipDatasetToInPlaceOn(datasetArrivingOn("cp-clients", CURRENT), inPlaceOn);
+    const behind = w.clipDatasetToInPlaceOn(datasetArrivingOn("cp-carers", BEHIND), inPlaceOn);
 
     expect(current.runs.map((r) => r.run_date)).toEqual(["2026-02-01", "2026-05-01"]);
     expect(behind.runs.map((r) => r.run_date)).toEqual(["2026-02-01", "2026-05-01"]);
@@ -121,26 +121,26 @@ describe("as-of viewing across datasets whose dates do not line up", () => {
     // promotion input at all to read instead.
     const w = load();
     const d = datasetArrivingOn("cp-clients", CURRENT);
-    expect(w.clipDatasetToAsOf(d, "2026-08-15").lastArrival.run_date).toBe("2026-08-01");
+    expect(w.clipDatasetToInPlaceOn(d, "2026-08-15").lastArrival.run_date).toBe("2026-08-01");
     expect(Object.keys(d)).not.toContain("promotedRuns");
   });
 
   it("an arrival AFTER the as-of date is excluded from the clipped history", () => {
     const w = load();
-    const clipped = w.clipDatasetToAsOf(datasetArrivingOn("cp-clients", CURRENT), "2026-05-01");
+    const clipped = w.clipDatasetToInPlaceOn(datasetArrivingOn("cp-clients", CURRENT), "2026-05-01");
     expect(clipped.arrivalHistory.map((a) => a.run_date)).toEqual(["2026-02-01", "2026-05-01"]);
   });
 
   it("a daily dataset and a quarterly one in the same collection each clip on their own cadence", () => {
     const w = load();
-    const quarterly = w.clipDatasetToAsOf(datasetArrivingOn("cp-clients", CURRENT, QUARTERLY), "2026-08-15");
-    const daily = w.clipDatasetToAsOf(
+    const quarterly = w.clipDatasetToInPlaceOn(datasetArrivingOn("cp-clients", CURRENT, QUARTERLY), "2026-08-15");
+    const daily = w.clipDatasetToInPlaceOn(
       datasetArrivingOn("bdm", ["2026-08-13", "2026-08-14", "2026-08-15"], DAILY), "2026-08-15");
 
     // The quarterly one is inside its own current cycle and is not stale;
     // the daily one's newest run IS the as-of date, so neither is.
-    expect(quarterly.staleAsOf).toBe(false);
-    expect(daily.staleAsOf).toBe(false);
+    expect(quarterly.staleInPlaceOn).toBe(false);
+    expect(daily.staleInPlaceOn).toBe(false);
     expect(daily.runs).toHaveLength(3);
   });
 });
@@ -148,7 +148,7 @@ describe("as-of viewing across datasets whose dates do not line up", () => {
 describe("a dataset with no arrival on or before the chosen date", () => {
   it("returns the existing no-data-as-of state rather than an empty or stale panel", () => {
     const w = load();
-    const clipped = w.clipDatasetToAsOf(datasetArrivingOn("cp-case-workers", LATE_STARTER), "2026-05-15");
+    const clipped = w.clipDatasetToInPlaceOn(datasetArrivingOn("cp-case-workers", LATE_STARTER), "2026-05-15");
     expect(clipped).toBeNull();
   });
 
@@ -160,10 +160,10 @@ describe("a dataset with no arrival on or before the chosen date", () => {
     // from here.
     const w = load();
     const d = datasetArrivingOn("cp-case-workers", LATE_STARTER);
-    for (const asOf of ["2026-01-01", "2026-05-15", "2026-08-01", "2026-12-31"]) {
-      const clipped = w.clipDatasetToAsOf(d, asOf);
+    for (const inPlaceOn of ["2026-01-01", "2026-05-15", "2026-08-01", "2026-12-31"]) {
+      const clipped = w.clipDatasetToInPlaceOn(d, inPlaceOn);
       expect(clipped === null || typeof clipped === "object").toBe(true);
-      if (clipped !== null) expect(clipped.noDataAsOf).toBeUndefined();
+      if (clipped !== null) expect(clipped.noDataInPlaceOn).toBeUndefined();
     }
   });
 
@@ -174,7 +174,7 @@ describe("a dataset with no arrival on or before the chosen date", () => {
     // a dataset - only the caller knows the name, because the feed it
     // would have come from is the thing that is missing.
     const empty = w.noDataDataset(d.id, d.name, "a provider", "CSV", d.sla);
-    expect(empty.noDataAsOf).toBe(true);
+    expect(empty.noDataInPlaceOn).toBe(true);
     expect(empty.status).toBe("nodata");
     expect(empty.id).toBe("cp-case-workers");
   });
@@ -183,7 +183,7 @@ describe("a dataset with no arrival on or before the chosen date", () => {
 describe("a collection arriving on six different schedules is not a bug", () => {
   it("every dataset resolves to a real state at one as-of date", () => {
     const w = load();
-    const asOf = "2026-06-15";
+    const inPlaceOn = "2026-06-15";
     const datasets = [
       datasetArrivingOn("cp-clients", CURRENT),
       datasetArrivingOn("cp-carers", BEHIND),
@@ -194,11 +194,11 @@ describe("a collection arriving on six different schedules is not a bug", () => 
     ];
 
     const resolved = datasets.map((d) =>
-      w.clipDatasetToAsOf(d, asOf) ?? w.noDataDataset(d.id, d.name, "a provider", "CSV", d.sla));
+      w.clipDatasetToInPlaceOn(d, inPlaceOn) ?? w.noDataDataset(d.id, d.name, "a provider", "CSV", d.sla));
 
     // Five have supplied by then; the late starter has not.
-    expect(resolved.filter((d) => d.noDataAsOf)).toHaveLength(1);
-    expect(resolved.filter((d) => !d.noDataAsOf)).toHaveLength(5);
+    expect(resolved.filter((d) => d.noDataInPlaceOn)).toHaveLength(1);
+    expect(resolved.filter((d) => !d.noDataInPlaceOn)).toHaveLength(5);
     // And nothing came back undefined - a dataset that resolves to
     // neither state is the "empty panel" criterion 4 forbids.
     expect(resolved.every(Boolean)).toBe(true);

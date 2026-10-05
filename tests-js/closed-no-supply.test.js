@@ -16,15 +16,15 @@ const LATER_DAY = slot("2026-03-09", 18);
 describe("what a closed slot reads as, as at the date on show", () => {
   it("is not a gap before it closes", () => {
     const w = load();
-    expect(w.closedGapsAsOf([DAYS[0]], "2026-02-28").open).toHaveLength(0);
-    expect(w.closedGapsAsOf([DAYS[0]], "2026-03-02").open).toHaveLength(1);
+    expect(w.closedGapsInPlaceOn([DAYS[0]], "2026-02-28").open).toHaveLength(0);
+    expect(w.closedGapsInPlaceOn([DAYS[0]], "2026-03-02").open).toHaveLength(1);
   });
 
   it("stops being a gap once something is filed or filled into it", () => {
     const w = load();
     const late = {...DAYS[0], filedAt: "2026-03-05T02:00:00+00:00"};
-    expect(w.closedGapsAsOf([late], "2026-03-04").open).toHaveLength(1);
-    expect(w.closedGapsAsOf([late], "2026-03-05").open).toHaveLength(0);
+    expect(w.closedGapsInPlaceOn([late], "2026-03-04").open).toHaveLength(1);
+    expect(w.closedGapsInPlaceOn([late], "2026-03-05").open).toHaveLength(0);
   });
 
   it("is a gap again once the slot is emptied after being filled (#105)", () => {
@@ -32,8 +32,8 @@ describe("what a closed slot reads as, as at the date on show", () => {
     const refilled = {...DAYS[0], changes: [
       {at: "2026-03-04T02:00:00+00:00", held: true},
       {at: "2026-03-08T02:00:00+00:00", held: false}]};
-    expect(w.closedGapsAsOf([refilled], "2026-03-05").open).toHaveLength(0);
-    expect(w.closedGapsAsOf([refilled], "2026-03-09").open).toHaveLength(1);
+    expect(w.closedGapsInPlaceOn([refilled], "2026-03-05").open).toHaveLength(0);
+    expect(w.closedGapsInPlaceOn([refilled], "2026-03-09").open).toHaveLength(1);
   });
 
   it("drops a mark once the slot has changed after it", () => {
@@ -42,7 +42,7 @@ describe("what a closed slot reads as, as at the date on show", () => {
       marks: [{at: "2026-03-05T02:00:00+00:00", actor: "k", reason: "r"}],
       changes: [{at: "2026-03-06T02:00:00+00:00", held: true},
                 {at: "2026-03-07T02:00:00+00:00", held: false}]};
-    const got = w.closedGapsAsOf([s], "2026-03-08");
+    const got = w.closedGapsInPlaceOn([s], "2026-03-08");
     expect(got.accepted).toHaveLength(0);
     expect(got.open).toHaveLength(1);
   });
@@ -51,8 +51,8 @@ describe("what a closed slot reads as, as at the date on show", () => {
     const w = load();
     const marked = {...DAYS[0],
                     marks: [{at: "2026-03-07T02:00:00+00:00", actor: "k@x", reason: "supplier outage"}]};
-    expect(w.closedGapsAsOf([marked], "2026-03-06").open).toHaveLength(1);
-    const after = w.closedGapsAsOf([marked], "2026-03-08");
+    expect(w.closedGapsInPlaceOn([marked], "2026-03-06").open).toHaveLength(1);
+    const after = w.closedGapsInPlaceOn([marked], "2026-03-08");
     expect(after.open).toHaveLength(0);
     expect(after.accepted).toHaveLength(1);
   });
@@ -75,7 +75,7 @@ describe("a dataset with an unmarked gap is red, an accepted one is not", () => 
   it("rolls an unmarked gap up as red", () => {
     const w = load();
     expect(w.rollup([dataset({noSupply: [{periods: ["x"]}]}), dataset({})])).toBe("red");
-    expect(w.rollup([dataset({noSupply: [{periods: ["x"]}], noDataAsOf: true, columns: []})])).toBe("red");
+    expect(w.rollup([dataset({noSupply: [{periods: ["x"]}], noDataInPlaceOn: true, columns: []})])).toBe("red");
   });
 
   it("keeps an accepted gap out of the red", () => {
@@ -116,8 +116,8 @@ describe("a period whose supply was rejected (REQ-PIPE-153 criterion 9)", () => 
 
   it("was waiting, not a gap, until the rejection", () => {
     const w = load();
-    expect(w.closedGapsAsOf([REJECTED], "2025-08-20").open).toHaveLength(0);
-    expect(w.closedGapsAsOf([REJECTED], "2025-09-01").open).toHaveLength(1);
+    expect(w.closedGapsInPlaceOn([REJECTED], "2025-08-20").open).toHaveLength(0);
+    expect(w.closedGapsInPlaceOn([REJECTED], "2025-09-01").open).toHaveLength(1);
   });
 
   it("says what happened to the supply, naming who and why", () => {
@@ -140,15 +140,15 @@ describe("the queue is read as at the date on show (UX critic, 2026-10-05)", () 
 
   it("replaces the build's closed periods with the page's own, as at the date", () => {
     const w = load();
-    const items = w.asOfQueueItems([BUILD_GAP], data);
+    const items = w.inPlaceOnQueueItems([BUILD_GAP], data);
     expect(items.map(i => i.headline)).toEqual(["Dataset D: 2 periods with no supply, 2025-Q2 to 2025-Q3"]);
     expect(items[0].redsDataset).toBe(true);
   });
 
   it("leaves out what was observed after the date on show", () => {
     const w = load();
-    w.eval("CURRENT_AS_OF = '2026-01-01'");
-    const kinds = w.asOfQueueItems([LATER, EARLIER], data).map(i => i.observedAt || "gap");
+    w.eval("CURRENT_IN_PLACE_ON = '2026-01-01'");
+    const kinds = w.inPlaceOnQueueItems([LATER, EARLIER], data).map(i => i.observedAt || "gap");
     expect(kinds).toContain(EARLIER.observedAt);
     expect(kinds).not.toContain(LATER.observedAt);
   });
@@ -161,15 +161,15 @@ describe("a slot late but still open", () => {
                            filedAt: null, closesAt: "2026-10-05T00:00:00+00:00"}]};
   it("is named on the day it is late and gone once it closes", () => {
     const w = load();
-    expect(w.lateOpenAsOf(DS, "2026-10-04").period).toBe("2026-10-04");
-    expect(w.lateOpenAsOf(DS, "2026-10-03")).toBeNull();
-    expect(w.lateOpenAsOf(DS, "2026-10-05")).toBeNull();
+    expect(w.lateOpenInPlaceOn(DS, "2026-10-04").period).toBe("2026-10-04");
+    expect(w.lateOpenInPlaceOn(DS, "2026-10-03")).toBeNull();
+    expect(w.lateOpenInPlaceOn(DS, "2026-10-05")).toBeNull();
   });
   it("is gone once a file arrives", () => {
     const w = load();
     const filed = {lateSlots: [{...DS.lateSlots[0], filedAt: "2026-10-04T05:00:00+00:00",
                                 closesAt: null}]};
-    expect(w.lateOpenAsOf(filed, "2026-10-04")).toBeNull();
+    expect(w.lateOpenInPlaceOn(filed, "2026-10-04")).toBeNull();
   });
 });
 
@@ -181,8 +181,8 @@ describe("a late slot on the build's own day", () => {
                 closesAt: "2026-10-05T02:00:00+00:00"};
   it("is open before it closes and gone after", () => {
     const w = load();
-    expect(w.lateOpenAsOf({lateSlots: [SLOT]}, "2026-10-05", "2026-10-05T00:52:00+00:00").period)
+    expect(w.lateOpenInPlaceOn({lateSlots: [SLOT]}, "2026-10-05", "2026-10-05T00:52:00+00:00").period)
       .toBe("2026-10-04");
-    expect(w.lateOpenAsOf({lateSlots: [SLOT]}, "2026-10-05", "2026-10-05T03:00:00+00:00")).toBeNull();
+    expect(w.lateOpenInPlaceOn({lateSlots: [SLOT]}, "2026-10-05", "2026-10-05T03:00:00+00:00")).toBeNull();
   });
 });

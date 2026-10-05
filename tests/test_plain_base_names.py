@@ -16,7 +16,8 @@ AG, COL = "child-protection-family-support", "child-protection"
 
 def _tables_in(conn, schema):
     return sorted(r[0] for r in conn.execute(
-        "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = ? "
+        "AND table_name <> '_manifest'",  # a period's own account (REQ-PIPE-130)
         [schema]).fetchall())
 
 

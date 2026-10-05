@@ -2310,6 +2310,32 @@ judgement about who reads the page rather than about the rule.
       reference, a third copy of #84), plus two to log - `_redact` misses
       keyword-form DSNs; test_devcontainer checks only the first CI
       postgres service.
+      - SPRINT 9 PUSHED (11eb18e): REQ-PIPE-140 (a decision runs a supply's
+        QA again, as a run of its own), REQ-PIPE-141 (re-file) and
+        REQ-GHUB-142 (its warning) BUILT. Both critics run: the delivery
+        critic's six findings fixed before that commit (post-build-review
+        #114); the CLI UX critic, driving it for real, found a reject
+        landing on a supply's OLD period after a re-file - fixed in sprint
+        10 with the rest of its defects (#115). Also fixed: the sprints
+        gate read a wrapped **Owns:** line one line deep, and supply-model
+        sprint 26 had read `done` since 2026-09-27 on 96/112 criteria.
+      - SPRINT 10: REQ-PIPE-130 (every period's _manifest), REQ-PIPE-123
+        (the replacement setting, `never` as shipped), REQ-PIPE-121 (the
+        knock-on of a table arriving in or leaving a period - one hook in
+        the decision log, owed in the decision's transaction, cheap path
+        first), REQ-DASH-126 (red promoted) and REQ-DASH-127 (each supply's
+        outcome in its history) BUILT; REQ-PIPE-081 BUILT with the "In place
+        on" rename. Schema 27 carries every new decision-log column in one
+        bump.
+        FOR KEITH: REQ-PIPE-081 CRITERION 6 IS NOT BUILT - "where a decision
+        has changed what an earlier date now shows, say so and name it".
+        The data is there (effective_at and recorded_at on every entry), but
+        in a bootstrap replay EVERY decision is recorded after the date it
+        took effect, so the plain reading would flag every past date on a
+        synthetic asset. What should count as "changed"?
+        ALSO OPEN: #115 D4 (re-filing a promoted supply into a period that
+        already holds one left a re-check unable to read its own table) -
+        not reproduced into an empty period; to retry on the rebuilt database.
  All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.

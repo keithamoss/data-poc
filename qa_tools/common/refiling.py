@@ -69,13 +69,20 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
             f"{supply} is not filed for {dataset_id}, so there is nothing to re-file. "
             f"`mothman supply queue` lists what is waiting.")
     from_period = rows[0][0]
+    if not _on_calendar(dataset_id, to_period):
+        # A PERIOD THE CALENDAR DOES NOT HAVE (post-build-review #115, D1):
+        # `2026-Q9` was accepted, recorded and re-checked, filing a supply
+        # to a period nothing will ever read.
+        raise decision_log.DecisionRefused(
+            f"{to_period} is not a period {dataset_id} is delivered in - its calendar has "
+            f"no such period. `mothman supply slots --dataset {dataset_id}` lists them.")
     if not from_period:
         # A HELD SUPPLY IS PLACED, NOT RE-FILED (#114, minor): it has no
         # period to leave, and the decision log refused it later with a
         # message about two slots.
         raise decision_log.DecisionRefused(
             f"{supply} is filed to no period - it is held, waiting to be placed - so there "
-            f"is nothing to re-file it from. Place it instead; `mothman supply queue` "
+            f"is nothing to re-file it from. Place it instead; `mothman supply holds` "
             f"shows how.")
     if from_period == to_period:
         raise decision_log.DecisionRefused(f"{supply} is already filed to {to_period}.")
@@ -165,6 +172,13 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
                 effective_at=effective_at,
                 reason=f"{p.supply} was re-filed into {p.to_period} in its place")
     return owed_id
+
+
+def _on_calendar(dataset_id: str, period: str) -> bool:
+    """Whether `period` is one of this dataset's slots on its calendar."""
+    from qa_tools.common import slots
+
+    return slots.slot_named(dataset_id, period) is not None
 
 
 def _what_it_does(p: Plan) -> tuple:

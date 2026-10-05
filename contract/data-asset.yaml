@@ -138,6 +138,22 @@ amber_setting:
       changelog:
         - "2023-01-01: amber promotes itself into an unfilled slot - unchanged from before the setting existed (REQ-PIPE-075)."
 
+# WHETHER A RESUPPLY MAY REPLACE AN ALREADY-PROMOTED SUPPLY AUTOMATICALLY
+# (REQ-PIPE-123). One of:
+#   never           - a supply filed into a filled slot waits for a person
+#   green           - a green resupply replaces the promoted one, which
+#                     moves to superseded (reversible: un-supersede it)
+#   green-or-amber  - a green or amber one does
+# The same mechanism as amber_setting above: asset, collection or dataset,
+# nearest wins, effective-dated, the past frozen, and no default. CI
+# refuses green-or-amber wherever the amber setting is hold.
+replacement_setting:
+  versions:
+    - effective_from: "2023-01-01"
+      value: never
+      changelog:
+        - "2023-01-01: a filled slot waits for a person - unchanged from before the setting existed (REQ-PIPE-075 criterion 4)."
+
 
 calendars:
   - name: quarterly

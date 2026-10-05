@@ -141,6 +141,44 @@ releases:
               decide whether it is promoted. The earlier filing stays on
               record, and you are shown first anything the move takes out or
               sets aside.
+          - headline: Every period says what each of its tables is
+            components: ["Pipeline & publishing"]
+            description: >
+              Each period schema now has a _manifest view: one row per table,
+              saying whether it was promoted, inherited or substituted, which
+              supply it is, when it was received and decided, and the status it
+              went in on. An analyst or tool with access to the period alone can
+              read it.
+          - headline: Choose whether a resend may replace accepted data
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              A new replacement setting decides whether a resupply may replace a
+              promoted supply automatically: never (as shipped), when green, or
+              when green or amber. The replaced supply is superseded, not lost,
+              and the gate refuses green-or-amber wherever amber is held.
+          - headline: Moving a table re-checks what reads it
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Promoting, rejecting, demoting or re-filing a supply now re-checks
+              the cross-table checks in that period that read its table, and the
+              gate looks again at every supply waiting there. One that still
+              fails is listed in one prominent decision-log entry; anything left
+              undone shows as owed in the queue.
+          - headline: Red promoted, and every supply's outcome
+            components: ["Dashboard UI"]
+            description: >
+              A promoted supply whose newest cross-table results are red now
+              says so beside its status, with when and after what it turned and
+              the status it went in on. Each supply in a dataset's history shows
+              its outcome: promoted, rejected, superseded (by which, by whom), or
+              waiting.
+          - headline: The date control says "In place on"
+            components: ["Dashboard UI"]
+            description: >
+              The date picker is now labelled "In place on", and the page says
+              plainly that it uses everything known today; the snapshot archive
+              is what shows what the page said on a past date. Old links using
+              ?asof= still work and are rewritten to ?in-place-on=.
           - headline: A decision can check a supply again, as a run of its own
             components: ["Pipeline & publishing", "QA checks & contract"]
             description: >

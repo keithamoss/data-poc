@@ -55,6 +55,6 @@ describe("loading the raw template with no real data embedded", () => {
   it("renders no agency tiles, because the tree comes from embedded config alone", () => {
     dashboard = loadDashboard();
     expect(dashboard.document.querySelectorAll("#agency-grid .card").length).toBe(0);
-    expect(dashboard.window.buildData(dashboard.window.CURRENT_AS_OF).agencies).toEqual([]);
+    expect(dashboard.window.buildData(dashboard.window.CURRENT_IN_PLACE_ON).agencies).toEqual([]);
   });
 });

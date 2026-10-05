@@ -16,20 +16,20 @@ const SOURCE = b => ({items: [], blockers: [b]});
 describe("whether a hold or contest is open, as at the date on show", () => {
   it("is open from the supply's receipt, not before", () => {
     const w = load();
-    expect(w.blockerOpenAsOf("cp-case-workers", "2026-03-09", SOURCE(HELD))).toBeNull();
-    expect(w.blockerOpenAsOf("cp-case-workers", "2026-03-10", SOURCE(HELD))).not.toBeNull();
-    expect(w.blockerOpenAsOf("cp-case-workers", "2027-01-01", SOURCE(HELD))).not.toBeNull();
+    expect(w.blockerOpenInPlaceOn("cp-case-workers", "2026-03-09", SOURCE(HELD))).toBeNull();
+    expect(w.blockerOpenInPlaceOn("cp-case-workers", "2026-03-10", SOURCE(HELD))).not.toBeNull();
+    expect(w.blockerOpenInPlaceOn("cp-case-workers", "2027-01-01", SOURCE(HELD))).not.toBeNull();
   });
 
   it("closes on the day the decision that ended it took effect", () => {
     const w = load();
-    expect(w.blockerOpenAsOf("cp-case-workers", "2026-03-19", SOURCE(RESOLVED))).not.toBeNull();
-    expect(w.blockerOpenAsOf("cp-case-workers", "2026-03-20", SOURCE(RESOLVED))).toBeNull();
+    expect(w.blockerOpenInPlaceOn("cp-case-workers", "2026-03-19", SOURCE(RESOLVED))).not.toBeNull();
+    expect(w.blockerOpenInPlaceOn("cp-case-workers", "2026-03-20", SOURCE(RESOLVED))).toBeNull();
   });
 
   it("belongs to its own dataset only", () => {
     const w = load();
-    expect(w.blockerOpenAsOf("cp-clients", "2026-03-15", SOURCE(HELD))).toBeNull();
+    expect(w.blockerOpenInPlaceOn("cp-clients", "2026-03-15", SOURCE(HELD))).toBeNull();
   });
 
   it("says why in words, never by colour alone", () => {
@@ -49,7 +49,7 @@ describe("a blocked dataset is one red that rolls up", () => {
 
   it("counts as red even where its runs alone would be quiet", () => {
     const w = load();
-    expect(w.rollup([dataset({blocked: HELD, noDataAsOf: true, columns: []})])).toBe("red");
+    expect(w.rollup([dataset({blocked: HELD, noDataInPlaceOn: true, columns: []})])).toBe("red");
   });
 
   it("its own checks read not run, never the last verdict carried forward", () => {
@@ -106,7 +106,7 @@ describe("several blockers of one kind", () => {
   it("are counted, and the oldest and newest receipts named", () => {
     const w = load();
     const second = {...HELD, supply: "cp-case-workers@k2", openedAt: "2026-03-15T02:00:00+00:00"};
-    const b = w.blockerOpenAsOf("cp-case-workers", "2026-04-01", {items: [], blockers: [second, HELD]});
+    const b = w.blockerOpenInPlaceOn("cp-case-workers", "2026-04-01", {items: [], blockers: [second, HELD]});
     expect(b.count).toBe(2);
     expect(b.openedAt).toBe(HELD.openedAt);
     expect(w.blockerReasonText(b)).toContain("(2 supplies)");

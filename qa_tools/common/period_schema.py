@@ -187,7 +187,42 @@ def ensure_period_schema(conn, period_name: str) -> str:
     """
     schema = period_schema(period_name)
     supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+    ensure_manifest(conn, period_name)
     return schema
+
+
+#: Every period schema's own account of itself (REQ-PIPE-130). Reserved:
+#: CI refuses a dataset whose table carries this name (criterion 13).
+MANIFEST = "_manifest"
+
+
+def ensure_manifest(conn, period_name: str) -> None:
+    """Create the period's `_manifest` view if it is not there.
+
+    BY THE SAME MECHANISM HOWEVER THE PERIOD CAME TO EXIST (criterion 1):
+    ensure_period_schema() is the one place a period schema is created,
+    for a first promotion and an opening by instruction alike.
+
+    A THIN VIEW over qa.manifest_for, with the period's AUTHORED name
+    written in by the code that opens it (NFR 7) rather than recovered from
+    the schema name in SQL. Created only where absent: CREATE OR REPLACE
+    takes an exclusive lock on the view every time a schema is ensured,
+    which is often.
+    """
+    import psycopg
+
+    if not isinstance(getattr(conn, "raw", None), psycopg.Connection):
+        return  # a DuckDB reader's scratch period: no metadata schema to describe it
+    schema = period_schema(period_name)
+    if conn.execute(
+            "SELECT 1 FROM information_schema.views WHERE table_schema = ? "
+            "AND table_name = ?", [schema, MANIFEST]).fetchall():
+        return
+    literal = period_name.replace("'", "''")
+    schema_literal = schema.replace("'", "''")
+    supply_db.create_if_absent(
+        conn, f'CREATE OR REPLACE VIEW "{schema}"."{MANIFEST}" AS SELECT * FROM '
+        f'"{qa_store.SCHEMA}".manifest_for(\'{literal}\', \'{schema_literal}\')')
 
 
 def opened(conn, period_name: str) -> bool:

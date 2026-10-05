@@ -167,18 +167,36 @@ def supply_states(dataset_id: str,
             return supply_states(dataset_id, conn=opened)
     actions = tuple(_STATE_AFTER)
     out: dict[str, list[dict]] = {}
-    for supply, action, at in conn.execute(
-            f"SELECT supply, action, effective_at FROM {decision_log.TABLE} "
+    for supply, action, at, kind, newer in conn.execute(
+            f"SELECT supply, action, effective_at, actor_kind, superseded_by "
+            f"FROM {decision_log.TABLE} "
             f"WHERE dataset_id = ? AND supply IS NOT NULL AND action IN "
             f"({', '.join('?' * len(actions))}) ORDER BY effective_at, id",
             [dataset_id, *actions]).fetchall():
-        state = _STATE_AFTER[action]
-        entries = out.setdefault(supply, [])
-        if entries and entries[-1]["state"] == state:
-            continue
-        entries.append({"at": at.isoformat() if hasattr(at, "isoformat") else str(at),
-                        "state": state})
+        # EVERY ENTRY, WITH WHAT IT WAS AND WHO (REQ-DASH-127 criteria 1, 3
+        # and 4): a supply's OUTCOME - promoted, rejected, superseded or
+        # waiting - is read from its action, and superseded and rejected are
+        # both "withdrawn" for the verdict but are different outcomes.
+        entry = {"at": at.isoformat() if hasattr(at, "isoformat") else str(at),
+                 "state": _STATE_AFTER[action], "action": action, "by": kind}
+        if action == decision_log.SUPERSEDE:
+            entry["supersededBy"] = newer
+            setting = _replaced_under(conn, dataset_id, supply)
+            if setting:
+                entry["setting"] = setting
+        out.setdefault(supply, []).append(entry)
     return out
+
+
+def _replaced_under(conn, dataset_id: str, supply: str) -> str | None:
+    """The replacement setting a rule's promotion replaced this supply under
+    (REQ-PIPE-123 criterion 6), or None."""
+    rows = conn.execute(
+        f"SELECT replacement_setting FROM {decision_log.TABLE} WHERE dataset_id = ? "
+        "AND action = ? AND replaces = ? AND replacement_setting IS NOT NULL "
+        "ORDER BY effective_at DESC, id DESC LIMIT 1",
+        [dataset_id, decision_log.PROMOTE, supply]).fetchall()
+    return rows[0][0] if rows else None
 
 
 def run_states(dataset_id: str,
@@ -190,10 +208,18 @@ def run_states(dataset_id: str,
         with supply_db.connect(read_only=True, label="mothman:run-states") as opened:
             return run_states(dataset_id, conn=opened)
     out: dict[str, list[dict]] = {}
+    runs: dict[str, str | None] = {}
+
+    def run_of(supply):
+        if supply not in runs:
+            runs[supply] = _run_for(conn, dataset_id, supply)
+        return runs[supply]
     for supply, states in supply_states(dataset_id, conn=conn).items():
-        run = _run_for(conn, dataset_id, supply)
+        run = run_of(supply)
         if run:
-            out[run] = states
+            # The superseding supply by the RUN the page knows it as.
+            out[run] = [{**e, "supersededByRun": run_of(e["supersededBy"])}
+                        if e.get("supersededBy") else e for e in states]
     return out
 
 

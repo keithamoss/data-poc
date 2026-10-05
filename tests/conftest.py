@@ -855,3 +855,18 @@ def clone_run_views(conn, source_run: str, new_run: str, *, held=(), contested=(
         res.resolved[logical] = physical
     supply_db.record_resolution(conn, res)
     return res
+
+
+@pytest.fixture(autouse=True)
+def _minted_periods_are_on_the_calendar(monkeypatch):
+    """A re-file is refused into a period its dataset's calendar does not
+    have (post-build-review #115, D1). Tests mint their own periods -
+    `2099-<something>` - so nothing one test files answers another's
+    question; those count as on the calendar, and every real name is still
+    judged by the real calendar."""
+    from qa_tools.common import refiling
+
+    real = refiling._on_calendar
+    monkeypatch.setattr(refiling, "_on_calendar",
+                        lambda dataset_id, period: period.startswith("2099-")
+                        or real(dataset_id, period))

@@ -289,15 +289,29 @@ def _refile_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
     else:
         after = (f"{p.to_period} has no accepted {name}; the re-filed one waits there to "
                  f"be checked, and the promotion gate decides.")
+    if not p.displaced and p.target_held_as in (decision_log.PROMOTED,
+                                                 decision_log.SUBSTITUTED):
+        # WHAT THE TARGET READS UNTIL THEN (REQ-GHUB-142 criterion 6; post-
+        # build-review #115, W7): a re-file into a period that already holds
+        # an accepted version said nothing about that period at all.
+        lines.append(
+            f"{after} Only a promotion of the re-filed one - by a person, or by the "
+            f"promotion gate where the replacement setting allows - replaces it.")
     for d in p.displaced:
         lines.append(
             f"This supersedes {p.to_period}'s waiting {name} from {day(d.received)}. "
-            f"{after} To bring the superseded one back, un-supersede it once the re-filed "
-            f"one is out of the way:\n"
+            f"{after} To bring the superseded one back, first reject, supersede or re-file "
+            f"the re-filed one out of {p.to_period}, then un-supersede it:\n"
             f"  mothman supply decide --operation un-supersede --dataset {p.dataset_id} "
             f"--period {p.to_period} --supply {d.supply} --reason '<why>' --yes")
         done.append(f"{p.to_period}'s waiting {name} from {day(d.received)} was superseded.")
     return lines, done
+
+
+def _spoken(operation: str) -> str:
+    """The operation as a person writes it - `re-file`, as the menu and the
+    warnings say it, never the identifier (#115, W8)."""
+    return "re-file" if operation == REFILE else operation
 
 
 def offered(operation: str) -> str:
@@ -607,8 +621,12 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     return Outcome(
         operation=request.operation, dataset_id=request.dataset_id,
         period=request.period, changed=True, owed=owed,
-        message=(f"{request.operation} recorded for {request.dataset_id} "
-                 f"{request.period or ''}".strip() + f", by {request.actor_name}."
+        message=(f"{_spoken(request.operation)} recorded for {request.dataset_id} "
+                 f"{request.period or ''}".strip()
+                 # WHERE IT WENT (post-build-review #115, W6): "re-file recorded
+                 # for X 2026-Q3" read as though it went INTO Q3.
+                 + (f" -> {request.to_period}" if request.operation == REFILE else "")
+                 + f", by {request.actor_name}."
                  + "".join(f" {line}" for line in found.done)))
 
 

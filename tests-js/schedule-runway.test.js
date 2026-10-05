@@ -7,7 +7,7 @@
 // exactly like a healthy feed.
 //
 // The nodata trap is the specific shape to keep out: rollup() filters
-// noDataAsOf and rollupStatuses() filters nodata before worstOf(), and
+// noDataInPlaceOn and rollupStatuses() filters nodata before worstOf(), and
 // STATUS_ORDER puts nodata at -1 where it can only ever LOSE a reduce
 // that starts from green. The obvious derivation lands an exhausted
 // schedule in exactly the bucket engineered to vanish.
@@ -21,7 +21,7 @@ afterEach(() => {
   dashboard = undefined;
 });
 
-// The runway is passed to scheduleRunwayAsOf() rather than assigned
+// The runway is passed to scheduleRunwayInPlaceOn() rather than assigned
 // onto the window: a top-level `const` in a classic script lives in
 // script scope, not on globalThis, so assigning SCHEDULE_RUNWAY here
 // would create a NEW global the page's own code never reads - every
@@ -51,10 +51,10 @@ const RUNWAY = {
   }],
 };
 
-describe("scheduleRunwayAsOf", () => {
+describe("scheduleRunwayInPlaceOn", () => {
   it("finds nothing exhausted while dates remain", () => {
     const w = load();
-    const r = w.scheduleRunwayAsOf("2026-01-01", RUNWAY);
+    const r = w.scheduleRunwayInPlaceOn("2026-01-01", RUNWAY);
     expect(r.exhaustedCount).toBe(0);
     expect(r.exhausted).toEqual({});
   });
@@ -64,40 +64,40 @@ describe("scheduleRunwayAsOf", () => {
     // whole reason the page recomputes this per as-of date instead of
     // reading a boolean baked in at build time.
     const w = load();
-    expect(w.scheduleRunwayAsOf("2026-01-01", RUNWAY).low[0].remaining).toBe(2);
-    expect(w.scheduleRunwayAsOf("2027-06-01", RUNWAY).low[0].remaining).toBe(1);
-    expect(w.scheduleRunwayAsOf("2028-01-01", RUNWAY).low[0].remaining).toBe(0);
+    expect(w.scheduleRunwayInPlaceOn("2026-01-01", RUNWAY).low[0].remaining).toBe(2);
+    expect(w.scheduleRunwayInPlaceOn("2027-06-01", RUNWAY).low[0].remaining).toBe(1);
+    expect(w.scheduleRunwayInPlaceOn("2028-01-01", RUNWAY).low[0].remaining).toBe(0);
   });
 
   it("says nothing at all once a calendar has room again", () => {
     const w = load();
     const roomy = {...RUNWAY, calendars: [{...RUNWAY.calendars[0], threshold: 1}]};
-    expect(w.scheduleRunwayAsOf("2026-01-01", roomy).low).toEqual([]);
+    expect(w.scheduleRunwayInPlaceOn("2026-01-01", roomy).low).toEqual([]);
   });
 
   it("lets the dataset that runs out FIRST decide when a calendar is low", () => {
     // twice-a-year has one slot left after Feb 2027; every-quarter has
     // three. The calendar is low because of the former.
     const w = load();
-    expect(w.scheduleRunwayAsOf("2027-03-01", RUNWAY).low[0].remaining).toBe(1);
+    expect(w.scheduleRunwayInPlaceOn("2027-03-01", RUNWAY).low[0].remaining).toBe(1);
   });
 
   it("exhausts each dataset on its own last date, not the calendar's", () => {
     const w = load();
-    const r = w.scheduleRunwayAsOf("2027-09-01", RUNWAY);
+    const r = w.scheduleRunwayInPlaceOn("2027-09-01", RUNWAY);
     expect(Object.keys(r.exhausted)).toEqual(["twice-a-year"]);
     expect(r.exhausted["twice-a-year"].lastPeriod).toBe("2027-Q3");
   });
 
   it("exhausts everything once the calendar itself runs out", () => {
     const w = load();
-    const r = w.scheduleRunwayAsOf("2028-01-01", RUNWAY);
+    const r = w.scheduleRunwayInPlaceOn("2028-01-01", RUNWAY);
     expect(r.exhaustedCount).toBe(2);
   });
 
   it("is a no-op when nothing is embedded", () => {
     const w = load();
-    expect(w.scheduleRunwayAsOf("2028-01-01", null)).toEqual(
+    expect(w.scheduleRunwayInPlaceOn("2028-01-01", null)).toEqual(
       { exhausted: {}, low: [], exhaustedCount: 0 });
   });
 });
@@ -106,7 +106,7 @@ describe("an exhausted schedule is never absorbed by the rollup", () => {
   // The whole point. Under the naive derivation these all read green.
   const exhausted = { id: "x", scheduleExhausted: {calendar: "q"}, status: "exhausted", columns: [] };
   const healthy = { id: "h", status: "green", columns: [{ status: "green" }] };
-  const noData = { id: "n", noDataAsOf: true, status: "nodata", columns: [] };
+  const noData = { id: "n", noDataInPlaceOn: true, status: "nodata", columns: [] };
 
   it("does not vote green into its parent", () => {
     const w = load();
@@ -190,7 +190,7 @@ describe("exhaustedMarker", () => {
 
 // REQ-PIPE-053 asks for the low-runway warning "both in the dashboard
 // and as a non-fatal warning in the repository's gates". The gate half
-// worked. The dashboard half did not exist: scheduleRunwayAsOf() filled
+// worked. The dashboard half did not exist: scheduleRunwayInPlaceOn() filled
 // out.low, buildData() stored it, and the only consumer was
 // exhaustedNotice(), which returns "" unless something is already
 // EXHAUSTED - so the warning that exists to arrive BEFORE that point
@@ -205,9 +205,9 @@ describe("exhaustedMarker", () => {
 // Live at the time of writing: the real quarterly calendar has 2 future
 // slots against a threshold of 4.
 describe("the low-runway warning reaches the page", () => {
-  function notice(asOf) {
+  function notice(inPlaceOn) {
     const w = load();
-    return w.lowRunwayNotice(w.scheduleRunwayAsOf(asOf, RUNWAY));
+    return w.lowRunwayNotice(w.scheduleRunwayInPlaceOn(inPlaceOn, RUNWAY));
   }
 
   it("says nothing at all while there is plenty of runway", () => {
@@ -216,7 +216,7 @@ describe("the low-runway warning reaches the page", () => {
     // in its own past. Same construction the roomy case above uses.
     const w = load();
     const roomy = {...RUNWAY, calendars: [{...RUNWAY.calendars[0], threshold: 1}]};
-    expect(w.lowRunwayNotice(w.scheduleRunwayAsOf("2026-01-01", roomy))).toBe("");
+    expect(w.lowRunwayNotice(w.scheduleRunwayInPlaceOn("2026-01-01", roomy))).toBe("");
   });
 
   it("warns once for the calendar, naming it", () => {
@@ -249,14 +249,14 @@ describe("the low-runway warning reaches the page", () => {
     // Once a calendar has actually run out, "running low" is no longer
     // the news and two notices about one calendar is noise.
     const w = load();
-    const runway = w.scheduleRunwayAsOf("2028-01-01", RUNWAY);
+    const runway = w.scheduleRunwayInPlaceOn("2028-01-01", RUNWAY);
     expect(runway.exhaustedCount).toBeGreaterThan(0);
     expect(w.lowRunwayNotice(runway)).toBe("");
   });
 
   it("carries the driving dataset on the runway itself, not only in prose", () => {
     const w = load();
-    const low = w.scheduleRunwayAsOf("2027-03-01", RUNWAY).low[0];
+    const low = w.scheduleRunwayInPlaceOn("2027-03-01", RUNWAY).low[0];
     expect(low.drivingDataset).toBe("twice-a-year");
     expect(low.drivingLastPeriod).toBe("2027-Q3");
   });

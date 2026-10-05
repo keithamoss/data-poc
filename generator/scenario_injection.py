@@ -127,9 +127,9 @@ class Placement:
     def as_record(self) -> dict:
         """The shape qa_tools/common/scenario_map.py reads.
 
-        `as_of` is the LATEST day this scenario has anything to show,
+        `in_place_on` is the LATEST day this scenario has anything to show,
         which is what a reader wants the dashboard set to - an earlier
-        as-of date would hide the very arrival the scenario is about.
+        in-place-on date would hide the very arrival the scenario is about.
         """
         latest = self.period_date
         for arrival in self.arrivals:
@@ -140,7 +140,7 @@ class Placement:
             "scenario_id": self.scenario_id,
             "dataset": self.dataset,
             "period": self.period,
-            "as_of": latest.isoformat(),
+            "in_place_on": latest.isoformat(),
             "supplies": [a["run_id"] for a in self.arrivals if a.get("run_id")],
             "config": self.config,
         }

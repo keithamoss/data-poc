@@ -158,34 +158,34 @@ describe("the arrival context in the URL", () => {
   it("is dropped by the reader's next navigation, URL and all", () => {
     // It belongs to ONE page. A banner saying 'you have left 2026-Q3'
     // is true of the page it was followed to and a lie everywhere else.
-    const w = load("http://localhost/?from=2026-Q3&asof=2026-05-01");
+    const w = load("http://localhost/?from=2026-Q3&in-place-on=2026-05-01");
     expect(w.arrivalFromUrl()).toBe("2026-Q3");
     w.navigate({ tier: "agency", agencyId: "registry-services" });
     expect(w.arrivalFromUrl()).toBeNull();
     expect(w.arrivalBanner(ds(SUBSTITUTED))).toBe("");
     // The orthogonal query state a navigation has always kept stays.
-    expect(new w.URLSearchParams(w.location.search).get("asof")).toBe("2026-05-01");
+    expect(new w.URLSearchParams(w.location.search).get("in-place-on")).toBe("2026-05-01");
     expect(w.location.hash).toBe("#/agency/registry-services");
   });
 
   it("is dropped by a date the reader picked themselves", () => {
-    const w = load("http://localhost/?from=2026-Q3&asof=2026-05-01");
-    w.applyAsOf("2026-02-01");
+    const w = load("http://localhost/?from=2026-Q3&in-place-on=2026-05-01");
+    w.applyInPlaceOn("2026-02-01");
     expect(w.arrivalFromUrl()).toBeNull();
   });
 
   it("is set by the drill, alongside the date it moves to", () => {
-    const w = load("http://localhost/?asof=2026-08-01");
+    const w = load("http://localhost/?in-place-on=2026-08-01");
     w.drillToPeriod("2026-05-01", "2026-Q3");
     const params = new w.URLSearchParams(w.location.search);
     expect(params.get("from")).toBe("2026-Q3");
-    expect(params.get("asof")).toBe("2026-05-01");
+    expect(params.get("in-place-on")).toBe("2026-05-01");
   });
 
   it("refuses a date that is not a date, changing nothing", () => {
-    const w = load("http://localhost/?asof=2026-08-01");
+    const w = load("http://localhost/?in-place-on=2026-08-01");
     w.drillToPeriod("not-a-date", "2026-Q3");
-    expect(new w.URLSearchParams(w.location.search).get("asof")).toBe("2026-08-01");
+    expect(new w.URLSearchParams(w.location.search).get("in-place-on")).toBe("2026-08-01");
     expect(w.arrivalFromUrl()).toBeNull();
   });
 });
@@ -205,20 +205,20 @@ describe("wireArrivalContext", () => {
   }
 
   it("makes the drill button actually move the as-of date, and say where from", () => {
-    const w = load("http://localhost/?asof=2026-08-01");
+    const w = load("http://localhost/?in-place-on=2026-08-01");
     const host = wired(w, w.standingInDrill(ds(SUBSTITUTED)));
     host.querySelector("[data-standing-drill]").click();
     const params = new w.URLSearchParams(w.location.search);
-    expect(params.get("asof")).toBe("2026-05-01");
+    expect(params.get("in-place-on")).toBe("2026-05-01");
     expect(params.get("from")).toBe("2026-Q3");
   });
 
   it("makes the back button return to the period the reader left, framing gone", () => {
-    const w = load("http://localhost/?asof=2026-05-01&from=2026-Q3");
+    const w = load("http://localhost/?in-place-on=2026-05-01&from=2026-Q3");
     const host = wired(w, w.arrivalBanner(ds(SUBSTITUTED)));
     host.querySelector("[data-arrival-back]").click();
     const params = new w.URLSearchParams(w.location.search);
-    expect(params.get("asof")).toBe("2026-08-01");
+    expect(params.get("in-place-on")).toBe("2026-08-01");
     expect(params.get("from")).toBeNull();
   });
 });

@@ -165,7 +165,7 @@ def _state_to_path(state: dict) -> str:
     return "/"
 
 
-def _goto(page, html_path: Path, state: dict | None = None, as_of: str | None = None):
+def _goto(page, html_path: Path, state: dict | None = None, in_place_on: str | None = None):
     """Navigate, and wait for the page to have actually RENDERED.
 
     This used to end in `page.wait_for_timeout(500)`. With 126 call
@@ -187,7 +187,7 @@ def _goto(page, html_path: Path, state: dict | None = None, as_of: str | None = 
     survive a reload.
     """
     url = f"file://{html_path.resolve()}"
-    query = f"?asof={as_of}" if as_of else ""
+    query = f"?in-place-on={in_place_on}" if in_place_on else ""
     fragment = f"#{_state_to_path(state)}" if state else ""
     try:
         before = page.evaluate(
@@ -239,7 +239,7 @@ def test_raw_template_renders_with_zero_console_errors(clean_page):
     assert "0 agencies" not in view_text
 
 
-class TestAsOfDatePicking:
+class TestInPlaceOnDatePicking:
     def test_a_date_before_any_real_history_shows_no_data(self, clean_page, built_dashboard_html):
         run_ids = list_run_ids("registry-services", "civil-registration")
         assert run_ids, "no real committed BDM history to test against"
@@ -252,7 +252,7 @@ class TestAsOfDatePicking:
         _goto(
             clean_page, built_dashboard_html,
             state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
-            as_of=before_all_history,
+            in_place_on=before_all_history,
         )
 
         # `.view-head` rather than `#view h2` - see
@@ -261,7 +261,7 @@ class TestAsOfDatePicking:
         assert "No data" in clean_page.locator(".view-head").first.inner_text()
 
 
-class TestTheAsOfPanelSaysWhichPeriod:
+class TestTheInPlaceOnPanelSaysWhichPeriod:
     """REQ-DASH-054 criteria 6, 8, 9 and 10, at the layer a reader sees.
 
     THE DATA LAYER IS NOT ENOUGH HERE, and this project has the scar:
@@ -273,13 +273,13 @@ class TestTheAsOfPanelSaysWhichPeriod:
     """
 
     def _open_panel(self, page):
-        page.click("#asof-btn")
-        page.wait_for_selector("#asof-panel.open")
+        page.click("#in-place-on-btn")
+        page.wait_for_selector("#in-place-on-panel.open")
 
     def test_the_panel_names_the_period_per_calendar(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
         self._open_panel(clean_page)
-        text = clean_page.locator("#asof-periods").inner_text()
+        text = clean_page.locator("#in-place-on-periods").inner_text()
         # This asset has two named calendars, and the same chosen date is a
         # different period on each - which is the whole reason a reader
         # needs telling rather than inferring it from the date.
@@ -289,14 +289,14 @@ class TestTheAsOfPanelSaysWhichPeriod:
     def test_the_named_period_follows_the_date_the_reader_picks(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
         self._open_panel(clean_page)
-        before = clean_page.locator("#asof-periods").inner_text()
+        before = clean_page.locator("#in-place-on-periods").inner_text()
         # A date inside the covered range but well away from the default,
         # taken from the page's own embedded range rather than from a
         # literal - a hard-coded date here would go stale the moment the
         # calendars were re-authored.
         first = clean_page.evaluate("() => coveredDateRange().first")
-        clean_page.evaluate("(d) => renderAsOfPeriods(d)", first)
-        after = clean_page.locator("#asof-periods").inner_text()
+        clean_page.evaluate("(d) => renderInPlaceOnPeriods(d)", first)
+        after = clean_page.locator("#in-place-on-periods").inner_text()
         assert after != before, "the period statement did not follow the date"
 
     def test_the_input_is_bounded_to_what_the_page_has_periods_for(self, clean_page, built_dashboard_html):
@@ -306,8 +306,8 @@ class TestTheAsOfPanelSaysWhichPeriod:
         _goto(clean_page, built_dashboard_html)
         self._open_panel(clean_page)
         bounds = clean_page.evaluate(
-            "() => ({min: document.getElementById('asof-input').min,"
-            "        max: document.getElementById('asof-input').max,"
+            "() => ({min: document.getElementById('in-place-on-input').min,"
+            "        max: document.getElementById('in-place-on-input').max,"
             "        range: coveredDateRange()})")
         assert bounds["min"] == bounds["range"]["first"]
         assert bounds["max"] == bounds["range"]["last"]
@@ -320,8 +320,8 @@ class TestTheAsOfPanelSaysWhichPeriod:
         """Criteria 9 and 10. A URL is the way in - an old bookmark, a
         hand-edited query string - and the input's own bounds cannot stop
         any of those."""
-        _goto(clean_page, built_dashboard_html, as_of="1990-01-01")
-        notice = clean_page.locator("#asof-range-notice")
+        _goto(clean_page, built_dashboard_html, in_place_on="1990-01-01")
+        notice = clean_page.locator("#in-place-on-range-notice")
         assert notice.is_visible()
         text = notice.inner_text()
         assert "outside the dates" in text
@@ -334,32 +334,32 @@ class TestTheAsOfPanelSaysWhichPeriod:
         # about the date is the empty view criterion 10 forbids.
         assert clean_page.locator("#view").inner_html().strip()
 
-        clean_page.click("#asof-range-reset")
+        clean_page.click("#in-place-on-range-reset")
         # wait_for_function rather than wait_for_selector: the default
         # selector state is "visible", and what is being waited for here is
         # the element going hidden - which that condition can never see.
         clean_page.wait_for_function(
-            "() => document.getElementById('asof-range-notice').hidden")
-        assert "asof=" not in clean_page.url
+            "() => document.getElementById('in-place-on-range-notice').hidden")
+        assert "in-place-on=" not in clean_page.url
 
     def test_a_date_inside_the_range_draws_no_notice_at_all(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
-        assert clean_page.locator("#asof-range-notice").is_hidden()
+        assert clean_page.locator("#in-place-on-range-notice").is_hidden()
 
 
 class TestSupplyHistoryDrillDown:
-    def test_clicking_a_supply_history_entry_sets_the_as_of_date_to_that_run(self, clean_page, built_dashboard_html):
+    def test_clicking_a_supply_history_entry_sets_the_in_place_on_date_to_that_run(self, clean_page, built_dashboard_html):
         _goto(
             clean_page, built_dashboard_html,
             state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
         )
 
         # A run can legitimately land dated "today" (generator/anchor_date.py's
-        # own real wall-clock default), and setAsOfInUrl() deliberately drops
-        # the `asof` param entirely when it equals DEFAULT_AS_OF (today) - "a
+        # own real wall-clock default), and setInPlaceOnInUrl() deliberately drops
+        # the `in-place-on` param entirely when it equals DEFAULT_IN_PLACE_ON (today) - "a
         # plain shared link never implies someone deliberately chose a date"
         # (that function's own comment) - so this test needs a row whose
-        # run_date is NOT today, to actually exercise the asof=<date> case,
+        # run_date is NOT today, to actually exercise the in-place-on=<date> case,
         # not just whichever row happens to render first.
         toggle = clean_page.locator("#supply-history-toggle")
         if toggle.count():
@@ -375,7 +375,7 @@ class TestSupplyHistoryDrillDown:
         # asset clock is Australia/Perth (REQ-PIPE-048), so between
         # 16:00 and 24:00 UTC the page's default as-of is already
         # tomorrow. The test then picked a row dated on the page's own
-        # default, setAsOfInUrl() correctly dropped the parameter, and
+        # default, setInPlaceOnInUrl() correctly dropped the parameter, and
         # the assertion below failed on an entirely healthy page.
         #
         # Found by a real full-suite run in that window, 2026-09-25.
@@ -383,7 +383,7 @@ class TestSupplyHistoryDrillDown:
         # exists to prevent, living in the test rather than the code -
         # and unfixable by choosing a better hardcoded date, since the
         # authoritative value is the one the code under test uses.
-        today = clean_page.evaluate("() => DEFAULT_AS_OF")
+        today = clean_page.evaluate("() => DEFAULT_IN_PLACE_ON")
         run_dates = rows.evaluate_all("els => els.map(el => el.dataset.runDate)")
         target_run_date = next((d for d in run_dates if d != today), None)
         assert target_run_date, f"every real supply-history row is dated on the page's own default as-of ({today}) - can't exercise a real non-default as-of date"
@@ -392,7 +392,7 @@ class TestSupplyHistoryDrillDown:
         rows.nth(target_index).click()
         clean_page.wait_for_timeout(300)
 
-        assert f"asof={target_run_date}" in clean_page.url
+        assert f"in-place-on={target_run_date}" in clean_page.url
 
 
 class TestDarkModeToggle:
@@ -708,8 +708,8 @@ class TestAcknowledgementBadge:
         out.write_text(html[:start] + json.dumps(record, separators=(",", ":")) + html[end:])
         return out, run_id
 
-    def _badge(self, page, run_id, as_of):
-        return page.evaluate(f"() => acknowledgementBadge('birth-registrations', '{run_id}', '{as_of}')")
+    def _badge(self, page, run_id, in_place_on):
+        return page.evaluate(f"() => acknowledgementBadge('birth-registrations', '{run_id}', '{in_place_on}')")
 
     def test_it_reads_as_at_the_date_on_show(self, page, tmp_path, built_dashboard_html):
         out, run_id = self._page(built_dashboard_html, tmp_path)
@@ -811,7 +811,7 @@ class TestStatusMatchesEachToolsOwnVerdict:
       return {compared, missingVerdict, disagreements};
     }"""
 
-    _AS_OF_JS = """() => {
+    _IN_PLACE_ON_JS = """() => {
       let compared = 0;
       const disagreements = [];
       for (const raw of [REAL_BIRTH_REG_DATA, REAL_CP_DATA]) {
@@ -819,7 +819,7 @@ class TestStatusMatchesEachToolsOwnVerdict:
         for (const d of (raw.datasets ? raw.datasets : [raw])) {
           for (const r of d.runs) {
             const date = String(r.run_date).slice(0, 10);
-            const clipped = clipDatasetToAsOf(d, date);
+            const clipped = clipDatasetToInPlaceOn(d, date);
             if (!clipped || !clipped.runs.length) continue;
             const shown = clipped.runs[clipped.runs.length - 1].run_id;
             const built = buildRealDataset(clipped);
@@ -829,7 +829,7 @@ class TestStatusMatchesEachToolsOwnVerdict:
               compared++;
               const got = checkStatus(ck);
               if (got !== h.status && disagreements.length < 10) {
-                disagreements.push({dataset: d.id, asOf: date, check: ck.check_id || ck.id,
+                disagreements.push({dataset: d.id, inPlaceOn: date, check: ck.check_id || ck.id,
                                     tool: h.status, rendered: got});
               }
             }));
@@ -845,7 +845,7 @@ class TestStatusMatchesEachToolsOwnVerdict:
         colour their own run did not record - a check red that day read
         green. This test only ever looked at the default date."""
         _goto(clean_page, built_dashboard_html)
-        result = clean_page.evaluate(self._AS_OF_JS)
+        result = clean_page.evaluate(self._IN_PLACE_ON_JS)
         assert result["compared"] > 100, result
         assert result["disagreements"] == [], (
             "on a past date the page disagrees with the run it shows:\n"
@@ -1374,7 +1374,7 @@ class TestTheRenderedTreeComesFromTheHierarchy:
     def test_the_real_agency_and_collection_nodes_match_the_config(
             self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, {"tier": "executive"})
-        rendered = clean_page.evaluate("""() => buildData(CURRENT_AS_OF).agencies.map(a => ({
+        rendered = clean_page.evaluate("""() => buildData(CURRENT_IN_PLACE_ON).agencies.map(a => ({
             id: a.id, name: a.name,
             collections: a.collections.map(c => ({id: c.id, name: c.name})),
         }))""")
@@ -1427,14 +1427,14 @@ class TestTodayIsTheAssetsToday:
         "Pacific/Kiritimati",  # UTC+14, a day AHEAD of Perth
         "Australia/Perth",     # the asset's own
     ])
-    def test_the_default_as_of_date_is_the_assets_date_whatever_zone_the_viewer_is_in(
+    def test_the_default_in_place_on_date_is_the_assets_date_whatever_zone_the_viewer_is_in(
             self, browser, built_dashboard_html, viewer_tz):
         context = browser.new_context(timezone_id=viewer_tz)
         try:
             page = context.new_page()
             page.goto(f"file://{built_dashboard_html}")
             page.wait_for_timeout(400)
-            got = page.evaluate("() => ({today: liveNowDateStr(), default: defaultAsOf()})")
+            got = page.evaluate("() => ({today: liveNowDateStr(), default: defaultInPlaceOn()})")
         finally:
             context.close()
         assert got["today"] == self._asset_today(), (
@@ -1478,24 +1478,24 @@ class TestAnExhaustedScheduleIsLoud:
           "datasetId": "cp-case-workers"}
 
     def test_nothing_is_said_while_the_calendar_still_has_dates(self, page, dashboard_html_without_blockers):
-        _goto(page, dashboard_html_without_blockers, as_of=self.NONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, in_place_on=self.NONE_EXHAUSTED)
         assert page.locator(".notice-exhausted").count() == 0
 
     def test_the_executive_tier_says_how_many_above_the_grid(self, page, dashboard_html_without_blockers):
-        _goto(page, dashboard_html_without_blockers, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, in_place_on=self.ONE_EXHAUSTED)
         notice = page.locator(".notice-exhausted")
         assert notice.count() == 1
         text = " ".join(notice.inner_text().split())
         assert "1 dataset cannot be processed" in text
         assert "schedule has ended" in text
 
-    def test_the_count_tracks_the_as_of_date(self, page, dashboard_html_without_blockers):
-        _goto(page, dashboard_html_without_blockers, as_of=self.ALL_EXHAUSTED)
+    def test_the_count_tracks_the_in_place_on_date(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, in_place_on=self.ALL_EXHAUSTED)
         text = " ".join(page.locator(".notice-exhausted").inner_text().split())
         assert "6 datasets cannot be processed" in text
 
     def test_the_notice_names_the_file_to_edit(self, page, dashboard_html_without_blockers):
-        _goto(page, dashboard_html_without_blockers, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, in_place_on=self.ONE_EXHAUSTED)
         text = " ".join(page.locator(".notice-exhausted").inner_text().split())
         assert "contract/data-asset.yaml" in text
         assert "candidate-dates" in text, "and how to get the next dates proposed"
@@ -1504,7 +1504,7 @@ class TestAnExhaustedScheduleIsLoud:
         """A dismissible notice about a task nobody has done is a notice
         about a task nobody will do - and a dismissal persisted in
         browser storage would hide it for that person permanently."""
-        _goto(page, dashboard_html_without_blockers, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, in_place_on=self.ONE_EXHAUSTED)
         assert page.locator(".notice-exhausted button").count() == 0
         assert page.locator(".notice-exhausted [role=button]").count() == 0
         stored = page.evaluate(
@@ -1515,13 +1515,13 @@ class TestAnExhaustedScheduleIsLoud:
     def test_one_exhausted_dataset_among_five_healthy_is_not_swallowed(self, page, dashboard_html_without_blockers):
         """The nodata trap, at the tier it would vanish from."""
         _goto(page, dashboard_html_without_blockers, state={"tier": "agency", "agencyId": self.CP},
-              as_of=self.ONE_EXHAUSTED)
+              in_place_on=self.ONE_EXHAUSTED)
         rows = page.locator("tr", has=page.locator("td", has_text="Delivery schedule ended"))
         assert rows.count() == 1
         assert "Case Workers" in rows.first.inner_text()
 
     def test_the_dataset_itself_says_so_in_its_own_words(self, page, dashboard_html_without_blockers):
-        _goto(page, dashboard_html_without_blockers, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
         text = " ".join(page.locator("#view").inner_text().split())
         assert "delivery schedule has ended" in text.lower()
         assert "contract/data-asset.yaml" in text
@@ -1530,7 +1530,7 @@ class TestAnExhaustedScheduleIsLoud:
         """cp-case-workers' last owed period is 2027-Q3; the quarterly
         calendar runs to 2027-Q4. Naming the calendar's would tell a
         reader their dataset ended after a period it never had."""
-        _goto(page, dashboard_html_without_blockers, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
         text = " ".join(page.locator("#view").inner_text().split())
         assert "2027-Q3" in text
         assert "2027-Q4" not in text
@@ -1538,9 +1538,9 @@ class TestAnExhaustedScheduleIsLoud:
     def test_it_reads_differently_from_a_dataset_that_simply_has_no_run(self, page, dashboard_html_without_blockers):
         """Both are quiet tiles. Only one of them is somebody's job, and
         identical wording is exactly what would hide that."""
-        _goto(page, dashboard_html_without_blockers, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
         ended = " ".join(page.locator("#view").inner_text().split())
-        _goto(page, dashboard_html_without_blockers, state=self.DS, as_of="2023-01-01")
+        _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on="2023-01-01")
         no_run = " ".join(page.locator("#view").inner_text().split())
         assert ended != no_run
         assert "schedule has ended" in ended.lower()
@@ -1550,7 +1550,7 @@ class TestAnExhaustedScheduleIsLoud:
         """A supplier's clean dataset reading red because WE forgot to
         type next year's dates is an attribution error, and the fastest
         way to teach people that red does not mean what it says."""
-        _goto(page, dashboard_html_without_blockers, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
         # `.view-head` rather than `#view h2` since 2026-09-25: the
         # status pill moved OUT of the heading and into the right-hand
         # cluster every other dataset page puts it in
@@ -1572,9 +1572,9 @@ class TestAnExhaustedScheduleIsLoud:
         `clean_page` fixture has registered both `console` and
         `pageerror` all along, and asserts them empty in teardown.
         """
-        for as_of in (self.NONE_EXHAUSTED, self.ONE_EXHAUSTED, self.ALL_EXHAUSTED):
-            _goto(clean_page, dashboard_html_without_blockers, as_of=as_of)
-            _goto(clean_page, dashboard_html_without_blockers, state=self.DS, as_of=as_of)
+        for in_place_on in (self.NONE_EXHAUSTED, self.ONE_EXHAUSTED, self.ALL_EXHAUSTED):
+            _goto(clean_page, dashboard_html_without_blockers, in_place_on=in_place_on)
+            _goto(clean_page, dashboard_html_without_blockers, state=self.DS, in_place_on=in_place_on)
 
 
 def _contrast(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
@@ -1654,7 +1654,7 @@ class TestQuietStatesAreVisiblyBuilt:
         reads red (REQ-DASH-133), so no nodata pill is left to measure.
         This is about the pill's styling, not the corpus.
         """
-        _goto(clean_page, dashboard_html_without_blockers, as_of="2027-09-01")
+        _goto(clean_page, dashboard_html_without_blockers, in_place_on="2027-09-01")
         clean_page.evaluate(f"document.documentElement.setAttribute('data-theme', '{theme}')")
         pill = clean_page.locator(".pill.nodata").first
         pill.wait_for(state="attached")
@@ -1692,14 +1692,14 @@ class TestTheExecutiveLegendCountsWhatIsActuallyThere:
         return page.locator("#view .legend-key").first.inner_text()
 
     def test_no_agency_is_counted_green_when_none_is_green(self, clean_page, built_dashboard_html):
-        _goto(clean_page, built_dashboard_html, as_of=self.ALL_QUIET)
+        _goto(clean_page, built_dashboard_html, in_place_on=self.ALL_QUIET)
         statuses = clean_page.evaluate("() => DATA.agencies.map(a => a.status)")
         assert "green" not in statuses, "precondition - no agency should be green at this as-of"
         assert re.search(r"Green[^(]*\(0\b", self._legend(clean_page)), (
             f"legend claims green agencies that do not exist: {self._legend(clean_page)}")
 
     def test_the_quiet_states_are_named_and_counted(self, clean_page, built_dashboard_html):
-        _goto(clean_page, built_dashboard_html, as_of=self.ALL_QUIET)
+        _goto(clean_page, built_dashboard_html, in_place_on=self.ALL_QUIET)
         legend = self._legend(clean_page)
         statuses = clean_page.evaluate("() => DATA.agencies.map(a => a.status)")
         for label, status in (("No data", "nodata"), ("Schedule ended", "exhausted")):
@@ -1709,18 +1709,18 @@ class TestTheExecutiveLegendCountsWhatIsActuallyThere:
     def test_every_counter_sums_to_the_number_of_agencies(self, clean_page, built_dashboard_html):
         """The arithmetic bug was a subtraction that could not be
         checked. Whatever the legend shows must add up."""
-        for as_of in (self.NORMAL, self.ALL_QUIET, self.NOTHING_YET):
-            _goto(clean_page, built_dashboard_html, as_of=as_of)
+        for in_place_on in (self.NORMAL, self.ALL_QUIET, self.NOTHING_YET):
+            _goto(clean_page, built_dashboard_html, in_place_on=in_place_on)
             total = clean_page.evaluate("() => DATA.agencies.length")
             counted = sum(int(n) for n in re.findall(r"\((\d+)\)", self._legend(clean_page)))
             assert counted == total, (
-                f"as_of={as_of}: legend counts {counted} of {total} agencies: "
+                f"in_place_on={in_place_on}: legend counts {counted} of {total} agencies: "
                 f"{self._legend(clean_page)}")
 
-    def test_a_normal_as_of_still_reads_the_way_it_always_did(self, clean_page, built_dashboard_html):
+    def test_a_normal_in_place_on_still_reads_the_way_it_always_did(self, clean_page, built_dashboard_html):
         """The quiet counters must not become permanent furniture on a
         page where nothing is quiet."""
-        _goto(clean_page, built_dashboard_html, as_of=self.NORMAL)
+        _goto(clean_page, built_dashboard_html, in_place_on=self.NORMAL)
         legend = self._legend(clean_page)
         statuses = clean_page.evaluate("() => DATA.agencies.map(a => a.status)")
         if "nodata" not in statuses:
@@ -2171,7 +2171,7 @@ class TestNavigationUsesRealLinks:
             self, clean_page, built_dashboard_html):
         """The other half of the rule - a panel toggle is an action."""
         _goto(clean_page, built_dashboard_html)
-        for control_id in ["theme-btn", "activity-btn", "asof-btn"]:
+        for control_id in ["theme-btn", "activity-btn", "in-place-on-btn"]:
             tag = clean_page.evaluate(
                 f"() => (document.getElementById({control_id!r})||{{}}).tagName")
             assert tag in (None, "BUTTON"), f"{control_id} is a {tag}"
@@ -2195,12 +2195,12 @@ class TestAnExhaustedDatasetStillShowsItsHistory:
 
     # An as-of date past the quarterly calendar's last authored period,
     # so the dataset is genuinely exhausted rather than merely quiet.
-    AS_OF = "2028-06-01"
+    IN_PLACE_ON = "2028-06-01"
     STATE = {"tier": "dataset", "agencyId": "child-protection-family-support",
              "collectionId": "child-protection", "datasetId": "cp-case-workers"}
 
     def _open(self, page, html):
-        _goto(page, html, state=self.STATE, as_of=self.AS_OF)
+        _goto(page, html, state=self.STATE, in_place_on=self.IN_PLACE_ON)
         page.wait_for_timeout(400)
 
     def test_the_message_is_still_there_and_still_first(self, clean_page,
@@ -2666,7 +2666,7 @@ class TestOutstandingDecisions:
         _goto(clean_page, built_dashboard_html)
         newest = clean_page.evaluate(
             "REAL_BIRTH_REG_DATA.runs[REAL_BIRTH_REG_DATA.runs.length-1].run_date")
-        _goto(clean_page, built_dashboard_html, as_of=newest)
+        _goto(clean_page, built_dashboard_html, in_place_on=newest)
         clean_page.locator("#agency-grid .card").first.click()
         clean_page.wait_for_timeout(400)
         titles = clean_page.locator("td span[title*='currently filed to']")
@@ -2778,19 +2778,19 @@ class TestPerDatasetArrivals:
             f"expected the three cut-short datasets to resolve quietly, got {quiet}")
         assert rows.count() - len(quiet) == 3, "the untouched datasets stopped rendering"
 
-    def test_a_dataset_with_no_arrival_by_the_as_of_date_shows_the_existing_quiet_state(
+    def test_a_dataset_with_no_arrival_by_the_in_place_on_date_shows_the_existing_quiet_state(
             self, clean_page, dashboard_html_with_divergent_arrivals):
         """Criterion 4. cp-case-workers is cut to its single earliest
         arrival, so an as-of date before that has nothing to show - and
         the page must say so in the state it already has rather than
         rendering an empty panel."""
-        _goto(clean_page, dashboard_html_with_divergent_arrivals, as_of="2023-01-01")
+        _goto(clean_page, dashboard_html_with_divergent_arrivals, in_place_on="2023-01-01")
         clean_page.locator("#agency-grid .card").nth(1).click()
         clean_page.wait_for_timeout(500)
         text = clean_page.locator("#view").inner_text().lower()
         assert "no qa run within tolerance" in text or "no data" in text, text[:400]
 
-    def test_the_as_of_picker_moves_each_dataset_on_its_own_history(
+    def test_the_in_place_on_picker_moves_each_dataset_on_its_own_history(
             self, clean_page, dashboard_html_with_divergent_arrivals):
         """Criteria 2 and 3. Stepping the as-of date back must change
         what SOME datasets show without emptying the page - the case a
@@ -2798,7 +2798,7 @@ class TestPerDatasetArrivals:
         self._open_cp(clean_page, dashboard_html_with_divergent_arrivals)
         before = clean_page.locator(".dataset-table tbody tr td:nth-child(5)").all_inner_texts()
 
-        _goto(clean_page, dashboard_html_with_divergent_arrivals, as_of="2024-06-01")
+        _goto(clean_page, dashboard_html_with_divergent_arrivals, in_place_on="2024-06-01")
         clean_page.locator("#agency-grid .card").nth(1).click()
         clean_page.wait_for_timeout(500)
         after = clean_page.locator(".dataset-table tbody tr td:nth-child(5)").all_inner_texts()
@@ -3228,7 +3228,7 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
                      const d = REAL_CP_DATA.datasets.find(x => x.id === "cp-carers");
                      d.promotionState = Object.assign({}, d.promotionState,
                                                        {standingIn: st});
-                     DATA = buildData(CURRENT_AS_OF);
+                     DATA = buildData(CURRENT_IN_PLACE_ON);
                      renderFromState();
                    }""", standing_in)
 
@@ -3248,7 +3248,7 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         assert "ran against 2026-Q2's supply" in text
         assert "not 2026-Q3's own results" in text
 
-    def test_drilling_moves_the_as_of_date_and_records_where_from(
+    def test_drilling_moves_the_in_place_on_date_and_records_where_from(
             self, clean_page, built_dashboard_html):
         """Criterion 9's second half, and criterion 11's first: the
         framing is in the URL, so a refresh or a shared link says the
@@ -3256,7 +3256,7 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
         clean_page.locator('[data-testid="standing-in-drill"]').click()
         params = self._params(clean_page)
-        assert params.get("asof") == self.STANDS_ON_DATE
+        assert params.get("in-place-on") == self.STANDS_ON_DATE
         assert params.get("from") == "2026-Q3"
 
     def test_the_reader_is_told_they_have_left_the_period_they_were_on(
@@ -3273,7 +3273,7 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         clean_page.locator('[data-testid="standing-in-drill"]').click()
         clean_page.locator('[data-testid="arrival-back"]').click()
         params = self._params(clean_page)
-        assert params.get("asof") == self.PERIOD_DATE
+        assert params.get("in-place-on") == self.PERIOD_DATE
         assert "from" not in params
         assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
 
@@ -3299,7 +3299,7 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         params = self._params(clean_page)
         assert "from" not in params
         # The orthogonal query state a navigation has always kept stays.
-        assert params.get("asof") == self.STANDS_ON_DATE
+        assert params.get("in-place-on") == self.STANDS_ON_DATE
         assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
 
     def test_the_whole_drill_reports_no_console_errors(
@@ -3394,7 +3394,7 @@ class TestAHeldOrContestedDatasetReadsRed:
     and agency, and none of its own checks reads as passing."""
 
     OPENED = "2026-09-01T02:00:00+00:00"
-    AS_OF = "2026-09-23"
+    IN_PLACE_ON = "2026-09-23"
     BEFORE = "2026-08-20"
     CP = "child-protection-family-support"
 
@@ -3405,7 +3405,7 @@ class TestAHeldOrContestedDatasetReadsRed:
     def test_each_reads_red_with_its_reason_at_the_agency_tier(self, page,
                                                                dashboard_html_with_blockers):
         _goto(page, dashboard_html_with_blockers, state={"tier": "agency", "agencyId": self.CP},
-              as_of=self.AS_OF)
+              in_place_on=self.IN_PLACE_ON)
         contested = page.locator("tr[data-blocked=contested]")
         assert contested.count() == 1
         assert "Two files, choose one" in contested.inner_text()
@@ -3423,7 +3423,7 @@ class TestAHeldOrContestedDatasetReadsRed:
     def test_the_red_rolls_up_to_the_collection_and_the_agency(self, page,
                                                                dashboard_html_with_blockers):
         _goto(page, dashboard_html_with_blockers, state={"tier": "agency", "agencyId": self.CP},
-              as_of=self.AS_OF)
+              in_place_on=self.IN_PLACE_ON)
         statuses = page.evaluate(f"""() => {{
             const ag = DATA.agencies.find(a => a.id === "{self.CP}");
             return {{agency: ag.status, collection: ag.collections[0].status}};
@@ -3433,7 +3433,7 @@ class TestAHeldOrContestedDatasetReadsRed:
     @pytest.mark.parametrize("dataset_id", ["cp-clients"])
     def test_none_of_its_own_checks_reads_as_passing(self, page, dashboard_html_with_blockers,
                                                      dataset_id):
-        _goto(page, dashboard_html_with_blockers, state=self._ds(dataset_id), as_of=self.AS_OF)
+        _goto(page, dashboard_html_with_blockers, state=self._ds(dataset_id), in_place_on=self.IN_PLACE_ON)
         got = page.evaluate(f"""() => {{
             const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
                            .find(d => d.id === "{dataset_id}");
@@ -3452,7 +3452,7 @@ class TestAHeldOrContestedDatasetReadsRed:
         """Criterion 11 as amended 2026-10-05 (Keith): an open hold no
         longer blanks later periods - red with its reason, the latest
         checked supply's results shown."""
-        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), as_of=self.AS_OF)
+        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), in_place_on=self.IN_PLACE_ON)
         got = page.evaluate("""() => {
             const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
                            .find(d => d.id === "cp-carers");
@@ -3469,7 +3469,7 @@ class TestAHeldOrContestedDatasetReadsRed:
         """Criteria 11 and 26 in the check panel (delivery-critic, sprint 6):
         the pill read No data while the panel still showed the last run's
         value and row counts as "current"."""
-        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-clients"), as_of=self.AS_OF)
+        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-clients"), in_place_on=self.IN_PLACE_ON)
         page.evaluate("""() => {
           const ctx = resolveContext(STATE);
           const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
@@ -3482,14 +3482,14 @@ class TestAHeldOrContestedDatasetReadsRed:
         assert "rows checked, current run" not in text
 
     def test_its_supply_history_lists_it(self, page, dashboard_html_with_blockers):
-        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), as_of=self.AS_OF)
+        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), in_place_on=self.IN_PLACE_ON)
         assert page.locator("tr[data-blocker=held]").count() == 1
 
     def test_before_its_receipt_nothing_is_red_for_it(self, page, dashboard_html_with_blockers):
         """Criterion 12: open from the supply's own receipt, so the as-of
         view of an earlier date shows what a reader saw then."""
         _goto(page, dashboard_html_with_blockers, state={"tier": "agency", "agencyId": self.CP},
-              as_of=self.BEFORE)
+              in_place_on=self.BEFORE)
         assert page.locator("tr[data-blocked]").count() == 0
 
 
@@ -3505,7 +3505,7 @@ class TestHeldOutranksAnEndedSchedule:
              "openedAt": "2027-08-20T02:00:00+00:00", "resolvedAt": None,
              "reason": "could not be placed", "files": [], "loadFailures": []}])
         _goto(page, out, state={"tier": "agency", "agencyId": "child-protection-family-support"},
-              as_of="2027-09-15")
+              in_place_on="2027-09-15")
         # A held supply keeps the row (REQ-PIPE-115 criterion 11 as amended
         # 2026-10-05), red, with the hold beneath its pill.
         row = page.locator("tr", has=page.locator("[data-waiting-blocker=held]"))
@@ -3543,7 +3543,7 @@ class TestASupplyThatCouldNotBeLoaded:
     def test_it_reads_red_with_the_reason_and_the_rest_are_checked(self, page, tmp_path,
                                                                    built_dashboard_html):
         out = self._page(built_dashboard_html, tmp_path, rejected=False)
-        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, as_of="2026-09-23")
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, in_place_on="2026-09-23")
         row = page.locator("tr[data-blocked=refused]")
         assert row.count() == 1 and "Could not be loaded" in row.inner_text()
         assert self._status(page, "cp-placements") == "red"
@@ -3557,21 +3557,21 @@ class TestASupplyThatCouldNotBeLoaded:
         out = self._page(built_dashboard_html, tmp_path, rejected=False)
         _goto(page, out, state={"tier": "dataset", "agencyId": self.CP,
                                 "collectionId": "child-protection", "datasetId": "cp-placements"},
-              as_of="2026-09-23")
+              in_place_on="2026-09-23")
         text = " ".join(page.locator("#view").inner_text().split())
         assert "line 3 has 4 fields" in text
         assert page.locator("#col-grid .pill.green").count() == 0
 
-    def test_a_rejection_settles_it_and_the_as_of_view_still_shows_it(self, page, tmp_path,
+    def test_a_rejection_settles_it_and_the_in_place_on_view_still_shows_it(self, page, tmp_path,
                                                                      built_dashboard_html):
         out = self._page(built_dashboard_html, tmp_path, rejected=True)
-        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, as_of="2026-09-23")
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, in_place_on="2026-09-23")
         assert page.locator("tr[data-blocked=refused]").count() == 0
-        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, as_of="2026-09-05")
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, in_place_on="2026-09-05")
         assert page.locator("tr[data-blocked=refused]").count() == 1
         _goto(page, out, state={"tier": "dataset", "agencyId": self.CP,
                                 "collectionId": "child-protection", "datasetId": "cp-placements"},
-              as_of="2026-09-23")
+              in_place_on="2026-09-23")
         row = page.locator("tr[data-blocker=refused]")
         assert row.count() == 1
         assert "rejected by Keith Moss" in row.inner_text()
@@ -3613,7 +3613,7 @@ class TestClosedWithNoSupply:
     def test_an_unmarked_gap_is_red_and_rolls_up_in_words(self, page, tmp_path,
                                                          built_dashboard_html):
         out = self._page(built_dashboard_html, tmp_path)
-        _goto(page, out, as_of="2026-09-23")
+        _goto(page, out, in_place_on="2026-09-23")
         assert self._ds(page)["status"] == "red"
         assert page.evaluate(f"""() => DATA.agencies.find(a => a.id === "{self.CP}").status""") == "red"
         card = page.locator(f'a.card[href*="{self.CP}"]')
@@ -3624,7 +3624,7 @@ class TestClosedWithNoSupply:
     def test_consecutive_periods_are_one_item_on_the_agency_page(self, page, tmp_path,
                                                                 built_dashboard_html):
         out = self._page(built_dashboard_html, tmp_path)
-        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, as_of="2026-09-23")
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, in_place_on="2026-09-23")
         note = page.locator("[data-no-supply]")
         assert note.count() == 1
         assert "2 periods with no supply, 2025-Q2 to 2025-Q3" in note.inner_text()
@@ -3632,7 +3632,7 @@ class TestClosedWithNoSupply:
     def test_the_dataset_page_says_no_supply_and_names_the_accepted_reason(
             self, page, tmp_path, built_dashboard_html):
         out = self._page(built_dashboard_html, tmp_path)
-        _goto(page, out, state=self.DS, as_of="2026-09-23")
+        _goto(page, out, state=self.DS, in_place_on="2026-09-23")
         text = " ".join(page.locator("#view").inner_text().split())
         assert "No supply — 2 periods with no supply, 2025-Q2 to 2025-Q3" in text
         assert "Not supplied (accepted)" in text and "supplier had a system outage" in text
@@ -3644,14 +3644,14 @@ class TestClosedWithNoSupply:
     def test_the_supply_history_lists_every_closed_period(self, page, tmp_path,
                                                         built_dashboard_html):
         out = self._page(built_dashboard_html, tmp_path)
-        _goto(page, out, state=self.DS, as_of="2026-09-23")
+        _goto(page, out, state=self.DS, in_place_on="2026-09-23")
         assert page.locator("tr[data-gap=open]").count() == 1
         assert page.locator("tr[data-gap=accepted]").count() == 1
 
-    def test_as_of_before_the_mark_the_accepted_period_was_still_red(
+    def test_in_place_on_before_the_mark_the_accepted_period_was_still_red(
             self, page, tmp_path, built_dashboard_html):
         out = self._page(built_dashboard_html, tmp_path)
-        _goto(page, out, as_of="2025-06-01")
+        _goto(page, out, in_place_on="2025-06-01")
         got = self._ds(page)
         assert got["accepted"] is None, "not marked yet on this date"
         assert [g["periods"] for g in got["noSupply"]] == [["2024-Q4"]], \
@@ -3669,7 +3669,7 @@ class TestClosedWithNoSupply:
         out = _with_blockers(built_dashboard_html, tmp_path / "daily.html", [],
                              closed_slots={"birth-registrations": [slot]})
         _goto(page, out, state={"tier": "agency", "agencyId": "registry-services"},
-              as_of="2026-09-23")
+              in_place_on="2026-09-23")
         assert page.locator("tr[data-no-supply]").count() == 0
         note = page.locator(".no-supply-note")
         assert note.count() == 1 and "9 September 2026" in note.inner_text()

@@ -24,7 +24,7 @@ The map is the join. Criterion 2 forbids anyone maintaining it, which
 is why neither half is authored here.
 
 COORDINATES ONLY, NEVER A LINK (criterion 5). The generator knows the
-dataset, the supplies, the period and the as-of date; it does not, and
+dataset, the supplies, the period and the in-place-on date; it does not, and
 should not, know the dashboard's routing scheme. Emitting URLs here
 would couple the two and break silently the next time a route changes -
 so the dashboard constructs the link from these coordinates
@@ -73,7 +73,7 @@ class Placement:
     dataset: str
     supplies: tuple[str, ...]
     period: str
-    as_of: str
+    in_place_on: str
 
     @classmethod
     def of(cls, record: Mapping) -> "Placement":
@@ -82,7 +82,10 @@ class Placement:
             dataset=str(record.get("dataset") or ""),
             supplies=tuple(record.get("supplies") or ()),
             period=str(record.get("period") or ""),
-            as_of=str(record.get("as_of") or ""))
+            # The key the generator wrote before the "In place on" rename
+            # (REQ-PIPE-081 criterion 25) is still read, so a placements file
+            # from an earlier bootstrap keeps its coordinates.
+            in_place_on=str(record.get("in_place_on") or record.get("as" + "_of") or ""))
 
     @property
     def is_complete(self) -> bool:
@@ -90,7 +93,7 @@ class Placement:
         says a scenario with no generated data behind it says so
         rather than emitting a coordinate that leads nowhere, and a
         record naming a dataset but no period leads exactly nowhere."""
-        return bool(self.dataset and self.period and self.as_of)
+        return bool(self.dataset and self.period and self.in_place_on)
 
 
 def read_placements(path: Path | str | None = None) -> dict[str, Placement]:
@@ -141,7 +144,7 @@ the same as a real one would, because that is the point. **This is the
 list that says which red was on purpose, and where to look at it.**
 
 Each entry gives coordinates - the dataset, the supplies, the period,
-and the date to set the as-of picker to - and never a link. The
+and the date to set the In place on picker to - and never a link. The
 generator knows where a scenario landed; it does not know how the
 dashboard addresses its pages, and a URL written here would break
 silently the next time a route changed.
@@ -191,7 +194,7 @@ def _entry(scenario: scenarios_mod.Scenario, placement: Placement | None) -> lis
             f"| Dataset | {placement.dataset} |",
             f"| Supplies | {supplies} |",
             f"| Period | {placement.period} |",
-            f"| Set the as-of date to | {placement.as_of} |",
+            f"| Set the in-place-on date to | {placement.in_place_on} |",
             "",
         ]
     elif scenario.is_injected:
@@ -236,7 +239,7 @@ def _data_block(scenarios: Iterable[scenarios_mod.Scenario],
                 "dataset": placement.dataset,
                 "supplies": list(placement.supplies),
                 "period": placement.period,
-                "asOf": placement.as_of,
+                "inPlaceOn": placement.in_place_on,
             }
         entries.append(entry)
     return _DATA_OPEN + json.dumps({"scenarios": entries}, indent=1) + _DATA_CLOSE

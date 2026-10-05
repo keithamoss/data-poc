@@ -2,7 +2,7 @@
 
 WRITTEN BEFORE THE REFACTOR, DELIBERATELY. That requirement's own NFR
 asks for exactly this and says why: the current behaviour is correct by
-COINCIDENCE in at least one place - clipDatasetToAsOf() compares date
+COINCIDENCE in at least one place - clipDatasetToInPlaceOn() compares date
 STRINGS, which gives end-of-day semantics by accident rather than by
 design - so "did the refactor change anything" cannot be answered by
 reading the new code. It has to be measured against what the old code

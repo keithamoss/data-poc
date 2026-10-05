@@ -43,6 +43,12 @@ HOLD, PROMOTE_AND_ACKNOWLEDGE, PROMOTE = AMBER_SETTINGS
 #: The levels a setting can be stated at, nearest first.
 DATASET, COLLECTION, ASSET = "dataset", "collection", "data asset"
 
+#: THE CONFIGURATION KEY. This module is the one mechanism for an
+#: effective-dated, nearest-wins, frozen-past setting: REQ-PIPE-123's
+#: replacement setting is read by the same functions under its own key
+#: ("by the same mechanism, and with the same protection of its past").
+KEY = "amber_setting"
+
 
 class AmberSettingError(ValueError):
     """The configuration cannot answer - no asset-level value in effect."""
@@ -87,10 +93,10 @@ def _nodes_for(doc: dict, dataset_id: str) -> tuple[dict | None, dict | None]:
     return None, None
 
 
-def _resolve_on(doc: dict, dataset_id: str, on: date) -> Resolved | None:
+def _resolve_on(doc: dict, dataset_id: str, on: date, key: str = KEY) -> Resolved | None:
     collection, dataset = _nodes_for(doc, dataset_id)
     for level, node in ((DATASET, dataset), (COLLECTION, collection), (ASSET, doc)):
-        version = _in_effect((node or {}).get("amber_setting"), on)
+        version = _in_effect((node or {}).get(key), on)
         if version:
             return Resolved(value=str(version["value"]), level=level,
                             version=str(version["effective_from"]))
@@ -145,26 +151,28 @@ def describe(dataset_id: str, on: date, *, doc: dict | None = None) -> str:
             f"since {since.day} {since.strftime('%b %Y')})")
 
 
-def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None) -> Resolved:
-    """The amber setting for `dataset_id` as at the instant `at` - the
-    instant the decision about a supply takes effect (criterion 4)."""
+def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None,
+            key: str = KEY, values: tuple[str, ...] = AMBER_SETTINGS,
+            label: str = "amber setting") -> Resolved:
+    """The setting for `dataset_id` as at the instant `at` - the instant
+    the decision about a supply takes effect (criterion 4)."""
     from qa_tools.common import asset_time
 
     instant = at if isinstance(at, datetime) else asset_time.parse_instant(at, "at")
     on = asset_time.local_date(instant)
     doc = doc if doc is not None else _doc()
-    found = _resolve_on(doc, dataset_id, on)
+    found = _resolve_on(doc, dataset_id, on, key)
     if found is not None:
         return found
     raise AmberSettingError(
-        f"no amber setting is in effect for {dataset_id} on {on.isoformat()} - the data "
-        f"asset level must state one (one of {', '.join(AMBER_SETTINGS)}), and there is no "
+        f"no {label} is in effect for {dataset_id} on {on.isoformat()} - the data "
+        f"asset level must state one (one of {', '.join(values)}), and there is no "
         f"default.")
 
 
 # ---- the configuration's guards (criteria 6 to 9 and 20) --------------
 
-def standing_problems(doc: dict, today: date) -> list[tuple[str, str]]:
+def standing_problems(doc: dict, today: date, key: str = KEY) -> list[tuple[str, str]]:
     """[(where, problem)] in the configuration as it stands - no history
     needed (delivery-critic on REQ-PIPE-122, F4 and F5).
 
@@ -175,29 +183,29 @@ def standing_problems(doc: dict, today: date) -> list[tuple[str, str]]:
     silently.
     """
     problems: list[tuple[str, str]] = []
-    for where, setting in _settings(doc).items():
+    for where, setting in _settings(doc, key).items():
         starts = [str(v.get("effective_from")) for v in (setting.get("versions") or [])
                   if isinstance(v, dict)]
         for start in sorted({s for s in starts if starts.count(s) > 1}):
             problems.append((where, f"two versions share the date {start}, so which "
                                     f"applies is ambiguous"))
-    if isinstance(doc.get("amber_setting"), dict) and not _in_effect(doc["amber_setting"], today):
+    if isinstance(doc.get(key), dict) and not _in_effect(doc[key], today):
         problems.append((ASSET, f"no version is in effect today ({today.isoformat()}) - the "
                                 f"data asset level must always state one"))
     return problems
 
-def _settings(doc: dict) -> dict[str, dict]:
+def _settings(doc: dict, key: str = KEY) -> dict[str, dict]:
     """{where: setting} for every level that states one."""
     out: dict[str, dict] = {}
-    if isinstance(doc.get("amber_setting"), dict):
-        out[ASSET] = doc["amber_setting"]
+    if isinstance(doc.get(key), dict):
+        out[ASSET] = doc[key]
     for agency in ((doc.get("hierarchy") or {}).get("agencies") or []):
         for collection in (agency.get("collections") or []):
-            if isinstance(collection.get("amber_setting"), dict):
-                out[f"collection {collection.get('id')}"] = collection["amber_setting"]
+            if isinstance(collection.get(key), dict):
+                out[f"collection {collection.get('id')}"] = collection[key]
             for dataset in (collection.get("datasets") or []):
-                if isinstance(dataset.get("amber_setting"), dict):
-                    out[f"dataset {dataset.get('id')}"] = dataset["amber_setting"]
+                if isinstance(dataset.get(key), dict):
+                    out[f"dataset {dataset.get('id')}"] = dataset[key]
     return out
 
 
@@ -207,7 +215,7 @@ def _versions(setting: dict) -> dict[str, dict]:
 
 
 def past_change_problems(old: dict, new: dict, today: date, *,
-                         synthetic: bool, added=None) -> list[tuple[str, str]]:
+                         synthetic: bool, added=None, key: str = KEY) -> list[tuple[str, str]]:
     """[(where, problem)] for every change that rewrites a setting's past.
 
     `today` is on the asset's clock. A version is PAST once its date is
@@ -227,7 +235,7 @@ def past_change_problems(old: dict, new: dict, today: date, *,
         found = added(start) if callable(added) else added
         return found or today
     problems: list[tuple[str, str]] = []
-    was, now = _settings(old), _settings(new)
+    was, now = _settings(old, key), _settings(new, key)
     for where, setting in was.items():
         before = _versions(setting)
         after = _versions(now.get(where) or {})

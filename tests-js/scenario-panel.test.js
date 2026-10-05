@@ -53,7 +53,7 @@ function entry(overrides = {}) {
 const PLACED = entry({
   coordinates: {
     dataset: "cp-clients", supplies: ["cp_run_007"],
-    period: "2026-Q3", asOf: "2026-08-15",
+    period: "2026-Q3", inPlaceOn: "2026-08-15",
   },
 });
 
@@ -61,7 +61,7 @@ describe("turning coordinates into a target", () => {
   it("resolves a dataset id to its own page, with the as-of date the entry names", () => {
     const w = load();
     const target = w.scenarioTarget(PLACED);
-    expect(target.asOf).toBe("2026-08-15");
+    expect(target.inPlaceOn).toBe("2026-08-15");
     expect(target.nav).toEqual({
       tier: "dataset",
       agencyId: "child-protection-family-support",
@@ -73,7 +73,7 @@ describe("turning coordinates into a target", () => {
   it("resolves a dataset by its display name too, since the map is written for people", () => {
     const w = load();
     const target = w.scenarioTarget(entry({
-      coordinates: { dataset: "Carer Register", period: "2026-Q3", asOf: "2026-08-15" },
+      coordinates: { dataset: "Carer Register", period: "2026-Q3", inPlaceOn: "2026-08-15" },
     }));
     expect(target.nav.datasetId).toBe("cp-carers");
   });
@@ -81,7 +81,7 @@ describe("turning coordinates into a target", () => {
   it("resolves a collection to its agency page", () => {
     const w = load();
     const target = w.scenarioTarget(entry({
-      coordinates: { dataset: "child-protection", period: "2026-Q3", asOf: "2026-08-15" },
+      coordinates: { dataset: "child-protection", period: "2026-Q3", inPlaceOn: "2026-08-15" },
     }));
     expect(target.nav).toEqual({ tier: "agency", agencyId: "child-protection-family-support" });
   });
@@ -97,7 +97,7 @@ describe("turning coordinates into a target", () => {
     // telling them it has gone.
     const w = load();
     expect(w.scenarioTarget(entry({
-      coordinates: { dataset: "a-dataset-that-never-existed", period: "p", asOf: "2026-01-01" },
+      coordinates: { dataset: "a-dataset-that-never-existed", period: "p", inPlaceOn: "2026-01-01" },
     }))).toBeNull();
   });
 });
@@ -127,7 +127,7 @@ describe("what the map may not contain", () => {
     // supply one, a route change would break it silently.
     const w = load();
     const target = w.scenarioTarget(PLACED);
-    expect(Object.keys(target).sort()).toEqual(["asOf", "nav"]);
+    expect(Object.keys(target).sort()).toEqual(["inPlaceOn", "nav"]);
     expect(JSON.stringify(target)).not.toContain("http");
     expect(JSON.stringify(target)).not.toContain("#/");
   });
@@ -135,7 +135,7 @@ describe("what the map may not contain", () => {
   it("a coordinate that already looks like a URL is still not followed", () => {
     const w = load();
     expect(w.scenarioTarget(entry({
-      coordinates: { dataset: "https://example.test/evil", period: "p", asOf: "2026-01-01" },
+      coordinates: { dataset: "https://example.test/evil", period: "p", inPlaceOn: "2026-01-01" },
     }))).toBeNull();
   });
 });

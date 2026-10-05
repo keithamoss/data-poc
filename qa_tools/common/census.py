@@ -75,7 +75,10 @@ def compare(conn: supply_db.SupplyConnection,
     for schema, name, kind in conn.execute(
             "SELECT table_schema, table_name, table_type FROM information_schema.tables "
             "WHERE table_schema LIKE 'period\\_%' "
-            "AND table_schema NOT LIKE '%\\_superseded'").fetchall():
+            "AND table_schema NOT LIKE '%\\_superseded' "
+            # A period's own account of itself (REQ-PIPE-130), not a table
+            # anybody decided on.
+            "AND table_name <> '_manifest'").fetchall():
         if schemas is not None and schema not in schemas:
             continue
         actual[(schema, name)] = kind

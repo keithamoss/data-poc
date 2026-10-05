@@ -172,7 +172,7 @@ export function loadDashboard({ html, hierarchy, assetTimezone, periodSequences,
 
   const errors = [];
   const dom = new JSDOM(source, {
-    // A REAL URL, because the page reads one. `?asof=` is where an
+    // A REAL URL, because the page reads one. `?in-place-on=` is where an
     // out-of-range as-of date comes from (REQ-DASH-054 criterion 9) and a
     // hash is where drill-down state lives, so a test about either has to
     // set the address rather than poke at the page afterwards.

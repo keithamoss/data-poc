@@ -332,7 +332,7 @@ button{font:inherit; color:inherit;}
    own IBM Plex Mono with tabular numerals, which every other code-ish
    string on the page uses. */
 .notice-exhausted code, .notice-runway code, .notice-queue code,
-.stale-link-notice code, .asof-range-notice code, .view-sub code{
+.stale-link-notice code, .in-place-on-range-notice code, .view-sub code{
   background:var(--surface); padding:1px 5px; border-radius:4px;
   /* Without this a wrapped chip renders as TWO rounded boxes, so
      `mothman schedule candidate-dates` reads as two commands at 390px
@@ -357,10 +357,10 @@ button{font:inherit; color:inherit;}
    notice appeared, so a second thing wearing that class breaks an
    assertion about the first. Sharing the rule shares the look without
    making the class an identifier. */
-.stale-link-notice, .asof-range-notice{border:1px solid var(--warn-border, var(--ink-faint)); border-radius:8px;
+.stale-link-notice, .in-place-on-range-notice{border:1px solid var(--warn-border, var(--ink-faint)); border-radius:8px;
   padding:10px 12px; margin-bottom:14px; font-size:13.5px; color:var(--ink);
   background:var(--warn-bg, transparent); max-width:72ch;}
-.stale-link-notice code, .asof-range-notice code{font-size:12.5px;}
+.stale-link-notice code, .in-place-on-range-notice code{font-size:12.5px;}
 /* Visually hidden, still announced. The route announcer (#10) has to
    reach a screen reader without appearing on the page; display:none
    and visibility:hidden would remove it from the accessibility tree
@@ -836,7 +836,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     </button>
     <div class="header-actions">
       <button class="snapshots-btn" id="theme-btn" type="button">🌙 Dark mode</button>
-      <button class="snapshots-btn" id="asof-btn" type="button">📅 As of: <span id="asof-btn-label">…</span></button>
+      <button class="snapshots-btn" id="in-place-on-btn" type="button">📅 In place on: <span id="in-place-on-btn-label">…</span></button>
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
       <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
       <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
@@ -858,7 +858,11 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
        on screen is still a real answer, it is just not the answer the
        link asked for. Empty and hidden unless there is something to
        say. -->
-  <div id="asof-range-notice" class="asof-range-notice" role="status" hidden></div>
+  <div id="in-place-on-range-notice" class="in-place-on-range-notice" role="status" hidden></div>
+  <!-- ON THE PAGE ITSELF (REQ-PIPE-081 criterion 22): a reader arriving by
+       a link with a past date already set meets the distinction without
+       opening the panel. -->
+  <div id="in-place-on-past-notice" class="in-place-on-range-notice" role="status" hidden></div>
   <main id="view"></main>
 
   <footer>
@@ -917,35 +921,37 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
      it would have read on some earlier date - live app, filtered data,
      not an archive. One global control for the whole dashboard, not
      per-dataset (Keith: "that's like global, not per dataset"). -->
-<div class="backdrop" id="asof-backdrop"></div>
-<aside class="drawer" id="asof-panel" aria-hidden="true" inert>
+<div class="backdrop" id="in-place-on-backdrop"></div>
+<aside class="drawer" id="in-place-on-panel" aria-hidden="true" inert>
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;">Cadence-aware viewing</div>
-      <h3>View data asset as of a date</h3>
+      <h3>What was in place on a date</h3>
     </div>
-    <button class="drawer-close" id="asof-panel-close" aria-label="Close">✕</button>
+    <button class="drawer-close" id="in-place-on-panel-close" aria-label="Close">✕</button>
   </div>
-  <div class="drawer-body" id="asof-panel-body">
+  <div class="drawer-body" id="in-place-on-panel-body">
     <div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:16px;">
-      Rolls every real dataset back to whichever of its own QA runs was the
-      most recent at or before the date you pick — showing exactly what was
-      actually known as of that date, not just filtering what's on screen
-      now. A dataset with no run yet as of that date shows as
-      <b>No data</b>, never a misleading blank, green, or red. Applies to
-      the whole data asset at once.
+      Shows, for every dataset, the supply that was in place on the date
+      you pick - or the newest one still awaiting a decision - and its
+      results. It uses <b>everything known today</b>, including decisions
+      made since that date: a supply rejected or superseded later is shown
+      that way. To see what this page itself said on a past date, open the
+      <b>snapshot archive</b> (🕐 Past snapshots). A dataset with nothing
+      supplied by that date shows as <b>No data</b>, never a misleading
+      blank, green, or red. Applies to the whole data asset at once.
     </div>
-    <label for="asof-input" style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">As of date</label>
-    <input type="date" id="asof-input" style="font:600 14px 'IBM Plex Mono',monospace; padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); width:100%; max-width:220px;">
+    <label for="in-place-on-input" style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">In place on</label>
+    <input type="date" id="in-place-on-input" style="font:600 14px 'IBM Plex Mono',monospace; padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); width:100%; max-width:220px;">
     <!-- WHICH PERIOD, PER CALENDAR (criterion 6). A date on its own does
          not tell a reader what they are about to see: on a quarterly
          calendar the 20th of a month is deep inside a period that began
          seven weeks earlier, and two datasets on two calendars are
          showing two different periods of the same chosen date. Naming
          both is what makes the chosen date mean something. -->
-    <div id="asof-periods" style="margin-top:14px; font-size:12.5px; color:var(--ink-muted);"></div>
+    <div id="in-place-on-periods" style="margin-top:14px; font-size:12.5px; color:var(--ink-muted);"></div>
     <div style="margin-top:14px;">
-      <button class="link-btn" id="asof-reset-btn" type="button">Reset to default (<span id="asof-default-label"></span>)</button>
+      <button class="link-btn" id="in-place-on-reset-btn" type="button">Reset to default (<span id="in-place-on-default-label"></span>)</button>
     </div>
   </div>
 </aside>
@@ -1247,10 +1253,10 @@ function assetEndOfDay(dateStr){
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(Date.UTC(y, m-1, d, 23, 59, 59) - offsetMs);
 }
-function asOfNow(){
+function inPlaceOnNow(){
   const real = new Date();
-  if(!CURRENT_AS_OF) return real;
-  const end = assetEndOfDay(CURRENT_AS_OF);
+  if(!CURRENT_IN_PLACE_ON) return real;
+  const end = assetEndOfDay(CURRENT_IN_PLACE_ON);
   return end < real ? end : real;
 }
 
@@ -1456,7 +1462,7 @@ function fmtMetric(x, unit){
 //
 // Not "nodata" either, which is what the naive derivation produces and
 // is the trap this requirement was written around: rollup() filters
-// noDataAsOf and rollupStatuses() filters nodata before worstOf(), and
+// noDataInPlaceOn and rollupStatuses() filters nodata before worstOf(), and
 // STATUS_ORDER puts nodata at -1 where it can only ever LOSE a reduce
 // starting from green. One exhausted dataset among twenty-nine healthy
 // ones would make its collection, its agency and the executive tier
@@ -1933,7 +1939,7 @@ function buildRealDataset(d){
     // silently, which this project has paid for twice - see
     // REQ-DASH-032's decisions for both. Safe to spread; nothing
     // iterates a check's own keys, so the raw twins left beside their
-    // transformed versions (retired_as_of beside retiredAsOf) are inert.
+    // transformed versions (retired_as_of beside retiredOn) are inert.
     const checks = col.checks.map(ck => ({
       ...ck,
       // Phase 5b (plans/publishing-and-history.md Thread D): a check is
@@ -1942,7 +1948,7 @@ function buildRealDataset(d){
       // check going quiet. `retired` is the boolean the rest of the
       // dashboard actually branches on.
       retired: isRetired(ck),
-      retiredAsOf: ck.retired_as_of ? toDate(ck.retired_as_of) : null,
+      retiredOn: ck.retired_as_of ? toDate(ck.retired_as_of) : null,
       retiredReason: ck.retired_reason,
       // changelog dates are already full ISO-8601 ("2026-09-17T00:00:00Z",
       // check_lifecycle.py's own authored format) - new Date() directly,
@@ -1967,7 +1973,7 @@ function buildRealDataset(d){
   // this (dataset/collection/agency) rolls up from c.status, so excluding
   // retired checks here is the one place this needs enforcing.
   //
-  // Phase 5g/5j: d.staleAsOf (clipDatasetToAsOf's flag - nothing has
+  // Phase 5g/5j: d.staleInPlaceOn (clipDatasetToInPlaceOn's flag - nothing has
   // landed yet in the as-of date's current cadence cycle) forces every
   // column's ROLLED-UP status to "nodata" too, same reasoning as the
   // retired-check rule just above: we don't trust a stale run to
@@ -1983,7 +1989,7 @@ function buildRealDataset(d){
   // rollupStatuses, not worstOf: a check may carry `inactive`, which
   // worstOf refuses to rank - correctly - and which this has to turn
   // into a column status rather than throw on (post-build-review #4).
-  columns.forEach(c=> c.status = d.staleAsOf ? "nodata" : rollupStatuses(c.checks.filter(ck=>!ck.retired).map(checkStatus)));
+  columns.forEach(c=> c.status = d.staleInPlaceOn ? "nodata" : rollupStatuses(c.checks.filter(ck=>!ck.retired).map(checkStatus)));
 
   const arrivalHistory = d.arrivalHistory.map((a,i)=>({ idx:i, date: toDate(a.run_date), arrivalStatus: a.arrivalStatus }));
 
@@ -2020,15 +2026,15 @@ function buildRealDataset(d){
     columns,
     isReal: true,
     realRunCount: d.runs.length,
-    // Phase 5g: mirrors noDataDataset()'s own noDataAsOf/status pairing
+    // Phase 5g: mirrors noDataDataset()'s own noDataInPlaceOn/status pairing
     // for the "genuinely empty" case above, but with real columns/checks
     // attached (see the c.status loop above) - the wiring pass below
     // (data.agencies.forEach...) only recomputes ds.status when
-    // !ds.noDataAsOf, so this has to be set correctly here or not at
+    // !ds.noDataInPlaceOn, so this has to be set correctly here or not at
     // all. undefined (not false) when NOT stale, so the wiring pass's
     // own falsy check still runs its normal worstOf() computation.
-    noDataAsOf: d.staleAsOf || undefined,
-    status: d.staleAsOf ? "nodata" : undefined,
+    noDataInPlaceOn: d.staleInPlaceOn || undefined,
+    status: d.staleInPlaceOn ? "nodata" : undefined,
     // Phase 5d: the dataset's own full run manifest, kept around (not
     // just its .length like realRunCount above) so trendChart() can tell
     // "no result for this check between two of its history points" apart
@@ -2170,7 +2176,7 @@ function coveredDateRange(){
 // byRun doesn't happen to cover every run (a column/check introduced
 // partway through history) - returns null if truly none of them do,
 // left to each caller's own fallback. Extracted out of
-// clipDatasetToAsOf() (Phase 5j Stage 2) so buildSupplyHistory() below
+// clipDatasetToInPlaceOn() (Phase 5j Stage 2) so buildSupplyHistory() below
 // can reuse the exact same lookup rather than re-deriving it.
 function rowCountAtRun(d, runId){
   for(const col of d.columns){
@@ -2229,7 +2235,7 @@ function datasetStatusByRun(d){
 // end of a resupply chain" (Keith's own final call). An ordinary
 // green/amber arrival with no open chain before it is just a one-entry
 // group, same as before. Operates on the RAW dataset shape (d.runs/
-// d.arrivalByRun/d.columns - the same object clipDatasetToAsOf() takes),
+// d.arrivalByRun/d.columns - the same object clipDatasetToInPlaceOn() takes),
 // not the already-clipped one, since this section deliberately shows the
 // WHOLE history, not just what's eligible as of the current as-of date -
 // renderDataset() picks which group to show BY DEFAULT (Keith's
@@ -2345,34 +2351,36 @@ function cycleLabel(cadence, cycleStartStr){
 // name. The behaviour is deliberately unchanged - tests/
 // test_asset_time_semantics.py pins it - and only the intent is now
 // written down.
-function ranOnOrBeforeAsOf(runDateStr, asOfDateStr){
-  return runDateStr <= asOfDateStr;
+function ranOnOrBeforeInPlaceOn(runDateStr, inPlaceOnDateStr){
+  return runDateStr <= inPlaceOnDateStr;
 }
 // A RUN'S SUPPLY ON THE DATE ON SHOW - promoted, awaiting or withdrawn
 // (REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05, Keith). The
 // build embeds the answers from the decision log; before its first entry a
 // supply that arrived is awaiting a decision. Looked up, never derived.
-function runStateAsOf(d, runId, asOfDateStr){
+function runStateInPlaceOn(d, runId, inPlaceOnDateStr){
   let state = "awaiting";
   (((d.runStates || {})[runId]) || []).forEach(e=>{
-    if(assetDateStrOf(e.at) <= asOfDateStr) state = e.state;
+    if(assetDateStrOf(e.at) <= inPlaceOnDateStr) state = e.state;
   });
   return state;
 }
-function clipDatasetToAsOf(d, asOfDateStr){
+function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
   // THE NEWEST SUPPLY IN PLACE OR AWAITING A DECISION (criterion 1 as
   // amended): one withdrawn by the date on show - demoted, turned down,
   // re-filed out or superseded - is not the dataset's verdict, however
   // recently it arrived.
-  const eligibleRuns = d.runs.filter(r => ranOnOrBeforeAsOf(r.run_date, asOfDateStr)
-    && runStateAsOf(d, r.run_id, asOfDateStr) !== "withdrawn");
+  const eligibleRuns = d.runs.filter(r => ranOnOrBeforeInPlaceOn(r.run_date, inPlaceOnDateStr)
+    && runStateInPlaceOn(d, r.run_id, inPlaceOnDateStr) !== "withdrawn");
   if(!eligibleRuns.length) return null; // never supplied yet as of this date
   const effectiveRun = eligibleRuns[eligibleRuns.length-1];
-  const verdictState = runStateAsOf(d, effectiveRun.run_id, asOfDateStr);
+  const verdictState = runStateInPlaceOn(d, effectiveRun.run_id, inPlaceOnDateStr);
   const inPlace = verdictState === "promoted" ? effectiveRun
-    : [...eligibleRuns].reverse().find(r=> runStateAsOf(d, r.run_id, asOfDateStr) === "promoted") || null;
+    : [...eligibleRuns].reverse().find(r=> runStateInPlaceOn(d, r.run_id, inPlaceOnDateStr) === "promoted") || null;
   const verdictOf = {state: verdictState,
-    inPlaceRunDate: inPlace && inPlace !== effectiveRun ? inPlace.run_date : null};
+    inPlaceRunDate: inPlace && inPlace !== effectiveRun ? inPlace.run_date : null,
+    // The run of the supply IN PLACE, for its red-promoted label (REQ-DASH-126).
+    inPlaceRunId: inPlace ? inPlace.run_id : null};
   // Phase 5j (plans/qa-pipeline.md, 2026-09-17 - replacing the flat
   // AS_OF_OFFSET_DAYS day-count tolerance this same rule used to be):
   // "no data" now means "nothing has landed yet in the CURRENT expected
@@ -2389,14 +2397,14 @@ function clipDatasetToAsOf(d, asOfDateStr){
   // this run's real history outright. It used to return null here too,
   // which made noDataDataset() below throw away every column/check -
   // Tier 3 had nothing left to render but a text blurb, not even
-  // clickable. Now it's flagged (staleAsOf) and passed through
+  // clickable. Now it's flagged (staleInPlaceOn) and passed through
   // unchanged so buildRealDataset() can still build real columns/checks/
   // history for drill-down - only the ROLLED-UP dataset/column status
   // pills go neutral "no data" (buildRealDataset()'s own job), never
   // the checks' own real current/previous values or their historical
   // trend charts. Only a genuinely EMPTY eligibleRuns (checked above,
   // still returns null) has nothing at all worth passing through.
-  const staleAsOf = effectiveRun.run_date < periodStartDate(d.id, asOfDateStr);
+  const staleInPlaceOn = effectiveRun.run_date < periodStartDate(d.id, inPlaceOnDateStr);
   const effectiveRunId = effectiveRun.run_id;
   const prevRunId = eligibleRuns.length>1 ? eligibleRuns[eligibleRuns.length-2].run_id : null;
   const eligibleRunIds = new Set(eligibleRuns.map(r=>r.run_id));
@@ -2416,9 +2424,9 @@ function clipDatasetToAsOf(d, asOfDateStr){
         // so keeping the newest one coloured a past date by today's
         // verdict - a check red on that run read green. Without a status
         // of its own the point falls back to the threshold math.
-        const asOf = {...ck, history, current: last.value, previous: prev.value};
-        if(last.status) asOf.current_status = last.status; else delete asOf.current_status;
-        return asOf;
+        const inPlaceOn = {...ck, history, current: last.value, previous: prev.value};
+        if(last.status) inPlaceOn.current_status = last.status; else delete inPlaceOn.current_status;
+        return inPlaceOn;
       })
       .filter(Boolean);
     const byRun = (col.stats && col.stats.byRun) || {};
@@ -2451,7 +2459,7 @@ function clipDatasetToAsOf(d, asOfDateStr){
     arrivalHistory: (d.arrivalHistory || []).filter(a => eligibleRunIds.has(a.run_id)),
     lastArrival,
     rowCount, prevRowCount,
-    staleAsOf,
+    staleInPlaceOn,
     verdictOf,
   };
 }
@@ -2459,16 +2467,16 @@ function clipDatasetToAsOf(d, asOfDateStr){
 // A dataset with no run at or before the as-of date - a real, distinct
 // state ("no data available yet"), never rendered as a misleading
 // blank/red/green tile (Keith's own words, plans/publishing-and-
-// history.md Thread C). Only the fields the noDataAsOf-aware render
+// history.md Thread C). Only the fields the noDataInPlaceOn-aware render
 // paths actually read are populated; everything else stays a safe,
 // inert placeholder rather than mirroring buildRealDataset()'s full
-// shape, so a render path that FORGETS to check noDataAsOf fails
+// shape, so a render path that FORGETS to check noDataInPlaceOn fails
 // loudly (undefined property access) instead of silently showing
 // wrong numbers.
 function noDataDataset(id, name, provider, deliveryFormat, sla){
   return {
     id, name, provider, deliveryFormat, sla,
-    status: "nodata", noDataAsOf: true, isReal: true, realRunCount: 0,
+    status: "nodata", noDataInPlaceOn: true, isReal: true, realRunCount: 0,
     columns: [], lastArrival: null, arrivalHistory: [], rowCount: 0, prevRowCount: 0,
   };
 }
@@ -2486,18 +2494,18 @@ function noDataDataset(id, name, provider, deliveryFormat, sla){
 // Real datasets ARE clipped to the as-of date; a dataset whose history
 // starts after it genuinely has nothing to show as at that date, which
 // is what noDataDataset() is for.
-function buildBirthRegistrations(asOfDateStr){
+function buildBirthRegistrations(inPlaceOnDateStr){
   if(!REAL_BIRTH_REG_DATA) return null;
-  const clipped = clipDatasetToAsOf(REAL_BIRTH_REG_DATA, asOfDateStr);
+  const clipped = clipDatasetToInPlaceOn(REAL_BIRTH_REG_DATA, inPlaceOnDateStr);
   return clipped ? buildRealDataset(clipped)
     : {...noDataDataset(REAL_BIRTH_REG_DATA.id, REAL_BIRTH_REG_DATA.name, REAL_BIRTH_REG_DATA.provider,
                      REAL_BIRTH_REG_DATA.deliveryFormat, REAL_BIRTH_REG_DATA.sla),
        closedSlots: REAL_BIRTH_REG_DATA.closedSlots || []};
 }
-function buildChildProtectionDatasets(asOfDateStr){
+function buildChildProtectionDatasets(inPlaceOnDateStr){
   if(!REAL_CP_DATA) return [];
   return REAL_CP_DATA.datasets.map(d => {
-    const clipped = clipDatasetToAsOf(d, asOfDateStr);
+    const clipped = clipDatasetToInPlaceOn(d, inPlaceOnDateStr);
     return clipped ? buildRealDataset(clipped)
       : {...noDataDataset(d.id, d.name, d.provider, d.deliveryFormat, d.sla),
          closedSlots: d.closedSlots || []};
@@ -2534,7 +2542,7 @@ function rawRealDatasetById(datasetId){
    shapes (plans/running-thoughts.md #29).
 ========================================================================= */
 // Datasets with no data as of the currently-selected as-of date
-// (ds.noDataAsOf, Thread C) are excluded from the worst-of - "no data"
+// (ds.noDataInPlaceOn, Thread C) are excluded from the worst-of - "no data"
 // is a different KIND of signal from a real green/amber/red and must
 // never silently vote "green" (an empty ds.columns list would default
 // worstOf() to green) into its parent collection/agency's own status.
@@ -2570,7 +2578,7 @@ function rollup(datasets){
   // A BLOCKED DATASET IS A RED like any other (REQ-PIPE-115 criterion
   // 10), whatever quiet state its runs alone would have put it in.
   const live = counted.filter(d=> d.blocked || d.waitingBlocker || d.noSupply
-    || (!d.noDataAsOf && !d.scheduleExhausted));
+    || (!d.noDataInPlaceOn && !d.scheduleExhausted));
   if(!live.length){
     if(counted.some(d=>d.scheduleExhausted)) return "exhausted";
     return counted.length ? "nodata" : "green";
@@ -2621,7 +2629,7 @@ function rollupStatuses(statuses){
 // reachable from outside the script in jsdom, so a version reading
 // SCHEDULE_RUNWAY directly could only ever be tested against the
 // embedded null, which is to say not tested at all.
-function scheduleRunwayAsOf(asOfDateStr, runway){
+function scheduleRunwayInPlaceOn(inPlaceOnDateStr, runway){
   const source = runway === undefined ? SCHEDULE_RUNWAY : runway;
   const out = {exhausted:{}, low:[], exhaustedCount:0};
   if(!source) return out;
@@ -2630,8 +2638,8 @@ function scheduleRunwayAsOf(asOfDateStr, runway){
     (cal.datasets||[]).forEach(ds=>{
       // A slot still to come is one whose date is AFTER the date being
       // viewed. Strings compare correctly here because both are
-      // ISO-8601 - the same reasoning clipDatasetToAsOf() relies on.
-      const remaining = (ds.dates||[]).filter(d=> d > asOfDateStr).length;
+      // ISO-8601 - the same reasoning clipDatasetToInPlaceOn() relies on.
+      const remaining = (ds.dates||[]).filter(d=> d > inPlaceOnDateStr).length;
       if(fewest===null || remaining < fewest) fewest = remaining;
       if(remaining === 0){
         // The DATASET's own last period, falling back to its
@@ -2656,7 +2664,7 @@ function scheduleRunwayAsOf(asOfDateStr, runway){
       // correction the CLI's own warning needed
       // (post-build-review #22 and #2).
       const driver = (cal.datasets||[])
-        .map(ds=>({ds, remaining:(ds.dates||[]).filter(d=> d > asOfDateStr).length}))
+        .map(ds=>({ds, remaining:(ds.dates||[]).filter(d=> d > inPlaceOnDateStr).length}))
         .filter(x=> x.remaining === fewest)
         .sort((a,b)=> String(a.ds.id).localeCompare(String(b.ds.id)))[0];
       out.low.push({name:cal.name, remaining:fewest, lastPeriod:cal.lastPeriod,
@@ -2717,7 +2725,7 @@ function liveNowDateStr(){ return assetTodayDateStr(); }
 // misconfiguration. The as-of chrome, which is the only thing that
 // needs a date before any data is loaded, simply is not drawn.
 const HAS_ASSET_CLOCK = typeof ASSET_TIMEZONE === "string" && ASSET_TIMEZONE.trim() !== "";
-function defaultAsOf(){
+function defaultInPlaceOn(){
   return HAS_ASSET_CLOCK ? liveNowDateStr() : null;
 }
 // URL query-string persistence, deliberately separate from the
@@ -2726,14 +2734,22 @@ function defaultAsOf(){
 // someone would want "back" to step through one change at a time). Kept
 // out of the URL entirely when it's just the default, so a plain shared
 // link never implies "someone deliberately chose a date".
-function asOfFromUrl(){
-  const v = new URLSearchParams(location.search).get("asof");
+// THE PARAMETER IS NAMED AFTER THE LABEL (REQ-PIPE-081 criterion 23), and
+// the one it replaced is still HONOURED (criterion 24): a saved link
+// carrying it keeps its date, and the address bar is rewritten to the
+// current spelling on the first write, so nothing keeps two spellings.
+const IN_PLACE_ON_PARAM = "in-place-on";
+const PREVIOUS_DATE_PARAM = "as" + "of";
+function inPlaceOnFromUrl(){
+  const params = new URLSearchParams(location.search);
+  const v = params.get(IN_PLACE_ON_PARAM) || params.get(PREVIOUS_DATE_PARAM);
   return /^\d{4}-\d{2}-\d{2}$/.test(v||"") ? v : null;
 }
-function setAsOfInUrl(dateStr, defaultDateStr){
+function setInPlaceOnInUrl(dateStr, defaultDateStr){
   const url = new URL(location.href);
-  if(dateStr === defaultDateStr) url.searchParams.delete("asof");
-  else url.searchParams.set("asof", dateStr);
+  url.searchParams.delete(PREVIOUS_DATE_PARAM);
+  if(dateStr === defaultDateStr) url.searchParams.delete(IN_PLACE_ON_PARAM);
+  else url.searchParams.set(IN_PLACE_ON_PARAM, dateStr);
   // `from` is the ARRIVAL CONTEXT, and it never survives a date change
   // (REQ-DASH-085 criterion 11, REQ-DASH-100 criterion 10). Written
   // back separately by drillToPeriod(), which is the one caller
@@ -2764,8 +2780,8 @@ function arrivalFromUrl(){
 }
 let ARRIVAL_FROM = arrivalFromUrl();
 
-const DEFAULT_AS_OF = defaultAsOf();
-let CURRENT_AS_OF = asOfFromUrl() || DEFAULT_AS_OF;
+const DEFAULT_IN_PLACE_ON = defaultInPlaceOn();
+let CURRENT_IN_PLACE_ON = inPlaceOnFromUrl() || DEFAULT_IN_PLACE_ON;
 
 // The whole agencies/collections/datasets literal, and its bottom-up
 // rollup wiring, wrapped in a rebuildable function (was a one-shot const
@@ -2799,13 +2815,13 @@ const AGENCY_BLURB = {
 // Presentation copy, not hierarchy: a blurb is how the page describes
 // an agency, which contract/data-asset.yaml has no business knowing.
 // An agency with none simply shows no blurb.
-function datasetTile(datasetId, asOfDateStr){
-  if(datasetId === "birth-registrations") return buildBirthRegistrations(asOfDateStr);
-  const cp = buildChildProtectionDatasets(asOfDateStr);
+function datasetTile(datasetId, inPlaceOnDateStr){
+  if(datasetId === "birth-registrations") return buildBirthRegistrations(inPlaceOnDateStr);
+  const cp = buildChildProtectionDatasets(inPlaceOnDateStr);
   return cp.find(d => d.id === datasetId) || null;
 }
 
-function buildData(asOfDateStr){
+function buildData(inPlaceOnDateStr){
   const agencies = ((HIERARCHY && HIERARCHY.agencies) || []).map(ag => ({
     id: ag.id,
     name: ag.name,
@@ -2814,16 +2830,16 @@ function buildData(asOfDateStr){
       id: col.id,
       name: col.name,
       datasets: (col.datasets || []).map(d =>
-        datasetTile(d.id, asOfDateStr)
+        datasetTile(d.id, inPlaceOnDateStr)
         || noDataDataset(d.id, d.name, "", "", null)),
     })),
   }));
   const data = {agencies};
   // REQ-PIPE-053. Marked BEFORE the rollup below, because it changes
   // which datasets that rollup is allowed to read a status from.
-  const runway = scheduleRunwayAsOf(asOfDateStr);
+  const runway = scheduleRunwayInPlaceOn(inPlaceOnDateStr);
   data.scheduleRunway = runway;
-  // wire up rollup statuses bottom-up. A noDataAsOf dataset already
+  // wire up rollup statuses bottom-up. A noDataInPlaceOn dataset already
   // carries its own "nodata" status from noDataDataset() above - its
   // (empty) columns list must never be re-derived over the top of that,
   // since worstOf([]) would silently default it back to "green".
@@ -2833,17 +2849,17 @@ function buildData(asOfDateStr){
       col.exhaustedCount = 0; col.noSupplyCount = 0; col.acceptedCount = 0;
       col.datasets.forEach(ds=>{
         const ended = runway.exhausted[ds.id];
-        const blocked = blockerOpenAsOf(ds.id, asOfDateStr);
+        const blocked = blockerOpenInPlaceOn(ds.id, inPlaceOnDateStr);
         // CLOSED WITH NO SUPPLY (REQ-DASH-133 criteria 4, 5 and 9): an
         // unmarked gap is RED and rolls up; an accepted one stays out of the
         // red and is shown quieter. A held, contested or unloadable supply
         // says THAT instead (criterion 1's exception), so it is checked first.
-        const gaps = closedGapsAsOf(ds.closedSlots, asOfDateStr);
+        const gaps = closedGapsInPlaceOn(ds.closedSlots, inPlaceOnDateStr);
         ds.noSupply = gaps.open.length ? groupGaps(gaps.open) : null;
         ds.acceptedGaps = gaps.accepted.length ? groupGaps(gaps.accepted) : null;
         if(ds.noSupply){ col.noSupplyCount = (col.noSupplyCount||0) + 1; ag.noSupplyCount = (ag.noSupplyCount||0) + 1; }
         if(ds.acceptedGaps){ col.acceptedCount = (col.acceptedCount||0) + 1; ag.acceptedCount = (ag.acceptedCount||0) + 1; }
-        const blanking = blocked && blockerWithoutARunOfItsOwn(ds, asOfDateStr);
+        const blanking = blocked && blockerWithoutARunOfItsOwn(ds, inPlaceOnDateStr);
         if(blocked && !blanking){
           // RED, BUT THE PERIOD'S OWN RESULTS STAND (REQ-PIPE-115
           // criterion 11 as amended 2026-10-05, Keith): a held supply has
@@ -2874,7 +2890,7 @@ function buildData(asOfDateStr){
           ds.scheduleExhausted = ended;
           ds.status = "exhausted";
           col.exhaustedCount++; ag.exhaustedCount++;
-        } else if(!ds.noDataAsOf){
+        } else if(!ds.noDataInPlaceOn){
           // ITS OWN STATUS IS ITS REAL VERDICT even where no schedule is
           // agreed (REQ-PIPE-106 criterion 7) - what changes is that
           // `rollup()` above leaves it out of the collection.
@@ -2887,7 +2903,7 @@ function buildData(asOfDateStr){
   });
   return data;
 }
-let DATA = buildData(CURRENT_AS_OF);
+let DATA = buildData(CURRENT_IN_PLACE_ON);
 
 /* =========================================================================
    4. SVG CHART HELPERS
@@ -3682,7 +3698,7 @@ function setRail(items){
 //     [/column/<name>[/check/<key>]] - the drill-down "page" someone is
 //     on, kept explicit (agency+collection+dataset all present, not
 //     re-derived) so a link never needs a lookup to resolve.
-//   - the QUERY STRING (location.search, same real params asof= already
+//   - the QUERY STRING (location.search, same real params in-place-on= already
 //     used) carries orthogonal, non-navigational state: cmp= (which run
 //     a check is compared against - setCompareIdx() below), panel=
 //     (which of the 4 header side-panels is open - openPanel() below).
@@ -3809,13 +3825,13 @@ function collectionCrossTableSection(ag, col){
 function stateToHash(state){ return "#" + stateToPath(state); }
 // The URL a real navigation lands on: today's path and query string,
 // plus the new hash, minus the arrival context. pushState() given a
-// bare "#..." keeps the current query string - which is what asof= and
+// bare "#..." keeps the current query string - which is what in-place-on= and
 // panel= rely on and what `from` must NOT have.
 //
 // BUILT WITH URL RATHER THAN BY CONCATENATION, and that is not a
 // tidy-up: `stateToHash(STATE) + location.search` puts the query string
 // INSIDE the hash, so a reader who had an as-of date set ended up with
-// `#/.../dataset/birth-registrations?asof=2026-05-01` and a dataset id
+// `#/.../dataset/birth-registrations?in-place-on=2026-05-01` and a dataset id
 // that resolves to nothing on the next load. forgetStaleSegment() did
 // exactly that, and the repair that was meant to make a stale link
 // shareable made it unresolvable (found 2026-09-29).
@@ -3836,7 +3852,7 @@ function hashToState(){
 }
 
 // panel=/cmp= (see comment above): read from location.search, same
-// URLSearchParams pattern asOfFromUrl() already established.
+// URLSearchParams pattern inPlaceOnFromUrl() already established.
 const SIDE_PANELS = ["activity","changelog","requirements","snapshots","leaderboard","scenarios"];
 function panelFromUrl(){
   const v = new URLSearchParams(location.search).get("panel");
@@ -4081,7 +4097,7 @@ function lowRunwayNotice(runway){
    which one time-ordered feed cannot do at once. A feed is scanned and
    discarded; a queue is drained. The activity feed stays a feed.
 
-   `source` IS A PARAMETER for the reason scheduleRunwayAsOf()'s is:
+   `source` IS A PARAMETER for the reason scheduleRunwayInPlaceOn()'s is:
    it is how this gets tested against real, varied data without a
    build, and the embedded const is only the default. */
 const EVENT_SEVERITY_LABEL = {"needs-action":"Needs action", warning:"Warning",
@@ -4140,16 +4156,16 @@ function blockersFor(datasetId, source){
   const src = outstandingSource(source);
   return ((src && src.blockers) || []).filter(b=> b.datasetId === datasetId);
 }
-function blockersOpenAsOf(datasetId, asOfDateStr, source){
+function blockersOpenInPlaceOn(datasetId, inPlaceOnDateStr, source){
   return blockersFor(datasetId, source).filter(b=>
-    assetDateStrOf(b.openedAt) <= asOfDateStr
-    && (!b.resolvedAt || assetDateStrOf(b.resolvedAt) > asOfDateStr));
+    assetDateStrOf(b.openedAt) <= inPlaceOnDateStr
+    && (!b.resolvedAt || assetDateStrOf(b.resolvedAt) > inPlaceOnDateStr));
 }
 // The first open one, carrying how many there are of its kind - a
 // dataset with nine held supplies says nine, not one (UX critic,
 // 2026-10-05).
-function blockerOpenAsOf(datasetId, asOfDateStr, source){
-  const open = blockersOpenAsOf(datasetId, asOfDateStr, source)
+function blockerOpenInPlaceOn(datasetId, inPlaceOnDateStr, source){
+  const open = blockersOpenInPlaceOn(datasetId, inPlaceOnDateStr, source)
     .sort((a,b)=> String(a.openedAt).localeCompare(String(b.openedAt)));
   if(!open.length) return null;
   const same = open.filter(b=> b.kind === open[0].kind);
@@ -4160,9 +4176,9 @@ function blockerOpenAsOf(datasetId, asOfDateStr, source){
 // filed to a period - contested or unloadable, never held, which has no
 // period - and received after the latest supply that was checked. Where
 // nothing was ever checked, any open blocker does.
-function blockerWithoutARunOfItsOwn(ds, asOfDateStr, source){
+function blockerWithoutARunOfItsOwn(ds, inPlaceOnDateStr, source){
   const latest = ds.lastArrival && ds.lastArrival.arrivedAt;
-  const open = blockersOpenAsOf(ds.id, asOfDateStr, source)
+  const open = blockersOpenInPlaceOn(ds.id, inPlaceOnDateStr, source)
     .filter(b=> !latest || (b.kind !== "held" && String(b.openedAt) > String(latest)))
     .sort((a,b)=> String(a.openedAt).localeCompare(String(b.openedAt)));
   if(!open.length) return null;
@@ -4180,9 +4196,9 @@ function blockerReasonText(b){
 // that decide what it reads as (pipeline/closed_slots.py); the page only
 // compares those instants with the date on show (criterion 10) - it never
 // re-derives closing, which is REQ-PIPE-131's rule and lives in Python.
-function closedGapsAsOf(slots, asOfDateStr){
+function closedGapsInPlaceOn(slots, inPlaceOnDateStr){
   const open = [], accepted = [];
-  const by = v => v && assetDateStrOf(v) <= asOfDateStr;
+  const by = v => v && assetDateStrOf(v) <= inPlaceOnDateStr;
   (slots || []).forEach(s=>{
     if(!by(s.closesAt)) return;                                   // not closed yet
     // WHAT THE SLOT HELD ON THE DATE: its last change by then, from the
@@ -4234,10 +4250,10 @@ function gapText(group){
 // fine - the red pill must never be left to say it alone (criterion 11).
 // THE AMBER SETTING IN FORCE ON THE DATE ON SHOW (REQ-PIPE-122 NFR 1):
 // the latest change dated on or before it, or null.
-function amberSettingAsOf(ds, asOfDateStr){
+function amberSettingInPlaceOn(ds, inPlaceOnDateStr){
   const list = (ds && ds.amberSetting) || [];
   let found = null;
-  list.forEach(a=>{ if(String(a.from) <= asOfDateStr) found = a; });
+  list.forEach(a=>{ if(String(a.from) <= inPlaceOnDateStr) found = a; });
   return found;
 }
 // WHICH SUPPLY THE VERDICT IS ABOUT (REQ-PIPE-081 criterion 1 as amended
@@ -4249,7 +4265,7 @@ function verdictLine(ds){
   // results below to be about, and the banner says so.
   if(!v || !ds.lastArrival || ds.blocked) return "";
   if(v.state === "promoted"){
-    return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place, received ${fmtInstant(ds.lastArrival.arrivedAt)}.</div>`;
+    return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place, received ${fmtInstant(ds.lastArrival.arrivedAt)}. ${redPromotedBadge(ds.id, v.inPlaceRunId)}</div>`;
   }
   const inPlace = v.inPlaceRunDate
     ? `The supply in place is the one received ${escHtml(fmtDay(String(v.inPlaceRunDate).slice(0,10)))}.`
@@ -4261,36 +4277,36 @@ function verdictLine(ds){
 // warehouse as it stands now. Prominent, naming each period and table,
 // because a period whose table the warehouse does not hold is answering
 // nothing whatever the log says.
-function censusAsOf(ds, asOfDateStr){
+function censusInPlaceOn(ds, inPlaceOnDateStr){
   const points = (ds && ds.census) || [];
   let found = null;
   // ON THE ASSET'S CALENDAR (#113): a census taken at 22:00 UTC is the
   // next day in Perth, and the date on show is an asset date.
-  points.forEach(p=>{ if(assetDateStrOf(p.takenAt) <= asOfDateStr) found = p; });
+  points.forEach(p=>{ if(assetDateStrOf(p.takenAt) <= inPlaceOnDateStr) found = p; });
   return found;
 }
-function censusBanner(ds, asOfDateStr){
-  const c = censusAsOf(ds, asOfDateStr);
+function censusBanner(ds, inPlaceOnDateStr){
+  const c = censusInPlaceOn(ds, inPlaceOnDateStr);
   if(!c || !c.discrepancies.length) return "";
   const items = c.discrepancies.map(d=> `<li><span class="mono">${escHtml(d.period)}</span> · <span class="mono">${escHtml(d.table)}</span> - ${escHtml(d.detail)}</li>`).join("");
   return `<div class="notice-exhausted" data-census role="status"><b>The warehouse and the decision log disagree (census ${escHtml(fmtInstant(c.takenAt))})</b><ul style="margin:4px 0 0 18px; padding:0;">${items}</ul><div style="margin-top:6px;">Until this is put right, what this page says a period holds may not be what a query of that period reads.</div></div>`;
 }
 
-function amberSettingLine(ds, asOfDateStr){
-  const a = amberSettingAsOf(ds, asOfDateStr);
+function amberSettingLine(ds, inPlaceOnDateStr){
+  const a = amberSettingInPlaceOn(ds, inPlaceOnDateStr);
   if(!a) return "";
   return `<div class="amber-setting-line" data-amber-setting="${escHtml(a.value)}" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 14px;" title="What happens to a supply whose checks come back amber, and where that was set">Amber setting: ${escHtml(a.text)}</div>`;
 }
 // THE NEWEST SLOT LATE BUT STILL OPEN on the date on show (REQ-DASH-133,
 // Keith 2026-10-05): past its late instant, no file yet, not yet closed.
 // The build embeds the instants; the page only compares them.
-function lateOpenAsOf(ds, asOfDateStr, builtAt){
+function lateOpenInPlaceOn(ds, inPlaceOnDateStr, builtAt){
   // TODAY IS JUDGED AT THE BUILD INSTANT (Keith, 2026-10-05; UX critic
   // #110 M2): compared by whole days, yesterday's slot - late at 3pm,
   // closing at 10am today - read closed all morning, so the note never
   // showed on the view people open. Past dates still compare days.
   const built = builtAt === undefined ? (typeof BUILT_AT !== "undefined" ? BUILT_AT : null) : builtAt;
-  if(built && asOfDateStr === assetDateStrOf(built)){
+  if(built && inPlaceOnDateStr === assetDateStrOf(built)){
     const t = Date.parse(built), at = v => v ? Date.parse(v) : null;
     let found = null;
     ((ds && ds.lateSlots) || []).forEach(s=>{
@@ -4299,7 +4315,7 @@ function lateOpenAsOf(ds, asOfDateStr, builtAt){
     });
     return found;
   }
-  const by = v => v && assetDateStrOf(v) <= asOfDateStr;
+  const by = v => v && assetDateStrOf(v) <= inPlaceOnDateStr;
   let found = null;
   ((ds && ds.lateSlots) || []).forEach(s=>{
     if(by(s.lateAt) && !by(s.filedAt) && !by(s.closesAt)) found = s;
@@ -4307,7 +4323,7 @@ function lateOpenAsOf(ds, asOfDateStr, builtAt){
   return found;
 }
 function noSupplyNote(ds){
-  const late = lateOpenAsOf(ds, CURRENT_AS_OF);
+  const late = lateOpenInPlaceOn(ds, CURRENT_IN_PLACE_ON);
   const lateNote = late
     ? `<div class="late-open-note" data-late-open="${escHtml(late.period)}" style="font-size:11.5px; color:var(--ink); margin-top:3px;">Late, still open: ${escHtml(fmtPeriodOrDay(late.period))} — no file yet</div>`
     : "";
@@ -4339,7 +4355,7 @@ function outstandingItems(scope, id, source){
     // throws rather than giving undefined.
     let data = null;
     try{ data = DATA; }catch(e){ data = null; }
-    if(data && data.agencies) items = asOfQueueItems(items, data);
+    if(data && data.agencies) items = inPlaceOnQueueItems(items, data);
   }
   if(!scope || !id) return items;
   const key = scope==="agency" ? "agencyId" : scope==="collection" ? "collectionId" : "datasetId";
@@ -4357,10 +4373,10 @@ function outstandingItems(scope, id, source){
 //     out, since a reader on that date could not have seen it. What was
 //     open then and resolved since cannot be put back from a queue
 //     judged now; REQ-DASH-070 criterion 14 owns that.
-function asOfQueueItems(items, data){
+function inPlaceOnQueueItems(items, data){
   const kept = items.filter(i=> i.kind !== "closed-unfilled-slot"
-    && !(i.observedAt && typeof CURRENT_AS_OF !== "undefined"
-         && assetDateStrOf(i.observedAt) > CURRENT_AS_OF));
+    && !(i.observedAt && typeof CURRENT_IN_PLACE_ON !== "undefined"
+         && assetDateStrOf(i.observedAt) > CURRENT_IN_PLACE_ON));
   const gaps = [];
   data.agencies.forEach(ag=> ag.collections.forEach(col=> col.datasets.forEach(ds=>{
     (ds.noSupply || []).forEach(g=> gaps.push({
@@ -4685,7 +4701,7 @@ function renderAgency(view, agencyId){
           if(ds.blocked){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}' data-blocked="${ds.blocked.kind}">
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">${escHtml(blockerReasonText(ds.blocked))}
                 — ${blockerReceivedText(ds.blocked)}; nothing is checked until it is resolved</td>
             </tr>`;
@@ -4696,13 +4712,13 @@ function renderAgency(view, agencyId){
           // missing. A dataset WITH a current run keeps its row, and says
           // the gap beneath its name instead (below).
           // ONLY WHERE NOTHING HAS EVER ARRIVED (UX critic, 2026-10-05):
-          // keying this on noDataAsOf flipped a daily feed's row to the
+          // keying this on noDataInPlaceOn flipped a daily feed's row to the
           // reason row whenever today's file was not in yet, hiding the
           // period actually late and still open, and the arrivals before it.
           if(ds.noSupply && !ds.lastArrival){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}' data-no-supply="${ds.noSupply.length}">
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">No supply — ${escHtml(ds.noSupply.map(gapText).join("; "))}.
                 Closed with nothing in it, so a person decides: substitute an earlier supply, re-file a late one, or accept it as not supplied</td>
             </tr>`;
@@ -4710,16 +4726,16 @@ function renderAgency(view, agencyId){
           if(ds.scheduleExhausted){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">Delivery schedule ended after
                 ${ds.scheduleExhausted.lastPeriod} — no supply expected, and QA cannot run until dates are added</td>
             </tr>`;
           }
-          if(ds.noDataAsOf && !ds.noSupply){
+          if(ds.noDataInPlaceOn && !ds.noSupply){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
               <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}${noSupplyNote(ds)}</td>
-              <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance as of the selected date</td>
+              <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance on the selected date</td>
             </tr>`;
           }
           const arrivalPillHtml = arrivalPill(ds.lastArrival.arrivalStatus, "sm");
@@ -4775,9 +4791,9 @@ function renderAgency(view, agencyId){
 // already uses, not a new visual language). Each row's click applies
 // that entry's own run_date as the global as-of date (Keith's confirmed
 // answer: clicking an entry should drill into that run's own real
-// column/check breakdown) - reusing applyAsOf() rather than building a
+// column/check breakdown) - reusing applyInPlaceOn() rather than building a
 // second drill-down mechanism, since setting as-of to a specific real
-// run_date already makes clipDatasetToAsOf() pick that exact run as the
+// run_date already makes clipDatasetToInPlaceOn() pick that exact run as the
 // effective one everywhere else on this same page.
 // WHETHER A PROMOTED AMBER SUPPLY WAS ACKNOWLEDGED (REQ-PIPE-122
 // criterion 21), which replaced REQ-QAC-017's per-run /accept. The build
@@ -4787,11 +4803,11 @@ function renderAgency(view, agencyId){
 // nothing once the supply left its period - the debt lapsed rather than
 // stayed outstanding (criterion 16). The pill's own colour never changes;
 // this is a badge beside it, in words.
-function acknowledgementBadge(datasetId, runId, asOfDateStr){
+function acknowledgementBadge(datasetId, runId, inPlaceOnDateStr){
   const raw = rawRealDatasetById(datasetId);
   const a = raw && raw.acknowledgements && raw.acknowledgements[runId];
   if(!a) return "";
-  const on = asOfDateStr || (typeof CURRENT_AS_OF !== "undefined" ? CURRENT_AS_OF : null);
+  const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
   const by = v => !on || (v && assetDateStrOf(v) <= on);
   if(!by(a.promotedAt)) return "";
   if(a.acknowledged && by(a.acknowledged.at)){
@@ -4800,7 +4816,70 @@ function acknowledgementBadge(datasetId, runId, asOfDateStr){
   if(a.lapsedAt && by(a.lapsedAt)) return "";
   return `<span class="pill tag sm" data-awaiting-acknowledgement><span class="ico"></span>Amber, promoted - awaiting acknowledgement</span>`;
 }
+// EACH SUPPLY'S OUTCOME ON THE DATE ON SHOW (REQ-DASH-127 criteria 1, 3 and
+// 4): promoted, rejected, superseded or waiting - read from the decision
+// log's entries the build embeds, never derived here. Superseded and
+// rejected are both out of the verdict, and they are different outcomes:
+// a supersession says nothing about the supply's quality.
+function runOutcomeInPlaceOn(datasetId, runId, inPlaceOnDateStr){
+  const raw = rawRealDatasetById(datasetId);
+  const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  let last = null;
+  (((raw && raw.runStates) || {})[runId] || []).forEach(e=>{
+    if(!on || assetDateStrOf(e.at) <= on) last = e;
+  });
+  if(!last) return {kind:"waiting"};
+  const kind = {promote:"promoted", reject:"rejected", supersede:"superseded"}[last.action] || "waiting";
+  return {kind, entry:last};
+}
+function outcomeCell(datasetId, runId, runsById){
+  const o = runOutcomeInPlaceOn(datasetId, runId);
+  const who = e => e.by === "rule" ? "by the rule" : "by a person";
+  if(o.kind === "promoted") return `<span class="outcome" data-outcome="promoted">Promoted</span>`;
+  if(o.kind === "rejected") return `<span class="outcome" data-outcome="rejected">Rejected ${who(o.entry)}, ${fmtInstant(o.entry.at)}</span>`;
+  if(o.kind === "superseded"){
+    const e = o.entry;
+    const newer = e.supersededByRun && runsById[e.supersededByRun];
+    const naming = newer ? ` by the supply received ${fmtDay(newer.run_date)}` : "";
+    // INFORMATIONAL, NO PROMINENCE ABOVE AN ORDINARY ENTRY (REQ-PIPE-123
+    // criterion 6): a replacement the deployment opted into is normal.
+    const setting = e.setting ? ` under the replacement setting '${escHtml(e.setting)}'` : "";
+    return `<span class="outcome" data-outcome="superseded" style="color:var(--ink-muted);">Superseded${naming} ${who(e)}${setting}, ${fmtInstant(e.at)}</span>`;
+  }
+  return `<span class="outcome" data-outcome="waiting" style="color:var(--ink-muted);">Waiting</span>`;
+}
+// RED PROMOTED (REQ-DASH-126): a promoted supply whose status, from its most
+// recent cross-table results, is red on the date on show - a LABEL beside
+// the status pill, never a new status (criterion 5), naming what turned it
+// red and keeping the verdict it went in on (criteria 2 and 4). Before it
+// turned, the page shows it as it was, with a note of when and after what
+// (criterion 6). Nothing at all beside a promoted supply that is not red.
+function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
+  const raw = rawRealDatasetById(datasetId);
+  const h = raw && raw.promotedHealth && runId && raw.promotedHealth[runId];
+  if(!h) return "";
+  const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  const st = runStateInPlaceOn(raw, runId, on);
+  if(st !== "promoted") return "";
+  const promotedAt = h.promotedAt;
+  let now = null, later = null;
+  (h.timeline || []).forEach(t=>{
+    if(!t.at || (promotedAt && t.at < promotedAt)) return;
+    if(!on || assetDateStrOf(t.at) <= on) now = t;
+    else if(!later && t.status === "red") later = t;
+  });
+  if(now && now.status === "red"){
+    const went = h.promotedOn ? `went in ${escHtml(h.promotedOn)}, ` : "";
+    return `<span class="pill tag sm" data-red-promoted style="border-color:var(--red); color:var(--red);"><span class="ico"></span>Red promoted - ${went}turned red ${fmtInstant(now.at)} after ${escHtml(now.cause)}</span>`;
+  }
+  if(later){
+    return `<span class="pill tag sm" data-turns-red-later style="color:var(--ink-muted);"><span class="ico"></span>Turned red later - ${fmtInstant(later.at)}, after ${escHtml(later.cause)}</span>`;
+  }
+  return "";
+}
 function renderSupplyCycleRows(entries, datasetId){
+  const raw = rawRealDatasetById(datasetId);
+  const runsById = Object.fromEntries(((raw && raw.runs) || []).map(r=>[r.run_id, r]));
   return entries.map(e => {
     const resupplyBadge = e.isResupply
       ? `<span class="pill tag sm"><span class="ico"></span>Resupply, attempt ${e.attemptNumber}</span>` : "";
@@ -4810,7 +4889,8 @@ function renderSupplyCycleRows(entries, datasetId){
     // chain), so it's shown directly rather than the old, dropped
     // dirtySeverity pill (a synthetic-generation-only concept no real
     // production dashboard would have - item 72).
-    const statusBadge = pill(e.status, "sm") + " " + acknowledgementBadge(datasetId, e.run_id);
+    const statusBadge = pill(e.status, "sm") + " " + acknowledgementBadge(datasetId, e.run_id)
+      + " " + redPromotedBadge(datasetId, e.run_id);
     // A resupply (any entry after the first in its chain) has no real
     // arrivalStatus (item 69's own reasoning, now keyed off real chain
     // position) - shows how long it's been since the previous supply/
@@ -4832,6 +4912,7 @@ function renderSupplyCycleRows(entries, datasetId){
       <td>${statusBadge}</td>
       <td>${arrivalCell}</td>
       <td class="mono">${e.rowCount!=null ? fmtInt(e.rowCount) : "—"}</td>
+      <td>${outcomeCell(datasetId, e.run_id, runsById)}</td>
       <td>${resupplyBadge}</td>
     </tr>`;
   }).join("");
@@ -4841,12 +4922,12 @@ function renderSupplyCycleRows(entries, datasetId){
 // period to be listed under, and its run records no per-check result
 // (criterion 6), so without this the supply history would not mention
 // it at all. Each one received on or before the date on show.
-function blockerHistoryRows(datasetId, asOfDateStr, source){
+function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
   const rows = blockersFor(datasetId, source)
-    .filter(b=> assetDateStrOf(b.openedAt) <= asOfDateStr)
+    .filter(b=> assetDateStrOf(b.openedAt) <= inPlaceOnDateStr)
     .sort((a,b)=> String(b.openedAt).localeCompare(String(a.openedAt)));
   if(!rows.length) return "";
-  const anyOpen = rows.some(b=> !(b.resolvedAt && assetDateStrOf(b.resolvedAt) <= asOfDateStr));
+  const anyOpen = rows.some(b=> !(b.resolvedAt && assetDateStrOf(b.resolvedAt) <= inPlaceOnDateStr));
   return `
     <div class="supply-cycle" data-blocker-rows>
       <div class="supply-cycle-label"><b>${anyOpen ? "Waiting for a person" : "Needed a person"}</b>
@@ -4855,7 +4936,7 @@ function blockerHistoryRows(datasetId, asOfDateStr, source){
       <table class="dataset-table">
         <thead><tr><th>Arrived</th><th>Status</th><th>Why</th><th>Rows</th><th></th></tr></thead>
         <tbody>${rows.map(b=>{
-          const resolved = b.resolvedAt && assetDateStrOf(b.resolvedAt) <= asOfDateStr;
+          const resolved = b.resolvedAt && assetDateStrOf(b.resolvedAt) <= inPlaceOnDateStr;
           return `<tr data-blocker="${b.kind}">
             <td class="mono">${fmtInstant(b.openedAt)}</td>
             <td>${resolved ? pill("nodata","sm") : pill("red","sm")}</td>
@@ -4876,8 +4957,8 @@ function blockerHistoryRows(datasetId, asOfDateStr, source){
 // exactly what scrolling back to the current cycle would hide. Grouped
 // into runs (criterion 7), judged as at the date on show (criterion 9),
 // and newest first like the rest of the history.
-function gapHistoryRows(ds, asOfDateStr){
-  const gaps = closedGapsAsOf(ds.closedSlots, asOfDateStr);
+function gapHistoryRows(ds, inPlaceOnDateStr){
+  const gaps = closedGapsInPlaceOn(ds.closedSlots, inPlaceOnDateStr);
   const groups = [...groupGaps(gaps.open).map(g=>({...g, accepted:false})),
                   ...groupGaps(gaps.accepted).map(g=>({...g, accepted:true}))]
     .sort((a,b)=> b.lastIndex - a.lastIndex);
@@ -4907,7 +4988,7 @@ function renderBlockedSupplyHistoryOnly(ds){
   if(wrap) wrap.innerHTML = renderSupplyHistorySection(ds, [], null);
 }
 function renderSupplyHistorySection(ds, cycles, currentCycleStart){
-  const waiting = blockerHistoryRows(ds.id, CURRENT_AS_OF) + gapHistoryRows(ds, CURRENT_AS_OF);
+  const waiting = blockerHistoryRows(ds.id, CURRENT_IN_PLACE_ON) + gapHistoryRows(ds, CURRENT_IN_PLACE_ON);
   if(!cycles.length){
     return waiting ? `<div class="supply-history"><div class="supply-history-head"><h3>Supply history</h3></div>${waiting}</div>` : "";
   }
@@ -4928,7 +5009,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
       </div>
       <div class="overflow-x">
       <table class="dataset-table">
-        <thead><tr><th>Arrived</th><th>Status</th><th>Timing</th><th>Rows</th><th></th></tr></thead>
+        <thead><tr><th>Arrived</th><th>Status</th><th>Timing</th><th>Rows</th><th>Outcome</th><th></th></tr></thead>
         <tbody>${renderSupplyCycleRows(c.entries, ds.id)}</tbody>
       </table>
       </div>
@@ -4957,7 +5038,7 @@ function wireSupplyHistorySection(container){
     toggle.dataset.collapsedLabel = toggle.textContent;
   }
   container.querySelectorAll(".supply-history tbody tr[data-run-date]").forEach(tr=>
-    tr.addEventListener("click", ()=> applyAsOf(tr.dataset.runDate)));
+    tr.addEventListener("click", ()=> applyInPlaceOn(tr.dataset.runDate)));
 }
 
 function renderDataset(view, agencyId, collectionId, datasetId){
@@ -4973,11 +5054,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     {tier:"Tier 3",label:ds.name, nav:{tier:"dataset",agencyId,collectionId,datasetId}},
   ]);
   // Phase 5g: genuinely EMPTY (never supplied at all as of this date -
-  // clipDatasetToAsOf() returned null outright, so noDataDataset() gave
+  // clipDatasetToInPlaceOn() returned null outright, so noDataDataset() gave
   // us columns: []) is the only case left with nothing to drill into -
   // stays the plain text-only page. A STALE dataset (real history
-  // exists, just past the staleness tolerance - clipDatasetToAsOf()
-  // still built real columns/checks, only flagged staleAsOf) falls
+  // exists, just past the staleness tolerance - clipDatasetToInPlaceOn()
+  // still built real columns/checks, only flagged staleInPlaceOn) falls
   // through to the normal render path below instead: same column grid,
   // same clickable tiles, same drawer/trend-chart drill-down - only the
   // pills read "no data" (buildRealDataset()'s own doing), not the
@@ -5012,7 +5093,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           Its calendar <b style="display:inline">${ended.calendar}</b> has no dates after
           <b style="display:inline">${ended.lastPeriod}</b>
           (${fmtDay(ended.lastDate)}), so as of
-          <b style="display:inline">${fmtDay(CURRENT_AS_OF)}</b> no supply
+          <b style="display:inline">${fmtDay(CURRENT_IN_PLACE_ON)}</b> no supply
           is expected, none can be filed, and QA cannot run for it.<br><br>
           Nothing is wrong with the data. Add the next delivery dates to
           <code>${file}</code> — <code>mothman schedule candidate-dates</code> proposes them for
@@ -5082,7 +5163,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div class="accepted-gaps-note" style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:70ch;">
         ${ds.acceptedGaps.map(g=>`<div>Not supplied (accepted) — ${escHtml(gapText(g).replace(" with no supply", ""))}${g.marks.length ? `: “${escHtml(g.marks[g.marks.length-1].reason)}”, ${escHtml(g.marks[g.marks.length-1].actor)}, ${fmtInstant(g.marks[g.marks.length-1].at)}` : ""}</div>`).join("")}
       </div>` : "";
-  if(ds.noDataAsOf && !ds.columns.length){
+  if(ds.noDataInPlaceOn && !ds.columns.length){
     if(ds.noSupply && !ds.blocked){
       view.innerHTML = `
       <div class="view-head">
@@ -5111,8 +5192,8 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         </div>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
-      ${amberSettingLine(ds, CURRENT_AS_OF)}
-      ${censusBanner(ds, CURRENT_AS_OF)}
+      ${amberSettingLine(ds, CURRENT_IN_PLACE_ON)}
+      ${censusBanner(ds, CURRENT_IN_PLACE_ON)}
       ${blockedBanner}
       ${outstandingQueue("dataset", ds.id)}
       <div class="sla-strip">
@@ -5137,8 +5218,8 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <b>Nothing had been supplied by this date.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
           There is no QA run within the accepted freshness window as of
-          <b style="display:inline">${fmtDay(CURRENT_AS_OF)}</b>. Pick a
-          later date, or reset to the default, using the 📅 As of control above.
+          <b style="display:inline">${fmtDay(CURRENT_IN_PLACE_ON)}</b>. Pick a
+          later date, or reset to the default, using the 📅 In place on control above.
         </div>
       </div>
     `;
@@ -5161,18 +5242,18 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
     ${verdictLine(ds)}
-    ${amberSettingLine(ds, CURRENT_AS_OF)}
-    ${censusBanner(ds, CURRENT_AS_OF)}
+    ${amberSettingLine(ds, CURRENT_IN_PLACE_ON)}
+    ${censusBanner(ds, CURRENT_IN_PLACE_ON)}
     ${arrivalBanner(ds)}
     ${blockedBanner}
     ${waitingBanner}
     ${exhaustedBanner}
     ${noSupplyBanner}
     ${acceptedGapsNote}
-    ${ds.noDataAsOf && !ds.blocked && !ds.noSupply ? `
+    ${ds.noDataInPlaceOn && !ds.blocked && !ds.noSupply ? `
     <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">
-      As of <b>${fmtDay(CURRENT_AS_OF)}</b>, nothing has landed yet in this dataset's
-      current expected cycle (started <b>${fmtDay(periodStartDate(ds.id, CURRENT_AS_OF))}</b>) -
+      On <b>${fmtDay(CURRENT_IN_PLACE_ON)}</b>, nothing has landed yet in this dataset's
+      current expected cycle (started <b>${fmtDay(periodStartDate(ds.id, CURRENT_IN_PLACE_ON))}</b>) -
       so the figures below show its full real history, but no column reads red/amber/green as CURRENT status.
     </div>` : ""}
     ${outstandingQueue("dataset", ds.id)}
@@ -5298,7 +5379,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   const historyWrap = document.getElementById("supply-history-wrap");
   if(rawDs){
     const cycles = buildSupplyHistory(rawDs);
-    const currentCycleStart = periodStartDate(ds.id, CURRENT_AS_OF);
+    const currentCycleStart = periodStartDate(ds.id, CURRENT_IN_PLACE_ON);
     historyWrap.innerHTML = renderSupplyHistorySection(ds, cycles, currentCycleStart);
     wireSupplyHistorySection(historyWrap);
   }
@@ -5411,7 +5492,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
     const st = checkStatus(ck);
     return `<a class="check-card ${ck.retired?'is-retired':''}" href="${checkHref(ck)}" data-idx="${ck.__idx}">
       <div class="row1"><span class="name"></span>
-        ${ck.retired? `<span class="pill retired sm" title="Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?': '+ck.retiredReason:''}"><span class="ico"></span>Retired</span>` : pill(st,"sm")}
+        ${ck.retired? `<span class="pill retired sm" title="Retired ${fmtDate(ck.retiredOn)}${ck.retiredReason?': '+ck.retiredReason:''}"><span class="ico"></span>Retired</span>` : pill(st,"sm")}
       </div>
       ${ck.description? `<div class="check-desc"></div>`:""}
       ${ck.tool_ref? `<div class="tool-ref"></div>`:""}
@@ -5421,7 +5502,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
         ck.blockedThisPeriod ? `<span class="not-evaluated-tag">not run for this period</span>`
           : notEvaluated((ck.history||[]).slice(-1)[0]) ? `<span class="not-evaluated-tag">not evaluated in the latest run</span>` : `current ${fmtMetric(ck.current,ck.unit)}`,
       ].filter(Boolean).join(" · ")}${(ck.warn==null&&ck.fail==null) ? ` <span class="muted">(no single-sided threshold — status is this tool's own verdict)</span>` : ""}</div>
-      ${ck.retired? `<div class="retired-note">Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?' — '+ck.retiredReason:''} — no longer part of current status.</div>` : ""}
+      ${ck.retired? `<div class="retired-note">Retired ${fmtDate(ck.retiredOn)}${ck.retiredReason?' — '+ck.retiredReason:''} — no longer part of current status.</div>` : ""}
       <div class="check-card-hint">View current &amp; historical run detail ›</div>
     </a>`;
   };
@@ -5655,7 +5736,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // panel body is Phase 5c's job, this is just the header staying
   // consistent with where the panel was opened from.
   document.getElementById("check-panel-status").innerHTML = check.retired
-    ? `<span class="pill retired sm" title="Retired ${fmtDate(check.retiredAsOf)}${check.retiredReason?': '+check.retiredReason:''}"><span class="ico"></span>Retired</span>`
+    ? `<span class="pill retired sm" title="Retired ${fmtDate(check.retiredOn)}${check.retiredReason?': '+check.retiredReason:''}"><span class="ico"></span>Retired</span>`
     : pill(checkStatus(check), "sm");
   document.getElementById("check-panel-source-link").innerHTML = githubCheckLink(check);
   const body = document.getElementById("check-panel-body");
@@ -5952,7 +6033,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
 // worked back through every one. Now replaceState instead - compare
 // selection is an in-panel refinement, not a top-level navigation worth
 // its own back/forward stop, same reasoning already applied to the
-// as-of date picker (setAsOfInUrl()'s own comment). URL still updates
+// as-of date picker (setInPlaceOnInUrl()'s own comment). URL still updates
 // (a reload/shared link still lands on the chosen comparison), it just
 // no longer creates a new history entry to step through - (X) now
 // always closes the panel in exactly one click, however many
@@ -5964,7 +6045,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
 // same replaceState-not-pushState behaviour as before, just a different
 // part of the URL. Omitted entirely when it equals this check's own
 // default comparison (the immediately-previous run) - same "don't
-// clutter the URL with the default" convention setAsOfInUrl() already
+// clutter the URL with the default" convention setInPlaceOnInUrl() already
 // established, recomputed here rather than threaded through as an arg.
 function setCompareIdx(ag, col, ds, column, check, idx){
   STATE = {...STATE, compareIdx: idx};
@@ -6048,9 +6129,9 @@ function renderSnapshotsPanel(){
 // AskUserQuestion), and only one panel is ever open at a time (opening a
 // second one while the first is still open now closes the first rather
 // than stacking both visually, a latent bug in the old independent-pairs
-// version that this unification incidentally fixes). asof-panel is
+// version that this unification incidentally fixes). in-place-on-panel is
 // deliberately NOT one of these 4 - it keeps its own separate, no-
-// history-entry behaviour (openAsOfPanel()/closeAsOfPanel() below,
+// history-entry behaviour (openInPlaceOnPanel()/closeInPlaceOnPanel() below,
 // unchanged) since Thread C's own design already settled that.
 const PANEL_RENDER = {activity:renderActivityPanel, changelog:renderChangelogPanel, requirements:renderRequirementsPanel, snapshots:renderSnapshotsPanel, leaderboard:renderLeaderboardPanel, scenarios:renderScenariosPanel};
 function showPanelDom(name){
@@ -6110,13 +6191,13 @@ document.getElementById("snapshots-panel-close").addEventListener("click", close
 // now only the one thing that was ever local to it: WHICH `now` the
 // activity feed measures against. Real wall-clock now is right here and
 // else on this page - the feed is about when results reached the shared
-// branch - but it is still read AS OF a date (criterion 12), so asOfNow()
+// branch - but it is still read AS OF a date (criterion 12), so inPlaceOnNow()
 // is what supplies it.
 // (The counting changed slightly in the fold: units are floored rather
 // than rounded, so 1000 days reads "2 years ago" rather than "3". The
 // table is the standard; rounding up past a boundary the reader can
 // count to is the older behaviour, not the agreed one.)
-function fmtRelativeTime(isoString){ return fmtRelative(isoString, asOfNow()); }
+function fmtRelativeTime(isoString){ return fmtRelative(isoString, inPlaceOnNow()); }
 function renderActivityPanel(){
   const body = document.getElementById("activity-panel-body");
   if(!CHANGELOG_FEED.length){
@@ -6434,13 +6515,13 @@ function scenarioTarget(entry){
     for(const collection of (agency.collections||[])){
       for(const dataset of (collection.datasets||[])){
         if(dataset.id === coords.dataset || dataset.name === coords.dataset){
-          return {asOf: coords.asOf || null,
+          return {inPlaceOn: coords.inPlaceOn || null,
                   nav: {tier:"dataset", agencyId:agency.id,
                         collectionId:collection.id, datasetId:dataset.id}};
         }
       }
       if(collection.id === coords.dataset || collection.name === coords.dataset){
-        return {asOf: coords.asOf || null,
+        return {inPlaceOn: coords.inPlaceOn || null,
                 nav: {tier:"agency", agencyId:agency.id}};
       }
     }
@@ -6456,12 +6537,12 @@ function goToScenario(index){
   const target = scenarioTarget(entry);
   if(!target) return;
   closePanel();
-  // THE AS-OF DATE FIRST, then the navigation. applyAsOf() rebuilds
+  // THE AS-OF DATE FIRST, then the navigation. applyInPlaceOn() rebuilds
   // DATA and re-renders, so navigating first would render the target
   // page at the old date and then replace it - a visible flash of the
   // wrong answer, which on a page about as-of dates is the one flash
   // worth avoiding.
-  if(target.asOf) applyAsOf(target.asOf);
+  if(target.inPlaceOn) applyInPlaceOn(target.inPlaceOn);
   navigate(target.nav);
 }
 
@@ -6500,7 +6581,7 @@ function renderScenariosPanel(){
       const coords = entry.coordinates;
       const where = target
         ? `<button type="button" class="pill tag sm" data-scenario="${index}"
-             style="border:0; cursor:pointer; font:inherit;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · as of ${escHtml(coords.asOf)}</button>`
+             style="border:0; cursor:pointer; font:inherit;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · in place on ${escHtml(coords.inPlaceOn)}</button>`
         : `<span style="font-size:11.5px; color:var(--ink-faint);">${
              entry.mode==="INJECT" ? "not in the data yet" : "no data behind it — a unit test"}</span>`;
       return `<div style="border-top:1px solid var(--line); padding:9px 0;">
@@ -6702,7 +6783,7 @@ const PLANS_EXPANDED = new Set();
 
 // Real URL persistence for the filter bar (Keith's own ask, 2026-09-19) -
 // q=/status=/component=/file= in location.search, the same "orthogonal,
-// non-navigational state lives in the query string" convention asof=/
+// non-navigational state lives in the query string" convention in-place-on=/
 // panel=/cmp= already established (see stateToPath()'s own comment).
 // Read once on real tier-entry (render()'s own dispatch, never from
 // inside renderPlans() itself - that also runs on every internal chip-
@@ -6969,20 +7050,20 @@ document.getElementById("wordmark-btn").addEventListener("click", ()=> navigate(
 // then re-renders whatever view/drawer/panel is currently open via
 // renderFromState() so picking a date doesn't also silently close
 // whatever the person was looking at.
-function updateAsOfButtonLabel(){
-  const btn = document.getElementById("asof-btn");
+function updateInPlaceOnButtonLabel(){
+  const btn = document.getElementById("in-place-on-btn");
   // No asset clock means no asset (see HAS_ASSET_CLOCK) - hide the
   // control rather than label it with a date from somewhere else.
-  if(!CURRENT_AS_OF){ if(btn) btn.hidden = true; return; }
-  const label = document.getElementById("asof-btn-label");
-  if(label) label.textContent = fmtDay(CURRENT_AS_OF);
+  if(!CURRENT_IN_PLACE_ON){ if(btn) btn.hidden = true; return; }
+  const label = document.getElementById("in-place-on-btn-label");
+  if(label) label.textContent = fmtDay(CURRENT_IN_PLACE_ON);
 }
 // WHICH PERIOD THE CHOSEN DATE FALLS IN, one line per named calendar
 // (criterion 6). A calendar the date is BEFORE gets a line too, saying
 // so - leaving it out would read as "this calendar has no opinion", and
 // "the asset's records do not go back that far" is the actual answer.
-function renderAsOfPeriods(dateStr){
-  const wrap = document.getElementById("asof-periods");
+function renderInPlaceOnPeriods(dateStr){
+  const wrap = document.getElementById("in-place-on-periods");
   if(!wrap) return;
   const names = calendarNames();
   if(!names.length || !dateStr){ wrap.innerHTML = ""; return; }
@@ -7003,8 +7084,8 @@ function renderAsOfPeriods(dateStr){
 // THE MAXIMUM IS NOT "TODAY". It is the last date the embedded sequences
 // cover, which on a daily calendar is the date of the last build - the
 // honest bound, and the one a reader can act on.
-function boundAsOfInput(){
-  const input = document.getElementById("asof-input");
+function boundInPlaceOnInput(){
+  const input = document.getElementById("in-place-on-input");
   const range = coveredDateRange();
   if(!input) return;
   if(!range){ input.removeAttribute("min"); input.removeAttribute("max"); return; }
@@ -7014,31 +7095,42 @@ function boundAsOfInput(){
 
 // AND SAY SO when a date outside that range arrives anyway (criteria 9
 // and 10). A URL is the way in - a bookmark from before a calendar was
-// re-authored, a hand-edited `?asof=`, a link from someone else's
+// re-authored, a hand-edited `?in-place-on=`, a link from someone else's
 // deployment - and the input's own min/max cannot stop any of those.
 //
 // Above the page rather than instead of it: every dataset still resolves
 // to a real state at an uncovered date (each one rolls back to its own
 // newest run at or before it, or says No data), so replacing the page
 // would hide correct answers to make a point about the date.
-function renderAsOfRangeNotice(){
-  const notice = document.getElementById("asof-range-notice");
+function renderInPlaceOnPastNotice(){
+  const notice = document.getElementById("in-place-on-past-notice");
+  if(!notice) return;
+  const past = CURRENT_IN_PLACE_ON && DEFAULT_IN_PLACE_ON && CURRENT_IN_PLACE_ON !== DEFAULT_IN_PLACE_ON;
+  if(!past){ notice.hidden = true; notice.innerHTML = ""; return; }
+  notice.hidden = false;
+  notice.innerHTML = `Showing what was <b>in place on ${fmtDay(CURRENT_IN_PLACE_ON)}</b>, using
+    everything known today - decisions made since that date included. The
+    snapshot archive (🕐 Past snapshots) shows what this page itself said then.`;
+}
+function renderInPlaceOnRangeNotice(){
+  renderInPlaceOnPastNotice();
+  const notice = document.getElementById("in-place-on-range-notice");
   if(!notice) return;
   const range = coveredDateRange();
-  const outside = range && CURRENT_AS_OF
-    && (CURRENT_AS_OF < range.first || CURRENT_AS_OF > range.last);
+  const outside = range && CURRENT_IN_PLACE_ON
+    && (CURRENT_IN_PLACE_ON < range.first || CURRENT_IN_PLACE_ON > range.last);
   if(!outside){ notice.hidden = true; notice.innerHTML = ""; return; }
   notice.hidden = false;
-  notice.innerHTML = `You are viewing this asset as of
-    <b>${fmtDay(CURRENT_AS_OF)}</b>, which is outside the dates this
+  notice.innerHTML = `You are viewing what was in place on
+    <b>${fmtDay(CURRENT_IN_PLACE_ON)}</b>, which is outside the dates this
     dashboard has delivery periods for — it covers
     <b>${fmtDay(range.first)}</b> to <b>${fmtDay(range.last)}</b>.
-    <button class="link-btn" id="asof-range-reset" type="button">View as of
-    ${fmtDay(DEFAULT_AS_OF)} instead</button>`;
-  const reset = document.getElementById("asof-range-reset");
-  if(reset) reset.addEventListener("click", ()=> applyAsOf(DEFAULT_AS_OF));
+    <button class="link-btn" id="in-place-on-range-reset" type="button">View
+    ${fmtDay(DEFAULT_IN_PLACE_ON)} instead</button>`;
+  const reset = document.getElementById("in-place-on-range-reset");
+  if(reset) reset.addEventListener("click", ()=> applyInPlaceOn(DEFAULT_IN_PLACE_ON));
 }
-function applyAsOf(dateStr){
+function applyInPlaceOn(dateStr){
   // A date the reader chose themselves is not an arrival from anywhere,
   // so it clears the framing - the second half of REQ-DASH-085
   // criterion 11 and REQ-DASH-100 criterion 10.
@@ -7049,52 +7141,52 @@ function applyAsOf(dateStr){
 // earned these results, and say where the reader came from.
 //
 // A REPLACE RATHER THAN A PUSH, matching what "as of" has always done
-// here (see asOfFromUrl()'s own comment - it is a filter over the whole
+// here (see inPlaceOnFromUrl()'s own comment - it is a filter over the whole
 // page, not a navigable state somebody wants to step back through one
 // change at a time). The way back is the banner's own button, which
 // both requirements ask for by name rather than leaving to the browser.
 function drillToPeriod(dateStr, fromPeriod){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || "")) return;
-  CURRENT_AS_OF = dateStr;
-  DATA = buildData(CURRENT_AS_OF);
+  CURRENT_IN_PLACE_ON = dateStr;
+  DATA = buildData(CURRENT_IN_PLACE_ON);
   ARRIVAL_FROM = fromPeriod || null;
-  setAsOfInUrl(CURRENT_AS_OF, DEFAULT_AS_OF);
-  updateAsOfButtonLabel();
-  renderAsOfPeriods(dateStr);
-  renderAsOfRangeNotice();
+  setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON);
+  updateInPlaceOnButtonLabel();
+  renderInPlaceOnPeriods(dateStr);
+  renderInPlaceOnRangeNotice();
   renderFromState();
 }
-function openAsOfPanel(){
-  document.getElementById("asof-input").value = CURRENT_AS_OF;
-  boundAsOfInput();
-  renderAsOfPeriods(CURRENT_AS_OF);
-  document.getElementById("asof-default-label").textContent = fmtDay(DEFAULT_AS_OF);
-  document.getElementById("asof-backdrop").classList.add("open");
-  document.getElementById("asof-panel").classList.add("open");
-  setDrawerHidden("asof-panel", false);
+function openInPlaceOnPanel(){
+  document.getElementById("in-place-on-input").value = CURRENT_IN_PLACE_ON;
+  boundInPlaceOnInput();
+  renderInPlaceOnPeriods(CURRENT_IN_PLACE_ON);
+  document.getElementById("in-place-on-default-label").textContent = fmtDay(DEFAULT_IN_PLACE_ON);
+  document.getElementById("in-place-on-backdrop").classList.add("open");
+  document.getElementById("in-place-on-panel").classList.add("open");
+  setDrawerHidden("in-place-on-panel", false);
 }
-function closeAsOfPanel(){
-  document.getElementById("asof-backdrop").classList.remove("open");
-  document.getElementById("asof-panel").classList.remove("open");
-  setDrawerHidden("asof-panel", true);
+function closeInPlaceOnPanel(){
+  document.getElementById("in-place-on-backdrop").classList.remove("open");
+  document.getElementById("in-place-on-panel").classList.remove("open");
+  setDrawerHidden("in-place-on-panel", true);
 }
-document.getElementById("asof-btn").addEventListener("click", openAsOfPanel);
-document.getElementById("asof-backdrop").addEventListener("click", closeAsOfPanel);
-document.getElementById("asof-panel-close").addEventListener("click", closeAsOfPanel);
-document.getElementById("asof-input").addEventListener("change", (e)=> applyAsOf(e.target.value));
+document.getElementById("in-place-on-btn").addEventListener("click", openInPlaceOnPanel);
+document.getElementById("in-place-on-backdrop").addEventListener("click", closeInPlaceOnPanel);
+document.getElementById("in-place-on-panel-close").addEventListener("click", closeInPlaceOnPanel);
+document.getElementById("in-place-on-input").addEventListener("change", (e)=> applyInPlaceOn(e.target.value));
 // The period statement follows the INPUT, not the applied date - a reader
 // scrubbing through dates wants to see which period each one is before
 // deciding, and `change` on a date input does apply immediately anyway.
-document.getElementById("asof-input").addEventListener("input", (e)=> renderAsOfPeriods(e.target.value));
-document.getElementById("asof-reset-btn").addEventListener("click", ()=>{
-  document.getElementById("asof-input").value = DEFAULT_AS_OF;
-  applyAsOf(DEFAULT_AS_OF);
+document.getElementById("in-place-on-input").addEventListener("input", (e)=> renderInPlaceOnPeriods(e.target.value));
+document.getElementById("in-place-on-reset-btn").addEventListener("click", ()=>{
+  document.getElementById("in-place-on-input").value = DEFAULT_IN_PLACE_ON;
+  applyInPlaceOn(DEFAULT_IN_PLACE_ON);
 });
-updateAsOfButtonLabel();
+updateInPlaceOnButtonLabel();
 // AT BOOT, because the URL is where an out-of-range date comes from, and
 // the notice has to be there on the first paint rather than after the
 // reader's first interaction.
-renderAsOfRangeNotice();
+renderInPlaceOnRangeNotice();
 
 document.getElementById("backdrop").addEventListener("click", closeDrawer);
 document.getElementById("drawer-close").addEventListener("click", closeDrawer);
@@ -7103,11 +7195,11 @@ document.getElementById("drawer-close").addEventListener("click", closeDrawer);
 // activity - changelog/requirements had no Escape handling at all, a
 // latent gap this generalization also closes). Now a single STATE.panel
 // check, same unification openPanel()/closePanel() above already did.
-// asof-panel stays its own explicit check - deliberately outside
+// in-place-on-panel stays its own explicit check - deliberately outside
 // STATE/history, per that panel's own unchanged design.
 document.addEventListener("keydown", (e)=>{
   if(e.key!=="Escape") return;
-  if(document.getElementById("asof-panel").classList.contains("open")) closeAsOfPanel();
+  if(document.getElementById("in-place-on-panel").classList.contains("open")) closeInPlaceOnPanel();
   else if(STATE && STATE.panel) closePanel();
   else if(STATE && STATE.checkKey) closeCheckPanel();
   else closeDrawer();

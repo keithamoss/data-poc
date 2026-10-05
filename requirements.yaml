@@ -592,11 +592,11 @@ requirements:
       - qa_tools/common/validate_check_lifecycle.py::collect_checks
 
   - id: REQ-PIPE-007
-    title: Cadence-aware "as of" viewing
+    title: Cadence-aware "in place on" viewing
     story: >
       As a data engineer, I want to pick any date and see the data asset
       exactly as it stood then, so that I can answer "what did we know
-      as of this date" for a daily or a quarterly dataset alike.
+      in place on this date" for a daily or a quarterly dataset alike.
     moscow: should
     status: built
     signed_off:
@@ -613,7 +613,7 @@ requirements:
         misleading blank or stale-but-colored view.
     linked_tests:
       - tests/test_cadence.py
-      - tests/test_dashboard_e2e.py::TestAsOfDatePicking::test_a_date_before_any_real_history_shows_no_data
+      - tests/test_dashboard_e2e.py::TestInPlaceOnDatePicking::test_a_date_before_any_real_history_shows_no_data
     evidence:
       - >
         2026-09-20: cadence parsed from each contract resolves to genuinely
@@ -624,9 +624,9 @@ requirements:
     decisions:
       - >
         `pipeline/cadence.py::classify_arrival` WAS LISTED HERE AND IS
-        DELETED (REQ-PIPE-080 criterion 2, 2026-10-02). What it contributed - a per-run early/on-time/late verdict for the as-of view - is now READ from the filing rather than derived from the arrival date, so `pipeline/recorded_arrival.py::for_run` takes its place in this list. The criteria are unaffected: staleness still comes from each dataset's own cadence.
+        DELETED (REQ-PIPE-080 criterion 2, 2026-10-02). What it contributed - a per-run early/on-time/late verdict for the in-place-on view - is now READ from the filing rather than derived from the arrival date, so `pipeline/recorded_arrival.py::for_run` takes its place in this list. The criteria are unaffected: staleness still comes from each dataset's own cadence.
       - >
-        A single global as-of day-count was tried, corrected from per-dataset to data-asset-level, then removed entirely - a flat day-count was the wrong shape, not the wrong number. A quarterly dataset's real ~92-day delivery gap made it read 'no data' for roughly two-thirds of every quarter.
+        A single global in-place-on day-count was tried, corrected from per-dataset to data-asset-level, then removed entirely - a flat day-count was the wrong shape, not the wrong number. A quarterly dataset's real ~92-day delivery gap made it read 'no data' for roughly two-thirds of every quarter.
       - >
         Replaced by per-dataset cadence declared in each dataset's own ODCS contract, so 'no data' means nothing has landed in the CURRENT expected cycle rather than the last delivery being more than N days old.
     implemented_by:
@@ -1498,7 +1498,7 @@ requirements:
     - '2026-09-25: the empty state is asserted in a REAL browser at two tiers, not in a unit test, because it is the state a reader actually meets today - the real committed history has nothing outstanding, and "nothing is waiting" must not look like "this panel is broken".
   
       '
-    - '2026-09-26: one of criterion 11''s own e2e assertions was FOUND WRONG the same night, by the gate rather than in review. It drove the default as-of date - today on the asset clock - and went red the moment the Perth date rolled past the newest generated run: Birth Registrations is daily, so a day later its newest supply falls outside its own current cycle and the row correctly renders the quiet state, which has no arrival cell to carry a qualifier. Nothing about the page was wrong. It now takes the as-of date from the page''s own data. Same shape as plans/post-build-review.md #59, and it would have gone red in CI on the next run for the same reason.
+    - '2026-09-26: one of criterion 11''s own e2e assertions was FOUND WRONG the same night, by the gate rather than in review. It drove the default in-place-on date - today on the asset clock - and went red the moment the Perth date rolled past the newest generated run: Birth Registrations is daily, so a day later its newest supply falls outside its own current cycle and the row correctly renders the quiet state, which has no arrival cell to carry a qualifier. Nothing about the page was wrong. It now takes the in-place-on date from the page''s own data. Same shape as plans/post-build-review.md #59, and it would have gone red in CI on the next run for the same reason.
   
       '
     - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
@@ -1563,7 +1563,7 @@ requirements:
       '
     - 'A HELD, CONTESTED, UNLOADABLE OR CLOSED-UNFILLED SUPPLY REDDENS ITS DATASET, AND THE QUEUE STOPS SAYING OTHERWISE (Keith, 2026-10-04): criterion 5 as built kept event severity and status wholly apart, and the queue''s copy says ''none of them changes a dataset''s red/amber/green status'' (dashboard/qa-reporting-dashboard.template.html:4113-4114), which REQ-PIPE-115, REQ-DASH-148 and REQ-DASH-133 (all signed 2026-10-04) make false. The item keeps its event-severity pill; the dataset''s red is a status. REJECTED keeping the copy and the reds both - a page that says two contradictory things is the dashboard reviewer''s first must-fix.'
     - 'A CLOSED, UNFILLED SLOT IS BOTH AN ITEM AND A RED (Keith, 2026-10-04), reversing criterion 7 as signed 2026-09-24 (''SHALL NOT render it as a red data verdict''). Keith chose red ''very clearly'' for REQ-DASH-133, rolling up to the agency. ''Closed by monotonic filling'' also went: REQ-PIPE-131 closes a period when the next period''s claim window opens. REJECTED leaving 070 criterion 7 as built beside REQ-DASH-133 criterion 4, which would be two signed criteria saying opposite things.'
-    - 'THE QUEUE, THE MARKERS AND THE RED ARE JUDGED AT ONE AS-OF INSTANT (Keith, 2026-10-04). Today outstanding.survey() reads only what is open NOW, so the as-of picker could show a past dataset red while the queue beside it lists today''s items. REJECTED leaving the queue as ''now'' only: the reds REQ-PIPE-115 and REQ-DASH-148 add are judged as at the instant on show, and the two would disagree on every past date.'
+    - 'THE QUEUE, THE MARKERS AND THE RED ARE JUDGED AT ONE IN-PLACE-ON INSTANT (Keith, 2026-10-04). Today outstanding.survey() reads only what is open NOW, so the in-place-on picker could show a past dataset red while the queue beside it lists today''s items. REJECTED leaving the queue as ''now'' only: the reds REQ-PIPE-115 and REQ-DASH-148 add are judged as at the instant on show, and the two would disagree on every past date.'
     - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
 
   - id: REQ-GHUB-015
@@ -1724,7 +1724,7 @@ requirements:
     linked_tests:
       - tests-js/navigation.test.js
       - tests-js/plans-filter-url.test.js
-      - tests/test_dashboard_e2e.py::TestAsOfDatePicking
+      - tests/test_dashboard_e2e.py::TestInPlaceOnDatePicking
     implemented_by:
       - dashboard/qa-reporting-dashboard.template.html::stateToPath
       - dashboard/qa-reporting-dashboard.template.html::hashToState
@@ -4676,9 +4676,9 @@ requirements:
       - THE SYSTEM SHALL NOT retain a generator for mock check results,
         columns, datasets or value pools.
       - WHERE a real dataset has no history at or before the selected
-        as-of date, THE SYSTEM SHALL say so on that dataset's own tile
+        in-place-on date, THE SYSTEM SHALL say so on that dataset's own tile
         rather than omitting the dataset.
-      - THE SYSTEM SHALL keep every rollup, navigation and as-of
+      - THE SYSTEM SHALL keep every rollup, navigation and in-place-on
         behaviour it has today for the datasets that remain.
       - THE SYSTEM SHALL NOT carry a second statement of the
         agency/collection/dataset tree once the illustrative one is
@@ -5366,10 +5366,10 @@ requirements:
         gates.
 
   - id: REQ-DASH-041
-    title: Supply history and as-of viewing hold up under per-dataset arrivals
+    title: Supply history and in-place-on viewing hold up under per-dataset arrivals
     date_written: "2026-09-21"
     story: >
-      As a data engineer using the as-of picker, I want the supply
+      As a data engineer using the in-place-on picker, I want the supply
       history to still read correctly when each table arrives on its own
       schedule, so that the feature that survived a chain-building test
       in the lab also survives on the page.
@@ -5378,7 +5378,7 @@ requirements:
     source: >
       The stated limit of item 6's own verification, 2026-09-20 -
       buildSupplyHistory was driven in a real browser against a doctored
-      dataset and held up, but whether the as-of picker and the rendered
+      dataset and held up, but whether the in-place-on picker and the rendered
       supply-history UI also hold up is untested.
     signed_off:
       by: Keith
@@ -5387,15 +5387,15 @@ requirements:
       - WHEN a collection's datasets have different arrival histories,
         THE SYSTEM SHALL render each dataset's supply history from that
         dataset's own arrivals alone.
-      - THE SYSTEM SHALL offer as-of viewing across datasets whose
+      - THE SYSTEM SHALL offer in-place-on viewing across datasets whose
         arrival dates do not line up.
-      - WHEN a viewer picks an as-of date, THE SYSTEM SHALL show each
+      - WHEN a viewer picks an in-place-on date, THE SYSTEM SHALL show each
         dataset as at its own most recent ARRIVAL on or before that
         date, and SHALL NOT show it as at its most recently promoted
         supply instead.
-      - IF a dataset has no arrival on or before the chosen as-of date,
+      - IF a dataset has no arrival on or before the chosen in-place-on date,
         THEN THE SYSTEM SHALL continue to render the existing
-        no-data-as-of state rather than an empty or stale panel, and
+        no-data-in-place-on state rather than an empty or stale panel, and
         SHALL NOT introduce a further quiet state alongside it.
       - THE SYSTEM SHALL render all of this with zero console errors in
         a real browser.
@@ -5427,7 +5427,7 @@ requirements:
       - tests-js/per-dataset-arrivals.test.js
       - tests/test_dashboard_e2e.py
     implemented_by:
-      - dashboard/qa-reporting-dashboard.template.html::clipDatasetToAsOf
+      - dashboard/qa-reporting-dashboard.template.html::clipDatasetToInPlaceOn
       - dashboard/qa-reporting-dashboard.template.html::buildSupplyHistory
       - dashboard/qa-reporting-dashboard.template.html::noDataDataset
     evidence:
@@ -5456,11 +5456,11 @@ requirements:
       - >
         2026-09-25: the divergence assertion is about STATE, not about
         dates, and that came out of a first version that asserted the
-        wrong thing. At the default as-of date the three cut-short
+        wrong thing. At the default in-place-on date the three cut-short
         datasets correctly fall outside their own current cycle and
         render the existing quiet row, while the three whole ones
         render a real arrival - three and three, asserted both ways. A
-        collection-wide as-of would put all six in the same state
+        collection-wide in-place-on would put all six in the same state
         whichever it chose, which is exactly what this rules out.
       - >
         2026-09-25: criterion 4's "no FURTHER quiet state" is held as a
@@ -5472,16 +5472,16 @@ requirements:
         2026-09-25: criterion 3's recorded contradiction was checked
         rather than stepped around. Thread H reads as-at T as
         promotion-filtered and the 2026-09-23 decision reads the
-        dashboard's as-of as arrival-filtered; the newer one wins, and
+        dashboard's in-place-on as arrival-filtered; the newer one wins, and
         nothing promotes yet, so the two cannot diverge in the data
         today. What the test holds is the structural fact underneath:
-        clipDatasetToAsOf reads `runs`, which are arrivals, and has no
+        clipDatasetToInPlaceOn reads `runs`, which are arrivals, and has no
         promotion input to read instead. TS-28 still needs rewording,
         which is Keith's.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     decisions:
       - >
-        Decided the as-of view shows the most recent ARRIVAL, never the
+        Decided the in-place-on view shows the most recent ARRIVAL, never the
         most recently promoted supply (Keith, 2026-09-23). The criterion
         said "arrival" before staging and promotion were split apart, so
         it was ambiguous rather than wrong; it now says so explicitly.
@@ -5499,13 +5499,13 @@ requirements:
         Drafted as REQ-DASH-056, unsigned.
       - >
         Criterion 4 was reworded from "SHALL say so plainly" to
-        "SHALL continue to render the existing no-data-as-of state",
+        "SHALL continue to render the existing no-data-in-place-on state",
         because the behaviour it describes is ALREADY BUILT - the page
         even documents the promise in its own help text. A criterion
         that restates shipped behaviour as new work invites a second
         mechanism alongside the first. It also now forbids adding a
         further quiet state, because there are already three with
-        different meanings - no run at all as of the date, a run older
+        different meanings - no run at all by the date, a run older
         than the cadence window, and a schedule whose dates ran out -
         and the first two both collapse into `nodata`, which rollup()
         filters out before worst-of. A fourth would either duplicate
@@ -5520,9 +5520,9 @@ requirements:
 
       - >
         CONTRADICTION FOUND AFTER SIGN-OFF, 2026-09-23. Criterion 3 says
-        the as-of view shows the most recent ARRIVAL. Thread H wrinkle 1
+        the in-place-on view shows the most recent ARRIVAL. Thread H wrinkle 1
         says "as at T = the latest version PROMOTED on or before T";
-        wrinkle 7 names clipDatasetToAsOf() directly and says filtering
+        wrinkle 7 names clipDatasetToInPlaceOn() directly and says filtering
         on arrival "becomes wrong the moment promotion lands"; and TS-28,
         approved by Keith 2026-09-22, expects a supply promoted on Friday
         to be ABSENT from the as-at-Wednesday view. The 2026-09-23
@@ -5530,7 +5530,7 @@ requirements:
         obligation that every scenario gets a unit test, so someone will
         write a test asserting the opposite of a signed criterion. The
         likely clean resolution - the WAREHOUSE's as-at is
-        promotion-filtered while the DASHBOARD's as-of is
+        promotion-filtered while the DASHBOARD's in-place-on is
         arrival-filtered, because the dashboard reports QA rather than
         warehouse contents - is not written anywhere, and TS-28 needs
         rewording either way.
@@ -6653,7 +6653,7 @@ requirements:
     status: built
     source: >
       Keith, 2026-09-22, on the test scenario register - "if I click on a
-      test, it takes me to the relevant as-of date and then the relevant
+      test, it takes me to the relevant in-place-on date and then the relevant
       page for the check, the dataset or the data collection".
       plans/supply-model.md test scenario register. Scoped by
       delivery-scoper, batch 1+2 pass, 2026-09-22.
@@ -6664,7 +6664,7 @@ requirements:
       - >
         THE SYSTEM SHALL generate a map naming, for each injected
         scenario, the dataset, the supplies it produced, the period
-        and the as-of date at which that scenario can be seen.
+        and the in-place-on date at which that scenario can be seen.
       - >
         THE SYSTEM SHALL generate the map from the generator's own
         record of where each scenario actually landed, and SHALL NOT
@@ -6774,7 +6774,7 @@ requirements:
       - criterion: >
           Criteria 1 and 2 pass VACUOUSLY on the real repo today: there
           are zero injected scenarios, so the map names no dataset, no
-          supply, no period and no as-of date for anything. Both are
+          supply, no period and no in-place-on date for anything. Both are
           built and are exercised against a real placement record in
           the tests.
         why: >
@@ -6791,13 +6791,13 @@ requirements:
     decisions:
       - Decided the map carries COORDINATES and the dashboard constructs
         the LINK (Keith's own framing, 2026-09-22). The generator knows
-        the dataset, the supplies, the as-of date and the check; it does
+        the dataset, the supplies, the in-place-on date and the check; it does
         not, and should not, know the dashboard's routing scheme.
         Emitting URLs from the generator would couple the two and break
         silently the next time a route changes.
-      - Decided the target is an AS-OF DATE, not a snapshot. Keith
+      - Decided the target is an IN-PLACE-ON DATE, not a snapshot. Keith
         floated both. The live dashboard defaults to as-corrected, so an
-        as-of link shows the scenario as we now understand it, whereas a
+        in-place-on link shows the scenario as we now understand it, whereas a
         snapshot shows what was published at the time - a different
         question, and the wrong one for "show me this scenario working".
       - Decided a unit-only scenario appears in the map saying it has no
@@ -6814,14 +6814,14 @@ requirements:
     date_written: "2026-09-22"
     story: >
       As Keith walking someone through this, I want to click a scenario
-      and arrive at the right dataset on the right as-of date, so that
+      and arrive at the right dataset on the right in-place-on date, so that
       showing what the model does is one click rather than a date picker
       and an explanation.
     moscow: should
     status: built
     source: >
       Keith, 2026-09-22, on the test scenario register - "if I click on a
-      test, it takes me to the relevant as-of date and then the relevant
+      test, it takes me to the relevant in-place-on date and then the relevant
       page for the check, the dataset or the data collection". Scoped by
       delivery-scoper, batch 1+2 pass, 2026-09-22.
     signed_off:
@@ -6831,7 +6831,7 @@ requirements:
       - THE SYSTEM SHALL render the committed scenario map in the
         dashboard.
       - WHEN a viewer selects a scenario entry, THE SYSTEM SHALL
-        navigate to the as-of date that entry names and to the dataset,
+        navigate to the in-place-on date that entry names and to the dataset,
         collection or check it names.
       - THE SYSTEM SHALL construct that link itself from the entry's
         coordinates, and SHALL NOT consume a link authored anywhere
@@ -6869,7 +6869,7 @@ requirements:
       - >
         2026-09-25: criterion 3 is asserted as what the map MAY NOT
         CONTAIN as well as what the page does with it. The target
-        carries a state and an as-of date and nothing else; the
+        carries a state and an in-place-on date and nothing else; the
         embedded map is asserted to contain no "http" and no "#/"
         anywhere; and a coordinate that already looks like a URL
         resolves to no target at all rather than being followed.
@@ -6885,11 +6885,11 @@ requirements:
         a page that does not exist. Sending a reader somewhere broken
         is worse than telling them it has gone.
       - >
-        2026-09-25: the as-of date is applied BEFORE the navigation, not
-        after. applyAsOf() rebuilds the data and re-renders, so
+        2026-09-25: the in-place-on date is applied BEFORE the navigation, not
+        after. applyInPlaceOn() rebuilds the data and re-renders, so
         navigating first would render the target page at the old date
         and then replace it - a visible flash of the wrong answer,
-        which on a page about as-of dates is the one flash worth
+        which on a page about in-place-on dates is the one flash worth
         avoiding.
       - >
         2026-09-25: A SIDE PANEL rather than a top-level tab, unlike
@@ -6910,7 +6910,7 @@ requirements:
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     unmet_criteria:
       - criterion: >
-          Criterion 2 - navigating to the as-of date and the page an
+          Criterion 2 - navigating to the in-place-on date and the page an
           entry names - is built and unit-tested through
           scenarioTarget(), but no entry carries coordinates today, so
           the click path is never exercised end to end in a browser.
@@ -6928,7 +6928,7 @@ requirements:
       - Decided this is a separate requirement from the map's
         generation, because the two are verified in entirely different
         ways - one by regenerating and diffing, one by driving a real
-        browser - and because the link target depends on as-of viewing,
+        browser - and because the link target depends on in-place-on viewing,
         which is batch 6 work.
       - "[B2] Decided the WHOLE rendering is held to batch 6, and sprint 2
         does no dashboard work (Keith, 2026-09-22). This is STRICTER than
@@ -6938,14 +6938,14 @@ requirements:
         alongside the map, and rejected the split delivery."
       - "[B2] The reason holds independently of anyone's preference, and
         is the same one that put every dashboard sprint last: building a
-        view against a data shape still moving is how clipDatasetToAsOf()
+        view against a data shape still moving is how clipDatasetToInPlaceOn()
         ended up filtering on arrival rather than promotion - correct
         only because promotion did not yet exist. The map's own
         coordinates are exactly such a shape while slot assignment and
         promotion are unbuilt."
     open_questions:
       - Whether a scenario link should be able to target an INSTANT
-        rather than a date. Sprint 24's time-granular as-of makes it
+        rather than a date. Sprint 24's time-granular in-place-on makes it
         possible, and the register notes it "matters for the injected
         scenarios whose whole point is an intra-day sequence" - but
         sprint 24 is the last sprint in the plan.
@@ -7218,7 +7218,7 @@ requirements:
         and must not be revisited. It is small and independent
         deliberately.
       - The current behaviour is correct by coincidence in at least one
-        place - clipDatasetToAsOf() compares date STRINGS, which gives
+        place - clipDatasetToInPlaceOn() compares date STRINGS, which gives
         end-of-day semantics by accident rather than by design. Pin the
         current semantics with a test BEFORE the refactor, not after,
         so the behaviour is provably unchanged when the comparison
@@ -7271,7 +7271,7 @@ requirements:
         2026-09-23: A REAL, LIVE BUG, found by the criterion rather than
         reasoned about. liveNowDateStr() used toISOString(), which is
         UTC - so between midnight and 08:00 in Perth the dashboard's
-        default as-of date was YESTERDAY, every working morning, for
+        default in-place-on date was YESTERDAY, every working morning, for
         eight hours. It had gone unnoticed because the page tends to be
         opened later in the day. Proved in a real browser at 07:40 Perth
         on 2026-09-23, a moment when the two calendars genuinely
@@ -7337,8 +7337,8 @@ requirements:
         schedule derive from a fixed, committed anchor - a pinned anchor
         makes the question moot rather than answering it twice.
       - >
-        Decided clipDatasetToAsOf()'s date comparison keeps its
-        behaviour and gains a NAME (ranOnOrBeforeAsOf). Both sides are
+        Decided clipDatasetToInPlaceOn()'s date comparison keeps its
+        behaviour and gains a NAME (ranOnOrBeforeInPlaceOn). Both sides are
         YYYY-MM-DD in the asset's calendar, for which a lexicographic
         comparison is exactly the end-of-day-inclusive answer criterion
         6 asks for. This requirement's own NFR flags it as right by
@@ -8480,14 +8480,14 @@ requirements:
       - THE SYSTEM SHALL render an exhausted schedule as a status
         distinct from green, amber and red, and SHALL NOT render it with
         the same status or the same wording as a dataset that simply has
-        no run on or before the selected as-of date.
+        no run on or before the selected in-place-on date.
       - THE SYSTEM SHALL NOT allow an exhausted schedule to be absorbed
         by the worst-of status rollup at any tier.
       - WHEN one or more schedules are exhausted, THE SYSTEM SHALL state
         so in a notice above the executive tier's agency grid, naming
         how many.
       - THE SYSTEM SHALL evaluate the exhausted-schedule condition
-        against the as-of date currently selected, and SHALL NOT report
+        against the in-place-on date currently selected, and SHALL NOT report
         a schedule as exhausted while viewing a date its calendar
         covers.
       - THE SYSTEM SHALL name, in that notice and in the failure, the
@@ -8571,7 +8571,7 @@ requirements:
         implementation produces and is invisible in every rollup above
         it."
       - "The nodata trap is verified in the real code, not reasoned:
-        rollup() filters d.noDataAsOf and rollupStatuses() filters
+        rollup() filters d.noDataInPlaceOn and rollupStatuses() filters
         s!==nodata before worstOf(), and STATUS_ORDER puts nodata at -1
         - the template's own comment says it can only ever lose a reduce
         that starts from green. So one exhausted dataset among 29
@@ -8606,7 +8606,7 @@ requirements:
         built: the register''s model is binary, so the alternative was
         to drop the record of everything verified today. Recorded
         rather than worked around quietly."
-      - "[BUILD] Decided an exhausted schedule OUTRANKS `noDataAsOf` on
+      - "[BUILD] Decided an exhausted schedule OUTRANKS `noDataInPlaceOn` on
         the same dataset. Both render as a quiet tile and both are
         reachable at once - a dataset with no recent run whose calendar
         has also ended - but only one of them is somebody''s job. The
@@ -8624,7 +8624,7 @@ requirements:
         the quarterly calendar runs to 2027-Q4 - and the first version
         of this told a reader their dataset ended after a period it
         never had."
-      - "[BUILD] Made scheduleRunwayAsOf() take the runway as a
+      - "[BUILD] Made scheduleRunwayInPlaceOn() take the runway as a
         parameter rather than reading the embedded const directly. A
         top-level `const` in a classic script is not reachable from
         outside it, so the version that read SCHEDULE_RUNWAY could only
@@ -8659,7 +8659,7 @@ requirements:
         exiting 0.
       - >
         2026-09-23: eleven real-browser tests assert what is ON THE
-        PAGE rather than what the model computed, across three as-of
+        PAGE rather than what the model computed, across three in-place-on
         dates - none exhausted, exactly one exhausted among five
         healthy siblings, and all six. A correct derivation nobody can
         see is the same failure in a different place.
@@ -8677,7 +8677,7 @@ requirements:
       - >
         2026-09-23: the wording differs from a dataset that simply has
         no run, compared directly by loading the SAME dataset at two
-        as-of dates and requiring the two pages to differ. Both are
+        in-place-on dates and requiring the two pages to differ. Both are
         quiet tiles; only one is somebody's job.
       - >
         2026-09-23: the notice cannot be dismissed and nothing about it
@@ -8685,7 +8685,7 @@ requirements:
         sessionStorage after rendering it, not by reading the code.
       - >
         2026-09-23: computed from configuration alone against the
-        SELECTED as-of date, which is what lets the page show an
+        SELECTED in-place-on date, which is what lets the page show an
         exhausted schedule even though the run that would have reported
         it never happened. Both halves assert they open nothing under
         data/.
@@ -8704,7 +8704,7 @@ requirements:
         gates are green.
 
   - id: REQ-DASH-054
-    title: The as-of picker knows the real calendar, because it is embedded
+    title: The in-place-on picker knows the real calendar, because it is embedded
     date_written: "2026-09-22"
     story: >
       As someone viewing the dashboard, I want to pick a date in the
@@ -8720,9 +8720,9 @@ requirements:
       - dashboard/qa-reporting-dashboard.template.html::periodNameFor
       - dashboard/qa-reporting-dashboard.template.html::periodForCalendar
       - dashboard/qa-reporting-dashboard.template.html::coveredDateRange
-      - dashboard/qa-reporting-dashboard.template.html::renderAsOfPeriods
-      - dashboard/qa-reporting-dashboard.template.html::boundAsOfInput
-      - dashboard/qa-reporting-dashboard.template.html::renderAsOfRangeNotice
+      - dashboard/qa-reporting-dashboard.template.html::renderInPlaceOnPeriods
+      - dashboard/qa-reporting-dashboard.template.html::boundInPlaceOnInput
+      - dashboard/qa-reporting-dashboard.template.html::renderInPlaceOnRangeNotice
       - dashboard/qa-reporting-dashboard.template.html::buildSupplyHistory
       - dashboard/qa-reporting-dashboard.template.html::cycleLabel
     linked_tests:
@@ -8732,9 +8732,9 @@ requirements:
       - tests/test_embed_dashboard_data.py::test_nothing_that_has_not_begun_is_embedded
       - tests/test_embed_dashboard_data.py::test_the_current_period_IS_embedded_because_it_has_begun
       - tests/test_embed_dashboard_data.py::test_deriving_the_sequences_opens_nothing_under_data
-      - tests/test_dashboard_e2e.py::TestTheAsOfPanelSaysWhichPeriod
+      - tests/test_dashboard_e2e.py::TestTheInPlaceOnPanelSaysWhichPeriod
       - tests-js/cadence.test.js
-      - tests-js/asof-range.test.js
+      - tests-js/in-place-on-range.test.js
       - tests-js/supply-history.test.js
     evidence:
       - >
@@ -8773,14 +8773,14 @@ requirements:
       - >
         Verified at the render layer in a real Chromium, per this
         requirement's own NFR: tests/test_dashboard_e2e.py's
-        TestTheAsOfPanelSaysWhichPeriod drives the built page - the panel
+        TestTheInPlaceOnPanelSaysWhichPeriod drives the built page - the panel
         naming a period per calendar, the date input's min/max matching
-        coveredDateRange(), an `?asof=1990-01-01` arrival showing the
+        coveredDateRange(), an `?in-place-on=1990-01-01` arrival showing the
         plain out-of-range message and its one-click reset, and the page
         itself still rendered underneath it. 5 passed.
       - >
         tests-js: 25 files, 377 tests passing, including the new
-        tests-js/asof-range.test.js (16). tests/test_embed_dashboard_data.py
+        tests-js/in-place-on-range.test.js (16). tests/test_embed_dashboard_data.py
         18 passed. Full `mothman check`: all eleven gates green, pytest
         2189 passed in 257s.
     signed_off:
@@ -8788,7 +8788,7 @@ requirements:
       date: "2026-09-27"
     source: >
       plans/supply-model.md Thread C - the dashboard's cycleStartDate()
-      reimplements cycle_start() in JS because the as-of picker lets a
+      reimplements cycle_start() in JS because the in-place-on picker lets a
       viewer pick any date and a static site has no backend to ask. That
       reimplementation computes a cadence rule and cannot compute an
       authored date list, so the period sequences have to be embedded.
@@ -8820,20 +8820,20 @@ requirements:
       - THE SYSTEM SHALL end each embedded sequence at the period the
         present moment falls in on the asset's own clock, and SHALL NOT
         embed a period that has not begun.
-      - THE SYSTEM SHALL use those embedded sequences for the as-of
+      - THE SYSTEM SHALL use those embedded sequences for the in-place-on
         picker's period arithmetic.
       - THE SYSTEM SHALL NOT reimplement schedule derivation in the
         browser.
-      - WHEN a viewer opens the as-of panel, THE SYSTEM SHALL state, for
+      - WHEN a viewer opens the in-place-on panel, THE SYSTEM SHALL state, for
         each of the asset's named calendars, which period the selected
         date falls in.
-      - THE SYSTEM SHALL keep the as-of selection in its query parameter
+      - THE SYSTEM SHALL keep the in-place-on selection in its query parameter
         as a calendar date, and SHALL NOT replace it with a period name.
-      - THE SYSTEM SHALL bound the as-of date input to the range the
+      - THE SYSTEM SHALL bound the in-place-on date input to the range the
         embedded sequences cover, so that neither a future date nor a
         date before the asset's earliest period can be chosen with the
         picker.
-      - IF an as-of date outside that range arrives by URL, THEN THE
+      - IF an in-place-on date outside that range arrives by URL, THEN THE
         SYSTEM SHALL say so plainly, state the covered range, and offer
         a one-click reset to the default.
       - IF a viewer reaches a date the embedded sequences do not cover,
@@ -8861,7 +8861,7 @@ requirements:
       - Verify in a real browser, at the render layer. A correct Python
         derivation says nothing about a template with its own transform.
       - This is easy to discover late, and the symptom would be an
-        as-of picker silently returning nothing on a quarterly asset -
+        in-place-on picker silently returning nothing on a quarterly asset -
         which looks like no data rather than like a bug.
     dependencies: [REQ-PIPE-051, REQ-DASH-041]
     decisions:
@@ -8870,7 +8870,7 @@ requirements:
         Keith's own question rather than a rule inherited from anywhere
         (2026-09-27): "why would we be able to choose a date in the
         future? nothing has happened yet, so why project forward?" The
-        as-of picker asks a question about the PAST - what did this look
+        in-place-on picker asks a question about the PAST - what did this look
         like then - so a date with nothing behind it has no answer to
         give. This REMOVES an open question rather than answering it:
         there is no horizon to choose, because each sequence simply ends
@@ -8940,14 +8940,14 @@ requirements:
         slightly beyond the thread, and worth Keith reacting to at
         sign-off.
       - Recorded because it explains why the duplication existed at all
-        and is not a mistake to undo carelessly - the as-of picker lets
+        and is not a mistake to undo carelessly - the in-place-on picker lets
         a viewer pick ANY date in the browser and a static site has no
         backend to ask, so a client-side computation was genuinely
         unavoidable while the schedule was a RULE. It stops being
         unavoidable once the schedule is a list, because a list can be
         shipped.
       - "[A1] Decided the embed carries every calendar rather than one
-        sequence. With named calendars the as-of picker must know which
+        sequence. With named calendars the in-place-on picker must know which
         calendar a dataset follows before it can do any period arithmetic
         for it - an embed of one merged sequence would be unusable and
         silently wrong for whichever calendar lost."
@@ -8965,11 +8965,11 @@ requirements:
       - "The reason the recommendation lost is the same one that put
         every dashboard sprint last, and it is Keith's own [B2]
         reasoning applied consistently: building a view against a data
-        shape still moving is how clipDatasetToAsOf() ended up filtering
+        shape still moving is how clipDatasetToInPlaceOn() ended up filtering
         on arrival rather than promotion - correct only because
         promotion did not yet exist. Slot assignment and promotion are
         unbuilt, so the coordinates this picker reasons about are still
-        moving. The accepted cost, stated plainly: the as-of picker
+        moving. The accepted cost, stated plainly: the in-place-on picker
         silently returns nothing on a quarterly asset until batch 6."
       - "Decided the picker STAYS a plain date, with each calendar's
         period shown as context in the panel (Keith, 2026-09-23).
@@ -8983,7 +8983,7 @@ requirements:
         control, no URL change, and no existing shared link broken."
       - "Decided the date input is BOUNDED to the embedded range rather
         than handling the out-of-range case well. delivery-dashboard-ux
-        found #asof-input has no min/max at all today, so nothing
+        found #in-place-on-input has no min/max at all today, so nothing
         prevents it. Removing the error case beats handling it; the
         by-URL path still needs the recovery, since a bound on the input
         cannot constrain a pasted link."
@@ -9059,7 +9059,7 @@ requirements:
       date: "2026-09-27"
     source: >
       Keith, 2026-09-23, during REQ-DASH-041's sign-off. Settling that
-      the as-of view shows the most recent ARRIVAL rather than the most
+      the in-place-on view shows the most recent ARRIVAL rather than the most
       recently promoted supply left a gap he named immediately - "latest
       supply is red and staged, promoted version is Monday's. Yes, I do
       want that" - and agreed it is probably a requirement of its own
@@ -9113,7 +9113,7 @@ requirements:
       - >
         Decided this is its own requirement rather than a criterion on
         REQ-DASH-041 (Keith, 2026-09-23). 041 is about supply history
-        and as-of viewing holding up under per-dataset arrivals; this is
+        and in-place-on viewing holding up under per-dataset arrivals; this is
         a new thing to show, with its own empty state, its own wording
         and its own noise risk at 30 datasets.
       - >
@@ -9453,7 +9453,7 @@ requirements:
         observed these deliveries in flight" is a record about THE RUN,
         which genuinely happened and genuinely saw that. The as-at
         framing is then honest labelling rather than a caveat, and it is
-        what the dashboard already is: CURRENT_AS_OF and the snapshot
+        what the dashboard already is: CURRENT_IN_PLACE_ON and the snapshot
         archive rest on the same premise.
       - >
         FILENAMES, not just the delivery name, and not a count. A count
@@ -11436,7 +11436,7 @@ requirements:
       - "THE SYSTEM SHALL NOT report an arrival into a slot that was never filled, so that the ordinary repair path after a rejection stays silent."
       - "THE SYSTEM SHALL name, in that report, the three responses available - accepting the supply as a correction, re-filing it to another slot, and rejecting it as a duplicate."
       - "THE SYSTEM SHALL report these as warnings rather than failures, and SHALL NOT stop processing on either."
-      - "THE SYSTEM SHALL NOT automatically promote a supply that landed in a slot already filled by a promoted supply, whatever that supply's own status."
+      - THE SYSTEM SHALL NOT automatically promote a supply that landed in a slot already filled by a promoted supply, whatever that supply's own status - EXCEPT where the resolved replacement setting permits that status, when it replaces the promoted supply (REQ-PIPE-123). AMENDED 2026-10-05 by REQ-PIPE-123 criterion 12, as that criterion requires.
     non_functional_requirements:
       - "On a healthy feed an arrival into an accepted slot is rare, which is what keeps the report meaningful rather than becoming wallpaper at 30 datasets. If it turns out to be common, that is a signal about the claim windows, not a reason to suppress the report."
       - "The trigger is STRUCTURAL - the slot had been promoted into, and something arrived anyway - so there is nothing to tune. Keep it that way: the version this replaced needed a 'within X of the window opening' threshold, and any such X is arbitrary, with a case just outside it slipping through silently."
@@ -11583,7 +11583,7 @@ requirements:
       - "Two implementations of one concept that can disagree is item 74's exact failure mode, and it is the reason this is a signature change rather than an addition. The visible symptom of getting it wrong is 'filed to Q3, reported late for Q2', and the current derivation is live in BOTH dashboard build paths - pipeline/build_dashboard_data.py and pipeline/build_cp_dashboard_data.py."
       - "The usual seeded regenerate-and-diff check does NOT apply here, and that has to be said out loud before the work starts. Today's generated history measures 0 early, 240 on time, 112 late under the arrival-date derivation; the new derivation will legitimately produce different numbers, so a diff against today's output is evidence of the change working, not of a regression."
       - "Classification must be computable at check time, before promotion, because a rejected supply still gets classified. Anything requiring promotion state would make the record depend on a decision that may never be taken."
-      - "The verdict travels with the supply, so the dashboard's JS never recomputes classification - the duplicated-logic surface shrinks rather than grows. cycleStartDate() still earns its place for the as-of picker's period maths, and that is a different job."
+      - "The verdict travels with the supply, so the dashboard's JS never recomputes classification - the duplicated-logic surface shrinks rather than grows. cycleStartDate() still earns its place for the in-place-on picker's period maths, and that is a different job."
     dependencies: [REQ-PIPE-062, REQ-PIPE-048]
     decisions:
       - "The gap being fixed, with its worked examples. classify_arrival() derives the cycle from the arrival date via cycle_start(), which is defined as the most recent expected day AT OR BEFORE its input - it can only look backwards. So 'early' today can only mean early within a cycle. A quarterly supply arriving 2026-07-25 for the 2026-08-01 anchor resolves to the 2026-05-01 anchor and reads about twelve weeks LATE for a quarter that was filled months ago; a 10pm daily arrival intended for the next day reads late against the current one."
@@ -11736,7 +11736,7 @@ requirements:
       - "WHERE a supply's filing has not changed, THE SYSTEM SHALL leave its classification unchanged, and SHALL NOT recompute it on every run."
     non_functional_requirements:
       - "Recomputation must be local to the supply that moved. A re-file changes one supply's verdict, and a design requiring the history to be replayed to answer that is one that stops being usable once a daily feed has years behind it."
-      - "The live dashboard defaults to as-corrected, so a recomputed verdict legitimately changes what a past as-of view shows. That is intended rather than a defect; the as-published answer lives in the snapshot archive. Say so where a reader will meet it, or it reads as history rewriting itself."
+      - "The live dashboard defaults to as-corrected, so a recomputed verdict legitimately changes what a past in-place-on view shows. That is intended rather than a defect; the as-published answer lives in the snapshot archive. Say so where a reader will meet it, or it reads as history rewriting itself."
       - "pipeline/cadence.py's own docstring currently states the opposite - that the verdict is computed once, committed, and never needs porting to JS because a past run's arrival time never changes. The arrival TIME still never changes; the VERDICT becomes a function of the current filing. Correct the docstring in the same change rather than leaving two accounts."
     dependencies: [REQ-PIPE-066]
     decisions:
@@ -11827,7 +11827,7 @@ requirements:
         minutes, hours, days, weeks, months and years, and SHALL NOT fall
         back to an absolute date at any threshold.
       - >-
-        WHERE a relative time is shown on a page that is being read as of
+        WHERE a relative time is shown on a page that is being read for
         a selected date, THE SYSTEM SHALL compute it relative to that
         selected date rather than to the reader's own clock.
       - >-
@@ -11842,7 +11842,7 @@ requirements:
     non_functional_requirements:
       - >-
         Mechanical breadth. This lands on the dashboard's own date
-        helpers, the supply-history table, the SLA tile, the as-of
+        helpers, the supply-history table, the SLA tile, the in-place-on
         control, and the mothman schedule output - so the change is wide
         and shallow, and the risk is a site missed rather than a site
         wrong. Enumerate the call sites before changing any of them.
@@ -11899,9 +11899,9 @@ requirements:
         column, the snapshots picker, latest arrival, release notes and
         plans dates.
       - >-
-        Decided relative time must be computed against the SELECTED as-of
+        Decided relative time must be computed against the SELECTED in-place-on
         date rather than the reader's own clock, and decided it here
-        rather than at build time. Viewing as of a date in 2027, a
+        rather than at build time. Viewing what was in place on a date in 2027, a
         "2 days ago" measured against the real clock is not unhelpful, it
         is false. It is cheap to build in and expensive to retrofit, which
         is the whole reason parking the rest is safe.
@@ -11969,7 +11969,7 @@ requirements:
         reads correctly. For one west of UTC it would read a day early,
         and the fix is for toDate to build asset-midnight rather than
         for the formatter to guess. Not done here because toDate's
-        output also feeds as-of comparison arithmetic that constructs
+        output also feeds in-place-on comparison arithmetic that constructs
         UTC midnight directly, and two conventions coexisting would be
         worse than one narrow one.
       - >-
@@ -12888,9 +12888,7 @@ requirements:
       - >
         IF a supply's status is red, THEN THE SYSTEM SHALL NOT promote
         it automatically, and SHALL leave it staged awaiting a person.
-      - >
-        IF a supply's assigned slot is already filled, THEN THE SYSTEM
-        SHALL NOT promote it automatically, whatever its status.
+      - IF a supply's assigned slot is already filled, THEN THE SYSTEM SHALL NOT promote it automatically, whatever its status - EXCEPT where the slot is filled by a PROMOTED supply and the resolved replacement setting permits the arriving supply's status, when it replaces that supply (REQ-PIPE-123). AMENDED 2026-10-05 by REQ-PIPE-123 criterion 12, as that criterion requires.
       - >
         IF a supply is held because no slot could be confidently
         claimed, THEN THE SYSTEM SHALL NOT promote it and SHALL NOT
@@ -14682,9 +14680,9 @@ requirements:
         Worth knowing for a real deployment, where regenerating is not
         an option and that command would have to exist.
       - >
-        THE TEMPLATE'S AS-OF PATH COPIED ARRIVAL FIELDS BY NAME, and
+        THE TEMPLATE'S IN-PLACE-ON PATH COPIED ARRIVAL FIELDS BY NAME, and
         would have dropped all three new ones in silence - the live
-        dataset page showing a wait that the as-of view did not. Fixed
+        dataset page showing a wait that the in-place-on view did not. Fixed
         to a spread in the same change. This is the exact failure
         CLAUDE.md's shape-change rule describes, found by looking for
         it rather than by a test going red, because no test existed
@@ -14774,7 +14772,53 @@ requirements:
       August changes the June answer only where it genuinely should -
       and whoever asks can see which decision changed it.
     moscow: must
-    status: in_progress
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 6 - where a decision has changed what an earlier date
+        now shows, say so and name the decision.
+      owner: unowned
+      why: 'Not built. Every decision carries effective_at and recorded_at (criterion
+        4), so the data is there, but what counts as ''changed'' needs Keith:
+        in a bootstrap replay EVERY decision is recorded after the date it took
+        effect, so the plain reading (recorded after the date on show, effective
+        on or before it) would flag every past date on a synthetic asset. Raised
+        rather than guessed.'
+      blocked_by:
+        unowned: true
+    evidence:
+    - '2026-10-05: built across sprints 7 (the page reads what was in place from
+      the decision log), 8 (the census, criteria 12-16) and 10 (the ''In place
+      on'' rename, criteria 20-26: label, panel and on-page notice, element ids,
+      the in-place-on query parameter with the previous one honoured and rewritten,
+      identifiers renamed across the template, both test suites and the Python
+      that reads the page''s data, and the register''s own prose). tests-js/in-place-on-range.test.js
+      asserts no ''asof'' identifier is left in the page.'
+    implemented_by:
+    - pipeline/slot_timeline.py::run_states
+    - pipeline/slot_timeline.py::supply_states
+    - qa_tools/common/census.py::compare
+    - qa_tools/common/census.py::after_move
+    - qa_tools/common/census.py::build_warnings
+    - qa_tools/common/supply_db.py::move_table
+    - qa_tools/common/rejection.py::demote
+    - dashboard/qa-reporting-dashboard.template.html::clipDatasetToInPlaceOn
+    - dashboard/qa-reporting-dashboard.template.html::runStateInPlaceOn
+    - dashboard/qa-reporting-dashboard.template.html::verdictLine
+    - dashboard/qa-reporting-dashboard.template.html::censusBanner
+    - dashboard/qa-reporting-dashboard.template.html::inPlaceOnFromUrl
+    - dashboard/qa-reporting-dashboard.template.html::setInPlaceOnInUrl
+    - dashboard/qa-reporting-dashboard.template.html::renderInPlaceOnPastNotice
+    linked_tests:
+    - tests/test_slot_timeline.py
+    - tests/test_census.py
+    - tests/test_declared_capabilities.py
+    - tests/test_promotion_effective_at.py
+    - tests/test_plain_base_names.py
+    - tests/test_decision_log.py
+    - tests-js/verdict-of.test.js
+    - tests-js/census.test.js
+    - tests-js/in-place-on-range.test.js
+    - tests/test_dashboard_e2e.py
     source: >
       Keith, 2026-09-26, batch 4 scoping input (b): "we're going to have
       to work out how demotion fits in and keeps as-at-T stable." Thread
@@ -14956,7 +15000,7 @@ requirements:
         generated event sequences rather than only worked examples.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-DASH-041]
     decisions:
-      - "THE REMAINDER JOINS THE OPTION A AND PERIOD-CLOSING BATCH, IN THREE PLACES (Keith, 2026-10-04). (1) The page switch - criteria 1, 2, 5-8 and 11 - lands WITH REQ-DASH-133, because both replace the same template staleness path (clipDatasetToAsOf), and reads REQ-PIPE-130's one view of what a slot holds, whose as-at form is this requirement's engine. (2) The census - criteria 12-16 - lands after REQ-PIPE-128 and 129, which change the names it compares. (3) The 'In place on' rename - criteria 20-26, ~900 occurrences - is its own standalone change once the batch's template work is done, so it does not collide with every other template edit. REJECTED renaming first (later template work would build on churn) and REJECTED keeping 081 out of the batch (the same function would be rewritten twice)."
+      - "THE REMAINDER JOINS THE OPTION A AND PERIOD-CLOSING BATCH, IN THREE PLACES (Keith, 2026-10-04). (1) The page switch - criteria 1, 2, 5-8 and 11 - lands WITH REQ-DASH-133, because both replace the same template staleness path (clipDatasetToInPlaceOn), and reads REQ-PIPE-130's one view of what a slot holds, whose as-at form is this requirement's engine. (2) The census - criteria 12-16 - lands after REQ-PIPE-128 and 129, which change the names it compares. (3) The 'In place on' rename - criteria 20-26, ~900 occurrences - is its own standalone change once the batch's template work is done, so it does not collide with every other template edit. REJECTED renaming first (later template work would build on churn) and REJECTED keeping 081 out of the batch (the same function would be rewritten twice)."
       - >
         AS-AT-T HAD NO HISTORY TO ANSWER OVER, found 2026-10-02 while
         wiring phase 2 and fixed in the same change - the requirement
@@ -15027,7 +15071,7 @@ requirements:
         slot held and when that changed, from the decision log alone.
         IT HAS NO PRODUCTION CALLER YET. The dashboard still answers
         as-of by filtering runs on their ARRIVAL date
-        (`clipDatasetToAsOf`), which is exactly what criteria 1, 2 and
+        (`clipDatasetToInPlaceOn`), which is exactly what criteria 1, 2 and
         8 exist to replace.
 
         STILL TO DO: that swap (1, 2, 5, 6, 7, 8, 11), the census
@@ -15328,9 +15372,9 @@ requirements:
         which name a thing that no longer exists and would read as
         current if relabelled. PROPOSED SPELLING, for whoever builds it:
         the id prefix and query parameter become "inplace" (?inplace=,
-        inplace-btn, inplace-panel), CURRENT_AS_OF/DEFAULT_AS_OF become
-        CURRENT_IN_PLACE_ON/DEFAULT_IN_PLACE_ON, and openAsOfPanel/
-        applyAsOf follow. Not fixed by a criterion, which requires only
+        inplace-btn, inplace-panel), CURRENT_IN_PLACE_ON/DEFAULT_IN_PLACE_ON become
+        CURRENT_IN_PLACE_ON/DEFAULT_IN_PLACE_ON, and openInPlaceOnPanel/
+        applyInPlaceOn follow. Not fixed by a criterion, which requires only
         that the names match the label and that no file mixes the two.
       - >
         POINTER ADDED 2026-09-26 against criterion 9, which returns a
@@ -15369,8 +15413,8 @@ requirements:
         set: pipeline/slot_timeline.py''s supply_states() reads each supply''s state
         after every decision about it - promoted, awaiting or withdrawn - from the
         decision log alone, and run_states() keys it by the run that checked it;
-        the build embeds it as `runStates`. The page''s clipDatasetToAsOf() only
-        looks it up (runStateAsOf), skips a run withdrawn on the date on show, takes
+        the build embeds it as `runStates`. The page''s clipDatasetToInPlaceOn() only
+        looks it up (runStateInPlaceOn), skips a run withdrawn on the date on show, takes
         the newest of the rest, and verdictLine() says in words whether that supply
         is in place or awaiting a decision and, if awaiting, which supply is in
         place. Before its first decision a supply that arrived is awaiting - so
@@ -15405,7 +15449,7 @@ requirements:
       - 'WHERE CRITERIA 1, 2 AND 8 LIVE, while the requirement stays in progress
         (the register forbids linked_tests and implemented_by before it is built):
         pipeline/slot_timeline.py::supply_states and run_states, qa_tools/common/drift_reference.py::run_for,
-        and the template''s runStateAsOf, clipDatasetToAsOf and verdictLine; tested
+        and the template''s runStateInPlaceOn, clipDatasetToInPlaceOn and verdictLine; tested
         by tests/test_slot_timeline.py::TestEachSuppliesStateOverTime, tests-js/verdict-of.test.js,
         tests/test_drift_reference.py::TestASupplysRunIsItsOwnDatasetsRun and tests/test_dashboard_e2e.py::TestStatusMatchesEachToolsOwnVerdict.
         Move them to the fields when the census and rename land.'
@@ -15441,6 +15485,18 @@ requirements:
         on the asset''s calendar (assetDateStrOf), not UTC''s. Logged, not built:
         views created or dropped by substitute and inherit take no census of their
         own - criterion 13 says ''wherever a table is moved''.'
+      - 'THE RENAME (criteria 20-26, sprint 10): asOf/AsOf/AS_OF/asof became inPlaceOn/InPlaceOn/IN_PLACE_ON/in-place-on
+        in the template, both test suites, the e2e module (its as_of helpers too,
+        so no file mixes the two) and dataset_status.py''s mirror of the page''s
+        noDataInPlaceOn. The query parameter is in-place-on; the previous one is
+        read only as a legacy string, and the first write replaces it. retiredAsOf,
+        a check''s retirement date and a different concept, became retiredOn; the
+        Python field retired_as_of and the historical AS_OF_OFFSET_DAYS mentions
+        in comments are left as they are.'
+      - 'THE PANEL''S OLD TEXT WAS WRONG ABOUT WHAT IT SHOWS: it said ''exactly
+        what was actually known as of that date'', the opposite of criterion 21;
+        it now says the view uses everything known today and names the snapshot
+        archive.'
   - id: REQ-GHUB-082
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
@@ -17095,7 +17151,7 @@ requirements:
       - >
         Decided DETECTION and ACTION are separated before choosing a
         mechanism, because they are not the same problem. Lateness is
-        ALREADY derived client-side as a pure function of schedule, as-of date and fill state - that is what produces the red-with-no-data reading today. Nothing new needs computing; what is missing
+        ALREADY derived client-side as a pure function of schedule, in-place-on date and fill state - that is what produces the red-with-no-data reading today. Nothing new needs computing; what is missing
         is the ACTOR that turns a derived state into a durable event.
       - >
         Recorded against the QA-run-triggered option: it would ride on
@@ -17827,7 +17883,7 @@ requirements:
         plus the 16 already in standing-in.test.js; Playwright, 18 tests
         across the two real-browser classes, run together against the real
         built page. The drill-through is driven end to end in a real
-        Chromium: the detail block's own button moves the as-of date to
+        Chromium: the detail block's own button moves the in-place-on date to
         2026-05-01 and writes `from=2026-Q3`, the banner says "You have
         left 2026-Q3", the way back restores 2026-08-01 and removes
         `from`, and a breadcrumb click afterwards leaves `asof` in place
@@ -17998,18 +18054,18 @@ requirements:
         11 close with it. The shape, because the obvious reading of
         "drill into the check results" is the wrong one here: this page
         has no per-period route to navigate TO. A period is chosen by
-        the as-of date, so drilling to the period that earned the
-        results IS an as-of move, and the whole feature is
-        `drillToPeriod(date, fromPeriod)` - the existing `applyAsOf()`
+        the in-place-on date, so drilling to the period that earned the
+        results IS an in-place-on move, and the whole feature is
+        `drillToPeriod(date, fromPeriod)` - the existing `applyInPlaceOn()`
         with one extra argument, which it now calls with null.
         `periodDateFor()` is the inverse of the page's own
         `periodNameFor()`, reading the same embedded calendar sequence
         rather than doing date arithmetic in the browser.
       - >
         REJECTED - a pushState for the drill. Browser back would then
-        change the URL's `asof` without changing CURRENT_AS_OF, because
-        the as-of date has deliberately never been part of STATE (see
-        asOfFromUrl()'s own comment: it is a filter over the whole page,
+        change the URL's `in-place-on` without changing CURRENT_IN_PLACE_ON, because
+        the in-place-on date has deliberately never been part of STATE (see
+        inPlaceOnFromUrl()'s own comment: it is a filter over the whole page,
         not a navigable state somebody steps back through one change at
         a time). So the drill replaces, and the way back is the banner's
         own button - which criterion 10 asks for by name anyway.
@@ -18017,7 +18073,7 @@ requirements:
         REJECTED - rendering the framing only when a matching
         standing-in record is present. That would drop it on exactly the
         shared and refreshed links criterion 11 exists to protect, since
-        the record depends on the as-of date the link carries. A
+        the record depends on the in-place-on date the link carries. A
         hand-edited `?from=` is honoured instead: it claims only that
         the reader arrived from that period, and the worst case is a way
         back to a period they were never on, which costs one click.
@@ -18030,7 +18086,7 @@ requirements:
         second.
       - >
         FOUND WHILE BUILDING: renderDataset() has a second branch that
-        replaces the page when a dataset has nothing as of the chosen
+        replaces the page when a dataset has nothing in place on the chosen
         date, and it is a LIKELY destination of a backwards drill rather
         than an edge case. Without the banner there a reader lands on an
         empty page with no way back to where they were. Both branches
@@ -18925,7 +18981,7 @@ requirements:
         the runtime cost of invoking each tool once per table - what
         changed it was the ODCS constraint laid out concretely: one
         contract document IS one data product, carrying document-level
-        identity, version, team, support and as-of config plus ten real
+        identity, version, team, support and in-place-on config plus ten real
         cross-table checks with no single owning table to live under. The
         call was to keep all four tools uniformly at dataset level rather
         than carve out ODCS as the one exception while the other three
@@ -19032,7 +19088,7 @@ requirements:
         WHAT IS NOT LOST, which is why this is safe: the generator is
         seeded, so arrivals, receipts, delivery names and the data
         itself regenerate identically, and the arrival history and
-        as-of views are unaffected. The only casualty is a timeline
+        in-place-on views are unaffected. The only casualty is a timeline
         recording when a session happened to run a command, which is
         an artefact of how this PoC was built rather than a fact about
         the data.
@@ -22106,7 +22162,7 @@ requirements:
       '
     - WHEN a person chooses to keep a supply they received by hand, THE SYSTEM SHALL ask them when that supply was originally received - the email's arrival, or the S3 object's own time - before it files anything.
     - THE SYSTEM SHALL record that stated original arrival on each filed file's own qa.delivery_file row beside that file's receipt, and in that file's on-disk receipt record under its own key, marked as stated by a person, and SHALL keep the moment the command ran as that file's receipt.
-    - THE SYSTEM SHALL NOT use a stated original arrival to order arrivals, to name a run or a staged table, to file a supply to a slot, to judge lateness, in the promotion gate, or to place a supply in the as-of picker.
+    - THE SYSTEM SHALL NOT use a stated original arrival to order arrivals, to name a run or a staged table, to file a supply to a slot, to judge lateness, in the promotion gate, or to place a supply in the in-place-on picker.
     - THE SYSTEM SHALL let a non-interactive caller state the original arrival as a flag, and SHALL NOT prompt for it where one was given.
     - THE SYSTEM SHALL require an answer before filing a kept supply, SHALL accept `not known` as that answer, and SHALL record `not known` as such rather than as a time.
     - IF a non-interactive caller keeps a supply and states no original arrival, THEN THE SYSTEM SHALL refuse, say which flag is missing, and file nothing.
@@ -24744,7 +24800,7 @@ requirements:
     - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
     - qa_tools/cp/orchestrate_cp.py::_run_one_inner
     - qa_tools/bdm/orchestrate_bdm.py::_run_one_inner
-    - dashboard/qa-reporting-dashboard.template.html::blockerOpenAsOf
+    - dashboard/qa-reporting-dashboard.template.html::blockerOpenInPlaceOn
     - dashboard/qa-reporting-dashboard.template.html::rollup
     - dashboard/qa-reporting-dashboard.template.html::blockerHistoryRows
     - qa_tools/cp/orchestrate_cp.py::_reconciles
@@ -24779,7 +24835,7 @@ requirements:
     - IF a run's own table cannot be read for any reason other than a hold, a contest, or a load that refused the file (REQ-DASH-148), THEN THE SYSTEM SHALL treat it as a failed run naming the table, rather than recording nothing.
     - WHILE a 'held-supply' or contested outstanding item is open for a dataset as at the instant on show, THE SYSTEM SHALL count that dataset's status as RED for the period on show, stating the item's reason in words, and SHALL roll that red up to the collection and the agency like any other red, as REQ-DASH-133 criterion 4 does for a closed period with no supply.
     - 'WHILE criterion 10 applies, THE SYSTEM SHALL show each of that dataset''s own checks for the period on show with that period''s OWN recorded result where it has one, SHALL show them as not run - the existing grey ''No data'' - where the period has no run of its own (as for a contested table of that period), and SHALL NOT carry an earlier period''s verdict forward as that period''s result. AMENDED 2026-10-05 (Keith): an open hold no longer blanks later periods'' real, checked results; the dataset stays red with the hold''s reason under criterion 10.'
-    - THE SYSTEM SHALL judge whether such an item is open as at the instant on show - open from the held or contested supply's own receipt instant, not from the instant the hold was recorded or the wall clock, until it is resolved - so that the as-of view reproduces what a reader saw then.
+    - THE SYSTEM SHALL judge whether such an item is open as at the instant on show - open from the held or contested supply's own receipt instant, not from the instant the hold was recorded or the wall clock, until it is resolved - so that the in-place-on view reproduces what a reader saw then.
     - THE SYSTEM SHALL have a real-browser test, against the built dashboard, in which one dataset has a held supply and another a contested table, asserting that each dataset reads red with its reason, that the red rolls up to its collection and agency, and that none of its own checks reads as passing for that period.
     - WHERE a cross-table check reads a table whose supply is held or contested, and the run reading it is of an arrival received with that supply (same delivery or same receipt instant) or finds that table contested for its own period, THE SYSTEM SHALL record that check as not evaluated, red, in the run of the dataset the check belongs to, giving held or contested as the reason and naming the supply.
     - WHERE criterion 14 applies, THE SYSTEM SHALL give held or contested as the reason, ahead of not yet due, overdue, awaiting a decision and the catch-all.
@@ -24825,7 +24881,7 @@ requirements:
     - 'HOW THE COUNTS READ NOW, since honest counts were the reason for the rejected alternative: that dataset''s own checks read as NOT RUN for the period - never as passing, never the last run''s verdict carried forward (criterion 11) - and the dataset itself is one red, with its reason, rolling up to collection and agency. Nothing is counted as passing that was not evaluated, which was the point of the per-check reds; it is said once instead of per check.'
     - 'OTHER DATASETS'' CROSS-TABLE CHECKS ARE UNCHANGED BY THAT REVERSAL (Keith, 2026-10-04): each check that READS a held or contested table still gets its own not-evaluated record, in its own dataset''s run, naming the table and saying held or contested (criteria 14 to 16). Those are other datasets'' checks, so a dataset-level red on the held or contested dataset would not tell their readers anything.'
     - 'CONTESTED HAS NO OUTSTANDING ITEM TODAY, found checking Keith''s correction against the code. REQ-DASH-070''s ''contested-file'' kind is the OPPOSITE case: ONE FILE matching several datasets, attributed to neither and scoped to the collection with no dataset (outstanding._from_deliveries, from contested_by). Two files for ONE dataset - REQ-PIPE-105 criterion 6''s contest - raises nothing since that criterion retired the delivery-level hold kind on 2026-10-02, and REQ-PIPE-144''s own decisions call the two ''opposite cases''. ''held-supply'' does exist, dataset-scoped, from qa.hold, and covers held in both collections. So criterion 8 adds a dataset-scoped item for the contest - see open question 1 for whether it is a new kind or a widened ''contested-file''.'
-    - 'A HELD SUPPLY HAS NO PERIOD, so ''red for that period'' is judged by the item being open AS AT THE INSTANT ON SHOW (criterion 12), the same rule REQ-DASH-133 criterion 9 uses: the dataset reads red for whichever period is on show while the item is open. WORTH KNOWING: outstanding.survey() today reads only what is open NOW, so an as-of view of a past instant needs each item''s raised and resolved instants carried into the build - qa.hold has both (raised_at, resolved_by); the contest item will need the same.'
+    - 'A HELD SUPPLY HAS NO PERIOD, so ''red for that period'' is judged by the item being open AS AT THE INSTANT ON SHOW (criterion 12), the same rule REQ-DASH-133 criterion 9 uses: the dataset reads red for whichever period is on show while the item is open. WORTH KNOWING: outstanding.survey() today reads only what is open NOW, so an in-place-on view of a past instant needs each item''s raised and resolved instants carried into the build - qa.hold has both (raised_at, resolved_by); the contest item will need the same.'
     - 'REQ-PIPE-078 CRITERION 9 IS REWORDED, NOT BROKEN (Keith, 2026-10-04, option b of the scoper''s question): it forbids a TOOL VERDICT against a supply with no period, and allows a not-evaluated record. Needed because REQ-PIPE-144 criterion 13 (signed 2026-10-04) files a held contested pair to no period, and under the old wording the contested and Birth Registrations reds would have been forbidden the moment 144 landed. The original concern survives intact: a green, or any verdict that would have to be thrown away once the slot is known, never sits against no period.'
     - 'THE ROUTE IS FILTER-BEFORE-RUN, IN MEMORY, and it is built: dbt --exclude stg_<table>+ (the + takes dependants with it), Soda via readable_checks_yaml, datacontract-cli by skipping on the shared tables_read declaration, Evidently by not evaluating. REJECTED Keith''s 2026-09-30 reframing of letting the tools error and classifying the errors - it needed per-tool, version-sensitive text matching, and filtering made it unnecessary. Old criterion 6 survives as criterion 18: any tool error is a failed run.'
     - 'NO TOOL RUNS FOR A RUN WHOSE OWN TABLE IS UNREADABLE (criterion 6): every check in such a run''s scope is either the dataset''s own or reads its table, so nothing in it is evaluable. Birth Registrations already does this; Child Protection''s contested case currently runs all four tools to leave everything out. A run''s own table can be unreadable only through a hold or a contest - its own arrival carries it - so any other cause is a failed run (criterion 9, the scoper''s proposal) rather than a silent one. Amended 2026-10-04 (Keith): a refused load is a third way - the arrival carries the file and the load refuses it - and it is shown like a hold or a contest, red for its dataset, rather than failing the run.'
@@ -24869,10 +24925,10 @@ requirements:
       as at the date on show'' from them. The contested pair''s own item is the
       new dataset-scoped kind `contested-table`, labelled ''Two files, choose
       one''.'
-    - 'AS AT THE DATE ON SHOW, ON THE ASSET''S CLOCK (criterion 12): the as-of
+    - 'AS AT THE DATE ON SHOW, ON THE ASSET''S CLOCK (criterion 12): the in-place-on
       picker chooses a DATE, so a blocker is open on a date when its receipt''s
       asset-local date is on or before it and its resolution''s is after it -
-      the same day boundary every other as-of comparison on the page uses.'
+      the same day boundary every other in-place-on comparison on the page uses.'
     - 'HELD OUTRANKS AN ENDED SCHEDULE (PROVISIONAL, 2026-10-05): criterion 10
       makes an open hold red unconditionally, and a file waiting on a person makes
       ''no supply expected'' untrue. The ended-schedule e2e tests now read a build
@@ -25282,7 +25338,7 @@ requirements:
         since REQ-PIPE-144): period_schemas() answers with period names, so reset-synthetic
         failed on any database holding a period schema.'
       - 'LOGGED, NOT FIXED: F9 (closed_slots drops a superseded supply by its CURRENT
-        state, so the as-of history could turn a period red retroactively - no instance
+        state, so the in-place-on history could turn a period red retroactively - no instance
         in the supply8 corpus, so latent) and F13 (a period whose own name normalises
         to end in _superseded is unreadable as a period).'
       - 'A DEMOTE BESIDE A NEWER WAITING VERSION IS REFUSED (Keith, 2026-10-05,
@@ -25420,7 +25476,43 @@ requirements:
       date: "2026-10-04"
     story: "As the person working a period's supplies, I want a waiting supply whose cross-table checks went red only because its partner was not yet accepted to be re-checked when that partner is promoted, so that a first correction arriving before its partner still gets through without me."
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 16's second half - completing an owed re-evaluation
+        on the next run of the processing pass.
+      owner: REQ-PIPE-151
+      why: 'Owed re-evaluations are completed right after the decision that owed
+        them (the batch''s own promotions, a person''s decision in the terminal)
+        and are shown as owed in `mothman supply queue` while they are; the pass that finishes what
+        a failure left owed is REQ-PIPE-151 (Keith, 2026-10-05: no interim command).'
+      blocked_by:
+        requirements:
+        - REQ-PIPE-151
+    evidence:
+    - '2026-10-05 (sprint 10): tests/test_knock_on.py: 12 tests - owing (one per
+      period per transaction, caused by the latest decision; a departure owes;
+      nothing for a decision that moves nothing or is rolled back), the run with
+      its collaborators stood in (only stale readers run, only waiting ones gated,
+      one shout per causing decision, a filled slot is not a failure, a broken
+      run stays owed), the shout against the real log, the writer''s readers-only
+      scope, and end to end on the real Child Protection fixture (promoting carers
+      re-gates the waiting placements without re-running its tools).'
+    implemented_by:
+    - qa_tools/common/knock_on.py::owe
+    - qa_tools/common/knock_on.py::readers
+    - qa_tools/common/knock_on.py::complete
+    - qa_tools/common/knock_on.py::follow_up
+    - qa_tools/common/decision_log.py::decision_transaction
+    - qa_tools/common/decision_log.py::apply_decision
+    - qa_tools/common/recheck.py::run_all_owed
+    - qa_tools/common/recheck.py::execute
+    - qa_tools/common/qa_results_writer.py::_readers_scope
+    - qa_tools/common/supply_status.py::latest_results
+    - cli/supply.py::_say_owed
+    - cli/filing_tui.py::_follow_up
+    linked_tests:
+    - tests/test_knock_on.py
+    - tests/test_recheck.py
     source: "Keith, 2026-10-03, option A item 7, confirmed in the 'OPTION A CONFIRMED' paragraph (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
       - "WHEN a table arrives in or leaves a period schema - promoted by a rule or a person, re-filed in or out, superseded, demoted or rejected - THE SYSTEM SHALL re-evaluate, within that period only, every cross-table check that declares it reads the moved table, whether it belongs to a supply WAITING in that period or one PROMOTED there, and SHALL NOT re-evaluate any check that does not read a moved table."
@@ -25459,6 +25551,32 @@ requirements:
       - "A FILE LANDING IN STAGING STAYS OUTSIDE THIS MECHANISM (Keith, 2026-10-04): it is not a period movement, and its own first run already evaluates it and refreshes its readers (REQ-PIPE-079). Both share reevaluation.plan() as the one answer to 'which checks read this table'. REJECTED folding a first run into this handler, which would mix a QA run from scratch with a knock-on re-check."
       - "CASCADES ARE BOUNDED (Keith, 2026-10-04): a re-evaluation can only lead to promotions, never a rejection, demotion or supersession; a supply promotes at most once; nothing automatically restores a superseded supply. A departure can lead to a promotion - a reader that failed only against the departed table may pass against a waiting version of it - which is the same rule arrivals follow."
       - 'RE-POINTED 2026-10-04 (Keith, wording approved): owed work completes on the next run of the processing pass (REQ-PIPE-151) rather than ''the next pipeline run'', because `mothman pipeline run` regenerates synthetic data and would never run in production.'
+      - 'A MOVE IS SEEN, NOT INFERRED (criterion 8): apply_decision compares how
+        each of the decision''s periods is held before and after it, so every decision
+        that changes a slot - promote, reject, demote, re-file out, substitute,
+        inherit and their undoings - triggers it, and no route has to remember to.
+        A supersession of a WAITING supply moves nothing in a period and owes nothing.'
+      - 'ONE PER TRANSACTION, CAUSED BY THE LATEST (criteria 9 and 10): decision_transaction
+        gathers moves across its nested decisions and the outermost owes one re-evaluation
+        per period, caused by the latest decision in it; latest_results orders a
+        supply''s runs by their cause''s effective time, so a slower, older re-evaluation
+        never becomes current.'
+      - 'THE CHEAP PATH (NFR 4): a reader''s tools run again only where the latest
+        result of one of its reading checks read the moved table as a different
+        supply than the period now holds (qa.tables_read). Right after an arrival
+        that is rarely, because its own run re-evaluated its readers (REQ-PIPE-079
+        criterion 6).'
+      - A READERS-ONLY RUN RUNS THE COLLECTION'S TOOLS AND RECORDS ONLY the reading
+        checks of the moved tables (the writer's scope, from qa.run.scope 'readers'
+        and reads_table) - the tools cannot be asked for a subset, so the cost is
+        the tools' and the recorded result is criterion 2's.
+      - 'RE-GATED AT THE CAUSE''S INSTANT: a knock-on''s promotions take effect
+        when the decision that caused them did, so a bootstrap replaying four years
+        does not stamp them with today (REQ-PIPE-081).'
+      - THE SHOUT is a 'still-failing' decision-log action (schema 27), rule actor,
+        supply-less, naming every failing supply in its reason and the cause in
+        caused_by_decision; `mothman supply decisions` shows it in bold red where every other rule entry is
+        dimmed (criterion 13).
     open_questions: []
 
   - id: REQ-PIPE-122
@@ -25633,7 +25751,31 @@ requirements:
       date: "2026-10-04"
     story: "As manager of a daily data asset, I want a clean resupply for a day already filled to replace what is there without waiting for me, with the replaced supply moved out of the period but kept and reversible, so that routine same-day corrections from a scheduled extract do not queue up for a person and the period only ever holds what is in use."
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 (sprint 10): contract/data-asset.yaml states replacement_setting
+      never from 2023-01-01, so behaviour is unchanged until a deployment opts
+      in. tests/test_replacement_setting.py: 17 tests - resolution by the amber
+      setting''s own mechanism, its frozen past, the green-or-amber-with-hold
+      conflict on any overlapping date, and the gate against a real database (never,
+      green replacing and superseding, green refusing amber, a person-promoted
+      supply replaced, a stood-on supply left waiting with why recorded, a substituted
+      slot never replaced, contested refused first), and the two amended criteria.'
+    implemented_by:
+    - qa_tools/common/replacement_setting.py::resolve
+    - qa_tools/common/replacement_setting.py::permits
+    - qa_tools/common/replacement_setting.py::conflicts
+    - qa_tools/common/amber_setting.py::resolve
+    - qa_tools/common/promotion.py::after_run
+    - qa_tools/common/promotion.py::_refuse_what_the_slot_forbids
+    - qa_tools/common/promotion.py::_record_withheld
+    - qa_tools/common/validate_schedule.py::_replacement_setting_errors
+    - qa_tools/common/schemas.py::ReplacementSetting
+    - dashboard/qa-reporting-dashboard.template.html::outcomeCell
+    - pipeline/slot_timeline.py::supply_states
+    linked_tests:
+    - tests/test_replacement_setting.py
+    - tests-js/supply-outcome.test.js
     source: "Keith, 2026-10-03 ('OPTION A, ROUND TWO') and the group 2 sign-off round 2026-10-04 (plans/road-testing.md #16 - 'REPLACED ACCEPTED FILES GO TO SUPERSEDED'). Redrafted by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL read a replacement setting taking one of never, green or green-or-amber, at data asset, collection and dataset level, resolved nearest-wins and versioned by effective date, by the same mechanism, and with the same protection of its past, as REQ-PIPE-122, with the asset level required to state a value."
@@ -25664,6 +25806,22 @@ requirements:
       - "ONE DECISION, NOT DEMOTE-THEN-PROMOTE, following REQ-PIPE-074 criterion 9's reasoning for re-file."
       - "THE ONE CONFIGURATION CONFLICT IS green-or-amber REPLACEMENT WITH amber hold (Keith, 2026-10-04): replacing accepted data with an amber supply where amber may not even fill an EMPTY slot unattended makes no sense. green-or-amber with promote-and-acknowledge is consistent - the replacement promotes and asks for an acknowledgement."
       - "CRITERION 10 AMENDED 2026-10-04 (routine, on Keith's blanket approval): 'off-cycle' removed from the refusals it lists, because REQ-PIPE-131 retired the off-cycle gate (REQ-PIPE-077) - an arrival with no open period is held before it is filed."
+      - 'THE SAME MECHANISM, LITERALLY (criterion 1): amber_setting.py''s resolve,
+        timeline and frozen-past guards now take the configuration key, and replacement_setting.py
+        reads them under its own - REJECTED a copy of the amber module, the second
+        implementation of ''which version is in force'' this criterion''s wording
+        rules out.'
+      - 'THE CONFLICT IS CHECKED AT EVERY DATE EITHER SETTING CHANGES, at every
+        level, for every dataset (criterion 11): both resolve piecewise-constantly
+        between those dates, so that set of dates is exactly ''any date where versions
+        of the two overlap''.'
+      - A STOOD-ON REFUSAL IS RECORDED AS A promotion-withheld NOTE (criterion 8),
+        once per supply and reason - the same shape REQ-PIPE-122's hold note has;
+        it changes no slot.
+      - 'REPLACEMENT ONLY LIFTS THE FILLED-SLOT REFUSAL (criterion 10): should_promote()
+        is asked with slot_filled false only where the setting permits, so every
+        refusal ahead of it in the gate''s order still comes first, and the stood-on
+        check runs only once the gate would otherwise promote.'
     open_questions: []
 
 
@@ -25675,7 +25833,23 @@ requirements:
       date: "2026-10-04"
     story: "As a data team leader, I want a supply that was promoted and has since gone red because a sibling changed to be shown unmistakably as red and promoted, so that I never read accepted-but-now-failing data as fine just because it was accepted."
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 (sprint 10): the build embeds promotedHealth per run - the status
+      promoted on and the status after each run that read the supply, with its
+      cause - and the page labels a promoted supply red on the dates it was, beside
+      the status pill on its dataset page, its agency card row and its supply-history
+      row. tests-js/supply-outcome.test.js covers the label, the note before it
+      turned, nothing beside a healthy one and nothing when not promoted on the
+      date; tests/test_red_promoted.py the timeline.'
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::redPromotedBadge
+    - dashboard/qa-reporting-dashboard.template.html::verdictLine
+    - dashboard/qa-reporting-dashboard.template.html::renderSupplyCycleRows
+    - pipeline/red_promoted.py::for_dataset
+    linked_tests:
+    - tests-js/supply-outcome.test.js
+    - tests/test_red_promoted.py
     source: "Keith, 2026-10-03, 'OPTION A CONFIRMED' - a promoted supply whose refreshed cross-table result has gone red must be shown, very clearly, as a RED PROMOTED supply (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
       - "WHERE a promoted supply's status, recomputed with its most recent cross-table results, is red, THE SYSTEM SHALL show it as RED PROMOTED on its dataset page and its agency card, distinctly from a red supply awaiting a decision and from a promoted supply that is not red."
@@ -25702,7 +25876,21 @@ requirements:
       date: "2026-10-04"
     story: "As someone looking back over a dataset's period, I want every version that arrived - including those superseded - shown in its supply history with what happened to each, so that I can see why a period holds the supply it does and know an earlier version is still recoverable."
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-05 (sprint 10): every supply-history row carries an Outcome - promoted,
+      rejected (by whom, when), superseded (by the supply received on its date,
+      by the rule or a person, under the replacement setting where one replaced
+      it, when) or waiting - read from the decision log''s entries the build embeds
+      per run. tests-js/supply-outcome.test.js and tests/test_red_promoted.py.'
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::runOutcomeInPlaceOn
+    - dashboard/qa-reporting-dashboard.template.html::outcomeCell
+    - pipeline/slot_timeline.py::supply_states
+    - pipeline/slot_timeline.py::run_states
+    linked_tests:
+    - tests-js/supply-outcome.test.js
+    - tests/test_red_promoted.py
     source: "Keith, 2026-10-03, option A item 2 (plans/road-testing.md #16) - superseded is kept and reversible, so it has to be findable. Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
       - "THE SYSTEM SHALL list every superseded supply in its dataset's supply history, as superseded, naming the supply that superseded it, when, and whether a rule or a person did it."
@@ -26107,7 +26295,29 @@ requirements:
       date: '2026-10-04'
     story: As an external tool or analyst reading a period, I want to ask the period itself which of its tables are promoted, inherited or substituted, from which supply and on whose decision, so that I can flag substituted or acknowledged-amber data to my own users without parsing names or querying the pipeline's metadata.
     moscow: must
-    status: in_progress
+    status: built
+    evidence:
+    - '2026-10-05 (sprint 10): schema 27. qa.manifest_for(period, schema) is one
+      SECURITY DEFINER SQL function over the catalogue, qa.slot_holds, qa.supply_receipt
+      and the promotion entry; every period schema gets a thin _manifest view
+      on it from ensure_period_schema(), the one place a period schema is created.
+      tests/test_manifest.py: 11 tests on a real database (columns, a stray object
+      listed, opened by instruction, decided_by without a name, substituted, acknowledged
+      owed then given, table_name and promoted_status on the log, a period-only
+      reader with no metadata grant, the reserved name, the census ignoring it)
+      plus the NFR 1 parity test over every period of the bootstrapped deployment.'
+    implemented_by:
+    - qa_tools/common/period_schema.py::ensure_manifest
+    - qa_tools/common/period_schema.py::ensure_period_schema
+    - qa_tools/common/decision_log.py::_insert
+    - qa_tools/common/decision_log.py::_table_of
+    - qa_tools/common/promotion.py::_status_at_promotion
+    - qa_tools/common/supply_status.py::status
+    - qa_tools/common/validate_hierarchy.py::reserved_table_errors
+    - qa_tools/common/census.py::compare
+    linked_tests:
+    - tests/test_manifest.py
+    - tests/test_slot_holds.py
     source: 'Keith, group 2 sign-off round 2026-10-04 (plans/road-testing.md #16 - ''NEW IDEA, Keith: A MANIFEST IN EVERY PERIOD SCHEMA'', ''THE MANIFEST: _manifest, a VIEW over the decision log'', ''TABLE NAME GOES INTO THE DECISION LOG''). Drafted by delivery-scoper 2026-10-04.'
     acceptance_criteria:
     - THE SYSTEM SHALL create, in every period schema, a view named _manifest, by the same mechanism whether the period was created by a first promotion or opened by instruction (REQ-PIPE-098 criterion 4).
@@ -26149,6 +26359,20 @@ requirements:
     - 'PROVISIONAL (overnight sprint 2): A FUNCTION RATHER THAN A PLAIN VIEW, so the as-at form and the one-dataset form are one definition; a view cannot take a parameter. The walk is a recursive CTE per (dataset, slot) - cheap at today''s hundreds of decisions; at production scale it would want the decision log''s (dataset_id, effective_at) index, which exists.'
     - 'THE VIEW SAYS HOW A SLOT IS HELD, NOT ONLY WHAT FILLS IT (overnight sprint 2, the critic''s option b, schema v17): qa.slot_holds returns held_as (promoted, substituted, inherited, or NULL for empty) and holder beside fills, and decision_log.held()/held_all() expose it. EVERY reader now asks held_as - slot_state, substitution, inheritance, filing_decisions, drift_reference, promotion_state, _standing_on, newest_promoted, _most_recent_promoted - and no reader interprets an action, except an EMPTY slot''s state saying how it was emptied (rejected vs returned). latest_for_slot is gone. The view reads ONLY the decisions that change a slot (an include list), so an annotating decision added later (REQ-PIPE-132) is ignored until somebody decides it changes one, never read as emptying a slot by default; and an entry about a different supply now leaves an INHERITED slot alone as well as a filled one. A real SQL defect found by the parity test on the way: `to_slot = slot` is NULL, not false, for a reject, which silently disabled the skip - now IS NOT DISTINCT FROM.'
     - "CRITERIA 4 AND 7 AMENDED 2026-10-04 by REQ-PIPE-144 criteria 35-36 (Keith, signed; criterion 7's wording approved by him): _manifest reads the supply's receipt from qa.supply_receipt as an instant, and is a view over qa.slot_holds, the filings and that receipt view. There is no filing record document any more."
+    - 'ONE FUNCTION, A THIN VIEW PER PERIOD (sprint 10): qa.manifest_for holds
+      the definition once and each _manifest is SELECT * FROM it with the period''s
+      authored name written in by the code that opens the period (NFR 7). SECURITY
+      DEFINER with a pinned search_path is what lets a reader granted only the
+      period schema read it (NFR 2) - a plain view would still run qa.slot_holds
+      with the reader''s own rights.'
+    - promoted_status FOR A PERSON'S PROMOTION is read at the moment of promotion
+      from the recorded results through supply_status.status() - the newest result
+      per check that read the supply - the same function REQ-PIPE-121's re-gating
+      and REQ-DASH-126 use (REQ-PIPE-121 NFR 4). The rule passes the status it
+      judged. None where no recorded result contributes.
+    - 'THE CENSUS AND EVERY TEST THAT LISTS A PERIOD''S TABLES skip _manifest
+      by name: it is the period''s account of itself, not a table any decision
+      put there.'
     open_questions: []
 
   - id: REQ-PIPE-131
@@ -26381,17 +26605,17 @@ requirements:
     moscow: must
     status: built
     evidence:
-    - '2026-10-05: tests-js/closed-no-supply.test.js (9 tests) green - closedGapsAsOf
+    - '2026-10-05: tests-js/closed-no-supply.test.js (9 tests) green - closedGapsInPlaceOn
       judges closed, filed, filled and marked as at the date on show (c9); groupGaps/gapText
       group consecutive periods by schedule position (c7); rollup counts an unmarked
       gap red and an accepted one not (c4, c5); outstandingMarker gives one line
-      broken out by kind with the as-of gap count replacing the queue''s own closed-period
+      broken out by kind with the in-place-on gap count replacing the queue''s own closed-period
       items (c3, c6).'
     - '2026-10-05: tests/test_dashboard_e2e.py::TestClosedWithNoSupply (5 real-browser
       tests) green against a bootstrapped corpus with gaps injected - agency card
       ''1 no supply'' and the quiet accepted line, one grouped row on the agency
       page, the dataset banner naming the mark-not-supplied command and the accepted
-      reason, both kinds in supply history, and the as-of view before the mark
+      reason, both kinds in supply history, and the in-place-on view before the mark
       reading it red.'
     - '2026-10-05: tests/test_not_supplied.py::TestWhatTheBuildEmbeds (3) green
       - the build embeds every slot that was a gap when it closed, with its closing,
@@ -26421,7 +26645,7 @@ requirements:
     - 'THE SYSTEM SHALL show, on the agency card, one line counting everything there waiting for a person, broken out by kind (for example ''3 waiting for a person: 2 no supply, 1 red promoted''), rather than a line per kind.'
     - THE SYSTEM SHALL group consecutive closed unfilled periods of one dataset into a single item naming the count and the date range (for example '4 days with no supply, 12-15 Oct') wherever they are listed.
     - THE SYSTEM SHALL show every closed unfilled period, marked or not, in the dataset's supply history, whatever the period on show.
-    - THE SYSTEM SHALL judge closed, unfilled and marked as at the instant on show, so that the as-of view reproduces what a reader saw then.
+    - THE SYSTEM SHALL judge closed, unfilled and marked as at the instant on show, so that the in-place-on view reproduces what a reader saw then.
     - THE SYSTEM SHALL replace, for real datasets, the dashboard's existing neutral 'no data' treatment of a dataset with nothing in the current cycle, so that no period is shown both as neutral 'no data' and as red 'no supply'; the build SHALL embed each slot's closing instant and the page SHALL only compare it with the instant on show, never re-derive closing.
     - THE SYSTEM SHALL NOT convey any of these states by colour alone.
     - THE SYSTEM SHALL keep, under criterion 10, the existing grey 'No data' reading of a dataset's own checks that were not run because its supply could not be read (REQ-DASH-148 criterion 2, REQ-PIPE-115 criterion 11), replacing only the dataset-level neutral treatment.
@@ -26482,7 +26706,7 @@ requirements:
       after a rejection or a supply a person put back. The page and the queue
       now agree on that.'
     - 'THE QUEUE ON THE PAGE IS READ AS AT THE DATE ON SHOW (UX critic #104, 2026-10-05):
-      closed periods come from the page''s own as-of reading, never the build''s
+      closed periods come from the page''s own in-place-on reading, never the build''s
       list, and anything else the build observed after the date is left out. Such
       an item is pilled ''Makes its dataset red'' - the queue''s copy used to
       say everything but holds, contests and failed loads changes no status.'
@@ -26585,7 +26809,7 @@ requirements:
       - "THE SCRIPT IS CONFIGURATION, ITS EFFECTS ARE STATE (CLAUDE.md's standing rule): it is a committed, reviewed declaration of what a person does in the demonstration, like the injection table and SCENARIOS.md; the entries it produces live only in the database and are regenerated with it."
       - "RECORDED AS A PERSON'S DECISION, NOT A RULE'S (Keith, 2026-10-04): the point is to show what a person's decision looks like, and REQ-PIPE-074 criterion 4 makes person and rule distinguishable - a rule actor would show the wrong thing. The ACTOR is what makes it clearly synthetic."
       - "UNLABELLED ON THE DATASET PAGES (Keith, 2026-10-04: 'the dataset pages stay unlabelled'). The synthetic actor's identity is visible in the decision log and the terminal, which is where a person's identity is shown anyway; the pages show a person decided, as they would for anyone. Only the scenario view says what was planted."
-      - "THE EFFECTIVE INSTANT IS SCRIPTED, THE RECORDED INSTANT IS REAL, following REQ-PIPE-074 criterion 2's two instants and promotion.effective_at_for()'s precedent for replayed history, so the as-of view shows the decision at the moment the scenario says it happened."
+      - "THE EFFECTIVE INSTANT IS SCRIPTED, THE RECORDED INSTANT IS REAL, following REQ-PIPE-074 criterion 2's two instants and promotion.effective_at_for()'s precedent for replayed history, so the in-place-on view shows the decision at the moment the scenario says it happened."
       - "GUARDED BY THE ASSET, NOT THE ENVIRONMENT (this draft). The published PoC dashboard is built in the `production` environment from synthetic data, so 'refuse in production' would hide the scenarios exactly where Keith wants them seen. What must never happen is a scripted decision acting on a REAL asset, so the asset's own configuration declares whether it is synthetic, and a real deployment never says so."
       - "DETERMINISTIC BY PLACEMENT, NOT BY SEED, following REQ-GEN-044's injection module ('A seed would be a second thing that has to stay fixed for the placement to be reproducible'). Keith said 'deterministic from the seed'; placement-derived instants meet that and need nothing extra."
       - "THE SYNTHETIC ACTOR LIVES IN contract/people.yaml, MARKED SYNTHETIC (Keith, 2026-10-04, option a), so the ordinary allowlist check applies to it exactly as to anyone. REJECTED keeping it only in the decision script with playback accepting it on the asset's say-so - that skips the allowlist for one actor, which is the back door Keith ruled out. COST, ACCEPTED: REQ-GHUB-082 criterion 29 (every non-placeholder needs a GitHub username; a placeholder may not raise a decision) did not allow for a third kind of entry, and is amended to."
@@ -26704,12 +26928,12 @@ requirements:
     source: "Keith, 2026-10-04, 'THE SCENARIO MAP IS ALSO SHOWN INSIDE THE DASHBOARD (e.g. a Scenarios tab beside Plans and Demo)', plans/road-testing.md #16. Scoped by delivery-scoper 2026-10-04, which found REQ-DASH-046 already renders the map in a side drawer with click-through links."
     acceptance_criteria:
       - "THE SYSTEM SHALL render the committed scenario map as a top-level tab with its own URL, alongside Plans and Demo, in place of REQ-DASH-046's side drawer."
-      - "THE SYSTEM SHALL keep every behaviour REQ-DASH-046 specifies - links built from coordinates to the as-of date and the page, plain text where there are none, read from committed SCENARIOS.md only, zero console errors."
+      - "THE SYSTEM SHALL keep every behaviour REQ-DASH-046 specifies - links built from coordinates to the in-place-on date and the page, plain text where there are none, read from committed SCENARIOS.md only, zero console errors."
       - "THE SYSTEM SHALL show, for each scenario, the requirement or requirements it demonstrates and whether it has data behind it yet."
       - "THE SYSTEM SHALL NOT mark planted supplies anywhere outside this tab."
     non_functional_requirements:
       - "Self-hosted and file:// safe like the other tabs: embedded at build time, no fetch."
-      - "Real-browser test of the tab and of one click-through landing on the right page and as-of date."
+      - "Real-browser test of the tab and of one click-through landing on the right page and in-place-on date."
     dependencies: [REQ-GEN-045]
     decisions:
       - "A TOP-LEVEL TAB REPLACES REQ-DASH-046's HEADER DRAWER (Keith, 2026-10-04, told the drawer already existed). The drawer was built 2026-09-22 when the map had almost nothing in it; with a whole batch of scenarios to walk through, it becomes a destination like Plans and Demo, with its own URL. REQ-DASH-046's criteria all survive - none of them says 'drawer' - so this replaces how it is presented, not what it promises; the drawer, its header button and its side-panel entry are removed in the same change, so there are never two ways in."
@@ -26726,17 +26950,6 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: Criterion 2 - a run of only the cross-table checks that read
-        a given table in a given period.
-      owner: REQ-PIPE-121
-      why: 'The executor and its schema carry the scope (qa.run.scope ''readers'',
-        qa.owed_run kind ''reevaluate''), but the run itself is refused as not
-        built: its only callers are REQ-PIPE-121''s knock-on re-evaluations, built
-        next sprint, and a readers-only run needs the one scope predicate the
-        architect review asked for so left_out.reconcile does not reject it.'
-      blocked_by:
-        requirements:
-        - REQ-PIPE-121
     - criterion: Criterion 8's second half - completing an owed run on the next
         run of the processing pass.
       owner: REQ-PIPE-151
@@ -26765,27 +26978,31 @@ requirements:
       recorded and the earlier verdict standing; nothing on a build path imports
       the executor.'
     implemented_by:
-    - qa_tools/common/recheck.py::owe
-    - qa_tools/common/recheck.py::run
-    - qa_tools/common/recheck.py::owed
+    - cli/filing_tui.py::_run_owed
+    - qa_tools/common/drift_reference.py::run_for
+    - qa_tools/common/qa_results_reader.py::current_runs_only
+    - qa_tools/common/qa_results_writer.py::_readers_scope
+    - qa_tools/common/qa_results_writer.py::open_run
+    - qa_tools/common/qa_store.py::current_run
+    - qa_tools/common/qa_store.py::set_run_purpose
+    - qa_tools/common/recheck.py::execute
     - qa_tools/common/recheck.py::first_run_id
-    - qa_tools/common/supply_db.py::rerun_id
-    - qa_tools/common/supply_db.py::split_run
+    - qa_tools/common/recheck.py::mint_run_id
+    - qa_tools/common/recheck.py::owe
+    - qa_tools/common/recheck.py::owed
+    - qa_tools/common/recheck.py::run
+    - qa_tools/common/supersession.py::un_supersede
     - qa_tools/common/supply_db.py::dbt_audit_schema
     - qa_tools/common/supply_db.py::drop_run_schemas
-    - qa_tools/common/qa_store.py::set_run_purpose
-    - qa_tools/common/qa_store.py::current_run
-    - qa_tools/common/qa_results_writer.py::open_run
-    - qa_tools/common/qa_results_reader.py::current_runs_only
-    - qa_tools/common/drift_reference.py::run_for
-    - qa_tools/common/supersession.py::un_supersede
-    - cli/filing_tui.py::_run_owed
+    - qa_tools/common/supply_db.py::rerun_id
+    - qa_tools/common/supply_db.py::split_run
     linked_tests:
+    - tests/test_knock_on.py
     - tests/test_recheck.py
-    - tests/test_run_schema_lifecycle.py::test_a_rerun_of_the_same_supply_is_not_collateral
-    - tests/test_run_schema_lifecycle.py::test_a_rerun_id_round_trips_and_keeps_its_supply
-    - tests/test_run_schema_lifecycle.py::test_the_longest_real_run_id_has_room_for_a_rerun
     - tests/test_refile_decision.py::TestANewFilingTheOldKept
+    - tests/test_run_schema_lifecycle.py::test_a_rerun_id_round_trips_and_keeps_its_supply
+    - tests/test_run_schema_lifecycle.py::test_a_rerun_of_the_same_supply_is_not_collateral
+    - tests/test_run_schema_lifecycle.py::test_the_longest_real_run_id_has_room_for_a_rerun
     source: 'Found by delivery-scoper 2026-10-04 verifying what REQ-PIPE-079 still lacks for re-file (Keith: ''build it, after REQ-PIPE-079 is finished''). REQ-PIPE-075 criterion 17''s unmet entry already named it: ''reevaluation.plan() answers WHICH checks, and nothing executes a plan''. Scoped by delivery-scoper 2026-10-04.'
     acceptance_criteria:
     - THE SYSTEM SHALL offer one way to run QA for a supply that is already staged and filed, outside the processing of an arrival, evaluating the supply's own checks and the cross-table checks that read it against its filed period's overlay - the same scope an arrival's run has (REQ-PIPE-105 criterion 11).
@@ -26856,6 +27073,11 @@ requirements:
       one (D2); every result of a decision-triggered run carries reevaluated_after_decision,
       a different key from an arrival''s, and never names the run''s own key as
       an arrival (D6) - criterion 4 is met on each result, not only through qa.run.'
+    - 'CRITERION 2 BUILT WITH REQ-PIPE-121 (sprint 10): a readers-only run goes
+      through the same executor (recheck.execute) with scope ''readers'' and the
+      moved tables recorded on the run; the writer keeps only those tables'' reading
+      checks of its dataset, and scope_of_run gives the left-out reconciliation
+      the same answer.'
     open_questions: []
 
   - id: REQ-PIPE-141
@@ -26867,27 +27089,6 @@ requirements:
     story: "As the person working a period's supplies, I want to move a supply that landed in the wrong period to the right one, and have it checked there and promoted by the ordinary rules, so that correcting a filing is one decision rather than a demote, a re-check and a promote I have to stitch together."
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criteria 14 and 15 (NFR 5) - re-evaluating the cross-table checks
-        that read the table in the old period and the new, and re-applying the
-        gate to their waiting supplies.
-      owner: REQ-PIPE-121
-      why: The one knock-on handler for any table arriving in or leaving a period
-        is REQ-PIPE-121, next sprint; NFR 5 forbids a re-file-specific path. The
-        re-filed supply's OWN checks are re-run (criterion 7).
-      blocked_by:
-        requirements:
-        - REQ-PIPE-121
-    - criterion: Criterion 7's replacement-setting half, and criterion 9's question
-        of whether the gate may replace a promoted version in the target.
-      owner: REQ-PIPE-123
-      why: The gate applies the amber setting in force now; the replacement setting
-        is REQ-PIPE-123 (sprint 10). Until then the gate refuses a filled slot
-        and a person decides - which keeps the promoted version in place, as criterion
-        9 requires.
-      blocked_by:
-        requirements:
-        - REQ-PIPE-123
     evidence:
     - '2026-10-05: tests/test_refile_decision.py green against a real database
       (14 tests): a re-file adds a new filing and keeps the old, the supply waits
@@ -26913,12 +27114,14 @@ requirements:
     - qa_tools/common/qa_store.py::ensure_schema
     - pipeline/slot_timeline.py::supply_states
     linked_tests:
+    - tests/test_filing.py::TestAFilingIsRecordedInTheDatabase
+    - tests/test_filing_decisions.py::TestSevenOfTheEightReallyWork
+    - tests/test_knock_on.py
     - tests/test_refile_decision.py
     - tests/test_refiling.py
-    - tests/test_filing.py::TestAFilingIsRecordedInTheDatabase
+    - tests/test_replacement_setting.py
     - tests/test_slot_holds.py
     - tests/test_slot_timeline.py::TestWhatASlotResolvedTo
-    - tests/test_filing_decisions.py::TestSevenOfTheEightReallyWork
     source: "Keith, 2026-10-04, 'RE-FILE MECHANICS SETTLED' and 'BUILD ORDER' (plans/road-testing.md #16); REQ-GHUB-082's unmet criterion 2 (re-file's effect) and REQ-PIPE-075 criterion 17. Scoped by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "WHEN a person re-files a supply, THE SYSTEM SHALL record a NEW filing of that supply to the target period, and SHALL keep its earlier filing unchanged as history."
@@ -26993,6 +27196,12 @@ requirements:
         REQ-PIPE-128''s promote has.'
       - 'THE COST IN DECISION 10 IS LIFTED: with REQ-PIPE-131 and 132 built, re-filing
         into a closed period is available; nothing refuses a closed target.'
+      - 'CRITERIA 14 AND 15 MET BY REQ-PIPE-121 (sprint 10): a re-file out of a
+        promoted period changes what the period holds, which the decision log''s
+        one hook sees and owes a re-evaluation for - no re-file-specific path. Criterion
+        7''s replacement half and criterion 9 are met by REQ-PIPE-123: the gate
+        the re-checked supply meets is the one that may replace a promoted version
+        where the replacement setting permits.'
     open_questions: []
 
   - id: REQ-GHUB-142
@@ -27253,7 +27462,7 @@ requirements:
     - 'Consumers found of filing.record (all via filing.filing_for / filing.filings_of, plus direct SQL in filing.py): filing.period_for_key, recorded_arrival_at, classification_of, supplies_of, refile, file_arrivals'' already-filed check; slot_state.reconcile and state_of (supply_id, slot); unrunnable (slot); outstanding._from_filings (ambiguous, ambiguity - retired by REQ-PIPE-131); promotion_state.state_for (supply_id, slot of the newest); cli/supply.py filings command (supply_id, slot, branch). period_overlay reads columns directly. Tests: test_filing, test_refiling, test_recorded_arrival_classification, test_promotion_state, test_drift_reference, test_outstanding, tests/conftest.py:726 (an upsert fixture writing record with no received_at or delivery), tests/test_period_overlay.py:48, and about twenty direct filing.record() calls in tests that will need a delivery fixture once unlinked filings are refused.'
     - 'Consumers found of filing.received_at: filing.received_at_of (used by refile) and filing.recorded_arrival -> pipeline/recorded_arrival.for_run -> the dashboard''s arrivedAt and waitedSeconds; and, unbuilt, REQ-PIPE-130''s _manifest (criteria 4 and 7). Writer: filing.record() from Assignment.received_at.'
     - 'Consumers found of qa.delivery.contested: writer delivery_log.record; returned by delivery_log.records() and records_carrying() (callers cli/supply.py deliveries, outstanding._delivery_records, validate_arrival_patterns, arrival_history - none read the contested key); tests test_holds.py and test_outstanding.py. delivery_log.sql() already omits it. Consumer of delivery_log.prune(): cli/pipeline.py only, plus its tests.'
-    - 'Proof by bootstrap comparison because the pipeline is seeded and deterministic. Its blind spots are named rather than assumed covered: filledAt and waitedSeconds depend on the clock (promotion effective_at is the earlier of now and receipt plus lag), the dashboard''s default as-of follows the Perth date, and arrivedAt''s rendered offset follows the server TimeZone - hence same Perth day, same server config. It does not exercise prune, the reset command, hand-filing, re-file, trials or the refuse-on-missing path, which get their own tests; column-absence tests cover the storage shape.'
+    - 'Proof by bootstrap comparison because the pipeline is seeded and deterministic. Its blind spots are named rather than assumed covered: filledAt and waitedSeconds depend on the clock (promotion effective_at is the earlier of now and receipt plus lag), the dashboard''s default in-place-on follows the Perth date, and arrivedAt''s rendered offset follows the server TimeZone - hence same Perth day, same server config. It does not exercise prune, the reset command, hand-filing, re-file, trials or the refuse-on-missing path, which get their own tests; column-absence tests cover the storage shape.'
     - 'RESET COMMAND APPROVED (Keith, 2026-10-04): one command, mothman env reset-synthetic, resetting the whole synthetic qa history together - deliveries, filings, holds, decisions, runs and results - in effect rebuild-from-empty made explicit. Refused in production, a typed confirmation naming what it deletes, called by nothing else: ''not something a human can stumble across''. One command rather than a delivery-only reset, because the foreign key from filings would refuse a partial reset anyway.'
     - '_MANIFEST BUILD ORDER SETTLED (Keith, 2026-10-04): only REQ-PIPE-130''s slot view is built early in the batch; the rest of 130, including _manifest, is built after REQ-PIPE-141 and therefore after this requirement, so _manifest is written once against the receipt view and never repointed.'
     - '_manifest''s received_at is a timestamptz instant, not the recorded text (Keith: ''an actual date time timestamp rather than a string of text''). The text with the writer''s offset stays in our own records on qa.delivery_file, where REQ-PIPE-069 criterion 5 protects it.'
@@ -27461,7 +27670,7 @@ requirements:
     - qa_tools/common/unrunnable.py::results_for
     - qa_tools/bdm/build_per_run_warehouses.py::build_one
     - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
-    - dashboard/qa-reporting-dashboard.template.html::blockerOpenAsOf
+    - dashboard/qa-reporting-dashboard.template.html::blockerOpenInPlaceOn
     - dashboard/qa-reporting-dashboard.template.html::blockerHistoryRows
     - cli/supply.py::failures_command
     linked_tests:
@@ -27475,7 +27684,7 @@ requirements:
     acceptance_criteria:
     - WHILE a 'failed-load' outstanding item is open for a dataset as at the instant on show, THE SYSTEM SHALL count that dataset's status as RED for the period on show, stating in words that the supply could not be loaded and the recorded reason - which, for a file refused by a file check, names that check (REQ-QAC-096 criterion 11) - and SHALL roll that red up to the collection and the agency like any other red.
     - WHILE criterion 1 applies, THE SYSTEM SHALL show each of that dataset's own checks as not run for that period, each reading the existing grey 'No data', and SHALL NOT show any of them as passing or carry an earlier run's verdict forward as that period's result.
-    - THE SYSTEM SHALL judge whether a failed-load item is open as at the instant on show - open from the failed supply's own receipt instant (REQ-PIPE-144's receipt view), not from the instant its load record was written, until a later record for the same table says it loaded, or until a person's rejection of that supply takes effect (REQ-PIPE-153), whichever comes first - so that the as-of view reproduces what a reader saw then.
+    - THE SYSTEM SHALL judge whether a failed-load item is open as at the instant on show - open from the failed supply's own receipt instant (REQ-PIPE-144's receipt view), not from the instant its load record was written, until a later record for the same table says it loaded, or until a person's rejection of that supply takes effect (REQ-PIPE-153), whichever comes first - so that the in-place-on view reproduces what a reader saw then.
     - WHERE a period's slot is closed and unfilled and a supply for it failed to load, THE SYSTEM SHALL say that a supply arrived and could not be loaded, and SHALL NOT word it as no supply.
     - IF a run's own table cannot be read because its load failed, THEN THE SYSTEM SHALL run no tool for that run, record no per-check result for that dataset's own checks, and complete the run without treating it as a failed run.
     - WHERE a cross-table check reads a table whose load failed for the arrival being checked, THE SYSTEM SHALL record that check as not evaluated, red, under the existing 'unrunnable' pseudo-tool, giving 'could not be loaded' as the reason ahead of every slot reason.
@@ -27511,7 +27720,7 @@ requirements:
     - 'REJECTING A FAILED LOAD IS REQ-PIPE-153''s, NOT THIS REQUIREMENT''S (Keith, 2026-10-04): post-build-review #80 reproduced that a rejection was accepted and left the item open, because load_log.failures reads only load records. Keith split the fix out so this requirement stays ''a failed load reads red''; the only change here is criterion 3''s closing rule, which names a rejection alongside a later load.'
     - 'A FILE REFUSED BY A FILE CHECK TAKES THIS PATH (Keith, 2026-10-04): any failing file check refuses the whole file (REQ-QAC-096 criterion 11), so this requirement''s red and item are the only dataset-level signal for it, with the check named in the reason. REQ-DASH-097 shows the file section; it adds no red of its own.'
     - 'A BLOCKED DATASET''S OWN CHECKS READ THE EXISTING GREY ''No data'' (Keith, 2026-10-04). REJECTED a new ''not run'' cell treatment: the status vocabulary does not grow (REQ-DASH-041), and grey ''No data'' already means nothing was evaluated for this period.'
-    - A FAILED-LOAD ITEM OPENS AT THE SUPPLY'S RECEIPT INSTANT, NOT THE WALL CLOCK (Keith, 2026-10-04). The load record is written when the pipeline happened to process the file; the receipt is when it arrived, which is what every other as-of judgement uses. REJECTED the load record's written instant, which makes the as-of view depend on when a pass ran.
+    - A FAILED-LOAD ITEM OPENS AT THE SUPPLY'S RECEIPT INSTANT, NOT THE WALL CLOCK (Keith, 2026-10-04). The load record is written when the pipeline happened to process the file; the receipt is when it arrived, which is what every other in-place-on judgement uses. REJECTED the load record's written instant, which makes the in-place-on view depend on when a pass ran.
     - Follows criterion 3's change to the opening instant (Keith, 2026-10-04).
     - '''COULD NOT BE LOADED'' REPLACES ''FAILED LOAD'' EVERYWHERE (Keith, 2026-10-04): it says what happened to the supply rather than naming a pipeline stage. REJECTED keeping both, one per surface.'
     - 'A SUPPLY THAT COULD NOT BE LOADED HAS A SUPPLY-HISTORY ROW (Keith, 2026-10-04) - the dashboard reviewer''s third must-fix. REJECTED leaving supply history to runs only: a run whose own table failed to load records no per-check result (criterion 5), so the arrival would vanish from the one place a reader looks for what arrived.'
@@ -27776,7 +27985,7 @@ requirements:
     - THE SYSTEM SHALL NOT offer a rejection under this requirement for a failed-load supply that was filed to no period, and SHALL leave that supply to REQ-PIPE-078's held-supply route.
     - THE SYSTEM SHALL record, in the same change, that the rejection half of REQ-PIPE-060 criterion 18 is delivered by this requirement's criteria 1 to 4.
     - 'THE SYSTEM SHALL have a regression test, started from post-build-review #80''s reproduction (`TestRejectingASupplyThatNeverLoaded`, placed in tests/test_filing_decisions.py) and confirmed failing before the fix, asserting that a person''s rejection of a failed-load supply is accepted, leaves `load_log.failures()` and the outstanding items, leaves the failed load record unchanged, and that the item still reads open as at an instant before the rejection took effect.'
-    - THE SYSTEM SHALL extend REQ-DASH-148 criterion 9's real-browser test so that, after a person rejects the supply that failed to load, its dataset no longer reads red on that account at the default as-of instant, still reads red as at an instant between the failed load and the rejection, and the closed, unfilled period names who rejected it, when and why.
+    - THE SYSTEM SHALL extend REQ-DASH-148 criterion 9's real-browser test so that, after a person rejects the supply that failed to load, its dataset no longer reads red on that account at the default in-place-on instant, still reads red as at an instant between the failed load and the rejection, and the closed, unfilled period names who rejected it, when and why.
     - 'WHEN a person rejects a supply that could not be loaded, THE SYSTEM SHALL keep that supply''s supply-history row, reading ''Could not be loaded - rejected by <person>, <when>: <reason>''.'
     non_functional_requirements:
     - 'A FALSE GREEN IS STILL THE FAILURE TO PREVENT (REQ-DASH-148 NFR 1): a rejected supply leaves its period unfilled, and an unfilled period is never green.'
@@ -27798,7 +28007,7 @@ requirements:
     - 'SPLIT FROM REQ-DASH-148 (Keith, 2026-10-04): 148 stays ''a failed load reads red'', changed as little as possible - only criterion 3''s closing rule and the NFR and decision that follow from it - and rejection lives here, depending on 148. A first draft added eleven criteria to 148 itself, taking it to twenty; rejected for Keith''s small, self-contained rule.'
     - 'PIPE, NOT DASH (scoper, 2026-10-04): the primary outcome is a recorded decision closing a work item and leaving the period''s filing correct - load_log, outstanding, filing_decisions and the decision log, the same component as REQ-PIPE-060 and REQ-PIPE-076 that it completes. The dashboard only consumes the result (criteria 8 to 10), and DASH ''only ever consumes'' per docs/components.md. GHUB was the other candidate, because the terminal queue is REQ-GHUB-082''s, but that is one criterion of fifteen.'
     - 'REJECTING A FAILED LOAD WAS BROKEN (post-build-review #80, reproduced 2026-10-04): filing_decisions.apply(REJECT) on a failed-load supply was accepted - changed=True, a decision-log entry, no table moved because there is none - and the item stayed open, because load_log.failures() reads only load records. The person was told the decision was recorded and then offered it again.'
-    - 'A FAILED-LOAD SUPPLY IS FILED, SO A REJECTION NAMES ITS FILED PERIOD (scoper, 2026-10-04, verified by reading). Staging runs first (build_all writes the FAILED record), then each arrival is filed before it is checked - file_and_overlay calls filing.file_arrivals, which iterates arrival.files_by_dataset (the files on disk) and never consults the load outcome. REJECTED: a rejection that names no period (the slot is a load-bearing invariant of the decision log and every as-of read); a pseudo-period for unloaded supplies (a second meaning of ''period'' every reader would have to know).'
+    - 'A FAILED-LOAD SUPPLY IS FILED, SO A REJECTION NAMES ITS FILED PERIOD (scoper, 2026-10-04, verified by reading). Staging runs first (build_all writes the FAILED record), then each arrival is filed before it is checked - file_and_overlay calls filing.file_arrivals, which iterates arrival.files_by_dataset (the files on disk) and never consults the load outcome. REJECTED: a rejection that names no period (the slot is a load-bearing invariant of the decision log and every in-place-on read); a pseudo-period for unloaded supplies (a second meaning of ''period'' every reader would have to know).'
     - 'A SUPPLY FILED TO NO PERIOD GOES TO THE HELD-SUPPLY ROUTE (Keith, W3, 2026-10-04): where the assignment rule could not file it, the decision log has no slot to record against and REQ-PIPE-078 already owns that state. REJECTED: a criterion here for rejecting without a period.'
     - 'EITHER A REJECTION OR A LATER LOAD CLOSES IT, WHICHEVER COMES FIRST (Keith, Q1, 2026-10-04). Those are the two responses the item has always offered (REQ-PIPE-060 criterion 18). REJECTED: a successful load only (that is the defect - the person''s decision ignored); a rejection only (breaks the reprocess route that already works).'
     - 'CLOSURE IS DERIVED FROM THE DECISION LOG, NOT RECORDED A SECOND TIME (scoper, 2026-10-04). REJECTED: a third load outcome, ''rejected'', in qa.load_outcome - a rejection is a person''s decision about a supply, not a fact about whether a file could be read, which REQ-PIPE-060 criterion 20 keeps apart, and it would be a second record of one decision that could disagree with the log. REJECTED: a resolved_by column on the load record, as supply_holds has - a hold is a mutable work item, but load records are append-only by REQ-PIPE-060 criterion 19.'

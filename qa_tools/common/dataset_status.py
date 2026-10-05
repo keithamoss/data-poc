@@ -249,7 +249,7 @@ def rollup_datasets(datasets) -> str:
     """
     counted = [d for d in datasets if not in_no_rollup(d)]
     live = [d for d in counted
-            if not d.get("noDataAsOf") and not d.get("scheduleExhausted")]
+            if not d.get("noDataInPlaceOn") and not d.get("scheduleExhausted")]
     if not live:
         if any(d.get("scheduleExhausted") for d in counted):
             return "exhausted"

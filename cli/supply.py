@@ -529,7 +529,14 @@ def decisions_command(dataset_id: str | None, as_at: str | None, limit: int) -> 
                  if entry["action"] == decision_log.REFILE
                  else (entry["to_slot"] or entry["from_slot"] or ""))
         who = entry["actor"]
-        if entry["actor_kind"] == decision_log.RULE:
+        action = entry["action"]
+        if entry["action"] == decision_log.STILL_FAILING:
+            # FULL PROMINENCE, NEVER DIMMED (REQ-PIPE-121 criteria 12 and 13):
+            # a re-evaluation left waiting supplies failing, and a person must
+            # look - the one rule entry this list does not quieten.
+            who = f"[bold red]{who} (rule)[/bold red]"
+            action = f"[bold red]{action}[/bold red]"
+        elif entry["actor_kind"] == decision_log.RULE:
             who = f"[dim]{who} (rule)[/dim]"
         # ON THE ASSET'S CLOCK (REQ-DASH-071). The column stores an
         # INSTANT, so psycopg hands it back in UTC whatever offset it was
@@ -537,7 +544,7 @@ def decisions_command(dataset_id: str | None, as_at: str | None, limit: int) -> 
         # 9:30am promotion happened at 1:30am, which is the exact defect
         # the display standard exists to prevent.
         table.add_row(display_time.format_instant(entry["effective_at"]),
-                       entry["action"], entry["supply"],
+                       action, entry["supply"] or "",
                        slot, who, entry["reason"] or "[dim]-[/dim]")
     console.print(table)
 
@@ -784,14 +791,40 @@ def queue_command(collection_id: str) -> None:
     try:
         with filing_tui.open_log() as conn:
             waiting = filing_queue.awaiting(conn, collection_id)
+            owed_now = _owed_in(conn, collection_id)
     except filing_queue.LogUnreachable as exc:
         filing_tui.say_unreachable(exc)
         raise SystemExit(1) from exc
     if not waiting:
         console.print("Nothing is waiting on a person.", style="green")
+    else:
+        console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a decision\n")
+        console.print(filing_tui.queue_table(waiting))
+    _say_owed(owed_now)
+
+
+def _owed_in(conn, collection_id: str) -> list:
+    """QA owed and not yet run for this collection - re-checks and
+    re-evaluations (REQ-PIPE-140 criterion 7, REQ-PIPE-121 criterion 16)."""
+    from qa_tools.common import hierarchy, recheck
+
+    mine = {d.dataset_id for d in hierarchy.datasets_in_collection(collection_id)}
+    return [o for o in recheck.owed(conn) if o.dataset_id in mine]
+
+
+def _say_owed(owed_now: list) -> None:
+    """WHILE OWED, SHOWN AS OWED (REQ-PIPE-121 criterion 16): a re-check a
+    run left undone is otherwise invisible until the processing pass
+    finishes it (REQ-PIPE-151)."""
+    if not owed_now:
         return
-    console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a decision\n")
-    console.print(filing_tui.queue_table(waiting))
+    console.print(f"\n[bold yellow]{len(owed_now)}[/bold yellow] QA run(s) owed, not yet "
+                  "done - the processing pass completes them:")
+    for o in owed_now:
+        what = (f"re-check of {o.supply_id}" if o.kind == "recheck"
+                else f"re-evaluation of {o.period}'s readers of {', '.join(o.tables or [])}")
+        why = f" - last attempt: {o.last_failure}" if o.last_failure else ""
+        console.print(f"  {what} (owed to decision {o.caused_by_decision}){why}")
 
 
 @supply_group.command("slots")

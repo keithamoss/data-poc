@@ -74,7 +74,7 @@ def list_command(injected_only: bool) -> None:
     for scenario in sorted(entries, key=lambda s: s.sort_key):
         placement = placements.get(scenario.id)
         if placement is not None and placement.is_complete:
-            where = f"{placement.dataset} · {placement.period} · as of {placement.as_of}"
+            where = f"{placement.dataset} · {placement.period} · in place on {placement.in_place_on}"
         elif scenario.is_injected:
             where = "not injected yet"
         else:

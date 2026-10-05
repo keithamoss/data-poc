@@ -55,7 +55,10 @@ class TestAReRunIsARunOfItsOwn:
                 [CP_DIRTY_RUN_ID]).fetchall()[0][0]
         got = recheck.run(owed_id, run_by="pytest@example.org")
         assert got.completed, got.message
-        assert supply_db.split_run(got.run_key) == (CP_DIRTY_RUN_ID, 1)
+        # A RUN ID OF ITS OWN (criterion 3) - the next `__r<N>`, whatever N:
+        # another module on the same worker's fixture may have taken __r1.
+        first, n = supply_db.split_run(got.run_key)
+        assert first == CP_DIRTY_RUN_ID and n >= 1
         with supply_db.connect(label="test-recheck") as conn:
             row = conn.execute(
                 "SELECT scope, dataset_id, supply_id, period, caused_by_decision, "
@@ -161,3 +164,35 @@ class TestTwoOwedRunsNeverShareAnId:
         b = recheck.run(second, run_by="pytest@example.org")
         assert not a.completed and not b.completed
         assert a.run_key != b.run_key
+
+
+class TestAPromotedSupplyRefiledIsCheckedInItsNewPeriod:
+    """post-build-review #115 D4: re-filing a PROMOTED supply left a re-check
+    that could not read its own table ('UnreadableOwnTable ... set up
+    wrong'), so the supply had left its period and was never checked in the
+    new one."""
+
+    def test_the_owed_recheck_runs(self, cp_duckdb_dir, monkeypatch):
+        from qa_tools.common import filing_decisions as fd, people, promotion
+
+        monkeypatch.setenv("GIT_AUTHOR_EMAIL", "pytest@example.org")
+        monkeypatch.setattr(promotion, "report", lambda outcome: None)
+        person = "fpycnkgvmt@privaterelay.appleid.com"
+        with supply_db.connect(label="test-recheck") as conn:
+            qa_store.ensure_schema(conn)
+            promotion.promote(conn, agency_id="child-protection-family-support",
+                              collection_id="child-protection", dataset_id=DATASET,
+                              supply=SUPPLY, period="2026-Q2",
+                              physical_tables=[recheck.first_run_id(DATASET, SUPPLY)],
+                              actor=person, actor_kind=dl.PERSON,
+                              effective_at="2026-04-02T00:00:00+00:00", reason="in")
+
+            def ask(acknowledged=None):
+                return fd.Request(operation=fd.REFILE, dataset_id=DATASET,
+                                  actor=people.person_by_email(person), reason="belongs in Q1",
+                                  period="2026-Q2", supply=SUPPLY, to_period="2026-Q1",
+                                  confirmed=True, acknowledged=acknowledged)
+            key = fd.consequences(conn, ask()).key
+            got = fd.apply(ask(key), effective_at="2026-04-03T00:00:00+00:00", conn=conn)
+        done = recheck.run(got.owed, run_by="pytest@example.org")
+        assert done.completed, done.message

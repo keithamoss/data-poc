@@ -69,13 +69,13 @@ class TestAScenarioLandsWhereItsAnchorSays:
             placed.period_date.isoformat(),
             (placed.period_date + timedelta(days=2)).isoformat()]
 
-    def test_the_as_of_date_reaches_the_latest_arrival(self):
-        """A reader sets the dashboard to this date, so an as-of before
+    def test_the_in_place_on_date_reaches_the_latest_arrival(self):
+        """A reader sets the dashboard to this date, so an in-place-on date before
         the scenario's own last arrival would hide the thing it is
         about."""
         placed = si.resolve(si.Injection(
             "TS-x", "d", -5, "cfg", arrivals=(si.ExtraArrival(3, "09:00"),)), _daily(30))
-        assert placed.as_record()["as_of"] == (
+        assert placed.as_record()["in_place_on"] == (
             placed.period_date + timedelta(days=3)).isoformat()
 
 

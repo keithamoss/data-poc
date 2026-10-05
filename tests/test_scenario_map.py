@@ -97,7 +97,7 @@ class TestWhereEachScenarioLanded:
         path.write_text(json.dumps({"placements": [{
             "scenario_id": "TS-1", "dataset": "birth-registrations",
             "supplies": ["run_047", "run_048"], "period": "2026-07-14",
-            "as_of": "2026-07-15"}]}))
+            "in_place_on": "2026-07-15"}]}))
 
         placement = sm.read_placements(path)["TS-1"]
 
@@ -118,12 +118,12 @@ class TestTheMapItself:
     def _map(self, placements=None):
         return sm.build_map(sc.parse_register(), placements or {})
 
-    def test_it_names_the_dataset_supplies_period_and_as_of_date(self):
+    def test_it_names_the_dataset_supplies_period_and_in_place_on_date(self):
         """Criterion 1."""
         text = sm.build_map(sc.parse_register(), {"TS-1": sm.Placement(
             scenario_id="TS-1", dataset="Birth Registrations",
             supplies=("run_047", "run_048"), period="2026-07-14",
-            as_of="2026-07-15")})
+            in_place_on="2026-07-15")})
 
         assert "Birth Registrations" in text
         assert "`run_047`" in text and "`run_048`" in text
@@ -136,7 +136,7 @@ class TestTheMapItself:
         the next time a route changed."""
         text = self._map({"TS-1": sm.Placement(
             scenario_id="TS-1", dataset="d", supplies=("s",),
-            period="p", as_of="2026-01-01")})
+            period="p", in_place_on="2026-01-01")})
 
         assert "http://" not in text and "https://" not in text
         assert "#/" not in text

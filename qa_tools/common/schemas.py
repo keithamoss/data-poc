@@ -499,6 +499,24 @@ class AmberSetting(_Strict):
     versions: list[AmberSettingVersion] = Field(min_length=1)
 
 
+#: THE REPLACEMENT SETTING'S THREE VALUES, STRICTEST FIRST (REQ-PIPE-123
+#: criterion 1): whether a resupply may replace an already-promoted supply
+#: automatically.
+REPLACEMENT_SETTINGS = ("never", "green", "green-or-amber")
+
+
+class ReplacementSettingVersion(_Strict):
+    """One effective-dated value of the replacement setting - the amber
+    setting's shape, by the same mechanism (REQ-PIPE-123 criterion 1)."""
+    effective_from: str = Field(pattern=_DATE_PATTERN)
+    value: Literal[*REPLACEMENT_SETTINGS]  # type: ignore[valid-type]
+    changelog: list[NonEmptyStr] = Field(min_length=1)
+
+
+class ReplacementSetting(_Strict):
+    versions: list[ReplacementSettingVersion] = Field(min_length=1)
+
+
 class NotExpectedPeriod(_Strict):
     """A reason is REQUIRED, not decoration: "no November file" with
     nothing beside it is indistinguishable, six months later, from
@@ -546,6 +564,7 @@ class DatasetConfig(_Strict):
     dates: list[CalendarDate] | None = None
     not_expected: list[NotExpectedPeriod] | None = None
     amber_setting: AmberSetting | None = None
+    replacement_setting: ReplacementSetting | None = None
 
 
 class CollectionConfig(_Strict):
@@ -559,6 +578,7 @@ class CollectionConfig(_Strict):
     #: delivery from a source that has not said what one is.
     delivery_boundary: NonEmptyStr | None = None
     amber_setting: AmberSetting | None = None
+    replacement_setting: ReplacementSetting | None = None
     datasets: list[DatasetConfig] = Field(min_length=1)
 
 
@@ -591,3 +611,7 @@ class DataAsset(_Strict):
     #: that says nothing about amber is a configuration error, never a
     #: quiet "promote".
     amber_setting: AmberSetting
+    #: REQUIRED, with no default (REQ-PIPE-123 criterion 1), for the amber
+    #: setting's reason: the one rule that lets automation displace accepted
+    #: data is never switched on, or off, by saying nothing.
+    replacement_setting: ReplacementSetting

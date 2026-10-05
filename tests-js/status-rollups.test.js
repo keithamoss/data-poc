@@ -77,8 +77,8 @@ describe("rollupStatuses (worstOf's nodata-aware counterpart)", () => {
 });
 
 describe("rollup (dataset-list -> worst-of-columns rollup)", () => {
-  function dataset(status, { noDataAsOf = false } = {}) {
-    return { noDataAsOf, columns: [{ status }] };
+  function dataset(status, { noDataInPlaceOn = false } = {}) {
+    return { noDataInPlaceOn, columns: [{ status }] };
   }
 
   it("green across the board rolls up to green", () => {
@@ -91,16 +91,16 @@ describe("rollup (dataset-list -> worst-of-columns rollup)", () => {
     expect(w.rollup([dataset("green"), dataset("red")])).toBe("red");
   });
 
-  it("datasets with noDataAsOf are excluded before rolling up", () => {
+  it("datasets with noDataInPlaceOn are excluded before rolling up", () => {
     const w = load();
     // the one real dataset is green; the nodata one must not drag this
     // down to "nodata" or otherwise change the real outcome
-    expect(w.rollup([dataset("green"), dataset("red", { noDataAsOf: true })])).toBe("green");
+    expect(w.rollup([dataset("green"), dataset("red", { noDataInPlaceOn: true })])).toBe("green");
   });
 
   it("returns nodata only when every dataset has no data as of the selected date", () => {
     const w = load();
-    expect(w.rollup([dataset("green", { noDataAsOf: true })])).toBe("nodata");
+    expect(w.rollup([dataset("green", { noDataInPlaceOn: true })])).toBe("nodata");
   });
 
   it("returns green for a genuinely empty dataset list", () => {

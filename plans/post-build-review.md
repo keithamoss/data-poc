@@ -5640,3 +5640,55 @@ twice. It deliberately did not re-find the `TypeError`.
       says 96 of 112 criteria are met. Both now read `in-progress`, as
       counted. Worth knowing: a "done" sprint tag before today was checked
       against a short list.
+
+115. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **The CLI UX
+    critic on the re-file (11eb18e), driving it for real** against a copy of
+    the deployment database. Each defect below was checked against the code
+    and, where it could be, reproduced in a failing test before it was fixed.
+    None changes agreed behaviour, so none needed Keith.
+    - **D1, FIXED** (failing test first): the target period was never
+      checked. `2026-Q9` was accepted, recorded and re-checked. A re-file into
+      a period the dataset's calendar does not have is now refused and names
+      `mothman supply slots`. Tests mint `2099-` periods, which a conftest
+      fixture counts as on the calendar; every real name is still judged by
+      the real calendar.
+    - **D2 and D3, FIXED** (failing tests first). This was the serious one.
+      A period emptied by re-filing a WAITING supply out read "returned by a
+      person", naming the supply that had left. The queue offered actions on
+      it, and a reject there was recorded against the supply's OLD period
+      while it waited in the new one. Three fixes:
+      - The slot view now reads a slot emptied by a re-file whose supply is
+        filed elsewhere as though nothing was decided there.
+      - The decision log refuses a reject or demote naming a supply filed to
+        another period, and names that period.
+      - A supply re-filed into a period past the claim horizon was listed
+        nowhere. Its period is now listed.
+    - **D5, FIXED:** the re-check panel was green whenever the run completed,
+      red verdict or not, and said only two run ids. It now says what the
+      supply came out as against which period, and whether the gate promoted
+      it, coloured by the verdict.
+    - **D4, NOT REPRODUCED, OPEN:** re-filing a PROMOTED supply left a
+      re-check that could not read its own table (`UnreadableOwnTable`). A
+      real-tools test of exactly that path, into an empty period, passes
+      (`TestAPromotedSupplyRefiledIsCheckedInItsNewPeriod`). The critic's
+      case had a target that already held a promoted version, and its tree
+      was an archive run without dbt on PATH. To be retried against a copy
+      of the schema-27 deployment once it is rebuilt.
+    - **FIXED, wording:**
+      - The held-supply refusal now points at `mothman supply holds` (W1).
+      - The supersede undo says what "out of the way" means (W3).
+      - "Recorded" names the target period (W6).
+      - The warning names what an already-filled target keeps reading (W7).
+      - "re-file", never "refile", in what a person reads (W8, partly).
+    - **LOGGED, not changed:**
+      - The non-interactive hint for a re-file leaves out `--to-period` (W2).
+      - The `--acknowledge` key wraps inside its panel (W4).
+      - "Recording ..." prints before a refusal that needs no lock (W5).
+      - The actor shows as an email rather than a name (W8).
+      - "or point them elsewhere:" is unexplained (W9).
+      - Library warnings leak into re-check output (P1).
+      - `--collection cp` crashes, which predates this (P2).
+      - The queue shows no supply ids (P3).
+      - The Ctrl-C reason wording (P4).
+      - The queue's silent pause (P5).
+      - The re-file prompt offers no list of periods.

@@ -463,6 +463,12 @@ def promote_after(arrival, got: list[dict], run_by: str) -> None:
         actor=promotion.RULE_ACTOR, actor_kind=decision_log.RULE,
         effective_at=promotion.effective_at_for(
             arrival.received_at, seed=arrival.run_id).isoformat()))
+    # THE KNOCK-ON OF WHAT IT PROMOTED (REQ-PIPE-121): every period the
+    # promotions moved a table into owes its readers a re-evaluation, owed in
+    # the promotion's own transaction and completed here.
+    from qa_tools.common import knock_on
+
+    knock_on.follow_up(cp_common.COLLECTION_ID, run_by=run_by)
 
 
 def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:

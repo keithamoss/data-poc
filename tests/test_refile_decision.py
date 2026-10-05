@@ -297,3 +297,35 @@ class TestCriticFindingsOnSprintNine:
         filing_support.place(conn, DS, a, None, delivery)
         with pytest.raises(dl.DecisionRefused, match="filed to no period"):
             refiling.plan(conn, dataset_id=DS, supply=a, to_period=target)
+
+
+class TestCliCriticFindingsOnSprintNine:
+    """post-build-review #115: what the CLI UX critic found driving the
+    re-file for real, each reproduced here before it was fixed."""
+
+    def test_a_period_the_calendar_does_not_have_is_refused(self, conn, period):
+        """D1: `2026-Q9` was accepted, recorded, and re-checked."""
+        from qa_tools.common import refiling
+
+        a, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        with pytest.raises(dl.DecisionRefused, match="2026-Q9"):
+            refiling.plan(conn, dataset_id=DS, supply=a, to_period="2026-Q9")
+
+    def test_the_old_period_no_longer_names_the_supply_that_left(self, conn, period, target):
+        """D2 and D3: the emptied period still read 'returned by a person'
+        naming the re-filed supply, and a reject there landed on it."""
+        from qa_tools.common import slot_state
+
+        a, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        _refile(conn, a, period, target)
+        h = dl.held(conn, DS, period)
+        assert slot_state.left_by_refile(conn, DS, period, h)
+
+    def test_a_reject_of_a_supply_filed_elsewhere_is_refused(self, conn, period, target):
+        """D3: the reject was recorded against the supply's OLD period."""
+        a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        _refile(conn, a, period, target)
+        with pytest.raises(dl.DecisionRefused, match=target):
+            rejection.reject(conn, agency_id=AG, collection_id=COL, dataset_id=DS, supply=a,
+                             physical_tables=[a_table], actor=REAL_PERSON,
+                             effective_at=WHEN, reason="probe", from_slot=period)

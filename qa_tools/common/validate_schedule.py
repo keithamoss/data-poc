@@ -767,8 +767,11 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
             continue
         if not isinstance(doc, dict):
             continue
+        # EITHER SETTING (REQ-PIPE-123 criterion 1): the replacement setting
+        # is versioned by the same mechanism, so dated the same way.
         if any(start in amber_setting._versions(setting)
-               for setting in amber_setting._settings(doc).values()):
+               for key in (amber_setting.KEY, "replacement_setting")
+               for setting in amber_setting._settings(doc, key).values()):
             return asset_time.local_date(datetime.fromisoformat(stamp))
     return None
 
@@ -895,8 +898,25 @@ def _retrospective_edit_errors(raw: dict, src: Source, today: date | None = None
 
 # ---- the amber setting's past is frozen (REQ-PIPE-122) --------------
 
+def _replacement_setting_errors(raw: dict, src: Source, today: date | None = None,
+                                ref: str | None = None) -> list[ConfigError]:
+    """REQ-PIPE-123: the replacement setting's past is frozen by the amber
+    setting's own guard, read under its key (criterion 1), and green-or-amber
+    replacement is refused wherever the amber setting is hold, on any date
+    the two overlap (criterion 11)."""
+    from qa_tools.common import replacement_setting
+
+    out = _amber_setting_errors(raw, src, today, ref, module=replacement_setting)
+    return out + [ConfigError(
+        src.name, f"replacement_setting ({where})", f"{problem}.",
+        "Make the replacement setting green (or never) for those dates, or the amber "
+        "setting promote or promote-and-acknowledge - by a NEW version of whichever you "
+        "change, since a past version is frozen.")
+        for where, problem in replacement_setting.conflicts(raw)]
+
+
 def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
-                          ref: str | None = None) -> list[ConfigError]:
+                          ref: str | None = None, module=None) -> list[ConfigError]:
     """Criteria 6 to 8: a version of the amber setting whose date has
     passed may not be altered or removed, WHATEVER CHANGELOG ACCOMPANIES
     IT - unlike a calendar date, there is no correction route, because a
@@ -911,12 +931,14 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
     """
     from qa_tools.common import amber_setting
 
+    module = module or amber_setting
+    key = module.KEY
     today = today or asset_time.local_date(asset_time.now())
     standing = [ConfigError(
-        src.name, f"amber_setting ({where})", f"{problem}.",
+        src.name, f"{key} ({where})", f"{problem}.",
         "Give each version its own effective_from, and keep a data-asset-level version "
         "in effect - there is no default.")
-        for where, problem in amber_setting.standing_problems(raw, today)]
+        for where, problem in module.standing_problems(raw, today)]
     ref = ref or diff_base()
     previous = _content_at(str(src.asset_path.relative_to(ROOT)), ref) \
         if src.asset_path.is_relative_to(ROOT) else None
@@ -929,17 +951,17 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
     if not isinstance(old_doc, dict):
         return standing
     synthetic = bool(old_doc.get("synthetic")) and bool(raw.get("synthetic"))
-    problems = amber_setting.past_change_problems(old_doc, raw, today, synthetic=synthetic)
+    problems = module.past_change_problems(old_doc, raw, today, synthetic=synthetic)
     if any("before the day it was added" in p for _, p in problems):
         # ONLY NOW ask git when it was added (criterion 7 as amended): a
         # version dated before today is the one case the commit's date can
         # change, and every other run keeps to the single `git show`.
         rel = str(src.asset_path.relative_to(ROOT))
-        problems = amber_setting.past_change_problems(
+        problems = module.past_change_problems(
             old_doc, raw, today, synthetic=synthetic,
             added=lambda start: _version_added_on(rel, ref, start))
     return standing + [ConfigError(
-        src.name, f"amber_setting ({where})", f"{problem}.",
+        src.name, f"{key} ({where})", f"{problem}.",
         "A setting's past is frozen - add a NEW version, dated today or later, with the "
         "value you want from then on. Nothing judged under the old version changes, "
         "because each promotion recorded the setting it acted under.")
@@ -983,6 +1005,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _contract_errors(raw, src)
     errors += _retrospective_edit_errors(raw, src)
     errors += _amber_setting_errors(raw, src)
+    errors += _replacement_setting_errors(raw, src)
     if src.asset_path == DATA_ASSET_YAML and not errors:
         errors += _overlap_errors(src)
     return _attribute(errors, raw)

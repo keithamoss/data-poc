@@ -11,9 +11,9 @@ const DS = {amberSetting: [
 describe("the amber setting on the date on show", () => {
   it("is the latest change on or before that date", () => {
     const w = loadDashboard().window;
-    expect(w.amberSettingAsOf(DS, "2026-10-04").value).toBe("promote");
-    expect(w.amberSettingAsOf(DS, "2026-10-05").value).toBe("promote-and-acknowledge");
-    expect(w.amberSettingAsOf(DS, "2022-12-31")).toBeNull();
+    expect(w.amberSettingInPlaceOn(DS, "2026-10-04").value).toBe("promote");
+    expect(w.amberSettingInPlaceOn(DS, "2026-10-05").value).toBe("promote-and-acknowledge");
+    expect(w.amberSettingInPlaceOn(DS, "2022-12-31")).toBeNull();
   });
 
   it("is said in words, naming where it was set", () => {

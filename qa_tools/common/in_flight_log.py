@@ -8,7 +8,7 @@ things that actually happened. Committing "the run at 14:32 observed
 these deliveries in flight" is a record about the RUN, which genuinely
 happened and genuinely saw that. The as-at framing is then honest
 labelling rather than a caveat - and it is what this dashboard already
-is, since CURRENT_AS_OF and the snapshot archive rest on the same
+is, since CURRENT_IN_PLACE_ON and the snapshot archive rest on the same
 premise.
 
 WHY IT HAD NOWHERE ELSE TO GO. A delivery is treated as received only

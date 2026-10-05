@@ -29,9 +29,9 @@ const ds = {
 describe("the census as at a date", () => {
   it("reads the last census on or before the date, never a later one", () => {
     const w = load();
-    expect(w.censusAsOf(ds, "2026-09-30")).toBe(null);
-    expect(w.censusAsOf(ds, "2026-10-03").discrepancies).toHaveLength(1);
-    expect(w.censusAsOf(ds, "2026-10-05").discrepancies).toHaveLength(0);
+    expect(w.censusInPlaceOn(ds, "2026-09-30")).toBe(null);
+    expect(w.censusInPlaceOn(ds, "2026-10-03").discrepancies).toHaveLength(1);
+    expect(w.censusInPlaceOn(ds, "2026-10-05").discrepancies).toHaveLength(0);
   });
 
   it("names the period and the table, and says nothing when they agree", () => {
@@ -51,7 +51,7 @@ describe("the census date is the asset's", () => {
     const w = dashboard.window;
     const late = { census: [{ takenAt: "2026-10-05T22:00:00+00:00", discrepancies: [
       { kind: "stray", period: "p", datasetId: null, table: "t", supply: null, detail: "d" }] }] };
-    expect(w.censusAsOf(late, "2026-10-05")).toBe(null);
-    expect(w.censusAsOf(late, "2026-10-06")).not.toBe(null);
+    expect(w.censusInPlaceOn(late, "2026-10-05")).toBe(null);
+    expect(w.censusInPlaceOn(late, "2026-10-06")).not.toBe(null);
   });
 });

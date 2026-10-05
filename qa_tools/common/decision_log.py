@@ -153,17 +153,25 @@ SUPERSEDE = "supersede"
 #: A person brings a superseded supply back to staging (REQ-PIPE-120).
 UN_SUPERSEDE = "un-supersede"
 
+#: A RE-EVALUATION LEFT WAITING SUPPLIES FAILING (REQ-PIPE-121 criterion
+#: 12): ONE record per causing decision, naming every such supply in its
+#: reason and the decision in `caused_by_decision`, at the log's highest
+#: prominence - a person must look. Rule only; changes no slot.
+STILL_FAILING = "still-failing"
+
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
            INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
-           MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE)
+           MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE, STILL_FAILING)
 
-#: Actions that name no supply - each is about one that is not there.
-NO_SUPPLY = (INHERIT_REFUSED, MARK_NOT_SUPPLIED)
+#: Actions that name no supply - each is about one that is not there, or
+#: (STILL_FAILING) about several.
+NO_SUPPLY = (INHERIT_REFUSED, MARK_NOT_SUPPLIED, STILL_FAILING)
 
 #: The actions a RULE may take. Everything else is a person's, and
 #: rejection.py and substitution.py enforce that by not offering an
 #: actor_kind at all.
-AUTOMATIC_ACTIONS = (PROMOTE, INHERIT, INHERIT_REFUSED, PROMOTION_WITHHELD, SUPERSEDE)
+AUTOMATIC_ACTIONS = (PROMOTE, INHERIT, INHERIT_REFUSED, PROMOTION_WITHHELD, SUPERSEDE,
+                     STILL_FAILING)
 
 #: The decisions that move a supply, and so are the ones criterion 11
 #: refuses while a later period stands on it.
@@ -236,6 +244,17 @@ class Decision:
     amber_version: str | None = None
     #: The newer supply that superseded this one (REQ-PIPE-118 criterion 10).
     superseded_by: str | None = None
+    #: The supply's status when it was promoted (REQ-PIPE-130 criterion 11).
+    promoted_status: str | None = None
+    #: The promoted supply a rule's promotion replaced, and the replacement
+    #: setting it acted under (REQ-PIPE-123 criterion 5).
+    replaces: str | None = None
+    replacement_setting: str | None = None
+    replacement_level: str | None = None
+    replacement_version: str | None = None
+    #: The decision a rule's STILL_FAILING record follows from
+    #: (REQ-PIPE-121 criterion 12).
+    caused_by_decision: int | None = None
 
     @property
     def slots(self) -> tuple[str, ...]:
@@ -545,6 +564,25 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
                 f"{decision.from_slot} --supply {waiting[0]} --reason '<why>'`, or the "
                 f"same with `--operation supersede`.")
 
+    if decision.action in (REJECT, DEMOTE) and decision.supply and decision.from_slot:
+        # A SUPPLY FILED TO ANOTHER PERIOD IS NOT DECIDED ABOUT HERE (post-
+        # build-review #115, D3): after a re-file, a reject naming the
+        # supply's OLD period was recorded against it there - a decision on
+        # a period it has left, about a supply waiting somewhere else.
+        from qa_tools.common import filing
+
+        rows = conn.execute(
+            f"SELECT slot FROM {filing.CURRENT} WHERE dataset_id = ? AND supply_id = ?",
+            [decision.dataset_id, decision.supply]).fetchall()
+        holder = held(conn, decision.dataset_id, decision.from_slot)
+        if (rows and rows[0][0] and rows[0][0] != decision.from_slot
+                and not (holder and holder.holder == decision.supply)):
+            raise DecisionRefused(
+                f"{decision.supply} is filed to {rows[0][0]}, not {decision.from_slot}. "
+                f"Decide about it there:\n  mothman supply decide --operation "
+                f"{decision.action} --dataset {decision.dataset_id} --period {rows[0][0]} "
+                f"--supply {decision.supply} --reason '<why>'")
+
     if decision.action == REJECT and decision.supply:
         # A SUPERSEDED SUPPLY IS NOT REJECTED (post-build-review #109, F7):
         # it is already out of staging, and rejecting it would let an
@@ -639,18 +677,37 @@ def _lock(conn: supply_db.SupplyConnection, decision: Decision) -> None:
                       [f"{decision.dataset_id}/{slot}"])
 
 
+def _table_of(dataset_id: str) -> str | None:
+    """The dataset's table, for the entry (REQ-PIPE-130 criterion 10) -
+    from the one hierarchy, so the log never holds a second mapping. None
+    for a dataset the tree does not know (a test's), which concerns no
+    table of this asset."""
+    from qa_tools.common import hierarchy
+
+    try:
+        return hierarchy.dataset(dataset_id).table
+    except hierarchy.UnknownDatasetError:
+        return None
+
+
 def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
     rows = conn.execute(
         f"INSERT INTO {TABLE} (agency_id, collection_id, dataset_id, action, supply, "
         "from_slot, to_slot, actor, actor_kind, reason, effective_at, stands_on, "
-        "amber_setting, amber_level, amber_version, superseded_by) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "amber_setting, amber_level, amber_version, superseded_by, table_name, "
+        "promoted_status, replaces, replacement_setting, replacement_level, "
+        "replacement_version, caused_by_decision) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "RETURNING id",
         [decision.agency_id, decision.collection_id, decision.dataset_id,
          decision.action, decision.supply or None, decision.from_slot, decision.to_slot,
          decision.actor.strip(), decision.actor_kind,
          (decision.reason or "").strip() or None, decision.effective_at,
          decision.stands_on, decision.amber_setting, decision.amber_level,
-         decision.amber_version, decision.superseded_by]).fetchall()
+         decision.amber_version, decision.superseded_by, _table_of(decision.dataset_id),
+         decision.promoted_status, decision.replaces, decision.replacement_setting,
+         decision.replacement_level, decision.replacement_version,
+         decision.caused_by_decision]).fetchall()
     return int(rows[0][0])
 
 
@@ -672,12 +729,27 @@ def decision_transaction(conn: supply_db.SupplyConnection) -> Iterator[None]:
     Nested, it is a savepoint inside the caller's."""
     import psycopg
 
+    # WHAT THIS TRANSACTION MOVED IN OR OUT OF A PERIOD (REQ-PIPE-121
+    # criteria 8, 9 and 15), gathered by every apply_decision inside it and
+    # owed ONCE, at the end, by the outermost - so a displacing promotion,
+    # which writes a supersession and a promotion, owes one re-evaluation
+    # rather than two, and it is recorded in the same transaction.
+    outermost = getattr(conn, "_period_moves", None) is None
+    if outermost:
+        conn._period_moves = []
     try:
         with conn.raw.transaction():
             conn.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
             yield
+            if outermost and conn._period_moves:
+                from qa_tools.common import knock_on
+
+                knock_on.owe(conn, conn._period_moves)
     except psycopg.errors.LockNotAvailable as exc:
         raise DecisionRefused(RUN_IN_PROGRESS) from exc
+    finally:
+        if outermost:
+            conn._period_moves = None
 
 
 @contextmanager
@@ -714,6 +786,10 @@ def apply_decision(conn: supply_db.SupplyConnection,
     with decision_transaction(conn):
         _lock(conn, decision)
         _judge(conn, decision)
+        # HOW EACH OF ITS PERIODS WAS HELD BEFORE, so that afterwards a change
+        # is SEEN rather than inferred from the action (REQ-PIPE-121
+        # criterion 8): one mechanism, whatever decision moved the table.
+        before = {slot: _holding(conn, decision.dataset_id, slot) for slot in decision.slots}
         entry_id = _insert(conn, decision)
         # A DECISION ABOUT A HELD SUPPLY ENDS ITS HOLD (REQ-PIPE-078
         # criterion 6), and it happens HERE because this is the one
@@ -729,6 +805,15 @@ def apply_decision(conn: supply_db.SupplyConnection,
             conn, dataset_id=decision.dataset_id, supply=decision.supply or "",
             decision_id=entry_id)
         yield entry_id
+        for slot, was in before.items():
+            if _holding(conn, decision.dataset_id, slot) != was:
+                conn._period_moves.append((entry_id, decision.dataset_id, slot))
+
+
+def _holding(conn, dataset_id: str, slot: str) -> tuple:
+    """What a period holds for a dataset, as a comparable pair."""
+    h = held(conn, dataset_id, slot)
+    return (h.held_as, h.holder) if h and h.held_as else (None, None)
 
 
 def record_automatic(conn: supply_db.SupplyConnection, decision: Decision) -> int:

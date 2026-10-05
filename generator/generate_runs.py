@@ -109,7 +109,7 @@ ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single del
 # dataset showed 'no data' on the default view" (2026-09-16, Keith's
 # own call). That constraint is GONE: AS_OF_OFFSET_DAYS was removed
 # entirely on 2026-09-17 in favour of per-dataset cadence, and the
-# dashboard's defaultAsOf() is now simply today. Since START_DATE is
+# dashboard's defaultInPlaceOn() is now simply today. Since START_DATE is
 # anchored so the LAST delivery lands ON the anchor date, the default
 # view shows fresh data at any N. Checked in the template rather than
 # assumed, after a 2026-09-22 lesson about inferring behaviour from

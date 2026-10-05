@@ -169,6 +169,20 @@ def _state_from(h) -> tuple[str, str | None]:
     return RETURNED, None
 
 
+def left_by_refile(conn, dataset_id: str, period: str, h) -> bool:
+    """Whether this slot is EMPTY because its last change re-filed a supply
+    out, and that supply is now filed to another period."""
+    if h is None or h.held_as is not None or h.action != decision_log.REFILE:
+        return False
+    from qa_tools.common import filing
+
+    rows = conn.execute(
+        f"SELECT f.slot FROM {decision_log.TABLE} d JOIN {filing.CURRENT} f "
+        "ON f.dataset_id = d.dataset_id AND f.supply_id = d.supply WHERE d.id = ?",
+        [h.decision_id]).fetchall()
+    return bool(rows) and rows[0][0] != period
+
+
 def _rejected(conn, dataset_id: str, supply: str) -> bool:
     """Whether this supply is no longer waiting: a person or the rule
     rejected it, or a newer version superseded it (REQ-PIPE-118)."""
@@ -239,6 +253,13 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
     # be about another supply or a refusal (post-build-review #84).
     h = decision_log.held(conn, dataset_id, slot.name)
     closed = slots_mod.is_closed(slot, now)
+    if h and left_by_refile(conn, dataset_id, slot.name, h):
+        # EMPTIED BY A RE-FILE OUT, the supply now filed elsewhere
+        # (post-build-review #115, D2 and D3): read as though nothing was
+        # decided here, so the period shows what is filed to it or what the
+        # clock says - never a "returned" supply that is not here, which
+        # the queue offered to reject and the reject then landed on.
+        h = None
     if h:
         state, supply = _state_from(h)
         if supply is None:
@@ -392,8 +413,18 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
             print(f"note: {entry.dataset_id} has no slots to reconcile "
                   f"({type(exc).__name__}: {exc}).")
             continue
-        filings = filings_by_period(conn, entry.dataset_id, filing.filings_of(entry.dataset_id))
-        ever = bool(filing.filings_of(entry.dataset_id))
+        every = filing.filings_of(entry.dataset_id)
+        filings = filings_by_period(conn, entry.dataset_id, every)
+        ever = bool(every)
+        # A PERIOD A SUPPLY WAS RE-FILED INTO, past the claim horizon
+        # (post-build-review #115, D2): a person can file into a future
+        # period the clock has not reached, and the supply waiting there was
+        # listed nowhere.
+        listed = {s.name for s in dataset_slots}
+        for name in sorted(set(filings) - listed):
+            found = slots_mod.slot_named(entry.dataset_id, name)
+            if found is not None:
+                dataset_slots.append(found)
         for slot in dataset_slots:
             out.append(state_of(conn, dataset_id=entry.dataset_id, slot=slot,
                                  now=now, filings=filings, ever_delivered=ever))

@@ -221,6 +221,23 @@ def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
     return out
 
 
+#: How far ahead a slot is looked for by name: far enough for any period a
+#: person would re-file into, bounded so a daily calendar does not
+#: generate without end.
+SLOT_LOOKUP_YEARS = 3
+
+
+def slot_named(dataset_id: str, period: str) -> Slot | None:
+    """This dataset's slot for `period`, or None where its calendar has no
+    such period it takes part in."""
+    from qa_tools.common import asset_time
+
+    horizon = asset_time.local_date(asset_time.now())
+    horizon = horizon.replace(year=horizon.year + SLOT_LOOKUP_YEARS)
+    return next((s for s in slots_for_dataset(dataset_id, until=horizon)
+                 if s.name == period), None)
+
+
 def _calendar_periods(dataset_id: str, until: date | None) -> list[Period]:
     """The full period sequence a dataset's slots close against - its
     calendar's, or its own dates where it overrides the calendar - with

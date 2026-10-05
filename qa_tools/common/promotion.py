@@ -50,7 +50,9 @@ def promote(conn: supply_db.SupplyConnection, *,
             supply_is_red: bool = False,
             from_schema: str | None = None,
             amber=None,
-            remove_substitution: bool = False) -> bool:
+            remove_substitution: bool = False,
+            status: str | None = None,
+            replacing=None) -> bool:
     """Move this supply's tables into `period` and record the decision.
 
     Returns True where it promoted, False where the supply was already
@@ -80,7 +82,7 @@ def promote(conn: supply_db.SupplyConnection, *,
             f"{from_schema or supply_db.STAGING_SCHEMA} to promote, so nothing was done. "
             "Check the supply id against `mothman supply queue`.")
     _refuse_what_the_slot_forbids(conn, dataset_id, supply, period, actor_kind,
-                                  remove_substitution)
+                                  remove_substitution, replacing=replacing)
 
     # OPENED, NOT JUST CREATED (REQ-PIPE-098 criterion 4): a first
     # promotion is one of the two ways a period comes into existence,
@@ -106,6 +108,16 @@ def promote(conn: supply_db.SupplyConnection, *,
         amber_setting=amber.value if amber else None,
         amber_level=amber.level if amber else None,
         amber_version=amber.version if amber else None,
+        # THE STATUS IT WAS PROMOTED ON (REQ-PIPE-130 criterion 11), rule or
+        # person: the gate passes the one it judged; a person's promotion
+        # reads it from the recorded results, the same function the gate's
+        # re-evaluations use (REQ-PIPE-121 NFR 4).
+        promoted_status=_status_at_promotion(conn, dataset_id, supply, status),
+        # THE SETTING A RULE'S REPLACEMENT ACTED UNDER (REQ-PIPE-123
+        # criterion 5); `replaces` is filled in under the lock below.
+        replacement_setting=replacing.value if replacing else None,
+        replacement_level=replacing.level if replacing else None,
+        replacement_version=replacing.version if replacing else None,
     )
 
     # A supply usually comes from staging, but a rejection being
@@ -141,7 +153,7 @@ def promote(conn: supply_db.SupplyConnection, *,
         if decision_log.promoted_into(conn, dataset_id, period) == supply:
             return False
         h = _refuse_what_the_slot_forbids(conn, dataset_id, supply, period, actor_kind,
-                                          remove_substitution)
+                                          remove_substitution, replacing=replacing)
         substituted = bool(h and h.held_as == decision_log.SUBSTITUTED)
         displaced = (h.holder if h and h.held_as == decision_log.PROMOTED
                      and h.holder != supply else None)
@@ -161,6 +173,12 @@ def promote(conn: supply_db.SupplyConnection, *,
                 dataset_id=dataset_id, supply=displaced, period=period, by=supply,
                 actor=actor, actor_kind=actor_kind, effective_at=effective_at,
                 replacing=list(physical_tables))
+        if displaced:
+            # The supply this promotion REPLACED, named on its own entry
+            # (REQ-PIPE-123 criterion 5) - known only now, under the lock.
+            import dataclasses
+
+            decision = dataclasses.replace(decision, replaces=displaced)
         with decision_log.apply_decision(conn, decision):
             move()
     # CHECKED WHEN IT IS TAKEN (REQ-PIPE-081 criterion 13), after the
@@ -171,8 +189,25 @@ def promote(conn: supply_db.SupplyConnection, *,
     return True
 
 
+def _status_at_promotion(conn, dataset_id: str, supply: str, given: str | None) -> str | None:
+    """The supply's status now, for the promotion entry - green, amber or
+    red, or None where no recorded result contributes."""
+    if given is not None:
+        return given if given in ("green", "amber", "red") else None
+    from qa_tools.common import supply_status
+
+    from qa_tools.common import hierarchy
+
+    try:
+        found = supply_status.status(conn, dataset_id, supply)
+    except (UnreadableVerdictError, hierarchy.UnknownDatasetError):
+        return None
+    return found if found in ("green", "amber", "red") else None
+
+
 def _refuse_what_the_slot_forbids(conn, dataset_id: str, supply: str, period: str,
-                                  actor_kind: str, remove_substitution: bool):
+                                  actor_kind: str, remove_substitution: bool,
+                                  replacing=None):
     """What the slot holds decides what else happens (REQ-PIPE-128
     criteria 4, 5 and 10). Returns what it holds; raises where it forbids
     this promotion."""
@@ -186,7 +221,9 @@ def _refuse_what_the_slot_forbids(conn, dataset_id: str, supply: str, period: st
             f"  mothman supply decide --operation un-inherit --dataset {dataset_id} "
             f"--period {period} --reason '<why>' --yes")
     if (actor_kind == decision_log.RULE and h and h.held_as == decision_log.PROMOTED
-            and h.holder != supply):
+            and h.holder != supply and replacing is None):
+        # (REQ-PIPE-123: unless the replacement setting the gate resolved
+        # permits it - the only rule that displaces accepted data.)
         # A RULE NEVER DISPLACES (criterion 2 is a person's promotion). The
         # gate's own filled-slot check is read before the lock; this is the
         # same answer under it, so a person promoting at the same instant
@@ -445,7 +482,8 @@ def promote_each(conn: supply_db.SupplyConnection,
                           effective_at=effective_at,
                           reason=item.get("reason", reason),
                           supply_is_red=item.get("supply_is_red", False),
-                          amber=item.get("amber"))
+                          amber=item.get("amber"), status=item.get("status"),
+                          replacing=item.get("replacing"))
         except Exception as exc:
             # DELIBERATELY BROAD. Anything one dataset's promotion can
             # raise - a missing table, a refused decision, a lock timeout
@@ -729,7 +767,8 @@ def after_run(conn: supply_db.SupplyConnection, *,
     the thirtieth was odd is a step somebody turns off, which is the
     same blast-radius rule this batch applies everywhere.
     """
-    from qa_tools.common import amber_setting, inheritance, rejection, supersession
+    from qa_tools.common import (amber_setting, inheritance, rejection, replacement_setting,
+                                 supersession)
 
     work: list[dict] = []
     refused: dict[str, str] = {}
@@ -763,6 +802,23 @@ def after_run(conn: supply_db.SupplyConnection, *,
             except amber_setting.AmberSettingError as exc:
                 refused[dataset_id] = str(exc)
                 continue
+        # MAY THIS SUPPLY REPLACE A PROMOTED ONE (REQ-PIPE-123)? Only where
+        # the slot is filled by a PROMOTED supply - never a substituted or
+        # inherited one (criterion 9) - and the replacement setting in force
+        # now permits this status. It lifts the filled-slot refusal and
+        # nothing else: every other refusal below still comes first
+        # (criterion 10).
+        replacing = None
+        held = decision_log.held(conn, dataset_id, period) if period else None
+        if (held and held.held_as == decision_log.PROMOTED
+                and held.holder != item["supply"] and status in ("green", "amber")):
+            try:
+                setting = replacement_setting.resolve(dataset_id, effective_at)
+            except amber_setting.AmberSettingError as exc:
+                refused[dataset_id] = str(exc)
+                continue
+            if replacement_setting.permits(setting, status):
+                replacing = setting
         ok, why = should_promote(
             # NO PERIOD IS THE SAME REFUSAL AS A HELD SUPPLY, and saying
             # so here rather than inventing a fourth reason keeps the
@@ -774,7 +830,7 @@ def after_run(conn: supply_db.SupplyConnection, *,
             # Nothing contributed means nothing was asked - see the
             # gate's own comment on why that outranks the verdict.
             has_active_checks=status is not None,
-            slot_filled=period in filled_slots(conn, dataset_id),
+            slot_filled=(period in filled_slots(conn, dataset_id)) and replacing is None,
             inherited=(period is not None
                        and inheritance.inherited(conn, dataset_id, period) is not None),
             decided_by_a_person=rejection.decided_by_a_person(
@@ -789,10 +845,30 @@ def after_run(conn: supply_db.SupplyConnection, *,
                                       supply=item["supply"], period=period, amber=amber,
                                       effective_at=effective_at)
             continue
+        reason = AUTOMATIC_REASON
+        if replacing is not None:
+            # NOT WHILE A LATER PERIOD STANDS ON IT (criterion 8): left
+            # waiting for a person, and why recorded.
+            try:
+                decision_log.refuse_if_stood_on(conn, dataset_id, held.holder,
+                                                decision_log.SUPERSEDE)
+            except decision_log.DecisionRefused as exc:
+                why = (f"the replacement setting '{replacing.value}' would replace "
+                       f"{held.holder}, but a later period stands on it - {exc}")
+                refused[dataset_id] = why
+                _record_withheld(conn, agency_id=agency_id, collection_id=collection_id,
+                                 dataset_id=dataset_id, supply=item["supply"],
+                                 period=period, reason=why, effective_at=effective_at)
+                continue
+            # THE SETTING THAT AUTHORISED IT IS THE REASON (criterion 5).
+            reason = (f"{AUTOMATIC_REASON} It replaces {held.holder} under the replacement "
+                      f"setting '{replacing.value}' (set for the {replacing.level}, version "
+                      f"{replacing.version}); {held.holder} is superseded, not rejected.")
         work.append({"dataset_id": dataset_id, "supply": item["supply"],
                      "period": period,
                      "physical_tables": item["physical_tables"],
-                     "reason": AUTOMATIC_REASON, "amber": amber})
+                     "reason": reason, "amber": amber, "status": status,
+                     "replacing": replacing})
 
     promoted, failed = promote_each(
         conn, work, agency_id=agency_id, collection_id=collection_id,
@@ -822,6 +898,24 @@ def _record_amber_waiting(conn, *, agency_id: str, collection_id: str, dataset_i
             actor_kind=decision_log.RULE, effective_at=effective_at, to_slot=period,
             reason=AMBER_WAITING_REASON, amber_setting=amber.value,
             amber_level=amber.level, amber_version=amber.version)):
+        pass
+
+
+def _record_withheld(conn, *, agency_id: str, collection_id: str, dataset_id: str,
+                     supply: str, period: str, reason: str, effective_at: str) -> None:
+    """The rule stood back from a replacement and says why (REQ-PIPE-123
+    criterion 8) - a promotion-withheld note, which changes no slot. Once
+    per supply and reason, so a retry records nothing more."""
+    if conn.execute(
+            f"SELECT 1 FROM {decision_log.TABLE} WHERE dataset_id = ? AND action = ? "
+            "AND supply = ? AND reason = ?",
+            [dataset_id, decision_log.PROMOTION_WITHHELD, supply, reason]).fetchall():
+        return
+    with decision_log.apply_decision(conn, decision_log.Decision(
+            agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
+            action=decision_log.PROMOTION_WITHHELD, supply=supply, actor=RULE_ACTOR,
+            actor_kind=decision_log.RULE, effective_at=effective_at, to_slot=period,
+            reason=reason)):
         pass
 
 

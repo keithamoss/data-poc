@@ -35,7 +35,7 @@ from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import parse_cadence_from_contract
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
-from pipeline import acknowledgements, closed_slots, recorded_arrival, slot_timeline
+from pipeline import acknowledgements, closed_slots, recorded_arrival, red_promoted, slot_timeline
 from qa_tools.common import promotion_state
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
@@ -504,6 +504,11 @@ def build() -> dict:
         # page's verdict is the newest supply promoted or awaiting on the
         # date on show. Answers from the decision log, looked up there.
         "runStates": slot_timeline.run_states("birth-registrations"),
+        # HOW EACH PROMOTED SUPPLY HAS DONE SINCE (REQ-DASH-126): the status
+        # it was promoted on and its status after each run that read it, so
+        # the page can say "red promoted" on the dates it was, and when and
+        # after what it turned. See pipeline/red_promoted.py.
+        "promotedHealth": red_promoted.for_dataset("birth-registrations"),
         # EVERY PERIOD THAT CLOSED WITH NO SUPPLY, and the instants that
         # decide what it reads as on any date (REQ-DASH-133 criteria 9 and
         # 10) - see pipeline/closed_slots.py. The page compares instants;

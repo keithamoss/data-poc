@@ -21,7 +21,7 @@ the same as a real one would, because that is the point. **This is the
 list that says which red was on purpose, and where to look at it.**
 
 Each entry gives coordinates - the dataset, the supplies, the period,
-and the date to set the as-of picker to - and never a link. The
+and the date to set the In place on picker to - and never a link. The
 generator knows where a scenario landed; it does not know how the
 dashboard addresses its pages, and a URL written here would break
 silently the next time a route changed.
@@ -47,7 +47,7 @@ for injection and has not been placed yet.
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609151400000800`, `birth_registrations__202609151600000800`, `birth_registrations__202609152000000800` |
 | Period | 2026-09-15 |
-| Set the as-of date to | 2026-09-15 |
+| Set the in-place-on date to | 2026-09-15 |
 
 ### TS-2 - Backward cascade
 
@@ -62,7 +62,7 @@ for injection and has not been placed yet.
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609111400000800` |
 | Period | 2026-09-11 |
-| Set the as-of date to | 2026-09-11 |
+| Set the in-place-on date to | 2026-09-11 |
 
 ### TS-3 - Arrival just OUTSIDE the claim window - four sub-tests
 
@@ -107,7 +107,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Dataset | birth-registrations |
 | Supplies | `birth_registrations__202609151400000800`, `birth_registrations__202609151600000800`, `birth_registrations__202609152000000800` |
 | Period | 2026-09-15 |
-| Set the as-of date to | 2026-09-15 |
+| Set the in-place-on date to | 2026-09-15 |
 
 ### TS-5 - A missed slot must not absorb a later resupply
 
@@ -372,7 +372,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 | Dataset | cp-clients |
 | Supplies | `cp_clients__202602010900000800` |
 | Period | 2026-Q1 |
-| Set the as-of date to | 2026-02-01 |
+| Set the in-place-on date to | 2026-02-01 |
 
 ### TS-39 - A split extract, once patterns are regexes
 
@@ -420,7 +420,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
      "birth_registrations__202609152000000800"
     ],
     "period": "2026-09-15",
-    "asOf": "2026-09-15"
+    "inPlaceOn": "2026-09-15"
    }
   },
   {
@@ -437,7 +437,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
      "birth_registrations__202609111400000800"
     ],
     "period": "2026-09-11",
-    "asOf": "2026-09-11"
+    "inPlaceOn": "2026-09-11"
    }
   },
   {
@@ -506,7 +506,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
      "birth_registrations__202609152000000800"
     ],
     "period": "2026-09-15",
-    "asOf": "2026-09-15"
+    "inPlaceOn": "2026-09-15"
    }
   },
   {
@@ -923,7 +923,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
      "cp_clients__202602010900000800"
     ],
     "period": "2026-Q1",
-    "asOf": "2026-02-01"
+    "inPlaceOn": "2026-02-01"
    }
   },
   {
