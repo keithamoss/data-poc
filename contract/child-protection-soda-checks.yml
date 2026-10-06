@@ -67,7 +67,7 @@ checks for cp_clients:
   - missing_count(cp_client_id):
       warn: when > 0
       fail: when > 3
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.cp_client_id.missing_count_soda
         category: completeness
@@ -81,7 +81,7 @@ checks for cp_clients:
   - duplicate_count(cp_client_id):
       warn: when > 0
       fail: when > 3
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.cp_client_id.duplicate_count_soda
         category: uniqueness
@@ -95,7 +95,7 @@ checks for cp_clients:
   - missing_count(given_name):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.given_name.missing_count_soda
         category: completeness
@@ -109,7 +109,7 @@ checks for cp_clients:
   - missing_count(family_name):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.family_name.missing_count_soda
         category: completeness
@@ -123,7 +123,7 @@ checks for cp_clients:
   - missing_count(date_of_birth):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.date_of_birth.missing_count_soda
         category: completeness
@@ -138,7 +138,7 @@ checks for cp_clients:
       valid values: [M, F, X]
       warn: when > 0%
       fail: when > 2%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.sex.invalid_percent_soda
         category: conformity
@@ -153,7 +153,7 @@ checks for cp_clients:
   - missing_count(suburb):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.suburb.missing_count_soda
         category: completeness
@@ -167,7 +167,7 @@ checks for cp_clients:
   - missing_count(case_opened_date):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.case_opened_date.missing_count_soda
         category: completeness
@@ -185,7 +185,7 @@ checks for cp_clients:
       valid values: ["6007", "6008", "6014", "6018", "6019", "6027", "6028", "6030", "6035", "6036", "6050", "6056", "6061", "6062", "6064", "6069", "6100", "6102", "6107", "6109", "6110", "6112", "6122", "6148", "6151", "6155", "6160", "6162", "6163", "6164", "6167", "6168", "6171", "6210", "6215", "6225", "6230", "6258", "6280", "6285", "6312", "6330", "6401", "6430", "6450", "6530", "6714", "6721", "6725"]
       warn: when > 0%
       fail: when > 3%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.postcode.invalid_percent_soda
         category: conformity
@@ -199,7 +199,7 @@ checks for cp_clients:
   - missing_count(postcode):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.postcode.missing_count_soda
         category: completeness
@@ -267,7 +267,7 @@ checks for cp_notifications:
   - missing_count(notification_id):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.missing_count_soda
         category: completeness
@@ -281,7 +281,7 @@ checks for cp_notifications:
   - duplicate_count(notification_id):
       warn: when > 0
       fail: when > 3
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.duplicate_count_soda
         category: uniqueness
@@ -295,7 +295,7 @@ checks for cp_notifications:
   - missing_count(cp_client_id):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.missing_count_soda
         category: completeness
@@ -309,7 +309,7 @@ checks for cp_notifications:
   - missing_count(notification_date):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_date.missing_count_soda
         category: completeness
@@ -324,7 +324,7 @@ checks for cp_notifications:
       valid values: ["School", "Police", "Health service", "Family member", "Neighbour", "Anonymous", "Self-report"]
       warn: when > 0%
       fail: when > 3%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.source_type.invalid_percent_soda
         category: conformity
@@ -339,7 +339,7 @@ checks for cp_notifications:
       valid values: ["Neglect", "Physical abuse", "Emotional abuse", "Sexual abuse", "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
       warn: when > 0%
       fail: when > 3%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.concern_type.invalid_percent_soda
         category: conformity
@@ -355,7 +355,7 @@ checks for cp_notifications:
       valid values: ["Low", "Medium", "High", "Critical"]
       warn: when > 0%
       fail: when > 3%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.risk_rating.invalid_percent_soda
         category: conformity
@@ -369,7 +369,7 @@ checks for cp_notifications:
   - missing_count(assigned_worker_id):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.missing_count_soda
         category: completeness
@@ -384,7 +384,7 @@ checks for cp_notifications:
       valid values: ["No further action", "Referred to family support", "Investigation opened"]
       warn: when > 0%
       fail: when > 3%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.outcome.invalid_percent_soda
         category: conformity
@@ -407,7 +407,7 @@ checks for cp_notifications:
   # that child-protection-contract.yaml's matching SQL rules describe in
   # theory but nothing ever exercises.
   - values in (cp_client_id) must exist in cp_clients (cp_client_id):
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.relationships_soda
         reads_tables: [cp_clients]
@@ -420,7 +420,7 @@ checks for cp_notifications:
           self-evident
         changelog: []
   - values in (assigned_worker_id) must exist in cp_case_workers (worker_id):
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.relationships_soda
         reads_tables: [cp_case_workers]
@@ -470,7 +470,7 @@ checks for cp_investigations:
   - missing_count(investigation_id):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.missing_count_soda
         category: completeness
@@ -484,7 +484,7 @@ checks for cp_investigations:
   - duplicate_count(investigation_id):
       warn: when > 0
       fail: when > 3
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.duplicate_count_soda
         category: uniqueness
@@ -498,7 +498,7 @@ checks for cp_investigations:
   - missing_count(notification_id):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.missing_count_soda
         category: completeness
@@ -512,7 +512,7 @@ checks for cp_investigations:
   - missing_count(cp_client_id):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.missing_count_soda
         category: completeness
@@ -526,7 +526,7 @@ checks for cp_investigations:
   - missing_count(lead_worker_id):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.missing_count_soda
         category: completeness
@@ -540,7 +540,7 @@ checks for cp_investigations:
   - missing_count(start_date):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.start_date.missing_count_soda
         category: completeness
@@ -582,7 +582,7 @@ checks for cp_investigations:
       valid values: ["Substantiated", "Not substantiated", "Inconclusive"]
       warn: when > 0%
       fail: when > 3%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.substantiated.invalid_percent_soda
         category: conformity
@@ -594,7 +594,7 @@ checks for cp_investigations:
         changelog: []
 
   - values in (notification_id) must exist in cp_notifications (notification_id):
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.relationships_soda
         reads_tables: [cp_notifications]
@@ -607,7 +607,7 @@ checks for cp_investigations:
           self-evident
         changelog: []
   - values in (cp_client_id) must exist in cp_clients (cp_client_id):
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.relationships_soda
         reads_tables: [cp_clients]
@@ -620,7 +620,7 @@ checks for cp_investigations:
           self-evident
         changelog: []
   - values in (lead_worker_id) must exist in cp_case_workers (worker_id):
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.relationships_soda
         reads_tables: [cp_case_workers]
@@ -668,7 +668,7 @@ checks for cp_placements:
   - missing_count(placement_id):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_id.missing_count_soda
         category: completeness
@@ -682,7 +682,7 @@ checks for cp_placements:
   - duplicate_count(placement_id):
       warn: when > 0
       fail: when > 3
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_id.duplicate_count_soda
         category: uniqueness
@@ -696,7 +696,7 @@ checks for cp_placements:
   - missing_count(cp_client_id):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.missing_count_soda
         category: completeness
@@ -711,7 +711,7 @@ checks for cp_placements:
       valid values: ["Kinship care", "Foster care", "Residential care", "Family group home"]
       warn: when > 0%
       fail: when > 3%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_type.invalid_percent_soda
         category: conformity
@@ -725,7 +725,7 @@ checks for cp_placements:
   - missing_count(carer_id):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.missing_count_soda
         category: completeness
@@ -739,7 +739,7 @@ checks for cp_placements:
   - missing_count(placement_start):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_start.missing_count_soda
         category: completeness
@@ -753,7 +753,7 @@ checks for cp_placements:
   - missing_count(placement_suburb):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_suburb.missing_count_soda
         category: completeness
@@ -765,7 +765,7 @@ checks for cp_placements:
         changelog: []
 
   - values in (cp_client_id) must exist in cp_clients (cp_client_id):
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.relationships_soda
         reads_tables: [cp_clients]
@@ -778,7 +778,7 @@ checks for cp_placements:
           self-evident
         changelog: []
   - values in (carer_id) must exist in cp_carers (carer_id):
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.relationships_soda
         reads_tables: [cp_carers]
@@ -846,7 +846,7 @@ checks for cp_carers:
   - missing_count(carer_id):
       warn: when > 0
       fail: when > 3
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id.missing_count_soda
         category: completeness
@@ -860,7 +860,7 @@ checks for cp_carers:
   - duplicate_count(carer_id):
       warn: when > 0
       fail: when > 3
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id.duplicate_count_soda
         category: uniqueness
@@ -874,7 +874,7 @@ checks for cp_carers:
   - missing_count(given_name):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.given_name.missing_count_soda
         category: completeness
@@ -888,7 +888,7 @@ checks for cp_carers:
   - missing_count(family_name):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.family_name.missing_count_soda
         category: completeness
@@ -903,7 +903,7 @@ checks for cp_carers:
       valid values: ["Kinship", "Foster", "Residential-staff"]
       warn: when > 0%
       fail: when > 3%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_type.invalid_percent_soda
         category: conformity
@@ -918,7 +918,7 @@ checks for cp_carers:
       valid values: ["Approved", "Provisional", "Under review"]
       warn: when > 0%
       fail: when > 3%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.approval_status.invalid_percent_soda
         category: conformity
@@ -948,7 +948,7 @@ checks for cp_case_workers:
   - missing_count(worker_id):
       warn: when > 0
       fail: when > 3
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.worker_id.missing_count_soda
         category: completeness
@@ -962,7 +962,7 @@ checks for cp_case_workers:
   - duplicate_count(worker_id):
       warn: when > 0
       fail: when > 3
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.worker_id.duplicate_count_soda
         category: uniqueness
@@ -976,7 +976,7 @@ checks for cp_case_workers:
   - missing_count(given_name):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.given_name.missing_count_soda
         category: completeness
@@ -990,7 +990,7 @@ checks for cp_case_workers:
   - missing_count(family_name):
       warn: when > 0
       fail: when > 5
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.family_name.missing_count_soda
         category: completeness
@@ -1005,7 +1005,7 @@ checks for cp_case_workers:
       valid values: ["Metro North", "Metro South", "Metro East", "South West", "Great Southern", "Goldfields", "Kimberley", "Pilbara", "Wheatbelt", "Midwest-Gascoyne"]
       warn: when > 0%
       fail: when > 3%
-      samples limit: 5
+      samples limit: 100
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.team_region.invalid_percent_soda
         category: conformity

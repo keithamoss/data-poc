@@ -448,6 +448,10 @@ def _parse_soda_check(check: Any, source: str, location: str) -> list[CheckMetad
         raise MissingCheckIdError(f"{source}: {location}: soda check {check_expr!r} has no attributes.check_id")
     category = _require_category(attributes, f"{source}: {location}: soda check {check_expr!r} (check_id={check_id!r})")
     check_config.pop("name", None)  # cosmetic label, not part of what the check does
+    # HOW MANY EXAMPLE ROWS SODA RETURNS is not what the check checks either:
+    # the verdict and the count are the same at any limit. Raised on 71
+    # checks at once for post-build-review #129, none of them changed.
+    check_config.pop("samples limit", None)
     return [CheckMetadata(
         check_id=check_id, category=category, tool="soda", config_hash=_config_hash(check_config),
         source_file=source, **_lifecycle_fields(attributes),

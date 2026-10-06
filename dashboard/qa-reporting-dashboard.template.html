@@ -1275,6 +1275,25 @@ function inPlaceOnNow(){
 function fmtDate(d){ return fmtDay(d); }
 function fmtDateShort(d){ return fmtDay(d); }
 function fmtInt(x){ return x.toLocaleString("en-US"); }
+
+// WHICH failing rows the example keys are, in one line under them
+// (post-build-review #129, Keith 2026-10-07: "note that in the fine print").
+// Every sample is in key order. dbt reads the lowest keys of all the failing
+// rows; Soda is asked for SODA_SAMPLES_ASKED of them and datacontract-cli
+// returns DATACONTRACT_SAMPLES_RETURNED of its own choosing, so past those
+// the tool decided which rows we sorted. tests/test_sample_keys_deterministic
+// pins both numbers to the pipeline's own.
+const SODA_SAMPLES_ASKED = 100;
+const DATACONTRACT_SAMPLES_RETURNED = 5;
+function sampleFinePrint(toolRef, shown, failing){
+  if (!shown || !(failing > shown)) return "";
+  const tool = String(toolRef || "").split(":")[0];
+  if (tool === "soda" && failing > SODA_SAMPLES_ASKED)
+    return `The lowest keys among the ${SODA_SAMPLES_ASKED} failing rows Soda returned, in key order - Soda chooses which ${SODA_SAMPLES_ASKED}, so another run of the same data can show different rows.`;
+  if (tool === "datacontract" && failing > DATACONTRACT_SAMPLES_RETURNED)
+    return `The ${DATACONTRACT_SAMPLES_RETURNED} failing rows datacontract-cli returned, in key order - it chooses which ${DATACONTRACT_SAMPLES_RETURNED} itself, so another run of the same data can show different rows.`;
+  return "The lowest keys among the failing rows, in key order - the same data always shows the same rows.";
+}
 // REQ-DASH-071. lastArrival.arrivedAt is a real INSTANT and now reads
 // as one, in the single form this project uses everywhere. What it used
 // to be is the reason the standard exists: the wall clock was
@@ -6169,6 +6188,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
         <div style="display:flex; flex-wrap:wrap; gap:5px;">
           ${sampleKeys.map(k => `<span style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--panel-2, rgba(127,127,127,.12)); border-radius:4px; padding:2px 6px;">${k}</span>`).join("")}
         </div>
+        ${(fp => fp ? `<div class="sample-fine-print" style="font-size:10.5px; color:var(--ink-faint); margin-top:5px;">${fp}</div>` : "")(sampleFinePrint(check.tool_ref, sampleKeys.length, currentPoint.row_count_invalid))}
       </div>` : (currentPoint.row_count_invalid ? `
       <div style="font-size:11.5px; color:var(--ink-faint); margin-top:8px;">No failing-row sample available for this check - not every check type this pipeline runs supports per-row samples yet (see plans/qa-pipeline.md #15).</div>` : "");
 

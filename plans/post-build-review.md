@@ -6527,7 +6527,7 @@ twice. It deliberately did not re-find the `TypeError`.
     FIXED: the dbt queries order by the key, the Soda sampler keeps
     everything Soda returned (bounded by Soda's own sample limit) and
     `failing_sample_keys` sorts before keeping five, and datacontract-cli's
-    samples are sorted (its count was never capped here, and still is not).
+    samples are sorted.
     Failing test first: `tests/test_sample_keys_deterministic.py`, three
     tests, all red before. MEASURED over a whole bootstrap against the
     previous one: 1,002 results' samples changed and nothing else in them -
@@ -6540,6 +6540,31 @@ twice. It deliberately did not re-find the `TypeError`.
     checks configuration so our sort chooses; NOT done without Keith, since
     it is a configuration change. Minor - no verdict, count or status changes - so
     fixed under the standing rule rather than held for Keith.
+
+    THE SODA EDGE, CLOSED (Keith, 2026-10-07: "go ahead", and "note that in
+    the fine print on the dashboard"). The 71 checks at `samples limit: 5`
+    now ask for 100 - Soda's own default - so the five recorded are the
+    lowest keys of all the failing rows up to 100; past 100, the lowest of
+    the 100 Soda returned. The nine "failed rows" checks keep their
+    deliberate 100000 (sodadata/soda-core#1985). Failing test first, against
+    REAL Soda: eight failing rows stored so the first five are not the
+    lowest five, red at 5 and green at 100. The limit is no longer part of a
+    Soda check's `config_hash` (how many example rows come back is not what
+    a check checks), so raising it asked for no changelog entries -
+    `validate-check-lifecycle` reports zero changes. Takes effect on the next
+    bootstrap; results already recorded keep the samples they had.
+
+    A CORRECTION TO THE FIX ABOVE: "datacontract-cli's count was never
+    capped" was wrong. The tool caps itself - `_FAILED_SAMPLE_LIMIT = 5` in
+    `datacontract/engines/ibis/ibis_check_execute.py`, a `LIMIT 5` with no
+    ORDER BY - so past five failing rows datacontract-cli chooses which five,
+    exactly as Soda did, and there is no setting to raise. Patching the
+    tool's private constant was not done (it is the pinning-shaped change
+    Keith does not want). The dashboard says so instead: the new fine print
+    under the example rows names, per tool, whether the keys are the lowest
+    of all the failing rows or the tool's own choice, and
+    `tests/test_sample_keys_deterministic.py` pins the page's two numbers to
+    Soda's configured limit and datacontract-cli's constant.
 
 130. **[done, 2026-10-06]** **[Pipeline & publishing]** **Recording each
     delivery at its first arrival (REQ-TEST-159) silently switched off

@@ -109,6 +109,27 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-07"
+    summary: >
+      The example failing rows on a check are the same on every run of the
+      same data, and say which rows they are.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Same data, same example rows
+            components: ["QA checks & contract"]
+            description: >
+              A check's example failing rows were whichever rows a tool
+              happened to return first. They are now the lowest keys, in key
+              order, so two runs of the same data show the same rows.
+      - category: Improved
+        items:
+          - headline: Fine print on example rows
+            components: ["Dashboard UI"]
+            description: >
+              Under a check's example failing rows, a line says which rows
+              they are - and, past the number Soda or datacontract-cli
+              returns, that the tool chose them.
   - date: "2026-10-06"
     summary: >
       One command now processes whatever has arrived and finishes what is

@@ -334,6 +334,24 @@ def test_parse_soda_check_metadata_config_hash_ignores_name_and_attributes(tmp_p
     assert hash_a == hash_b, "renaming a check's cosmetic name: field must not change its config hash"
 
 
+def test_parse_soda_check_metadata_config_hash_ignores_samples_limit(tmp_path):
+    """How many example rows Soda returns is not what the check checks: the
+    verdict and the count are the same at any limit (post-build-review #129,
+    which raised it on 71 checks without changing one)."""
+    base = """\
+        checks for t:
+          - missing_count(col) = 0:
+              attributes:
+                check_id: x.y.t.col.missing_count
+                category: completeness
+                changelog: []
+              samples limit: {limit}
+        """
+    a = cl.parse_soda_check_metadata(_write(tmp_path, "a.yml", base.format(limit=5)))[0]
+    b = cl.parse_soda_check_metadata(_write(tmp_path, "b.yml", base.format(limit=100)))[0]
+    assert a.config_hash == b.config_hash
+
+
 # ---- Contract parsing -------------------------------------------------
 
 def test_parse_contract_check_metadata_extracts_check_id_from_custom_properties(tmp_path):

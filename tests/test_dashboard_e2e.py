@@ -3799,3 +3799,28 @@ class TestFileChecksOnThePage:
             return rollupStatuses((d.columns||[]).map(c => c.status));
         }""")
         assert ds["status"] == own
+
+
+class TestSampleFinePrint:
+    """post-build-review #129 (Keith 2026-10-07): the example failing rows
+    say which rows they are, in the real panel."""
+
+    def test_a_soda_check_past_its_limit_says_soda_chose_them(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        text = clean_page.evaluate("""() => {
+          const ctx = resolveContext(STATE);
+          const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+          const ck = col.checks[0];
+          ck.tool_ref = "soda:missing_count";
+          for (const h of ck.history) {
+            h.failing_sample_keys = ["A1", "A2", "A3", "A4", "A5"];
+            h.row_count_invalid = 250;
+          }
+          openColumnDrawer(ctx.ag, ctx.col, ctx.ds, col);
+          openCheckPanel(ctx.ag, ctx.col, ctx.ds, col, ck);
+          const fp = document.querySelector('#check-panel-body .sample-fine-print');
+          return fp ? fp.textContent : null;
+        }""")
+        assert text and "Soda chooses which 100" in text

@@ -65,6 +65,17 @@ ENGINE_TAG = "Soda Core 3.5"
 # failing-row samples, not a per-tool guess. See plans/qa-pipeline.md #15.
 FAILING_SAMPLE_LIMIT = 5
 
+#: How many failing rows each Soda check asks Soda for (`samples limit:` in
+#: the checks YAML) - more than FAILING_SAMPLE_LIMIT on purpose, so the five
+#: recorded are the lowest keys rather than whichever five Soda returned
+#: first (post-build-review #129). 100 is Soda's own default. Past this many
+#: failing rows the five are the lowest of the rows Soda returned.
+SODA_SAMPLES_LIMIT = 100
+
+#: The live checks files, whose every `samples limit:` is SODA_SAMPLES_LIMIT.
+SODA_CHECK_FILES = ("contract/bdm-birth-registrations-soda-checks.yml",
+                    "contract/child-protection-soda-checks.yml")
+
 
 class CaptureSampler(Sampler):
     """Soda's own DefaultSampler computes failing-row samples then
