@@ -761,8 +761,8 @@ def dataset_for_filename(filename: str) -> str | None:
     REQ-PIPE-058 criterion 4 exists to end. The pattern now lives in
     the dataset's own configuration as a regular expression, and
     qa_tools/common/arrival_patterns.py owns the matching.
-    file_arrival.py's own matcher legitimately survives: it matches
-    whole S3 keys, which is the transport concern aws/'s handlers use.
+    file_arrival.py's whole-key matcher outlived it until REQ-PIPE-152,
+    when the handlers stopped matching keys at all.
     """
     return arrival_patterns.dataset_for_filename(filename)
 

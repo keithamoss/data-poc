@@ -288,6 +288,20 @@ releases:
             description: >
               The Check column now shows the column and check name, since the
               tool already has its own column.
+          - headline: Files arriving in S3 go through the same steps as everything else
+            components: ["Pipeline & publishing"]
+            description: >
+              The S3 handlers now record each arriving object as a delivery,
+              with its receipt taken from storage, and then run the same
+              processing pass the terminal does - filed, checked and gated in
+              receipt order. Nothing is copied, and a retried event records
+              nothing twice.
+          - headline: CI reuses the bootstrapped database
+            components: ["Testing & dev tooling"]
+            description: >
+              When nothing that shapes the generated QA history has changed,
+              CI restores the database from its cache instead of spending
+              over twenty minutes rebuilding it, and its log says which it did.
           - headline: A refusal in the menu no longer ends the session
             components: ["Testing & dev tooling"]
             description: >

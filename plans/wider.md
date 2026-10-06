@@ -1521,10 +1521,14 @@ check_lifecycle.py`'s own `check_id` convention.
     across that morning's conversation).** Kept here because it spans every
     component; each item's own detail lives where named.
     1. Soda's silent pass on a configuration error - a defect, the 2026-10-06
-       staleness sweep (plans/road-testing.md #7).
-    2. REQ-TEST-117 - CI reuses a bootstrapped database.
+       staleness sweep (plans/road-testing.md #7). DONE, 15edf01. Then the
+       critic fix sprint on #121-#124, DONE in three chunks (0c9b4d8,
+       5c5a616, 18203af).
+    2. REQ-TEST-117 - CI reuses a bootstrapped database. BUILT in 33a1bf6;
+       flipped to built once CI shows a real miss and then a real hit.
     3. REQ-PIPE-152 - the S3 Lambda handlers (criteria 12-13 added that day;
-       every arrival built from the database, qa schema 32).
+       every arrival built from the database). BUILT 2026-10-06 at qa schema
+       33 (32 went to the critic sprint's current-run tie-break).
     4. REQ-PIPE-078 - finish it for all four tools.
     5. REQ-DASH-148 criterion 12 - a reload owes a re-check.
     6. REQ-QAC-039 - a dataset's hierarchy identifiers in one place (survey

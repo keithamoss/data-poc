@@ -431,6 +431,45 @@ class TestThePassItself:
         assert report.failures == [("owed #7", "no")] and report.red
 
 
+class TestAHandlersPassHasABudget:
+    """REQ-PIPE-152 criterion 12: once a handler's budget has passed, no new
+    arrival is taken, the one in progress finishes, and the rest stay owed -
+    reported, and never as a failure. A pass with no budget takes them all."""
+
+    world = TestThePassItself.world
+
+    def test_out_of_time_takes_nothing_new_and_fails_nothing(self, world):
+        import time
+
+        report = pp.run_pass(run_by="me", say=lambda m: None, deadline=time.monotonic() - 1)
+        assert world.processed == []
+        assert report.left_for_budget == [a.run_id for a in world.arrivals]
+        assert report.failures == [] and report.exit_status == pp.EXIT_OK
+
+    def test_the_arrival_in_progress_finishes(self, world, monkeypatch):
+        """The budget runs out DURING the first arrival: it completes, and
+        the next two are left owed."""
+        import time
+
+        clock = {"now": 0.0}
+        monkeypatch.setattr(time, "monotonic", lambda: clock["now"])
+        real_one = pp._one
+
+        def slow(arrival, *a, **k):
+            real_one(arrival, *a, **k)
+            clock["now"] = 100.0
+        monkeypatch.setattr(pp, "_one", slow)
+        report = pp.run_pass(run_by="me", say=lambda m: None, deadline=50.0)
+        first, *rest = world.arrivals
+        assert world.processed == [first.run_id]
+        assert report.left_for_budget == [a.run_id for a in rest]
+
+    def test_no_budget_takes_everything(self, world):
+        report = pp.run_pass(run_by="me", say=lambda m: None)
+        assert report.left_for_budget == []
+        assert world.processed == [a.run_id for a in world.arrivals]
+
+
 class TestARefusalAfterTheSupplyMovedIsStillRecorded:
     """Criterion 3, post-build-review #120 D7: the once-only check skipped a
     refusal whenever the supply had EVER been promoted or withheld, so a

@@ -28944,7 +28944,27 @@ requirements:
       date: '2026-10-04'
     story: As whoever will eventually switch on the automated path, I want aws/'s Birth Registrations and Child Protection handlers to treat each arriving S3 object as a delivery and put it through exactly the steps the terminal and the batch use - recognise it, record its receipt, file it, check it, apply the promotion gate - so that the automation does what an engineer at the terminal did, rather than a stage-and-check shortcut that files nothing and promotes nothing.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria: []
+    evidence:
+    - "2026-10-06: built against a sandbox database rebuilt from empty at qa schema 33 (bootstrap 1648s; every one of its 152 recorded files carries a storage URI). tests/test_arrivals_from_records.py 5 passed - including arrivals_from_records() equal, field for field and in order, to disk recognition (arrivals_for) for both collections over the whole deployment, so building every arrival from the database changes nothing locally. tests/test_lambda_handlers.py, test_processing_pass.py (3 new budget tests), test_delivery_log, test_arrival_patterns, test_cdk_handler_environment: 104 passed. Criterion 11's regression test binds the handler's call against run_single's REAL signature and failed first with TypeError: got an unexpected keyword argument 'reference_csv'; the handlers no longer call run_single at all. Never run in a real Lambda or against real S3 (no AWS access here): S3 is a mocked client throughout."
+    implemented_by:
+    - qa_tools/common/s3_arrival.py::handle_event
+    - qa_tools/common/s3_arrival.py::record_object
+    - qa_tools/common/s3_arrival.py::receipt_of
+    - qa_tools/common/s3_arrival.py::delivery_name_for
+    - qa_tools/common/s3_arrival.py::materialise
+    - qa_tools/common/arrivals.py::arrivals_from_records
+    - qa_tools/common/processing_pass.py::all_arrivals
+    - qa_tools/common/processing_pass.py::run_pass
+    - qa_tools/common/delivery_log.py::record
+    - aws/lambda_handlers/bdm_ingest_handler.py::handler
+    - aws/lambda_handlers/cp_ingest_handler.py::handler
+    linked_tests:
+    - tests/test_lambda_handlers.py
+    - tests/test_arrivals_from_records.py
+    - tests/test_processing_pass.py
+    - tests/test_cdk_handler_environment.py
     source: 'Keith, 2026-10-04: his Q2 answer on the REQ-PIPE-086 refresh moved the Lambda handlers onto the shared per-arrival lifecycle now, and his follow-up the same day split them into their own requirement, chose the S3 object itself as the delivery, and added the failing-test-first criterion for the handler''s TypeError, which he verified himself. Drafted by delivery-scoper the same day.'
     acceptance_criteria:
     - WHEN an S3 event hands aws/'s Birth Registrations or Child Protection handler an object, THE SYSTEM SHALL treat that S3 object as the delivery, and SHALL NOT copy it to any other storage.
@@ -29016,6 +29036,13 @@ requirements:
       refuses without MOTHMAN_ENVIRONMENT and a matching qa.identity row, and
       the CDK stack gives both Lambdas no environment at all. Supplying both is
       part of building this, not a new decision.'
+    - 'BUILT 2026-10-06 (qa schema 33). A storage URI on every qa.delivery_file row: `s3://bucket/key` for an object a handler recorded, `local:<delivery>/<file>` for a file in the deliveries tree - RELATIVE to the tree, so a database restored on another machine (CI''s cache, REQ-TEST-117) finds the file under that machine''s own tree. REJECTED an absolute path, which a restored dump would carry from the machine that made it.'
+    - 'A LOCAL DELIVERY WHOSE DIRECTORY IS GONE IS NOT AN ARRIVAL. Building arrivals from records alone would offer every delivery ever recorded, including the orphans CLAUDE.md records from 2026-09-28 (test deliveries whose files were deleted) and every other test''s deliveries in a worker''s shared database - each an arrival whose files cannot be read. arrivals_from_records() offers a local delivery only while its directory exists under the tree being read; an S3 delivery has no directory and is always offered.'
+    - 'AN S3 DELIVERY IS NAMED FROM ITS BUCKET, KEY AND OWN LastModified (criterion 7): a retry of the same object names the same delivery and records nothing, while a NEW object under the same key - a supplier re-sending a file - is a new delivery, as a second folder on disk is. REJECTED bucket and key alone, under which a re-sent file would be taken for a retry and silently dropped.'
+    - 'THE OBJECT IS FETCHED WHEN THE PASS STAGES IT, not when the handler records it: s3_arrival.materialise() downloads to a temporary directory and hands the loaders a local path, so nothing downstream of staging changed. Only arrivals the pass is about to stage are fetched.'
+    - 'THE BUDGET STOPS STAGING TOO (criterion 12): the pass stages before it checks, so a budget that only stopped the checking would still spend the invocation staging a backlog. No new arrival is staged or taken once the deadline has passed; the one in progress finishes; the rest are reported as left for the next pass, never as failures, so a handler that ran out of time exits 0.'
+    - 'file_arrival.py WENT WITH THE KEY MATCHING. Its whole-key matcher was kept by REQ-PIPE-058 as the handlers'' transport concern; once a handler takes every object under its prefix and recognition decides the dataset, it had no caller but its own test - production code alive only for its test, the kind Keith''s 2026-10-06 test review targets. Deleted with tests/test_file_arrival.py; test_arrival_patterns now asserts it is gone.'
+    - 'FLAGGED FOR KEITH, NOT DECIDED: the CDK stack passes MOTHMAN_SUPPLY_DSN - which carries the database password - as a Lambda environment variable, readable by anyone who can read the function''s configuration. A real deployment should hold it in Secrets Manager and have supply_db read it from there. Both values come from required cdk context (-c mothman_environment=..., -c supply_dsn=...) with no default; the database must already be marked by a person (mothman env mark).'
   - id: REQ-PIPE-153
     title: A person rejects a supply that could not be loaded, and the rejection settles it
     date_written: '2026-10-04'

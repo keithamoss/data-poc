@@ -401,7 +401,7 @@ one when this line suggests it matters.
   - *touches:* `qa_tools/common/leaderboard.py`, `contract/people.yaml`, `tests/test_leaderboard.py`
 - **#4** `investigate` 2026-09-18 - GitHub Issues -> Microsoft Teams integration (research first).
 - **#5** `done` 2026-09-19 - Staff adoption - two threads.
-  - *touches:* `qa_tools/common/file_arrival.py`, `aws/cdk/app.py`, `qa_tools/common/git_identity.py`, `contract/people.yaml`
+  - *touches:* `aws/cdk/app.py`, `qa_tools/common/git_identity.py`, `contract/people.yaml`
 - **#6** `done` 2026-09-18 - Read-only tension: accepting/rejecting Amber supplies.
   - *touches:* `qa_tools/common/ticket_sync.py`
 - **#7** `done` 2026-09-18 - Business requirements page on the dashboard.

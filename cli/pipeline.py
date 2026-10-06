@@ -201,6 +201,9 @@ def _say_pass(report) -> None:
         console.print(f"{len(report.left_behind_locked)} later arrival(s) left for the next "
                       f"pass behind one being processed elsewhere, to keep receipt order.",
                       style="yellow")
+    if report.left_for_budget:
+        console.print(f"{len(report.left_for_budget)} arrival(s) left for the next pass - "
+                      f"this pass's time budget ran out.", style="yellow")
     for what, why in report.failures:
         console.print(f"FAILED {what}: {why}", style="red")
     for line in report.tickets:

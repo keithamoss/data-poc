@@ -1,101 +1,27 @@
-"""
-Lambda handler for Birth Registrations file arrivals - the AWS event-
-driven MVP (plans/running-thoughts.md #5 Thread B / docs/aws-event-
-driven-mvp-design.md's own "Lambda handlers" section). Triggered by a
-real S3 ObjectCreated event under the raw bucket's `bdm/` prefix (see
-aws/cdk/data_pipeline_stack.py for the event wiring).
+"""Lambda handler for Birth Registrations objects arriving under the raw
+bucket's `bdm/` prefix (see aws/cdk/data_pipeline_stack.py for the wiring).
 
-**Never invoked by a real Lambda runtime or a real S3 event in this
-sandbox** (no AWS access at all here) - written against the real,
-documented S3 event JSON shape and exercised in tests/
-test_lambda_handlers.py against hand-built fixture event dicts and a
-mocked boto3 S3 client, not a real invocation.
+IT RECORDS, THEN RUNS THE PROCESSING PASS (REQ-PIPE-152). Each arriving
+object is recorded as a delivery - REQ-PIPE-144's rows, its receipt from
+storage, its dataset from the declared pattern - and REQ-PIPE-151's pass
+then does what the terminal and the batch do: file, check and gate, in
+global receipt order. It used to call the single-run entry point, which
+files nothing and promotes nothing, took its run id from the key and its
+date from the Lambda's clock - and passed a `reference_csv=` that
+entry point no longer accepts, so it raised on its first object.
+
+**Never invoked by a real Lambda runtime in this sandbox** (no AWS access
+here); exercised by tests/test_lambda_handlers.py with a mocked S3 client.
 """
 from __future__ import annotations
-import json
-import os
-import tempfile
 
-import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
-from qa_tools.common.file_arrival import match_arrival
-from qa_tools.common import asset_time
+from qa_tools.common import s3_arrival
 
-# The proposed arrivalPattern contract extension (docs/aws-event-driven-
-# mvp-design.md's own "File-arrival contract matching" section) - a
-# hardcoded stand-in here, NOT wired into the real production contract
-# YAML files yet (that doc explains why: no way to verify it against
-# real Soda/dbt/datacontract-cli parsing overnight without real AWS
-# access to actually deploy and test against). Move this into contract/
-# bdm-birth-registrations-contract.yaml's own customProperties once
-# someone can verify that round-trip for real.
-BDM_ARRIVAL_PATTERNS = [
-    {"type": "single_file", "keyPattern": "bdm/birth_registrations_{run_id}.csv", "dataset_id": "birth-registrations"},
-]
-
-# A real, placeholder answer to the design doc's own open question
-# ("where does the Evidently reference run come from in production") -
-# reuses this repo's own synthetic run_01 convention rather than
-# resolving a real one. Flagged there as a real gap, not solved here.
-REFERENCE_RUN_ID = "run_001"
-REFERENCE_CSV = "run_001.csv"
-
-AGENCY_ID = orchestrate_bdm.AGENCY_ID
-COLLECTION_ID = orchestrate_bdm.COLLECTION_ID
+#: The prefix this handler's objects arrive under.
+PREFIX = "bdm/"
 
 
 def handler(event: dict, context=None) -> dict:
     import boto3
 
-    s3_client = boto3.client("s3")
-    summary = {"processed": 0, "skipped": 0, "pass": 0, "warn": 0, "fail": 0, "error": 0}
-
-    # THERE IS NOTHING TO REDIRECT ANY MORE, and the absence is worth a
-    # note because it used to be the fiddliest thing in this handler.
-    # write_qa_result() wrote JSON files under this repo's own committed
-    # qa_results/ path, which is neither present nor writable inside a
-    # Lambda, so every call had to be rebound to /tmp and the files
-    # uploaded to a results bucket for a sync workflow to lay back into
-    # git. REQ-PIPE-089 records results in the database instead, so the
-    # redirection, the upload and the sync all went with it - a Lambda
-    # inside the VPC reaches the database directly.
-    for record in event.get("Records", []):
-        bucket = record["s3"]["bucket"]["name"]
-        key = record["s3"]["object"]["key"]
-
-        match = match_arrival(key, BDM_ARRIVAL_PATTERNS)
-        if match is None:
-            # A real, expected occurrence (a stray file, a different
-            # team's object in a shared bucket) - never a pipeline
-            # failure. See qa_tools/common/file_arrival.py's own
-            # docstring.
-            print(f"no arrival pattern matched key={key!r} - skipping")
-            summary["skipped"] += 1
-            continue
-
-        run_id = match.groups.get("run_id") or os.path.splitext(os.path.basename(key))[0]
-        # A real S3 object's own LastModified would be a better arrival
-        # timestamp than "now" - not threaded through record["s3"] in the
-        # real S3 event notification shape, so run_date here is really
-        # "when this Lambda processed it," not "when the file actually
-        # arrived" - a real, small imprecision, not solved in this MVP.
-        run_date = asset_time.now().date().isoformat()
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            local_csv = os.path.join(tmp_dir, os.path.basename(key))
-            s3_client.download_file(bucket, key, local_csv)
-
-            # This used to pass an explicit dirty_severity=None, with a
-            # comment explaining that a real arriving file carries no
-            # such label. REQ-GEN-043 removed the parameter outright for
-            # exactly that reason - it was a synthetic-data-generator
-            # concept (generator/dirty.py's calibrated defect injection)
-            # that had no business crossing into the pipeline at all.
-            results = orchestrate_bdm.run_single(
-                run_id, local_csv, run_date,
-                reference_run_id=REFERENCE_RUN_ID, reference_csv=REFERENCE_CSV)
-
-        summary["processed"] += 1
-        for status in ("pass", "warn", "fail", "error"):
-            summary[status] += sum(1 for r in results if r["status"] == status)
-
-    return {"statusCode": 200, "body": json.dumps(summary)}
+    return s3_arrival.handle_event(event, boto3.client("s3"), prefix=PREFIX)

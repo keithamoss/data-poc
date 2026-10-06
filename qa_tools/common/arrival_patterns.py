@@ -15,8 +15,10 @@ placeholders in a dedicated field - cannot express a split extract
 without gaining optionality, then repetition, then alternation, which is
 reinventing regex badly. It deliberately does NOT reuse the ODCS
 contract's `arrivalPattern` keyPattern, which is an S3 key and a
-TRANSPORT concern; qa_tools/common/file_arrival.py still owns that, and
-keeping the two apart is the whole point of criterion 4.
+TRANSPORT concern, and keeping the two apart is the whole point of
+criterion 4. (file_arrival.py, which matched whole S3 keys against it, went
+with REQ-PIPE-152: a handler now takes every object under its prefix and
+this module decides the dataset, as on every other route.)
 
 THE ReDoS RISK IS BOUNDED MECHANICALLY rather than by trusting the
 author. Keith accepted the residual risk - "I'm kind of willing to

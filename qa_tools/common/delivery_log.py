@@ -89,7 +89,8 @@ def _db(conn: supply_db.SupplyConnection | None):
 
 
 def record(delivery, recognition,
-           conn: supply_db.SupplyConnection | None = None) -> dict | None:
+           conn: supply_db.SupplyConnection | None = None,
+           storage_uris: dict[str, str] | None = None) -> dict | None:
     """Commit what this delivery was, once.
 
     WRITTEN ONCE AND NEVER REWRITTEN (criterion 1). A delivery already
@@ -144,7 +145,11 @@ def record(delivery, recognition,
              "received_from": _file_source(delivery, name),
              "receipt_sequence": delivery.sequence_of(name),
              # REQ-PIPE-103 criterion 10 - absent unless a person stated it.
-             "originally_received_stated": _stated(delivery, name)}
+             "originally_received_stated": _stated(delivery, name),
+             # WHERE IT IS (REQ-PIPE-152): the S3 object a handler recorded,
+             # else the file in the deliveries tree, named relative to it.
+             "storage_uri": (storage_uris or {}).get(name)
+                            or f"local:{delivery.name}/{name}"}
             for name in sorted(delivery.files)
         ],
         # WHAT WAS CONTESTED (REQ-PIPE-059 criterion 4) is NOT written:
@@ -178,13 +183,15 @@ def record(delivery, recognition,
                 f'INSERT INTO "{qa_store.SCHEMA}".delivery_file '
                 "(delivery, filename, dataset_id, contested_by, received_at, "
                 "received_instant, received_from, receipt_sequence, "
-                "originally_received_stated, originally_received_stated_instant) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "originally_received_stated, originally_received_stated_instant, "
+                "storage_uri) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [payload["delivery"], entry["filename"], entry["dataset_id"],
                  json.dumps(entry["contested_by"]) if entry["contested_by"] else None,
                  entry["received_at"], entry["received_instant"], entry["received_from"],
                  entry["receipt_sequence"], entry["originally_received_stated"],
-                 _stated_instant(entry["originally_received_stated"])])
+                 _stated_instant(entry["originally_received_stated"]),
+                 entry["storage_uri"]])
     payload["contested"] = [{"dataset_id": h.dataset_id, "files": list(h.files)}
                             for h in holds.holds_in(recognition)]
     for entry in payload["files"]:
@@ -237,16 +244,17 @@ def records(conn: supply_db.SupplyConnection | None = None) -> list[dict]:
         ).fetchall()
         contested_lists = _contested(db, None)
         files: dict[str, list[dict]] = {}
-        for delivery, filename, dataset_id, contested, received_at, sequence, source, stated in db.execute(
+        for (delivery, filename, dataset_id, contested, received_at, sequence, source, stated,
+             uri) in db.execute(
                 f'SELECT delivery, filename, dataset_id, contested_by, received_at, '
-                f'receipt_sequence, received_from, originally_received_stated '
+                f'receipt_sequence, received_from, originally_received_stated, storage_uri '
                 f'FROM "{qa_store.SCHEMA}".delivery_file ORDER BY delivery, filename'
         ).fetchall():
             files.setdefault(delivery, []).append(
                 {"filename": filename, "dataset_id": dataset_id,
                  "contested_by": contested, "received_at": received_at,
                  "receipt_sequence": sequence, "received_from": source,
-                 "originally_received_stated": stated})
+                 "originally_received_stated": stated, "storage_uri": uri})
     return [{"delivery": name, "received_at": received_at,
              "received_from": received_from,
              "collections": collections, "files": files.get(name, []),

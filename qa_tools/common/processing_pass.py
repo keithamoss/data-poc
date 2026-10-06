@@ -169,13 +169,20 @@ def state_of(arrival, rec: Recorded) -> str:
 
 
 def all_arrivals(deliveries_dir=None, receipts_dir=None) -> list:
-    """Every collection's arrivals in ONE receipt order (criterion 9)."""
+    """Every collection's arrivals in ONE receipt order (criterion 9).
+
+    FROM THE DELIVERY RECORDS, NOT THE TREE (REQ-PIPE-152 criterion 6; Keith,
+    2026-10-06). The pass records every delivery on disk before it asks, so
+    building every arrival from qa.delivery_file gives one source and one
+    arrival type - and an object a Lambda recorded straight from S3, with no
+    directory anywhere, is an arrival like any other. `receipts_dir` is
+    unused now and kept so a caller passing it still works.
+    """
     from qa_tools.common import arrivals
 
     found = []
-    for collection_id, (_, _, prefix) in COLLECTIONS.items():
-        found.extend(arrivals.arrivals_for(collection_id, prefix, deliveries_dir,
-                                           receipts_dir))
+    for collection_id in COLLECTIONS:
+        found.extend(arrivals.arrivals_from_records(collection_id, deliveries_dir))
     found.sort(key=lambda a: (a.received_at, a.sequence, a.run_id))
     return found
 
@@ -197,6 +204,9 @@ class PassReport:
     left_locked: list[str] = field(default_factory=list)
     left_behind_failure: list[str] = field(default_factory=list)
     left_behind_locked: list[str] = field(default_factory=list)
+    #: Not taken because the pass's budget ran out (REQ-PIPE-152 criterion
+    #: 12) - owed to the next pass, and not a failure.
+    left_for_budget: list[str] = field(default_factory=list)
     failures: list[tuple[str, str]] = field(default_factory=list)
     owed: list = field(default_factory=list)
     tickets: list[str] = field(default_factory=list)
@@ -206,7 +216,7 @@ class PassReport:
     def nothing_to_do(self) -> bool:
         return not (self.processed or self.gated_only or self.left_locked
                     or self.left_behind_failure or self.left_behind_locked
-                    or self.failures or self.owed)
+                    or self.left_for_budget or self.failures or self.owed)
 
     @property
     def exit_status(self) -> int:
@@ -227,8 +237,22 @@ def _modules(collection_id):
     return importlib.import_module(orchestrator), importlib.import_module(builder)
 
 
-def run_pass(*, run_by: str | None = None, say=print) -> PassReport:
-    """Criterion 1's one pass. The caller holds the pass lock."""
+def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = None,
+             s3_client=None) -> PassReport:
+    """Criterion 1's one pass. The caller holds the pass lock.
+
+    `deadline` (a time.monotonic() instant) is a Lambda handler's budget
+    (REQ-PIPE-152 criterion 12): once it has passed, no NEW arrival is taken -
+    the one in progress finishes - and the rest stay owed to the next pass.
+    None, as from the terminal or a scheduler, is no budget at all.
+    `s3_client` fetches an arrival recorded from S3 (criterion 6).
+    """
+    import time
+
+    from qa_tools.common import s3_arrival
+
+    def out_of_time() -> bool:
+        return deadline is not None and time.monotonic() >= deadline
     from qa_tools.common import (asset_time, delivery_log, qa_store, recheck,
                                  ticket_reconciler)
     from qa_tools.common.git_identity import get_run_by
@@ -275,12 +299,26 @@ def run_pass(*, run_by: str | None = None, say=print) -> PassReport:
     # candidates the overlay sees when its first is checked. Only what is
     # still owed its checks - a gated arrival's table has moved on. A
     # staging failure is that arrival's failure, not the pass's (D2).
+    # AN S3 OBJECT IS FETCHED HERE, through its recorded URI (REQ-PIPE-152
+    # criterion 6), so everything after reads a local file as it always has.
+    fetched = []
+    for arrival in todo:
+        try:
+            fetched.append(s3_arrival.materialise(arrival, s3_client=s3_client))
+        except Exception as exc:  # noqa: BLE001 - criterion 14: reported, left owed
+            fail_arrival(arrival, exc)
+            fetched.append(arrival)
+    todo = fetched
+    staged: set[str] = set()
     for arrival in todo:
         if arrival.collection_id in blocked or state_of(arrival, rec) != UNCHECKED:
             continue
+        if out_of_time():
+            break
         try:
             _, builder = _modules(arrival.collection_id)
             builder.stage_arrival(arrival)
+            staged.add(arrival.run_id)
         except Exception as exc:  # noqa: BLE001 - criterion 14: reported, left owed
             fail_arrival(arrival, exc)
     staged_failures = {run_id for run_id, _ in report.failures}
@@ -294,6 +332,12 @@ def run_pass(*, run_by: str | None = None, say=print) -> PassReport:
                 continue
             if arrival.collection_id in locked_out:
                 report.left_behind_locked.append(arrival.run_id)
+                continue
+            # THE BUDGET (REQ-PIPE-152 criterion 12): no new arrival once it
+            # has run out, and none the staging above did not reach.
+            if out_of_time() or (state_of(arrival, rec) == UNCHECKED
+                                 and arrival.run_id not in staged):
+                report.left_for_budget.append(arrival.run_id)
                 continue
             with arrival_lock(lock_conn, arrival.run_id) as mine:
                 if not mine:

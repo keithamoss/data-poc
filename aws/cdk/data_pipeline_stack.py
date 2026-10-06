@@ -65,6 +65,26 @@ class DataPipelineStack(Stack):
         # for exactly one account. CDK auto-generates a unique name from
         # the construct/stack id; the real name is only known post-deploy,
         # which is exactly what the CfnOutputs below are for.
+        # A STATED ENVIRONMENT AND A DATABASE, OR NO STACK (REQ-PIPE-152).
+        # Every connection refuses without MOTHMAN_ENVIRONMENT and a matching
+        # qa.identity row (REQ-PIPE-093, REQ-PIPE-107), so a handler deployed
+        # without either fails on its first object. Both come from CDK
+        # context and neither has a default: `cdk synth -c
+        # mothman_environment=production -c supply_dsn=...`. The database
+        # must already be marked with the same environment by a person
+        # (`mothman env mark`) - the stack cannot do that for them.
+        #
+        # FLAGGED, NOT SOLVED: a DSN carries a password, and a Lambda
+        # environment variable is readable by anyone who can read the
+        # function's configuration. A real deployment should hold it in
+        # Secrets Manager and have supply_db read it from there; that is a
+        # security decision for whoever deploys this, not one to make in a
+        # sketch nobody has synthesised.
+        handler_environment = {
+            "MOTHMAN_ENVIRONMENT": self._required_context("mothman_environment"),
+            "MOTHMAN_SUPPLY_DSN": self._required_context("supply_dsn"),
+        }
+
         raw_bucket = s3.Bucket(
             self,
             "RawDataBucket",
@@ -94,8 +114,7 @@ class DataPipelineStack(Stack):
             # this limit is one of the design doc's own open questions, never checked against a real
             # invocation.
             memory_size=1024,
-            environment={
-            },
+            environment=dict(handler_environment),
         )
 
         cp_lambda = lambda_.Function(
@@ -107,8 +126,10 @@ class DataPipelineStack(Stack):
             code=lambda_.Code.from_asset(LAMBDA_HANDLERS_DIR),
             timeout=Duration.minutes(15),
             memory_size=1024,
-            # NO ENVIRONMENT AT ALL: the completion table it used to name
-            # is gone with the completion tracking (REQ-PIPE-105).
+            # The completion table it used to name is gone with the
+            # completion tracking (REQ-PIPE-105); what it needs now is the
+            # same stated environment and database as the other handler.
+            environment=dict(handler_environment),
         )
 
         # S3 ObjectCreated -> Lambda wiring, filtered by prefix so each
@@ -157,3 +178,13 @@ class DataPipelineStack(Stack):
         CfnOutput(self, "RawBucketName", value=raw_bucket.bucket_name)
         CfnOutput(self, "BdmIngestHandlerFunctionName", value=bdm_lambda.function_name)
         CfnOutput(self, "CpIngestHandlerFunctionName", value=cp_lambda.function_name)
+
+    def _required_context(self, key: str) -> str:
+        """A CDK context value this stack cannot be built without - refused
+        by name rather than defaulted, as MOTHMAN_ENVIRONMENT itself is."""
+        value = self.node.try_get_context(key)
+        if not value:
+            raise ValueError(f"cdk context '{key}' is required (-c {key}=...) - the handlers "
+                             f"refuse to connect without it, so the stack is not built "
+                             f"without it either.")
+        return str(value)

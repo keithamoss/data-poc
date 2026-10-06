@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 32
+SCHEMA_VERSION = 33
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -473,6 +473,13 @@ ALTER TABLE "{SCHEMA}".delivery_file ADD COLUMN IF NOT EXISTS originally_receive
 -- the receipt's own text-plus-instant convention. NULL for 'not-known'
 -- and where nobody was asked. Still a note - nothing decides on it.
 ALTER TABLE "{SCHEMA}".delivery_file ADD COLUMN IF NOT EXISTS originally_received_stated_instant timestamptz;
+-- WHERE THE FILE IS (REQ-PIPE-152, qa schema 33): `local:<delivery>/<file>`,
+-- relative to the deliveries tree so a database restored on another machine
+-- finds it under that machine's own, or `s3://<bucket>/<key>` for an object a
+-- handler recorded without copying it. The processing pass builds every
+-- arrival from these rows and fetches an S3 object when it stages it. NULL
+-- only in a database recorded before the column, which a rebuild replaces.
+ALTER TABLE "{SCHEMA}".delivery_file ADD COLUMN IF NOT EXISTS storage_uri text;
 
 --   "when did this dataset last arrive", across all deliveries. Real
 --   columns rather than a JSONB document for the same reason
