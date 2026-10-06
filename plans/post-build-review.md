@@ -6713,3 +6713,60 @@ twice. It deliberately did not re-find the `TypeError`.
     Out of scope, a sighting only: Client Register at 2023-08-05 shows
     "What is in the warehouse is not the latest file - 2026-Q2 / 2026-Q3".
     TO FIX in the same batch as #131, failing test first for A1-A5.
+
+133. **[in-progress, 2026-10-07]** **[Testing & dev tooling]** **The CLI UX
+    critic on checkpoint and resume** (REQ-TEST-159/160), driven for real
+    against its own scratch database - a ~10-minute bootstrap with a
+    checkpoint, template copies with doctored descriptions for the failure
+    states, every database it made deleted afterwards. Scope chosen by
+    Keith, 2026-10-07. B2 was re-checked against the code by the main
+    session. ITS SIDE EFFECTS, checked and put right the same morning: the
+    runs regenerated `data/deliveries` (by design - the arrivals still match
+    the `supply` database, 42 and 108, the three extra rows being one
+    supply's knock-on re-runs) and rewrote `reports/results_cp.json` from
+    the scratch database, which was rebuilt from `supply`.
+    - **B1 (HIGH, gap) - where a resume lands cannot be pasted.** It ends
+      "Point MOTHMAN_SUPPLY_DSN at user=user dbname=mothman_resume_... host=
+      ... password=***", in libpq keyword form, wrapped across three lines,
+      password masked - at the end of a multi-minute run, which undercuts the
+      signed "a person points MOTHMAN_SUPPLY_DSN at it". Print one unwrapped
+      `export MOTHMAN_SUPPLY_DSN=postgresql://user:<password>@.../<db>` line
+      and how to go back.
+    - **B2 (HIGH, defect), CONFIRMED.** `bootstrap --checkpoint-before` with
+      an impossible N (1, 0, negative, past the end) prints a ~70-line
+      traceback ending in a good `CheckpointRefused` sentence - only
+      `resume_command` catches it. And an unreadable checkpoint (described
+      as "before arrival 0") is not refused by `first.arrival < cp.before`,
+      so `resume` crashes with StopIteration at `bootstrap.py:310`, while
+      `checkpoint list` promises it would replay from the first arrival.
+    - **B3 (HIGH, gap) - a refusal after `data/` was already rewritten.**
+      Every bad-N refusal came after the synthetic data was regenerated.
+      Validate N first.
+    - **B4 (HIGH, gap) - N is a number nobody can see.** Nothing prints
+      which delivery is arrival 55; the range is learned only from the
+      refusal. A listing of arrivals, and the delivery's name beside every
+      arrival number in messages.
+    - **B5 (MEDIUM) - asking for a checkpoint on a populated database says
+      "nothing to do" and exits 0.** Refuse, non-zero, with the three real
+      steps (an empty database, `env mark`, bootstrap).
+    - **B6 (MEDIUM) - the checkpoint's name is buried** at line 644 of 1,209;
+      the run's last line does not mention it. Repeat it, and the resume
+      command, in the closing summary.
+    - **B7 (MEDIUM, defect against criterion 7) - deleting a name that does
+      not exist reports "Deleted"** (`DROP ... IF EXISTS`), with no
+      confirmation and `WITH (FORCE)`. Refuse unknown names; confirm.
+    - **B8 (MEDIUM) - resume databases are not listed** (also #131 D5).
+    - **B9 (MEDIUM) - a resume does not say up front** what changed, which
+      arrivals it will replay, into which database, or roughly how long.
+    - **B10-B14 (polish).** "removed" for a changed file (#131 D1); help
+      text cites requirement ids, says "receipt instant" where the code
+      snaps per delivery, does not say NAME comes from `checkpoint list`;
+      two confusing result-count lines at the end of a resume, the second
+      saying "from committed history"; checkpoint times in UTC rather than
+      the asset's clock; a trailing "..." on statements. Not in the TUI,
+      rightly - a developer tool.
+    Works well: every refusal sentence that is caught says what happened,
+    names the arrival and delivery, says nothing was copied, and gives a
+    next step; nothing-changed answers in 5 seconds; snapping explains
+    itself; `delete supply` is refused.
+    TO FIX in the same batch as #131 and #132.
