@@ -89,6 +89,14 @@ already scoped.
   new significant piece of work in case it's already something Keith's
   flagged there, and scope each item with him before building it, same
   as anywhere else in this project.
+- `plans/morning-reports.md` - what happened on each night Keith left
+  the build running unattended: the plan he approved, his terms for the
+  night, what each sprint built, every PROVISIONAL choice, and the
+  questions left for him with his answers. Split out of
+  `plans/road-testing.md` on 2026-10-06 at Keith's ask. A new overnight
+  run writes its report HERE, as a new numbered entry - never inside
+  another plans file - and anything still to build lives in
+  `requirements.yaml`, not only in a report.
 - `plans/road-testing.md` - observations from actually USING the
   dashboard and the `mothman` CLI/TUI, as opposed to things found by
   designing, reviewing code or reading a requirement. Created

@@ -4521,6 +4521,19 @@ Belongs with batch 5's check work.
     complaint. The four tools running one after another inside each
     run is still the obvious first place to look.
 
+    **SCOPED WITH KEITH, 2026-10-06 morning.** BOTH a faster full
+    bootstrap and a scenario checkpoint/replay, scoped together as two
+    requirements (over either alone). Target UNDER 5 MINUTES for the full
+    bootstrap (over under 10, or no target) - flagged to him as ambitious:
+    arrivals within a collection must stay sequential, so 150 arrivals in 5
+    minutes is about 2 seconds each against about 11 today, which needs
+    more than parallel tools - per-run overheads cut, and possibly
+    different datasets' chains run side by side. The profile comes first and
+    the number gets revisited with him if 5 is not realistic. The output
+    must be IDENTICAL, proven by an equivalence test, as REQ-TEST-116's own
+    parallelism is. QUEUED after the current queue, PAIRED with #67's test
+    review.
+
 66. **[todo, 2026-10-05]** **[Testing & dev tooling]** **Bring a development
     database's schema forward in place.** Keith, 2026-10-05 evening: "happy
     for you to upgrade the database schema in place during development."
@@ -4533,3 +4546,41 @@ Belongs with batch 5's check work.
     ~27-minute rebuild per schema bump while a feature is developed. It
     stays refused for a reshape (anything below RESHAPED_AT) and for any
     non-synthetic asset. Pairs with #65 (rebuilds too slow to iterate).
+
+67. **[todo, 2026-10-06]** **[Testing & dev tooling]** **Review every test:
+    is it still needed, and is our testing guidance any good?** Keith,
+    2026-10-06 morning, while a gate ran: "do a review of all of our tests
+    and identify if they're still all required, because the gate is taking
+    a long time." The full gate is about 15 minutes - 3,500 tests needing no
+    deployment ~6.5 min, 292 deployment tests ~5.5 min (mostly real-browser),
+    JS tests and validators ~1.5 min.
+
+    HIS SHARPER POINT, the same conversation, and it is the first cut rather
+    than the slow tests: "a lot of tests that don't actually test any code
+    that is used in the real - it's just code that exists for running tests,
+    and then tests that are actual code that is only ever being used by
+    tests." And: "you're writing tests that are very defensive, and you have
+    tests running against behaviour we haven't had in weeks because we
+    replaced it. Which is pointless." Two examples written that very morning
+    prove him right: one test asserts the old database-setting identity is
+    no longer read, another that backlog.unprocessed no longer exists.
+
+    SCOPED: aim FEWER, STRONGER tests (over gate time alone, or a hard
+    target) - weak source-grep tests replaced by behaviour tests even where
+    that costs time. Order of work:
+    1. A call-graph pass: every function in qa_tools/, pipeline/, cli/,
+       dashboard/ and generator/ whose ONLY callers are in tests/ - dead
+       code kept alive by its tests; both go.
+    2. A retired-behaviour pass: tests asserting something is absent,
+       removed or no longer read, and tests that only grep the source.
+    3. The testing GUIDANCE: CLAUDE.md's rules all lean towards adding a
+       test (one per defect, a guard per incident) and say nothing about
+       when a test should go. Draft wording - when to add one, what it must
+       exercise (real entry points, not test-only code), when one is deleted
+       (its behaviour is gone), and no "proving absence" tests - for Keith's
+       approval word for word, as authoring standards are.
+    4. Then the timing profile, taken from a gate run that happens anyway.
+    Nothing is deleted without Keith's yes per item; a change that only
+    makes a test cheaper while it proves the same thing can just be made.
+    QUEUED with #65's bootstrap speed work.
+

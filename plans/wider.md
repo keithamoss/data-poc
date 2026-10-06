@@ -1514,3 +1514,33 @@ check_lifecycle.py`'s own `check_id` convention.
     file's own item #2) so it survives compaction either way - ask him
     for this directly next time revisiting either the HCI guide or the
     roles/ticketing work, don't let it quietly drop.
+
+11. **[in-progress, 2026-10-06]** **[Docs & process]** **The work queue Keith
+    set on 2026-10-06 morning, in order.** **Priority: work through in this
+    order (Keith, 2026-10-06: "let's work through them" / "sounds good",
+    across that morning's conversation).** Kept here because it spans every
+    component; each item's own detail lives where named.
+    1. Soda's silent pass on a configuration error - a defect, the 2026-10-06
+       staleness sweep (plans/road-testing.md #7).
+    2. REQ-TEST-117 - CI reuses a bootstrapped database.
+    3. REQ-PIPE-152 - the S3 Lambda handlers (criteria 12-13 added that day;
+       every arrival built from the database, qa schema 32).
+    4. REQ-PIPE-078 - finish it for all four tools.
+    5. REQ-DASH-148 criterion 12 - a reload owes a re-check.
+    6. REQ-QAC-039 - a dataset's hierarchy identifiers in one place (survey
+       first).
+    7. REQ-PIPE-086 criterion 11, REQ-PIPE-140 criterion 5's terminal half,
+       then REQ-PIPE-081 criterion 6 with REQ-DASH-126 criterion 3.
+    8. Bootstrap speed and the test review together
+       (plans/running-thoughts.md #65 and #67).
+    9. The calendar group (REQ-PIPE-110 to 113, with road-testing #3).
+    10. A walk through plans/running-thoughts.md.
+    11. Sprints planned around everything left in plans/road-testing.md.
+    ALONGSIDE: delivery-scoper drafts for REQ-PIPE-053's five criteria,
+    REQ-PIPE-057 criterion 18 and REQ-PIPE-068 criterion 2, then the sweep's
+    four new requirements (overview labels with a failing-columns count,
+    contract-declared date outliers, cardinality drift, one histogram); the
+    four critics on a17d6e8 (plans/post-build-review.md); and clearing
+    road-testing #16's design log once its decisions are confirmed on
+    REQ-PIPE-118 to 127.
+

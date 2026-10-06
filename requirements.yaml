@@ -23126,7 +23126,7 @@ requirements:
         Measured: 28 supplies refused as contested, 73 promoted where 84
         had (figures from a `--force` bootstrap over an earlier crashed
         one, so inflated in both directions - see
-        plans/road-testing.md #15), and TS-1/TS-4 broken - the 16:00 Birth Registrations
+        REQ-PIPE-144, which closed the sighting), and TS-1/TS-4 broken - the 16:00 Birth Registrations
         correction landed beside the red 14:00 supply, was never checked
         or accepted, and the 20:00 arrival never met a filled slot. And
         nothing re-runs a contested correction once somebody rejects the
@@ -24728,6 +24728,21 @@ requirements:
     - 'A GAP RED LOOKS LIKE ANY OTHER RED, LABELLED (Keith, 2026-10-05): same
       colour, with ''compared across a gap, measured: <verdict>'' at the check
       group, rather than a second red style.'
+    - 'SODA CORE CANNOT EXECUTE A CHANGE-OVER-TIME CHECK, which is why the volume
+      check is ours (carried from plans/road-testing.md #13, verified 2026-09-24
+      by real experiment against the installed soda-core 3.5.6). SodaCL''s `change
+      for row_count` / `change percent for` / `change avg last 7 for` all PARSE,
+      tiered warn/fail included, but Soda Core keeps no measurement history -
+      scan.py''s Soda Cloud metric-store lookup logs that it must connect to Soda
+      Cloud and returns {} - so the check crashes while evaluating, is marked
+      not evaluated and is ABSENT from scan.get_scan_results()[''checks''], while
+      the scan exits 3. A declared check that never reports is a false green,
+      which the runners did not catch then (the 2026-10-06 staleness sweep confirmed
+      nothing reads Soda''s error state; that defect is now queued). So every
+      change-over-time check here - row-count change included - is computed by
+      us at run time against recorded history (evidently_common.status_for_row_drop,
+      the CP volume results), never declared in SodaCL. Absolute row-count bands
+      with both tiers DO work in Soda Core and are used.'
   - id: REQ-GHUB-109
     title: >
       A ticket comment says something new, and REQ-GHUB-027's
@@ -25630,7 +25645,8 @@ requirements:
         CI SHALL cache a dump of the bootstrapped database, keyed on a hash
         of every input that shapes it - generator/,
         synthetic_data_generator/, pipeline/, qa_tools/, contract/,
-        dbt_project/, pyproject.toml, uv.lock and the workflow file itself.
+        dbt_project/, cli/pipeline.py, pyproject.toml, uv.lock and the workflow file itself.
+        AMENDED 2026-10-06 (Keith): cli/pipeline.py added, because the bootstrap enters through it - and nothing else under cli/, so ordinary terminal changes still restore.
       - >
         ON a key match, THE SYSTEM SHALL restore the dump instead of
         bootstrapping; on a miss it SHALL bootstrap as today and save the
@@ -25674,6 +25690,19 @@ requirements:
         of criterion 1's inputs and would have restored. Adding checks to an
         existing dataset is the case that must miss - only 1 of the 200 was
         contract-only.
+      - cli/pipeline.py JOINS THE KEY, AND ONLY IT (Keith, 2026-10-06; criterion
+        1 amended), over all of cli/ - which would make nearly every terminal change
+        pay a full bootstrap - and over leaving cli/ out as first written, which
+        would restore a stale database after a bootstrap change made only there.
+      - 'THE GENERATED DELIVERY FILES ARE CACHED WITH THE DUMP (Keith, 2026-10-06),
+        over regenerating them on a hit: data/deliveries, data/receipts, data/generator_bookkeeping.json
+        and data/scenario_placements.json - the inputs the tests and the dashboard
+        build read, and still generated synthetic data only (criterion 5). data/dbt_scratch
+        is not cached: it is per-run working space. Regenerating instead would be
+        two sources that must agree, the split rejected on 2026-10-03.'
+      - 'THE DUMP CARRIES ITS OWN MARKING since qa schema 31: the identity is a
+        qa.identity row (REQ-PIPE-107), so a restored database is already marked
+        `ci` and the marking step is a no-op after a restore.'
   - id: REQ-PIPE-118
     title: "One waiting version per table per period - a newer file supersedes every earlier unaccepted version"
     date_written: "2026-10-03"
@@ -28848,6 +28877,8 @@ requirements:
     - IF no dataset's pattern claims an object a handler receives, or more than one does, THEN THE SYSTEM SHALL report it as unplaceable on the same terms as the pipeline reports an unplaceable delivery (REQ-PIPE-057), and SHALL continue with the event's other objects.
     - THE SYSTEM SHALL record a handler's delivery as received automatically, with no person and no hand-filing route (REQ-PIPE-147 criterion 5).
     - WHEN the Birth Registrations handler is given one arriving object, THE SYSTEM SHALL process it without raising, and SHALL carry a regression test, confirmed failing against today's code before the fix, that reproduces today's TypeError - the handler passes `reference_csv=` to orchestrate_bdm.run_single, which no longer accepts it.
+    - "WHEN a handler runs REQ-PIPE-151's processing pass, THE SYSTEM SHALL take no new arrival once 10 minutes of the invocation have passed, SHALL finish the arrival in progress, and SHALL end the pass as completed, leaving every arrival it did not take owed to the next invocation or scheduled pass; a pass run from the terminal or a scheduler SHALL have no such budget."
+    - "IF a handler's processing pass is refused because another pass holds the lock, THEN THE SYSTEM SHALL fail the invocation so that the platform retries it, having recorded the delivery first, so that a retry finds it recorded and the scheduled pass remains the backstop."
     non_functional_requirements:
     - 'CORRECTNESS BY CONSTRUCTION, the same as REQ-PIPE-086: the handler is an adapter from an S3 event to the per-arrival function, and nothing more. REQ-PIPE-086''s equivalence test names this route.'
     - 'COMPATIBILITY: no EFS, no copy, no persistent disk assumed - a Lambda''s /tmp is scratch for the download and nothing outlives it. The design is a sketch (aws/ is ''not yet the live pipeline'', docs/components.md) and stays deployable without new storage.'
@@ -28877,8 +28908,33 @@ requirements:
     - 'Follows criterion 5 (Keith, 2026-10-04): the arrival is built by the pass, not the handler.'
     - A retry re-runs recording and the pass (Keith, 2026-10-04); recording must be idempotent, and the pass's own no-op rule (REQ-PIPE-151 criterion 7) covers the rest.
     - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
-    open_questions:
-    - 'When a handler''s pass is refused because another pass is running (exit 75), should the invocation fail so the platform retries it soon (risking a retry budget spent while a long pass runs), or succeed and leave the arrival to the next scheduled pass (risking a wait as long as the schedule''s gap)? A pass that started before the delivery was recorded decides its list in one read and will not see it. DEFERRED BY KEITH, 2026-10-04: ''decide when we focus on building the aws side later''.'
+    - A REFUSED PASS FAILS THE INVOCATION (Keith, 2026-10-06; criterion 13, settling
+      the question he deferred on 2026-10-04 'to the AWS side', which building
+      the handler forced). The platform retries a failed asynchronous invocation
+      with backoff; recording is idempotent, so a retry is cheap; and when the
+      retries run out the scheduled pass picks the arrival up. REJECTED succeeding
+      and leaving it to the schedule, which costs a wait as long as the schedule's
+      gap.
+    - A HANDLER'S PASS HAS A 10-MINUTE BUDGET (Keith, 2026-10-06; criterion 12,
+      new). A Lambda stops at 15 minutes and a pass drains everything owed - a
+      full bootstrap's 150 arrivals take about 25 minutes - so a backlog would
+      time out mid-arrival on every retry. The budget stops it TAKING new arrivals,
+      never mid-arrival; the rest stays owed. REJECTED no budget, where a timeout
+      is a crash re-run under the same id (REQ-PIPE-086 criterion 8's exception)
+      and a large backlog can time out over and over. A terminal or scheduled
+      pass has no budget.
+    - THE PASS BUILDS EVERY ARRIVAL FROM THE DATABASE (Keith, 2026-10-06), over
+      reading the disk tree for local deliveries and the database only for S3
+      ones. The pass already records every disk delivery first (delivery_log.record_all),
+      so building all arrivals from qa.delivery_file gives one source and one
+      arrival type, the same code locally and in Lambda - the 'ONE arrival type'
+      decision above, taken all the way. It needs the storage-location column
+      (qa schema 32) and a rebuild from empty.
+    - 'THE HANDLERS NEED A STATED ENVIRONMENT AND A MARKED DATABASE (found re-reading
+      this requirement 2026-10-06, after REQ-PIPE-093/107 landed): every connection
+      refuses without MOTHMAN_ENVIRONMENT and a matching qa.identity row, and
+      the CDK stack gives both Lambdas no environment at all. Supplying both is
+      part of building this, not a new decision.'
   - id: REQ-PIPE-153
     title: A person rejects a supply that could not be loaded, and the rejection settles it
     date_written: '2026-10-04'
