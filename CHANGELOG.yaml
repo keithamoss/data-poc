@@ -243,6 +243,57 @@ releases:
             description: >
               The supply commands now name the known collections when you
               mistype one, and take bdm and cp as pipeline run does.
+          - headline: Red promoted is easier to see
+            components: ["Dashboard UI"]
+            description: >
+              A promoted supply that has since turned red now shows a short
+              red pill in the dataset's header, with the reason beneath, and
+              the agency and collection cards list those datasets.
+          - headline: Supplies waiting for a decision are on the dashboard
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              "Waiting for a person" now includes the supplies the terminal's
+              queue lists as awaiting a decision, one line per dataset, and the
+              cards count the same things the list does.
+          - headline: Supply history keeps each period's story to itself
+            components: ["Dashboard UI"]
+            description: >
+              A red supply is no longer shown as resupplied by the next
+              period's supply, and the history tables' columns line up from
+              one period to the next.
+          - headline: Jumping to a scenario says so, and Back undoes it
+            components: ["Dashboard UI"]
+            description: >
+              Following a scenario's link shows a bar naming the scenario and
+              the date you are viewing, with a way back to today, and the
+              browser's Back button returns you to the date you left.
+          - headline: Cross-table checks say which tables and tool
+            components: ["Dashboard UI"]
+            description: >
+              On a collection page, each cross-table check now names the table
+              it is declared on, its column and the tool that runs it.
+          - headline: Red and green read clearly in dark mode
+            components: ["Dashboard UI"]
+            description: >
+              The red and green status colours are lighter in dark mode, so
+              both meet the usual contrast standard against their pills.
+          - headline: A promotion past a reference gap says so
+            components: ["Pipeline & publishing"]
+            description: >
+              When the rule promotes a supply whose only reds come from a gap
+              in its reference, the recorded reason now names those checks
+              instead of saying every check passed or warned.
+          - headline: The terminal report shows which check, not the shared prefix
+            components: ["Testing & dev tooling"]
+            description: >
+              The Check column now shows the column and check name, since the
+              tool already has its own column.
+          - headline: Resetting a synthetic database keeps its identity in place
+            components: ["Pipeline & publishing"]
+            description: >
+              A reset now empties everything except the database's identity
+              record, so nothing reading it at the same moment is told the
+              database is unmarked, and the date it was marked stays.
 
   - date: "2026-10-05"
     summary: >

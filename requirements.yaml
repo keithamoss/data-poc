@@ -4286,6 +4286,7 @@ requirements:
         longer green. The error came from
         publishing-and-history item 6 answer 2 and propagated unchecked
         into a signed criterion.
+      - 'A CROSS-TABLE ROW NAMES ITS TABLE, COLUMN AND TOOL (Keith, 2026-10-06, post-build-review #121 D7): nine rows reading ''Client reference'' could not be told apart. The collection page''s row now says the dataset the check is declared on, its column and its tool, from the check''s key and tool_ref.'
 
   - id: REQ-PIPE-038
     title: Committed history is keyed per dataset and regenerated from scratch
@@ -15581,8 +15582,12 @@ requirements:
         same dataset read from the recorded deliveries (promotion.next_receipt),
         and caps the promotion one second before it, never earlier than the supply''s
         own receipt - so the asset timeline never shows two versions waiting because
-        of a lag nobody measured. Live there is no next receipt yet, so nothing
-        changes.'
+        of a lag nobody measured. CORRECTED 2026-10-06 (Keith, post-build-review
+        #122 D4): this used to say that live there is no next receipt yet, so
+        nothing changes. That is wrong when a live pass catches up a backlog,
+        because the pass records every delivery before it processes any, so a
+        later receipt is already known and the cap applies. The behaviour stays,
+        and the cap is right there too.'
   - id: REQ-GHUB-082
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
@@ -20461,6 +20466,7 @@ requirements:
       --commit still asks at filing, because criterion 6 forbids the flag being
       the confirmation too. The synthetic route''s ''record this check?'' is unchanged
       - synthetic data is not run in production.'
+    - 'THE TYPED ID IS ASKED ONCE PER KEEP, AND A TYPO GETS ONE RETRY (Keith, 2026-10-06, post-build-review #124 D1). The first build of the typed-id keep (#119 D10) passed its ''already typed'' answer to the filing step through a module flag, and the filing step called decide_keep() again, which reset the flag, so production asked for the id twice. decide_keep() now returns a Keep decision that carries whether the id was typed, and returns one passed back in unchanged. A mistyped id is asked once more before it becomes a trial; a blank answer is a no straight away. The test that missed this asserted the flag and never drove the filing step; its replacement drives the real filing.'
   - id: REQ-DASH-094
     title: "The dashboard says which environment's QA it is showing"
     date_written: "2026-09-26"
@@ -24467,6 +24473,7 @@ requirements:
       way is unmarked and refuses until `mothman env mark` (regenerate, never
       migrate). A test or command that drops the qa schema must put the identity
       back (tests/conftest.py drop_qa_schema).'
+    - 'THE RESET NEVER DROPS THE IDENTITY TABLE (Keith, 2026-10-06, post-build-review #122 D1/D2). Dropping the qa schema and re-marking it in the same transaction still let another connection''s probe, on an older snapshot, meet a qa.identity created after it began, and refuse a marked database as unmarked; and the re-mark rewrote marked_at. The reset now drops every other schema and every other qa object (views, tables, functions with the guard''s event triggers, stray sequences), and leaves qa.identity and its row exactly as they were. REJECTED: keeping the drop-and-re-mark and retrying the probe, which treats the symptom.'
   - id: REQ-QAC-108
     title: 'Drift and volume are measured against the last supply actually PROMOTED, never against a view or an arrival nobody promoted
   
@@ -24780,6 +24787,7 @@ requirements:
       us at run time against recorded history (evidently_common.status_for_row_drop,
       the CP volume results), never declared in SodaCL. Absolute row-count bands
       with both tiers DO work in Soda Core and are used.'
+    - 'A PROMOTION PAST A GAP RED NAMES IT (Keith, 2026-10-06, post-build-review #124 D3). A gap red warns rather than blocks (criterion 15 as amended), and the promotion then recorded ''every check passed or warned'' beside a table showing two reds. The rule''s reason now says how many contributing checks were red only because their reference crossed an owed period, and names them. promotion.gap_reds() shares the gate''s own definition of which checks contribute (_contributing_records), so the two cannot disagree.'
   - id: REQ-GHUB-109
     title: >
       A ticket comment says something new, and REQ-GHUB-027's
@@ -26425,6 +26433,7 @@ requirements:
       - NFRs 1 AND 3 (a real-browser test, and one either side of the instant) ARE
         NOT YET MET - the label is tested in vitest against hand-built data and
         in Python with its collaborators stood in (#116).
+      - 'A SHORT PILL WITH ITS SENTENCE BENEATH, IN THE HEADER AND ON THE CARDS (Keith, 2026-10-06, post-build-review #121 D1/D2 and #123 A1). The label was one nowrap pill carrying a whole sentence, 598px wide, coloured with var(--red), which is not a token, so it had no red in it. It is now a ''Red promoted'' pill in the status colour with the sentence beneath. It moved from the verdict line into the dataset header, beside the status pill, so it shows when a newer supply awaits a decision and the dataset reads green. The agency and collection cards name the red promoted datasets as a kind of their own.'
     open_questions: []
 
   - id: REQ-DASH-127
@@ -26465,6 +26474,7 @@ requirements:
         listed as ordinary rows rather than collapsed under the version that superseded
         them. Recorded here because an NFR has no unmet-criteria entry to carry
         it.'
+      - 'A RESUPPLY CHAIN NEVER CROSSES A PERIOD, AND THE CYCLE TABLES LINE UP (Keith, 2026-10-06, post-build-review #123 B1 and #121 D3). The red-then-green chain was kept, over grouping strictly per period, but a chain continues only within the period its supplies are FILED to (the arrival record''s slot, else the period its date falls in), so the next period''s own supply is never shown as a resupply. Every cycle table shares one fixed set of column widths, where each used to size its own and Outcome''s left edge swung 499px between cycles.'
     open_questions: []
 
   - id: REQ-PIPE-128
@@ -27290,6 +27300,8 @@ requirements:
     - 'THE LATE NOTE SHOWS ON A ROW WITH NO RUN TOO (Keith, 2026-10-05; #111 M3):
       a day a daily feed has no file at all - the commonest daily case - took
       the ''no QA run within tolerance'' row, which did not render it.'
+    - 'THE CARDS COUNT WHAT THE QUEUE COUNTS (Keith, 2026-10-06, post-build-review #123 B3): one item per run of consecutive closed periods (gapItemCount()), where the cards used to count each dataset with a gap once and so disagreed with the headline.'
+    - 'SUPPLIES AWAITING A DECISION ARE WAITING FOR A PERSON (Keith, 2026-10-06, post-build-review #123 B2). The dashboard left out the red supplies awaiting a decision that mothman supply queue lists - about twenty in Child Protection. outstanding.py raises one item per dataset from filing_queue.awaiting(), the terminal''s own definition, less the states another producer already raises (a hold, a file that could not load). It needs action without blocking, and the card reads as needing action for it. REJECTED: one item per supply, which at thirty datasets is a list nobody reads.'
     open_questions: []
 
   - id: REQ-PIPE-134
@@ -27721,6 +27733,7 @@ requirements:
       - 'A STALE ?panel=scenarios LINK IS DROPPED ONCE IT HAS OPENED THE TAB (sprint
         11 critic, defect 2): left in the address bar it took over every later reload
         and copied link. Rewritten on load, the way the old asof parameter is.'
+      - 'A SCENARIO JUMP SAYS SO AND BACK UNDOES IT (Keith, 2026-10-06, post-build-review #123 B4). A jump silently moved the whole dashboard to a past date and Back did not put it back. The jump now pushes a history entry carrying the date it left, without rewriting the entry it left, and shows a bar naming the scenario and the date with a ''Back to today'' button; popstate restores the date when Back leaves a jump and re-applies it on Forward. The date stays a filter that ordinary history does not step through.'
     open_questions: []
 
   - id: REQ-PIPE-140
@@ -27870,6 +27883,8 @@ requirements:
       else the run''s own instant - the order supply_status.runs_about already
       used. The two definitions named different runs current in a replay, which
       stamps run instants in processing order.'
+    - 'follows() NEVER RETURNS AN INSTANT AFTER NOW (Keith, 2026-10-06, post-build-review #122 D3): a future-dated decision, or a recorded_at ahead of this clock, would otherwise stamp re-run work later than it ran. min(now, ...), as effective_at_for() already does.'
+    - 'A TIE ON THE TIMELINE GOES TO THE LATER RUN, THEN THE KEY (Keith, 2026-10-06, post-build-review #122 D6). supply_current_run broke a tie by run_key as TEXT, so __r10 lost to __r9. It now orders by run_instant before run_key. qa schema 32.'
     open_questions: []
 
   - id: REQ-PIPE-141

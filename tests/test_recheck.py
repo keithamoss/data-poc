@@ -297,3 +297,32 @@ class TestOneDefinitionOfASupplysCurrentRun:
                 finish_run(key)
                 ids[f"run_{name}"] = key
             assert qa_store.current_run(conn, ds, supply) == ids["run_august"]
+
+    def test_a_tie_on_the_timeline_goes_to_the_later_run_not_the_later_key(self, supply_dsn):
+        """Keith, 2026-10-06 (post-build-review #122 D6): two runs about the
+        same supply with the same cause sorted by run key as TEXT, so
+        `__r10` lost to `__r9`. The run instant breaks the tie first."""
+        import uuid
+
+        from qa_tools.common.qa_results_writer import finish_run
+
+        ds = f"cp-{uuid.uuid4().hex[:10]}"
+        supply = f"{ds}@2024070100000000"
+        tag = uuid.uuid4().hex[:6]
+        with supply_db.connect(label="test-current-run") as conn:
+            qa_store.ensure_schema(conn)
+            with dl.apply_decision(conn, dl.Decision(
+                    agency_id="a", collection_id="c", dataset_id=ds, action=dl.PROMOTE,
+                    supply=supply, actor="k@x", actor_kind=dl.PERSON, to_slot="2099-x",
+                    effective_at="2024-08-01T09:00:00+08:00")):
+                pass
+            cause = conn.execute(f"SELECT max(id) FROM {dl.TABLE} WHERE dataset_id = ?",
+                                 [ds]).fetchone()[0]
+            for key, ran in ((f"z_first_{tag}", "2026-10-06T10:00:00+08:00"),
+                             (f"a_second_{tag}", "2026-10-06T10:05:00+08:00")):
+                qa_store.record_run(conn, run_key=key, agency_id="a", collection_id="c",
+                                    run_timestamp=ran, run_by="t@x", environment="test")
+                qa_store.set_run_purpose(conn, key, dataset_id=ds, supply_id=supply,
+                                         scope="full", caused_by_decision=cause)
+                finish_run(key)
+            assert qa_store.current_run(conn, ds, supply) == f"a_second_{tag}"

@@ -182,10 +182,10 @@ class TestMarking:
             if re.search(r"db_identity\.mark(_by_admin)?\(|mothman\.(environment|data_asset_id)",
                          text):
                 writers.add(path.relative_to(ROOT).as_posix())
-        # The reset drops the qa schema the identity lives in, and puts the
-        # SAME identity straight back in the same transaction (criterion 11)
-        # - preserving it, never changing it.
-        assert writers == {"cli/env.py", "qa_tools/common/synthetic_reset.py"}
+        # The reset used to drop the qa schema and put the identity back; it
+        # now never touches the identity table at all (post-build-review #122
+        # D1/D2), so marking is the only writer.
+        assert writers == {"cli/env.py"}
 
 
 class TestItLivesInATable:

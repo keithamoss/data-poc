@@ -562,6 +562,46 @@ def _is_file_check(check_id: str | None) -> bool:
     return bool(parsed and parsed.tool == file_checks.TOOL)
 
 
+def _contributing_records(dataset_id: str, results: Sequence[dict],
+                          reads: dict[str, list[str]]):
+    """The records that contribute to this dataset's status - the one
+    definition status_of() and gap_reds() share (see status_of)."""
+    from qa_tools.common import hierarchy
+
+    try:
+        own_tables = {hierarchy.dataset(dataset_id).table}
+    except hierarchy.UnknownDatasetError:
+        # A dataset the tree does not know. Its id is the best name for
+        # its table there is - the same fallback tables_read._own_table
+        # makes, and for the same reason: being slightly over-inclusive
+        # beats raising inside a promotion gate.
+        #
+        # NARROW ON PURPOSE. This was `except Exception` for about a
+        # minute, and it silently swallowed an AttributeError from
+        # getting the field name wrong - the fallback then made every
+        # cross-table check look like it read nothing. A bare except
+        # around a lookup turns a bug into a wrong answer.
+        own_tables = {dataset_id}
+
+    for record in results:
+        # A FILE CHECK IS NEVER PART OF A STATUS (REQ-QAC-096 criteria 9 and
+        # 10): it is a statement about the file as delivered, and a refused
+        # file reaches its dataset only as a failed load. Skipped HERE, at
+        # the one status function, rather than at each reader - several
+        # read every scope of a run, and the first version of the file
+        # checks would have had a column-order warning turning a green
+        # supply amber.
+        if _is_file_check(record.get("check_id")):
+            continue
+        mine = record.get("dataset_id") == dataset_id
+        if not mine:
+            declared = reads.get(record.get("check_id") or "")
+            mine = bool(declared and own_tables.intersection(declared))
+        if not mine:
+            continue
+        yield record
+
+
 def status_of(dataset_id: str, results: Sequence[dict], *,
               reads: dict[str, list[str]]) -> str | None:
     """This dataset's status, from EVERY check that contributes to it
@@ -586,40 +626,10 @@ def status_of(dataset_id: str, results: Sequence[dict], *,
     no contributing check has no verdict to gate on, and calling that
     green is criterion 12's check-free table arriving by another road.
     """
-    from qa_tools.common import dataset_status, hierarchy
-
-    try:
-        own_tables = {hierarchy.dataset(dataset_id).table}
-    except hierarchy.UnknownDatasetError:
-        # A dataset the tree does not know. Its id is the best name for
-        # its table there is - the same fallback tables_read._own_table
-        # makes, and for the same reason: being slightly over-inclusive
-        # beats raising inside a promotion gate.
-        #
-        # NARROW ON PURPOSE. This was `except Exception` for about a
-        # minute, and it silently swallowed an AttributeError from
-        # getting the field name wrong - the fallback then made every
-        # cross-table check look like it read nothing. A bare except
-        # around a lookup turns a bug into a wrong answer.
-        own_tables = {dataset_id}
+    from qa_tools.common import dataset_status
 
     contributing = []
-    for record in results:
-        # A FILE CHECK IS NEVER PART OF A STATUS (REQ-QAC-096 criteria 9 and
-        # 10): it is a statement about the file as delivered, and a refused
-        # file reaches its dataset only as a failed load. Skipped HERE, at
-        # the one status function, rather than at each reader - several
-        # read every scope of a run, and the first version of the file
-        # checks would have had a column-order warning turning a green
-        # supply amber.
-        if _is_file_check(record.get("check_id")):
-            continue
-        mine = record.get("dataset_id") == dataset_id
-        if not mine:
-            declared = reads.get(record.get("check_id") or "")
-            mine = bool(declared and own_tables.intersection(declared))
-        if not mine:
-            continue
+    for record in _contributing_records(dataset_id, results, reads):
         # A RECORDED RESULT CARRIES ITS TOOL'S OWN VERDICT - `pass`,
         # `warn`, `fail`, `error` - and the gate speaks the dashboard's
         # green/amber/red. The first version of this fed the raw verdict
@@ -653,6 +663,17 @@ def status_of(dataset_id: str, results: Sequence[dict], *,
     # On every mixed input the two agree exactly.
     return dataset_status.rollup_statuses(contributing)
 
+
+
+def gap_reds(dataset_id: str, results: Sequence[dict], *,
+             reads: dict[str, list[str]]) -> list[str]:
+    """The contributing checks recorded red only because their reference
+    crossed an owed period (REQ-QAC-108 criterion 15) - which warn rather
+    than block, and which a promotion past them names (Keith, 2026-10-06,
+    post-build-review #124 D3)."""
+    return sorted({r.get("check_id") or "" for r in
+                   _contributing_records(dataset_id, results, reads)
+                   if r.get("reference_gap") and r.get("status") in ("fail", "error", "red")})
 
 # ---------------------------------------------------------------------------
 # When a promotion needs QA running again (criteria 16 and 17).
@@ -897,6 +918,12 @@ def after_run(conn: supply_db.SupplyConnection, *,
                                       effective_at=effective_at)
             continue
         reason = AUTOMATIC_REASON
+        past = gap_reds(dataset_id, results, reads=reads)
+        if past:
+            reason = (f"every check contributing to this dataset passed or warned, apart "
+                      f"from {len(past)} recorded red only because its reference crossed "
+                      f"an owed period, which warns rather than blocks "
+                      f"({', '.join(past)}); and its slot for this period was unfilled")
         if replacing is not None:
             # NOT WHILE A LATER PERIOD STANDS ON IT (criterion 8): left
             # waiting for a person, and why recorded.
@@ -912,7 +939,7 @@ def after_run(conn: supply_db.SupplyConnection, *,
                                  period=period, reason=why, effective_at=effective_at)
                 continue
             # THE SETTING THAT AUTHORISED IT IS THE REASON (criterion 5).
-            reason = (f"{AUTOMATIC_REASON} It replaces {held.holder} under the replacement "
+            reason = (f"{reason} It replaces {held.holder} under the replacement "
                       f"setting '{replacing.value}' (set for the {replacing.level}, version "
                       f"{replacing.version}); {held.holder} is superseded, not rejected.")
         work.append({"dataset_id": dataset_id, "supply": item["supply"],

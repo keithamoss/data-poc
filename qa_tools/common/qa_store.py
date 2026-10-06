@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 31
+SCHEMA_VERSION = 32
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -1012,6 +1012,10 @@ LEFT JOIN "{SCHEMA}".supply_receipt rc
 WHERE r.supply_id IS NOT NULL AND r.scope <> 'readers'
 ORDER BY r.dataset_id, r.supply_id,
          COALESCE(d.effective_at, rc.received_instant, r.run_instant) DESC,
+         -- A TIE GOES TO THE LATER RUN, then the key (Keith, 2026-10-06,
+         -- post-build-review #122 D6): keys sort as text, `__r10` before
+         -- `__r9`. Schema 32.
+         r.run_instant DESC,
          r.run_key DESC;
 
 -- A RE-RUN THAT IS OWED (REQ-PIPE-140 criterion 7). Recorded in the

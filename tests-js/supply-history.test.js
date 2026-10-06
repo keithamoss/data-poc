@@ -44,7 +44,11 @@ function datasetWithStatuses(entries, cadence = { type: "daily", expected_time: 
     id: "birth-registrations",
     sla: { cadence },
     runs: entries.map(([run_id, run_date]) => ({ run_id, run_date })),
-    arrivalByRun,
+    // ONE FILED PERIOD unless a test says otherwise (#123 B1): a chain
+    // never crosses a period, so these chain-logic fixtures file every run
+    // to the same one, as a daily dataset's resupplies of one day would be.
+    arrivalByRun: Object.fromEntries(entries.map(([run_id]) =>
+      [run_id, { slot: "2026-01-01", ...(arrivalByRun[run_id] || {}) }])),
     columns: [{ checks: [{ warn: 1, fail: 2, history }] }],
   };
 }
@@ -98,6 +102,30 @@ describe("buildSupplyHistory", () => {
     expect(history[0].cycleStart).toBe("2026-01-01");
     expect(history[0].entries.map((e) => e.run_id)).toEqual(["r2", "r1"]); // newest first
     expect(history[0].entries.map((e) => e.isResupply)).toEqual([true, false]);
+  });
+
+  it("never chains across a period - Keith, 2026-10-06 (#123 B1): a red supply filed to one period is not resupplied by one filed to the next", () => {
+    const w = load();
+    const d = datasetWithStatuses([
+      ["r1", "2026-01-01", "red"],
+      ["r2", "2026-01-02", "red"],
+      ["r3", "2026-01-02", "green"],
+    ], undefined, {r1: {slot: "2026-01-01"}, r2: {slot: "2026-01-02"}, r3: {slot: "2026-01-02"}});
+
+    const history = w.buildSupplyHistory(d);
+
+    expect(history.map((c) => c.entries.map((e) => e.run_id))).toEqual([["r3", "r2"], ["r1"]]);
+    expect(history[1].entries[0].isResupply).toBe(false);
+  });
+
+  it("follows the period a supply is FILED to, not the day it arrived", () => {
+    const w = load();
+    // A late file for 1 January arriving on the 3rd still resupplies it.
+    const d = datasetWithStatuses([
+      ["r1", "2026-01-01", "red"],
+      ["r2", "2026-01-03", "green"],
+    ], undefined, {r1: {slot: "2026-01-01"}, r2: {slot: "2026-01-01"}});
+    expect(w.buildSupplyHistory(d)).toHaveLength(1);
   });
 
   it("a RED arrival stays open through further REDs and closes on the first GREEN", () => {
@@ -334,5 +362,26 @@ describe("rowCountAtRun", () => {
     const w = load();
     const d = { columns: [{ stats: { byRun: {} } }] };
     expect(w.rowCountAtRun(d, "r1")).toBeNull();
+  });
+});
+
+describe("the cycle tables line up (#121 D3)", () => {
+  // Keith, 2026-10-06: Outcome's left edge swung 499px between cycles,
+  // because each table sized its own columns to its own content.
+  it("every cycle table shares one fixed set of column widths", () => {
+    const w = load();
+    const ds = { id: "birth-registrations", sla: { cadence: { type: "daily" } } };
+    const cycles = [
+      { cycleStart: "2026-01-02", entries: [{ run_id: "a", run_date: "2026-01-02", status: "green" }] },
+      { cycleStart: "2026-01-01", entries: [{ run_id: "b", run_date: "2026-01-01", status: "red" }] },
+    ];
+    const root = w.document.createElement("div");
+    root.innerHTML = w.renderSupplyHistorySection(ds, cycles, "2026-01-02");
+    const tables = [...root.querySelectorAll("table")];
+    expect(tables.length).toBe(2);
+    const widths = tables.map((t) => [...t.querySelectorAll("colgroup col")].map((c) => c.getAttribute("style")));
+    expect(widths[0].length).toBe(6);
+    expect(widths[1]).toEqual(widths[0]);
+    expect(tables.every((t) => t.classList.contains("supply-cycle-table"))).toBe(true);
   });
 });

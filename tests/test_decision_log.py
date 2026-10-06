@@ -711,6 +711,19 @@ class TestWhenWorkFollowingADecisionTakesEffect:
         took = asset_time.parse_instant(dl.follows(conn, did), "t")
         assert took == effective + timedelta(seconds=40)
 
+    def test_never_after_now(self, conn, dataset, monkeypatch):
+        """Keith, 2026-10-06 (post-build-review #122 D3): a decision dated in
+        the future, or a recorded_at ahead of this clock, must not stamp work
+        later than the moment it ran - min(now, ...), as effective_at_for."""
+        from datetime import timedelta
+
+        from qa_tools.common import asset_time
+
+        did, recorded = self._decision(conn, dataset,
+                                       effective_at=asset_time.now() + timedelta(days=30))
+        took = asset_time.parse_instant(dl.follows(conn, did), "t")
+        assert took <= asset_time.now()
+
     def test_with_no_cause_it_is_now(self, conn):
         from qa_tools.common import asset_time
 

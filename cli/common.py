@@ -951,6 +951,21 @@ def reference_for_fallback_trial(reference, flag: str, what: str):
     return answer
 
 
+def check_label(result: dict) -> str:
+    """`column.check` for a terminal report's Check column - the tool has its
+    own column (Keith, 2026-10-06, post-build-review #124). The full id
+    starts with the same asset, agency, collection and dataset on every
+    row, so at a normal width that shared prefix was all anyone saw. An id
+    that does not parse is shown whole."""
+    from qa_tools.common import check_id as cid
+
+    raw = result.get("check_id") or result.get("name") or "?"
+    parsed = cid.try_parse(raw)
+    if parsed is None:
+        return raw
+    return f"{parsed.column}.{parsed.check_name}" if parsed.column else parsed.check_name
+
+
 def reference_suffix(result: dict) -> str:
     """What a drift or volume verdict was compared across, for the
     terminal report (REQ-QAC-108 criterion 14): where the red is the gap

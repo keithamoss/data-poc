@@ -114,6 +114,11 @@ CLOSED_UNFILLED_SLOT = "closed-unfilled-slot"
 #: ours rather than the supplier's, which is exactly what somebody
 #: looking at an empty period needs told.
 INHERITANCE_REFUSED = "inheritance-refused"
+#: Supplies waiting on a person's decision - the terminal queue's list
+#: (filing_queue.awaiting), ONE ITEM PER DATASET counting them (Keith,
+#: 2026-10-06, post-build-review #123 B2). The dashboard used to leave
+#: them out while `mothman supply queue` listed about twenty.
+AWAITING_DECISION = "awaiting-decision"
 
 
 @dataclass(frozen=True)
@@ -467,6 +472,63 @@ def _from_in_flight(observations_dir: Path | None = None) -> list[Item]:
     return items
 
 
+def _name_of(dataset_id: str) -> str:
+    try:
+        return hierarchy.dataset(dataset_id).dataset_name
+    except hierarchy.UnknownDatasetError:
+        return dataset_id
+
+
+def _from_awaiting_decisions(conn=None) -> list[Item]:
+    """The supplies `mothman supply queue` lists, grouped per dataset.
+
+    THE TERMINAL'S OWN DEFINITION, never a second one - filing_queue.
+    awaiting(), less the states another producer here already raises: a
+    hold (_from_holds) and a file that could not be loaded (_from_loads).
+    Observed at the earliest receipt among them, so a past date shows only
+    what had arrived by then.
+    """
+    from qa_tools.common import filing_queue, slot_state
+
+    skip = {slot_state.HELD, slot_state.REJECTED, filing_queue.COULD_NOT_LOAD}
+    by_dataset: dict[str, list] = {}
+    try:
+        with delivery_log._db(conn) as db:
+            # NOTHING FILED, NOTHING AWAITING - and the slot walk below is the
+            # dearest thing the survey does, so it is not paid for nothing.
+            if not db.execute("SELECT 1 FROM qa.filing LIMIT 1").fetchall():
+                return []
+            for collection in sorted({d.collection_id for d in hierarchy.all_datasets()}):
+                for state in filing_queue.awaiting(db, collection):
+                    if state.state in skip or not state.supply:
+                        continue
+                    by_dataset.setdefault(state.dataset_id, []).append(state)
+            received = {(r[0], r[1]): r[2] for r in db.execute(
+                "SELECT dataset_id, supply_id, received_at FROM qa.supply_receipt").fetchall()}
+    except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
+        print(f"note: could not read the supplies awaiting a decision "
+              f"({type(exc).__name__}: {exc}) - the rest of the queue is unaffected.")
+        return []
+    items = []
+    for dataset_id, states in sorted(by_dataset.items()):
+        agency, collection = _scope_of(dataset_id)
+        n = len(states)
+        when = sorted(str(received[(dataset_id, s.supply)]) for s in states
+                      if received.get((dataset_id, s.supply)))
+        periods = ", ".join(sorted({display_time.format_period(s.period) for s in states}))
+        items.append(Item(
+            kind=AWAITING_DECISION, severity=NEEDS_ACTION, blocking=False,
+            headline=(f"{_name_of(dataset_id)}: {n} {'supply' if n == 1 else 'supplies'} "
+                      f"waiting for a decision"),
+            detail=(f"The rule left these for a person to decide - for {periods}. "
+                    f"`mothman supply queue --collection {collection}` lists each one."),
+            agency_id=agency, collection_id=collection, dataset_id=dataset_id,
+            observed_at=when[0] if when else None,
+            # THE SLOT STATE'S OWN RESPONSES, as the terminal offers them.
+            responses=states[0].responses))
+    return items
+
+
 def _from_inheritance_refusals() -> list[Item]:
     """REQ-PIPE-098 criterion 10 - an inheritance that could not
     complete, surfaced rather than silent.
@@ -532,6 +594,7 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
               + _from_contested_tables(blockers)
               + _from_loads(dataset_blockers.refused_in_a_contest(conn))
               + _from_inheritance_refusals()
+              + _from_awaiting_decisions(conn)
               + _from_unfilled_periods(conn)
               + _from_in_flight(observations_dir))
     return Outstanding(items=tuple(sorted(items, key=_sort_key)),

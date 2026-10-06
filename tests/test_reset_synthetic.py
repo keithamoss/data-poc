@@ -53,6 +53,27 @@ class TestTheCommand:
             synthetic_reset.reset(conn, synthetic_reset.confirmation_phrase())
             assert synthetic_reset.schemas_to_drop(conn) == []
 
+    def test_the_identity_table_is_never_dropped(self, private_supply_dsn):
+        """Keith, 2026-10-06 (post-build-review #122 D1/D2): dropping the qa
+        schema and re-marking in one transaction still let another
+        connection's probe, on an older snapshot, see a NEW identity table
+        it could not read - and refuse a marked database as unmarked. And
+        the re-mark rewrote marked_at. Every qa table goes but this one."""
+        def _identity(conn):
+            return conn.execute(
+                f"SELECT to_regclass('{qa_store.SCHEMA}.identity')::oid, "
+                f'(SELECT marked_at FROM "{qa_store.SCHEMA}".identity)').fetchall()[0]
+
+        with supply_db.connect(label="test-reset") as conn:
+            qa_store.ensure_schema(conn)
+            _history(conn)
+            before = _identity(conn)
+            assert before[1] is not None, "the test database is marked"
+            synthetic_reset.reset(conn, synthetic_reset.confirmation_phrase())
+            assert _identity(conn) == before
+            assert not bootstrap.holds_history(conn)
+            assert synthetic_reset.schemas_to_drop(conn) == []
+
     def test_a_wrong_phrase_deletes_nothing(self, private_supply_dsn):
         from cli.env import env_group
 

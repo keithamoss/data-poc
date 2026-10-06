@@ -532,7 +532,7 @@ def report_table(results: list[dict], run_id: str) -> Table:
         style = _STATUS_STYLE.get(r.get("status"), "")
         status = r.get("status", "?")
         cell = f"[{style}]{status}[/{style}]" if style else status
-        table.add_row(r.get("engine", "?"), r.get("check_id") or r.get("name", "?"),
+        table.add_row(r.get("engine", "?"), common.check_label(r),
                       cell + common.reference_suffix(r))
     n_fail = sum(1 for r in results if r.get("status") in ("fail", "error"))
     n_warn = sum(1 for r in results if r.get("status") == "warn")

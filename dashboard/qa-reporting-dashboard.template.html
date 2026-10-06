@@ -63,7 +63,7 @@ try{
     --ink:#ECE8DD; --ink-muted:#A7A99A; --ink-faint:#767A6C;
     --line:#2E3329; --line-strong:#3C4234;
     --accent:#8FB6D6; --accent-ink:#D9E9F5; --accent-soft:#1E2D38; --accent-soft-line:#31485A;
-    --good:#019F68; --good-soft:#122B1E; --warn:#E0AC3E; --warn-fill:#BC7600; --warn-soft:#2E2510; --bad:#B71532; --bad-soft:#301017;
+    --good:#14B47A; --good-soft:#122B1E; --warn:#E0AC3E; --warn-fill:#BC7600; --warn-soft:#2E2510; --bad:#EF5A6F; --bad-soft:#301017;
     --change:#C9A0E8; --change-soft:#2A1F38;
     --shadow-1: 0 1px 2px rgba(0,0,0,.3); --shadow-2: 0 12px 28px rgba(0,0,0,.45);
   }
@@ -73,7 +73,7 @@ try{
   --ink:#ECE8DD; --ink-muted:#A7A99A; --ink-faint:#767A6C;
   --line:#2E3329; --line-strong:#3C4234;
   --accent:#8FB6D6; --accent-ink:#D9E9F5; --accent-soft:#1E2D38; --accent-soft-line:#31485A;
-  --good:#019F68; --good-soft:#122B1E; --warn:#E0AC3E; --warn-fill:#BC7600; --warn-soft:#2E2510; --bad:#B71532; --bad-soft:#301017;
+  --good:#14B47A; --good-soft:#122B1E; --warn:#E0AC3E; --warn-fill:#BC7600; --warn-soft:#2E2510; --bad:#EF5A6F; --bad-soft:#301017;
   --change:#C9A0E8; --change-soft:#2A1F38;
   --shadow-1: 0 1px 2px rgba(0,0,0,.3); --shadow-2: 0 12px 28px rgba(0,0,0,.45);
 }
@@ -541,6 +541,8 @@ button{font:inherit; color:inherit;}
   color:var(--ink); background:var(--surface); max-width:72ch;}
 .arrival-notice b{display:block; margin-bottom:4px;}
 .supply-history{margin-block:8px 30px;}
+.supply-cycle-table{table-layout:fixed; width:100%; min-width:760px;}
+.supply-cycle-table td{overflow-wrap:anywhere;}
 .supply-history-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
 .supply-history-head h3{font-size:16px; font-family:"Public Sans",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);}
 .supply-cycle{margin-bottom:18px;}
@@ -632,7 +634,9 @@ button{font:inherit; color:inherit;}
 .scope-check .label{min-width:0;}
 .scope-check .label .nm{font-weight:600; font-size:13px;}
 .scope-check .label .tr{font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace; margin-left:8px;}
-.scope-check .label .ds{font-size:12px; color:var(--ink-muted); margin-top:2px;}
+.red-promoted{display:inline-flex; flex-direction:column; align-items:flex-start; gap:2px; vertical-align:top; max-width:46ch;}
+.red-promoted .rp-why{font-size:11.5px; color:var(--ink-muted); white-space:normal; line-height:1.35;}
+.scope-check .label .ds{display:block; font-size:12px; color:var(--ink-muted); margin-top:2px;}
 /* REQ-DASH-097: the file section. Told apart from data checks by LABEL as
    well as look (criterion 9) - every row carries "File check". Its own
    class, not .scope-section: it is not one of the data checks' sections. */
@@ -2272,16 +2276,24 @@ function buildSupplyHistory(d){
   const runsChronological = [...(d.runs || [])]
     .sort((a,b)=> a.run_date.localeCompare(b.run_date) || a.run_id.localeCompare(b.run_id));
 
-  const chains = []; // {cycleStart, entries[], open}
+  const chains = []; // {cycleStart, period, entries[], open}
   let current = null;
+  // A CHAIN NEVER CROSSES A PERIOD (Keith, 2026-10-06, post-build-review
+  // #123 B1): a red supply filed to one period is not resupplied by one
+  // filed to the next - that is the next period's own supply, which the
+  // slot model on the same page already says. The period is the one the
+  // supply is FILED to where the arrival record knows it, else the one
+  // its date falls in.
+  const periodOf = run => (arrivalByRun[run.run_id] || {}).slot || periodStartDate(d.id, run.run_date);
   for(const run of runsChronological){
     const status = statusByRun.get(run.run_id) || "green";
-    if(!current || !current.open){
+    if(!current || !current.open || current.period !== periodOf(run)){
       // No open chain to continue - this arrival starts a fresh one,
       // anchored at ITS OWN cadence cycle (never the previous chain's -
       // a resolved chain is done, whatever cycle the next arrival lands
       // in is a new story).
-      current = {cycleStart: periodStartDate(d.id, run.run_date), entries: [], open: false};
+      current = {cycleStart: periodStartDate(d.id, run.run_date), period: periodOf(run),
+                 entries: [], open: false};
       chains.push(current);
     }
     const idx = current.entries.length;
@@ -2878,7 +2890,7 @@ function buildData(inPlaceOnDateStr){
         const gaps = closedGapsInPlaceOn(ds.closedSlots, inPlaceOnDateStr);
         ds.noSupply = gaps.open.length ? groupGaps(gaps.open) : null;
         ds.acceptedGaps = gaps.accepted.length ? groupGaps(gaps.accepted) : null;
-        if(ds.noSupply){ col.noSupplyCount = (col.noSupplyCount||0) + 1; ag.noSupplyCount = (ag.noSupplyCount||0) + 1; }
+        if(ds.noSupply){ col.noSupplyCount = (col.noSupplyCount||0) + gapItemCount(ds); ag.noSupplyCount = (ag.noSupplyCount||0) + gapItemCount(ds); }
         if(ds.acceptedGaps){ col.acceptedCount = (col.acceptedCount||0) + 1; ag.acceptedCount = (ag.acceptedCount||0) + 1; }
         const blanking = blocked && blockerWithoutARunOfItsOwn(ds, inPlaceOnDateStr);
         if(blocked && !blanking){
@@ -3821,6 +3833,16 @@ function collectionCrossTableChecks(col){
   return [...seen.values()];
 }
 
+// WHICH TABLE AND WHICH TOOL (#121 D7): "Client reference" nine times over
+// said nothing about which pair of tables or which tool. The check's key
+// names the dataset it is declared on and its column; tool_ref names the tool.
+function crossTableSource(col, entry){
+  const parts = String(entry.check.key || "").split(".");
+  const declared = (col.datasets || []).find(d=> d.id === parts[0]) || entry.dataset;
+  const column = parts.length >= 3 ? parts.slice(1, -1).join(".") : null;
+  const tool = String(entry.check.tool_ref || "").split(":")[0];
+  return [declared && declared.name, column, tool].filter(Boolean).join(" · ");
+}
 function collectionCrossTableSection(ag, col){
   const entries = collectionCrossTableChecks(col);
   if(!entries.length) return "";
@@ -3833,7 +3855,8 @@ function collectionCrossTableSection(ag, col){
   const worst = rollupStatuses(entries.map(e=> checkStatus(e.check)));
   const rows = entries.map(e=> `
     <button class="scope-check" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:e.dataset.id})}'>
-      <span class="label"><span class="nm">${escHtml(e.check.label || e.check.name || e.check.check_id)}</span></span>
+      <span class="label"><span class="nm">${escHtml(e.check.label || e.check.name || e.check.check_id)}</span>
+        <span class="ds">${escHtml(crossTableSource(col, e))}</span></span>
       ${pill(checkStatus(e.check),"sm")}
     </button>`).join("");
   return `<div class="scope-section" data-scope="cross-table" style="margin-bottom:14px;">
@@ -4097,7 +4120,15 @@ function renderFromState(){
 }
 
 window.addEventListener("popstate", (e)=>{
+  const leaving = STATE;
   STATE = e.state || stateFromLocation();
+  // BACK UNDOES A SCENARIO JUMP, and Forward redoes it (#123 B4): the date
+  // is otherwise a filter over the page that history does not step through.
+  if(leaving && leaving.scenarioJump && !(STATE && STATE.scenarioJump)){
+    setInPlaceOnQuietly(inPlaceOnFromUrl() || leaving.scenarioJump.from || DEFAULT_IN_PLACE_ON);
+  } else if(STATE && STATE.scenarioJump && STATE.scenarioJump.to !== CURRENT_IN_PLACE_ON){
+    setInPlaceOnQuietly(STATE.scenarioJump.to);
+  }
   renderFromState();
 });
 
@@ -4138,6 +4169,8 @@ function render(){
   // one signal that says a render actually finished; nothing in the
   // page reads it.
   const done = r => {
+    const bar = scenarioJumpBar();
+    if(bar){ view.insertAdjacentHTML("afterbegin", bar); wireScenarioJumpBar(view); }
     describeRoute();
     const el = document.documentElement;
     el.dataset.renderCount = String((Number(el.dataset.renderCount) || 0) + 1);
@@ -4267,7 +4300,8 @@ const OUTSTANDING_KIND_LABEL = {
   "held-supply":"Held supply", "failed-load":"Could not be loaded",
   "contested-file":"Contested file", "contested-table":"Two files, choose one", "unrecognised-file":"Unrecognised file",
   "in-flight-delivery":"Still arriving",
-  "closed-unfilled-slot":"No supply"};
+  "closed-unfilled-slot":"No supply", "awaiting-decision":"Awaiting a decision",
+  "inheritance-refused":"No earlier supply to stand on"};
 function outstandingKindLabel(kind){ return OUTSTANDING_KIND_LABEL[kind] || kind; }
 
 // A SUPPLY NOBODY COULD PLACE, OR A TABLE TWO FILES CLAIM, MAKES ITS
@@ -4410,7 +4444,7 @@ function verdictLine(ds){
   // NOR WHERE THE DATE ON SHOW BLANKS THEM (#123 A5) - the other cause.
   if(!v || !ds.lastArrival || ds.blocked || ds.noDataInPlaceOn) return "";
   if(v.state === "promoted"){
-    return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place, received ${fmtInstant(ds.lastArrival.arrivedAt)}. ${redPromotedBadge(ds.id, v.inPlaceRunId)}</div>`;
+    return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place, received ${fmtInstant(ds.lastArrival.arrivedAt)}.</div>`;
   }
   const inPlace = v.inPlaceRunDate
     ? `The supply in place is the one received ${escHtml(fmtDay(String(v.inPlaceRunDate).slice(0,10)))}.`
@@ -4518,6 +4552,10 @@ function outstandingItems(scope, id, source){
 //     out, since a reader on that date could not have seen it. What was
 //     open then and resolved since cannot be put back from a queue
 //     judged now; REQ-DASH-070 criterion 14 owns that.
+// HOW MANY QUEUE ITEMS A DATASET'S GAPS ARE (#123 B3): one per run of
+// consecutive periods, exactly as inPlaceOnQueueItems() raises them - the
+// cards used to count the dataset once, so they disagreed with the headline.
+function gapItemCount(ds){ return (ds && ds.noSupply) ? ds.noSupply.length : 0; }
 function inPlaceOnQueueItems(items, data){
   const kept = items.filter(i=> i.kind !== "closed-unfilled-slot"
     && !(i.observedAt && typeof CURRENT_IN_PLACE_ON !== "undefined"
@@ -4561,7 +4599,9 @@ function outstandingMarker(scope, id, source, noSupply){
   const total = items.length + gaps;
   if(!total) return "";
   const blocking = items.filter(i=>i.blocking).length;
-  const severity = (blocking || gaps) ? "needs-action"
+  // A NEEDS-ACTION ITEM NEEDS ACTION whether or not it blocks (#123 B2): a
+  // supply awaiting a decision blocks nothing and still waits on a person.
+  const severity = (blocking || gaps || items.some(i=> i.severity === "needs-action")) ? "needs-action"
     : items.some(i=>i.severity==="warning") ? "warning" : "informational";
   const byKind = {};
   items.forEach(i=>{ const k = outstandingKindLabel(i.kind).toLowerCase(); byKind[k] = (byKind[k]||0) + 1; });
@@ -4760,6 +4800,7 @@ function renderExec(view){
       ${spark}
       ${exhaustedMarker(ag.exhaustedCount, ag.status)}
       ${outstandingMarker("agency", ag.id, undefined, ag.noSupplyCount)}
+      ${redPromotedMarker(ag)}
       ${acceptedGapsMarker(ag.acceptedCount)}
       <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
     </a>`;
@@ -4829,6 +4870,7 @@ function renderAgency(view, agencyId){
     <div class="collection-block">
       <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}</div>
       ${outstandingMarker("collection", col.id, undefined, col.noSupplyCount)}
+      ${redPromotedMarker(col)}
       ${acceptedGapsMarker(col.acceptedCount)}
       ${collectionCrossTableSection(ag, col)}
       <div class="overflow-x">
@@ -5025,12 +5067,30 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
     const went = h.promotedOn ? `went in ${escHtml(h.promotedOn)}, ` : "";
     const how = wentRed ? "promoted while red"
       : `turned red ${fmtInstant(since.at)} after ${escHtml(since.cause)}`;
-    return `<span class="pill tag sm" data-red-promoted style="border-color:var(--red); color:var(--red);"><span class="ico"></span>Red promoted - ${wentRed ? "" : went}${how}</span>`;
+    // A SHORT PILL WITH ITS SENTENCE BENEATH (#121 D1/D2, Keith 2026-10-06):
+    // the whole sentence in one nowrap pill was 598px wide and coloured with
+    // var(--red), which is not a token, so it had no red in it at all.
+    return `<span class="red-promoted" data-red-promoted><span class="pill red sm"><span class="ico"></span>Red promoted</span><span class="rp-why" data-red-promoted-why>${sentenceCase(`${wentRed ? "" : went}${how}`)}</span></span>`;
   }
   if(later){
     return `<span class="pill tag sm" data-turns-red-later style="color:var(--ink-muted);"><span class="ico"></span>Turned red later - ${fmtInstant(later.at)}, after ${escHtml(later.cause)}</span>`;
   }
   return "";
+}
+// RED PROMOTED AS A KIND ON THE AGENCY AND COLLECTION CARDS (#123 A1, Keith
+// 2026-10-06): a dataset whose newer supply awaits a decision reads Green on
+// its card while the supply in place has turned red - so the card says it.
+function redPromotedDatasets(scope){
+  const out = [];
+  (scope.collections || [scope]).forEach(col=> (col.datasets || []).forEach(ds=>{
+    if(redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId).includes("data-red-promoted")) out.push(ds);
+  }));
+  return out;
+}
+function redPromotedMarker(scope){
+  const found = redPromotedDatasets(scope);
+  if(!found.length) return "";
+  return `<div class="red-promoted-marker" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${found.length} red promoted: ${escHtml(found.map(d=> d.name).join(", "))}</span></div>`;
 }
 function renderSupplyCycleRows(entries, datasetId){
   const raw = rawRealDatasetById(datasetId);
@@ -5077,6 +5137,12 @@ function renderSupplyCycleRows(entries, datasetId){
 // period to be listed under, and its run records no per-check result
 // (criterion 6), so without this the supply history would not mention
 // it at all. Each one received on or before the date on show.
+// ONE SET OF COLUMN WIDTHS FOR EVERY CYCLE TABLE (#121 D3, Keith 2026-10-06):
+// each table sized its columns to its own content, so Outcome's left edge
+// swung 499px from one cycle to the next. Fixed layout, shared widths; the
+// blocker table's first two columns line up with them.
+const SUPPLY_CYCLE_COLS = `<colgroup><col style="width:17%"><col style="width:20%"><col style="width:23%"><col style="width:9%"><col style="width:21%"><col style="width:10%"></colgroup>`;
+const SUPPLY_BLOCKER_COLS = `<colgroup><col style="width:17%"><col style="width:20%"><col style="width:44%"><col style="width:9%"><col style="width:10%"></colgroup>`;
 function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
   const rows = blockersFor(datasetId, source)
     .filter(b=> assetDateStrOf(b.openedAt) <= inPlaceOnDateStr)
@@ -5088,12 +5154,12 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
       <div class="supply-cycle-label"><b>${anyOpen ? "Waiting for a person" : "Needed a person"}</b>
         <span style="color:var(--ink-faint);">supplies with no period yet, two files for one table, or a file that could not be loaded</span></div>
       <div class="overflow-x">
-      <table class="dataset-table">
+      <table class="dataset-table supply-cycle-table">${SUPPLY_BLOCKER_COLS}
         <thead><tr><th>Arrived</th><th>Status</th><th>Why</th><th>Rows</th><th></th></tr></thead>
         <tbody>${rows.map(b=>{
           const resolved = b.resolvedAt && assetDateStrOf(b.resolvedAt) <= inPlaceOnDateStr;
           return `<tr data-blocker="${b.kind}">
-            <td class="mono">${fmtInstant(b.openedAt)}</td>
+            <td>${fmtInstant(b.openedAt)}</td>
             <td>${resolved ? pill("nodata","sm") : pill("red","sm")}</td>
             <td><b>${escHtml(BLOCKER_LABEL[b.kind] || b.kind)}</b>${resolved
               ? (b.rejected
@@ -5163,7 +5229,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
         <span style="color:var(--ink-faint);">${c.entries.length} ${pluralize(c.entries.length,"delivery","deliveries")}</span>
       </div>
       <div class="overflow-x">
-      <table class="dataset-table">
+      <table class="dataset-table supply-cycle-table">${SUPPLY_CYCLE_COLS}
         <thead><tr><th>Arrived</th><th>Status</th><th>Timing</th><th>Rows</th><th>Outcome</th><th></th></tr></thead>
         <tbody>${renderSupplyCycleRows(c.entries, ds.id)}</tbody>
       </table>
@@ -5394,7 +5460,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
     ${verdictLine(ds)}
     ${amberSettingLine(ds, CURRENT_IN_PLACE_ON)}
@@ -6715,8 +6781,35 @@ function goToScenario(index){
   // page at the old date and then replace it - a visible flash of the
   // wrong answer, which on a page about as-of dates is the one flash
   // worth avoiding.
-  if(target.inPlaceOn) applyInPlaceOn(target.inPlaceOn);
-  navigate(target.nav);
+  // A JUMP IS SAID AND BACK UNDOES IT (Keith, 2026-10-06, post-build-review
+  // #123 B4). The date is set without touching the entry being left - a
+  // replaceState there would rewrite the very entry Back returns to - and the
+  // new entry carries what it moved from, so popstate can put it back.
+  const from = CURRENT_IN_PLACE_ON;
+  const to = target.inPlaceOn || from;
+  if(to !== from) setInPlaceOnQuietly(to);
+  navigate({...target.nav, scenarioJump: {id: entry.id, from, to}});
+  if(to !== from) setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON);
+}
+
+// The bar a scenario jump leaves on the page it lands on: which date, for
+// which scenario, and the way back to today.
+function scenarioJumpBar(){
+  const jump = STATE && STATE.scenarioJump;
+  if(!jump || jump.to === DEFAULT_IN_PLACE_ON) return "";
+  return `<div class="arrival-notice" role="status" data-testid="scenario-jump-bar">
+    <b>Viewing ${escHtml(fmtDay(jump.to))} for ${escHtml(jump.id)}.</b>
+    The whole dashboard is showing that date, not today.
+    <div class="promo-actions"><button type="button" class="link-btn" data-scenario-back>Back to today</button></div></div>`;
+}
+function wireScenarioJumpBar(view){
+  const btn = view.querySelector("[data-scenario-back]");
+  if(!btn) return;
+  btn.addEventListener("click", ()=>{
+    const {scenarioJump, ...rest} = STATE;
+    STATE = rest;
+    drillToPeriod(DEFAULT_IN_PLACE_ON, null);
+  });
 }
 
 const SCENARIO_MODE_LABEL = {INJECT:"In the data", unit:"Unit test", both:"Unit test and data"};
@@ -7336,14 +7429,20 @@ function applyInPlaceOn(dateStr){
 // both requirements ask for by name rather than leaving to the browser.
 function drillToPeriod(dateStr, fromPeriod){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || "")) return;
-  CURRENT_IN_PLACE_ON = dateStr;
-  DATA = buildData(CURRENT_IN_PLACE_ON);
+  setInPlaceOnQuietly(dateStr);
   ARRIVAL_FROM = fromPeriod || null;
   setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON);
+  renderFromState();
+}
+// THE DATE, AND EVERYTHING THAT SHOWS IT - without writing the address bar
+// or rendering, for a caller that does both itself (a scenario jump, Back).
+function setInPlaceOnQuietly(dateStr){
+  CURRENT_IN_PLACE_ON = dateStr;
+  DATA = buildData(CURRENT_IN_PLACE_ON);
+  ARRIVAL_FROM = null;
   updateInPlaceOnButtonLabel();
   renderInPlaceOnPeriods(dateStr);
   renderInPlaceOnRangeNotice();
-  renderFromState();
 }
 function openInPlaceOnPanel(){
   document.getElementById("in-place-on-input").value = CURRENT_IN_PLACE_ON;

@@ -2900,6 +2900,34 @@ class TestScenariosTab:
         assert f"in-place-on={placement.in_place_on}" in clean_page.url
         assert "/dataset/birth-registrations" in clean_page.url
 
+    def test_a_jump_says_so_and_back_undoes_it(self, clean_page, built_dashboard_html):
+        """Keith, 2026-10-06 (post-build-review #123 B4): a scenario jump
+        silently moved the whole dashboard to a past date, and Back did not
+        put it back. It now shows a bar naming the scenario and the date,
+        with a way back to today, and Back restores the date it left."""
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get("TS-47")
+        if placement is None or not placement.is_complete:
+            pytest.skip("TS-47 is not placed in this history")
+        _goto(clean_page, built_dashboard_html)
+        before = clean_page.evaluate("CURRENT_IN_PLACE_ON")
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+        index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-47')")
+        clean_page.locator(f'button[data-scenario="{index}"]').click()
+        clean_page.wait_for_timeout(600)
+        bar = clean_page.locator("[data-testid=scenario-jump-bar]")
+        assert bar.count() == 1
+        assert "TS-47" in bar.inner_text()
+        assert clean_page.evaluate("CURRENT_IN_PLACE_ON") == placement.in_place_on
+
+        clean_page.go_back()
+        clean_page.wait_for_timeout(600)
+        assert "/scenarios" in clean_page.url
+        assert clean_page.evaluate("CURRENT_IN_PLACE_ON") == before
+        assert f"in-place-on={placement.in_place_on}" not in clean_page.url
+
     def test_the_committed_map_carries_no_url_for_the_page_to_follow(
             self, clean_page, built_dashboard_html):
         """Criterion 3. The page constructs the link; a URL written into

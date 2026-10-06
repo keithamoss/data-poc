@@ -87,6 +87,30 @@ class TestAGreenSupplyPromotesItself:
         assert rows and rows[0][0] == promotion.AUTOMATIC_REASON
 
 
+class TestAPromotionPastAGapRedNamesIt:
+    """Keith, 2026-10-06 (post-build-review #124 D3): a gap red warns rather
+    than blocks, and the kept-run report then said every check passed or
+    warned under a table showing two reds. The reason now names them."""
+
+    def test_the_reason_names_each_gap_red(self, conn, period):
+        ds = _dataset()
+        gap = {**_result(ds, "fail", f"{ds}.volume_evidently"), "reference_gap": True,
+               "measured_status": "pass"}
+        out = _run(conn, [_supply(conn, ds, period)], [_result(ds, "pass"), gap])
+        assert out.promoted == (ds,)
+        [(reason,)] = conn.execute(
+            f"SELECT reason FROM {dl.TABLE} WHERE dataset_id = ?", [ds]).fetchall()
+        assert "volume_evidently" in reason
+        assert "apart from 1 recorded red" in reason
+
+    def test_with_none_the_reason_is_unchanged(self, conn, period):
+        ds = _dataset()
+        _run(conn, [_supply(conn, ds, period)], [_result(ds, "pass")])
+        [(reason,)] = conn.execute(
+            f"SELECT reason FROM {dl.TABLE} WHERE dataset_id = ?", [ds]).fetchall()
+        assert reason == promotion.AUTOMATIC_REASON
+
+
 class TestTheStatusComesFromEveryContributingCheck:
     """Criterion 2, and the failure it exists to stop: a referential
     check between placements and carers is filed under whichever it

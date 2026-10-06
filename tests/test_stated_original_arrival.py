@@ -295,6 +295,12 @@ class TestItIsShownBesideTheReceipt:
         assert block["statedOriginal"] == "2026-09-20T10:00:00+08:00"
         assert block["statedOriginal"] != block["arrivedAt"]
         assert block["filedBy"]["kind"] == "person" and block["filedBy"]["route"] == "file"
+        # THE PERIOD IT IS FILED TO (#123 B1): the supply history chains
+        # resupplies within a period and never across one.
+        from qa_tools.common import filing
+
+        recorded = filing.recorded_arrival_at("birth-registrations", arrival.received_at)
+        assert recorded.slot and block["slot"] == recorded.slot
 
     def test_the_person_is_resolved_through_people_yaml(self, monkeypatch):
         from qa_tools.common import people

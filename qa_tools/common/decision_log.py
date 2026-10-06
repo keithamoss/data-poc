@@ -726,7 +726,10 @@ def follows(conn: supply_db.SupplyConnection, decision_id: int | None) -> str:
         if rows and rows[0][0] is not None and rows[0][1] is not None:
             effective, recorded = rows[0]
             lag = max(now - recorded, now - now)
-            return (effective + lag).astimezone(now.tzinfo).isoformat()
+            # NEVER AFTER NOW (Keith, 2026-10-06, post-build-review #122 D3):
+            # a future-dated decision, or a recorded_at ahead of this clock,
+            # would otherwise stamp the work later than it ran.
+            return min(effective + lag, now).astimezone(now.tzinfo).isoformat()
     return now.isoformat()
 
 

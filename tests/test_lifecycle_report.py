@@ -239,3 +239,30 @@ class TestAKeptRunIdNothingRecognisesIsRefusedPlainly:
         monkeypatch.setattr(arrivals, "arrivals_for", lambda c, p: [])
         with pytest.raises(common.click.ClickException, match="run_404"):
             common.kept_arrival("civil-registration", "run_", "run_404")
+
+
+class TestTheCheckColumnSaysWhichCheck:
+    """Keith, 2026-10-06 (post-build-review #124): at normal widths the
+    Check column showed only the shared "data-asset-1.registry-services.
+    civil-..." prefix. It shows `column.check` now; the tool has its own
+    column."""
+
+    def test_a_column_check(self):
+        from cli import common
+
+        r = {"check_id": "data-asset-1.child-protection-family-support.child-protection."
+                         "cp-placements.cp_client_id.relationships_dbt"}
+        assert common.check_label(r) == "cp_client_id.relationships"
+
+    def test_a_dataset_level_check_has_no_column(self):
+        from cli import common
+
+        r = {"check_id": "data-asset-1.child-protection-family-support.child-protection."
+                         "cp-placements.row_count_soda"}
+        assert common.check_label(r) == "row_count"
+
+    def test_anything_unparsable_is_shown_whole(self):
+        from cli import common
+
+        assert common.check_label({"check_id": "odd"}) == "odd"
+        assert common.check_label({"name": "n"}) == "n"

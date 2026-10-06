@@ -6224,3 +6224,38 @@ twice. It deliberately did not re-find the `TypeError`.
     - #123 CLI side-find: every `supply` command's `--collection` is
       validated, naming the known collections, and takes bdm/cp as `pipeline
       run` does.
+
+    **CHUNK B, KEITH'S ANSWERS - BUILT 2026-10-06**, each recorded as a
+    decision on the requirement it belongs to:
+    - #122 D1/D2 (REQ-PIPE-107): the reset empties the qa schema of
+      everything but `identity` and never drops that table, so marked_at
+      stays and no probe meets a table newer than its snapshot.
+    - #122 D3 (REQ-PIPE-140): `follows()` is capped at now.
+    - #122 D4 (REQ-PIPE-081): the decision text that said the lag cap changes
+      nothing live is corrected; the behaviour stays.
+    - #122 D6 (REQ-PIPE-140): `supply_current_run` breaks a tie by
+      run_instant before run_key. **qa schema 32.** The sandbox `supply`
+      database had the view hand-applied (the code never migrates in place);
+      its next rebuild makes that moot.
+    - #124 D3 (REQ-QAC-108): a promotion past gap reds names them in its
+      reason; `gap_reds()` shares the gate's own contributing-check rule.
+    - #124: terminal report tables show `column.check` (`check_label()`).
+    - #123 A1 / #121 D1, D2 (REQ-DASH-126): a short Red promoted pill with its
+      sentence beneath, in the dataset header, and a kind on the agency and
+      collection cards. D1's `var(--red)` went with it.
+    - #123 B2, B3 (REQ-DASH-133): supplies awaiting a decision are queue
+      items, one per dataset, from `filing_queue.awaiting()`; the cards count
+      queue items (`gapItemCount()`). A needs-action item makes its card read
+      as needing action whether or not it blocks.
+    - #123 B1 / #121 D3 (REQ-DASH-127): a chain never crosses the period its
+      supplies are filed to (`recorded_arrival` now carries the slot), and
+      every cycle table shares fixed column widths.
+    - #123 B4 (REQ-DASH-139): a scenario jump pushes an entry carrying the
+      date it left, shows a "Viewing <date> for <scenario>" bar with Back to
+      today, and popstate restores the date.
+    - #121 D5: dark-mode `--good`/`--bad` lightened to #14B47A/#EF5A6F
+      (5.64:1 and 5.25:1 on their pills), held there by
+      `tests-js/status-contrast.test.js` in both themes.
+    - #121 D7 (REQ-QAC-037): cross-table rows name their table, column and
+      tool. #121 D6 (`.ds` display:block) went in alongside, being the same
+      span.

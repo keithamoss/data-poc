@@ -504,3 +504,44 @@ class TestClosedUnfilledPeriodsAreOneItemPerRun:
         # Nothing was ever supplied here, so each dataset's gaps are one run.
         assert set(per_dataset.values()) == {1}
         assert all("with no supply" in i.headline and not i.blocking for i in items)
+
+
+class TestSuppliesAwaitingADecisionAreWaitingForAPerson:
+    """Keith, 2026-10-06 (post-build-review #123 B2): the terminal's queue
+    listed about twenty Child Protection supplies awaiting a decision that
+    the dashboard's "waiting for a person" left out. The same list, grouped
+    one item per dataset."""
+
+    def _states(self, monkeypatch, states):
+        from qa_tools.common import filing_queue
+
+        monkeypatch.setattr(filing_queue, "awaiting",
+                            lambda conn, collection_id, **k: [
+                                s for s in states
+                                if s.dataset_id.startswith("cp-") == (collection_id ==
+                                                                      "child-protection")])
+
+    def test_one_item_per_dataset_counting_its_supplies(self, tmp_path, monkeypatch):
+        import filing_support
+        from qa_tools.common import slot_state as ss
+        from qa_tools.common.assignment import Assignment
+
+        # Something filed, or the producer has nothing to look at.
+        filing_support.file(Assignment(dataset_id="cp-carers", supply_id="cp-carers@1",
+                                       slot="2025-Q1", branch="open-slot-unfilled",
+                                       considered=("2025-Q1",)))
+
+        self._states(monkeypatch, [
+            ss.SlotState("cp-carers", "2025-Q1", ss.AWAITING_DECISION, "cp-carers@1"),
+            ss.SlotState("cp-carers", "2025-Q2", ss.AWAITING_DECISION, "cp-carers@2"),
+            ss.SlotState("cp-clients", "2025-Q2", ss.AWAITING_DECISION, "cp-clients@1"),
+            # A hold is the held-supply item's already, never counted twice.
+            ss.SlotState("cp-clients", "2025-Q3", ss.HELD, "cp-clients@2"),
+        ])
+        items = [i for i in outstanding.survey(observations_dir=tmp_path).items
+                 if i.kind == outstanding.AWAITING_DECISION]
+        by_dataset = {i.dataset_id: i for i in items}
+        assert set(by_dataset) == {"cp-carers", "cp-clients"}
+        assert "2 supplies" in by_dataset["cp-carers"].headline
+        assert "1 supply" in by_dataset["cp-clients"].headline
+        assert all(i.collection_id == "child-protection" for i in items)

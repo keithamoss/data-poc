@@ -137,6 +137,33 @@ def what_it_deletes(conn: supply_db.SupplyConnection) -> dict[str, int]:
     return out
 
 
+def _empty_qa_schema(conn: supply_db.SupplyConnection) -> None:
+    """Drop every object in the qa schema except `identity`. Views first,
+    then tables, then functions (taking the guard's event triggers with
+    them - qa_store.ensure_schema() puts both back), then any sequence
+    that outlived its table."""
+    def names(sql: str) -> list[str]:
+        return [r[0] for r in conn.execute(sql, [qa_store.SCHEMA]).fetchall()]
+
+    rel = ("SELECT quote_ident(c.relname) FROM pg_class c JOIN pg_namespace n "
+           "ON n.oid = c.relnamespace WHERE n.nspname = ? AND c.relname <> 'identity' "
+           "AND c.relkind IN ({})")
+    q = f'"{qa_store.SCHEMA}".'
+    views = names(rel.format("'v', 'm'"))
+    if views:
+        conn.execute("DROP VIEW IF EXISTS " + ", ".join(q + v for v in views) + " CASCADE")
+    tables = names(rel.format("'r', 'p'"))
+    if tables:
+        conn.execute("DROP TABLE IF EXISTS " + ", ".join(q + t for t in tables) + " CASCADE")
+    for fn in names("SELECT p.oid::regprocedure::text FROM pg_proc p JOIN pg_namespace n "
+                    "ON n.oid = p.pronamespace WHERE n.nspname = ?"):
+        conn.execute(f"DROP FUNCTION IF EXISTS {fn} CASCADE")
+    sequences = names(rel.format("'S'"))
+    if sequences:
+        conn.execute("DROP SEQUENCE IF EXISTS " + ", ".join(q + x for x in sequences)
+                     + " CASCADE")
+
+
 def reset(conn: supply_db.SupplyConnection, typed: str,
           schemas: list[str] | None = None) -> list[str]:
     """Drop the whole QA history; return the schemas dropped.
@@ -165,17 +192,19 @@ def reset(conn: supply_db.SupplyConnection, typed: str,
     # cascaded drop of a period's view unless its own schema goes in the
     # same statement (REQ-PIPE-129 criterion 17), so dropping one at a time
     # failed on the first period another stood on.
-    # THE IDENTITY STAYS (REQ-PIPE-107 criterion 11). It is a row in the qa
-    # schema the reset drops (Keith, 2026-10-06), so it is read first and put
-    # back in the SAME TRANSACTION: there is never a committed moment at which
-    # this database is unmarked, which every other connection would refuse.
-    from qa_tools.common import db_identity
-
-    _, identity = db_identity.read(conn)
+    # THE IDENTITY STAYS (REQ-PIPE-107 criterion 11) - and its TABLE is never
+    # dropped (Keith, 2026-10-06, post-build-review #122 D1/D2). Dropping the
+    # qa schema and re-marking it in one transaction still let a probe on an
+    # older snapshot meet a table created after it began, and refuse a marked
+    # database as unmarked; and the re-mark rewrote marked_at. So the qa
+    # schema is emptied of everything else instead, in the same transaction
+    # as the other schemas' drop.
+    others = [name for name in dropped if name != qa_store.SCHEMA]
     if dropped:
         with conn.raw.transaction():
-            conn.execute("DROP SCHEMA " + ", ".join(f'"{name}"' for name in dropped)
-                         + " CASCADE")
-            if identity is not None:
-                db_identity.mark(conn, identity)
+            if others:
+                conn.execute("DROP SCHEMA " + ", ".join(f'"{name}"' for name in others)
+                             + " CASCADE")
+            if qa_store.SCHEMA in dropped:
+                _empty_qa_schema(conn)
     return dropped

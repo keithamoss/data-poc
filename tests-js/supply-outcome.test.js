@@ -63,8 +63,31 @@ describe("red promoted", () => {
     const w = withRaw(raw);
     const html = w.redPromotedBadge("cp-carers", "r1", "2026-03-05");
     expect(html).toContain("data-red-promoted");
-    expect(html).toContain("went in green");
+    expect(html).toContain("Went in green");
     expect(html).toContain("the promote of Client Register");
+  });
+
+  it("is a short red pill with its sentence beneath, not a sentence in a pill (#121 D1/D2)", () => {
+    const w = withRaw(raw);
+    const root = w.document.createElement("div");
+    root.innerHTML = w.redPromotedBadge("cp-carers", "r1", "2026-03-05");
+    const pill = root.querySelector(".pill.red");
+    expect(pill && pill.textContent.trim()).toBe("Red promoted");
+    const why = root.querySelector("[data-red-promoted-why]");
+    expect(why.textContent).toContain("the promote of Client Register");
+    expect(root.innerHTML).not.toContain("var(--red)");
+  });
+
+  it("is counted as a kind on the agency card (#123 A1)", () => {
+    const w = withRaw(raw);
+    w.eval("CURRENT_IN_PLACE_ON = '2026-03-05'");
+    const ag = {id: "dcp", collections: [{id: "c", datasets: [
+      {id: "cp-carers", name: "Carers", verdictOf: {inPlaceRunId: "r1"}},
+      {id: "cp-clients", name: "Clients", verdictOf: {inPlaceRunId: null}}]}]};
+    const html = w.redPromotedMarker(ag);
+    expect(html).toContain("1 red promoted");
+    expect(html).toContain("Carers");
+    expect(w.redPromotedMarker({id: "x", collections: []})).toBe("");
   });
 
   it("before it turned, shows a note rather than red", () => {
@@ -97,7 +120,7 @@ describe("a supply promoted while red", () => {
         timeline: [{at: "2026-01-10T01:00:00+00:00", status: "red", cause: "the arrival of X"}]}}});
     const html = w.redPromotedBadge("x", "r1", "2026-02-01");
     expect(html).toContain("data-red-promoted");
-    expect(html).toContain("promoted while red");
+    expect(html).toContain("Promoted while red");
   });
 });
 

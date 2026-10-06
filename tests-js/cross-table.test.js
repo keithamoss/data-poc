@@ -111,6 +111,23 @@ describe("the collection gathers them once", () => {
   });
 });
 
+describe("each row says which table pair and which tool (#121 D7)", () => {
+  // Keith, 2026-10-06: nine rows reading "Client reference" with nothing to
+  // tell the table pair or the tool apart.
+  it("names the dataset the check is declared on, its column and its tool", () => {
+    const w = load();
+    const ck = { ...check("x", 3), name: "Client reference",
+                 key: "cp-placements.cp_client_id.relationships_dbt",
+                 tool_ref: "dbt:relationships" };
+    const col = collection({ "cp-placements": [ck] });
+    col.datasets[0].name = "Placements";
+    const html = w.collectionCrossTableSection({ id: "a" }, col);
+    expect(html).toContain("Placements");
+    expect(html).toContain("cp_client_id");
+    expect(html).toContain("dbt");
+  });
+});
+
 describe("the verdict folds into every participating dataset", () => {
   it("a dataset whose only failing check is a cross-table one reads red", () => {
     // Criterion 7, and the cost Keith took knowingly: cp-carers

@@ -52,7 +52,7 @@ def for_run(dataset_id: str, received_at) -> dict:
     if record is None:
         return {"arrivedAt": None, "arrivalStatus": UNKNOWN,
                 "filledAt": None, "waitedSeconds": None, "awaiting": False,
-                "statedOriginal": None, "filedBy": None}
+                "statedOriginal": None, "filedBy": None, "slot": None}
     waited = record.waited
     return {
         "arrivedAt": record.received_at.isoformat() if record.received_at else None,
@@ -69,6 +69,9 @@ def for_run(dataset_id: str, received_at) -> dict:
         # filed it with the person resolved through contract/people.yaml.
         "statedOriginal": record.stated_original,
         "filedBy": _filed_by(record.filed_by),
+        # THE PERIOD IT IS FILED TO (post-build-review #123 B1): the supply
+        # history chains resupplies within a period, never across one.
+        "slot": record.slot,
     }
 
 

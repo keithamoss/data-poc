@@ -186,3 +186,32 @@ describe("a late slot on the build's own day", () => {
     expect(w.lateOpenInPlaceOn({lateSlots: [SLOT]}, "2026-10-05", "2026-10-05T03:00:00+00:00")).toBeNull();
   });
 });
+
+describe("the cards count what the queue counts (#123 B3)", () => {
+  // Keith, 2026-10-06: the agency and collection cards counted DATASETS with
+  // a gap while the queue counts one item per run of consecutive periods, so
+  // a headline of 5 sat over cards totalling 3.
+  it("one per run of periods, the same as the queue's items", () => {
+    const w = load();
+    const ds = {id: "cp-carers", name: "Carers",
+                noSupply: [{periods: ["2026-Q1", "2026-Q2"]}, {periods: ["2026-Q4"]}]};
+    const data = {agencies: [{id: "dcp", collections: [{id: "child-protection", datasets: [ds]}]}]};
+    const items = w.inPlaceOnQueueItems([], data).filter(i => i.kind === "closed-unfilled-slot");
+    expect(w.gapItemCount(ds)).toBe(items.length);
+    expect(w.gapItemCount(ds)).toBe(2);
+    expect(w.gapItemCount({id: "x", noSupply: null})).toBe(0);
+  });
+});
+
+describe("supplies awaiting a decision on the cards (#123 B2)", () => {
+  const AWAITING = {kind: "awaiting-decision", severity: "needs-action", blocking: false,
+                    agencyId: "dcp", collectionId: "child-protection", datasetId: "cp-carers"};
+
+  it("are named as their own kind and read as needing action", () => {
+    const w = load();
+    const html = w.outstandingMarker("agency", "dcp", {items: [AWAITING], blockers: []});
+    expect(html).toContain("1 thing waiting for a person");
+    expect(w.outstandingKindLabel("awaiting-decision")).toBe("Awaiting a decision");
+    expect(html).toContain("ev-action");
+  });
+});
