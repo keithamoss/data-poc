@@ -314,3 +314,80 @@ def _split(doc: dict, gone: set, declared: dict) -> tuple[dict, list[str]]:
             checks = kept
         out[key] = checks
     return out, removed
+
+
+def unreported_checks(yaml_text: str, scan_results: dict, scan) -> list[dict]:
+    """Every check the SodaCL handed to the scan declared, that the scan did
+    not report - each as {check_id, table, check_name, column, reason}.
+
+    A CHECK SODA CANNOT EVALUATE DISAPPEARS (Keith, 2026-10-06, the
+    road-testing sweep's #7, a defect): Soda Core logs an error, marks the
+    check not evaluated and leaves it OUT of get_scan_results()["checks"],
+    so a declared check that never reports read as nothing at all - a false
+    green. A change-over-time check, which needs Soda Cloud, is the worked
+    case. The runners record each of these red, "could not be evaluated",
+    and the rest of the scan's results stand.
+
+    Compared by check_id - the one identity every check here declares - so
+    a check Soda renamed or reshaped still matches. The reason is Soda's own
+    error, shortened; never a value from the data, which Soda's evaluation
+    errors do not carry.
+    """
+    import yaml
+
+    reported = {check_id_from_resource_attributes(c) for c in scan_results.get("checks") or ()}
+    doc = yaml.safe_load(yaml_text) or {}
+    errors = []
+    try:
+        errors = [str(getattr(log, "message", log)) for log in scan.get_error_logs()]
+    except Exception:  # noqa: BLE001 - the reason is a courtesy; the record is not
+        pass
+    missing = []
+    for key, checks in doc.items():
+        if not (isinstance(key, str) and key.startswith("checks for ")):
+            continue
+        table = key[len("checks for "):].strip()
+        for item in checks or ():
+            check_id = _check_id_of(item)
+            if not check_id or check_id in reported:
+                continue
+            line = next(iter(item)) if isinstance(item, dict) else str(item)
+            body = next(iter(item.values())) if isinstance(item, dict) else {}
+            name = (body or {}).get("name") if isinstance(body, dict) else None
+            mine = [e for e in errors if line in e or (name and name in e)]
+            reason = (mine or errors or ["Soda reported no result for it"])[0]
+            reason = " ".join(reason.split())[:300]
+            column = None
+            if "(" in line and line.endswith(")"):
+                column = line[line.index("(") + 1:-1].split(",")[0].strip() or None
+            missing.append({"check_id": check_id, "table": table,
+                            "check_name": name or line, "column": column or "(table)",
+                            "reason": reason})
+    return missing
+
+
+def not_evaluated_record(missing: dict, **fields) -> dict:
+    """The recorded shape of one check Soda could not evaluate: red, with
+    no measurement, saying why. `fields` carries the runner's own identity
+    columns (agency, collection, dataset, run, engine, row count)."""
+    return {
+        **fields,
+        "check_id": missing["check_id"],
+        "column_name": missing["column"],
+        "check_name": missing["check_name"],
+        "dimension": "",
+        "label": None,
+        "metric_value": None,
+        "unit": None,
+        "warn_threshold": None,
+        "fail_threshold": None,
+        "status": "error",
+        "on_fail_action": "flag",
+        "row_count_invalid": None,
+        "failing_sample_keys": [],
+        "finding": f"could not be evaluated - {missing['reason']}",
+        # Read by both dashboard builders, which show it as the run's "not
+        # evaluated" line - the same place a drift check with no reference
+        # says why.
+        "not_evaluated_reason": f"Soda could not evaluate it - {missing['reason']}",
+    }

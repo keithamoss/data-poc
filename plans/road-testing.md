@@ -44,9 +44,11 @@ requirements:
   losses counted separately, against the last promoted supply.
 - #6 known date outliers: declared in the contract, on any date column,
   tolerated up to a stated percentage.
-- #7 a misconfigured Soda check passing silently: A DEFECT, first in the
-  queue - every declared check Soda does not report becomes red, "could
-  not be evaluated", with why, plus a configuration-time check in CI.
+- #7 a misconfigured Soda check passing silently: A DEFECT, FIXED the same
+  morning and the entry deleted - every declared check Soda does not report
+  is red, "could not be evaluated", with why; `mothman dashboard
+  validate-soda` refuses the unparseable and Soda-Cloud-only kinds in CI
+  (REQ-QAC-001/002's decisions).
 - #9 and #10: one histogram component, this supply against the last
   promoted one, and a check without a breakdown SAYS so.
 - #12 tall-dataset completeness: parked until the 30-dataset asset is
@@ -355,44 +357,6 @@ two levels) and #17.
    where `failure_indicates` has real work to do - "more rows than
    agreed carry a known-bad date" is a different message from "a date we
    do not recognise appeared".
-
-7. **[todo, 2026-09-24]** **[QA checks & contract]** **A misconfigured
-   Soda check passes silently, because the runners ignore Soda's own
-   error log.** Found 2026-09-24 while verifying item 6, and it is a
-   real defect rather than a design gap - three separate instances have
-   now turned up in one morning.
-
-   `qa_tools/bdm/run_soda_bdm.py` and `qa_tools/cp/run_soda_cp.py` both
-   call `scan.execute()` and go straight to `scan.get_scan_results()`.
-   Neither inspects the return value, and neither calls
-   `scan.has_error_logs()`. Soda reports a bad check configuration by
-   logging an ERROR and carrying on, so the three cases found today all
-   reach the dashboard as ordinary results:
-
-   - `valid sql` - unsupported, silently skipped, check then **passes**
-     at 0.0% invalid because nothing is being validated.
-   - `valid min` / `valid max` given a date - rejected as not-a-float,
-     check then **passes** at 0.0% for the same reason.
-   - a change-over-time check with no Soda Cloud - crashes in
-     evaluation, and the check vanishes from
-     `get_scan_results()["checks"]` entirely, so it reports nothing at
-     all (see item 4).
-
-   In every case `scan.has_error_logs()` was `True`, so the signal
-   exists and is simply not read. Two of the three produce a GREEN check
-   that guards nothing, and the third produces a `check_id` that is
-   declared, lifecycle-validated, and never reports - all three are the
-   false-green direction.
-
-   Not yet decided, and worth a moment because the obvious fix is too
-   blunt: whether an error should fail the whole scan (simple, and one
-   bad check then stops a dataset's entire QA run - the blast-radius
-   shape `REQ-PIPE-053` exists to avoid), or mark just the affected
-   checks as errored and surface them as needing attention, or be
-   caught at config time by a gate over the checks file so a broken
-   check never runs at all. The third is the most in keeping with how
-   this project already gates check lifecycle, and would not have
-   caught the change-over-time case, which only fails at run time.
 
 8. **[investigate, 2026-09-24]** **[Dashboard UI]** **Closing a check
    panel navigates back TWO levels, landing on the agency view instead

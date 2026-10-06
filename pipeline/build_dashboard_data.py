@@ -201,7 +201,7 @@ def build() -> dict:
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "engine": r["engine"], "check_name": r["check_name"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
-            "status_by_run": {}, "reference": {},
+            "status_by_run": {}, "reference": {}, "not_evaluated": {},
         })
         slot["by_run"][r["run_id"]] = r["metric_value"]
         # item 74 Bug A: the tool's own verdict, carried through rather
@@ -210,6 +210,9 @@ def build() -> dict:
         # WHAT IT WAS COMPARED WITH, AND THE MEASURED VERDICT BESIDE A GAP'S
         # RED (REQ-QAC-108 criteria 14 and 16).
         slot["reference"][r["run_id"]] = drift_reference.reference_note(r, dashboard_status)
+        # A REAL TOOL THAT COULD NOT EVALUATE A CHECK it was handed says why
+        # (the road-testing sweep's #7, 2026-10-06).
+        slot["not_evaluated"][r["run_id"]] = r.get("not_evaluated_reason")
         slot["row_count_total"][r["run_id"]] = r["row_count_total"]
         slot["row_count_invalid"][r["run_id"]] = r["row_count_invalid"]
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
@@ -257,7 +260,8 @@ def build() -> dict:
                         "status": slot["status_by_run"].get(run_id),
                         "reference": slot["reference"].get(run_id),
                         # Criterion 9's red is NOT EVALUATED, said in words.
-                        "not_evaluated": ((slot["reference"].get(run_id) or {}).get("reason")
+                        "not_evaluated": slot["not_evaluated"].get(run_id) or (
+                                         (slot["reference"].get(run_id) or {}).get("reason")
                                           if slot["status_by_run"].get(run_id) == "red"
                                           and slot["by_run"][run_id] is None
                                           and slot["reference"].get(run_id) else None),

@@ -85,6 +85,10 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # actually occurs. Neither alone is enough at thirty datasets.
     ("patterns", ["uv", "run", "python3", "-m", "qa_tools.common.validate_arrival_patterns"],
      "one filename can only ever belong to one dataset", False),
+    # The road-testing sweep's #7 (Keith, 2026-10-06): a SodaCL check this
+    # project cannot run is refused here, before a run reports it red.
+    ("soda", ["uv", "run", "mothman", "dashboard", "validate-soda"],
+     "every Soda check parses and can run without Soda Cloud", False),
     ("requirements", ["uv", "run", "mothman", "dashboard", "validate-requirements"],
      "every linked test and implemented_by symbol still exists", False),
     # REQ-DOCS-072. The delivery plan and the register are two records

@@ -20,7 +20,8 @@ from qa_tools.common import left_out, supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
-    execute_scan, left_out_checks, readable_checks_yaml,
+    execute_scan, left_out_checks, not_evaluated_record, readable_checks_yaml,
+    unreported_checks,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
@@ -83,7 +84,8 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
         # what the SET search_path above was doing for the shared connection.
         scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
             "cp_collection", supply_db.run_schema(run_id)))
-        scan.add_sodacl_yaml_str(readable_checks_yaml(SODA_CHECKS_PATH, unreadable))
+        handed = readable_checks_yaml(SODA_CHECKS_PATH, unreadable)
+        scan.add_sodacl_yaml_str(handed)
         left_out.note(run_id, "soda", left_out_checks(SODA_CHECKS_PATH, unreadable))
         sampler = CaptureSampler()
         scan.sampler = sampler
@@ -167,6 +169,19 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
                 "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], cp_common.TABLE_PK[table]),
                 "engine": ENGINE_TAG,
             })
+
+        # EVERY DECLARED CHECK SODA DID NOT REPORT IS RED, never absent -
+        # see run_soda_bdm.py. Only what was HANDED to the scan: a check
+        # left out for an unreadable table is recorded as not evaluated
+        # by left_out, not here.
+        for missing in unreported_checks(handed, scan_results, scan):
+            if missing["table"] not in cp_common.TABLES:
+                continue
+            results.append(not_evaluated_record(
+                missing, agency_id=cp_common.AGENCY_ID, collection_id=cp_common.COLLECTION_ID,
+                dataset_id=hierarchy.dataset_for_table(missing["table"]).dataset_id,
+                run_id=run_id, run_timestamp=run_timestamp,
+                row_count_total=n_total_by_table.get(missing["table"]), engine=ENGINE_TAG))
 
     finally:
         conn.close()

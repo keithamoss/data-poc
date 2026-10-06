@@ -254,6 +254,10 @@ def _not_evaluated_reason(record: dict) -> str | None:
     (REQ-PIPE-078 criterion 10) - so a real tool's result can never be
     mistaken for one."""
     return (record.get("unrunnable_reason") or record.get("held_reason")
+            # A real tool that could not evaluate a check it was handed
+            # (Soda leaving it out of its results - the road-testing
+            # sweep's #7, 2026-10-06).
+            or record.get("not_evaluated_reason")
             # REQ-QAC-108 criterion 9: red, not evaluated, under Evidently.
             or (record.get("reference_reason") if record.get("reference_not_evaluated")
                 else None)

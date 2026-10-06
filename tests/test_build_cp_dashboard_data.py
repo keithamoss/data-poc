@@ -159,6 +159,27 @@ class TestACheckThatCouldNotRunStaysOnItsOwnCard:
         assert by_run["cp_run_001"]["not_evaluated"] is None
 
 
+class TestACheckATheToolCouldNotEvaluateSaysWhy:
+    """The road-testing sweep's #7 (Keith, 2026-10-06): a real tool's check
+    that it could not evaluate - Soda leaving it out of its results - is
+    recorded red with a reason, and the card shows that reason."""
+
+    def test_the_reason_reaches_the_card(self):
+        failed = _check("cp_run_002", "assigned_worker_id", None, status="error", check_id=_XT,
+                        check_name="relationships_cp_notifications_assigned_worker_id",
+                        not_evaluated_reason="Soda could not evaluate it - needs Soda Cloud")
+        real = _check("cp_run_001", "assigned_worker_id", 0, check_id=_XT,
+                      check_name="relationships_cp_notifications_assigned_worker_id")
+        table = bcd.build_one_table("cp_notifications", [real, failed], FIXTURE_RUNS,
+                                    FIXTURE_DATASET_STATS, {})
+        card = next(c for col in table["columns"] for c in col["checks"]
+                    if c.get("check_id") == _XT)
+        by_run = {h["run_id"]: h for h in card["history"]}
+        assert by_run["cp_run_002"]["status"] == "red"
+        assert by_run["cp_run_002"]["not_evaluated"] == \
+            "Soda could not evaluate it - needs Soda Cloud"
+
+
 class TestTwoChecksThatShareANameStayTwoCards:
     """post-build-review #88 (found 2026-10-04 overnight, by the full
     suite). cp-clients' cross-table section carries checks DECLARED by

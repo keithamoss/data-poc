@@ -40,6 +40,8 @@ from qa_tools.common import supply_db
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
     execute_scan,
+    not_evaluated_record,
+    unreported_checks,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 
@@ -223,6 +225,17 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
                 "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], "registration_number"),
                 "engine": ENGINE_TAG,
             })
+
+        # EVERY DECLARED CHECK SODA DID NOT REPORT IS RED, never absent
+        # (the road-testing sweep's #7, Keith 2026-10-06): Soda leaves a
+        # check it cannot evaluate out of its results entirely.
+        with open(SODA_CHECKS_PATH) as f:
+            handed = f.read()
+        for missing in unreported_checks(handed, scan_results, scan):
+            results.append(not_evaluated_record(
+                missing, agency_id=AGENCY_ID, collection_id=COLLECTION_ID,
+                dataset_id=DATASET_ID, run_id=run_id, run_timestamp=run_timestamp,
+                row_count_total=n_total, engine=ENGINE_TAG))
 
     finally:
         conn.close()

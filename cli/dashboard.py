@@ -91,6 +91,15 @@ def _validate_hierarchy() -> None:
         raise click.ClickException("hierarchy validation failed - see output above.")
 
 
+@dashboard_group.command("validate-soda")
+def validate_soda_command() -> None:
+    """Gate: every active SodaCL check parses and can be evaluated without
+    Soda Cloud (the road-testing sweep's #7, 2026-10-06)."""
+    from qa_tools.common.validate_soda import main as validate_main
+    if validate_main() != 0:
+        raise click.ClickException("Soda check validation failed - see output above.")
+
+
 @dashboard_group.command("validate-hierarchy")
 def validate_hierarchy_command() -> None:
     """Gate: every dataset contract agrees with the one hierarchy (REQ-QAC-039)."""

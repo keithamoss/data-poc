@@ -316,10 +316,11 @@ requirements:
       - All four tools' checks are reconciled into one dashboard view
         per column.
     linked_tests:
-      - tests/test_run_dbt_bdm.py
-      - tests/test_run_soda_bdm.py
-      - tests/test_run_datacontract_bdm.py
-      - tests/test_run_evidently_bdm.py
+    - tests/test_run_dbt_bdm.py
+    - tests/test_run_soda_bdm.py
+    - tests/test_run_datacontract_bdm.py
+    - tests/test_run_evidently_bdm.py
+    - tests/test_validate_soda.py
     evidence:
       - >
         2026-09-20: 352 committed run directories under
@@ -331,16 +332,33 @@ requirements:
         Ran the four real tools rather than reimplementing their logic. An earlier engines/ directory of hand-written Python/DuckDB stand-ins was deleted once it drifted out of sync with the real tools it imitated.
       - >
         Switched to dbt_utils macros (accepted_range, expression_is_true, recency) rather than hand-written equivalents, accepting a one-time `dbt deps` setup step as the cost.
+      - 'A CHECK SODA CANNOT EVALUATE IS RED, NEVER ABSENT (defect, Keith 2026-10-06,
+        the road-testing sweep''s #7, over failing the whole scan or a configuration-time
+        check alone). Soda Core logs an evaluation error, leaves the check out of
+        get_scan_results()[''checks''] and carries on, and nothing read its error
+        state - so a declared check that never reported read as nothing at all,
+        a false green. Each runner now compares what it HANDED Soda with what Soda
+        reported, by check_id (soda_common.unreported_checks), and records every
+        missing check as status error, no measurement, with Soda''s own reason (''could
+        not be evaluated - ...''), which the dashboard shows as that run''s ''not
+        evaluated'' line; the scan''s other results stand, the blast radius REQ-PIPE-053/115
+        chose. Proven against real Soda Core with a change-over-time check, which
+        needs Soda Cloud (tests/test_run_soda_bdm.py), failing first. THE CONFIGURATION-TIME
+        HALF: `mothman dashboard validate-soda` (a `mothman check` gate and a validate-config.yml
+        step) refuses a SodaCL check Soda Core cannot parse, or one of a kind that
+        needs Soda Cloud (change-over-time, anomaly) - those parse cleanly, so only
+        the kind catches them.'
     implemented_by:
-      - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
-      - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
-      - qa_tools/bdm/run_soda_bdm.py::evaluate_soda_bdm
-      - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
-      - qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm
-      - dbt_project/models/staging/schema.yml
-      - contract/bdm-birth-registrations-contract.yaml
-      - contract/bdm-birth-registrations-soda-checks.yml
-
+    - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
+    - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
+    - qa_tools/bdm/run_soda_bdm.py::evaluate_soda_bdm
+    - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
+    - qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm
+    - dbt_project/models/staging/schema.yml
+    - contract/bdm-birth-registrations-contract.yaml
+    - contract/bdm-birth-registrations-soda-checks.yml
+    - qa_tools/common/soda_common.py::unreported_checks
+    - qa_tools/common/validate_soda.py::problems
   - id: REQ-QAC-002
     title: Real multi-tool QA checks against Child Protection
     story: >
@@ -362,10 +380,12 @@ requirements:
         span more than one table) run for real, not just per-table
         column checks.
     linked_tests:
-      - tests/test_run_dbt_cp.py
-      - tests/test_run_soda_cp.py
-      - tests/test_run_datacontract_cp.py
-      - tests/test_run_evidently_cp_real.py
+    - tests/test_run_dbt_cp.py
+    - tests/test_run_soda_cp.py
+    - tests/test_run_datacontract_cp.py
+    - tests/test_run_evidently_cp_real.py
+    - tests/test_validate_soda.py
+    - tests/test_run_soda_bdm.py
     evidence:
       - >
         2026-09-20: 18 committed run directories under
@@ -378,15 +398,32 @@ requirements:
         Modelled Child Protection as one collection of six tables, with qa_results/ nesting kept at dataset level rather than table level - so a collection reads as one thing that was QA'd, not six.
       - >
         Kept cross-table rules (referential integrity, business rules) as real checks rather than deferring them, since a multi-table collection whose only checks are per-column would not have tested the thing that makes it different from a single feed.
+      - 'A CHECK SODA CANNOT EVALUATE IS RED, NEVER ABSENT (defect, Keith 2026-10-06,
+        the road-testing sweep''s #7, over failing the whole scan or a configuration-time
+        check alone). Soda Core logs an evaluation error, leaves the check out of
+        get_scan_results()[''checks''] and carries on, and nothing read its error
+        state - so a declared check that never reported read as nothing at all,
+        a false green. Each runner now compares what it HANDED Soda with what Soda
+        reported, by check_id (soda_common.unreported_checks), and records every
+        missing check as status error, no measurement, with Soda''s own reason (''could
+        not be evaluated - ...''), which the dashboard shows as that run''s ''not
+        evaluated'' line; the scan''s other results stand, the blast radius REQ-PIPE-053/115
+        chose. Proven against real Soda Core with a change-over-time check, which
+        needs Soda Cloud (tests/test_run_soda_bdm.py), failing first. THE CONFIGURATION-TIME
+        HALF: `mothman dashboard validate-soda` (a `mothman check` gate and a validate-config.yml
+        step) refuses a SodaCL check Soda Core cannot parse, or one of a kind that
+        needs Soda Cloud (change-over-time, anomaly) - those parse cleanly, so only
+        the kind catches them.'
     implemented_by:
-      - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
-      - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
-      - qa_tools/cp/run_soda_cp.py::evaluate_soda_cp
-      - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
-      - qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp
-      - contract/child-protection-contract.yaml
-      - contract/child-protection-soda-checks.yml
-
+    - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
+    - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
+    - qa_tools/cp/run_soda_cp.py::evaluate_soda_cp
+    - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
+    - qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp
+    - contract/child-protection-contract.yaml
+    - contract/child-protection-soda-checks.yml
+    - qa_tools/common/soda_common.py::unreported_checks
+    - qa_tools/common/validate_soda.py::problems
   - id: REQ-DASH-003
     title: Drill-down status rollup (Agency -> Collection -> Dataset -> Column)
     story: >

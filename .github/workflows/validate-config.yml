@@ -92,6 +92,9 @@ jobs:
       - name: Gate - check-lifecycle validation (Thread D)
         run: uv run mothman dashboard validate-check-lifecycle --require-explanations
 
+      - name: Every Soda check can run here
+        run: uv run mothman dashboard validate-soda
+
       - name: Gate - requirements validation (item 75)
         run: uv run mothman dashboard validate-requirements
 

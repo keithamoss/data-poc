@@ -571,3 +571,22 @@ def test_a_headline_check_with_no_value_for_a_run_does_not_crash_the_build(tmp_p
     data = bdd.build()
     sex = next(c for c in data["columns"] if c["name"] == "sex")
     assert set(sex["stats"]["byRun"]) == {"run_002"}
+
+
+def test_a_check_soda_could_not_evaluate_says_why(tmp_path, monkeypatch):
+    """The road-testing sweep's #7 (Keith, 2026-10-06): a check the tool
+    could not evaluate is red with no measurement, and the page says why -
+    the same 'not evaluated' line a drift check without a reference uses."""
+    _no_retired_checks(monkeypatch)
+    results = [_check("run_001", "sex", 0),
+               _check("run_002", "sex", None, status="error",
+                      not_evaluated_reason="Soda could not evaluate it - needs Soda Cloud")]
+    path = tmp_path / "results_bdm.json"
+    path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": results,
+                                "dataset_stats": FIXTURE_DATASET_STATS}))
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(path))
+    check = next(c for c in bdd.build()["columns"] if c["name"] == "sex")["checks"][0]
+    by_run = {h["run_id"]: h for h in check["history"]}
+    assert by_run["run_002"]["status"] == "red"
+    assert by_run["run_002"]["not_evaluated"] == "Soda could not evaluate it - needs Soda Cloud"
+    assert by_run["run_001"]["not_evaluated"] is None

@@ -210,6 +210,13 @@ releases:
               A database's environment is now kept as a row in its own QA
               history, so it travels with copies of the database. A database
               marked the old way needs marking once more with mothman env mark.
+          - headline: A Soda check that can't run now shows red
+            components: ["QA checks & contract"]
+            description: >
+              If Soda can't evaluate one of its checks, that check now reads
+              red with the reason, instead of quietly missing from the
+              results. CI also refuses a check Soda can't parse or one that
+              would need Soda Cloud.
 
   - date: "2026-10-05"
     summary: >

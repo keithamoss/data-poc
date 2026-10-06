@@ -50,3 +50,33 @@ def test_failed_rows_checks_route_to_their_real_column_not_table(monkeypatch, bd
     custom_named = [r for r in results if r["check_name"] in run_soda_bdm._CUSTOM_CHECK_COLUMN]
     assert custom_named, "no 'failed rows' custom-named checks found - fixture/test drifted from the real checks YAML"
     assert all(r["column_name"] != "(table)" for r in custom_named)
+
+
+def test_a_check_soda_cannot_evaluate_is_recorded_as_an_error(monkeypatch, bdm_duckdb_dir,
+                                                               tmp_path):
+    """Keith, 2026-10-06 (the road-testing sweep's #7, a defect): a check
+    Soda Core cannot evaluate - here a change-over-time check, which needs
+    Soda Cloud - used to be ABSENT from the scan's results, so a declared
+    check never reported and nothing noticed: a false green. Every declared
+    check that does not report is now recorded red, 'could not be
+    evaluated', with Soda's own reason."""
+    import yaml
+
+    with open(run_soda_bdm.SODA_CHECKS_PATH) as f:
+        doc = yaml.safe_load(f)
+    doc["checks for birth_registrations"].append({"change for row_count": {
+        "warn": "when > 10", "fail": "when > 50",
+        "attributes": {"check_id": "test.civil-registration.birth-registrations."
+                                   "change_rowcount_soda"}}})
+    checks = tmp_path / "checks.yml"
+    checks.write_text(yaml.safe_dump(doc, sort_keys=False))
+    monkeypatch.setattr(run_soda_bdm, "SODA_CHECKS_PATH", str(checks))
+    results = _run(monkeypatch, bdm_duckdb_dir, _REF_RUN_ID, "2026-01-01T06:30:00Z")
+    mine = [r for r in results
+            if r["check_id"] == "test.civil-registration.birth-registrations.change_rowcount_soda"]
+    assert len(mine) == 1, "the check Soda could not evaluate is missing from the results"
+    assert mine[0]["status"] == "error"
+    assert "could not be evaluated" in mine[0]["finding"]
+    others = [r for r in results if r is not mine[0]]
+    assert others and all(r["status"] in ("pass", "warn", "fail") for r in others), \
+        "the checks Soda could evaluate keep their own results"
