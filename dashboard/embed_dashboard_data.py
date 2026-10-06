@@ -384,10 +384,19 @@ def embed() -> None:
             # 2027-Q3 while its calendar runs to 2027-Q4 - and naming
             # the calendar's would tell a reader their dataset ended
             # after a period it never had.
+            # WHEN IT ENDS (REQ-DASH-155 criterion 6): the day its last slot
+            # closes, so the page says "exhausted" on the day the pipeline
+            # starts holding rather than about a period earlier. None where
+            # the last slot never closes.
+            try:
+                ends = runway.schedule_ends_on(entry.dataset_id)
+            except (ValueError, KeyError, FileNotFoundError):
+                ends = owed[-1].date if owed else None
             datasets.append({"id": entry.dataset_id,
                               "dates": [p.date.isoformat() for p in owed],
                               "lastPeriod": owed[-1].name if owed else None,
-                              "lastDate": owed[-1].date.isoformat() if owed else None})
+                              "lastDate": owed[-1].date.isoformat() if owed else None,
+                              "endsOn": ends.isoformat() if ends else None})
         schedule_runway["calendars"].append({
             "name": cal.name,
             "threshold": cal.runway_warning_slots or runway.DEFAULT_WARNING_SLOTS,

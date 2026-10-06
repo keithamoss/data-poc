@@ -2678,7 +2678,14 @@ function scheduleRunwayInPlaceOn(inPlaceOnDateStr, runway){
       // ISO-8601 - the same reasoning clipDatasetToInPlaceOn() relies on.
       const remaining = (ds.dates||[]).filter(d=> d > inPlaceOnDateStr).length;
       if(fewest===null || remaining < fewest) fewest = remaining;
-      if(remaining === 0){
+      // EXHAUSTED FROM WHEN THE LAST SLOT CLOSES (REQ-DASH-155 criterion 6;
+      // Keith, 2026-10-06) - the day the pipeline starts holding, not the
+      // last period's own date, a period earlier. `endsOn` null is a last
+      // slot that never closes. Without it (an older build) the dates rule.
+      const ended = ("endsOn" in ds)
+        ? (ds.endsOn !== null && inPlaceOnDateStr >= ds.endsOn)
+        : remaining === 0;
+      if(ended){
         // The DATASET's own last period, falling back to its
         // calendar's only when it has none of its own. They differ
         // wherever a dataset takes some months and not others, and
@@ -4205,9 +4212,36 @@ function render(){
 // NO DISMISS CONTROL, and nothing about it is persisted anywhere. A
 // dismissible notice about a task nobody has done is a notice about a
 // task nobody will do.
-function exhaustedNotice(){
-  const runway = (DATA && DATA.scheduleRunway) || null;
+// WHAT IS PILING UP BEHIND IT (REQ-DASH-155 criteria 1-5): supplies held
+// because a schedule ended, AS AT the date on show - received by then and not
+// yet resolved - aggregated across the exhausted datasets, with the earliest
+// receipt. From hold records only, and never a day count: daily and quarterly
+// feeds pile up at different rates, so a number of days misstates urgency.
+function scheduleEndedBacklog(datasetIds, onDateStr){
+  const ids = new Set(datasetIds);
+  const held = [];
+  rawRealDatasets().forEach(raw=>{
+    if(!ids.has(raw.id)) return;
+    (raw.scheduleEndedHolds || []).forEach(h=>{
+      const received = assetDateStrOf(h.receivedAt);
+      if(received > onDateStr) return;
+      if(h.resolvedAt && assetDateStrOf(h.resolvedAt) <= onDateStr) return;
+      held.push(received);
+    });
+  });
+  held.sort();
+  return {count: held.length, earliest: held[0] || null};
+}
+function exhaustedNotice(runwayState, onDateStr){
+  const runway = runwayState !== undefined ? runwayState
+    : ((DATA && DATA.scheduleRunway) || null);
   if(!runway || !runway.exhaustedCount) return "";
+  const on = onDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  const backlog = scheduleEndedBacklog(Object.keys(runway.exhausted), on);
+  const piled = backlog.count
+    ? `${backlog.count} ${backlog.count===1?"supply is":"supplies are"} held because of it, the
+      earliest received ${fmtDay(backlog.earliest)}.`
+    : `Nothing has arrived for them since the schedule ended.`;
   const n = runway.exhaustedCount;
   const calendars = [...new Set(Object.values(runway.exhausted).map(e=>e.calendar))];
   const which = calendars.map(c=>`<b style="display:inline">${c}</b>`).join(", ");
@@ -4221,6 +4255,7 @@ function exhaustedNotice(){
       Add the next dates to <code>${file}</code> — <code>mothman schedule candidate-dates</code>
       proposes them for review.
     </div>
+    <div data-schedule-backlog style="margin-top:4px; font-size:13px;">${piled}</div>
   </div>`;
 }
 

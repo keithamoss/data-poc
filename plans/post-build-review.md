@@ -2542,6 +2542,18 @@ here as its own question, not acted on.
     053 c4-6 restated) are to be revised for (2) and (3) and brought for
     sign-off.
 
+    **A WRONG PREMISE WENT TO KEITH, AND WAS CAUGHT BUILDING, 2026-10-06.**
+    The scoper reported that a held supply "is still staged and checked,
+    because arrival_lifecycle.process always runs the checks", and Keith
+    signed REQ-PIPE-154 criterion 5 on that. It is false: a held supply's
+    view is withheld (REQ-PIPE-078 criterion 9), so it gets its file checks
+    and no data checks - all 9 holds in the sandbox read 6 and 0. Caught
+    when the criterion was about to be marked met against
+    `tests/test_held_not_checked.py`, which says the opposite. Told him; he
+    kept today's behaviour and c5 is amended. The lesson is CLAUDE.md's own:
+    a critic's or scoper's claim about the code is a claim to verify against
+    the code BEFORE it goes to Keith, not after he has signed it.
+
 39. **[done, 2026-09-25]** **[Pipeline & publishing]** **[B1/B2] Three
     model functions built in this batch have zero production callers.**
 

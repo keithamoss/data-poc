@@ -1478,9 +1478,15 @@ class TestAnExhaustedScheduleIsLoud:
     real window - autumn 2027 - where exactly ONE dataset is exhausted
     among five that are not, which is the case a rollup most wants to
     swallow.
+
+    THE WINDOW STARTS WHEN ITS LAST SLOT CLOSES (REQ-DASH-155 criterion 6;
+    Keith, 2026-10-06), not at 2027-Q3's own date: the Q3 slot stays open
+    until Q4's claim window opens in late October, and its siblings' Q4
+    slot until early 2028. 15 September, the old date, is inside the open
+    Q3 slot, where the pipeline still files a supply.
     """
 
-    ONE_EXHAUSTED = "2027-09-15"
+    ONE_EXHAUSTED = "2027-12-15"
     ALL_EXHAUSTED = "2028-06-01"
     NONE_EXHAUSTED = "2026-09-23"
     CP = "child-protection-family-support"

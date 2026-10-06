@@ -140,6 +140,19 @@ releases:
               what recognition would make of each file.
       - category: Improved
         items:
+          - headline: A supply after its schedule ends says what to fix
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply that arrives after its dataset's last scheduled date is
+              held as schedule-ended, naming the last period, the file to edit
+              and the command that proposes dates. Once you add them, the next
+              processing pass files it for you.
+          - headline: The schedule-ended notice counts what is waiting
+            components: ["Dashboard UI"]
+            description: >
+              The notice now says how many supplies are held because a
+              schedule ended and when the earliest arrived, and appears from
+              the day the last slot closes rather than a period early.
           - headline: A rebuilt synthetic history keeps its own dates
             components: ["Pipeline & publishing", "Data generation"]
             description: >

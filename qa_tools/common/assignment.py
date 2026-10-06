@@ -97,6 +97,12 @@ class Assignment:
     #: - a test. The filing then records no classification rather than
     #: inventing one from the clock.
     received_at: "datetime | None" = None
+    #: HELD BECAUSE THE SCHEDULE RAN OUT (REQ-PIPE-154 criterion 2): the
+    #: receipt falls after the dataset's last authored slot closed, so no
+    #: date exists to file it to - a configuration problem, not the
+    #: supplier's. `last_period` names that last slot.
+    schedule_ended: bool = False
+    last_period: str | None = None
 
     @property
     def is_resupply(self) -> bool:
@@ -166,6 +172,20 @@ def open_slot(slots: Sequence[slots_mod.Slot], at: datetime) -> slots_mod.Slot |
     return candidate
 
 
+def schedule_ended(slots: Sequence[slots_mod.Slot], at: datetime,
+                   opened: int | None = None) -> bool:
+    """Has this dataset's schedule run out by `at` (REQ-PIPE-154)? True
+    once the LAST slot has closed - every slot's window has opened and the
+    newest is closed - which REQ-PIPE-131 criterion 16 makes possible for an
+    authored calendar. A last slot that never closes (a calendar of one
+    date) never ends; a gap between two slots is not an end."""
+    if not slots:
+        return False
+    if (opened if opened is not None else _opened_by(slots, at)) < len(slots):
+        return False
+    return slots_mod.is_closed(slots[-1], at)
+
+
 def assign(dataset_id: str, supply_id: str, at: datetime,
             slots: Sequence[slots_mod.Slot],
             filled: frozenset[str]) -> Assignment:
@@ -185,10 +205,13 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
     found = open_slot(slots, at)
     if found is None:
         considered = current_slot(slots, at)
+        index = _opened_by(slots, at)
+        ended = schedule_ended(slots, at, opened=index)
         return Assignment(
             dataset_id=dataset_id, supply_id=supply_id, received_at=at, slot=None,
             branch=HELD, considered=(considered.name,) if considered else (),
-            unavailable=_why_unavailable(slots, at, filled))
+            unavailable=_why_unavailable(slots, at, filled, opened=index, ended=ended),
+            schedule_ended=ended, last_period=slots[-1].name if ended else None)
     if found.name in filled:
         return Assignment(dataset_id=dataset_id, supply_id=supply_id, received_at=at,
                            slot=found.name, branch=RESUPPLY,
@@ -198,7 +221,8 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
 
 
 def _why_unavailable(slots: Sequence[slots_mod.Slot], at: datetime,
-                      filled: frozenset[str]) -> tuple[tuple[str, str], ...]:
+                      filled: frozenset[str], *, opened: int | None = None,
+                      ended: bool = False) -> tuple[tuple[str, str], ...]:
     """The slots either side of a held arrival, and why neither took it
     (REQ-PIPE-064 criterion 4).
 
@@ -208,15 +232,21 @@ def _why_unavailable(slots: Sequence[slots_mod.Slot], at: datetime,
     the rule itself.
     """
     out: list[tuple[str, str]] = []
-    index = _opened_by(slots, at)
+    # ONE BISECTION per arrival, shared with assign() (REQ-PIPE-131 NFR 1).
+    index = opened if opened is not None else _opened_by(slots, at)
     if index > 0:
         before = slots[index - 1]
         state = ("filled by a promoted supply, and " if before.name in filled else "")
         # NO INSTANT IN THE SENTENCE: a hold's reason is stored and shown
         # verbatim, and a raw ISO instant is the one thing REQ-DASH-071
         # says a reader never sees. The slot's own config says when.
-        out.append((before.name,
-                    f"{state}closed - the next period's claim window had opened"))
+        # AND NO NEXT PERIOD WHERE THERE IS NONE (REQ-PIPE-154 criterion 4):
+        # the calendar's last slot closes by a provisional measure, not
+        # because anything opened after it.
+        why = ("closed - it is the last period this dataset's schedule has, and no "
+               "later date is authored" if ended
+               else "closed - the next period's claim window had opened")
+        out.append((before.name, f"{state}{why}"))
     if index < len(slots):
         out.append((slots[index].name,
                     "its claim window has not opened yet, and nothing may claim forward"))

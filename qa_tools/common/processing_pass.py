@@ -211,10 +211,15 @@ class PassReport:
     owed: list = field(default_factory=list)
     tickets: list[str] = field(default_factory=list)
     red: bool = False
+    #: (datasets, supplies) this pass held because a schedule ended
+    #: (REQ-PIPE-154 criterion 6), and what it re-filed once dates covered
+    #: one (criterion 7).
+    schedule_ended: tuple[int, int] = (0, 0)
+    refiled: list = field(default_factory=list)
 
     @property
     def nothing_to_do(self) -> bool:
-        return not (self.processed or self.gated_only or self.left_locked
+        return not (self.processed or self.gated_only or self.left_locked or self.refiled
                     or self.left_behind_failure or self.left_behind_locked
                     or self.left_for_budget or self.failures or self.owed)
 
@@ -353,6 +358,17 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
                          run_by, report, say)
                 except Exception as exc:  # noqa: BLE001 - criterion 14: reported, left owed
                     fail_arrival(arrival, exc)
+    # HELD UNTIL DATES EXISTED (REQ-PIPE-154 criterion 7): re-filed by the
+    # rule before the owed work, so the re-check each is owed runs - and
+    # applies the gate - in this same pass. And what this pass's own runs
+    # held because a schedule ended, counted apart (criterion 6).
+    try:
+        from qa_tools.common import schedule_ended
+        report.refiled.extend(schedule_ended.refile_covered(say=say))
+        with supply_db.connect(read_only=True, label="mothman:process") as conn:
+            report.schedule_ended = schedule_ended.raised_by_runs(conn, report.processed)
+    except Exception as exc:  # noqa: BLE001 - the holds are durable; the next pass retries
+        failed("schedule-ended holds", exc)
     # OWED WORK (criterion 11): re-evaluations and re-checks alike, each
     # cleared only when its work completes; a failure stays owed.
     try:

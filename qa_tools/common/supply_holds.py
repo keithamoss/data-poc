@@ -127,6 +127,31 @@ class Holds:
                 f"Each needs somebody to assign it to a slot or reject it.")
 
 
+#: Where a dataset's delivery dates are authored (REQ-PIPE-154 criterion 3).
+SCHEDULE_FILE = "contract/data-asset.yaml"
+
+
+def reason_for(decided: Assignment) -> dict:
+    """What a hold records about why the rule could not place a supply -
+    the one place its shape is decided. A schedule-ended hold carries that
+    as a field, the last period, and the file and command that fix it
+    (REQ-PIPE-154 criteria 1-3)."""
+    reason = {"unavailable": [list(pair) for pair in decided.unavailable],
+              "considered": list(decided.considered)}
+    if decided.schedule_ended:
+        reason.update(schedule_ended=True, last_period=decided.last_period,
+                      fix_file=SCHEDULE_FILE)
+        try:
+            from qa_tools.common import schedule
+            calendar = schedule.calendar_for_dataset(decided.dataset_id).name
+            year = (decided.received_at.year if decided.received_at else None)
+            reason["fix_command"] = (f"mothman schedule candidate-dates --calendar {calendar}"
+                                     + (f" --year {year}" if year else ""))
+        except Exception:  # noqa: BLE001 - the file alone is still the fix
+            pass
+    return reason
+
+
 def holds_in(decisions) -> Holds:
     """The holds among a run's assignments, before anything is recorded.
 
@@ -161,6 +186,12 @@ class Held:
         return RESPONSES.get(self.kind, ())
 
     @property
+    def schedule_ended(self) -> bool:
+        """Held because the dataset's schedule ran out (REQ-PIPE-154
+        criterion 2) - read from the record, never from its prose."""
+        return self.reason.get("schedule_ended") is True
+
+    @property
     def unavailable(self) -> tuple[tuple[str, str], ...]:
         """Each slot considered and what made it unavailable, for an
         assignment-rule hold."""
@@ -174,6 +205,16 @@ class Held:
         this is that record read back, and it says what to do about it
         because a hold nobody can clear is indistinguishable from a bug.
         """
+        if self.schedule_ended:
+            # THE FIX IS OURS, NOT THE SUPPLIER'S (REQ-PIPE-154 criteria 1
+            # and 3), so the reason says where to make it.
+            command = self.reason.get("fix_command")
+            how = f" `{command}` proposes them." if command else ""
+            return (f"{self.supply_id} arrived after {self.dataset_id}'s schedule ended - "
+                    f"its last authored period is {self.reason.get('last_period')}, and "
+                    f"there is no later date to file it to. Add dates to the dataset's "
+                    f"calendar in {SCHEDULE_FILE}.{how} The next processing pass then "
+                    f"files it by the rule. Raised by {self.raised_by}.")
         reasons = "; ".join(f"{name}: {why}" for name, why in self.unavailable)
         why = (f"{self.supply_id} could not be placed - "
                 f"{reasons or 'no slot was open'}")
@@ -193,6 +234,9 @@ class Tally:
 
     by_dataset: tuple[tuple[str, int], ...]
     by_kind: tuple[tuple[str, int], ...]
+    #: (datasets, supplies) held because their schedule ended (REQ-PIPE-154
+    #: criterion 6) - counted apart, since the fix is configuration.
+    schedule_ended: tuple[int, int] = (0, 0)
 
     @property
     def total(self) -> int:
@@ -209,9 +253,15 @@ class Tally:
     def summary(self) -> str:
         if not self.total:
             return "No supply is currently held."
-        return (f"{self.total} supply/supplies held across "
+        line = (f"{self.total} supply/supplies held across "
                 f"{len(self.by_dataset)} dataset(s) - {', '.join(self.datasets)}. "
                 f"Each needs somebody to resolve it.")
+        datasets, supplies = self.schedule_ended
+        if supplies:
+            line += (f" {supplies} of them, across {datasets} dataset(s), because the "
+                     f"dataset's schedule has ended - add dates in {SCHEDULE_FILE} and the "
+                     f"next processing pass files them.")
+        return line
 
 
 def raise_hold(conn, *, dataset_id: str, supply_id: str, kind: str,
@@ -336,8 +386,12 @@ def tally(conn) -> Tally:
     by_kind = conn.execute(
         f"SELECT kind, count(*) FROM {TABLE} WHERE resolved_by IS NULL "
         "GROUP BY kind ORDER BY kind").fetchall()
+    ended = conn.execute(
+        f"SELECT count(DISTINCT dataset_id), count(*) FROM {TABLE} WHERE resolved_by IS NULL "
+        "AND (reason->>'schedule_ended')::boolean IS TRUE").fetchall()[0]
     return Tally(by_dataset=tuple((row[0], row[1]) for row in by_dataset),
-                  by_kind=tuple((row[0], row[1]) for row in by_kind))
+                  by_kind=tuple((row[0], row[1]) for row in by_kind),
+                  schedule_ended=(int(ended[0]), int(ended[1])))
 
 
 def arrival_key_of(supply: str) -> str:

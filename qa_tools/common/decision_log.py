@@ -338,7 +338,11 @@ def _check_shape(decision: Decision) -> None:
     if not decision.slots and decision.action != PROMOTION_REFUSED:
         raise DecisionRefused(
             "a decision needs at least one slot - which period it acts on")
-    if decision.action == REFILE and not (decision.from_slot and decision.to_slot):
+    # A HELD SUPPLY HAS NO SLOT TO LEAVE - and only the filing rule re-files
+    # one, once dates cover it (REQ-PIPE-154 criterion 7). A person places a
+    # held supply by promoting it.
+    if decision.action == REFILE and not (decision.to_slot and (
+            decision.from_slot or decision.actor_kind == RULE)):
         raise DecisionRefused(
             "a re-file names both slots: the one the supply is in and the one it "
             "is moving to. One entry, not a demotion followed by a promotion.")

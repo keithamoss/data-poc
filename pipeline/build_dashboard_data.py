@@ -30,6 +30,7 @@ import os
 from datetime import datetime
 
 from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
+from qa_tools.common import schedule_ended
 from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import parse_cadence_from_contract
@@ -526,6 +527,9 @@ def build() -> dict:
         # slot that was ever late while open, so the page can name today's
         # late file beside an older gap.
         "lateSlots": closed_slots.late_slots("birth-registrations"),
+        # HELD BECAUSE ITS SCHEDULE ENDED (REQ-DASH-155): receipt and
+        # resolution instants from hold records only, for the notice.
+        "scheduleEndedHolds": schedule_ended.for_dataset("birth-registrations"),
         # REQ-PIPE-081 criteria 14 and 15: what the RECORDED census found,
         # as change points - never the warehouse as it stands now.
         "census": census.for_datasets({"birth-registrations"}),

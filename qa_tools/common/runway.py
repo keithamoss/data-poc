@@ -185,10 +185,35 @@ def exhausted_datasets(as_of: date) -> dict[str, str]:
             continue            # owes nothing, so cannot be exhausted
         if calendar.current.is_cadence_rule:
             continue
-        owed = [p for p in schedule.periods_for_dataset(dataset.dataset_id) if p.expected]
-        if not [p for p in owed if p.date > as_of]:
+        try:
+            ends = schedule_ends_on(dataset.dataset_id)
+        except (ValueError, KeyError, FileNotFoundError):
+            # NO SLOTS CAN BE BUILT (no contract timing) - the filing rule
+            # then holds everything anyway, so the last owed date is the
+            # honest answer left. Blast radius: never raised for one dataset.
+            owed = [p for p in schedule.periods_for_dataset(dataset.dataset_id) if p.expected]
+            ends = owed[-1].date if owed else None
+        if ends is not None and as_of >= ends:
             out[dataset.dataset_id] = calendar.name
     return out
+
+
+def schedule_ends_on(dataset_id: str) -> date | None:
+    """The asset-local date this dataset's schedule ends: when its LAST slot
+    closes, the instant from which the pipeline holds a supply rather than
+    files it (REQ-DASH-155 criterion 6; Keith, 2026-10-06). None where the
+    last slot never closes - a calendar of one date - or there is none.
+
+    NOT the last period's own date, which is what this used to read: the
+    last slot stays open about one more period after it, so the page said
+    "cannot be processed" while supplies were still being filed normally."""
+    from qa_tools.common import asset_time
+    from qa_tools.common import slots as slots_mod
+
+    found = slots_mod.slots_for_dataset(dataset_id)
+    if not found or found[-1].closes_at is None:
+        return None
+    return asset_time.localise(found[-1].closes_at).date()
 
 
 def warning_lines(as_of: date) -> list[str]:

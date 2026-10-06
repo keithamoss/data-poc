@@ -395,8 +395,7 @@ def _raise_assignment_hold(arrival, decided: Assignment) -> None:
         supply_holds.raise_hold(
             conn, dataset_id=decided.dataset_id, supply_id=decided.supply_id,
             kind=supply_holds.ASSIGNMENT_RULE,
-            reason={"unavailable": [list(pair) for pair in decided.unavailable],
-                     "considered": list(decided.considered)},
+            reason=supply_holds.reason_for(decided),
             raised_by=arrival.run_id, delivery=arrival.delivery_name)
 
 

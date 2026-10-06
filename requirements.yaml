@@ -8417,7 +8417,7 @@ requirements:
       - WHEN more than one dataset is low on runway, THE SYSTEM SHALL
         state how many rather than warning once per dataset.
       - 'IF a supply arrives for a dataset whose authored schedule has ended, THEN THE SYSTEM SHALL hold that supply for a person rather than file it, so that it cannot be checked into a period that does not exist. RESTATED 2026-10-06 (Keith): it was a hard failure for the dataset; superseded by the hold chosen 2026-10-05 (REQ-PIPE-131 criterion 16), with the labelling it needs owned by REQ-PIPE-154.'
-      - 'THE SYSTEM SHALL decide that hold at filing, before the promotion gate, so that no supply for an ended schedule is promoted. RESTATED 2026-10-06 (Keith): it read ''fail at filing, before QA runs for that dataset''; a held supply is still staged and checked, which is what lets a person decide it.'
+      - 'THE SYSTEM SHALL decide that hold at filing, before the promotion gate, so that no supply for an ended schedule is promoted. RESTATED 2026-10-06 (Keith): it read ''fail at filing, before QA runs for that dataset''. A held supply is staged and its file checks run; its data checks do not, until the rule files it once dates exist (REQ-PIPE-154 criteria 5 and 7).'
       - 'THE SYSTEM SHALL scope that hold to the affected dataset, and SHALL NOT stop processing any other dataset. RESTATED 2026-10-06 (Keith): ''failure'' became ''hold''.'
       - WHILE a dataset's schedule is exhausted, THE SYSTEM SHALL
         continue to accept that dataset's supplies, so that the backlog
@@ -8598,6 +8598,7 @@ requirements:
         five datasets are red still has to say that a sixth stopped
         being processed entirely."
       - 'CRITERIA 4-6 RESTATED AND 9, 22 MOVED, 2026-10-06 (Keith, signing REQ-PIPE-154 and REQ-DASH-155 the same hour). The hard failure at filing he chose on 2026-09-21, because it cannot be ignored, is realised by the hold REQ-PIPE-131 criterion 16 built on 2026-10-05: a supply after the last authored slot is staged, checked and held for a person, per dataset. The original reason to fail BEFORE QA - results that could be filed nowhere - was overtaken by REQ-PIPE-064 and REQ-PIPE-105 criterion 13, under which a held supply is already checked and its results recorded. What the hold still lacked - an honest reason, a structured marker, the pass summary count, the backlog line and automatic re-filing once dates are added - is owned by REQ-PIPE-154 and REQ-DASH-155, so criteria 4-6 are met as restated and nothing here is left unmet. Rejected again: filing into the last authored period and relying on the runway warning, and reading UNKNOWN.'
+      - 'A CORRECTION TO THE DECISION ABOVE, 2026-10-06: it says a held supply is already checked and its results recorded. It is not - a held supply is staged and file-checked, and its data checks are withheld (REQ-PIPE-078 criterion 9) until it is filed. Found while building REQ-PIPE-154, after Keith had signed on that premise; he kept today''s behaviour when told (REQ-PIPE-154 criterion 5, amended). The decision stands otherwise.'
     linked_tests:
       - tests/test_backlog.py
       - tests/test_runway.py
@@ -29033,7 +29034,40 @@ requirements:
       out to be held and labelled as a schedule problem, not a generic filing problem, so that whoever resolves
       it knows the fix is our configuration rather than the supplier's file.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-06: tests/test_schedule_ended_hold.py written first and failing
+      (no schedule_ended on an assignment, no reason_for, no refile_covered),
+      then with tests/test_runway.py, test_assignment.py, test_held_not_checked.py,
+      test_processing_pass.py and test_decision_log.py 193 passed. A supply received
+      after the last slot closed is held with schedule_ended and last_period as
+      fields of the hold; its reason names contract/data-asset.yaml and `mothman
+      schedule candidate-dates --calendar <name> --year <year>` and never says
+      a next period opened; a gap inside the calendar and a last slot that never
+      closes are not ended; the tally and the pass summary count them apart; once
+      dates cover a receipt the next pass re-files it by rule, oldest receipt
+      first, the hold resolved by the refile decision whose filing replaced it
+      and a re-check owed; without dates nothing moves. assign() still reads O(log
+      n) slots (one bisection shared). Criterion 5 as amended is the existing
+      hold behaviour, held by test_held_not_checked.py and confirmed on the sandbox
+      database: every held supply has its 6 file checks and no data checks.'
+    implemented_by:
+    - qa_tools/common/assignment.py::schedule_ended
+    - qa_tools/common/assignment.py::assign
+    - qa_tools/common/assignment.py::_why_unavailable
+    - qa_tools/common/supply_holds.py::reason_for
+    - qa_tools/common/supply_holds.py::tally
+    - qa_tools/common/schedule_ended.py::refile_covered
+    - qa_tools/common/schedule_ended.py::raised_by_runs
+    - qa_tools/common/schedule_ended.py::pass_line
+    - qa_tools/common/processing_pass.py::run_pass
+    - qa_tools/common/decision_log.py::_check_shape
+    - cli/pipeline.py::_say_pass
+    - qa_tools/common/filing.py::_raise_assignment_hold
+    linked_tests:
+    - tests/test_schedule_ended_hold.py
+    - tests/test_assignment.py
+    - tests/test_held_not_checked.py
     source: Keith, re-scoping REQ-PIPE-053's five unmet criteria (4, 5, 6, 9, 22) against the system as
       built after REQ-PIPE-131 criterion 16 (2026-10-05); drafted by delivery-scoper 2026-10-06 at the main
       session's request. Signed by Keith 2026-10-06.
@@ -29050,8 +29084,7 @@ requirements:
       to add dates and the mothman command that proposes them.
     - THE SYSTEM SHALL NOT state, in a schedule-ended hold's reason, that the last slot closed because a
       next period's claim window opened.
-    - WHILE a dataset's schedule has ended, THE SYSTEM SHALL continue to stage and check each supply that
-      arrives for it, and SHALL NOT stop processing any other dataset or delivery.
+    - 'WHILE a dataset''s schedule has ended, THE SYSTEM SHALL continue to stage each supply that arrives for it and run its file checks, SHALL NOT run its data checks while it is held (REQ-PIPE-078 criterion 9, one rule for every hold), and SHALL NOT stop processing any other dataset or delivery. AMENDED 2026-10-06 (Keith): it read ''stage and check'', on a premise that was wrong - a held supply is staged and file-checked but not data-checked; its data checks run on the re-check owed when the rule files it (criterion 7).'
     - WHEN a processing pass holds one or more supplies because their dataset's schedule has ended, THE
       SYSTEM SHALL state in that pass's own summary how many datasets and how many supplies were held for
       that reason, separately from any other holds.
@@ -29084,10 +29117,11 @@ requirements:
       is what is built, so this requirement makes the hold carry the signal the failure was meant to carry
       rather than building a second mechanism.'
     - 'The original reason to fail BEFORE QA was that a supply with no slot produces results that can be
-      filed nowhere. That premise was overtaken by REQ-PIPE-064 and REQ-PIPE-105 criterion 13: every held
-      supply is already staged and checked, and its results are recorded and shown via held_blast_radius.
-      Checking an exhausted dataset''s supply is therefore the same as checking any other held supply, not
-      a special case.'
+      filed nowhere. The hold answers it the same way it does for every held supply: staged and
+      file-checked, its data checks withheld (REQ-PIPE-078 criterion 9) until the rule files it, when
+      the owed re-check runs them. CORRECTED 2026-10-06 - the scoped draft said a held supply was
+      already checked, which was wrong (every hold in the sandbox: 6 file checks, 0 data checks); Keith
+      kept today''s behaviour when told.'
     - 'REJECTED, carried from REQ-PIPE-131''s own decision: keep filing into the last authored period and
       rely on the runway warning. That is the 2030-file-filed-to-2027-Q4 defect.'
     - 'REJECTED reading UNKNOWN, carried from REQ-PIPE-053: it is ignorable, which is the failure the whole
@@ -29104,6 +29138,7 @@ requirements:
       - staged, checked and held, not left unchecked; and once dates are added, held supplies are re-filed
       AUTOMATICALLY by the next pass in receipt order rather than each staying a person''s call, because
       at ~30 datasets the manual route does not scale.'
+    - 'BUILT 2026-10-06. Ended is DECIDED BY THE RULE at filing - every slot''s window has opened and the last has closed (REQ-PIPE-131 criterion 16''s provisional close) - and stored as a field of the hold''s reason, with the last period, the file and the command, so no reader parses prose. Re-filing (criterion 7) is a RULE `refile` decision with no from-slot: the decision log''s shape check now allows that for the rule only - a person still places a held supply by promoting it - and apply_decision ends the hold in the same transaction, which is how the hold names the decision behind the replacing filing. The re-check it owes runs in the same pass, before the owed work, and is what applies the gate and runs the data checks the hold withheld. The pass counts only holds raised by its own runs; the tally counts the whole backlog. Rejected: a column on qa.hold for the flag (the reason is already jsonb, queried with ->> in one aggregate), and re-filing at the moment dates are committed (nothing runs then; the pass is the only thing that does).'
     open_questions:
     - Held supplies stay in staging until someone resolves them. In a real Birth Registrations or Child
       Protection deployment that is personal data with no end date - is there a retention bound, or is an
@@ -29114,7 +29149,34 @@ requirements:
     story: As a data team leader, I want the schedule-ended notice to tell me what is piling up behind it,
       so that I can judge how urgent fixing the dates is without opening the hold queue.
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-06: tests-js/schedule-ended-notice.test.js written first (4 of
+      5 failing), then with tests-js/schedule-runway.test.js 29 passed: a dataset
+      is not exhausted between its last period''s date and its last slot''s close,
+      and is from the close; the notice counts supplies held as at the date on
+      show - received by then, not resolved by then - with the earliest receipt
+      date, never a day count, and says nothing has arrived when none are. tests/test_schedule_ended_hold.py''s
+      TestExhaustedFromWhenTheLastSlotCloses walks every authored-calendar dataset
+      in the real configuration and finds each not exhausted the day after its
+      last period and exhausted on the day its last slot closes; test_runway.py''s
+      sibling case moved to a date after cp-case-workers'' last slot closes (it
+      was inside it).'
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::exhaustedNotice
+    - dashboard/qa-reporting-dashboard.template.html::scheduleEndedBacklog
+    - dashboard/qa-reporting-dashboard.template.html::scheduleRunwayInPlaceOn
+    - qa_tools/common/runway.py::schedule_ends_on
+    - qa_tools/common/runway.py::exhausted_datasets
+    - qa_tools/common/schedule_ended.py::for_dataset
+    - dashboard/embed_dashboard_data.py::embed
+    - pipeline/build_dashboard_data.py::build
+    - pipeline/build_cp_dashboard_data.py::build
+    linked_tests:
+    - tests-js/schedule-ended-notice.test.js
+    - tests-js/schedule-runway.test.js
+    - tests/test_schedule_ended_hold.py
+    - tests/test_runway.py
     source: 'Keith, REQ-PIPE-053 criterion 9 re-scoped (also post-build-review #7); drafted by delivery-scoper
       2026-10-06. Signed by Keith 2026-10-06.'
     signed_off:
@@ -29153,4 +29215,5 @@ requirements:
       pipeline agree on the day; the runway warning still gives notice before it. Found by the scoper: runway.exhausted_datasets
       fired about a period early, so the page said ''cannot be processed'' while supplies were still filed
       normally.'
+    - 'BUILT 2026-10-06. The page learns when a schedule ends from configuration - SCHEDULE_RUNWAY carries each dataset''s `endsOn`, the asset-local date its last slot closes, computed by runway.schedule_ends_on, which the CLI warning and the gate now share - so the notice still cannot go quiet when nothing has run. The BACKLOG sentence is the one part that reads recorded state: each dataset''s JSON carries its schedule-ended holds as receipt and resolution instants (schedule_ended.for_dataset, one query over qa.hold and the receipt view, no supply rows), and the page counts those held as at the date on show. Aggregated in the one executive notice. A dataset whose slots cannot be built (no contract timing) falls back to its last owed date rather than raising - the filing rule holds everything for it anyway. An older build with no `endsOn` keeps the dates rule.'
     open_questions: []

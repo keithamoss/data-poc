@@ -181,8 +181,13 @@ class TestAnExhaustedScheduleIsScopedToItsOwnDatasets:
 
     def test_a_dataset_runs_out_before_its_siblings_if_it_participates_less(self):
         """cp-case-workers' last slot is 2027-Q3, its siblings' is
-        2027-Q4 - so there is a window where it alone is exhausted."""
-        between = date(2027, 9, 1)
+        2027-Q4 - so there is a window where it alone is exhausted.
+
+        THAT WINDOW STARTS WHEN ITS LAST SLOT CLOSES (REQ-DASH-155 criterion
+        6; Keith, 2026-10-06), not at 2027-Q3's own date: the Q3 slot stays
+        open until Q4's claim window opens, and a supply arriving before then
+        is still filed. 1 September 2027, this test's old date, is inside it."""
+        between = date(2027, 12, 1)
         exhausted = runway.exhausted_datasets(between)
         assert set(exhausted) == {"cp-case-workers"}
 

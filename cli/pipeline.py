@@ -204,6 +204,15 @@ def _say_pass(report) -> None:
     if report.left_for_budget:
         console.print(f"{len(report.left_for_budget)} arrival(s) left for the next pass - "
                       f"this pass's time budget ran out.", style="yellow")
+    # REQ-PIPE-154 criteria 6 and 7: apart from every other hold, because
+    # the fix is configuration rather than the supplier's.
+    from qa_tools.common import schedule_ended
+    line = schedule_ended.pass_line(report.schedule_ended)
+    if line:
+        console.print(line, style="yellow")
+    if report.refiled:
+        console.print(f"{len(report.refiled)} supply/supplies held for an ended schedule were "
+                      f"filed now that dates cover them.", style="green")
     for what, why in report.failures:
         console.print(f"FAILED {what}: {why}", style="red")
     for line in report.tickets:
