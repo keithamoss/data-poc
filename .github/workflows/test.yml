@@ -252,12 +252,15 @@ jobs:
         # moment setup finishes and reports the common failure in about
         # three and a half minutes rather than nineteen.
         #
+        # `-rs` NAMES EVERY SKIP: this half should skip none, and a skip only
+        # the runner produced (3659 passed, 1 skipped, 2026-10-06, none under
+        # the same conditions locally) could not be identified without it.
         # `--cov` writes a PARTIAL measurement on purpose; the `coverage`
         # job below combines it with the other half's before anything is
         # enforced. Enforcing here would fail on every line only the
         # deployment tests reach.
         run: |
-          uv run pytest -m "not needs_deployment" \
+          uv run pytest -m "not needs_deployment" -rs \
             --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard \
             --cov-report= --cov-fail-under=0
 
@@ -480,7 +483,7 @@ jobs:
 
       - name: Run the tests that need a deployment
         run: |
-          uv run pytest -m needs_deployment \
+          uv run pytest -m needs_deployment -rs \
             --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard \
             --cov-report= --cov-fail-under=0
 
