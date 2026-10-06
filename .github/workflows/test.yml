@@ -237,6 +237,20 @@ jobs:
       - name: Install Playwright's Chromium
         run: uv run playwright install --with-deps chromium
 
+      # THE DASHBOARD'S JS, FOR THE ONE PYTHON TEST THAT RUNS IT: the
+      # Python and dashboard status rollups are compared on the same inputs
+      # (tests/test_no_calendar.py, the assertion that would have caught
+      # item 74). Without node_modules it skipped - on every CI run, found
+      # 2026-10-06 once this half named its skips. This half skips nothing.
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install the dashboard's JS dependencies
+        run: npm ci
+
       # Before the suite, because it is fast and because the class of
       # bug it catches is invisible to everything after it: PyYAML
       # silently keeps only the last of a duplicate mapping key, so the

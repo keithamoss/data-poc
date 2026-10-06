@@ -425,3 +425,19 @@ class TestItIsInNoRollup:
         assert out.returncode == 0, out.stderr[-2000:]
         theirs = json.loads(out.stdout.strip().splitlines()[-1])
         assert mine == theirs, f"python {mine} != dashboard {theirs}"
+
+
+def test_ci_installs_what_the_rollup_comparison_runs():
+    """The comparison above skips without node_modules - which it did on
+    every CI run until 2026-10-06. The no-deployment job must install the
+    dashboard's JS dependencies before its tests, or it checks nothing."""
+    from pathlib import Path
+
+    import yaml
+
+    workflow = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "test.yml"
+    steps = yaml.safe_load(workflow.read_text())["jobs"]["test"]["steps"]
+    runs = [s.get("run", "") for s in steps]
+    npm = next(i for i, r in enumerate(runs) if r.strip() == "npm ci")
+    tests = next(i for i, r in enumerate(runs) if 'pytest -m "not needs_deployment"' in r)
+    assert npm < tests
