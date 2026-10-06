@@ -201,3 +201,26 @@ def test_decide_record_asks_before_the_run_rather_than_after(monkeypatch):
     common.decide_record("run_07", keep=None)
     assert asked and "run_07" in asked[0]
     assert "promote" not in asked[0].lower()
+
+
+def test_a_change_production_must_type_for_does_not_point_at_a_flag(monkeypatch):
+    """post-build-review #124 D6: with no terminal, production's refusal read
+    "Use the flag-based form instead: ... cannot be confirmed by a flag" -
+    sending the reader to the very thing it then ruled out."""
+    monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
+    monkeypatch.setattr(common.sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr(common.sys.stdout, "isatty", lambda: False)
+    with pytest.raises(common.NeedsATerminal) as exc:
+        common.confirm_change("Record promote?", yes=True)
+    message = str(exc.value)
+    assert "flag-based form" not in message
+    assert "production" in message and "terminal" in message
+
+
+def test_the_progress_count_restarts_for_each_arrival():
+    """post-build-review #124 D7: a folder of five arrivals drove one bar,
+    whose count ran past its total (7/5). Each arrival counts its own steps."""
+    counter = common.StepCounter(common.RUN_STEPS)
+    seen = [counter.step(label) for label in list(common.RUN_STEPS) * 2]
+    assert max(done for done, _ in seen) < len(common.RUN_STEPS)
+    assert [n for _, n in seen] == [1] * len(common.RUN_STEPS) + [2] * len(common.RUN_STEPS)

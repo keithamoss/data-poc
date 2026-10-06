@@ -488,6 +488,10 @@ button{font:inherit; color:inherit;}
 .dataset-table tr:last-child td{border-bottom:none;}
 .dataset-table tbody tr{cursor:pointer;}
 .dataset-table tbody tr:hover{background:var(--surface-alt);}
+/* ROWS THAT GO NOWHERE LOOK LIKE IT (#121 D4): a pointer and a hover fill on
+   a row that does nothing when clicked is a promise the page breaks. */
+.dataset-table.static-rows tbody tr{cursor:default;}
+.dataset-table.static-rows tbody tr:hover{background:transparent;}
 /* A HOVERED ROW MUST NOT SWALLOW THE PILL INSIDE IT
    (post-build-review #48). The row hover and the three quiet pills all
    resolved to --surface-alt, so pointing at a row made its own status
@@ -4171,6 +4175,8 @@ function render(){
   const done = r => {
     const bar = scenarioJumpBar();
     if(bar){ view.insertAdjacentHTML("afterbegin", bar); wireScenarioJumpBar(view); }
+    // Links rendered anywhere in the view, including the queue's (#123 B5).
+    wireNavLinks(view);
     describeRoute();
     const el = document.documentElement;
     el.dataset.renderCount = String((Number(el.dataset.renderCount) || 0) + 1);
@@ -4638,6 +4644,14 @@ function outstandingResponses(item){
   return `<div class="queue-responses"><b>${lead}:</b> ${list}.${caveat}</div>`;
 }
 
+// A QUEUE ITEM LEADS SOMEWHERE (#123 B5): each one names a dataset, and
+// the reader's next move is to look at it - so it is a real link there.
+function queueItemLink(item){
+  if(!(item && item.datasetId && item.agencyId && item.collectionId)) return "";
+  const nav = {tier:"dataset", agencyId:item.agencyId, collectionId:item.collectionId,
+               datasetId:item.datasetId};
+  return `<div style="margin-top:4px;"><a class="link-btn" href="${navHref(nav)}" data-nav='${JSON.stringify(nav)}'>Open the dataset</a></div>`;
+}
 function outstandingItemHtml(item){
   // CRITERION 3, on its own channel: the left bar says blocking or
   // not, the pill says how loudly, and neither is doing the other's
@@ -4663,6 +4677,7 @@ function outstandingItemHtml(item){
       ${when}
     </div>
     <div class="queue-detail">${escHtml(item.detail||"")}</div>
+    ${queueItemLink(item)}
     ${outstandingResponses(item)}
   </div>`;
 }
@@ -5142,7 +5157,9 @@ function renderSupplyCycleRows(entries, datasetId){
 // swung 499px from one cycle to the next. Fixed layout, shared widths; the
 // blocker table's first two columns line up with them.
 const SUPPLY_CYCLE_COLS = `<colgroup><col style="width:17%"><col style="width:20%"><col style="width:23%"><col style="width:9%"><col style="width:21%"><col style="width:10%"></colgroup>`;
-const SUPPLY_BLOCKER_COLS = `<colgroup><col style="width:17%"><col style="width:20%"><col style="width:44%"><col style="width:9%"><col style="width:10%"></colgroup>`;
+// THREE COLUMNS, NOT FIVE (#121 D4): Rows was always a dash and the last
+// column had no heading. The first two still line up with the cycle tables.
+const SUPPLY_BLOCKER_COLS = `<colgroup><col style="width:17%"><col style="width:20%"><col style="width:63%"></colgroup>`;
 function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
   const rows = blockersFor(datasetId, source)
     .filter(b=> assetDateStrOf(b.openedAt) <= inPlaceOnDateStr)
@@ -5154,8 +5171,8 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
       <div class="supply-cycle-label"><b>${anyOpen ? "Waiting for a person" : "Needed a person"}</b>
         <span style="color:var(--ink-faint);">supplies with no period yet, two files for one table, or a file that could not be loaded</span></div>
       <div class="overflow-x">
-      <table class="dataset-table supply-cycle-table">${SUPPLY_BLOCKER_COLS}
-        <thead><tr><th>Arrived</th><th>Status</th><th>Why</th><th>Rows</th><th></th></tr></thead>
+      <table class="dataset-table supply-cycle-table static-rows">${SUPPLY_BLOCKER_COLS}
+        <thead><tr><th>Arrived</th><th>Status</th><th>Why</th></tr></thead>
         <tbody>${rows.map(b=>{
           const resolved = b.resolvedAt && assetDateStrOf(b.resolvedAt) <= inPlaceOnDateStr;
           return `<tr data-blocker="${b.kind}">
@@ -5166,8 +5183,6 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
                   ? ` <span style="color:var(--ink-faint);">— rejected by ${escHtml(b.rejected.actor)}, ${fmtInstant(b.rejected.at)}${b.rejected.reason ? ": "+escHtml(b.rejected.reason) : ""}</span>`
                   : ` <span style="color:var(--ink-faint);">— resolved ${fmtInstant(b.resolvedAt)}</span>`)
               : ""}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(b.reason)}</div></td>
-            <td class="mono">—</td>
-            <td></td>
           </tr>`;}).join("")}</tbody>
       </table>
       </div>
@@ -5189,7 +5204,7 @@ function gapHistoryRows(ds, inPlaceOnDateStr){
       <div class="supply-cycle-label"><b>Periods with no supply</b>
         <span style="color:var(--ink-faint);">closed with nothing in them</span></div>
       <div class="overflow-x">
-      <table class="dataset-table">
+      <table class="dataset-table supply-cycle-table static-rows">${SUPPLY_BLOCKER_COLS}
         <thead><tr><th>Periods</th><th>Status</th><th>What happened</th></tr></thead>
         <tbody>${groups.map(g=>{
           const mark = g.marks[g.marks.length-1];
@@ -6814,21 +6829,32 @@ function wireScenarioJumpBar(view){
 
 const SCENARIO_MODE_LABEL = {INJECT:"In the data", unit:"Unit test", both:"Unit test and data"};
 
+// WHAT KIND OF SCENARIO, SAID TRUTHFULLY (#121 D9): "In the data" sat on
+// every scenario meant for the data, including the 23 nothing has placed
+// yet, and in the dashed No data style. A placed one says it is in the
+// data; an unplaced one says it is planned for it.
+function scenarioModePill(entry, target){
+  const label = (entry.mode === "INJECT" && !target) ? "Planned for the data"
+    : (SCENARIO_MODE_LABEL[entry.mode] || entry.mode);
+  return `<span class="pill tag sm" data-scenario-mode="${escHtml(entry.mode)}"><span class="ico"></span>${escHtml(label)}</span>`;
+}
 // ONE SCENARIO ENTRY: what it demonstrates, by requirement, and where it is
 // in the data or that nothing is behind it yet (REQ-DASH-139 criterion 3).
 function scenarioEntryHtml(entry, index){
   const target = scenarioTarget(entry);
   const coords = entry.coordinates;
   const where = target
+    // NOT `font:inherit` (#121 D8): it overrode .pill.sm's size, so the chip
+    // drew at 15px and clipped at phone width. The family only, and it wraps.
     ? `<button type="button" class="pill tag sm" data-scenario="${index}"
-         style="border:0; cursor:pointer; font:inherit;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · in place on ${escHtml(coords.inPlaceOn)}</button>`
+         style="border:0; cursor:pointer; font-family:inherit; white-space:normal; text-align:left; max-width:100%; min-height:28px;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · in place on ${escHtml(coords.inPlaceOn)}</button>`
     : `<span style="font-size:11.5px; color:var(--ink-faint);">${
          entry.mode==="INJECT" ? "no data behind it yet" : "no data behind it — a unit test"}</span>`;
   return `<div style="border-top:1px solid var(--line); padding:9px 0;">
     <div style="display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;">
       <b style="font-weight:650;">${escHtml(entry.id)}</b>
       <span>${escHtml(entry.title||"")}</span>
-      <span class="pill nodata sm"><span class="ico"></span>${escHtml(SCENARIO_MODE_LABEL[entry.mode]||entry.mode)}</span>
+      ${scenarioModePill(entry, target)}
       ${(entry.requirements||[]).map(r=>`<span class="pill tag sm" data-demonstrates><span class="ico"></span>${escHtml(r)}</span>`).join("")}
     </div>
     <div style="color:var(--ink-muted); font-size:12.5px; margin-top:3px;">${inlinePlansMd(escHtml(entry.demonstrates||""))}</div>

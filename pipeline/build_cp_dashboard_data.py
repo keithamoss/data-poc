@@ -73,6 +73,7 @@ def _run_date(entry: dict) -> str:
 
 ENGINE_SHORT = {
     "dbt-core 1.12 + dbt-duckdb": "dbt-core",
+    "dbt-core 1.12 + dbt-postgres": "dbt-core",
     "Soda Core 3.5": "Soda Core",
     "datacontract-cli 1.2.0": "datacontract-cli",
     "Evidently 0.7": "Evidently AI",

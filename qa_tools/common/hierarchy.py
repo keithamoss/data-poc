@@ -55,7 +55,14 @@ class UnknownDatasetError(KeyError):
     A KeyError subclass so an existing `except KeyError` still catches
     it, but named so the traceback says what actually went wrong rather
     than showing a bare id.
+
+    ITS MESSAGE IS ITS STR (post-build-review #124 D8): KeyError's own
+    __str__ is the repr of its argument, so a caller printing str(exc) put
+    the whole sentence in quotes.
     """
+
+    def __str__(self) -> str:
+        return str(self.args[0]) if self.args else ""
 
 
 @dataclass(frozen=True)

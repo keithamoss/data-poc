@@ -674,6 +674,7 @@ one when this line suggests it matters.
 - **#122** `in-progress` 2026-10-06 - The delivery critic on 96813c1 and a17d6e8 (the #120 answers and the twelve standing answers, qa schema 31).
 - **#123** `in-progress` 2026-10-06 - The dashboard UX critic on a17d6e8 - everything since #110.
 - **#124** `in-progress` 2026-10-06 - The CLI UX critic on sprints 13-14 and a17d6e8, driving the real TUI in a pty against sandbox-, production-and unmarked...
+  - *touches:* `tests/test_promotion_waits_for_next_receipt.py`
 
 ## plans/road-testing.md
 

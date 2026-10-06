@@ -373,3 +373,12 @@ class TestACollectionIsNamedOrRefusedInWords:
         assert supply._collection(None, None, "cp") == "child-protection"
         assert supply._collection(None, None, "bdm") == "civil-registration"
         assert supply._collection(None, None, None) is None
+
+
+def test_discard_sample_names_an_unknown_dataset_without_a_repr():
+    """post-build-review #124 D8: the refusal printed the error's repr,
+    quotes and all, because UnknownDatasetError is a KeyError."""
+    result = CliRunner().invoke(supply_group, ["discard-sample", "--dataset", "nope"])
+    assert result.exit_code == 1
+    assert "\"'nope'" not in result.output and "\"'" not in result.output
+    assert "nope" in result.output

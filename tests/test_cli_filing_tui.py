@@ -229,7 +229,7 @@ class TestItNeverShowsACachedAnswer:
         monkeypatch.setattr(filing_tui.common, "select", lambda *a, **k: (
             _ for _ in ()).throw(AssertionError("nothing may be offered")))
         filing_tui.queue_flow("child-protection")
-        assert "Unreachable" in capsys.readouterr().out
+        assert "Decision log not available" in capsys.readouterr().out
 
     def test_the_command_fails_rather_than_printing_an_empty_queue(self,
                                                                     monkeypatch):

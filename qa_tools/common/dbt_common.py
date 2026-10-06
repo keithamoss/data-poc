@@ -18,7 +18,10 @@ import subprocess
 
 from qa_tools.common import supply_db
 
-ENGINE_TAG = "dbt-core 1.12 + dbt-duckdb"
+# dbt-postgres since REQ-PIPE-087 (post-build-review #124: the tag still
+# named the retired DuckDB adapter). The builders map both spellings, so a
+# result recorded under the old one still reads as dbt-core.
+ENGINE_TAG = "dbt-core 1.12 + dbt-postgres"
 
 # Matches datacontract-cli's own hardcoded sample cap - see
 # datacontract_common.py and plans/qa-pipeline.md #15.

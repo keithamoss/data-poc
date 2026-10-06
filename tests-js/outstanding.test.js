@@ -173,7 +173,12 @@ describe("responses are named, never offered as controls", () => {
   it("renders no button or link for a response that cannot yet be taken", () => {
     const w = load();
     const html = w.outstandingQueue(null, null, queueOf([HELD]));
-    expect(html).not.toMatch(/<button|<a\s/);
+    // The one link allowed is the way to the dataset (#123 B5) - navigation,
+    // never a response that acts.
+    const root = w.document.createElement("div");
+    root.innerHTML = html;
+    expect(root.querySelectorAll("button")).toHaveLength(0);
+    expect([...root.querySelectorAll("a")].every((a) => a.hasAttribute("data-nav"))).toBe(true);
     expect(html).toContain("not yet possible from this page");
   });
 });

@@ -215,3 +215,26 @@ describe("supplies awaiting a decision on the cards (#123 B2)", () => {
     expect(html).toContain("ev-action");
   });
 });
+
+describe("a queue item leads to its dataset (#123 B5)", () => {
+  it("is a real link to the dataset it names", () => {
+    const w = load();
+    const item = {kind: "held-supply", severity: "needs-action", blocking: true,
+                  agencyId: "dcp", collectionId: "child-protection", datasetId: "cp-carers",
+                  headline: "h", detail: "d"};
+    const root = w.document.createElement("div");
+    root.innerHTML = w.outstandingItemHtml(item);
+    const a = root.querySelector("a[data-nav]");
+    expect(a).not.toBeNull();
+    expect(JSON.parse(a.dataset.nav)).toMatchObject({tier: "dataset", datasetId: "cp-carers"});
+    expect(a.getAttribute("href")).toBeTruthy();
+  });
+
+  it("an item about no dataset has no link", () => {
+    const w = load();
+    const root = w.document.createElement("div");
+    root.innerHTML = w.outstandingItemHtml({kind: "unrecognised-file", severity: "warning",
+                                            blocking: false, headline: "h", detail: "d"});
+    expect(root.querySelector("a[data-nav]")).toBeNull();
+  });
+});

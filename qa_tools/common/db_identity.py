@@ -37,8 +37,9 @@ from dataclasses import dataclass
 SCHEMA = "qa"
 TABLE = f'"{SCHEMA}".identity'
 
-#: The table, created by marking - before anything else has made the qa
-#: schema - and by the qa schema's own DDL. One row: `only_row` can only be
+#: The table, created by marking and ONLY by marking - before anything else
+#: has made the qa schema. qa_store's DDL does not create it, and the reset
+#: never drops it (post-build-review #122). One row: `only_row` can only be
 #: true and is the key.
 DDL = (
     f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"',
@@ -130,9 +131,9 @@ def read(conn) -> tuple[str, Identity | None]:
 
 
 def mark(conn, identity: Identity) -> None:
-    """Write the identity. ONLY `mothman env mark`, the reset putting it back,
-    and the fixtures and setup scripts named in criterion 12 call this
-    (criterion 4)."""
+    """Write the identity. ONLY `mothman env mark` and the fixtures and setup
+    scripts named in criterion 12 call this (criterion 4) - the reset no
+    longer does, since it leaves the identity in place."""
     raw = getattr(conn, "raw", conn)  # a SupplyConnection, or psycopg's own
     for statement in DDL:
         raw.execute(statement)

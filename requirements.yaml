@@ -4018,6 +4018,7 @@ requirements:
       - pipeline/dashboard_check_labels.py::pooled_url_key
       - dashboard/qa-reporting-dashboard.template.html::collectionCrossTableChecks
       - dashboard/qa-reporting-dashboard.template.html::collectionCrossTableSection
+      - dashboard/qa-reporting-dashboard.template.html::crossTableSource
     evidence:
       - >
         2026-09-26: measured after regenerating Child Protection - 540
@@ -14887,6 +14888,8 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::inPlaceOnFromUrl
     - dashboard/qa-reporting-dashboard.template.html::setInPlaceOnInUrl
     - dashboard/qa-reporting-dashboard.template.html::renderInPlaceOnPastNotice
+    - qa_tools/common/promotion.py::next_receipt
+    - qa_tools/common/promotion.py::effective_at_for
     linked_tests:
     - tests/test_slot_timeline.py
     - tests/test_census.py
@@ -14898,6 +14901,7 @@ requirements:
     - tests-js/census.test.js
     - tests-js/in-place-on-range.test.js
     - tests/test_dashboard_e2e.py
+    - tests/test_promotion_waits_for_next_receipt.py
     source: >
       Keith, 2026-09-26, batch 4 scoping input (b): "we're going to have
       to work out how demotion fits in and keeps as-at-T stable." Thread
@@ -20363,9 +20367,14 @@ requirements:
     - contract/data-asset.yaml
     - .devcontainer/devcontainer.json
     - tests/conftest.py::stated_test_environment
+    - cli/common.py::decide_keep
+    - cli/common.py::Keep
+    - cli/common.py::confirm_drop
+    - cli/common.py::NeedsATerminal
     linked_tests:
     - tests/test_stated_environment.py
     - tests/test_supply_db.py
+    - tests/test_cli_common.py
     source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - an operator doing local development against their own PostgreSQL versus being hooked into dev, non-prod or prod Aurora. Priority kept by Keith 2026-10-04 (plans/supply-model.md, ''Priority: REQ-PIPE-093 is queued''). Refreshed by delivery-scoper 2026-10-04 against what REQ-PIPE-089/092 and REQ-DASH-094 have since built, and narrowed: the PostgreSQL version gate moved to REQ-PIPE-146 and the write-time disclosure to REQ-TEST-114. Keith answered the refresh''s questions 1 and 2 on 2026-10-04 (both option A).'
     acceptance_criteria:
     - THE SYSTEM SHALL resolve the stated environment before it opens any database connection, for a read as well as a write, and SHALL NOT limit that to registering a QA run.
@@ -24370,6 +24379,8 @@ requirements:
     - .claude/hooks/session-start.sh
     - .devcontainer/post-create.sh
     - .github/workflows/test.yml
+    - qa_tools/common/synthetic_reset.py::reset
+    - qa_tools/common/synthetic_reset.py::_empty_qa_schema
     linked_tests:
     - tests/test_db_identity.py::TestTheWorkersOwnDatabaseIsChecked
     - tests/test_db_identity.py::TestAnUnmarkedDatabase
@@ -24377,6 +24388,7 @@ requirements:
     - tests/test_db_identity.py::TestTheResetLeavesTheIdentity
     - tests/test_db_identity.py::TestEveryPlaceMarksItsOwn
     - tests/test_schema_version_refusal.py
+    - tests/test_reset_synthetic.py
     source: Keith, 2026-09-27, answering REQ-PIPE-091's question set D - 'no, protect this higher up so you can't mistakenly make changes to the wrong environment'. Drafted in that conversation without delivery-scoper; refreshed by delivery-scoper 2026-10-04. Keith answered the refresh's questions 3 and 4 on 2026-10-04 (both option A).
     acceptance_criteria:
     - THE SYSTEM SHALL record, in the database itself, the data asset id (contract/data-asset.yaml's data_asset_id) and the environment id that database belongs to.
@@ -24550,6 +24562,7 @@ requirements:
     - qa_tools/common/drift_reference.py::reference_note
     - cli/common.py::reference_suffix
     - qa_tools/common/promotion.py::_gating_status
+    - qa_tools/common/promotion.py::gap_reds
     linked_tests:
     - tests/test_drift_reference.py
     - tests/test_filing.py::TestWhichPeriodAnArrivalWasFiledTo
@@ -24562,6 +24575,7 @@ requirements:
     - tests/test_drift_reference_gap.py
     - tests-js/blocked-dataset.test.js
     - tests/test_promotion_status.py::TestAGapRedWarnsButDoesNotBlock
+    - tests/test_promotion_step.py
     evidence:
     - '2026-09-29. Verified against a `supply` database rebuilt from empty, twice
       - a re-bootstrap over an existing decision log cannot show criterion 5 at
@@ -25337,6 +25351,7 @@ requirements:
     - qa_tools/common/left_out.py::peek
     - qa_tools/common/held_blast_radius.py::results_for
     - dashboard/qa-reporting-dashboard.template.html::blockerWithoutARunOfItsOwn
+    - qa_tools/common/own_table.py::refused_at_load
     linked_tests:
     - tests/test_unreadable_own_table.py
     - tests/test_dataset_blockers.py
@@ -26407,6 +26422,7 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::verdictLine
     - dashboard/qa-reporting-dashboard.template.html::renderSupplyCycleRows
     - pipeline/red_promoted.py::for_dataset
+    - dashboard/qa-reporting-dashboard.template.html::redPromotedMarker
     linked_tests:
     - tests-js/supply-outcome.test.js
     - tests/test_red_promoted.py
@@ -26456,9 +26472,12 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::outcomeCell
     - pipeline/slot_timeline.py::supply_states
     - pipeline/slot_timeline.py::run_states
+    - dashboard/qa-reporting-dashboard.template.html::buildSupplyHistory
+    - pipeline/recorded_arrival.py::for_run
     linked_tests:
     - tests-js/supply-outcome.test.js
     - tests/test_red_promoted.py
+    - tests-js/supply-history.test.js
     source: "Keith, 2026-10-03, option A item 2 (plans/road-testing.md #16) - superseded is kept and reversible, so it has to be findable. Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
       - "THE SYSTEM SHALL list every superseded supply in its dataset's supply history, as superseded, naming the supply that superseded it, when, and whether a rule or a person did it."
@@ -27203,11 +27222,15 @@ requirements:
     - pipeline/build_cp_dashboard_data.py::build_one_table
     - dashboard/qa-reporting-dashboard.template.html
     - pipeline/closed_slots.py::late_slots
+    - qa_tools/common/outstanding.py::_from_awaiting_decisions
+    - dashboard/qa-reporting-dashboard.template.html::gapItemCount
+    - dashboard/qa-reporting-dashboard.template.html::queueItemLink
     linked_tests:
     - tests-js/closed-no-supply.test.js
     - tests/test_dashboard_e2e.py::TestClosedWithNoSupply
     - tests/test_not_supplied.py::TestWhatTheBuildEmbeds
     - tests/test_not_supplied.py::TestALateDayStillOpenIsNamed
+    - tests/test_outstanding.py
     source: 'Keith, 2026-10-04 (''shown very clearly as red / no supply'', plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-04; signed off by Keith 2026-10-04.'
     acceptance_criteria:
     - WHERE a dataset's slot for the period on show is closed and unfilled (REQ-PIPE-132), THE SYSTEM SHALL show that period on the dataset's page as red and 'no supply', distinctly from a period that is overdue but still open - except WHERE a supply for that slot arrived and could not be loaded, was rejected after failing to load, or is contested, where THE SYSTEM SHALL say that instead (REQ-DASH-148 criterion 4, REQ-PIPE-153 criterion 9, REQ-PIPE-115 criterion 8).
@@ -27710,6 +27733,8 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::stateFromLocation
     - qa_tools/common/scenarios.py::Scenario
     - qa_tools/common/scenario_map.py::build_map
+    - dashboard/qa-reporting-dashboard.template.html::scenarioJumpBar
+    - dashboard/qa-reporting-dashboard.template.html::scenarioModePill
     linked_tests:
     - tests-js/scenario-panel.test.js
     - tests/test_dashboard_e2e.py
@@ -27784,6 +27809,7 @@ requirements:
     - qa_tools/common/supply_db.py::drop_run_schemas
     - qa_tools/common/supply_db.py::rerun_id
     - qa_tools/common/supply_db.py::split_run
+    - qa_tools/common/decision_log.py::follows
     linked_tests:
     - tests/test_knock_on.py
     - tests/test_recheck.py
@@ -27791,6 +27817,7 @@ requirements:
     - tests/test_run_schema_lifecycle.py::test_a_rerun_id_round_trips_and_keeps_its_supply
     - tests/test_run_schema_lifecycle.py::test_a_rerun_of_the_same_supply_is_not_collateral
     - tests/test_run_schema_lifecycle.py::test_the_longest_real_run_id_has_room_for_a_rerun
+    - tests/test_decision_log.py
     source: 'Found by delivery-scoper 2026-10-04 verifying what REQ-PIPE-079 still lacks for re-file (Keith: ''build it, after REQ-PIPE-079 is finished''). REQ-PIPE-075 criterion 17''s unmet entry already named it: ''reevaluation.plan() answers WHICH checks, and nothing executes a plan''. Scoped by delivery-scoper 2026-10-04.'
     acceptance_criteria:
     - THE SYSTEM SHALL offer one way to run QA for a supply that is already staged and filed, outside the processing of an arrival, evaluating the supply's own checks and the cross-table checks that read it against its filed period's overlay - the same scope an arrival's run has (REQ-PIPE-105 criterion 11).

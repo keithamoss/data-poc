@@ -288,6 +288,23 @@ releases:
             description: >
               The Check column now shows the column and check name, since the
               tool already has its own column.
+          - headline: A refusal in the menu no longer ends the session
+            components: ["Testing & dev tooling"]
+            description: >
+              If something inside a menu flow is refused, you see why and
+              return to the menu, instead of being dropped out of mothman.
+          - headline: Clearer messages from the terminal
+            components: ["Testing & dev tooling"]
+            description: >
+              The progress bar counts each arrival separately, production
+              explains that a change needs a terminal, and the messages no
+              longer name a flag that does not exist or print quoted errors.
+          - headline: Waiting items link to their dataset
+            components: ["Dashboard UI"]
+            description: >
+              Each item in "waiting for a person" that names a dataset now
+              links straight to it, and rows that lead nowhere no longer
+              look clickable.
           - headline: Resetting a synthetic database keeps its identity in place
             components: ["Pipeline & publishing"]
             description: >

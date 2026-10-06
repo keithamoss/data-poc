@@ -83,36 +83,47 @@ def _main_menu_loop() -> None:
             console.print("Goodbye.", style="dim")
             return
         console.print()
-        if choice == _MAIN_MENU_QA:
-            from qa_tools.common import arrival_lifecycle
-
-            try:
-                _qa_menu()
-            except arrival_lifecycle.StageFailed as exc:
-                from cli import lifecycle_report
-
-                lifecycle_report.stage_failure(exc)
-        elif choice == _MAIN_MENU_DECIDE:
-            # REQ-GHUB-082 criterion 16: reachable without doing a QA
-            # run first. Second on the menu rather than last, because
-            # somebody sitting down to work is at least as likely to be
-            # draining the queue as to be running new checks - and the
-            # old rule that kept it off this menu entirely was reversed
-            # knowingly (see cli/supply.py's own note on why).
-            filing_tui.filing_menu()
-        elif choice == _MAIN_MENU_GENERATE:
-            _generate_menu()
-        elif choice == _MAIN_MENU_BOOTSTRAP:
-            _bootstrap_menu()
-        elif choice == _MAIN_MENU_PROCESS:
-            # REQ-PIPE-151 criterion 13: the same body the flag-invocable
-            # command runs. Its exit status is the command's business; here
-            # the menu simply carries on.
-            try:
-                pipeline.run_process(confirm=common.confirm_change)
-            except SystemExit:
-                pass
+        # A REFUSAL INSIDE A FLOW IS SAID, AND THE MENU CARRIES ON
+        # (post-build-review #124 D5): a ClickException is how every flow
+        # refuses, and letting it out of this loop ended the whole session
+        # over, say, an empty answer to one prompt.
+        try:
+            _run_choice(choice)
+        except click.ClickException as exc:
+            exc.show()
         console.print()
+
+
+def _run_choice(choice: str) -> None:
+    if choice == _MAIN_MENU_QA:
+        from qa_tools.common import arrival_lifecycle
+
+        try:
+            _qa_menu()
+        except arrival_lifecycle.StageFailed as exc:
+            from cli import lifecycle_report
+
+            lifecycle_report.stage_failure(exc)
+    elif choice == _MAIN_MENU_DECIDE:
+        # REQ-GHUB-082 criterion 16: reachable without doing a QA
+        # run first. Second on the menu rather than last, because
+        # somebody sitting down to work is at least as likely to be
+        # draining the queue as to be running new checks - and the
+        # old rule that kept it off this menu entirely was reversed
+        # knowingly (see cli/supply.py's own note on why).
+        filing_tui.filing_menu()
+    elif choice == _MAIN_MENU_GENERATE:
+        _generate_menu()
+    elif choice == _MAIN_MENU_BOOTSTRAP:
+        _bootstrap_menu()
+    elif choice == _MAIN_MENU_PROCESS:
+        # REQ-PIPE-151 criterion 13: the same body the flag-invocable
+        # command runs. Its exit status is the command's business; here
+        # the menu simply carries on.
+        try:
+            pipeline.run_process(confirm=common.confirm_change)
+        except SystemExit:
+            pass
 
 
 def _qa_menu() -> None:

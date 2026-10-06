@@ -6259,3 +6259,47 @@ twice. It deliberately did not re-find the `TypeError`.
     - #121 D7 (REQ-QAC-037): cross-table rows name their table, column and
       tool. #121 D6 (`.ds` display:block) went in alongside, being the same
       span.
+
+    **CHUNK C, POLISH AND TRACEABILITY - 2026-10-06.** Fixed:
+    - #124 D4: the non-interactive fallback names `--commit`/`--trial`, not
+      a `--keep` that does not exist.
+    - #124 D5: a ClickException inside any main-menu flow is shown and the
+      menu carries on, rather than ending the session - fixes the empty
+      fallback-trial reference and every other refusal of its kind.
+    - #124 D6: production with no terminal raises `NeedsATerminal`, which
+      says to run it from a terminal and no longer points at a flag form.
+    - #124 D7: the progress bar counts each arrival's own steps
+      (`StepCounter`) and names the arrival, so it never reads 7/5.
+    - #124 D8: `UnknownDatasetError` prints its message, not its repr.
+    - #124 judgements: the keep prompt calls the log "this asset's recorded
+      delivery log"; the dbt ENGINE_TAG names dbt-postgres (old tag still
+      mapped); an unreadable log is titled "Decision log not available".
+    - #121 D4: blocker and gap tables are static (no pointer, no hover) and
+      lost the dead Rows and unlabelled columns. #121 D8: scenario chips keep
+      `.pill.sm`'s size and wrap. #121 D9: an unplaced injected scenario
+      says "Planned for the data", in the tag style.
+    - #123 B5: each queue item naming a dataset links to it. B7 (Outcome
+      clipping on mobile) is answered by the fixed-layout tables, which
+      scroll at phone width rather than clip.
+    - #122 traceability: `implemented_by` and `linked_tests` added for every
+      new or named function; `tests/test_promotion_waits_for_next_receipt.py`
+      drives both orchestrators' `promote_after()` and was shown to fail with
+      `before=` removed; db_identity's docstrings no longer say qa_store
+      creates the table or the reset re-marks it.
+
+    **LEFT AS THEY ARE, and why** - none is a defect, each is a judgement
+    better made with the next road-test than guessed now:
+    - #122 D5 (a role without grants after a reset is told about identity,
+      not grants): fails closed; the right message needs the grants model
+      REQ-PIPE-092 is still settling.
+    - #123 B6 (Scenarios prose disagrees with the data, shows reviewer
+      notes), B8 (repetition and REQ ids in reader text), B9 ("Show all
+      history" not in the URL): each is a sweep across many strings or a
+      routing change, not a fix - candidates for road-testing.md.
+    - #121's judgements (the 2,708px queue notice, spaced hyphens, line
+      lengths, mixed header styles, held-supply Red/Green) and #124's
+      remaining ones (UserWarnings on every pass, the 590-line ticket outage,
+      left-behind files named after the keep, unplaceable refused after
+      "originally received", the no-environment first screen, `pipeline
+      process` not naming what is red, one UTC refusal, REQ ids in help, the
+      publish offer only on the synthetic route): recorded, not changed.

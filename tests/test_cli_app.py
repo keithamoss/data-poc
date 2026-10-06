@@ -188,3 +188,24 @@ class TestOneNounPerThing:
         dataset_flags = [path for path, opt, _c in self._options() if opt == "--dataset"]
         assert "schedule show" in dataset_flags
         assert "debug changelog" in dataset_flags
+
+
+def test_a_refusal_inside_a_flow_returns_to_the_menu(monkeypatch, capsys):
+    """post-build-review #124 D5: an empty answer to the fallback trial's
+    reference prompt raised a ClickException that ended the whole TUI
+    session. A refusal is said, and the menu carries on."""
+    import click
+
+    calls = iter([app._MAIN_MENU_QA, app._MAIN_MENU_QA, None])
+    monkeypatch.setattr(common, "select", lambda *a, **k: next(calls))
+    seen = []
+
+    def _refuse():
+        seen.append("qa")
+        raise click.ClickException("no reference was given")
+
+    monkeypatch.setattr(app, "_qa_menu", _refuse)
+    app._main_menu_loop()
+    out = capsys.readouterr()
+    assert seen == ["qa", "qa"], "the second choice was never offered"
+    assert "no reference was given" in out.out + out.err

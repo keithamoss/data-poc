@@ -129,6 +129,16 @@ def _ask(question):
     return _with_environment_toolbar(question).ask()
 
 
+class NeedsATerminal(NotInteractive):
+    """A change only a person at a terminal may make, with no terminal
+    attached - which has no flag-based form to point at (post-build-review
+    #124 D6: NotInteractive's "use the flag-based form" sent the reader to
+    the very thing this refusal rules out)."""
+
+    def __init__(self, message: str) -> None:
+        click.ClickException.__init__(self, message)
+
+
 def require_tty(flag_hint: str) -> None:
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         raise NotInteractive(flag_hint)
@@ -237,8 +247,13 @@ def confirm_change(message: str, *, yes: bool, default: bool = False,
     env = environments.current()
     if not env.confirm_changes:
         return confirm(message, yes=yes, default=default, flag_hint=flag_hint)
-    require_tty(f"type {env.id!r} at a terminal - in the {env.id!r} environment a change "
-                f"made by hand cannot be confirmed by a flag")
+    try:
+        require_tty("")
+    except NotInteractive:
+        raise NeedsATerminal(
+            f"This changes the {env.label} database, and in the {env.id!r} environment that "
+            f"has to be confirmed by typing {env.id} at a terminal - no flag stands in for it. "
+            f"There is no terminal here, so nothing was changed. Run it from one.") from None
     console.print(f"[bold]{message}[/bold]")
     typed = (_ask_text(f"This changes the {env.label} database. Type {env.id} to confirm:")
              or "").strip()
@@ -311,6 +326,27 @@ def raw_bucket_name() -> str:
     return bucket
 
 
+class StepCounter:
+    """Steps finished in the CURRENT arrival, and which arrival it is.
+
+    A folder of several arrivals drives one bar through RUN_STEPS once per
+    arrival, and a single running count went past its total (7/5,
+    post-build-review #124 D7). The first step starts the next arrival."""
+
+    def __init__(self, steps) -> None:
+        self.first = steps[0]
+        self.done = 0
+        self.arrival = 0
+
+    def step(self, label: str) -> tuple[int, int]:
+        if label == self.first or self.arrival == 0:
+            self.arrival += 1
+            self.done = 0
+        finished = self.done
+        self.done += 1
+        return finished, self.arrival
+
+
 def chain_progress(label: str):
     """Context manager for the real check chain's own progress indicator,
     yielding an `on_step` callback to hand to
@@ -360,15 +396,16 @@ def chain_progress(label: str):
             global _ACTIVE_PROGRESS
             _ACTIVE_PROGRESS = progress
             task = progress.add_task(f"Checking {label}", total=len(RUN_STEPS))
-            done = 0
+            counter = StepCounter(RUN_STEPS)
 
             def on_step(step_label: str) -> None:
-                nonlocal done
-                # Called BEFORE each step starts, so `done` is the count
+                # Called BEFORE each step starts, so the count is what is
                 # genuinely finished - never report work that hasn't
                 # happened yet just to make the bar move sooner.
-                progress.update(task, completed=done, description=f"Running {step_label}")
-                done += 1
+                done, arrival = counter.step(step_label)
+                which = f" (arrival {arrival})" if arrival > 1 else ""
+                progress.update(task, completed=done,
+                                description=f"Running {step_label}{which}")
 
             try:
                 yield on_step
@@ -440,7 +477,7 @@ def describe_keep_choice(paths) -> str:
     """
     names = ", ".join(sorted(os.path.basename(str(p)) for p in paths))
     return (f"Keep: file as a real delivery received now, and record the results.\n"
-            f"      These file names become part of this repository's public "
+            f"      These file names become part of this asset's recorded "
             f"delivery log: {names}\n"
             f"Trial: run the same four tools against the same rows and record "
             f"nothing anywhere.")
@@ -491,7 +528,7 @@ def decide_keep(paths, *, keep) -> Keep:
         return Keep(keep)
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         console.print(
-            "Not a real terminal and no --keep/--trial given - running as a TRIAL, "
+            "Not a real terminal and no --commit or --trial given - running as a TRIAL, "
             "which records nothing. Pass --commit to file this supply as a delivery.",
             style="yellow")
         return Keep(False)

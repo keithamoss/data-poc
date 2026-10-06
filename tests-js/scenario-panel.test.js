@@ -168,3 +168,14 @@ describe("what each entry says", () => {
     expect(view.textContent).toContain("no data behind it yet");
   });
 });
+
+describe("the mode pill says what is true (#121 D9)", () => {
+  it("an injected scenario nothing has placed is planned, not in the data", () => {
+    dashboard = loadDashboard();
+    const w = dashboard.window;
+    const html = w.scenarioModePill({ mode: "INJECT" }, null);
+    expect(html).toContain("Planned for the data");
+    expect(html).not.toContain("nodata");
+    expect(w.scenarioModePill({ mode: "INJECT" }, { nav: {} })).toContain("In the data");
+  });
+});

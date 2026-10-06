@@ -186,7 +186,7 @@ def say_unreachable(exc: Exception) -> None:
             ("Nothing cached or exported is shown in its place: a filing "
              "screen is acted on, and a stale one is worse than a blank one.",
              "dim")),
-        title="Unreachable", border_style="red", expand=False))
+        title="Decision log not available", border_style="red", expand=False))
 
 
 # ---------------------------------------------------------------------------
