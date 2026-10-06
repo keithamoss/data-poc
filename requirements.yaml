@@ -26417,16 +26417,6 @@ requirements:
     story: "As a data team leader, I want a supply that was promoted and has since gone red because a sibling changed to be shown unmistakably as red and promoted, so that I never read accepted-but-now-failing data as fine just because it was accepted."
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 3 - not giving a red promoted supply a green supply's
-        treatment - as it reads beside the status pill.
-      owner: unowned
-      why: 'The pill on a supply-history row is the supply''s arrival verdict
-        and the label is its newest result per check; they can disagree on screen
-        (post-build-review #116 D2). Which the pill should be for a promoted supply
-        is a question for Keith, asked in the morning report.'
-      blocked_by:
-        unowned: true
     evidence:
     - '2026-10-05 (sprint 10): the build embeds promotedHealth per run - the status
       promoted on and the status after each run that read the supply, with its
@@ -26435,12 +26425,19 @@ requirements:
       row. tests-js/supply-outcome.test.js covers the label, the note before it
       turned, nothing beside a healthy one and nothing when not promoted on the
       date; tests/test_red_promoted.py the timeline.'
+    - '2026-10-06: criterion 3 beside the pill. tests-js/supply-outcome.test.js
+      ''a promoted supply''s pill'', 4 written first and failing (no supplyRowStatus),
+      then 17 passed: a supply promoted green that turns red reads a Red pill
+      with ''Arrived Green'' beside it, reads Green with no note before it turned,
+      a supply promoted red that has since gone green reads Green with ''Arrived
+      Red'', and a supply not promoted on the date keeps its own verdict.'
     implemented_by:
     - dashboard/qa-reporting-dashboard.template.html::redPromotedBadge
     - dashboard/qa-reporting-dashboard.template.html::verdictLine
     - dashboard/qa-reporting-dashboard.template.html::renderSupplyCycleRows
     - pipeline/red_promoted.py::for_dataset
     - dashboard/qa-reporting-dashboard.template.html::redPromotedMarker
+    - dashboard/qa-reporting-dashboard.template.html::supplyRowStatus
     linked_tests:
     - tests-js/supply-outcome.test.js
     - tests/test_red_promoted.py
@@ -26468,6 +26465,7 @@ requirements:
         NOT YET MET - the label is tested in vitest against hand-built data and
         in Python with its collaborators stood in (#116).
       - 'A SHORT PILL WITH ITS SENTENCE BENEATH, IN THE HEADER AND ON THE CARDS (Keith, 2026-10-06, post-build-review #121 D1/D2 and #123 A1). The label was one nowrap pill carrying a whole sentence, 598px wide, coloured with var(--red), which is not a token, so it had no red in it. It is now a ''Red promoted'' pill in the status colour with the sentence beneath. It moved from the verdict line into the dataset header, beside the status pill, so it shows when a newer supply awaits a decision and the dataset reads green. The agency and collection cards name the red promoted datasets as a kind of their own.'
+      - 'CRITERION 3 BESIDE THE PILL, 2026-10-06 (Keith, asked directly on post-build-review #116 D2): for a supply promoted on the date on show, the supply-history pill is its NEWEST result - the last point of its promoted-health timeline up to that date - and the verdict it arrived with is shown beside it as "Arrived <status>" whenever the two differ. Rejected: keeping the pill as the arrival verdict with a marker, which left a Green pill beside "Red promoted". Only the supply-history row changed; a supply that is not promoted on the date keeps its own verdict.'
     open_questions: []
 
   - id: REQ-DASH-127
@@ -27788,17 +27786,6 @@ requirements:
     story: As the person working a period's supplies, I want a decision that changes what a supply is judged against - a re-file, an un-supersede - to run that supply's checks again there and then, so that the gate decides on verdicts computed against where the supply now sits, and the verdicts it earned before are kept rather than replaced.
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 5's terminal half - the terminal reading a supply's
-        verdict from its most recent run.
-      owner: unowned
-      why: 'No terminal command shows a supply''s verdict at all (the queue and
-        the decide flow show states, not results), so there is no terminal reader
-        to point at the newest run. The gate and the dashboard read it (qa_store.current_run,
-        qa_results_reader.current_runs_only). Found by the sprint 9 critic, post-build-review
-        #114.'
-      blocked_by:
-        unowned: true
     evidence:
     - '2026-10-05: tests/test_recheck.py green against the real four tools (5
       tests, ~14s): an owed re-check of the dirty Child Protection fixture''s
@@ -27842,7 +27829,7 @@ requirements:
     - THE SYSTEM SHALL offer, through the same mechanism, a run of only the cross-table checks that read a given table in a given period, for the decisions that re-evaluate readers without re-running a supply's own checks.
     - THE SYSTEM SHALL give every such run a run identity of its own, distinct from the supply's first run, and SHALL NOT overwrite or delete any result an earlier run recorded.
     - THE SYSTEM SHALL record, on every result such a run produces, the decision that caused it, distinguishably from a re-evaluation caused by an arrival (REQ-PIPE-079 criterion 7).
-    - THE SYSTEM SHALL let the promotion gate, the dashboard and the terminal read a supply's verdict from its most recent run, while every earlier run's verdicts remain readable as history.
+    - 'THE SYSTEM SHALL let the promotion gate and the dashboard read a supply''s verdict from its most recent run, while every earlier run''s verdicts remain readable as history. AMENDED 2026-10-06 (Keith): "and the terminal" removed - no terminal command shows a supply''s verdict at all (the queue and the decide flow show states, not results), so there was no terminal reader to point at the newest run; the non-functional requirement below binds any that is added.'
     - THE SYSTEM SHALL run QA this way only from the orchestrator path that legitimately holds a connection to supply rows, and SHALL NOT run it from any read-committed-history path.
     - THE SYSTEM SHALL record, in the transaction of the decision that triggers such a run - or of the load record of a failed load that has since loaded (REQ-DASH-148) - that the run is owed, and SHALL clear that record only when the run completes.
     - IF such a run fails to complete - the run itself breaking, as distinct from a red or amber verdict, which the gate judges as usual - THEN THE SYSTEM SHALL leave the decision that triggered it in place, leave the supply's earlier verdict as its current one, report the failure, and complete the owed run on the next run of the processing pass (REQ-PIPE-151).
@@ -27850,6 +27837,7 @@ requirements:
     - 'ONE executor for every decision-triggered run. Its callers, each today waiting on it: re-file (REQ-PIPE-141), un-supersede (REQ-PIPE-120 criterion 3), the re-check on promotion (REQ-PIPE-121), substitution''s reader re-evaluation (REQ-PIPE-084 criteria 6 and 14, unmet) and REQ-PIPE-075 criterion 17. A second implementation is how ''which checks touch this table'' comes to have two answers - reevaluation.plan() stays the one answer.'
     - 'Cost: a decision-triggered run is one supply''s checks, seconds to a minute; the terminal waits for it and shows the outcome (REQ-PIPE-120''s decision on waiting). Measure one on the largest Child Protection table and record it.'
     - The dbt scratch directory of each such run is removed with its schemas, as an arrival's is (CLAUDE.md's data/ leak note), keyed by the new run identity so it cannot collide with the first run's.
+    - 'Any terminal command added later that shows a supply''s verdict reads it from the supply''s most recent run (qa_store.current_run, as the gate and the dashboard do), never from the first run or from whichever run happens to be read last. Added 2026-10-06 when criterion 5''s terminal half was amended away (Keith).'
     dependencies: []
     decisions:
     - 'THIS IS WHAT REQ-PIPE-079 STILL LACKS FOR RE-FILE, verified against the code 2026-10-04. 079''s overlay and decision layer are wired (period_overlay.build(), unrunnable.py), and arrival-time re-evaluation happens INSIDE an arrival''s own run (qa_results_writer._scope_to_run keeps readers'' checks and marks them caused_by). What does not exist is a run started by a DECISION: reevaluation.plan() and promotion.needs_requalification() have no production caller. REQ-PIPE-075 criterion 17, REQ-PIPE-084 criteria 6 and 14 and REQ-GHUB-082''s re-file are all blocked on exactly this, which is why it is its own requirement and lands first.'
@@ -27930,6 +27918,7 @@ requirements:
       stamps run instants in processing order.'
     - 'follows() NEVER RETURNS AN INSTANT AFTER NOW (Keith, 2026-10-06, post-build-review #122 D3): a future-dated decision, or a recorded_at ahead of this clock, would otherwise stamp re-run work later than it ran. min(now, ...), as effective_at_for() already does.'
     - 'A TIE ON THE TIMELINE GOES TO THE LATER RUN, THEN THE KEY (Keith, 2026-10-06, post-build-review #122 D6). supply_current_run broke a tie by run_key as TEXT, so __r10 lost to __r9. It now orders by run_instant before run_key. qa schema 32.'
+    - 'CRITERION 5 AMENDED, NOT BUILT, 2026-10-06 (Keith, asked directly): its terminal half named a reader that does not exist - no terminal command shows a supply''s verdict - so it was removed rather than met by inventing a command, and a non-functional requirement binds any terminal reader added later to the newest run. Rejected: building `mothman supply show <supply>` to satisfy it, which would be a new requirement for the scoper, not this criterion.'
     open_questions: []
 
   - id: REQ-PIPE-141

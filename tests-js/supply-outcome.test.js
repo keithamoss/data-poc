@@ -137,3 +137,52 @@ describe("the verdict line", () => {
     expect(loadDashboard().window.verdictLine({...ds, noDataInPlaceOn: true})).toBe("");
   });
 });
+
+// REQ-DASH-126 criterion 3 / post-build-review #116 D2 (Keith, 2026-10-06):
+// a PROMOTED supply's pill in its history is its newest result on the date
+// on show, so the pill and the red-promoted label can never disagree; the
+// verdict it arrived with stays beside it when they differ.
+describe("a promoted supply's pill", () => {
+  const raw = {id: "cp-carers", runs: RUNS,
+    runStates: {r1: [{at: "2026-01-20T01:00:00+00:00", state: "promoted", action: "promote"}]},
+    promotedHealth: {r1: {promotedOn: "green", promotedAt: "2026-01-20T01:00:00+00:00",
+      timeline: [{at: "2026-01-10T01:00:00+00:00", status: "green", cause: "the arrival of Carers"},
+                 {at: "2026-03-01T01:00:00+00:00", status: "red",
+                  cause: "the promote of Client Register"}]}}};
+  const pillOf = (w, html) => {
+    const root = w.document.createElement("div");
+    root.innerHTML = html;
+    return {pill: root.querySelector(".pill").className, arrived: root.querySelector("[data-arrived-as]")};
+  };
+
+  it("reads red once its newest result is red, saying what it arrived as", () => {
+    const w = withRaw(raw);
+    const got = pillOf(w, w.supplyRowStatus("cp-carers", {run_id: "r1", status: "green"}, "2026-03-05"));
+    expect(got.pill).toContain("red");
+    expect(got.arrived.textContent).toBe("Arrived Green");
+  });
+
+  it("reads as it arrived before anything changed it", () => {
+    const w = withRaw(raw);
+    const got = pillOf(w, w.supplyRowStatus("cp-carers", {run_id: "r1", status: "green"}, "2026-02-01"));
+    expect(got.pill).toContain("green");
+    expect(got.arrived).toBeNull();
+  });
+
+  it("reads green when a supply that arrived red has since gone green", () => {
+    const w = withRaw({...raw, promotedHealth: {r1: {promotedOn: "red",
+      promotedAt: "2026-01-20T01:00:00+00:00", timeline: [
+        {at: "2026-01-10T01:00:00+00:00", status: "red", cause: "x"},
+        {at: "2026-02-15T01:00:00+00:00", status: "green", cause: "y"}]}}});
+    const got = pillOf(w, w.supplyRowStatus("cp-carers", {run_id: "r1", status: "red"}, "2026-03-05"));
+    expect(got.pill).toContain("green");
+    expect(got.arrived.textContent).toBe("Arrived Red");
+  });
+
+  it("a supply not promoted on the date keeps its own verdict", () => {
+    const w = withRaw(raw);
+    const got = pillOf(w, w.supplyRowStatus("cp-carers", {run_id: "r1", status: "amber"}, "2026-01-15"));
+    expect(got.pill).toContain("amber");
+    expect(got.arrived).toBeNull();
+  });
+});

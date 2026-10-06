@@ -5806,6 +5806,9 @@ twice. It deliberately did not re-find the `TypeError`.
       REQ-DASH-126 criterion 4 asks for the promoted-on verdict beside the
       current one, but does not say which of the two the PILL is. Which
       should it be, for a promoted supply?
+      **ANSWERED 2026-10-06 (Keith): the newest result.** Built the same
+      day - `supplyRowStatus`, with "Arrived <status>" beside the pill when
+      the two differ; recorded on REQ-DASH-126.
     - **D7, LOGGED:** REQ-DASH-127's NFR, which collapses superseded
       versions under the version that superseded them, is not built. They
       are flat rows. Recorded on the requirement.

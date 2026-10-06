@@ -5092,6 +5092,28 @@ function redPromotedBadge(datasetId, runId, inPlaceOnDateStr){
   }
   return "";
 }
+// A PROMOTED SUPPLY'S PILL IS ITS NEWEST RESULT (REQ-DASH-126 criterion 3,
+// #116 D2, Keith 2026-10-06): on a supply-history row the pill used to be the
+// verdict the supply arrived with while the red-promoted label read its
+// newest results, and the two disagreed on screen - a Green pill beside "Red
+// promoted". For a supply promoted on the date on show the pill is now the
+// newest point of its timeline up to that date, and the verdict it arrived
+// with stays beside it whenever the two differ. Any other supply keeps its
+// own verdict.
+function supplyRowStatus(datasetId, entry, inPlaceOnDateStr){
+  const raw = rawRealDatasetById(datasetId);
+  const h = raw && raw.promotedHealth && raw.promotedHealth[entry.run_id];
+  const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  let shown = entry.status;
+  if(h && runStateInPlaceOn(raw, entry.run_id, on) === "promoted"){
+    (h.timeline || []).forEach(t=>{
+      if(t.at && t.status && (!on || assetDateStrOf(t.at) <= on)) shown = t.status;
+    });
+  }
+  const arrived = shown !== entry.status && STATUS_LABEL[entry.status]
+    ? ` <span class="arrived-as" data-arrived-as style="color:var(--ink-muted); font-size:12px;">Arrived ${STATUS_LABEL[entry.status]}</span>` : "";
+  return pill(shown, "sm") + arrived;
+}
 // RED PROMOTED AS A KIND ON THE AGENCY AND COLLECTION CARDS (#123 A1, Keith
 // 2026-10-06): a dataset whose newer supply awaits a decision reads Green on
 // its card while the supply in place has turned red - so the card says it.
@@ -5119,7 +5141,7 @@ function renderSupplyCycleRows(entries, datasetId){
     // chain), so it's shown directly rather than the old, dropped
     // dirtySeverity pill (a synthetic-generation-only concept no real
     // production dashboard would have - item 72).
-    const statusBadge = pill(e.status, "sm") + " " + acknowledgementBadge(datasetId, e.run_id)
+    const statusBadge = supplyRowStatus(datasetId, e) + " " + acknowledgementBadge(datasetId, e.run_id)
       + " " + redPromotedBadge(datasetId, e.run_id);
     // A resupply (any entry after the first in its chain) has no real
     // arrivalStatus (item 69's own reasoning, now keyed off real chain

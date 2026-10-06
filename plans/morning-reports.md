@@ -553,6 +553,13 @@ one or more component tags, and a date.
         in a bootstrap replay EVERY decision is recorded after the date it
         took effect, so the plain reading would flag every past date on a
         synthetic asset. What should count as "changed"?
+        KEITH, 2026-10-06 midday: "why can't we just make the synthetic
+        data record dates properly?" - so a replay on a synthetic asset
+        stamps decisions, and (his "and the other stamps too") filings,
+        load outcomes and runs, from the replay's simulated clock, and c6
+        uses the plain rule. D2: the pill is the newest result (built).
+        REQ-PIPE-140 c5's terminal half: amended away (no terminal reader
+        of verdicts exists).
         SPRINT 10 PUSHED (8040a69). #115 D4 retried on the rebuilt database
         and not reproducible - closed as the critic's environment.
         SPRINT 10 CRITIC (#116): a real HIGH - runs were ordered partly by
