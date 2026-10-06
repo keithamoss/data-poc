@@ -4533,6 +4533,12 @@ Belongs with batch 5's check work.
     REQ-PIPE-158 (connections), the REQ-PIPE-157 spike (dbt, A vs B, back to
     Keith), then REQ-TEST-160 and 159 (checkpoint replay).
 
+    **REQ-PIPE-158 BUILT, 2026-10-06** (connections reused): the 12-arrival
+    replay opens 18 connections instead of 732 (107s -> 98s); a full
+    bootstrap 904s, proven identical. The whole-bootstrap saving is small -
+    after REQ-PIPE-156 the connections were no longer where the time went;
+    dbt (REQ-PIPE-157) is.
+
     THE COST IS NOT JUST THIS SANDBOX - measured the same night, at
     Keith's question "why is GitHub so much faster?". It is not, any
     more. The "about nine minutes" CI bootstrap that CLAUDE.md carries

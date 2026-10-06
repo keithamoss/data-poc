@@ -67,9 +67,11 @@ PoC now needs a PostgreSQL to point at. There is no file to open.
 """
 from __future__ import annotations
 
+import atexit
 import hashlib
 import os
 import re
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Collection, Mapping, Sequence
@@ -303,8 +305,12 @@ class SupplyConnection:
     transaction that is implicit is one nobody knows the boundaries of.
     """
 
-    def __init__(self, raw: "psycopg.Connection"):
+    def __init__(self, raw: "psycopg.Connection", vouched: tuple | None = None):
         self._raw = raw
+        # What this connection's checks vouched for, and so where it goes back
+        # to when closed (REQ-PIPE-158); None means it is never reused and
+        # closing really closes it.
+        self._vouched = vouched
 
     def execute(self, sql: str, params: Sequence | None = None):
         if params is None:
@@ -315,7 +321,13 @@ class SupplyConnection:
         self._raw.commit()
 
     def close(self) -> None:
-        self._raw.close()
+        """Hand the connection back for the next caller (REQ-PIPE-158), as
+        clean as a new one - or close it, if it cannot be made so."""
+        vouched, self._vouched = self._vouched, None
+        if vouched is None:
+            self._raw.close()
+            return
+        _give_back(vouched, self._raw)
 
     @property
     def raw(self) -> "psycopg.Connection":
@@ -343,7 +355,8 @@ def on_first_connection(hook) -> None:
 
 
 def connect(read_only: bool = False, dsn: str | None = None,
-            label: str = "mothman", *, for_marking: bool = False) -> SupplyConnection:
+            label: str = "mothman", *, for_marking: bool = False,
+            reuse: bool = True) -> SupplyConnection:
     """Open the supply database.
 
     `read_only` NOW MEANS WHAT IT SAYS. Under the retired engine it was
@@ -376,6 +389,25 @@ def connect(read_only: bool = False, dsn: str | None = None,
 
     env = environments.for_connection()
     target = dsn if dsn is not None else supply_db_dsn()
+    from qa_tools.common import db_identity, postgres_version
+
+    # A CONNECTION THIS PROCESS HAS ALREADY OPENED AND CHECKED, if one is idle
+    # (REQ-PIPE-158). Its checks vouch for what they were checked AGAINST, so
+    # that is the key, not just the database: the same target with the same
+    # expected identity, the same declared PostgreSQL major and the same
+    # probe. A process whose expectation changes - a test, or a command that
+    # states another environment - meets the checks again on a new
+    # connection, and is refused in the same words as ever (criterion 2).
+    #
+    # `reuse=False` is for a caller whose connection's own age is reported -
+    # the pass lock names its holder "since" the backend started.
+    vouched = None
+    if not for_marking and reuse:
+        vouched = (target, db_identity.PROBE, db_identity.expected(),
+                   postgres_version.declared_major())
+        reused = _take_idle(vouched, label, read_only)
+        if reused is not None:
+            return SupplyConnection(reused, vouched)
     try:
         raw = psycopg.connect(target, autocommit=True, application_name=label)
     except psycopg.Error as exc:
@@ -391,8 +423,6 @@ def connect(read_only: bool = False, dsn: str | None = None,
     # `for_marking` is `mothman env mark` alone - the one command allowed to
     # meet a database with no identity yet (criterion 7); it still gets the
     # version check, and does its own identity checks before writing.
-    from qa_tools.common import db_identity, postgres_version
-
     try:
         num, setconfig = raw.execute(db_identity.PROBE).fetchone()
         postgres_version.check_number(num)
@@ -425,7 +455,115 @@ def connect(read_only: bool = False, dsn: str | None = None,
     raw.execute(f"SET lock_timeout = {_lock_timeout_ms()}")
     if read_only:
         raw.execute("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")
-    return SupplyConnection(raw)
+    # `env mark` meets a database with no identity yet, so what it opens is
+    # never handed to a caller that skipped the identity check.
+    return SupplyConnection(raw, vouched)
+
+
+# ---------------------------------------------------------------------------
+# Connections reused (REQ-PIPE-158, signed by Keith 2026-10-06)
+#
+# WHY. A profiled 12-arrival Child Protection replay opened 716 connections -
+# about sixty an arrival - each a TCP and authentication round trip plus the
+# environment, version and identity checks (plans/running-thoughts.md #65).
+#
+# ONE SMALL CACHE PER PROCESS, keyed by the database it reaches, with
+# EXCLUSIVE CHECKOUT: a connection is either held by exactly one caller or
+# idle here, so no two threads ever use one at once (criterion 6) and a
+# nested caller gets a second connection rather than its outer caller's.
+# Keith's answer at signing was "a small per-thread cache inside supply_db";
+# it is process-wide rather than per thread because a run's dbt thread is a
+# NEW thread every run (parallel_orchestrate.beside), so a per-thread cache
+# would strand one idle connection per finished run. Exclusive checkout gives
+# the guarantee the per-thread wording was for.
+#
+# HANDED OVER AS NEW. On the way back: any open or failed transaction rolled
+# back, then RESET ALL (search_path, lock_timeout, read-only - every SET a
+# caller made), advisory locks released, temporary tables dropped, and LISTEN
+# registrations forgotten - what closing the connection used to undo. Not
+# DISCARD ALL, which would also drop psycopg's own prepared statements out
+# from under it. On the way out: the caller's own application_name,
+# lock_timeout and read-only setting in ONE round trip, which doubles as the
+# liveness probe - a broken connection is discarded and a new one opened to
+# the same target, never another (criterion 5).
+#
+# ---------------------------------------------------------------------------
+
+#: Idle connections kept per target. A run holds two or three at once (the
+#: orchestrator's, a tool's, the decision log's); anything past this is
+#: closed on return rather than kept.
+MAX_IDLE = 4
+
+#: Idle connections by what their checks vouched for - see connect().
+_idle: dict[tuple, list] = {}
+_idle_lock = threading.Lock()
+
+
+def _take_idle(vouched: tuple, label: str, read_only: bool):
+    """An idle connection checked against `vouched`, dressed for this caller,
+    or None."""
+    while True:
+        with _idle_lock:
+            pool = _idle.get(vouched)
+            if not pool:
+                return None
+            raw = pool.pop()
+        if raw.closed or raw.broken:
+            continue
+        try:
+            with raw.cursor() as cur:
+                cur.execute(
+                    "SELECT set_config('application_name', %s, false), "
+                    "set_config('lock_timeout', %s, false), "
+                    "set_config('default_transaction_read_only', %s, false)",
+                    [label, f"{_lock_timeout_ms()}ms", "on" if read_only else "off"])
+        except psycopg.OperationalError:
+            raw.close()
+            continue
+        return raw
+
+
+def _give_back(vouched: tuple, raw) -> None:
+    """Make `raw` as a new connection would be, and keep it idle - or close it."""
+    if raw.closed or raw.broken:
+        raw.close()
+        return
+    try:
+        if raw.info.transaction_status != psycopg.pq.TransactionStatus.IDLE:
+            raw.rollback()
+        if not raw.autocommit:
+            raw.autocommit = True
+        raw.execute("RESET ALL")
+        raw.execute("SELECT pg_advisory_unlock_all()")
+        raw.execute("DISCARD TEMP")
+        raw.execute("UNLISTEN *")
+    except psycopg.Error:
+        raw.close()
+        return
+    with _idle_lock:
+        pool = _idle.setdefault(vouched, [])
+        if len(pool) < MAX_IDLE:
+            pool.append(raw)
+            return
+    raw.close()
+
+
+def release_connections() -> None:
+    """Close every idle connection this process holds (criterion 7) - at
+    exit, and for a processing pass or Lambda handler that must hold nothing
+    once it finishes. A connection a caller still holds is closed when that
+    caller closes it."""
+    with _idle_lock:
+        held = [raw for pool in _idle.values() for raw in pool]
+        _idle.clear()
+    for raw in held:
+        try:
+            raw.close()
+        except Exception:  # noqa: BLE001 - closing at exit must not raise
+            pass
+
+
+atexit.register(release_connections)
 
 
 def _lock_timeout_ms() -> int:

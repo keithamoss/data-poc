@@ -75,7 +75,10 @@ class PassLockHeld(RuntimeError):
 def pass_lock(command: str):
     """Hold this database's pass lock for the length of the block, or raise
     PassLockHeld naming who has it - before anything is changed."""
-    conn = supply_db.connect(label=f"{PASS_LOCK_LABEL}{command}")
+    # NEVER A REUSED CONNECTION (REQ-PIPE-158): the refusal below says
+    # "since" the holder's backend started, which is when the lock was taken
+    # only if the connection was opened to take it.
+    conn = supply_db.connect(label=f"{PASS_LOCK_LABEL}{command}", reuse=False)
     try:
         got = conn.execute("SELECT pg_try_advisory_lock(?, 1)",
                            [PASS_LOCK_SPACE]).fetchone()[0]

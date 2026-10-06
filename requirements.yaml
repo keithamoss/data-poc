@@ -29375,7 +29375,39 @@ requirements:
       already opened and checked, so that an arrival stops paying for about sixty connection set-ups, each
       with its own environment, version and identity check.
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-06: tests/test_connection_reuse.py written first and failing (12
+      errors, no release_connections), then 13 passed: a closed connection is
+      handed to the next caller; the checks run once per connection opened; nested
+      callers get different connections; a writer never inherits a reader''s session
+      nor a reader a writer''s; search_path, lock_timeout and application_name
+      are the new caller''s; an open transaction is rolled back; an advisory lock
+      and a temporary table go with the caller; a terminated idle connection is
+      replaced; four threads at once get four connections; release closes what
+      is held; and the pass lock''s ''since'' is when it was taken. Keying the
+      idle connections by what their checks vouched for was found by test_db_identity
+      and test_postgres_version (4 failures when keyed by database alone, all
+      passing after - refused in the same words). Criterion 9: the 12-arrival
+      Child Protection replay opened 18 connections against 732 for the commit
+      before, counted the same way on the same machine the same day (107.4s ->
+      97.6s). Criterion 8: a full bootstrap from empty (904s) compared with the
+      previous database by tests/equiv_support.snapshot - every table the same
+      row count, every difference one the comparison already excludes (census
+      id and taken_at, check_result load_attempt, delivery_file receipt_sequence,
+      filing id, identity marked_at, owed_run''s knock-on numbering).'
+    implemented_by:
+    - qa_tools/common/supply_db.py::connect
+    - qa_tools/common/supply_db.py::SupplyConnection
+    - qa_tools/common/supply_db.py::_take_idle
+    - qa_tools/common/supply_db.py::_give_back
+    - qa_tools/common/supply_db.py::release_connections
+    - qa_tools/common/processing_pass.py::pass_lock
+    linked_tests:
+    - tests/test_connection_reuse.py
+    - tests/test_db_identity.py
+    - tests/test_postgres_version.py
+    - tests/test_processing_pass.py
     source: 'Keith, 2026-10-06, scoping plans/running-thoughts.md #65 after its further profile ("all four").
       Drafted by delivery-scoper the same day. Signed by Keith 2026-10-06.'
     signed_off:
@@ -29422,6 +29454,28 @@ requirements:
     - 'ANSWERED 2026-10-06 (Keith, signing): a small per-thread cache inside supply_db, no new dependency
       (psycopg_pool rejected for what it adds to keep current); the environment, version and identity checks
       run once per connection opened, as now, not on every hand-over.'
+    - 'ONE CACHE PER PROCESS WITH EXCLUSIVE CHECKOUT, NOT PER THREAD (built 2026-10-06,
+      departing from the signing answer''s ''per-thread'' wording, flagged to
+      Keith): a run''s dbt thread is a new thread every run (parallel_orchestrate.beside),
+      so a per-thread cache strands one idle connection per finished run. Exclusive
+      checkout gives the guarantee the per-thread wording was for - no two threads
+      on one connection.'
+    - 'KEYED BY WHAT THE CHECKS VOUCHED FOR, NOT BY DATABASE ALONE: target, the
+      identity probe, the expected identity (asset and stated environment) and
+      the declared PostgreSQL major. A process whose expectation changes meets
+      the checks again on a new connection; keyed by database alone, a changed
+      MOTHMAN_ENVIRONMENT was silently accepted (found by four existing tests).'
+    - 'RESET ALL, pg_advisory_unlock_all, DISCARD TEMP and UNLISTEN on return,
+      NOT DISCARD ALL: DISCARD ALL also deallocates psycopg''s own prepared statements
+      out from under it. The caller''s session is set in one set_config round
+      trip that doubles as the liveness probe.'
+    - 'THE PASS LOCK NEVER REUSES (connect(reuse=False)): its refusal names the
+      holder ''since'' pg_stat_activity.backend_start, which is when the lock
+      was taken only on a connection opened to take it - reused, a warm Lambda
+      container could report hours. Found by a test written first.'
+    - 'env mark''s connection (for_marking) is never reused: it skips the identity
+      check by design, so nothing it opened may reach a caller that relies on
+      that check.'
     open_questions: []
   - id: REQ-TEST-159
     title: A replay of one collection can keep a checkpoint and resume from it

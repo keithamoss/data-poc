@@ -20,6 +20,7 @@ anything else still passes.
 """
 from __future__ import annotations
 
+import psycopg
 import pytest
 
 from qa_tools.common import supply_db
@@ -35,26 +36,54 @@ class TestAConnectionIsReleasedWhenTheBodyRaises:
     it is a trap this suite has now hit twice: a count is a fact about
     the whole database at one instant, so it moves when anything else
     connects, and it cannot tell WHICH connection it is describing.
-    `conn.raw.closed` is the same claim about the one object under test.
+    `conn.raw.closed` was the same claim about the one object under test.
+
+    RELEASED, NOT NECESSARILY CLOSED, since REQ-PIPE-158: a released
+    connection may go back to this process for the next caller. What these
+    tests exist to rule out is the harm - a session left `idle in
+    transaction` holding what it read - so that is what they assert, about
+    the one backend under test (by its pid, not a count).
     """
 
+    @staticmethod
+    def _assert_released(conn, pid):
+        if conn.raw.closed:
+            return
+        with psycopg.connect(supply_db.supply_db_dsn(), autocommit=True) as other:
+            state = other.execute("SELECT state FROM pg_stat_activity WHERE pid = %s",
+                                  [pid]).fetchone()
+            locks = other.execute(
+                "SELECT count(*) FROM pg_locks WHERE pid = %s AND locktype = 'relation'",
+                [pid]).fetchone()[0]
+        assert state is None or state[0] == "idle", state
+        assert locks == 0, f"the released session still holds {locks} relation lock(s)"
+
+    @staticmethod
+    def _read_in_a_transaction(conn) -> int:
+        conn.raw.execute("BEGIN")
+        conn.execute("SELECT count(*) FROM pg_catalog.pg_class")
+        return conn.raw.info.backend_pid
+
     def test_the_context_manager_releases_on_an_exception(self, supply_dsn):
-        conn = None
+        conn = pid = None
         with pytest.raises(RuntimeError):
             with supply_db.connect(label="mothman:probe") as opened:
                 conn = opened
+                pid = self._read_in_a_transaction(opened)
                 raise RuntimeError("the QA step blew up")
-        assert conn is not None and conn.raw.closed
+        assert conn is not None
+        self._assert_released(conn, pid)
 
     def test_a_try_finally_releases_on_an_exception(self, supply_dsn):
         """The shape the four QA modules now use."""
         conn = supply_db.connect(label="mothman:probe")
+        pid = self._read_in_a_transaction(conn)
         with pytest.raises(RuntimeError):
             try:
                 raise RuntimeError("the QA step blew up")
             finally:
                 conn.close()
-        assert conn.raw.closed
+        self._assert_released(conn, pid)
 
     def test_the_old_shape_is_what_leaked(self, supply_dsn):
         """Pins the bug itself, so the tests above are demonstrably
