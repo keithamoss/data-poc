@@ -1529,7 +1529,9 @@ check_lifecycle.py`'s own `check_id` convention.
     3. REQ-PIPE-152 - the S3 Lambda handlers (criteria 12-13 added that day;
        every arrival built from the database). BUILT 2026-10-06 at qa schema
        33 (32 went to the critic sprint's current-run tie-break).
-    4. REQ-PIPE-078 - finish it for all four tools.
+    4. REQ-PIPE-078 - finish it for all four tools. BUILT 2026-10-06: the
+       other three were fixed by REQ-PIPE-079/115; what was missing was an
+       end-to-end test through all four, which now exists.
     5. REQ-DASH-148 criterion 12 - a reload owes a re-check.
     6. REQ-QAC-039 - a dataset's hierarchy identifiers in one place (survey
        first).

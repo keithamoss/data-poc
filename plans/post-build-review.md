@@ -4232,6 +4232,10 @@ twice. It deliberately did not re-find the `TypeError`.
     078, and is bigger than the criterion that found it. Nothing is
     worse in the meantime: the same hold crashed at dbt before this
     change and crashes at Soda after it, and the corpus has no holds.
+    **CLOSED 2026-10-06**: the other three tools were fixed by REQ-PIPE-079
+    and REQ-PIPE-115 (each leaves an unreadable table's checks out and says
+    so); REQ-PIPE-078 is built, with an end-to-end test through all four
+    tools over a held sibling (`TestAHeldSiblingDoesNotTakeAnyToolDown`).
 
 73. **[done, 2026-10-02]** **[Pipeline & publishing]** `EARLY`
     may be unreachable through the real assignment path, because the

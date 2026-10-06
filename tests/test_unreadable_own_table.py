@@ -313,3 +313,48 @@ class TestAnUnrelatedHoldDoesNotStopAFiledSupplyBeingChecked:
             with supply_db.connect(label="test-own-table") as conn:
                 conn.execute("DELETE FROM qa.hold WHERE dataset_id = 'cp-case-workers'")
         assert OWN not in seen["held"]
+
+
+class TestAHeldSiblingDoesNotTakeAnyToolDown:
+    """REQ-PIPE-078 criteria 9 and 10, end to end through all four tools.
+
+    WHAT WAS LEFT: criterion 10's producer (held_blast_radius) was built and
+    unit-tested on 2026-09-30, but a run with a held sibling died at dbt and,
+    once dbt was fixed, at Soda - so nothing had ever reached it. Since then
+    every tool leaves a check over an unreadable table out and says so
+    (REQ-PIPE-079, REQ-PIPE-115). This runs the real tools over a Child
+    Protection run whose OWN table is readable while cp_clients is held."""
+
+    def test_the_run_completes_and_names_the_held_table(self, cp_duckdb_dir):
+        """A PLACEMENTS run, because a run records only its own dataset's
+        checks: Placements' client-reference checks read cp_clients, so its
+        run is the one the held table costs (Case Workers' reads nothing
+        there, which is how the first draft of this test passed vacuously)."""
+        from conftest import clone_run_views
+        from fixture_ids import CP_REF_RUN_ID
+
+        mine = f"cp_placements__t{uuid.uuid4().hex[:12]}"
+        with supply_db.connect(label="test-own-table") as conn:
+            clone_run_views(conn, CP_REF_RUN_ID, mine, held={"cp_clients"})
+        entry = {"run_id": mine, "run_index": 1, "received_at": "2026-01-01T06:00:00+00:00",
+                 "delivery": "d", "files": {}}
+        results = orchestrate_cp._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+                                          reference_run_id=None)
+        recorded = _recorded(mine)
+        assert {"dbt", "soda"} <= set(recorded), (
+            f"the tools did not all run over the readable tables: {recorded}")
+        # CRITERION 10, AT THE LAYER THAT RECORDS: one red per check that
+        # reads the held table, under the held pseudo-tool, naming it.
+        assert recorded.get("held"), f"no check reading the held table was recorded: {recorded}"
+        with supply_db.connect(read_only=True, label="test-own-table") as conn:
+            named = conn.execute(
+                'SELECT DISTINCT status, column_name FROM "qa".check_result '
+                "WHERE run_key = ? AND tool = 'held'", [mine]).fetchall()
+            # NO TOOL VERDICT about the held table itself (criterion 9).
+            about_held = conn.execute(
+                'SELECT tool, count(*) FROM "qa".check_result WHERE run_key = ? '
+                "AND dataset_id = 'cp-clients' AND tool <> 'held' GROUP BY tool",
+                [mine]).fetchall()
+        assert named == [("fail", "cp_clients")]
+        assert about_held == []
+        assert results, "the run returned its results"

@@ -13846,7 +13846,24 @@ requirements:
       hold is a piece of work I can pick up rather than a message that
       scrolled past in one run output.
     moscow: must
-    status: in_progress
+    status: built
+    unmet_criteria: []
+    evidence:
+    - "2026-10-06: tests/test_unreadable_own_table.py::TestAHeldSiblingDoesNotTakeAnyToolDown runs the real dbt-core, Soda Core, datacontract-cli and Evidently over a Child Protection Placements run with cp_clients held - the end-to-end proof criterion 10 never had, because the run used to die at dbt and then at Soda before reaching the producer. It completes, with the tools' own Placements results recorded (asserted for dbt and Soda), every Placements check that reads cp_clients is recorded red naming cp_clients, and no tool records a verdict about cp_clients itself (criterion 9). With the hold modules (test_held_not_checked, test_holds, test_slot_holds, test_supply_hold_store, test_supply_holds, test_withheld_does_not_empty_a_slot) and test_run_dbt_cp: 142 passed."
+    implemented_by:
+    - qa_tools/common/supply_holds.py::raise_hold
+    - qa_tools/common/supply_holds.py::resolve
+    - qa_tools/common/supply_holds.py::outstanding
+    - qa_tools/common/supply_holds.py::tally
+    - qa_tools/common/held_blast_radius.py::results_for
+    - qa_tools/common/own_table.py::why_unreadable
+    linked_tests:
+    - tests/test_unreadable_own_table.py
+    - tests/test_held_not_checked.py
+    - tests/test_supply_holds.py
+    - tests/test_supply_hold_store.py
+    - tests/test_holds.py
+    - tests/test_run_dbt_cp.py
     source: >
       REQ-DASH-070's own unmet criterion 1 and supply_holds.py's own
       docstring ("THIS IS A DEAD END UNTIL SPRINT 12"), plus Thread E's
@@ -14087,6 +14104,7 @@ requirements:
         does not pre-empt REQ-PIPE-079's pending risk call. Nothing is
         worse in the meantime either: the same hold crashed at dbt
         before this change and crashes at Soda after it.
+      - 'THE OTHER THREE TOOLS WERE FIXED ELSEWHERE, AND THIS IS CLOSED BY PROOF RATHER THAN CODE (2026-10-06). The decision above, from 2026-09-30, said Soda, datacontract-cli and Evidently were unfixed and died one tool after dbt. REQ-PIPE-079 and REQ-PIPE-115 since made every tool leave a check over an unreadable table OUT and say so (left_out.note, reconciled before a run finishes), so the remainder here was never code - it was that nothing had run all four tools over a held sibling end to end. That test now exists. A first draft of it passed vacuously: it used a Case Workers run, whose own checks read nothing in cp_clients, so the held reds were (correctly) not that run''s to record.'
 
   - id: REQ-PIPE-079
     title: QA runs against the period a supply is filed to, not against staging alone
