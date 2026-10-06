@@ -298,6 +298,30 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
 
+      # THE BOOTSTRAP IS CACHED, KEYED ON EVERY INPUT THAT SHAPES IT
+      # (REQ-TEST-117). Computed HERE, before dbt deps or anything else adds
+      # files, so the key is the checkout's alone. cli/pipeline.py and no
+      # other cli/ file: the bootstrap enters through it, and a terminal
+      # change must not cost a full bootstrap. EXACT KEY ONLY - no
+      # restore-keys, so a dump made from different inputs is never used
+      # (criterion 3): a new check can turn a supply red and change every
+      # filing after it.
+      - name: Key the bootstrap cache
+        id: key
+        run: echo "key=bootstrap-v1-${{ hashFiles('generator/**', 'synthetic_data_generator/**', 'pipeline/**', 'qa_tools/**', 'contract/**', 'dbt_project/**', 'cli/pipeline.py', 'pyproject.toml', 'uv.lock', '.github/workflows/test.yml') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the bootstrapped database, if these inputs made one
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ steps.key.outputs.key }}
+          path: |
+            ci-cache
+            data/deliveries
+            data/receipts
+            data/generator_bookkeeping.json
+            data/scenario_placements.json
+
       - name: Sync dependencies
         run: uv sync --dev
 
@@ -315,6 +339,23 @@ jobs:
             -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
             -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
             -c 'SELECT pg_reload_conf()'
+
+      # A HIT RESTORES THE DUMP, identity row and all (it is a qa.identity
+      # row since qa schema 31), so the marking below is a no-op after it.
+      - name: Restore the cached database
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: |
+          PGPASSWORD=ci-not-a-secret pg_restore -h localhost -U postgres \
+            --dbname supply --no-owner --exit-on-error ci-cache/supply.dump
+
+      # CRITERION 4: plainly, and with the key, whichever it was.
+      - name: Say whether the database was restored or rebuilt
+        run: |
+          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+            echo "Bootstrap RESTORED from cache key ${{ steps.key.outputs.key }}"
+          else
+            echo "Bootstrap REBUILT - no cache for key ${{ steps.key.outputs.key }}"
+          fi
 
       - name: Install dbt_utils
         run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
@@ -352,7 +393,29 @@ jobs:
       # been allowed to generate its own synthetic supplies; that is
       # what the fixtures do.
       - name: Generate the QA history the suite reads
+        if: steps.cache.outputs.cache-hit != 'true'
         run: uv run mothman pipeline bootstrap
+
+      # ON A MISS, KEEP WHAT WAS JUST MADE for the next run with the same
+      # inputs - in GitHub's cache, never the repository (criterion 5).
+      - name: Dump the bootstrapped database
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ci-cache
+          PGPASSWORD=ci-not-a-secret pg_dump -h localhost -U postgres \
+            --format custom --no-owner --file ci-cache/supply.dump supply
+
+      - name: Save the bootstrapped database
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ steps.key.outputs.key }}
+          path: |
+            ci-cache
+            data/deliveries
+            data/receipts
+            data/generator_bookkeeping.json
+            data/scenario_placements.json
 
       - name: Build the dashboard data the suite reads
         run: |
