@@ -1483,6 +1483,37 @@ two levels) and #17.
       route is then removed, and what that means for REQ-PIPE-122/123's
       settings rules, which were settled separately.
 
+      **RESOLVED, Keith 2026-10-07 morning ("That's perfect, assuming the
+      TUI offers users ALL of the tools a human would need to undo
+      mistakes (ours or the supplier) and otherwise undo and fix up
+      everything that automated rules decide").** All four recommendations
+      put to him, accepted as a set:
+      1. STRICT, NO ESCAPE HATCH - REQ-PIPE-111 as drafted. A past date or
+         version-level property never changes, and no changelog entry
+         licenses it. REQ-PIPE-050's built say-what-you-did route
+         (`validate_schedule._retrospective_edit_errors`) is REMOVED in
+         the same change, its criteria and [BUILD] decisions amended on
+         the REQ-DOCS-101 precedent. Options (b) and (c) above rejected.
+      2. A RECORDED "LATENESS EXCUSED" DECISION answers the "noticed ON 2
+         Aug" scenario - option (a)'s half that strict-plus-tools does not
+         cover. A person records it with a reason; the decision log keeps
+         it; the dashboard shows the slot late-but-excused naming the
+         reason rather than plain late. Configuration never changes - only
+         the judgement does, through the ordinary decision route.
+      3. A SYNTHETIC ASSET MAY ADD PAST-DATED calendar and timezone
+         versions, matching REQ-PIPE-122/123's settings exception, so
+         generated history can have eras (REQ-GEN-136). Change or removal
+         of a past one stays refused there too.
+      4. `git commit --no-verify` IS OUT OF SCOPE as understood: "no escape
+         hatch" is about what mothman OFFERS; the CI gate catches a commit
+         that skipped the hook.
+      ASSUMPTION FOR THE SCOPER TO CONFIRM, Keith's own condition: the TUI
+      offers every tool a person needs to undo a mistake - ours or the
+      supplier's - and to undo or fix up everything an automated rule
+      decides. The strict rule is only acceptable on that footing, so the
+      scoper is to audit it against what is built, and name any gap as a
+      requirement rather than assume it away.
+      Sent to the scoper 2026-10-07 with these decisions.
       SETTLED THE SAME AFTERNOON AND NOT IN QUESTION: 110 - `participates`
       replaces `delivery_months`, `not_expected` stays (one-off decisions);
       `slaProperties` deleted entirely including `frequency`. 112 - the
@@ -1671,3 +1702,12 @@ two levels) and #17.
     The first run's per-check output was not kept, so which 19 failed is
     unknown. Next step if it recurs: keep the full output (COLUMNS=250) and
     compare the failing check ids against a stable run.
+
+18. **[investigate, 2026-10-07]** **[Dashboard UI]** **A past date shows
+    a warning about files from years later.** Seen by the dashboard UX
+    critic (post-build-review #132, out of its scope): Client Register with
+    the in-place-on date at 2023-08-05 shows "What is in the warehouse is
+    not the latest file - 2026-Q2 / 2026-Q3". If that notice reads files
+    received after the date on show, it is leaking the future into a past
+    view, which is what the as-of picker exists to prevent. A sighting, not
+    a diagnosis - not looked into yet.

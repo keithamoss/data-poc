@@ -6658,3 +6658,58 @@ twice. It deliberately did not re-find the `TypeError`.
     target (both measured at build time), and anything against real AWS.
     TO FIX in one batch once the two UX critics running alongside it have
     reported, failing test first for each defect.
+
+132. **[in-progress, 2026-10-07]** **[Dashboard UI]** **The dashboard UX
+    critic on four small changes** - REQ-DASH-155's schedule-ended notice,
+    REQ-PIPE-140 criterion 5's newest-result pill, REQ-PIPE-081 criterion 6's
+    "decisions made since then" note, and #129's fine print. Scope chosen by
+    Keith, 2026-10-07. Python Playwright over the built page (the MCP
+    browser would not connect), 1440 and 390 wide, light and dark, no
+    console errors. Finding A1 was re-checked against the code by the main
+    session before being written here.
+    - **A1 (HIGH, a false green), CONFIRMED - against REQ-DASH-126
+      criterion 5.** A promoted supply's history row takes its pill from
+      `promotedHealth.timeline`, which `promotion.status_of` fills with the
+      GATE's reading of each result - and `_gating_status` deliberately
+      reads a reference-gap red as its measured status (REQ-QAC-108
+      criterion 15: a gap warns, it does not block). "Arrived X" comes from
+      the page's own status. So on Client Register as at 2023-08-05 the
+      header and the supply-level checks read Red while the same supply's
+      row reads **Green, "Arrived Red"** - two status implementations on one
+      row, the item-74 pattern, failing in the green direction. 22 of the 23
+      "Arrived X" rows in the real data are this artefact (newest timeline
+      point at the arrival instant); one, cp-investigations 2024-08-01, is
+      the genuine turned-red case the change was built for. Right for the
+      gate, wrong for a display: the fix is to show the displayed status,
+      and change the pill only for a reading AFTER the arrival.
+    - **A2 (MEDIUM) - the fine print claims more than this database holds.**
+      The deployment was bootstrapped before 4a24a4d, so its Soda samples
+      were taken at `samples limit: 5`, and the page states today's limit
+      (`SODA_SAMPLES_ASKED`) as if it applied to them. Record the limit with
+      each result and word the line from that. Also: "the 100 failing rows
+      Soda returned" under "5 of 512" reads as if 100 rows failed - reword.
+    - **A3 (MEDIUM), injected - a schedule-ended hold reads as the generic
+      "held, waiting for a person".** Headline and footer say a person must
+      resolve it while the body says the next pass files it; the hold queue
+      offers file-it-yourself or reject, both the wrong fix (the fix is
+      adding dates); raw ids and "cp-clients's" rather than the dataset's
+      name; the command shows literal backticks through `escHtml`.
+    - **A4 (LOW-MEDIUM) - the exhausted-schedule notice.** It blames the
+      calendar ("quarterly has no delivery dates after...") when it is one
+      dataset's own `endsOn` that ran out (cp-case-workers, 2027-10-18,
+      while quarterly has 2027-11-01); it never names the dataset; "them"
+      beside "1 dataset".
+    - **A5 (LOW), injected - "decisions made since then".** Lists every
+      dataset's decisions on a single-dataset page (`decisionsChangingDate`
+      walks `rawRealDatasets()`); "and 1 more" is a dead end; it reads
+      `run.arrivedAt`, which `raw.runs` does not carry, so a same-day
+      resupply cannot be told apart.
+    - **A6 (polish).** The fine print is 10.5px at 3.39:1 / 3.88:1 contrast,
+      under 4.5:1 though matching its label; `dbt:unique` lists a repeated
+      key, which "lowest keys among the failing rows" does not explain.
+    Works well: the exhausted notice's backlog line counts as at the date
+    shown and reflows cleanly; the fine print hides when every row shows;
+    the genuine turned-red row reads exactly as intended.
+    Out of scope, a sighting only: Client Register at 2023-08-05 shows
+    "What is in the warehouse is not the latest file - 2026-Q2 / 2026-Q3".
+    TO FIX in the same batch as #131, failing test first for A1-A5.
