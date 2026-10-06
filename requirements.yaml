@@ -28527,18 +28527,9 @@ requirements:
     story: As a data team leader, I want a dataset whose supply arrived but could not be loaded to read clearly red for that period, saying the file could not be loaded and why, while the rest of the delivery is checked as usual, so that a bad file costs me one honest, explained red rather than a quiet gap, a stale green, or a stopped pipeline.
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 12 - a reloaded supply records, in the same transaction
-        as its new load record, that a re-check is owed, and the next processing
-        pass runs it through REQ-PIPE-140's re-check.
-      why: 'Both halves it waited on now exist - the owed re-check (REQ-PIPE-140)
-        and the pass that runs it (REQ-PIPE-151, 2026-10-06). What is missing
-        is the reload owing it: a load record that follows a failed one does not
-        yet call recheck.owe in its transaction.'
-      owner: unowned - morning report.
-      blocked_by:
-        unowned: true
+    unmet_criteria: []
     evidence:
+    - "2026-10-06, criterion 12: load_log.record_load() owes a re-check when a load record follows a failed one for the same table, in the same transaction as the new load record. tests/test_reload_owes_a_recheck.py 4 passed (confirmed failing first): a failure owes nothing, the reload owes one recheck naming its own load record as cause, a first load and a trial owe nothing, and a reload whose transaction rolls back takes the owed re-check with it. tests/test_recheck.py::TestAReloadIsACauseLikeADecision runs it through REQ-PIPE-140's real re-check: a run of its own, with qa.run.caused_by_load the reload's id. The related load-log, recheck, blocker, staging and processing-pass modules: 124 passed."
     - '2026-10-05 (overnight batch 6): tests/test_staging_loads.py pins the own-words
       reason against a real malformed CSV (''malformed row: line 3 has 4 fields
       where 2 were expected'', confirmed failing first) and four library messages
@@ -28565,6 +28556,7 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::blockerOpenInPlaceOn
     - dashboard/qa-reporting-dashboard.template.html::blockerHistoryRows
     - cli/supply.py::failures_command
+    - qa_tools/common/load_log.py::record_load
     linked_tests:
     - tests/test_staging_loads.py::TestAFailedLoadsReasonInOurOwnWords
     - tests/test_staging_loads.py::TestAFileThatCannotBeLoaded
@@ -28572,6 +28564,8 @@ requirements:
     - tests/test_unrunnable.py::TestCouldNotBeLoadedOutranksEverything
     - tests/test_dashboard_e2e.py::TestASupplyThatCouldNotBeLoaded
     - tests/test_cli_supply.py
+    - tests/test_reload_owes_a_recheck.py
+    - tests/test_recheck.py
     source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - ''today a failed load surfaces only in mothman supply failures ... the dashboard shows a dataset quietly holding no data''. Split out of REQ-DASH-097''s criterion 3 by delivery-scoper 2026-10-04, shaped on REQ-PIPE-115 (signed that day); closes REQ-PIPE-060 criterion 5''s unmet entry.'
     acceptance_criteria:
     - WHILE a 'failed-load' outstanding item is open for a dataset as at the instant on show, THE SYSTEM SHALL count that dataset's status as RED for the period on show, stating in words that the supply could not be loaded and the recorded reason - which, for a file refused by a file check, names that check (REQ-QAC-096 criterion 11) - and SHALL roll that red up to the collection and the agency like any other red.
@@ -28643,6 +28637,7 @@ requirements:
       CODE separately: REQ-PIPE-115''s gap-2 evidence (a held own table ran all
       four tools) is the same code path, and the guard that fixed one fixed both.
       Said rather than implied.'
+    - 'CRITERION 12 BUILT IN record_load, 2026-10-06. The reload is recognised there - the one place that already compares a new load record with the latest for its table - and owes the re-check through recheck.owe in a transaction around both writes, so a load record and its owed re-check exist together or not at all. A trial owes nothing (it records nothing that lasts). The re-check runs on the next processing pass like any other owed item, its gate taking effect now (follows() with no decision as cause): a reload is a live event, and the replayed history has no reloads to place in the past.'
   - id: REQ-TEST-150
     title: A kept terminal run says what the lifecycle decided about each arrival, and on what grounds
     date_written: '2026-10-04'

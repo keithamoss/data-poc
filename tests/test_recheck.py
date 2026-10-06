@@ -326,3 +326,29 @@ class TestOneDefinitionOfASupplysCurrentRun:
                                          scope="full", caused_by_decision=cause)
                 finish_run(key)
             assert qa_store.current_run(conn, ds, supply) == f"a_second_{tag}"
+
+
+class TestAReloadIsACauseLikeADecision:
+    """REQ-DASH-148 criterion 12, end to end: a supply whose load failed and
+    then loaded owes a re-check (load_log.record_load), and running it is a
+    run of its own whose recorded cause is the reload."""
+
+    def test_the_reload_is_the_runs_cause(self, cp_duckdb_dir, monkeypatch):
+        from qa_tools.common import load_log, promotion
+
+        monkeypatch.setenv("GIT_AUTHOR_EMAIL", "pytest@example.org")
+        monkeypatch.setattr(promotion, "report", lambda outcome: None)
+        physical = CP_DIRTY_RUN_ID   # the supply's staged table's own name
+        load_log.record_load("pytest-reload", DATASET, physical, load_log.FAILED,
+                             "2026-04-02T00:00:00+00:00", reason="ragged row")
+        loaded = load_log.record_load("pytest-reload", DATASET, physical, load_log.LOADED,
+                                      "2026-04-02T00:05:00+00:00", row_count=1)
+        with supply_db.connect(read_only=True, label="test-recheck") as conn:
+            [owed] = [o for o in recheck.owed(conn, DATASET)
+                      if o.caused_by_load == loaded.id]
+        got = recheck.run(owed.id, run_by="pytest@example.org")
+        assert got.completed, got.message
+        with supply_db.connect(read_only=True, label="test-recheck") as conn:
+            row = conn.execute("SELECT caused_by_load, caused_by_decision, supply_id "
+                               "FROM qa.run WHERE run_key = ?", [got.run_key]).fetchall()[0]
+        assert row == (loaded.id, None, SUPPLY)

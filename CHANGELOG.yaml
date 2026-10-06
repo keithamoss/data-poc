@@ -296,6 +296,12 @@ releases:
               processing pass the terminal does - filed, checked and gated in
               receipt order. Nothing is copied, and a retried event records
               nothing twice.
+          - headline: A fixed file that loads is checked again
+            components: ["Pipeline & publishing"]
+            description: >
+              When a supply that could not be loaded is reprocessed and loads,
+              its checks are now owed again, and the next processing pass runs
+              them as a run of their own, recording the reload as the reason.
           - headline: CI reuses the bootstrapped database
             components: ["Testing & dev tooling"]
             description: >

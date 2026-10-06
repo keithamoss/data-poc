@@ -1532,7 +1532,7 @@ check_lifecycle.py`'s own `check_id` convention.
     4. REQ-PIPE-078 - finish it for all four tools. BUILT 2026-10-06: the
        other three were fixed by REQ-PIPE-079/115; what was missing was an
        end-to-end test through all four, which now exists.
-    5. REQ-DASH-148 criterion 12 - a reload owes a re-check.
+    5. REQ-DASH-148 criterion 12 - a reload owes a re-check. BUILT 2026-10-06.
     6. REQ-QAC-039 - a dataset's hierarchy identifiers in one place (survey
        first).
     7. REQ-PIPE-086 criterion 11, REQ-PIPE-140 criterion 5's terminal half,

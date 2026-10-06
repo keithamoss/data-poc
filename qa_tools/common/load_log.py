@@ -178,8 +178,26 @@ def record_load(delivery: str, dataset_id: str, physical: str, outcome: str,
                 and latest.reason == reason and latest.row_count == row_count
                 and latest.delivery == delivery and latest.dataset_id == dataset_id):
             return None
-        return record(delivery, dataset_id, physical, outcome, recorded_at,
-                      reason=reason, row_count=row_count, trial=trial, conn=db)
+        reloaded = (trial is None and outcome == LOADED
+                    and latest is not None and not latest.loaded)
+        if not reloaded:
+            return record(delivery, dataset_id, physical, outcome, recorded_at,
+                          reason=reason, row_count=row_count, trial=trial, conn=db)
+        # A RELOAD AFTER A FAILURE OWES A RE-CHECK (REQ-DASH-148 criterion
+        # 12), in the SAME TRANSACTION as the load record that is its cause,
+        # so neither exists without the other. The next processing pass runs
+        # it through REQ-PIPE-140's re-check, as a run of its own that keeps
+        # the first.
+        from qa_tools.common import recheck
+
+        with db.raw.transaction():
+            written = record(delivery, dataset_id, physical, outcome, recorded_at,
+                             reason=reason, row_count=row_count, trial=trial, conn=db)
+            parts = supply_db.split_staged(physical)
+            if written is not None and written.id is not None and parts:
+                recheck.owe(db, dataset_id=dataset_id, supply_id=f"{dataset_id}@{parts[1]}",
+                            load_id=written.id)
+        return written
 
 
 def records(trial: str | None = None,

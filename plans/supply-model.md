@@ -2362,7 +2362,7 @@ exist.
     (`plans/qa-pipeline.md` item 87 - genuinely blocked), and `qa_results/` is
     still a committed tree, so `REQ-PIPE-089` onwards is untouched.
 
-27. **[in-progress, 2026-10-06]** **[QA checks & contract]** **Load-time file checks,
+27. **[done, 2026-10-06]** **[QA checks & contract]** **Load-time file checks,
     and where their results go.** The small explicit set of checks that can
     only be made on the file as delivered - encoding, delimiter, header row,
     column order, ragged rows, duplicate headers - as a fifth tool with real
