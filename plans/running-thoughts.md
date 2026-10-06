@@ -4546,7 +4546,8 @@ Belongs with batch 5's check work.
     are in the requirement's decisions. UNPARKED the same evening (Keith:
     "stay in v1 and do the change") - an in-process dbt worker per
     collection with dbt's own partial parse, nothing pinned, measured at
-    ~3.8s a run against ~8-9s; next to build.
+    ~3.8s a run against ~8-9s. **BUILT the same night: a full bootstrap
+    from empty 927s -> 512s (8.5 minutes), the 10-minute target met.**
 
     **REQ-TEST-159 AND 160 BUILT, 2026-10-06** (checkpoint replay): proven at
     full size - a resume from arrival 55 recorded exactly what the full

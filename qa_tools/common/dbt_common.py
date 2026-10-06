@@ -13,7 +13,6 @@ guessed in advance - see plans/qa-pipeline.md #84.
 from __future__ import annotations
 import os
 import re
-import subprocess
 
 
 from qa_tools.common import supply_db
@@ -100,9 +99,17 @@ def run_dbt(command: str, select: list[str], target_path: str,
         raise ValueError(
             "run_dbt needs a run_id: dbt's schema is per-run, and sharing one "
             "lets concurrent runs drop each other's models mid-read")
-    env["DBT_PG_SCHEMA"] = supply_db.dbt_schema(run_id)
-    if run_schema:
-        env["DBT_RUN_SCHEMA"] = run_schema
+    # STABLE NAMES FOR THE PROCESS'S LIFE (REQ-PIPE-157): dbt's partial parse
+    # is invalidated by a profile schema that changes, and by a sources
+    # schema that changes - which per-run names did, every run. Isolation
+    # between runs is kept by emptying them before each build (one build at
+    # a time per process); between processes, by the process id in the name.
+    worker_schema = supply_db.dbt_worker_schema()
+    source_schema = supply_db.dbt_source_schema()
+    _prepare_worker_schemas(worker_schema, source_schema, run_schema)
+    supply_db.built_by_worker(run_id)
+    env["DBT_PG_SCHEMA"] = worker_schema
+    env["DBT_RUN_SCHEMA"] = source_schema
     env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
     # STALE OUTPUT IS REMOVED BEFORE THE RUN, not trusted after it.
     # target_path is per-run and persists, so a build that fails early
@@ -114,7 +121,9 @@ def run_dbt(command: str, select: list[str], target_path: str,
             os.remove(os.path.join(target_path, artefact))
         except FileNotFoundError:
             pass
-    completed = subprocess.run(
+    from qa_tools.common import dbt_worker
+
+    completed = dbt_worker.invoke(
         # --target-path gives each run its OWN target/ subdirectory rather
         # than dbt's shared default - required for cross-run
         # parallelization (plans/performance.md #4): without this,
@@ -127,12 +136,30 @@ def run_dbt(command: str, select: list[str], target_path: str,
         # into a <target>_audit.<test> table (dbt_project.yml) in the same per-run
         # warehouse - the source failing_sample_keys_* below query for
         # per-row samples (see plans/qa-pipeline.md #15).
-        ["dbt", command, "--profiles-dir", profiles_dir, "--project-dir", project_dir, "--quiet",
+        [command, "--profiles-dir", profiles_dir, "--project-dir", project_dir, "--quiet",
          "--target-path", target_path, "--select", *select,
          *(("--exclude", *exclude) if exclude else ()), "--store-failures"],
-        env=env, cwd=root, check=False, capture_output=True, text=True,
-    )
+        env, target_path)
     _refuse_a_build_that_did_not_run(completed, target_path)
+
+
+def _prepare_worker_schemas(worker_schema: str, source_schema: str,
+                            run_schema: str | None) -> None:
+    """Empty this process's dbt schemas, and point the sources schema at the
+    run's own views - so a build reads exactly this run's tables and finds
+    nothing a previous run of this process built (REQ-PIPE-157 criterion 2).
+    A model excluded this run must not be found built from the last one."""
+    with supply_db.connect(label="mothman:dbt-worker-schemas") as conn:
+        for schema in (worker_schema + supply_db.DBT_AUDIT_SUFFIX, worker_schema,
+                       source_schema):
+            conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+        conn.execute(f'CREATE SCHEMA "{source_schema}"')
+        if run_schema:
+            for (table,) in conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = ? "
+                    "ORDER BY 1", [run_schema]).fetchall():
+                conn.execute(f'CREATE VIEW "{source_schema}"."{table}" AS '
+                             f'SELECT * FROM "{run_schema}"."{table}"')
 
 
 def _refuse_a_build_that_did_not_run(completed, target_path: str) -> None:

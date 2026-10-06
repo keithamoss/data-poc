@@ -152,11 +152,16 @@ def schemas_of(conn, run_id: str) -> list[str]:
     # Matched EXACTLY, so one trial cannot take a longer-named sibling's
     # (or a re-run's, REQ-PIPE-140) with it.
     mine.add(supply_db.dbt_audit_schema(run_id))
+    # BUILT BY THIS PROCESS'S dbt WORKER (REQ-PIPE-157): its models went to the
+    # worker's own schemas, which carry no trial prefix but are this trial's.
+    worker = supply_db.worker_schemas_of(run_id)
+    mine |= worker
     present = supply_db.schemas_with_prefix(conn, supply_db.TRIAL_SCHEMA_PREFIX)
     present += supply_db.schemas_with_prefix(conn, supply_db.RUN_SCHEMA_PREFIX
                                              + supply_db.TRIAL_SCHEMA_PREFIX)
     present += supply_db.schemas_with_prefix(conn, supply_db.DBT_SCHEMA_PREFIX
                                              + supply_db.TRIAL_SCHEMA_PREFIX)
+    present += [s for s in worker if s in supply_db.dbt_schemas(conn)]
     return sorted(mine & set(present))
 
 

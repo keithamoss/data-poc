@@ -6532,7 +6532,13 @@ twice. It deliberately did not re-find the `TypeError`.
     tests, all red before. MEASURED over a whole bootstrap against the
     previous one: 1,002 results' samples changed and nothing else in them -
     676 the same keys reordered, 326 DIFFERENT keys chosen for the same
-    data - and every sample recorded now is in key order. Minor - no verdict, count or status changes - so
+    data - and every sample recorded now is in key order. ONE EDGE REMAINS,
+    inside Soda: a check whose `samples limit` is 5 and where more than five
+    rows fail lets Soda choose WHICH five it returns before our sort sees
+    them (one such result differed between two bootstraps, 2026-10-06 -
+    8 rows failing). Fixing it means raising `samples limit` in the
+    checks configuration so our sort chooses; NOT done without Keith, since
+    it is a configuration change. Minor - no verdict, count or status changes - so
     fixed under the standing rule rather than held for Keith.
 
 130. **[done, 2026-10-06]** **[Pipeline & publishing]** **Recording each

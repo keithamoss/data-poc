@@ -20,11 +20,25 @@ SUPPLY = f"{DATASET}@{CP_DIRTY_RUN_ID.split('__')[1]}"
 
 
 def _a_decision(conn) -> int:
-    """A real decision to be the cause - criterion 4 names one."""
+    """A real decision to be the cause - criterion 4 names one.
+
+    THE LATEST FOR THIS SUPPLY: a supply's current run is the one whose
+    cause took effect last (asset time, Keith's 2026-10-05 answer), and
+    another module on the same worker - test_knock_on - leaves a later-dated
+    decision for this same supply, which made this test's re-run correctly
+    NOT current and the test fail in CI once the files were distributed
+    that way. The product was right; the test assumed it ran alone."""
+    from datetime import datetime, timedelta
+
+    latest = conn.execute(
+        "SELECT max(effective_at) FROM qa.decision WHERE dataset_id = ? AND supply = ?",
+        [DATASET, SUPPLY]).fetchall()[0][0]
+    floor = datetime.fromisoformat("2026-04-02T00:00:00+00:00")
+    at = max(floor, latest + timedelta(minutes=1)) if latest else floor
     return dl.record_automatic(conn, dl.Decision(
         agency_id="child-protection-family-support", collection_id="child-protection",
         dataset_id=DATASET, action=dl.PROMOTION_WITHHELD, supply=SUPPLY,
-        actor="pytest", actor_kind=dl.RULE, effective_at="2026-04-02T00:00:00+00:00",
+        actor="pytest", actor_kind=dl.RULE, effective_at=at.isoformat(),
         to_slot="2026-Q2", reason="cause for a re-check"))
 
 
@@ -211,9 +225,17 @@ class TestTheGateTakesEffectWhenItsCauseDid:
                             lambda arrivals, results, **k: seen.update(k) or
                             promotion.AfterRun(promoted=(), refused={}, failed={}))
         monkeypatch.setattr(promotion, "report", lambda o: None)
-        owed_id, _ = owed_one
+        owed_id, decision_id = owed_one
         recheck.run(owed_id, run_by="pytest@example.org")
-        assert seen["effective_at"].startswith("2026-04-02")
+        with supply_db.connect(label="test-recheck") as conn:
+            cause = conn.execute("SELECT effective_at FROM qa.decision WHERE id = ?",
+                                 [decision_id]).fetchall()[0][0]
+        from datetime import datetime, timedelta
+        # THE CAUSE'S INSTANT, give or take the moments the clock runs on from
+        # it (it runs at wall speed once anchored) - never the wall clock's day.
+        took = datetime.fromisoformat(seen["effective_at"])
+        assert timedelta(0) <= took - cause < timedelta(seconds=30), (
+            f"the gate took effect at {took}, not when its cause did ({cause})")
 
 
 class TestOnAFreshDatabase:

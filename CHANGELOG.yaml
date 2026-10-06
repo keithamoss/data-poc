@@ -155,7 +155,10 @@ releases:
               thousands of times, using the faster C parser. A test replay of
               twelve Child Protection arrivals dropped from about three minutes
               to under two, and database connections are now reused rather than
-              opened about sixty times per arrival.
+              opened about sixty times per arrival. dbt now runs in a process of
+              its own that keeps its parsed project between runs, so a full
+              bootstrap from empty takes about eight and a half minutes rather
+              than fifteen.
           - headline: A supply after its schedule ends says what to fix
             components: ["Pipeline & publishing"]
             description: >

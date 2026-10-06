@@ -29317,7 +29317,48 @@ requirements:
       it for every run after, so that a run stops paying about 6.5 of its 7.8 seconds of dbt time before
       any SQL executes.
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-06: tests/test_dbt_worker.py - 9 passed: dbt never runs in this
+      interpreter (a separate process, and dbt.cli never imported here); later
+      runs reuse the parse and are faster than the first, the kept parse file
+      existing; the kept parse goes when the worker stops; a model one run excluded
+      is not found built from the last run (the stable schema is emptied before
+      every build); two processes never share a schema; the kept parse never carries
+      the database password; a worker that died idle is replaced, and one lost
+      mid-request raises WorkerLost and the next run starts another; a tidied
+      run leaves none of the worker''s schemas - that test written first and failing
+      on the leak the whole-bootstrap comparison found (one sources schema per
+      process). The existing dbt integration tests (7) and trial tests pass through
+      the worker. Criterion 7: a full bootstrap from empty took 487s, then 512s
+      with the leak fixed (8.1-8.5 minutes), against 927s for the commit before
+      on the same machine the same day - under the 10-minute target; the 12-arrival
+      Child Protection replay 97.6s -> 56.4s. Criterion 6: that bootstrap compared
+      with the previous history by tests/equiv_support.snapshot - every dbt verdict
+      identical; the only differences the generator''s receipt counter and ONE
+      Soda failing-row sample (8 rows failed a check whose Soda `samples limit`
+      is 5, and Soda chooses which five - post-build-review #129''s remaining
+      edge, inside Soda, not dbt), and the schema list identical once the leak
+      was fixed.'
+    implemented_by:
+    - qa_tools/common/dbt_worker.py::invoke
+    - qa_tools/common/dbt_worker.py::stop
+    - qa_tools/common/dbt_worker.py::_serve
+    - qa_tools/common/dbt_worker.py::_start
+    - qa_tools/common/dbt_common.py::run_dbt
+    - qa_tools/common/dbt_common.py::_prepare_worker_schemas
+    - qa_tools/common/supply_db.py::dbt_worker_schema
+    - qa_tools/common/supply_db.py::dbt_source_schema
+    - qa_tools/common/supply_db.py::dbt_schema
+    - qa_tools/common/supply_db.py::worker_schemas_of
+    - qa_tools/common/supply_db.py::drop_run_schemas
+    - qa_tools/common/trial.py::schemas_of
+    linked_tests:
+    - tests/test_dbt_worker.py
+    - tests/test_run_dbt_cp.py
+    - tests/test_run_dbt_bdm.py
+    - tests/test_run_schema_lifecycle.py
+    - tests/test_trial_runs.py
     source: 'Keith, 2026-10-06, scoping plans/running-thoughts.md #65 after its further profile ("all four").
       Drafted by delivery-scoper the same day. Signed by Keith 2026-10-06.'
     signed_off:
@@ -29369,6 +29410,26 @@ requirements:
     - 'PARKED 2026-10-06 (Keith, on the spike results): NEITHER mechanism for now - dbt stays one subprocess per run. A (~3.5s a run, identical verdicts) remains the recommended one if it is picked up, B is not worth building alone (~1s a run). Criterion 7 amended the same day from a mean dbt time of 3s - unreachable by either, since dbt''s own SQL is ~2.9s - to the whole bootstrap at 10 minutes or less, which is the thing that was ever wanted.'
     - 'RESEARCHED AND MEASURED AGAIN, 2026-10-06 evening (Keith: no pinning dbt-core; research how else). Installed: dbt-core 1.12.4, dbt-postgres 1.11.0. WHERE ONE RUN''S TIME GOES today (debug JSON log timestamps, one real build of Child Protection''s 61 nodes, machine busy with a bootstrap so ~10% high): Python start and importing dbt 1.6-1.8s; adapter and project load 0.3s; a FULL parse plus writing manifest.json, semantic_manifest.json and osi_document.json 2.4-2.7s; relation cache and schema creation 0.2-0.3s; the 61 nodes 3.0-3.8s, of which SQL (connection set-up included) 1.4s over 200 statements, Jinja compile 0.6s and dbt''s own per-node bookkeeping ~1.5s; wrap-up and exit ~0.5s. WHY PARTIAL PARSE NEVER APPLIES, read in the installed source (parser/manifest.py build_manifest_state_check): the profile''s connection_info hash includes `schema`, so a per-run DBT_PG_SCHEMA forces a FULL reparse every run (the docs agree: an env var used in profiles.yml forces a full re-parse); DBT_RUN_SCHEMA in sources.yml reparses the sources and everything downstream; and the partial-parse file lives in the per-run --target-path. THE OPTION THAT NEEDS NO PIN: dbt in-process through dbtRunner().invoke() WITHOUT an injected manifest (supported in v1 and v2), with stable schema names and a stable --partial-parse-file-path (which must already exist - the first run goes without it): 6.0s for the first run, then 3.8-3.9s a run on 1 thread and 2.9-3.0s on 4, against 8.0-9.3s today. It still has to run in a process of its own per collection, beside Soda Core, datacontract-cli and Evidently rather than inside their interpreter (dbt does not support concurrent invocations in one process, and Soda reloads .env into os.environ). REJECTED: the v2 Rust parser (--use-v2-parser, bundled with 1.12) - Postgres is not a supported adapter (experimental flag only), it rejected this project''s dbt test YAML for deprecated top-level `meta`/arguments, and its parse took 7.0s against 4.8s. Worth doing anyway, separately: migrating that YAML to the new format before dbt v2. threads: 4 alone, subprocess unchanged: the node phase 3.8s -> 3.0s. NOT YET CHECKED for the in-process variant: verdicts identical to today''s (the pinned spike''s were).'
     - 'UNPARKED AND CHOSEN, 2026-10-06 evening (Keith: "let''s stay in v1 and do the change"): one long-lived dbt worker process per collection, calling dbtRunner().invoke() with NO injected manifest - the documented API, kept in v2 - with stable per-process schema names and a stable --partial-parse-file-path so dbt''s own partial parse applies. Nothing is pinned: dbt-core 2.0 is only at rc8 on PyPI (1.12.5 is the latest stable, checked 2026-10-06) and its engine does not yet support Postgres, so v2 is a separate later move, re-measured then. Criterion 1 reworded the same day from "parse at most once" to a full parse at most once with dbt''s partial parse after, which is what this mechanism does.'
+    - 'THE WORKER IS LAUNCHED AS ITS OWN MODULE (`python -m qa_tools.common.dbt_worker`),
+      connected back over an authenticated local socket whose key travels in the
+      environment, never argv. Not multiprocessing''s spawn: spawn re-imports
+      the parent''s __main__ in the child, so a caller script without a main guard
+      ran itself again inside the worker (found timing the 12-arrival replay).'
+    - 'STABLE NAMES PER PROCESS, ISOLATION BY EMPTYING: models in dbt_w<pid>,
+      audit in dbt_w<pid>_audit, sources in dbt_w<pid>_src as views onto the run''s
+      own view schema - dropped and recreated before each build, so a model one
+      run excluded is never read as built by the next. dbt_schema(run_id) answers
+      the worker schema for a run the worker built, so every existing reader finds
+      the models without being told.'
+    - 'A RUN''S TIDY-UP TAKES THE WORKER''S SCHEMAS WITH IT (worker_schemas_of),
+      and a trial''s too: the sources schema was emptied by CASCADE but left behind,
+      once per process, found by the whole-bootstrap comparison and fixed with
+      a failing test first.'
+    - A WORKER THAT DIED IDLE IS REPLACED QUIETLY; one lost mid-request raises
+      WorkerLost, so a run is never read as having produced nothing.
+    - dbt's output is captured per run into target/dbt_worker.log at the file-descriptor
+      level, so a refusal still quotes what dbt said, as the subprocess's captured
+      output did.
     open_questions:
     - Which mechanism, A or B - to be chosen by Keith on the spike's measurements.
   - id: REQ-PIPE-158

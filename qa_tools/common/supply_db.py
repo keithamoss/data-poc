@@ -1469,6 +1469,7 @@ def drop_run_schemas(conn, run_id: str) -> list[str]:
     # `run_0011`, and `<base>_` - what this used before REQ-PIPE-140 -
     # took a re-run's `<base>__r1` schema with its own supply's run.
     mine = {run_schema(run_id), dbt_schema(run_id), dbt_audit_schema(run_id)}
+    mine |= worker_schemas_of(run_id)
     dropped = []
     for schema in sorted(mine):
         conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
@@ -1543,9 +1544,49 @@ def drop_orphan_run_schemas(conn, keep: Sequence[str] = ()) -> list[str]:
 DBT_SCHEMA_PREFIX = "dbt_"
 
 
+#: Runs whose dbt models were built in this process's stable schema
+#: (REQ-PIPE-157) - so every reader of `dbt_schema(run_id)` finds them there.
+_built_by_worker: dict[str, str] = {}
+
+
+def dbt_worker_schema() -> str:
+    """dbt's schema for every run THIS PROCESS builds (REQ-PIPE-157): stable
+    for the process's life so dbt's partial parse stays valid - a schema
+    that changes forces a full parse - and distinct per process, so two
+    collections running side by side never share one. Emptied before each
+    build, so nothing one run built is read as another's."""
+    return f"{DBT_SCHEMA_PREFIX}w{os.getpid()}"
+
+
+def dbt_source_schema() -> str:
+    """The stable schema dbt's sources read (DBT_RUN_SCHEMA): views onto the
+    run's own view schema, re-pointed before each build (REQ-PIPE-157)."""
+    return dbt_worker_schema() + "_src"
+
+
 def dbt_schema(run_id: str) -> str:
-    """Where dbt's models and audit tables go for ONE run."""
-    return DBT_SCHEMA_PREFIX + _ident(run_id, "run id")
+    """Where dbt's models and audit tables go for ONE run - this process's
+    stable worker schema once a run has been built there (REQ-PIPE-157),
+    otherwise the run's own name."""
+    return _built_by_worker.get(run_id) or DBT_SCHEMA_PREFIX + _ident(run_id, "run id")
+
+
+def worker_schemas_of(run_id: str) -> set[str]:
+    """The dbt worker's schemas a run owns, if this process's worker built it
+    (REQ-PIPE-157): models, audit and sources. A run's tidy-up drops all
+    three - the sources schema is emptied by the run's views going, but not
+    removed, and was left behind once per process (found by the whole-
+    bootstrap comparison)."""
+    if run_id not in _built_by_worker:
+        return set()
+    worker = _built_by_worker[run_id]
+    return {worker, worker + DBT_AUDIT_SUFFIX, worker + "_src"}
+
+
+def built_by_worker(run_id: str) -> str:
+    """Record that `run_id`'s models are in this process's worker schema."""
+    _built_by_worker[run_id] = dbt_worker_schema()
+    return _built_by_worker[run_id]
 
 
 #: dbt's `--store-failures` schema for a run is its target schema plus
