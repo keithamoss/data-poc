@@ -330,6 +330,14 @@ def _from_holds(conn=None) -> list[Item]:
     items = []
     with delivery_log._db(conn) as db:
         held_supplies = supply_holds.outstanding(db)
+        # OBSERVED AT ITS RECEIPT (post-build-review #123 A2), as
+        # dataset_blockers already does: `raised_at` is the wall clock of
+        # whichever pass raised it - a replay's today - so on any past as-of
+        # date the page dropped every held supply from the queue.
+        received = {(r[0], r[1]): r[2] for r in db.execute(
+            "SELECT DISTINCT ON (dataset_id, delivery) dataset_id, delivery, received_at "
+            "FROM qa.delivery_file WHERE dataset_id IS NOT NULL "
+            "ORDER BY dataset_id, delivery, received_instant, receipt_sequence").fetchall()}
     for held in held_supplies:
         agency, collection = _scope_of(held.dataset_id)
         items.append(Item(
@@ -338,7 +346,8 @@ def _from_holds(conn=None) -> list[Item]:
             detail=(f"{held.describe()} Every other dataset in the same delivery "
                      f"was processed as usual."),
             agency_id=agency, collection_id=collection, dataset_id=held.dataset_id,
-            observed_at=held.raised_at.isoformat(),
+            observed_at=(received.get((held.dataset_id, held.delivery))
+                         or held.raised_at.isoformat()),
             responses=held.responses))
     return items
 

@@ -220,6 +220,30 @@ class TestARunWhoseOwnTableCouldNotBeLoaded:
         assert results == [] and _recorded(mine) == {}
 
 
+    def test_a_refused_table_that_fell_through_is_still_refused(self, cp_duckdb_dir):
+        """REAL DEFECT (post-build-review #124 D2): once the overlay rebuilt the
+        run over its period, a refused table FELL THROUGH to the period's
+        promoted version, so it read as readable - all four tools ran against
+        last period's table and recorded 78 passes under the refused file's
+        run. Keith: a refused file records its file-check verdicts only."""
+        from conftest import clone_run_views
+        from fixture_ids import CP_REF_RUN_ID
+        from qa_tools.common import load_log
+
+        received = "2031-04-04T04:04:04+00:00"
+        key = supply_db.arrival_segment(received)
+        mine = f"{OWN}__{key}"
+        with supply_db.connect(label="test-own-table") as conn:
+            clone_run_views(conn, CP_REF_RUN_ID, mine)   # readable: it fell through
+            load_log.record("refused-through", "cp-case-workers", f"{OWN}__{key}",
+                            load_log.FAILED, received, reason="ragged row", conn=conn)
+        entry = {"run_id": mine, "run_index": 1, "received_at": received,
+                 "delivery": "refused-through", "files": {}}
+        results = orchestrate_cp._run_one(entry, received, "t@example.com",
+                                          reference_run_id=None)
+        assert results == [] and _recorded(mine) == {}
+
+
 class TestAContestedTableThatFellThroughIsReadable:
     """REAL DEFECT, found by REQ-PIPE-115 criterion 17's reconciliation on
     its first full bootstrap: a sibling with two versions staged for the

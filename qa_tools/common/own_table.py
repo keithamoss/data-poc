@@ -37,14 +37,16 @@ class UnreadableOwnTable(RuntimeError):
     """A run's own table is missing for no reason the pipeline knows."""
 
 
-def _refused(own_dataset: str | None, arrival_key: str | None) -> bool:
+def refused_at_load(own_dataset: str | None, arrival_key: str | None,
+                    conn=None) -> bool:
+    """Whether this arrival's file for `own_dataset` was refused at load."""
     if not own_dataset or not arrival_key:
         return False
     from qa_tools.common import load_log
 
     # EVERY CURRENT FAILURE, settled or not: a load a person has rejected
     # still could not be loaded, and its run is still not a failed run.
-    for record in load_log.latest_by_table().values():
+    for record in load_log.latest_by_table(conn=conn).values():
         if record.loaded or record.dataset_id != own_dataset:
             continue
         parts = supply_db.split_staged(record.physical)
@@ -59,7 +61,7 @@ def why_unreadable(conn, run_id: str, own_table: str, resolution, *,
     """HELD, CONTESTED or REFUSED where the run must not check its own
     table, None where it may.
 
-    CONTESTED WINS OVER A READABLE VIEW. A contested table can fall
+    CONTESTED AND REFUSED WIN OVER A READABLE VIEW. A contested table can fall
     through to the period's promoted version, so the view exists - but
     it is not this arrival's supply, and checking it would put a verdict
     about last quarter's data under this arrival's run (REQ-PIPE-079
@@ -69,10 +71,14 @@ def why_unreadable(conn, run_id: str, own_table: str, resolution, *,
         return HELD
     if own_table in resolution.ambiguous:
         return CONTESTED
+    # REFUSED WINS OVER A READABLE VIEW TOO, for the same reason (post-build-
+    # review #124 D2): the overlay lets a refused table fall through to the
+    # period's promoted version, and the tools then recorded 78 verdicts
+    # about last period's data under the refused file's run.
+    if refused_at_load(own_dataset, arrival_key, conn=conn):
+        return REFUSED
     if own_table in supply_db.readable_in(conn, run_id):
         return None
-    if _refused(own_dataset, arrival_key):
-        return REFUSED
     raise UnreadableOwnTable(
         f"{run_id}: its own table {own_table} cannot be read, and it is not held, "
         f"contested or refused at load - see its tables_read. A run that cannot "

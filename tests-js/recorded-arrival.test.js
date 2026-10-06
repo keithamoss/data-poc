@@ -77,6 +77,27 @@ describe("waitedChip", () => {
     expect(html).not.toContain("promoted " + "2026");
   });
 
+  it("on a past date, counts to that date - and a later promotion is still to come (#123 A4)", () => {
+    const win = load();
+    win.eval("CURRENT_IN_PLACE_ON = '2026-08-04'");
+    const html = win.waitedChip({
+      waitedSeconds: 20 * 86400, awaiting: false,
+      arrivedAt: "2026-08-01T09:00:00+08:00", filledAt: "2026-08-21T09:00:00+08:00",
+    });
+    expect(html).toContain("waiting 4d");   // 1 Aug 09:00 to the end of 4 Aug
+    expect(html).not.toContain("20d");
+  });
+
+  it("on a past date, an open wait counts to that date, not to today (#123 A4)", () => {
+    const win = load();
+    win.eval("CURRENT_IN_PLACE_ON = '2026-08-04'");
+    const html = win.waitedChip({
+      waitedSeconds: 60 * 86400, awaiting: true,
+      arrivedAt: "2026-08-01T09:00:00+08:00", filledAt: null,
+    });
+    expect(html).toContain("waiting 4d");   // 1 Aug 09:00 to the end of 4 Aug
+  });
+
   it("is empty rather than an empty chip where there is no wait", () => {
     const win = load();
     expect(win.waitedChip({ waitedSeconds: null, awaiting: false })).toBe("");

@@ -69,7 +69,7 @@ class TestAReferenceIsATrialsOnly:
         monkeypatch.setattr(common, "path_prompt",
                             lambda m, flag_hint: asked.append(m) or next(answers))
         monkeypatch.setattr(common, "decide_keep", lambda paths, keep: asked.append("keep?")
-                            or True)
+                            or common.Keep(True))
         monkeypatch.setattr(cp, "run_check_local_folder",
                             lambda folder, ref, run_by, **k: asked.append(("ran", ref))
                             or ([], None))

@@ -33,6 +33,14 @@ describe("the file attempt on show", () => {
     expect(w.fileAttemptInPlaceOn(fc, "2026-01-01")).toBe(null);
   });
 
+  it("the check's own history lists no file received after the date on show (#123 A4)", () => {
+    const w = withFileChecks(fc);
+    w.eval("CURRENT_IN_PLACE_ON = '2026-01-20'");
+    const html = w.fileCheckPanelBody(fc.checks[0]);
+    expect(html).toContain('data-file-attempt="1"');
+    expect(html).not.toContain('data-file-attempt="2"');
+  });
+
   it("compares receipt INSTANTS, not their text, across UTC offsets (#118 D-A)", () => {
     // 11:00 Perth stored +08:00, then 14:04 Perth stored +00:00, same day.
     const early = {...point(37, "2026-09-08", "green"), receivedAt: "2026-09-08T11:00:00+08:00"};

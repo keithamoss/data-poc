@@ -441,6 +441,19 @@ class TestAHoldLeavesTheQueueWhenItIsResolved:
         found = outstanding.survey(observations_dir=tmp_path)
         assert [i.kind for i in found.items] == ["held-supply"]
 
+    def test_it_is_observed_at_its_receipt_not_when_the_pass_ran(
+            self, tmp_path, clean_delivery_log):
+        """REAL DEFECT (post-build-review #123 A2): the item carried the
+        hold's `raised_at`, the replay's wall clock, so on any past as-of
+        date the page dropped every held supply from the queue while the
+        dataset row still said Held."""
+        with clean_delivery_log as conn:
+            _delivery(conn, "monday",
+                       contested=[{"dataset_id": "cp-clients", "files": ["a.csv"]}],
+                       files=[{"filename": "cp_clients.csv", "dataset_id": "cp-clients"}])
+        [item] = outstanding.survey(observations_dir=tmp_path).items
+        assert item.observed_at.startswith("2026-09-01")
+
     def test_a_resolved_one_is_not(self, tmp_path, clean_delivery_log):
         from qa_tools.common import decision_log as dl
         from qa_tools.common import supply_holds

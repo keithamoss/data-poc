@@ -4584,3 +4584,14 @@ Belongs with batch 5's check work.
     makes a test cheaper while it proves the same thing can just be made.
     QUEUED with #65's bootstrap speed work.
 
+    A FOURTH CATEGORY, Keith the same morning, after a docs-only gate
+    reported "190 passed": "how the hell do we have 190 tests just for our
+    documentation?" They are tests of the PROCESS TOOLING that checks this
+    project's own plans and requirements - the requirements validator 97
+    (for 343 lines: nearly one test per field rule, three per field in
+    places - required, empty string rejected, whitespace rejected), sprint
+    state 49, the plans parser 19, the plans index 11, requirements.yaml's
+    shape 10, `mothman plans` 4. None of it is the product. The review looks
+    at internal process tooling as a category of its own: table-driven tests
+    where one rule is tested many ways, and whether every rule earns its keep.
+

@@ -217,6 +217,32 @@ releases:
               red with the reason, instead of quietly missing from the
               results. CI also refuses a check Soda can't parse or one that
               would need Soda Cloud.
+          - headline: Production asks for its name once per keep
+            components: ["Testing & dev tooling"]
+            description: >
+              Keeping a supply in production asked you to type its name
+              twice. It now asks once, and a typo gets one more try before
+              the check runs as a trial instead.
+          - headline: A file refused at load is not checked and replaces nothing
+            components: ["Pipeline & publishing"]
+            description: >
+              A file that fails a file check now records those results and
+              nothing else. Before, the tools ran against last period's table
+              under its name, and it set aside a real supply that was still
+              waiting.
+          - headline: Past dates on the dashboard no longer show today
+            components: ["Dashboard UI"]
+            description: >
+              On an earlier date, held supplies stay in the waiting list,
+              waits count to that date, and a file check's history stops at
+              it. A superseded supply names its replacement by the time it
+              arrived, and the "results below" line no longer sits above an
+              empty page.
+          - headline: An unknown collection name gets a plain answer
+            components: ["Testing & dev tooling"]
+            description: >
+              The supply commands now name the known collections when you
+              mistype one, and take bdm and cp as pipeline run does.
 
   - date: "2026-10-05"
     summary: >

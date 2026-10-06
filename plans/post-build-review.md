@@ -6031,3 +6031,196 @@ twice. It deliberately did not re-find the `TypeError`.
       D6 -> keep the recognised files and name each one left behind; D13's
       backlog.unprocessed -> deleted; the trial finding -> REQ-PIPE-103 c6
       stands, so a trial's run and results are discarded.
+
+121. **[in-progress, 2026-10-06]** **[Dashboard UI]** **The dashboard visual
+    critic on a17d6e8** - the first visual pass since 2026-09-24, over the
+    supply history (REQ-DASH-126/127/133), the file-check section
+    (REQ-DASH-097), the Scenarios tab (REQ-GEN-135) and the cross-table rows.
+    Real Chromium, 1440 and 390 wide, light and dark, measured with
+    getComputedStyle. D1 and D6 checked against the template before being
+    written here.
+    - **D1, FIX AS POLISH**: the "Red promoted" badge uses `var(--red)`,
+      which is not a token (`--bad` is), so it renders ink-on-blue with no
+      red at all.
+    - **D2, FOR KEITH (Q2)**: the badge is one nowrap pill carrying a whole
+      sentence - 598px wide, wrapping Arrived to three lines, scrolling the
+      table 3.2x on mobile.
+    - **D3, FOR KEITH (Q1)**: supply-history cycle tables misalign (measured:
+      Outcome's left edge swings 499px between cycles) - road-testing #11
+      confirmed. The blocker table's Arrived also uses a different font.
+    - **D4, FIX AS POLISH**: blocker and gap rows show a pointer and hover
+      fill but do nothing; a dead Rows column and an empty unlabelled one.
+    - **D5, FOR KEITH (Q3)**: dark-mode status pills fail contrast - Red
+      2.61:1, Green 4.43:1, against 4.5:1. A different token from #49's
+      declined debt.
+    - **D6, FIX AS POLISH**: `.scope-check .label .ds` is an inline span, so
+      its margin does nothing and the tool id runs into the description
+      ("soda:row_countThe number of rows..."); 7px past the viewport on one
+      mobile page.
+    - **D7, FOR KEITH (Q4)**: the collection page's cross-table rows show only
+      the check name - nine "Client reference" rows, nothing to tell which
+      table pair or tool (road-testing #14 confirmed).
+    - **D8, FIX AS POLISH**: Scenarios link chips carry an inline
+      `font:inherit` that overrides `.pill.sm` - 15px, clipped up to 58px at
+      390 wide, 29px tap target.
+    - **D9, FIX AS POLISH**: an "In the data" pill on all 31 scenarios,
+      including the 23 with no data, drawn in the dashed "No data" style.
+    - **POLISH JUDGEMENTS**: a 2,708px queue notice above the agency cards;
+      spaced hyphens reading as hyphenated words; unbounded line lengths;
+      mixed table header styles; a held supply reading Red in one table and
+      Green/Waiting in the next.
+
+122. **[in-progress, 2026-10-06]** **[Pipeline & publishing]** **The delivery
+    critic on 96813c1 and a17d6e8** (the #120 answers and the twelve standing
+    answers, qa schema 31). 413 tests across 15 modules passed in its own
+    archive; every finding reproduced against copies of the deployment.
+    - **D1, FOR KEITH (Q5)**: during `env reset-synthetic`, another
+      connection's probe can read the newly created `qa.identity` under an
+      older snapshot and is refused "this database carries no recorded
+      identity - mark it" - fails closed and brief, but sends a person to
+      re-mark a marked database. Recommended: drop every qa table except
+      `identity` rather than the schema.
+    - **D2**: the reset rewrites `marked_at`. Fixed by D1's recommendation.
+    - **D3, FOR KEITH (Q6)**: `decision_log.follows()` can return an instant
+      after now (clock skew, or a future-dated decision). Recommended:
+      `min(now, ...)`, as effective_at_for already does. Latent.
+    - **D4, FOR KEITH (Q7)**: REQ-PIPE-081's decision says the lag cap changes
+      nothing live - wrong when a live pass catches up a backlog, since the
+      pass records every delivery first. Recommended: keep the behaviour,
+      correct the decision text.
+    - **D5**: a role that lost its grants after a reset is refused with an
+      identity message rather than a grants one. Wording; fails closed.
+    - **D6, FOR KEITH (Q8)**: supply_current_run's tie-break sorts run keys as
+      text (`__r10` before `__r9`). Latent - nothing makes load-caused
+      re-runs yet.
+    - **COVERAGE AND TRACEABILITY**: several new functions are missing from
+      their requirements' `implemented_by` (follows, next_receipt,
+      confirm_drop, decide_keep, reset, inherit_into); no test fails if the
+      `before=next_receipt(...)` argument is removed from the orchestrators;
+      two of this morning's tests assert a flag or source text only. FIX.
+    - **CODE QUALITY**: db_identity's docstring says qa_store's DDL creates
+      the table (it does not); `_KEEP_TYPED` is module state passed between
+      two functions. FIX.
+    - Verified sound: the reset keeps the identity under a failure inside its
+      transaction; no code still reads the old database settings; the header
+      rule refuses no real header in the 152 delivered files; the lag cap
+      never moves a promotion before its own receipt.
+
+123. **[in-progress, 2026-10-06]** **[Dashboard UI]** **The dashboard UX
+    critic on a17d6e8** - everything since #110. Real Chromium, desktop and
+    mobile, cross-checked against the record with `mothman supply`.
+    - **A1 (HIGH), against REQ-DASH-126 c1/c3**: on a date when the one red
+      promoted supply is in place but a newer one awaits a decision, the
+      dataset reads Green and "Red promoted" appears only in collapsed
+      history; the agency card never names the kind. FOR KEITH (Q9) on where
+      it surfaces.
+    - **A2 (HIGH), against REQ-DASH-133 c6/c9**: on any past date, held
+      supplies drop out of the queue and the agency count while the dataset
+      row still says Held - a hold's observed instant is the replay's wall
+      clock. Same family as #116 D1. A DEFECT.
+    - **A3 (MEDIUM-HIGH), against REQ-DASH-127 c1**: "Superseded by the
+      supply received <day>" cannot identify which, on a day with several
+      supplies. A DEFECT.
+    - **A4 (MEDIUM), against REQ-DASH-097 c4**: the as-of view leaks today -
+      a file's history lists later files; "waiting Nd" counts to today.
+    - **A5 (MEDIUM)**: "results below are the newest supply" sits above tiles
+      that all read No data - #110 H3's fix applied to one of its two causes.
+    - **B1 (HIGH), FOR KEITH (Q10)**: supply history still groups by the old
+      red-then-green resupply chain, now contradicting the slot model on the
+      same page.
+    - **B2 (HIGH), FOR KEITH (Q11)**: the dashboard's "waiting for a person"
+      leaves out the red supplies awaiting a decision that the terminal's
+      queue lists - about 20 in Child Protection.
+    - **B3, FOR KEITH (Q12)**: the headline count and the card counts use
+      different units.
+    - **B4, FOR KEITH (Q13)**: a scenario jump silently moves the whole
+      dashboard to a past date, and Back does not undo it.
+    - **B5-B9, POLISH**: queue items are dead ends; the Scenarios prose
+      disagrees with the data and shows reviewer notes; the Outcome column
+      clips on mobile; repetition and REQ ids in reader text; "Show all
+      history" not kept in the URL.
+    - **CLI SIDE-FIND**: `mothman supply queue --collection cp` dies with a
+      raw UnknownDatasetError traceback.
+    - Verified sound: SPA basics (titles, focus, real links, Back, cold
+      deep links); REQ-DASH-097's file-check section; REQ-DASH-133's gap
+      grouping; promotion-refused correctly kept off the page.
+
+124. **[in-progress, 2026-10-06]** **[Testing & dev tooling]** **The CLI UX
+    critic on sprints 13-14 and a17d6e8**, driving the real TUI in a pty
+    against sandbox-, production- and unmarked copies of the deployment.
+    - **D1 (HIGH), A DEFECT OF THIS MORNING'S #119 D10 FIX, confirmed in the
+      code**: production asks for the typed id TWICE on every keep.
+      decide_keep() is called again inside filing with keep=True, and resets
+      the "already typed" flag before filing reads it. The test written for
+      it asserted the flag alone and never drove the flow - the weak,
+      defensive kind of test plans/running-thoughts.md #67 is about.
+    - **D2 (HIGH), A DEFECT, FOR KEITH AND ANSWERED**: a file REFUSED at load
+      still had all four tools run - against the period's existing promoted
+      table - recording 78 passes under its run, and the unloadable file
+      SUPERSEDED a real waiting supply.
+    - **D3 (MEDIUM)**: the kept-run report says "promoted - every check passed
+      or warned" under a table showing two reference-gap reds.
+    - **D4-D8 (MEDIUM to LOW)**: the non-interactive fallback names a
+      `--keep` flag that does not exist; an empty fallback-trial reference
+      ends the whole TUI session; the production no-terminal refusal reads
+      "use the flag-based form... cannot be confirmed by a flag"; the
+      multi-arrival progress bar counts past its total (7/5); a repr in
+      discard-sample's error.
+    - **UX JUDGEMENTS**: the Check column shows only the shared
+      "data-asset-1.registry-services.civil-..." prefix at normal widths;
+      raw Python UserWarnings with source paths on every pass; a ticket
+      outage prints 590 lines; a kept folder names its left-behind files only
+      after the keep and into the spinner; an unplaceable file is refused only
+      after "originally received" is answered; the keep prompt still calls
+      the delivery log "this repository's"; an identity mismatch in the TUI is
+      titled "Unreachable"; the no-environment first screen gives no example;
+      `pipeline process` does not say what is red; times in UTC in one
+      refusal; REQ ids and design history in errors and help; a stale
+      ENGINE_TAG (dbt-duckdb); the publish offer only on the synthetic route.
+    - Works well: process discoverable and its exit codes stated; the
+      toolbar on every prompt; production confirmations for process and tidy;
+      env mark's refusals; keep before reference; recorded arrivals refused
+      naming --trial; the lifecycle report's wording.
+
+    **KEITH'S ANSWERS TO #121-#124, 2026-10-06** (13 + 4 questions):
+    supply history keeps resupply chains but NEVER ACROSS A PERIOD, with
+    aligned columns (over grouping per period); the dashboard's "waiting for a
+    person" INCLUDES red supplies awaiting a decision, grouped per dataset;
+    Red promoted surfaces in the dataset header and as a kind on the agency
+    card, a short pill with its sentence beneath; dark-mode red and green
+    lightened to clear 4.5:1; the cards count what the queue counts; a
+    scenario jump shows a "viewing <date> for <scenario> - back to today" bar
+    and Back undoes it; cross-table rows name their source table and tool;
+    the reset drops every qa table except identity; follows() never returns
+    a future instant; the live-backlog lag cap stays and REQ-PIPE-081's
+    decision is corrected; the current-run tie-break orders by run instant
+    before key, now; a REFUSED FILE records its file-check verdicts only, runs
+    no tool and supersedes nothing; a promotion past gap-reds names them;
+    terminal tables show `column.check`; a mistyped production id gets one
+    retry before becoming a trial. Defects and polish are fixed without
+    further sign-off; each defect with a failing test first.
+
+    **CHUNK A, THE DEFECTS - FIXED 2026-10-06**, each with a failing test
+    first:
+    - #124 D1: `decide_keep()` now returns a `Keep` decision carrying whether
+      the id was typed, and returns one passed back in unchanged, so the
+      filing step reads how the first decision was made instead of a module
+      flag the second call reset. The new tests drive the real filing step.
+      Keith's one-retry answer went in at the same time.
+    - #124 D2: `own_table.why_unreadable()` now answers REFUSED before asking
+      whether a view exists, as CONTESTED already did, so a refused table
+      that fell through to the period's promoted one no longer runs the
+      tools. `supersession.supersede_earlier()` returns nothing for a newer
+      supply refused at load. TS-12's deployment record still shows the old
+      behaviour until the next rebuild.
+    - #123 A2: a held supply's queue item is observed at its receipt, as
+      `dataset_blockers` already did, not at the pass's wall clock.
+    - #123 A3: "superseded by the supply received" names the receipt instant.
+    - #123 A4: on a past date a file check's history stops at that date, and
+      a wait counts to it (`waitedInPlaceOn()`); the default date keeps the
+      built figure.
+    - #123 A5: the verdict line is withheld where the date on show blanks
+      the tiles (`noDataInPlaceOn`), the cause #110 H3 missed.
+    - #123 CLI side-find: every `supply` command's `--collection` is
+      validated, naming the known collections, and takes bdm/cp as `pipeline
+      run` does.

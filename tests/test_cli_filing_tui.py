@@ -550,7 +550,7 @@ class TestProductionTypesItsIdIntoTheRealFlows:
         from cli import common
 
         monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
-        monkeypatch.setattr(common, "decide_keep", lambda paths, keep: True)
+        monkeypatch.setattr(common, "decide_keep", lambda paths, keep: common.Keep(True))
         monkeypatch.setattr(common, "require_tty", lambda hint: None)
         typed = []
         monkeypatch.setattr(common, "_ask_text", lambda m: typed.append(m) or "nope")

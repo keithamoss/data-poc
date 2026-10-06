@@ -352,3 +352,24 @@ class TestReadingTheDecisionLog:
     def test_an_unknown_dataset_is_refused_before_a_database_is_opened(self, logged):
         result = _run(["decisions", "--dataset", "not-a-dataset"])
         assert result.exit_code != 0
+
+
+class TestACollectionIsNamedOrRefusedInWords:
+    """REAL DEFECT (post-build-review #123, CLI side-find): `supply queue
+    --collection cp` died with a raw UnknownDatasetError traceback, though
+    `pipeline run` takes `cp` for the same collection."""
+
+    @pytest.mark.parametrize("command", ["queue", "slots", "superseded"])
+    def test_an_unknown_collection_is_a_usage_error(self, command):
+        result = CliRunner().invoke(supply_group, [command, "--collection", "nope"])
+        assert result.exit_code == 2, result.output
+        assert "child-protection" in result.output
+        assert not isinstance(result.exception, Exception) or isinstance(
+            result.exception, SystemExit)
+
+    def test_the_short_names_pipeline_run_takes_are_taken_here(self):
+        from cli import supply
+
+        assert supply._collection(None, None, "cp") == "child-protection"
+        assert supply._collection(None, None, "bdm") == "civil-registration"
+        assert supply._collection(None, None, None) is None

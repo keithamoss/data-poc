@@ -36,6 +36,14 @@ describe("a supply's outcome", () => {
     expect(html).not.toContain("pill");
   });
 
+  it("names the superseding supply by its receipt instant, not its day (#123 A3)", () => {
+    const w = withRaw(raw);
+    w.CURRENT_IN_PLACE_ON = "2026-02-20";
+    const newer = {...RUNS[1], arrivedAt: "2026-02-10T03:15:00+00:00"};
+    const html = w.outcomeCell("cp-carers", "r1", {r2: newer});
+    expect(html).toContain(w.fmtInstant(newer.arrivedAt));
+  });
+
   it("is rejected, not superseded, for a reject", () => {
     const w = withRaw({id: "x", runs: RUNS, runStates: {
       r1: [{at: "2026-01-20T01:00:00+00:00", state: "withdrawn", action: "reject", by: "person"}]}});
@@ -90,5 +98,19 @@ describe("a supply promoted while red", () => {
     const html = w.redPromotedBadge("x", "r1", "2026-02-01");
     expect(html).toContain("data-red-promoted");
     expect(html).toContain("promoted while red");
+  });
+});
+
+describe("the verdict line", () => {
+  // #123 A5: "the results below" over tiles that all read No data. #110 H3
+  // suppressed it for a blocked page; a stale date on show blanks them too.
+  const ds = {id: "x", verdictOf: {state: "awaiting"}, lastArrival: {arrivedAt: "2026-09-01T01:00:00+00:00"}};
+
+  it("speaks where there are results below", () => {
+    expect(loadDashboard().window.verdictLine(ds)).toContain("data-verdict-of");
+  });
+
+  it("is absent where the date on show blanks every result", () => {
+    expect(loadDashboard().window.verdictLine({...ds, noDataInPlaceOn: true})).toBe("");
   });
 });

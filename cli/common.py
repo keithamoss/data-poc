@@ -446,12 +446,38 @@ def describe_keep_choice(paths) -> str:
             f"nothing anywhere.")
 
 
-def decide_keep(paths, *, keep: bool | None) -> bool:
+class Keep:
+    """A keep-or-trial decision, and how it was made.
+
+    Truthy when the supply is kept, so every caller that only asks "kept?"
+    reads it as the bool it used to be. `typed` says the environment's id
+    was typed to make it (#119 D10), which is what lets filing skip asking
+    a second time - carried ON the decision rather than in module state,
+    because a second decide_keep() call inside filing used to reset that
+    state and production asked for the id twice (post-build-review #124 D1).
+    """
+
+    __slots__ = ("keep", "typed")
+
+    def __init__(self, keep: bool, *, typed: bool = False):
+        self.keep = bool(keep)
+        self.typed = bool(typed) and self.keep
+
+    def __bool__(self) -> bool:
+        return self.keep
+
+    def __repr__(self) -> str:
+        return f"Keep({self.keep}, typed={self.typed})"
+
+
+def decide_keep(paths, *, keep) -> Keep:
     """Keep this supply, or run it as a trial?
 
     `keep` IS THE FLAG'S ANSWER and stops the prompt entirely rather
     than pre-filling it (criterion 3) - the same shape `confirm(yes=)`
-    already uses, so a scripted caller never needs a terminal.
+    already uses, so a scripted caller never needs a terminal. A Keep
+    passed back in is returned unchanged, so deciding twice never loses
+    how the first decision was made.
 
     A TRIAL IS THE NON-INTERACTIVE DEFAULT. With no flag and no
     terminal there is nobody to ask, and the two wrong answers are not
@@ -459,16 +485,16 @@ def decide_keep(paths, *, keep: bool | None) -> bool:
     and a delivery filed on somebody's behalf is a public record of an
     arrival they did not agree to.
     """
-    global _KEEP_TYPED
-    _KEEP_TYPED = False
-    if keep is not None:
+    if isinstance(keep, Keep):
         return keep
+    if keep is not None:
+        return Keep(keep)
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         console.print(
             "Not a real terminal and no --keep/--trial given - running as a TRIAL, "
             "which records nothing. Pass --commit to file this supply as a delivery.",
             style="yellow")
-        return False
+        return Keep(False)
     console.print(describe_keep_choice(paths))
     from qa_tools.common import environments
 
@@ -477,26 +503,25 @@ def decide_keep(paths, *, keep: bool | None) -> bool:
         # THE TYPED ID IS THE DECISION (Keith, 2026-10-06, post-build-review
         # #119 D10): where the environment confirms changes, typing its id is
         # keeping the supply, in place of a y/N followed by the id. Anything
-        # else is a trial, as "no" was. Filing then does not ask again.
-        typed = (_ask_text(f"Keep this check as a real delivery in the {env.label} "
-                           f"database? Type {env.id} to keep it - anything else runs it "
-                           f"as a trial:") or "").strip()
-        if typed != env.id:
-            console.print(f"Not {env.id!r} - running it as a TRIAL, which records "
-                          f"nothing.", style="yellow")
-            return False
-        _KEEP_TYPED = True
-        return True
-    return confirm("Keep this check?", yes=False, default=False)
-
-
-#: Whether the last keep decision was made by typing the environment's id
-#: (#119 D10) - so the filing that follows does not ask for it a second time.
-_KEEP_TYPED = False
-
-
-def keep_was_typed() -> bool:
-    return _KEEP_TYPED
+        # else is a trial, as "no" was - after ONE retry (#124, Keith's
+        # answer), since a typo is likelier than a change of mind. Filing
+        # then does not ask again.
+        prompt = (f"Keep this check as a real delivery in the {env.label} "
+                  f"database? Type {env.id} to keep it - anything else runs it "
+                  f"as a trial:")
+        for attempt in (1, 2):
+            typed = (_ask_text(prompt) or "").strip()
+            if typed == env.id:
+                return Keep(True, typed=True)
+            if attempt == 1 and typed:
+                console.print(f"Not {env.id!r} - type it again to keep, or anything "
+                              f"else for a trial.", style="yellow")
+                continue
+            break
+        console.print(f"Not {env.id!r} - running it as a TRIAL, which records "
+                      f"nothing.", style="yellow")
+        return Keep(False)
+    return Keep(confirm("Keep this check?", yes=False, default=False))
 
 
 
@@ -639,7 +664,8 @@ def file_or_trial(paths, collection_id: str, run_id_prefix: str,
 
 def _file_or_trial(paths, collection_id, run_id_prefix, *, keep, route, originally,
                    storage_times) -> hand_filing.Filed:
-    if not decide_keep(paths, keep=keep):
+    keep = decide_keep(paths, keep=keep)
+    if not keep:
         return _as_trial(paths)
     # ANOTHER COLLECTION'S FILE IS REFUSED FIRST (REQ-PIPE-086 criterion 5) -
     # before the typed id or any question about it, and with no trial on
@@ -652,7 +678,7 @@ def _file_or_trial(paths, collection_id, run_id_prefix, *, keep, route, original
     # (REQ-PIPE-093 criterion 4): --commit decides to keep it, and is not
     # allowed to be the confirmation too (criterion 6). yes=True because
     # everywhere else keeping was already confirmed above.
-    if not keep_was_typed() and not confirm_change("File this supply as a real delivery?",
+    if not keep.typed and not confirm_change("File this supply as a real delivery?",
                                                     yes=True):
         raise click.ClickException("not filed - the environment's id was not typed.")
     # WHO, AND WHEN IT WAS ORIGINALLY RECEIVED - both settled before

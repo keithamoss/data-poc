@@ -169,7 +169,17 @@ def supersede_earlier(conn, *, agency_id: str, collection_id: str, dataset_id: s
     """Supersede every earlier unaccepted version of this table in `period`
     by `newer`. Returns the supplies superseded. Each is its own decision
     with the rule as actor, its tables moved in the same transaction
-    (criterion 10); the caller wraps this with the filing."""
+    (criterion 10); the caller wraps this with the filing.
+
+    A FILE REFUSED AT LOAD SUPERSEDES NOTHING (Keith, 2026-10-06, post-
+    build-review #124 D2): it has no table to check, so setting a real
+    waiting version aside for it left the period with nothing checkable.
+    """
+    from qa_tools.common import own_table
+
+    key = newer.split("@", 1)[-1].split("#", 1)[0]
+    if own_table.refused_at_load(dataset_id, key, conn=conn):
+        return []
     done = []
     for supply in earlier_unaccepted(conn, dataset_id, period, newer):
         supersede_by_rule(conn, agency_id=agency_id, collection_id=collection_id,

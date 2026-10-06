@@ -513,7 +513,7 @@ def test_run_check_s3_downloads_both_keys_then_delegates_to_local_file_mode(monk
     # THE ANSWER IS WHAT TRAVELS DOWN, not a run id (REQ-PIPE-103) -
     # S3 mode is still "download, then Local files mode", and the
     # thing it must forward unchanged is the operator's decision.
-    assert captured["keep"] is False
+    assert not captured["keep"]   # a Keep decision, carried whole
     assert results == [{"status": "pass"}]
     assert tmp_dir == "/tmp/fake-results"
     assert filed.delivery_name == ""

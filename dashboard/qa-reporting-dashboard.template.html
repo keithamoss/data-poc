@@ -1397,7 +1397,24 @@ function filedNote(e){
 function receivedTitle(e){
   return e && e.filedBy && e.filedBy.kind === "automated" ? "Received automatically" : "When we received this supply";
 }
+// THE WAIT AS IT STOOD ON THE DATE ON SHOW (#123 A4). The build measures it
+// once, against its own today, so on a past date a supply promoted later read
+// as already decided and an open wait counted to today. On the default date
+// the built figure stands.
+function waitedInPlaceOn(e){
+  const built = {seconds: e.waitedSeconds, awaiting: e.awaiting};
+  if(typeof CURRENT_IN_PLACE_ON === "undefined" || !CURRENT_IN_PLACE_ON || !e.arrivedAt) return built;
+  const end = assetEndOfDay(CURRENT_IN_PLACE_ON);
+  if(!(end < new Date())) return built;
+  const arrived = Date.parse(e.arrivedAt), filled = e.filledAt ? Date.parse(e.filledAt) : null;
+  if(!(arrived <= end.getTime())) return built;
+  if(filled !== null && filled <= end.getTime()) return built;
+  if(filled === null && !e.awaiting) return built;
+  return {seconds: (end.getTime() - arrived) / 1000, awaiting: true};
+}
 function waitedChip(e){
+  const w = waitedInPlaceOn(e);
+  e = {...e, waitedSeconds: w.seconds, awaiting: w.awaiting};
   const text = fmtWaited(e.waitedSeconds, e.awaiting);
   if (!text) return "";
   return `<span class="mono" title="${waitedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;${e.awaiting ? "font-style:italic;" : ""}">${text}</span>`;
@@ -3913,7 +3930,11 @@ function fileCheckPanelBody(check){
   const failureIndicates =
     String(check.failure_indicates || "").trim().toLowerCase() === "self-evident"
       ? "" : check.failure_indicates;
-  const rows = (check.history||[]).slice().reverse().map(h=> `
+  // NOTHING RECEIVED AFTER THE DATE ON SHOW (#123 A4) - the same rule
+  // fileAttemptInPlaceOn() applies to the section.
+  const on = typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null;
+  const rows = (check.history||[]).filter(h=> !on || !h.run_date || h.run_date <= on)
+    .slice().reverse().map(h=> `
     <tr data-file-attempt="${h.attempt}"><td class="mono">${escHtml(fmtInstant(h.receivedAt))}</td>
       <td class="mono">${escHtml(h.filename||"")}</td><td>${pill(h.status,"sm")}</td>
       <td>${escHtml(h.finding||"")}</td></tr>`).join("");
@@ -4386,7 +4407,8 @@ function verdictLine(ds){
   const v = ds && ds.verdictOf;
   // NOT ON A BLANKED PAGE (UX critic on 8a942e7, H3): there are no
   // results below to be about, and the banner says so.
-  if(!v || !ds.lastArrival || ds.blocked) return "";
+  // NOR WHERE THE DATE ON SHOW BLANKS THEM (#123 A5) - the other cause.
+  if(!v || !ds.lastArrival || ds.blocked || ds.noDataInPlaceOn) return "";
   if(v.state === "promoted"){
     return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place, received ${fmtInstant(ds.lastArrival.arrivedAt)}. ${redPromotedBadge(ds.id, v.inPlaceRunId)}</div>`;
   }
@@ -4963,7 +4985,9 @@ function outcomeCell(datasetId, runId, runsById){
   if(o.kind === "superseded"){
     const e = o.entry;
     const newer = e.supersededByRun && runsById[e.supersededByRun];
-    const naming = newer ? ` by the supply received ${fmtDay(newer.run_date)}` : "";
+    // THE RECEIPT INSTANT, not its day (#123 A3): a day can hold several
+    // supplies, and "the supply received 12 Feb" could not say which.
+    const naming = newer ? ` by the supply received ${newer.arrivedAt ? fmtInstant(newer.arrivedAt) : fmtDay(newer.run_date)}` : "";
     // INFORMATIONAL, NO PROMINENCE ABOVE AN ORDINARY ENTRY (REQ-PIPE-123
     // criterion 6): a replacement the deployment opted into is normal.
     const setting = e.setting ? ` under the replacement setting '${escHtml(e.setting)}'` : "";

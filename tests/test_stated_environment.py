@@ -275,28 +275,70 @@ class TestInProductionTheTypedIdIsTheKeepDecision:
         from cli import common
 
         self._answer(monkeypatch, production_terminal, environments.current().id)
-        assert common.decide_keep(["/x/a.csv"], keep=None) is True
+        assert bool(common.decide_keep(["/x/a.csv"], keep=None)) is True
         assert len(production_terminal) == 1
 
     def test_anything_else_runs_a_trial(self, production_terminal, monkeypatch):
         from cli import common
 
         self._answer(monkeypatch, production_terminal, "")
-        assert common.decide_keep(["/x/a.csv"], keep=None) is False
+        assert bool(common.decide_keep(["/x/a.csv"], keep=None)) is False
+        assert len(production_terminal) == 1, "a blank answer is a no, not a typo"
+
+    def test_a_mistyped_id_gets_one_retry(self, production_terminal, monkeypatch):
+        """#124 (Keith's answer): a typo is likelier than a change of mind."""
+        from cli import common
+
+        answers = iter(["prodution", environments.current().id])
+        monkeypatch.setattr(common, "_ask_text",
+                            lambda m: production_terminal.append(m) or next(answers))
+        assert common.decide_keep(["/x/a.csv"], keep=None)
+        assert len(production_terminal) == 2
+
+    def test_two_mistypes_run_a_trial(self, production_terminal, monkeypatch):
+        from cli import common
+
+        self._answer(monkeypatch, production_terminal, "prodution")
+        assert not common.decide_keep(["/x/a.csv"], keep=None)
+        assert len(production_terminal) == 2
+
+    def _through_filing(self, monkeypatch, keep):
+        """Drive the real filing step after a keep decision, as every
+        terminal route does - the check the first test of this lacked
+        (post-build-review #124 D1: it asserted a flag and never drove the
+        flow, and production asked for the id twice)."""
+        from types import SimpleNamespace
+
+        from cli import common
+        from qa_tools.common import git_identity, hand_filing
+
+        asked = []
+        monkeypatch.setattr(common, "confirm_change",
+                            lambda *a, **k: asked.append("typed id again") or True)
+        monkeypatch.setattr(hand_filing, "check_collection", lambda paths, c: None)
+        monkeypatch.setattr(git_identity, "get_run_by", lambda: "k@x")
+        monkeypatch.setattr(hand_filing, "resolve_original", lambda *a, **k: None)
+        monkeypatch.setattr(hand_filing, "file_supply", lambda *a, **k: SimpleNamespace(
+            delivery_name="d", run_id="r"))
+        monkeypatch.setattr(common, "describe_original", lambda *a: "")
+        common.file_or_trial(["/x/a.csv"], "civil-registration", "run_", keep=keep,
+                             route="file", originally="not-known")
+        return asked
 
     def test_once_typed_filing_does_not_ask_again(self, production_terminal, monkeypatch):
         from cli import common
 
         self._answer(monkeypatch, production_terminal, environments.current().id)
-        assert common.decide_keep(["/x/a.csv"], keep=None) is True
-        monkeypatch.setattr(common, "confirm_change",
-                            lambda *a, **k: pytest.fail("asked for the id twice"))
-        assert common.keep_was_typed() is True
+        keep = common.decide_keep(["/x/a.csv"], keep=None)
+        assert keep
+        assert self._through_filing(monkeypatch, keep) == []
+        assert len(production_terminal) == 1, "the id is typed once per flow"
 
     def test_a_flag_is_still_not_the_confirmation(self, production_terminal, monkeypatch):
         """REQ-PIPE-093 criterion 6: --commit decides to keep and is not
         allowed to be the confirmation too, so filing still asks."""
         from cli import common
 
-        assert common.decide_keep(["/x/a.csv"], keep=True) is True
-        assert common.keep_was_typed() is False
+        keep = common.decide_keep(["/x/a.csv"], keep=True)
+        assert keep
+        assert self._through_filing(monkeypatch, keep) == ["typed id again"]

@@ -115,6 +115,19 @@ class TestWhatIsNotSuperseded:
         new, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
         assert _supersede(conn, period, new) == []
 
+    def test_a_file_refused_at_load_supersedes_nothing(self, conn, period):
+        """REAL DEFECT (post-build-review #124 D2): an unloadable file
+        superseded a real waiting supply, leaving the period with nothing
+        checkable. Keith: a refused file supersedes nothing."""
+        from qa_tools.common import load_log
+
+        old, old_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        new, new_table = _filed(conn, period, "2026-05-02T01:00:00+00:00", staged=False)
+        load_log.record("pytest-refused", DS, new_table, load_log.FAILED,
+                        "2026-05-02T01:00:00+00:00", reason="ragged row", conn=conn)
+        assert _supersede(conn, period, new) == []
+        assert _schema_of(conn, old_table) == [supply_db.STAGING_SCHEMA]
+
     def test_one_a_person_demoted_is_superseded_like_any_other(self, conn, period):
         """Decision 13: a supply a person returned is unaccepted too."""
         from qa_tools.common import rejection

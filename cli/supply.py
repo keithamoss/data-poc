@@ -54,6 +54,25 @@ from qa_tools.common import arrivals, delivery, filing_decisions, hierarchy
 console = Console()
 
 
+#: The short names `mothman pipeline run --collection` takes, accepted here
+#: too so one collection is not spelled two ways across the CLI.
+_SHORT_COLLECTION = {"bdm": "civil-registration", "cp": "child-protection"}
+
+
+def _collection(ctx, param, value):
+    """A --collection value, as a collection id - or a usage error naming the
+    known ones (#123 CLI side-find: an unknown name died in a traceback)."""
+    if value is None:
+        return None
+    value = _SHORT_COLLECTION.get(value, value)
+    known = sorted({d.collection_id for d in hierarchy.all_datasets()})
+    if value not in known:
+        raise click.BadParameter(
+            f"{value!r} is not a collection. Known: {', '.join(known)} "
+            f"(or bdm, cp).", ctx=ctx, param=param)
+    return value
+
+
 @click.group("supply")
 def supply_group() -> None:
     """Deliveries - what arrived, and what could not be placed."""
@@ -303,7 +322,7 @@ def log_command(as_sql: bool) -> None:
 
 
 @supply_group.command("load")
-@click.option("--collection", "collection_id", default=None,
+@click.option("--collection", "collection_id", callback=_collection, default=None,
                help="One collection only. Both are staged when this is left out.")
 def load_command(collection_id: str | None) -> None:
     """Stage every recognised delivery into the supply database.
@@ -778,7 +797,7 @@ def grant_publisher_command(role: str, password: str | None) -> None:
 # ---------------------------------------------------------------------------
 
 @supply_group.command("queue")
-@click.option("--collection", "collection_id", required=True,
+@click.option("--collection", "collection_id", callback=_collection, required=True,
                help="Which collection's queue to show.")
 def queue_command(collection_id: str) -> None:
     """Supplies waiting on a person (REQ-GHUB-082 criterion 16).
@@ -831,7 +850,7 @@ def _say_owed(owed_now: list) -> None:
 
 
 @supply_group.command("slots")
-@click.option("--collection", "collection_id", required=True,
+@click.option("--collection", "collection_id", callback=_collection, required=True,
                help="Which collection's periods to show.")
 @click.option("--dataset", "dataset_id", default=None,
                help="Narrow to one dataset.")
@@ -849,7 +868,7 @@ def slots_command(collection_id: str, dataset_id: str | None) -> None:
 
 
 @supply_group.command("amber-setting")
-@click.option("--collection", "collection_id", default=None,
+@click.option("--collection", "collection_id", callback=_collection, default=None,
                help="Narrow to one collection.")
 def amber_setting_command(collection_id: str | None) -> None:
     """The amber setting in force for each dataset, and where it was set
@@ -871,7 +890,7 @@ def amber_setting_command(collection_id: str | None) -> None:
 
 
 @supply_group.command("superseded")
-@click.option("--collection", "collection_id", required=True,
+@click.option("--collection", "collection_id", callback=_collection, required=True,
                help="Which collection's superseded supplies to list.")
 @click.option("--dataset", "dataset_id", default=None, help="Narrow to one dataset.")
 @click.option("--period", default=None, help="Narrow to one period.")

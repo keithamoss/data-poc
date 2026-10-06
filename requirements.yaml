@@ -25524,6 +25524,7 @@ requirements:
       a left-out check nothing unreadable explains gets no record, so the reconciliation
       still catches it. Reproduced and fixed: the same six-file trial with an
       unparseable cp_carers.csv now records 27 not evaluated and runs all 184.'
+    - 'REFUSED WINS OVER A READABLE VIEW, AS CONTESTED DOES (Keith, 2026-10-06, post-build-review #124 D2). The period overlay lets a refused table fall through to the period''s promoted version, so the run looked readable and all four tools recorded 78 verdicts about last period''s data under the refused file''s run. why_unreadable() now asks about a refused load before asking whether a view exists. A refused file records its file-check verdicts and nothing else.'
     open_questions: []
   - id: REQ-TEST-116
     title: A bootstrap does in parallel what does not depend on order, and produces the same history either way
@@ -25880,6 +25881,7 @@ requirements:
         criterion 17 added; post-build-review #109 F8). REJECTED: demote and then
         supersede the demoted supply (my recommendation); allowing two versions
         to wait, which made every sibling run read the table as contested.'
+      - 'A FILE REFUSED AT LOAD SUPERSEDES NOTHING (Keith, 2026-10-06, post-build-review #124 D2). It has no table to check, and it was setting aside a real supply that was still waiting, which left the period with nothing checkable. supersede_earlier() returns nothing for a newer supply whose own load was refused. REJECTED: undo the supersession once the refusal is known, which would mean writing two entries to an append-only log for something that should never have happened.'
     open_questions: []
 
   - id: REQ-PIPE-120

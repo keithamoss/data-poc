@@ -421,7 +421,7 @@ def test_run_check_s3_delivery_downloads_both_prefixes_then_delegates_to_local_f
     # THE ANSWER IS WHAT TRAVELS DOWN, not a run id (REQ-PIPE-103) -
     # this mode is still "download, then Local files mode", and what
     # it must forward unchanged is the operator's decision.
-    assert captured["keep"] is False
+    assert not captured["keep"]   # a Keep decision, carried whole
     assert results == [{"status": "pass"}]
 
 
