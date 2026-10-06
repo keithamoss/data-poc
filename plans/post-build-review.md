@@ -6585,3 +6585,76 @@ twice. It deliberately did not re-find the `TypeError`.
     `TestTheNextReceiptIsKnownInAReplay`. THE LESSON is the existing test's:
     it replaced `next_receipt` with a stub, so it proved the call site and
     never what the function would see.
+
+131. **[in-progress, 2026-10-07]** **[Pipeline & publishing]** **The delivery
+    critic on five builds of 2026-10-06** - REQ-PIPE-157 (the dbt worker),
+    REQ-TEST-159/160 (checkpoint and resume), REQ-PIPE-152 (the S3 handlers),
+    REQ-PIPE-154/REQ-DASH-155 (held after the schedule ends) and 15edf01 (a
+    Soda check that cannot run is red). Scope chosen by Keith, 2026-10-07:
+    everything else built that day was left out on purpose (pure-speed work
+    proven by the whole-bootstrap comparison, single-criterion amendments,
+    the CI cache). Findings 1, 2 and 6 were re-checked against the code by
+    the main session before being written here; the rest are as the critic
+    reported them, marked "read" where it did not run anything.
+    - **D1 (HIGH), CONFIRMED - a defect against REQ-TEST-160's fail-safe NFR
+      and REQ-TEST-159 criterion 3.** `replay_inputs.deliveries_print` has
+      one entry PER FILE, and `first_affected` returns that index as an
+      ARRIVAL number. An arrival can hold several files for one dataset (the
+      contested case, `arrivals.py:316`), so every arrival after one is
+      reported later than it is, and a resume can then start too late and
+      keep a stale verdict - the one direction the NFR forbids. The reason
+      text is wrong too: a changed file reads "removed". Latent today (no
+      multi-file arrival in either collection), and live the first time a
+      contested pair arrives.
+    - **D2 (MEDIUM-HIGH), CONFIRMED - REQ-PIPE-152's reliability NFR.**
+      `s3_arrival.handle_event` passes the event's key to `head_object`
+      raw, and S3 event notifications URL-encode keys - so any file name
+      with a space or bracket fails on every retry. And one object that
+      raises stops the rest of the event, so its siblings are never
+      recorded either.
+    - **D3 (MEDIUM), read - REQ-PIPE-152 criteria 12 and 13.** Criterion 13
+      leans on "the scheduled pass remains the backstop", and `aws/` has no
+      schedule, retry configuration or dead-letter queue. Several CP files
+      landing together start parallel invocations that mostly meet
+      `PassLockHeld`; their default retries can run out while one pass
+      holds the lock. The time budget is checked inside the staging and
+      arrival loops only - `materialise`, `refile_covered` and the owed
+      re-checks run outside it. FOR KEITH: whether the scheduled backstop
+      is in scope now.
+    - **D4 (MEDIUM), read - REQ-PIPE-157 criterion 2.** The worker's schemas
+      are named by PID alone, and PIDs repeat across containers; two such
+      processes on one database can empty each other's schemas mid-build.
+      Also two leaks in `dbt_worker.py`: a worker that died idle is replaced
+      without `stop()`, and `_start` catches only `OSError`.
+    - **D5 (MEDIUM-LOW), read - REQ-TEST-159 criterion 7 and the clutter
+      NFR.** Resume databases are never listed or pruned; `delete()` drops a
+      resume database with no confirmation even when it is the one a person
+      was told to point `MOTHMAN_SUPPLY_DSN` at; a resume that fails after
+      the copy leaves its database behind unnamed.
+    - **D6 (LOW, a false-green path), CONFIRMED and latent.**
+      `run_soda_cp.py:178` drops an unreported check whose `checks for` key
+      is not a bare table name, which excludes Soda's partition syntax
+      (`checks for t [recent]`, used by BDM today, not yet by CP); and
+      `unreported_checks` skips a check with no `check_id`, which nothing
+      at config time refuses.
+    - **D7 (LOW), read - REQ-PIPE-154 criterion 7.** `refile_covered` runs
+      after the arrival loop, so a newer supply in the same pass is filed
+      before an older held one.
+    - **D8 (LOW), read - REQ-DASH-155's performance NFR.** One query per
+      dataset where the NFR asks for one aggregate in `tally()`'s shape.
+    - **D9 (LOW), read.** `require_synthetic` tests truthiness where its
+      siblings require `is True`; and the pass lock's pause around a
+      checkpoint copy lets another pass start in the window.
+    - **D10 (polish), wording.** The schedule-ended notice says "cannot be
+      processed", while REQ-PIPE-154 criterion 5 says those supplies are
+      still staged and file-checked.
+    Found sound, and worth keeping on record: dbt re-reads the environment
+    on every invoke (so swapping it per request carries nothing across);
+    the partial-parse file never holds the password; checkpoint `delete()`
+    and `prune()` cannot reach a non-checkpoint or another source's
+    database; a resume writes only to its own copy; a retried S3 event
+    records nothing twice; a not-evaluated Soda result is red and escaped.
+    NOT VERIFIED by the critic: REQ-PIPE-157's equivalence and ten-minute
+    target (both measured at build time), and anything against real AWS.
+    TO FIX in one batch once the two UX critics running alongside it have
+    reported, failing test first for each defect.
