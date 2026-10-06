@@ -34,7 +34,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
+from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 ENVIRONMENTS_PATH = ROOT / "contract" / "environments.yaml"
@@ -69,7 +69,7 @@ def _load(path: Path | str | None = None) -> list[Environment]:
     path = Path(path or ENVIRONMENTS_PATH)
     if not path.exists():
         raise EnvironmentError_(f"no environments declared - {path} does not exist")
-    raw = yaml.safe_load(path.read_text()) or {}
+    raw = config_yaml.parse(path.read_text()) or {}
     declared = raw.get("environments")
     if not declared:
         raise EnvironmentError_(f"{path} declares no environments")
@@ -155,7 +155,7 @@ def ticket_repository() -> str | None:
     happens to run in."""
     from qa_tools.common.hierarchy import DATA_ASSET_YAML
 
-    doc = yaml.safe_load(Path(DATA_ASSET_YAML).read_text()) or {}
+    doc = config_yaml.parse(Path(DATA_ASSET_YAML).read_text()) or {}
     repo = str(doc.get("ticket_repository") or "").strip()
     return repo or None
 

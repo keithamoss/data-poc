@@ -173,13 +173,18 @@ def open_slot(slots: Sequence[slots_mod.Slot], at: datetime) -> slots_mod.Slot |
 
 
 def schedule_ended(slots: Sequence[slots_mod.Slot], at: datetime,
-                   opened: int | None = None) -> bool:
+                   opened: int | None = None, *, final_period: str | None = None) -> bool:
     """Has this dataset's schedule run out by `at` (REQ-PIPE-154)? True
     once the LAST slot has closed - every slot's window has opened and the
     newest is closed - which REQ-PIPE-131 criterion 16 makes possible for an
     authored calendar. A last slot that never closes (a calendar of one
     date) never ends; a gap between two slots is not an end."""
-    if not slots:
+    if not slots or final_period is None or slots[-1].name != final_period:
+        # ONLY THE CALENDAR'S REAL LAST PERIOD ENDS IT (defect, 2026-10-06):
+        # the slots handed in stop at the arrival's claim horizon, so for a
+        # dataset that skips quarters the last one listed is often not the
+        # last one there is - two 2023 Case Workers supplies were labelled
+        # schedule-ended with a 2027 calendar ahead of them.
         return False
     if (opened if opened is not None else _opened_by(slots, at)) < len(slots):
         return False
@@ -188,12 +193,16 @@ def schedule_ended(slots: Sequence[slots_mod.Slot], at: datetime,
 
 def assign(dataset_id: str, supply_id: str, at: datetime,
             slots: Sequence[slots_mod.Slot],
-            filled: frozenset[str]) -> Assignment:
+            filled: frozenset[str], *, final_period: str | None = None) -> Assignment:
     """File one supply, by rule, with no human in it.
 
     `at` is the RECEIPT instant, never when the supply is processed
     (REQ-PIPE-131 criterion 5): a file received inside a slot's open
     interval and processed after it closed is that slot's.
+
+    `final_period` is the dataset's LAST AUTHORED PERIOD, or None for a
+    calendar that never runs out - the only thing that can make a hold
+    schedule-ended (REQ-PIPE-154), since `slots` may stop well short of it.
 
     `filled` is the set of slot names a supply has been PROMOTED into -
     never staged, never merely arrived, never rejected.
@@ -206,7 +215,7 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
     if found is None:
         considered = current_slot(slots, at)
         index = _opened_by(slots, at)
-        ended = schedule_ended(slots, at, opened=index)
+        ended = schedule_ended(slots, at, opened=index, final_period=final_period)
         return Assignment(
             dataset_id=dataset_id, supply_id=supply_id, received_at=at, slot=None,
             branch=HELD, considered=(considered.name,) if considered else (),

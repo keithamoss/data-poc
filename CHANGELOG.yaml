@@ -140,6 +140,13 @@ releases:
               what recognition would make of each file.
       - category: Improved
         items:
+          - headline: Rebuilding the history is much faster
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              Configuration files are now read once per run rather than
+              thousands of times, using the faster C parser. A test replay of
+              twelve Child Protection arrivals dropped from about three minutes
+              to under two.
           - headline: A supply after its schedule ends says what to fix
             components: ["Pipeline & publishing"]
             description: >

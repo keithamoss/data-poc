@@ -27,26 +27,26 @@ AFTER = datetime(2030, 3, 1, tzinfo=UTC)
 class TestTheRuleKnowsTheScheduleEnded:
 
     def test_after_the_last_slot_closes_it_is_held_as_schedule_ended(self):
-        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, SLOTS, frozenset())
+        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, SLOTS, frozenset(), final_period="2027-Q4")
         assert decided.is_held
         assert decided.schedule_ended
         assert decided.last_period == "2027-Q4"
 
     def test_the_reason_never_claims_a_next_period_opened(self):
         """Criterion 4: an exhausted calendar has no next period."""
-        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, SLOTS, frozenset())
+        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, SLOTS, frozenset(), final_period="2027-Q4")
         said = " ".join(why for _, why in decided.unavailable)
         assert "next period's claim window" not in said
         assert "2027-Q4" in [name for name, _ in decided.unavailable]
 
     def test_a_gap_inside_the_calendar_is_not_schedule_ended(self):
         early = datetime(2027, 6, 1, tzinfo=UTC)
-        decided = assignment.assign("cp-carers", "cp-carers@x", early, SLOTS, frozenset())
+        decided = assignment.assign("cp-carers", "cp-carers@x", early, SLOTS, frozenset(), final_period="2027-Q4")
         assert decided.is_held and not decided.schedule_ended
 
     def test_a_last_slot_that_never_closes_is_never_ended(self):
         one = [_slot("2027-Q4", datetime(2027, 10, 1, tzinfo=UTC), None)]
-        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, one, frozenset())
+        decided = assignment.assign("cp-carers", "cp-carers@x", AFTER, one, frozenset(), final_period="2027-Q4")
         assert not decided.is_held and not decided.schedule_ended
 
 
@@ -61,7 +61,7 @@ def conn(supply_dsn):
 class TestTheHoldSaysWhatToEdit:
 
     def _held(self, conn, supply="cp-carers@20300301"):
-        decided = assignment.assign("cp-carers", supply, AFTER, SLOTS, frozenset())
+        decided = assignment.assign("cp-carers", supply, AFTER, SLOTS, frozenset(), final_period="2027-Q4")
         supply_holds.raise_hold(conn, dataset_id="cp-carers", supply_id=supply,
                                 kind=supply_holds.ASSIGNMENT_RULE,
                                 reason=supply_holds.reason_for(decided),
@@ -98,7 +98,7 @@ class TestAddingDatesFilesWhatWasHeld:
 
     def _held(self, conn, supply, at):
         import filing_support
-        decided = assignment.assign("cp-carers", supply, at, SLOTS, frozenset())
+        decided = assignment.assign("cp-carers", supply, at, SLOTS, frozenset(), final_period="2027-Q4")
         assert decided.schedule_ended
         filing_support.file(decided)
         supply_holds.raise_hold(conn, dataset_id="cp-carers", supply_id=supply,
@@ -166,7 +166,7 @@ class TestThePassSaysSo:
 
         for supply, run in (("cp-carers@e1", "run_a"), ("cp-carers@e2", "run_b"),
                             ("cp-carers@e3", "run_old")):
-            decided = assignment.assign("cp-carers", supply, AFTER, SLOTS, frozenset())
+            decided = assignment.assign("cp-carers", supply, AFTER, SLOTS, frozenset(), final_period="2027-Q4")
             supply_holds.raise_hold(conn, dataset_id="cp-carers", supply_id=supply,
                                     kind=supply_holds.ASSIGNMENT_RULE,
                                     reason=supply_holds.reason_for(decided),
@@ -196,7 +196,7 @@ class TestTheNoticeReadsHoldRecords:
         import filing_support
         from qa_tools.common import schedule_ended
 
-        decided = assignment.assign("cp-carers", "cp-carers@n1", AFTER, SLOTS, frozenset())
+        decided = assignment.assign("cp-carers", "cp-carers@n1", AFTER, SLOTS, frozenset(), final_period="2027-Q4")
         filing_support.file(decided)
         supply_holds.raise_hold(conn, dataset_id="cp-carers", supply_id="cp-carers@n1",
                                 kind=supply_holds.ASSIGNMENT_RULE,
@@ -236,3 +236,36 @@ class TestExhaustedFromWhenTheLastSlotCloses:
             assert entry.dataset_id in runway.exhausted_datasets(closed)
             checked += 1
         assert checked, "no authored calendar to check against"
+
+
+class TestATruncatedSlotListIsNotAnEndedSchedule:
+    """DEFECT, 2026-10-06, caught by REQ-PIPE-156's whole-history comparison:
+    filing hands assign() the slots up to the arrival's claim horizon, not the
+    whole calendar, so for a dataset that skips quarters the last slot in the
+    list is not the calendar's last - and two 2023 Case Workers supplies were
+    labelled schedule-ended with a 2027 calendar ahead of them."""
+
+    def test_a_case_workers_supply_in_2023_is_not_schedule_ended(self):
+        from datetime import date
+
+        from qa_tools.common import filing
+
+        dataset = "cp-case-workers"
+        at = datetime(2023, 5, 1, 1, 0, tzinfo=UTC)
+        truncated = slots.slots_for_dataset(
+            dataset, until=slots.claimable_until(dataset, date(2023, 5, 1)))
+        decided = assignment.assign(dataset, f"{dataset}@x", at, truncated, frozenset(),
+                                    final_period=filing.final_period_for(dataset))
+        assert not decided.schedule_ended, decided.unavailable
+        said = " ".join(why for _, why in decided.unavailable)
+        assert "last period this dataset's schedule has" not in said
+
+    def test_after_the_real_last_slot_it_still_is(self):
+        decided = assignment.assign("cp-carers", "cp-carers@y", AFTER, SLOTS, frozenset(),
+                                    final_period="2027-Q4")
+        assert decided.schedule_ended and decided.last_period == "2027-Q4"
+
+    def test_a_calendar_with_no_final_period_never_ends(self):
+        decided = assignment.assign("cp-carers", "cp-carers@z", AFTER, SLOTS, frozenset(),
+                                    final_period=None)
+        assert decided.is_held and not decided.schedule_ended

@@ -26,7 +26,7 @@ from contextlib import contextmanager
 
 from pathlib import Path
 
-import yaml
+from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 PEOPLE_YAML = ROOT / "contract" / "people.yaml"
@@ -50,7 +50,7 @@ def parse_people_config(path: Path | str = PEOPLE_YAML) -> dict:
     if not Path(path).exists():
         return {"people": {}, "agency_assignments": {}, "dataset_assignments": {}}
     with open(path) as f:
-        doc = yaml.safe_load(f) or {}
+        doc = config_yaml.parse(f) or {}
 
     people = {p["email"]: p for p in doc.get("people") or []}
     agency_assignments: dict[str, list[dict]] = {}

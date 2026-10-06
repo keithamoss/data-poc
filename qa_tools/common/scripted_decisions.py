@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import yaml
+from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SCRIPT_PATH = ROOT / "contract" / "scripted_decisions.yaml"
@@ -73,7 +73,7 @@ def load(path: Path | str | None = None) -> list[Script]:
     p = Path(path or SCRIPT_PATH)
     if not p.exists():
         return []
-    doc = yaml.safe_load(p.read_text()) or {}
+    doc = config_yaml.parse(p.read_text()) or {}
     out = []
     for raw in doc.get("decisions") or []:
         out.append(Script(
@@ -219,7 +219,7 @@ def _refuse_unless_synthetic() -> None:
     """Criterion 8: never on an asset that has not declared itself synthetic."""
     from qa_tools.common.hierarchy import DATA_ASSET_YAML
 
-    doc = yaml.safe_load(Path(DATA_ASSET_YAML).read_text()) or {}
+    doc = config_yaml.parse(Path(DATA_ASSET_YAML).read_text()) or {}
     if not doc.get("synthetic"):
         raise ScriptRefused(
             "scripted decisions are played back only into a synthetic history, and this "

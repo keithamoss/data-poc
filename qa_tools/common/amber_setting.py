@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
-import yaml
+from qa_tools.common import config_yaml
 
 from qa_tools.common.schemas import AMBER_SETTINGS
 
@@ -71,7 +71,7 @@ def _doc(path: Path | None = None) -> dict:
     from qa_tools.common.hierarchy import DATA_ASSET_YAML
 
     with open(path or DATA_ASSET_YAML) as f:
-        return yaml.safe_load(f) or {}
+        return config_yaml.parse(f) or {}
 
 
 def _in_effect(setting: dict | None, on: date) -> dict | None:

@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 
 import yaml
+from qa_tools.common import config_yaml
 
 ENGINE_TAG = "datacontract-cli 1.2.0"
 
@@ -84,7 +85,7 @@ def run_against_warehouse(contract_path: str, schema: str):
     from qa_tools.common import supply_db
 
     with open(contract_path) as f:
-        contract_dict = yaml.safe_load(f)
+        contract_dict = config_yaml.parse(f)
 
     fields = supply_db.connection_fields()
     d = copy.deepcopy(contract_dict)
@@ -145,7 +146,7 @@ def check_id_from_quality_definition(quality_definition: str | None) -> str | No
     `_QUALITY_CHECK_TYPES` guard before this ever gets called on one."""
     if not quality_definition:
         return None
-    doc = yaml.safe_load(quality_definition) or {}
+    doc = config_yaml.parse(quality_definition) or {}
     for prop in doc.get("customProperties") or []:
         if prop.get("property") == "check_id":
             return prop.get("value")
@@ -190,7 +191,7 @@ def fail_threshold_from_quality_definition(quality_definition: str | None, sever
         return None
     if not quality_definition:
         return 0
-    doc = yaml.safe_load(quality_definition) or {}
+    doc = config_yaml.parse(quality_definition) or {}
     for key in ("mustBe", "mustBeLessThan", "mustBeLessOrEqualTo"):
         if key in doc:
             return doc[key]

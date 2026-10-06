@@ -352,7 +352,7 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
             decided = assign_mod.assign(
                 dataset_id=dataset_id, supply_id=supply_id,
                 at=arrival.received_at, slots=slots_by_dataset[horizon],
-                filled=filled_slots(dataset_id))
+                filled=filled_slots(dataset_id), final_period=final_period_for(dataset_id))
             # FILED AND SUPERSEDING IN ONE TRANSACTION (REQ-PIPE-118's
             # reliability NFR): a crash leaves the old state or the new one,
             # never two waiting versions of one table in one period.
@@ -397,6 +397,23 @@ def _raise_assignment_hold(arrival, decided: Assignment) -> None:
             kind=supply_holds.ASSIGNMENT_RULE,
             reason=supply_holds.reason_for(decided),
             raised_by=arrival.run_id, delivery=arrival.delivery_name)
+
+
+def final_period_for(dataset_id: str) -> str | None:
+    """The dataset's last authored period, or None where its calendar never
+    runs out (a cadence rule) or it has none agreed (REQ-PIPE-154).
+
+    THE WHOLE CALENDAR, not the slots filing looked at - those stop at the
+    arrival's claim horizon, which is why this is asked separately."""
+    from qa_tools.common import schedule
+
+    try:
+        if schedule.calendar_for_dataset(dataset_id).current.is_cadence_rule:
+            return None
+    except schedule.NoCalendarAgreed:
+        return None
+    owed = [p for p in schedule.periods_for_dataset(dataset_id) if p.expected]
+    return owed[-1].period.name if owed else None
 
 
 def _supply_id_for(arrival, dataset_id: str) -> str:

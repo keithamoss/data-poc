@@ -36,7 +36,7 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
+from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DEFINITIONS_PATH = ROOT / "contract" / "file-checks.yaml"
@@ -85,7 +85,7 @@ class Definition:
 
 def definitions(path: Path | str | None = None) -> list[Definition]:
     """Every file check in the committed configuration, in NAMES order."""
-    doc = yaml.safe_load(Path(path or DEFINITIONS_PATH).read_text()) or {}
+    doc = config_yaml.parse(Path(path or DEFINITIONS_PATH).read_text()) or {}
     out = [Definition(check=str(raw["check"]), severity=str(raw["severity"]),
                       formats=tuple(raw.get("formats") or ("csv",)),
                       name=str(raw.get("name") or raw["check"]).strip(),
@@ -347,7 +347,7 @@ def reason_for(finding: Finding, filename: str) -> str:
 def expected_columns(contract_path, table: str) -> list[str]:
     """The contract's columns for one table, in the contract's order - what
     a header is compared with."""
-    doc = yaml.safe_load(Path(contract_path).read_text()) or {}
+    doc = config_yaml.parse(Path(contract_path).read_text()) or {}
     for entry in doc.get("schema") or []:
         if entry.get("name") == table:
             return [p["name"] for p in entry.get("properties") or []]

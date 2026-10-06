@@ -35,6 +35,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 from qa_tools.common import asset_time
+from qa_tools.common import config_yaml
 
 
 class SimulatedClockRefused(RuntimeError):
@@ -85,8 +86,7 @@ def _is_synthetic() -> bool:
     """Whether contract/data-asset.yaml declares the asset synthetic - read
     here rather than through the reset module, which nothing but `mothman env`
     may reach (REQ-PIPE-144 criterion 23)."""
-    import yaml
-    raw = yaml.safe_load(asset_time.DATA_ASSET_YAML.read_text()) or {}
+    raw = config_yaml.parse(asset_time.DATA_ASSET_YAML.read_text()) or {}
     return raw.get("synthetic") is True
 
 

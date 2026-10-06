@@ -194,8 +194,10 @@ class TestItReadsNoData:
 
     def test_assignment_takes_no_supply_contents_at_all(self):
         import inspect
+        # `final_period` (REQ-PIPE-154) is the calendar's last authored
+        # period - configuration, not anything inside the supply.
         assert list(inspect.signature(assignment.assign).parameters) == [
-            "dataset_id", "supply_id", "at", "slots", "filled"]
+            "dataset_id", "supply_id", "at", "slots", "filled", "final_period"]
 
     def test_the_module_never_touches_the_warehouse(self):
         import inspect

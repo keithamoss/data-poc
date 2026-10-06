@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from qa_tools.common import slot_state
+from qa_tools.common import config_yaml
 
 #: The marker that makes a comment THIS reconciler's own (criterion 11).
 #: An HTML comment, so it is invisible on the rendered ticket and exact
@@ -178,12 +179,11 @@ def policy_from_config(config: dict | None = None) -> str:
     rule this batch applies everywhere.
     """
     if config is None:
-        import yaml
 
         from qa_tools.common import hierarchy
 
         with open(hierarchy.DATA_ASSET_YAML) as handle:
-            config = yaml.safe_load(handle) or {}
+            config = config_yaml.parse(handle) or {}
     value = (config or {}).get("ticket_policy") or DEFAULT_POLICY
     if value not in POLICIES:
         print(f"note: ticket_policy {value!r} is not one of "

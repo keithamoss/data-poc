@@ -26,7 +26,7 @@ refuses those (criterion 29), and its message points here.
 """
 from __future__ import annotations
 
-import yaml
+from qa_tools.common import config_yaml
 
 from qa_tools.common import qa_store, supply_db
 
@@ -39,7 +39,7 @@ def is_synthetic() -> bool:
     """Whether contract/data-asset.yaml declares this asset synthetic."""
     from qa_tools.common import asset_time
 
-    raw = yaml.safe_load(asset_time.DATA_ASSET_YAML.read_text()) or {}
+    raw = config_yaml.parse(asset_time.DATA_ASSET_YAML.read_text()) or {}
     return raw.get("synthetic") is True
 
 
@@ -56,7 +56,7 @@ def in_production() -> bool:
 def asset_id() -> str:
     from qa_tools.common import asset_time
 
-    return (yaml.safe_load(asset_time.DATA_ASSET_YAML.read_text()) or {})["data_asset_id"]
+    return (config_yaml.parse(asset_time.DATA_ASSET_YAML.read_text()) or {})["data_asset_id"]
 
 
 def confirmation_phrase() -> str:

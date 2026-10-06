@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import yaml
+from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 COMPOSE = ROOT / ".devcontainer" / "docker-compose.yml"
@@ -36,7 +36,7 @@ class VersionMismatch(RuntimeError):
 def _data_asset_doc(path=None) -> dict:
     from qa_tools.common.hierarchy import DATA_ASSET_YAML
 
-    return yaml.safe_load(Path(path or DATA_ASSET_YAML).read_text()) or {}
+    return config_yaml.parse(Path(path or DATA_ASSET_YAML).read_text()) or {}
 
 
 def declaration_errors(path=None) -> list[str]:
@@ -100,12 +100,12 @@ def image_tags(compose=None, workflow=None) -> dict[str, str]:
     EVERY job of test.yml - its services and its own `container` - every one,
     not the first (post-build-review #87)."""
     found: dict[str, str] = {}
-    compose_doc = yaml.safe_load(Path(compose or COMPOSE).read_text()) or {}
+    compose_doc = config_yaml.parse(Path(compose or COMPOSE).read_text()) or {}
     for name, service in (compose_doc.get("services") or {}).items():
         image = str((service or {}).get("image") or "")
         if image and _is_postgres(image):
             found[f".devcontainer/docker-compose.yml service {name}"] = image
-    wf = yaml.safe_load(Path(workflow or TEST_WORKFLOW).read_text()) or {}
+    wf = config_yaml.parse(Path(workflow or TEST_WORKFLOW).read_text()) or {}
     for job_name, job in (wf.get("jobs") or {}).items():
         job = job or {}
         for svc_name, svc in (job.get("services") or {}).items():

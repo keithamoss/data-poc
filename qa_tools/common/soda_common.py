@@ -11,6 +11,7 @@ import os
 
 from soda.sampler.sampler import Sampler
 from soda.sampler.sample_ref import SampleRef
+from qa_tools.common import config_yaml
 
 def _defuse_sodas_dotenv_reload() -> None:
     """Build Soda's EnvHelper now, and put the environment back.
@@ -266,7 +267,7 @@ def readable_checks_yaml(path: str, unreadable) -> str:
         # VERBATIM in the ordinary case, so a run that can read every
         # table is handed exactly the authored file and no round-trip.
         return text
-    out, _ = _split(yaml.safe_load(text), gone, _declared_reads_tables())
+    out, _ = _split(config_yaml.parse(text), gone, _declared_reads_tables())
     return yaml.safe_dump(out, sort_keys=False)
 
 
@@ -274,7 +275,6 @@ def left_out_checks(path: str, unreadable) -> list[str]:
     """The check ids readable_checks_yaml() leaves out, so the run can
     reconcile them against what it recorded as not evaluated
     (REQ-PIPE-115 criterion 17)."""
-    import yaml
 
     from qa_tools.common.qa_results_writer import _declared_reads_tables
 
@@ -282,7 +282,7 @@ def left_out_checks(path: str, unreadable) -> list[str]:
     if not gone:
         return []
     with open(path) as f:
-        doc = yaml.safe_load(f)
+        doc = config_yaml.parse(f)
     _, removed = _split(doc, gone, _declared_reads_tables())
     return removed
 
@@ -333,10 +333,9 @@ def unreported_checks(yaml_text: str, scan_results: dict, scan) -> list[dict]:
     error, shortened; never a value from the data, which Soda's evaluation
     errors do not carry.
     """
-    import yaml
 
     reported = {check_id_from_resource_attributes(c) for c in scan_results.get("checks") or ()}
-    doc = yaml.safe_load(yaml_text) or {}
+    doc = config_yaml.parse(yaml_text) or {}
     errors = []
     try:
         errors = [str(getattr(log, "message", log)) for log in scan.get_error_logs()]

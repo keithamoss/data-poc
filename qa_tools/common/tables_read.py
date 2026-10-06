@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 import yaml
+from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -190,7 +191,7 @@ def _known_tables() -> set[str]:
 
 def _yaml(path: Path):
     try:
-        return yaml.safe_load(path.read_text()) or {}
+        return config_yaml.parse(path.read_text()) or {}
     except (OSError, yaml.YAMLError):
         return {}
 

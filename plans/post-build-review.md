@@ -6452,3 +6452,26 @@ twice. It deliberately did not re-find the `TypeError`.
     anything else". Found by the delivery-scoper 2026-10-06. Wording only,
     but it states the opposite of the built design, so it is a claim in
     requirements.yaml and is written up here rather than quietly fixed.
+
+127. **[done, 2026-10-06]** **[Pipeline & publishing]** **REQ-PIPE-154 labelled
+    holds schedule-ended while the calendar ran on for four more years.**
+    Shipped in 91226ea; caught the same afternoon by REQ-PIPE-156's
+    whole-history comparison, which found `qa.hold.reason` differing: two
+    2023 Case Workers holds read "it is the last period this dataset's
+    schedule has" with `last_period` 2023-Q1, under a calendar that runs to
+    2027.
+
+    THE CAUSE was an assumption made explicitly and wrongly while building:
+    that the last slot in the list handed to `assign()` is the calendar's
+    last. Filing passes the slots up to the arrival's claim horizon, and for
+    a dataset that skips quarters that list stops at the slot before the
+    arrival - which had closed - so a gap read as an end.
+
+    FIXED by telling `assign()` the dataset's real final period
+    (`filing.final_period_for`, from the whole calendar; None for a cadence
+    rule, which never ends); only that slot closing ends a schedule. Failing
+    test first: `TestATruncatedSlotListIsNotAnEndedSchedule`, against the real
+    Case Workers configuration. No supply was mis-filed - the hold kind and
+    the filing were right; the reason and the structured flag were wrong.
+    Worth carrying: the whole-history comparison built for the replay clock
+    caught a bug in a different change, which is what it is for.

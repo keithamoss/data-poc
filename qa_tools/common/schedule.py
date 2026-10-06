@@ -62,7 +62,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
-import yaml
+from qa_tools.common import config_yaml
 
 from qa_tools.common import hierarchy
 
@@ -312,7 +312,7 @@ def _as_date(value, where: str) -> date:
 @functools.lru_cache(maxsize=1)
 def _load() -> dict[str, Calendar]:
     with open(DATA_ASSET_YAML) as f:
-        doc = yaml.safe_load(f) or {}
+        doc = config_yaml.parse(f) or {}
     raw_calendars = doc.get("calendars")
     if not raw_calendars:
         raise ScheduleConfigError(f"{DATA_ASSET_YAML} defines no `calendars:`")
@@ -363,7 +363,7 @@ def _dataset_schedules() -> dict[str, dict]:
     REQ-QAC-039's criterion, applied here.
     """
     with open(DATA_ASSET_YAML) as f:
-        doc = yaml.safe_load(f) or {}
+        doc = config_yaml.parse(f) or {}
     out = {}
     for agency in (doc.get("hierarchy") or {}).get("agencies") or []:
         for collection in agency.get("collections") or []:

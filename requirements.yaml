@@ -29064,6 +29064,7 @@ requirements:
     - qa_tools/common/decision_log.py::_check_shape
     - cli/pipeline.py::_say_pass
     - qa_tools/common/filing.py::_raise_assignment_hold
+    - qa_tools/common/filing.py::final_period_for
     linked_tests:
     - tests/test_schedule_ended_hold.py
     - tests/test_assignment.py
@@ -29139,6 +29140,7 @@ requirements:
       AUTOMATICALLY by the next pass in receipt order rather than each staying a person''s call, because
       at ~30 datasets the manual route does not scale.'
     - 'BUILT 2026-10-06. Ended is DECIDED BY THE RULE at filing - every slot''s window has opened and the last has closed (REQ-PIPE-131 criterion 16''s provisional close) - and stored as a field of the hold''s reason, with the last period, the file and the command, so no reader parses prose. Re-filing (criterion 7) is a RULE `refile` decision with no from-slot: the decision log''s shape check now allows that for the rule only - a person still places a held supply by promoting it - and apply_decision ends the hold in the same transaction, which is how the hold names the decision behind the replacing filing. The re-check it owes runs in the same pass, before the owed work, and is what applies the gate and runs the data checks the hold withheld. The pass counts only holds raised by its own runs; the tally counts the whole backlog. Rejected: a column on qa.hold for the flag (the reason is already jsonb, queried with ->> in one aggregate), and re-filing at the moment dates are committed (nothing runs then; the pass is the only thing that does).'
+    - 'DEFECT FIXED, 2026-10-06 (post-build-review #127): ended was first decided from the last slot in the list assign() is handed, which filing truncates at the arrival claim horizon - so for a dataset that skips quarters a gap read as an end, and two 2023 Case Workers holds were labelled schedule-ended under a calendar running to 2027. assign() now takes the dataset''s real final period (filing.final_period_for, from the whole calendar; None for a cadence rule), and only that slot closing ends a schedule. Caught by REQ-PIPE-156''s whole-history comparison, not by this requirement''s own tests, which built their slot lists by hand and so could not see the truncation.'
     open_questions:
     - Held supplies stay in staging until someone resolves them. In a real Birth Registrations or Child
       Protection deployment that is personal data with no end date - is there a retention bound, or is an
@@ -29224,7 +29226,36 @@ requirements:
       per process rather than thousands of times, so that a bootstrap stops spending about half its time
       re-reading files that do not change during a run.
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-06: tests/test_config_yaml.py written first and failing (no module),
+      then 8 passed: the same bytes are parsed once; changed bytes are parsed
+      again with the size and modification time held the same; a stream and text
+      share the cache; mutating one result does not reach the next; 16 threads
+      at once each get a correct document; the C loader is used; and with yaml.safe_load
+      made to fail, slots, claimable_until, the environments file, the declared
+      PostgreSQL major and the asset timezone are all still read - the run path
+      never calls it. Criterion 7: the 12-arrival Child Protection replay measured
+      at 178s the same day took 102.4s (target 110s), same machine. Criterion
+      8: a full bootstrap from empty took 912s against 1652s for the previous
+      one the same day (27.5 -> 15.2 minutes, 45% faster). Criterion 6: that bootstrap
+      compared with the previous database by tests/equiv_support.snapshot - every
+      table the same row count, every difference a stamp, a surrogate id interleaved
+      between collections, or the generator''s receipt sequence; filings, decisions,
+      verdicts and holds identical, the arrival golden re-captured unchanged,
+      results unchanged (3599 / 3089 pass / 58 warn / 415 fail). The first comparison
+      also caught REQ-PIPE-154''s defect (post-build-review #127), fixed before
+      the second.'
+    implemented_by:
+    - qa_tools/common/config_yaml.py::parse
+    - qa_tools/common/config_yaml.py::load
+    - qa_tools/common/config_yaml.py::clear
+    - pipeline/cadence.py::parse_cadence_from_contract
+    - pipeline/cadence.py::parse_claim_window_from_contract
+    - qa_tools/common/postgres_version.py::_data_asset_doc
+    - qa_tools/common/environments.py::_load
+    linked_tests:
+    - tests/test_config_yaml.py
     source: 'Keith, 2026-10-06, scoping plans/running-thoughts.md #65 after its profile ("all four"). Drafted
       by delivery-scoper the same day. Signed by Keith 2026-10-06.'
     signed_off:
@@ -29273,6 +29304,7 @@ requirements:
     - 'ANSWERED 2026-10-06 (Keith, signing): BOTH the C loader and the content-keyed cache - CSafeLoader
       makes every parse ~9x faster (verified the same hour: 13 contract files 218ms -> 24ms, identical results)
       and the cache removes the repeats.'
+    - 'BUILT 2026-10-06. One module, config_yaml, with parse() for text or a stream and load() for a path; every run-path module switched from yaml.safe_load to it (19 modules, 34 call sites). The validate_* gates and sprint_state are not on the run path and stay as they were. The cache key is the TEXT itself rather than a hash of it: a dict lookup on a string already hashes it, and the strings are the documents being kept anyway. Bounded at 256 documents behind one lock; a parse happens outside the lock, so two threads may both parse a document the first time - harmless, the second write is the same value. The existing unkeyed lru_caches (schedule, hierarchy, asset_time) were left as they are: they now read through this loader, and re-keying them on content was the open question not asked.'
     open_questions:
     - Whether the existing unkeyed lru_caches (schedule, hierarchy, asset_time, arrival_patterns) should
       key on content too, so tests stop needing cache_clear(). Not asked; out of this requirement unless

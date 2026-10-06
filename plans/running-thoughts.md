@@ -4527,6 +4527,12 @@ Belongs with batch 5's check work.
     process, connections reused, and a checkpoint replay - sent to
     delivery-scoper for requirements before anything is built.
 
+    **REQ-PIPE-156 BUILT, 2026-10-06** (configuration parsed once, C loader):
+    a full bootstrap from empty 1,652s -> **912s** (27.5 -> 15.2 minutes),
+    proven identical to the previous history. Next, per the signed order:
+    REQ-PIPE-158 (connections), the REQ-PIPE-157 spike (dbt, A vs B, back to
+    Keith), then REQ-TEST-160 and 159 (checkpoint replay).
+
     THE COST IS NOT JUST THIS SANDBOX - measured the same night, at
     Keith's question "why is GitHub so much faster?". It is not, any
     more. The "about nine minutes" CI bootstrap that CLAUDE.md carries

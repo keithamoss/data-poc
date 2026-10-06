@@ -30,7 +30,7 @@ as opposed to a source-format parsing accident) needs representing.
 from __future__ import annotations
 
 import pandas as pd
-import yaml
+from qa_tools.common import config_yaml
 
 # DuckDB's own read_csv_auto/read_csv only ever sees an already-pandas-
 # written intermediate CSV in this pipeline (every read_csv_auto call
@@ -50,7 +50,7 @@ def load_null_values_by_column(contract_path: str) -> dict[str, dict[str, list[s
     handled separately below). A table/column with no `nullValues` entry
     simply won't appear here; callers treat that as an empty list."""
     with open(contract_path) as f:
-        contract = yaml.safe_load(f)
+        contract = config_yaml.parse(f)
     out: dict[str, dict[str, list[str]]] = {}
     for table in contract.get("schema", []):
         cols = {}
