@@ -221,6 +221,26 @@ def _say_pass(report) -> None:
         console.print("At least one recorded result is red.", style="yellow")
 
 
+def generated_into(root):
+    """Both generators writing under `root` - for a resume's comparison
+    (REQ-TEST-160), which lives in qa_tools/ and so may not import the
+    generator package itself."""
+    from generator.output import generated_into as _generated_into
+
+    return _generated_into(root)
+
+
+@pipeline_group.command("cache-key")
+def cache_key_command() -> None:
+    """Print the key CI caches a bootstrapped database under (REQ-TEST-117):
+    one digest of every input that shapes a bootstrap. The input list is
+    qa_tools/common/replay_inputs.py's, which a checkpoint replay compares
+    too (REQ-TEST-160) - one list, two readers. Needs no database."""
+    from qa_tools.common import replay_inputs
+
+    click.echo(replay_inputs.cache_key())
+
+
 @pipeline_group.command("bootstrap")
 @click.option("--collection", type=click.Choice(["bdm", "cp", "all"]), default="all",
               help="Which collection to populate - bdm = civil-registration, "
@@ -231,7 +251,14 @@ def _say_pass(report) -> None:
                    "from empty.")
 @click.option("--sequential", is_flag=True,
               help="Check one collection after the other instead of side by side - slower, and the reference a parallel bootstrap should match. Arrivals within a collection always run one at a time, because each filing depends on what the one before it promoted.")
-def bootstrap_command(collection: str, force: bool, sequential: bool) -> None:
+@click.option("--checkpoint-before", "checkpoint_before", type=int, default=None,
+              metavar="N",
+              help="Keep a copy of the database as it stood once arrival N-1 was processed, "
+                   "to resume from later with `mothman pipeline resume` (synthetic asset, "
+                   "one collection). N moves back to the start of its receipt instant if "
+                   "it falls inside one.")
+def bootstrap_command(collection: str, force: bool, sequential: bool,
+                      checkpoint_before: int | None) -> None:
     """Take an empty environment to one with data and QA results in it.
 
     Run this after cloning, on a fresh dev container, or whenever a
@@ -246,7 +273,8 @@ def bootstrap_command(collection: str, force: bool, sequential: bool) -> None:
     from qa_tools.common.bootstrap import bootstrap
 
     result = bootstrap(collection=collection, force=force, sequential=sequential,
-                        on_step=lambda msg: console.print(f"{msg}...", style="dim"))
+                        on_step=lambda msg: console.print(f"{msg}...", style="dim"),
+                        checkpoint_before=checkpoint_before)
     if result.refused:
         raise click.ClickException(result.reason)
     if not result.populated:
@@ -255,3 +283,72 @@ def bootstrap_command(collection: str, force: bool, sequential: bool) -> None:
     console.print(
         f"Populated: {result.staged_after} staged table(s) in this environment.",
         style="green")
+
+
+@pipeline_group.group("checkpoint")
+def checkpoint_group() -> None:
+    """Checkpoints of a replay, to resume from (REQ-TEST-159). Taken with
+    `mothman pipeline bootstrap --collection bdm|cp --checkpoint-before N`."""
+
+
+@checkpoint_group.command("list")
+def checkpoint_list_command() -> None:
+    """Every checkpoint on this server, oldest first."""
+    from qa_tools.common import checkpoints
+
+    found = checkpoints.listed()
+    if not found:
+        console.print("No checkpoints. Take one with `mothman pipeline bootstrap "
+                      "--collection cp --checkpoint-before N`.")
+        return
+    for cp in found:
+        if not cp.collection_id:
+            console.print(f"{cp.name}  (its description cannot be read - a resume would "
+                          f"replay from the first arrival)", style="yellow")
+            continue
+        console.print(f"{cp.name}  {cp.collection_id}, before arrival {cp.before} of "
+                      f"{len(cp.recorded.arrivals)}, taken {cp.taken_at} from {cp.source}")
+    console.print(f"Keeping the newest {checkpoints.keep()} "
+                  f"({checkpoints.KEEP_ENV} changes it).", style="dim")
+
+
+@checkpoint_group.command("delete")
+@click.argument("name")
+def checkpoint_delete_command(name: str) -> None:
+    """Delete one checkpoint, or a resume's database, by name."""
+    from qa_tools.common import checkpoints
+
+    try:
+        checkpoints.delete(name)
+    except checkpoints.CheckpointRefused as exc:
+        raise click.ClickException(str(exc)) from exc
+    console.print(f"Deleted {name}.")
+
+
+@pipeline_group.command("resume")
+@click.argument("name")
+@click.option("--sequential", is_flag=True,
+              help="Run each arrival's tools one after another rather than dbt beside the rest.")
+def resume_command(name: str, sequential: bool) -> None:
+    """Replay a collection from a checkpoint into a database of its own.
+
+    The first arrival a change can affect is worked out by regenerating the
+    deliveries and comparing them, and every other input, with what the
+    checkpoint recorded. A change before the checkpoint is refused, naming the
+    arrival; nothing changed says so and replays nothing. The checkpoint, and
+    the database you were using, are never written to."""
+    from qa_tools.common.bootstrap import resume
+
+    result = resume(name, sequential=sequential,
+                    on_step=lambda msg: console.print(f"{msg}...", style="dim"))
+    if result.refused:
+        raise click.ClickException(result.reason)
+    if not result.replayed:
+        console.print(result.reason)
+        return
+    from qa_tools.common import supply_db
+
+    console.print(result.reason + ".", style="green")
+    # REDACTED: the DSN carries the password, and this line is the one most
+    # likely to be pasted somewhere.
+    console.print(f"Point MOTHMAN_SUPPLY_DSN at {supply_db._redact(result.dsn)} to use it.")

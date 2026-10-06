@@ -164,7 +164,12 @@ def record(delivery, recognition,
         "filed_by": dict(getattr(delivery, "filed_by", None) or {"kind": "automated"}),
     }
 
-    with _db(conn) as db:
+    # ONE TRANSACTION, delivery and files together (REQ-TEST-159): each
+    # collection now records a delivery at its first arrival, so two
+    # collections sharing a delivery can record it at the same moment - the
+    # second's insert waits on the first's and finds it, rather than reading
+    # a delivery whose files are not written yet.
+    with _db(conn) as db, db.raw.transaction():
         written = db.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".delivery '
             "(name, received_at, received_instant, received_from, collections, "
@@ -371,6 +376,19 @@ def _recorded_stamp(delivery):
     from qa_tools.common import replay_clock
     replay_clock.anchor(delivery.received_at)
     return replay_clock.now()
+
+
+def record_arrival(arrival) -> dict | None:
+    """Record the delivery `arrival` came in, at its first arrival (Keith,
+    signing REQ-TEST-159, reversing REQ-TEST-116's record-everything-up-front):
+    a replay's database then holds only what had arrived, so a checkpoint is
+    a true picture of a moment, and nothing processed early can see a
+    delivery from its own future. Write-once, so every later arrival of the
+    same delivery - in either collection - is a no-op."""
+    from qa_tools.common import arrivals, delivery
+
+    d = delivery.read_delivery(arrival.delivery_name)
+    return record(d, arrivals.recognise(d))
 
 
 def record_all() -> None:

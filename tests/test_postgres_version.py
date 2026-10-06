@@ -104,7 +104,9 @@ class TestEveryImageTagNamesTheDeclaredMajor:
 
     def test_the_committed_files_agree(self):
         assert pv.image_tag_errors() == []
-        assert len(pv.image_tags()) == 3
+        # The dev container and three CI jobs: test, test-deployment, and
+        # on-demand (post-build-review #128).
+        assert len(pv.image_tags()) == 4
 
     def test_the_second_ci_job_is_checked_too(self, tmp_path):
         c, w = self._write(tmp_path, self.COMPOSE, self._workflow("postgres:16", "postgres:17"))

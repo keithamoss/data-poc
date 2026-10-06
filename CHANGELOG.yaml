@@ -117,6 +117,14 @@ releases:
     changes:
       - category: New
         items:
+          - headline: Replay a collection from a checkpoint
+            components: ["Testing & dev tooling"]
+            description: >
+              mothman pipeline bootstrap --collection cp --checkpoint-before N
+              keeps a copy of the database part-way through, and mothman
+              pipeline resume replays from there into a database of its own.
+              It works out for itself whether your change could affect an
+              earlier arrival, and refuses if it could.
           - headline: One command processes what has arrived
             components: ["Pipeline & publishing"]
             description: >

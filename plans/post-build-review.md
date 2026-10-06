@@ -6475,3 +6475,82 @@ twice. It deliberately did not re-find the `TypeError`.
     the filing were right; the reason and the structured flag were wrong.
     Worth carrying: the whole-history comparison built for the replay clock
     caught a bug in a different change, which is what it is for.
+
+128. **[done, 2026-10-06]** **[Testing & dev tooling]** **The on-demand
+    bootstrap-equivalence test (REQ-TEST-116 criterion 4) had been failing
+    on every run, and nothing noticed because nothing runs it by default.**
+    Found building REQ-TEST-159, whose criterion 5 rests on the same
+    harness. Two causes, both of the "it moved on and the test did not"
+    kind. The scripted decisions (REQ-GEN-135) refuse a cut-down corpus for
+    missing their supplies - `run_into_fresh_database` had been patched for
+    that, but the spawned-collection path the equivalence test uses had not,
+    so it now rides `apply_redirects` and reaches a spawned child. And the
+    comparison's exclusions predated the census, the identity row, owed
+    runs, `check_result.load_attempt` and `filing.refiled_by`, so it
+    reported every stamp and surrogate id in them as a difference.
+
+    FIXED in `tests/equiv_support.py`: those clock columns dropped, surrogate
+    ids dropped, and every id that points at another table compared as what
+    it names (a load outcome, a decision, a filing), with a knock-on's
+    running number (`knock-on/6`, `__r2`) masked. Confirmed failing on the
+    commit before (6 errors), passing after (6 passed).
+
+    THE PART WORTH SAYING TO KEITH: REQ-PIPE-158's evidence said its
+    whole-bootstrap comparison found "every difference one the comparison
+    already excludes". It did not exclude them - they were the same columns,
+    explained by hand with a scratch script, as REQ-PIPE-156's evidence
+    describes correctly. The comparison now does what that sentence claimed,
+    and the evidence is reworded. The finding itself stands: no difference
+    outside stamps, surrogate ids and the generator's receipt counter.
+
+    DECIDED, Keith 2026-10-06 ("option one sounds good"): an `on-demand`
+    job in `.github/workflows/test.yml` runs every test marked `on_demand` on
+    every push, beside the other jobs (~5 minutes, under the 15-minute
+    deployment job, so no added wait). The marker stays - it keeps a local
+    `uv run pytest` quick. Rejected: a nightly run (the failure lands on
+    nobody's push), path filters (a guess about what can break the history,
+    which is what these tests exist to catch), and remembering to pass
+    `--run-on-demand` locally (what had just failed). Pinned by
+    `tests/test_ci_on_demand.py`.
+
+129. **[done, 2026-10-06]** **[QA checks]** **A check's recorded failing-row
+    sample was whichever rows a query happened to return first.** Found by
+    the whole-bootstrap comparison for REQ-TEST-159: 20 cross-table results
+    whose `failing_sample_keys` held the same five keys in a different
+    order, once staging per arrival changed the tables' physical row order.
+    The dbt helpers read `SELECT pk ... LIMIT 5` with no ORDER BY, the Soda
+    sampler kept Soda's first five rows, and datacontract-cli's samples were
+    kept in its order. Past five failing rows, WHICH rows were sampled could
+    differ between two runs of the same data, not just their order - and a
+    sample is what a person reads to see what went wrong.
+
+    FIXED: the dbt queries order by the key, the Soda sampler keeps
+    everything Soda returned (bounded by Soda's own sample limit) and
+    `failing_sample_keys` sorts before keeping five, and datacontract-cli's
+    samples are sorted (its count was never capped here, and still is not).
+    Failing test first: `tests/test_sample_keys_deterministic.py`, three
+    tests, all red before. MEASURED over a whole bootstrap against the
+    previous one: 1,002 results' samples changed and nothing else in them -
+    676 the same keys reordered, 326 DIFFERENT keys chosen for the same
+    data - and every sample recorded now is in key order. Minor - no verdict, count or status changes - so
+    fixed under the standing rule rather than held for Keith.
+
+130. **[done, 2026-10-06]** **[Pipeline & publishing]** **Recording each
+    delivery at its first arrival (REQ-TEST-159) silently switched off
+    Keith's #117 D5 cap**, which keeps a replayed promotion's invented lag
+    before the same dataset's next receipt. `promotion.next_receipt` read
+    the next receipt from the recorded deliveries, and its docstring said
+    why that worked: the batch recorded every delivery before processing
+    the first. Once it recorded each at its first arrival, the next one was
+    not there yet, and 29 promotions' `effective_at` moved past the next
+    receipt - two versions shown waiting at once, the very thing #117 D5
+    fixed. Caught by the whole-bootstrap comparison before anything was
+    committed, which is what it is for.
+
+    FIXED: `next_receipt` also reads the arrivals in the delivery tree being
+    replayed - exactly the set the batch used to record up front, so a
+    replay answers as it did - and the live processing pass, which has no
+    tree, still answers from what it recorded. Failing test first:
+    `TestTheNextReceiptIsKnownInAReplay`. THE LESSON is the existing test's:
+    it replaced `next_receipt` with a stub, so it proved the call site and
+    never what the function would see.

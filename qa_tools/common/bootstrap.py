@@ -112,7 +112,8 @@ def already_populated(conn) -> bool:
 
 def bootstrap(collection: str = "all", force: bool = False,
               sequential: bool = False,
-              on_step: Callable[[str], None] | None = None) -> BootstrapResult:
+              on_step: Callable[[str], None] | None = None,
+              checkpoint_before: int | None = None) -> BootstrapResult:
     """Ensure this environment's database has data and QA results.
 
     `force` runs even when staging already holds tables - but NEVER over
@@ -122,6 +123,21 @@ def bootstrap(collection: str = "all", force: bool = False,
     wiping is `mothman env reset-synthetic`'s alone.
     """
     say = on_step or (lambda _msg: None)
+
+    # A CHECKPOINT IS OF ONE COLLECTION, on a synthetic asset (REQ-TEST-159):
+    # both side by side are never both between arrivals at once.
+    if checkpoint_before is not None:
+        from qa_tools.common import checkpoints
+        if collection not in checkpoints.COLLECTIONS:
+            return BootstrapResult(populated=False, staged_before=0, staged_after=0,
+                                   refused=True,
+                                   reason="a checkpoint is taken of one collection at a time - "
+                                          "choose --collection bdm or --collection cp")
+        try:
+            checkpoints.require_synthetic()
+        except checkpoints.CheckpointRefused as exc:
+            return BootstrapResult(populated=False, staged_before=0, staged_after=0,
+                                   refused=True, reason=str(exc))
 
     say("Checking what this environment already holds")
     with supply_db.connect(label="mothman:bootstrap") as conn:
@@ -147,7 +163,7 @@ def bootstrap(collection: str = "all", force: bool = False,
 
     try:
         lock = processing_pass.pass_lock("bootstrap")
-        lock.__enter__()
+        held = lock.__enter__()
     except processing_pass.PassLockHeld as exc:
         return BootstrapResult(populated=False, staged_before=before,
                                staged_after=before, refused=True, reason=str(exc))
@@ -170,22 +186,27 @@ def bootstrap(collection: str = "all", force: bool = False,
             for name in names:
                 say(f"Generating synthetic data ({_LABEL[name]})")
                 generate[name]()
+                after_each = None
+                if checkpoint_before is not None:
+                    after_each = _checkpoint_hook(name, checkpoint_before, held, say)
                 say(f"Running the real checks against every {_LABEL[name]} supply")
-                timings[name] = _run_collection(name, sequential, record_deliveries=True)
+                timings[name] = _run_collection(name, sequential, record_deliveries=True,
+                                                after_each=after_each)
         else:
             # SIDE BY SIDE (REQ-TEST-116 criterion 1). The two collections
             # share no dataset, slot or promotion, so neither's order depends
             # on the other's. GENERATION FIRST, both of it - 4.6s measured, not
             # worth overlapping - so neither pipeline recognises a delivery
-            # tree the other generator is still writing. THEN THE DELIVERY LOG,
-            # once, for the reason run_pipeline's own comment gives.
+            # tree the other generator is still writing. Each collection
+            # records a delivery at its first arrival (REQ-TEST-159); THE
+            # DELIVERIES NEITHER CLAIMED are recorded once both are done.
             for name in names:
                 say(f"Generating synthetic data ({_LABEL[name]})")
                 generate[name]()
-            _record_deliveries()
             say("Running the real checks against every supply - "
                 + " and ".join(_LABEL[n] for n in names) + " side by side")
             timings = _run_concurrently(names, sequential)
+            _record_deliveries()
         timings["total"] = time.monotonic() - started
         say("Took " + ", ".join(f"{_LABEL.get(k, k)} {v:.0f}s" for k, v in timings.items()))
     finally:
@@ -209,19 +230,120 @@ def _record_deliveries() -> None:
         delivery_log.record_all()
 
 
-def _run_collection(name: str, sequential: bool, record_deliveries: bool = False) -> float:
+def _run_collection(name: str, sequential: bool, record_deliveries: bool = False,
+                    **replay) -> float:
     """Run one collection's whole pipeline; return how long it took.
+    `replay` is start_at / after_each / player, for a checkpoint or a resume.
 
     TOP LEVEL, so a spawned process can import it by name.
     """
     started = time.monotonic()
     if name == "bdm":
         from qa_tools.bdm.orchestrate_bdm import run_pipeline
-        run_pipeline(sequential=sequential, record_deliveries=record_deliveries)
+        run_pipeline(sequential=sequential, record_deliveries=record_deliveries, **replay)
     else:
         from qa_tools.cp.orchestrate_cp import run_pipeline_cp
-        run_pipeline_cp(sequential=sequential, record_deliveries=record_deliveries)
+        run_pipeline_cp(sequential=sequential, record_deliveries=record_deliveries, **replay)
     return time.monotonic() - started
+
+
+def _checkpoint_hook(name: str, before: int, held, say):
+    """The after_each that takes the checkpoint, with `before` snapped back
+    to the start of its receipt instant - said aloud when it moves."""
+    from qa_tools.common import arrivals, checkpoints
+
+    collection_id = checkpoints.COLLECTIONS[name]
+    found = arrivals.arrivals_for(collection_id, "")
+    at = checkpoints.snapped(found, before)
+    if at != before:
+        say(f"Arrival {before} belongs with the arrivals before it (the same delivery or the "
+            f"same receipt instant), so the checkpoint is taken before arrival {at}, where "
+            f"they begin")
+    return checkpoints.taking_checkpoint(
+        collection_id, at, held.paused,
+        on_taken=lambda cp: say(f"Checkpoint {cp.name} taken before arrival {cp.before}"))
+
+
+@dataclass(frozen=True)
+class ResumeResult:
+    """What a resume did. `dsn` is the resume's own database - None when
+    nothing was replayed."""
+
+    replayed: bool
+    reason: str
+    dsn: str | None = None
+    first_affected: int | None = None
+    refused: bool = False
+
+
+def resume(name: str, sequential: bool = False,
+           on_step: Callable[[str], None] | None = None) -> ResumeResult:
+    """REQ-TEST-159 criteria 2 to 4 and 6: copy a checkpoint into a database
+    of its own and replay into it arrival N onwards - once REQ-TEST-160 has
+    found nothing changed before N. Refusals change nothing."""
+    import os
+
+    from qa_tools.common import checkpoints, processing_pass, replay_inputs, scripted_decisions
+
+    say = on_step or (lambda _msg: None)
+    try:
+        checkpoints.require_synthetic()
+        cp = checkpoints.find(name)
+    except checkpoints.CheckpointRefused as exc:
+        return ResumeResult(replayed=False, refused=True, reason=str(exc))
+
+    say("Regenerating the deliveries to compare them with the checkpoint's")
+    first = replay_inputs.first_affected(cp.recorded)
+    if first.arrival is None:
+        return ResumeResult(replayed=False, reason=first.reason)
+    if first.arrival < cp.before:
+        instead = ("Start again with a bootstrap from empty" if first.arrival < 2 else
+                   f"Take a checkpoint before arrival {first.arrival} or earlier, or start "
+                   f"again with a bootstrap from empty")
+        return ResumeResult(
+            replayed=False, refused=True, first_affected=first.arrival,
+            reason=f"{first.reason}, which is before this checkpoint (arrival {cp.before}) - "
+                   f"nothing was copied or replayed. {instead}.")
+
+    from cli import bdm, cp as cp_cli
+
+    short = next(k for k, v in checkpoints.COLLECTIONS.items() if v == cp.collection_id)
+    say("Generating the synthetic data the replay reads")
+    bdm.generate_synthetic_data()
+    cp_cli.generate_synthetic_data()
+    say(f"Copying {cp.name} into a database of the resume's own")
+    dsn = checkpoints.copy_for_resume(cp)
+
+    previous = os.environ.get(supply_db.SUPPLY_DSN_ENV)
+    os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
+    supply_db.release_connections()
+    try:
+        with processing_pass.pass_lock("resume"):
+            player = scripted_decisions.Player(
+                cp.collection_id,
+                scripts=[scripted_decisions.Script(**s) for s in cp.pending_scripts])
+            say(f"Replaying {_LABEL[short]} from arrival {cp.before}")
+            _run_collection(short, sequential, record_deliveries=True,
+                            start_at=cp.before, player=player)
+        _rebuild_results(short)
+    finally:
+        supply_db.release_connections()
+        if previous is None:
+            os.environ.pop(supply_db.SUPPLY_DSN_ENV, None)
+        else:
+            os.environ[supply_db.SUPPLY_DSN_ENV] = previous
+    return ResumeResult(replayed=True, dsn=dsn, first_affected=first.arrival,
+                        reason=f"{first.reason}; replayed from arrival {cp.before}")
+
+
+def _rebuild_results(short: str) -> None:
+    """A resume processed only part of the collection, so its results file
+    is rebuilt from the whole recorded history rather than left partial."""
+    if short == "bdm":
+        from qa_tools.bdm.build_results_from_history import build_results_from_history
+    else:
+        from qa_tools.cp.build_results_from_history import build_results_from_history
+    build_results_from_history()
 
 
 def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:

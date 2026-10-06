@@ -42,7 +42,7 @@ def apply_redirects(root: Path) -> dict:
     process can restore them; a spawned child simply exits.
     """
     from qa_tools.bdm import orchestrate_bdm
-    from qa_tools.common import delivery, in_flight_log, scenario_map
+    from qa_tools.common import delivery, in_flight_log, scenario_map, scripted_decisions
     from qa_tools.cp import orchestrate_cp
 
     root = Path(root)
@@ -52,6 +52,12 @@ def apply_redirects(root: Path) -> dict:
         (delivery, "BOOKKEEPING_PATH"): root / "generator_bookkeeping.json",
         (scenario_map, "PLACEMENTS_PATH"): root / "scenario_placements.json",
         (in_flight_log, "OBSERVATIONS_DIR"): root / "observations" / "in_flight",
+        # A CUT-DOWN CORPUS CANNOT CARRY THE REAL SCRIPTS: they name supplies
+        # it does not have, and the player refuses rather than finish a
+        # history missing one (REQ-GEN-135 criterion 6). Here, not only in
+        # run_into_fresh_database, so a SPAWNED collection gets it too - the
+        # on-demand equivalence test failed on every run without it.
+        (scripted_decisions, "SCRIPT_PATH"): root / "no_scripted_decisions.yaml",
         # run_pipeline()/run_pipeline_cp() END by writing these, and the
         # real ones are what the dashboard build and its e2e tests read.
         (orchestrate_bdm, "RESULTS_PATH"): str(root / "reports" / "results_bdm.json"),
@@ -70,7 +76,7 @@ def restore(original: dict) -> None:
 
 
 def redirected_run_collection(name: str, sequential: bool,
-                              record_deliveries: bool = False) -> float:
+                              record_deliveries: bool = False, **replay) -> float:
     """`bootstrap._run_collection`, with the corpus redirection applied first.
 
     The test patches `bootstrap._run_collection` to this in BOTH modes,
@@ -85,7 +91,7 @@ def redirected_run_collection(name: str, sequential: bool,
             f"{CORPUS_ENV} is not set - refusing to run a collection pipeline "
             f"against this repo's real delivery tree")
     apply_redirects(Path(root))
-    return _REAL_RUN_COLLECTION(name, sequential, record_deliveries=record_deliveries)
+    return _REAL_RUN_COLLECTION(name, sequential, record_deliveries=record_deliveries, **replay)
 
 
 # --------------------------------------------------------------------------
@@ -105,6 +111,21 @@ CLOCK_COLUMNS = {
     "load_outcome": {"recorded_at"},
     "period": {"opened_at"},
     "hold": {"raised_at", "resolved_at"},
+    # Added 2026-10-06 (REQ-TEST-159), for tables and columns that arrived
+    # after this list was written and had been explained by hand in every
+    # full-bootstrap comparison since: the census, the identity row's mark,
+    # an owed run's own stamps.
+    "census": {"taken_at"},
+    "identity": {"marked_at"},
+    "owed_run": {"owed_at"},
+}
+
+#: SURROGATE IDS WITH NO ORDER WORTH KEEPING, dropped outright. Rows that
+#: point at them are compared by what they point AT (DERIVED_COLUMNS).
+SURROGATE_COLUMNS = {
+    "census": {"id"},
+    "filing": {"id"},
+    "owed_run": {"id"},
 }
 
 #: SURROGATE KEYS, replaced rather than dropped. A bigserial id differs
@@ -123,9 +144,26 @@ ORDINAL_COLUMNS = {
 }
 
 #: Columns recomputed as a natural value rather than compared raw.
+_LOAD = ("(SELECT lo.dataset_id || '|' || lo.physical || '|' || lo.outcome "
+         "FROM qa.load_outcome lo WHERE lo.id = t.{col})")
+_DECISION = ("(SELECT d.dataset_id || '|' || d.action || '|' || coalesce(d.supply, '') "
+             "|| '|' || d.effective_at::text FROM qa.decision d WHERE d.id = t.{col})")
+
 DERIVED_COLUMNS = {
     # A completion stamp is clock time, but WHETHER a run completed is not.
     "run": {"completed_at": "completed_at IS NOT NULL"},
+    # Ids pointing at another table's surrogate: compared as what they name.
+    "check_result": {"load_attempt": _LOAD.format(col="load_attempt")},
+    "filing": {"refiled_by": "(SELECT f.dataset_id || '|' || f.supply_id || '|' || "
+                             "coalesce(f.slot, '') FROM qa.filing f WHERE f.id = t.refiled_by)"},
+    "owed_run": {"caused_by_decision": _DECISION.format(col="caused_by_decision"),
+                 "caused_by_load": _LOAD.format(col="caused_by_load"),
+                 "cleared_at": "cleared_at IS NOT NULL",
+                 # A knock-on's number (`knock-on/6`, `__r2`) counts those recorded so far,
+                 # which differs with the order two collections write in.
+                 "run_key": r"regexp_replace(run_key, '(__r|knock-on/)[0-9]+$', '\1#')",
+                 "cleared_by_run": r"regexp_replace(cleared_by_run, '(__r|knock-on/)[0-9]+$', "
+                                   r"'\1#')"},
     "hold": {"resolved_at": "resolved_at IS NOT NULL",
              # resolved_by is a decision's surrogate id; compare WHICH
              # decision resolved it instead.
@@ -165,7 +203,7 @@ def _qa_select(conn, table: str) -> tuple[list[str], str]:
             names.append(col + "*")
             exprs.append(derived)
             continue
-        if col in CLOCK_COLUMNS.get(table, ()):
+        if col in CLOCK_COLUMNS.get(table, ()) or col in SURROGATE_COLUMNS.get(table, ()):
             continue
         ordinal = ORDINAL_COLUMNS.get(table)
         if ordinal and ordinal[0] == col:
@@ -276,11 +314,22 @@ def drop_database(name: str) -> None:
 
 def run_into_fresh_database(tree: Path, db_name: str, run, inspect=None) -> dict:
     """`run()` against a new, empty database with every on-disk path under
-    `tree`; that database's snapshot. Scripted decisions are switched off -
-    they replay the synthetic scenarios over the whole corpus and refuse a
+    `tree`; that database's snapshot. The database is dropped afterwards."""
+    dsn = fresh_database(db_name)
+    try:
+        return run_into_database(tree, dsn, run, inspect, ensure_schema=True)
+    finally:
+        drop_database(db_name)
+
+
+def run_into_database(tree: Path, dsn: str, run, inspect=None, *,
+                      ensure_schema: bool = False) -> dict:
+    """`run()` against the database at `dsn` - an existing one, such as a
+    resume's copy of a checkpoint (REQ-TEST-159) - with every on-disk path
+    under `tree`; its snapshot. Scripted decisions are switched off - they
+    replay the synthetic scenarios over the whole corpus and refuse a
     cut-down history for missing the rest. `inspect(dsn)`, when given, is
-    called before the database is dropped and its answer kept under
-    "inspected"."""
+    called and its answer kept under "inspected"."""
     import shutil
 
     import pytest
@@ -289,30 +338,24 @@ def run_into_fresh_database(tree: Path, db_name: str, run, inspect=None) -> dict
 
     mp = pytest.MonkeyPatch()
     original = apply_redirects(tree)
-    dsn = fresh_database(db_name)
     scratch = None
     try:
         mp.setenv("MOTHMAN_SUPPLY_DSN", dsn)
+        supply_db.release_connections()
         scratch = supply_db.scratch_dir()
         mp.delenv("GITHUB_REPOSITORY", raising=False)
-        # NO SCRIPTED DECISIONS: they replay the synthetic scenarios over the
-        # whole corpus, and would refuse a one-delivery history for missing
-        # the rest. Not what any route is being compared on.
-        from qa_tools.common import scripted_decisions
-        mp.setattr(scripted_decisions, "SCRIPT_PATH", tree / "no_scripted_decisions.yaml")
-        with supply_db.connect(label="test-kept-routes") as conn:
-            from qa_tools.common import qa_store
-            qa_store.ensure_schema(conn)
+        if ensure_schema:
+            with supply_db.connect(label="test-kept-routes") as conn:
+                from qa_tools.common import qa_store
+                qa_store.ensure_schema(conn)
         run()
         snap = snapshot(dsn)
         if inspect is not None:
             snap["inspected"] = inspect(dsn)
         return snap
     finally:
+        supply_db.release_connections()
         mp.undo()
         restore(original)
         if scratch is not None:
             shutil.rmtree(scratch, ignore_errors=True)
-        drop_database(db_name)
-
-

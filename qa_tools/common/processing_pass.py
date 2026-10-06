@@ -71,35 +71,72 @@ class PassLockHeld(RuntimeError):
         self.holder, self.since = holder, since
 
 
+class _Held:
+    """A held pass lock - and the one way to let go of it for a moment."""
+
+    def __init__(self, command: str):
+        self.command = command
+        self.conn = None
+
+    def take(self) -> None:
+        # NEVER A REUSED CONNECTION (REQ-PIPE-158): the refusal below says
+        # "since" the holder's backend started, which is when the lock was
+        # taken only if the connection was opened to take it.
+        conn = supply_db.connect(label=f"{PASS_LOCK_LABEL}{self.command}", reuse=False)
+        try:
+            got = conn.execute("SELECT pg_try_advisory_lock(?, 1)",
+                               [PASS_LOCK_SPACE]).fetchone()[0]
+            if not got:
+                rows = conn.execute(
+                    "SELECT a.application_name, a.backend_start FROM pg_locks l "
+                    "JOIN pg_stat_activity a ON a.pid = l.pid "
+                    "WHERE l.locktype = 'advisory' AND l.classid = ? AND l.objid = 1 "
+                    "AND l.objsubid = 2 AND l.granted "
+                    # THIS DATABASE'S HOLDER: the lock is per database, pg_locks
+                    # is not - a bootstrap running against another database on
+                    # the same server was named as the holder (found by the lock
+                    # test while a rebuild ran beside it).
+                    "AND l.database = (SELECT oid FROM pg_database "
+                    "WHERE datname = current_database())", [PASS_LOCK_SPACE]).fetchall()
+                name, since = rows[0] if rows else ("", None)
+                raise PassLockHeld(
+                    (name or "").removeprefix(PASS_LOCK_LABEL) or "(unknown)",
+                    since.isoformat(timespec="seconds") if since else "an unknown time")
+        except BaseException:
+            conn.close()
+            raise
+        self.conn = conn
+
+    def release(self) -> None:
+        if self.conn is not None:
+            self.conn.close()
+            self.conn = None
+
+    @contextmanager
+    def paused(self):
+        """Let go of the lock and its connection for the block, then take it
+        back - for copying this database, which PostgreSQL refuses while
+        anything is connected to it (REQ-TEST-159). Taking it back raises
+        PassLockHeld if another pass got in between, rather than carry on
+        beside it."""
+        self.release()
+        try:
+            yield
+        finally:
+            self.take()
+
+
 @contextmanager
 def pass_lock(command: str):
     """Hold this database's pass lock for the length of the block, or raise
-    PassLockHeld naming who has it - before anything is changed."""
-    # NEVER A REUSED CONNECTION (REQ-PIPE-158): the refusal below says
-    # "since" the holder's backend started, which is when the lock was taken
-    # only if the connection was opened to take it.
-    conn = supply_db.connect(label=f"{PASS_LOCK_LABEL}{command}", reuse=False)
+    PassLockHeld naming who has it - before anything is changed. Yields the
+    held lock, whose `paused()` lets a checkpoint copy the database."""
+    held = _Held(command)
+    held.take()
     try:
-        got = conn.execute("SELECT pg_try_advisory_lock(?, 1)",
-                           [PASS_LOCK_SPACE]).fetchone()[0]
-        if not got:
-            rows = conn.execute(
-                "SELECT a.application_name, a.backend_start FROM pg_locks l "
-                "JOIN pg_stat_activity a ON a.pid = l.pid "
-                "WHERE l.locktype = 'advisory' AND l.classid = ? AND l.objid = 1 "
-                "AND l.objsubid = 2 AND l.granted "
-                # THIS DATABASE'S HOLDER: the lock is per database, pg_locks is
-                # not - a bootstrap running against another database on the
-                # same server was named as the holder (found by the lock test
-                # while a rebuild ran beside it).
-                "AND l.database = (SELECT oid FROM pg_database "
-                "WHERE datname = current_database())", [PASS_LOCK_SPACE]).fetchall()
-            name, since = rows[0] if rows else ("", None)
-            raise PassLockHeld((name or "").removeprefix(PASS_LOCK_LABEL) or "(unknown)",
-                               since.isoformat(timespec="seconds") if since else "an unknown time")
-        yield
+        yield held
     finally:
-        conn.close()
+        held.release()
 
 
 @contextmanager

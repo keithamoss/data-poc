@@ -9,8 +9,6 @@ a failure surface as somebody else's crash.
 """
 from __future__ import annotations
 
-import ast
-import inspect
 from pathlib import Path
 
 import duckdb
@@ -328,43 +326,48 @@ class TestRedForUnrun:
 
 
 class TestLoadingCompletesBeforeQARuns:
-    """Criterion 10, asserted structurally rather than by timing.
+    """Criterion 10: every table in a delivery is loaded before QA runs over
+    any of it. Asserted by BEHAVIOUR now: the batch no longer stages the
+    whole delivery set before the first run (REQ-TEST-159 stages and records
+    each delivery as it first arrives, so a replay never holds its future),
+    so what must hold is per delivery - and a delivery's files can land
+    minutes apart (REQ-GEN-044)."""
 
-    Both orchestrators stage the WHOLE delivery set before the QA
-    fan-out starts, which is what REQ-PIPE-060's own decision
-    established - "the staging pass lifted OUT of the
-    ProcessPoolExecutor fan-out and run once before it". A test that
-    merely ran the pipeline would pass whatever the order was.
-    """
+    def test_a_deliverys_every_table_is_staged_before_its_first_check(self, monkeypatch):
+        from datetime import datetime, timedelta, timezone
+        from types import SimpleNamespace
 
-    @pytest.mark.parametrize("module,function,builder", [
-        ("qa_tools.bdm.orchestrate_bdm", "run_pipeline", "build_all"),
-        ("qa_tools.cp.orchestrate_cp", "run_pipeline_cp", "build_all"),
-    ])
-    def test_the_staging_pass_precedes_the_fan_out(self, module, function, builder):
-        import importlib
+        from qa_tools.common import arrival_lifecycle, delivery_log
 
-        mod = importlib.import_module(module)
-        source = inspect.getsource(getattr(mod, function))
-        tree = ast.parse(source.lstrip())
+        base = datetime(2023, 2, 1, tzinfo=timezone.utc)
 
-        def line_of(name):
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
-                        and node.func.attr == name:
-                    return node.lineno
-            return None
-
-        staged_at = line_of(builder)
-        # The per-arrival lifecycle (REQ-PIPE-086 criterion 2) is where
-        # the runs happen now; it was parallel_orchestrate.run_manifest.
-        fanned_at = line_of("process_all")
-        assert staged_at is not None, f"{function} no longer stages before anything"
-        assert fanned_at is not None, f"{function} no longer fans out"
-        assert staged_at < fanned_at, (
-            "the staging pass has moved after the QA fan-out - a check can now be "
-            "evaluated against a table still mid-load")
-
+        def arrival(run_id, delivery, minutes):
+            return SimpleNamespace(run_id=run_id, delivery_name=delivery,
+                                   received_at=base + timedelta(minutes=minutes))
+        arrivals = [arrival("a1", "A", 0), arrival("b1", "B", 10), arrival("b2", "B", 14),
+                    arrival("b3", "B", 19), arrival("c1", "C", 30)]
+        events = []
+        monkeypatch.setattr(delivery_log, "record_arrival",
+                            lambda a: events.append(("record", a.delivery_name)))
+        steps = arrival_lifecycle.Steps(
+            file_and_overlay=lambda a, among: None,
+            entry_for=lambda a: a.run_id,
+            run_one=lambda entry, *rest, **kw: events.append(("check", entry)) or [],
+            promote_after=lambda a, got, run_by: None)
+        arrival_lifecycle.process_all(
+            arrivals, steps=steps, run_by="t", run_timestamp="2023-02-01T00:00:00+00:00",
+            prepare=arrival_lifecycle.staged_as_it_arrives(
+                lambda a: events.append(("stage", a.run_id))))
+        staged = [e[1] for e in events if e[0] == "stage"]
+        assert sorted(staged) == sorted(a.run_id for a in arrivals), "staged once each"
+        for a in arrivals:
+            first_check = events.index(("check", a.run_id))
+            same_delivery = [b.run_id for b in arrivals if b.delivery_name == a.delivery_name]
+            assert all(events.index(("stage", r)) < first_check for r in same_delivery), (
+                f"{a.run_id} was checked before every table of delivery {a.delivery_name} "
+                "was loaded")
+        # AND NOTHING FROM THE FUTURE: delivery C is not staged before B is checked.
+        assert events.index(("stage", "c1")) > events.index(("check", "b3"))
 
 class TestACheckIsEvaluatedOnce:
     """Criterion 11: against the state current at that moment, never

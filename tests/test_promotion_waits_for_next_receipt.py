@@ -37,3 +37,37 @@ def test_the_promotion_lands_before_the_next_receipt(module, monkeypatch):
     [effective] = stamped
     at = datetime.fromisoformat(effective)
     assert RECEIVED <= at < NEXT
+
+
+class TestTheNextReceiptIsKnownInAReplay:
+    """REQ-TEST-159 records each delivery at its FIRST ARRIVAL, so in a replay
+    the next delivery is not yet in the database when this one is promoted.
+    The cap must still see it - from the arrivals the replay is reading - or
+    an invented lag runs past the next supply and two versions show waiting
+    at once (Keith's #117 D5), which is what the whole-bootstrap comparison
+    caught: 29 promotions' effective_at moved past the next receipt."""
+
+    def _tree(self, root, rows):
+        import json
+
+        for seq, (name, received) in enumerate(rows, start=1):
+            (root / "deliveries" / name).mkdir(parents=True)
+            (root / "receipts" / name).mkdir(parents=True)
+            (root / "deliveries" / name / "cp_clients.csv").write_text(
+                "client_id,given_name\n1,Ann\n")
+            (root / "receipts" / name / "cp_clients.csv.json").write_text(json.dumps({
+                "delivery": name, "file": "cp_clients.csv", "received_at": received,
+                "received_from": "storage", "sequence": seq,
+                "filed_by": {"kind": "automated"}}))
+
+    def test_an_unrecorded_next_arrival_in_the_tree_caps_the_lag(
+            self, tmp_path, monkeypatch, clean_delivery_log):
+        from qa_tools.common import arrivals, delivery
+
+        self._tree(tmp_path, [("Extract A", "2023-04-03T09:00:00+00:00"),
+                              ("Extract B", "2023-04-03T09:00:30+00:00")])
+        monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "deliveries")
+        monkeypatch.setattr(delivery, "RECEIPTS_DIR", tmp_path / "receipts")
+        first, second = arrivals.arrivals_for("child-protection", "")
+        assert promotion.next_receipt(first) == second.received_at
+        assert promotion.next_receipt(second) is None

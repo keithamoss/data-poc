@@ -25560,6 +25560,7 @@ requirements:
         Protection, the 108 because REQ-PIPE-105 made every file its own
         arrival. Its companion for CI is REQ-TEST-117's cache, which covers
         the pushes that touch no pipeline input; this covers the rest.
+      - 'SUPERSEDED IN PART, 2026-10-06 (REQ-TEST-159, Keith''s signing answer): a bootstrap no longer records every delivery once before either collection starts. Each collection stages an arrival and records its delivery just before processing it (arrival_lifecycle.staged_as_it_arrives), and the deliveries neither collection claims are recorded once both finish. This decision''s reason - two collections writing one delivery at once is a race - is answered by delivery_log.record writing a delivery and its files in ONE transaction under its existing ON CONFLICT DO NOTHING. The on-demand equivalence test this requirement owns had been failing on every run since scripted decisions arrived, and is repaired and now run by CI on every push (post-build-review #128).'
   - id: REQ-TEST-117
     title: CI reuses a bootstrapped database whose inputs have not changed, and never one whose inputs have
     date_written: "2026-10-03"
@@ -29323,8 +29324,7 @@ requirements:
       by: Keith
       date: '2026-10-06'
     acceptance_criteria:
-    - WHILE one process runs a collection's arrivals, THE SYSTEM SHALL parse the dbt project at most once,
-      and again only if dbt_project/, the profile or a dbt package changes.
+    - WHILE one process runs a collection's arrivals, THE SYSTEM SHALL parse the dbt project in full at most once, every later run reusing dbt's own partial parse, and in full again only if dbt_project/, the profile or a dbt package changes.
     - THE SYSTEM SHALL keep each run's dbt models and audit tables apart from every other run's that may
       overlap it in time.
     - THE SYSTEM SHALL write each run's run_results.json and manifest.json to its own target path, removing
@@ -29367,6 +29367,8 @@ requirements:
       until he has chosen.'
     - 'SPIKE RESULTS, 2026-10-06 (a scratch copy of supply, Child Protection''s six staging models and 61 nodes, two periods, four runs each): TODAY 7.95-8.27s a run. B (stable target path and stable schema names, view schema re-pointed per run, a dbt subprocess per run) 6.6-7.9s - only about 1s saved, because a partial parse with NOTHING changed still costs 2.85s (1.86s of it dbt starting) and changing DBT_RUN_SCHEMA alone costs 4.03s, nearly a full parse. A (one long-lived Python process, parsed once in ~6s, then dbtRunner(manifest=...) per run) 3.3-3.9s a run, of which ~2.9s is dbt executing its own 61 nodes'' SQL - so dbt''s overhead falls from ~5s to ~0.5s. A''s verdicts were IDENTICAL to today''s on both periods (61 nodes, the same six not passing, the same failure counts). A ALSO NEEDS STABLE SCHEMA NAMES: a parsed manifest has its schemas baked in, so the per-run names become per-process ones with the run''s views re-pointed. NEITHER meets criterion 7''s 3s: the SQL alone is ~2.9s here, not the 1-2s the criterion assumed. A spike artefact worth knowing: dbt''s plugin discovery imports every top-level module named dbt_* on sys.path, so scripts named that way beside a worker run on its first parse (an apparent 38s parse).'
     - 'PARKED 2026-10-06 (Keith, on the spike results): NEITHER mechanism for now - dbt stays one subprocess per run. A (~3.5s a run, identical verdicts) remains the recommended one if it is picked up, B is not worth building alone (~1s a run). Criterion 7 amended the same day from a mean dbt time of 3s - unreachable by either, since dbt''s own SQL is ~2.9s - to the whole bootstrap at 10 minutes or less, which is the thing that was ever wanted.'
+    - 'RESEARCHED AND MEASURED AGAIN, 2026-10-06 evening (Keith: no pinning dbt-core; research how else). Installed: dbt-core 1.12.4, dbt-postgres 1.11.0. WHERE ONE RUN''S TIME GOES today (debug JSON log timestamps, one real build of Child Protection''s 61 nodes, machine busy with a bootstrap so ~10% high): Python start and importing dbt 1.6-1.8s; adapter and project load 0.3s; a FULL parse plus writing manifest.json, semantic_manifest.json and osi_document.json 2.4-2.7s; relation cache and schema creation 0.2-0.3s; the 61 nodes 3.0-3.8s, of which SQL (connection set-up included) 1.4s over 200 statements, Jinja compile 0.6s and dbt''s own per-node bookkeeping ~1.5s; wrap-up and exit ~0.5s. WHY PARTIAL PARSE NEVER APPLIES, read in the installed source (parser/manifest.py build_manifest_state_check): the profile''s connection_info hash includes `schema`, so a per-run DBT_PG_SCHEMA forces a FULL reparse every run (the docs agree: an env var used in profiles.yml forces a full re-parse); DBT_RUN_SCHEMA in sources.yml reparses the sources and everything downstream; and the partial-parse file lives in the per-run --target-path. THE OPTION THAT NEEDS NO PIN: dbt in-process through dbtRunner().invoke() WITHOUT an injected manifest (supported in v1 and v2), with stable schema names and a stable --partial-parse-file-path (which must already exist - the first run goes without it): 6.0s for the first run, then 3.8-3.9s a run on 1 thread and 2.9-3.0s on 4, against 8.0-9.3s today. It still has to run in a process of its own per collection, beside Soda Core, datacontract-cli and Evidently rather than inside their interpreter (dbt does not support concurrent invocations in one process, and Soda reloads .env into os.environ). REJECTED: the v2 Rust parser (--use-v2-parser, bundled with 1.12) - Postgres is not a supported adapter (experimental flag only), it rejected this project''s dbt test YAML for deprecated top-level `meta`/arguments, and its parse took 7.0s against 4.8s. Worth doing anyway, separately: migrating that YAML to the new format before dbt v2. threads: 4 alone, subprocess unchanged: the node phase 3.8s -> 3.0s. NOT YET CHECKED for the in-process variant: verdicts identical to today''s (the pinned spike''s were).'
+    - 'UNPARKED AND CHOSEN, 2026-10-06 evening (Keith: "let''s stay in v1 and do the change"): one long-lived dbt worker process per collection, calling dbtRunner().invoke() with NO injected manifest - the documented API, kept in v2 - with stable per-process schema names and a stable --partial-parse-file-path so dbt''s own partial parse applies. Nothing is pinned: dbt-core 2.0 is only at rc8 on PyPI (1.12.5 is the latest stable, checked 2026-10-06) and its engine does not yet support Postgres, so v2 is a separate later move, re-measured then. Criterion 1 reworded the same day from "parse at most once" to a full parse at most once with dbt''s partial parse after, which is what this mechanism does.'
     open_questions:
     - Which mechanism, A or B - to be chosen by Keith on the spike's measurements.
   - id: REQ-PIPE-158
@@ -29394,9 +29396,11 @@ requirements:
       before, counted the same way on the same machine the same day (107.4s ->
       97.6s). Criterion 8: a full bootstrap from empty (904s) compared with the
       previous database by tests/equiv_support.snapshot - every table the same
-      row count, every difference one the comparison already excludes (census
-      id and taken_at, check_result load_attempt, delivery_file receipt_sequence,
-      filing id, identity marked_at, owed_run''s knock-on numbering).'
+      row count, every difference in a stamp, a surrogate id or the generator''s
+      receipt counter (census id and taken_at, check_result load_attempt, delivery_file
+      receipt_sequence, filing id, identity marked_at, owed_run''s knock-on numbering)
+      - explained by hand at the time, since the comparison''s exclusions did
+      not yet cover them (post-build-review #128).'
     implemented_by:
     - qa_tools/common/supply_db.py::connect
     - qa_tools/common/supply_db.py::SupplyConnection
@@ -29485,7 +29489,62 @@ requirements:
       from the first one my change can affect, starting from a saved copy of the database just before it,
       so that each attempt costs minutes rather than a 27-minute rebuild.
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-06: tests/test_checkpoints.py - 21 passed in the ordinary suite:
+      a checkpoint inside a receipt instant moves back to where it begins, outside
+      the collection is refused, and needs an arrival before it; a checkpoint,
+      a bootstrap asking for one and a resume are all refused on an asset not
+      declared synthetic; both collections at once is refused; a checkpoint is
+      a copy carrying its collection, N, recorded inputs and pending scripted
+      decisions; the process''s own idle connections are let go first and a connection
+      still open is named in the refusal; no more than the configured number are
+      kept, per source database; one is deleted on request and nothing else can
+      be; a resume whose first affected arrival is before N is refused naming
+      it, an input change is refused as a restart, and nothing differing replays
+      nothing - each copying nothing. On demand (now run by CI on every push),
+      a resume from a checkpoint recorded exactly what the full replay did for
+      BOTH collections on the reduced corpus (2 passed). AT FULL SIZE, on the
+      final code (staging a whole delivery at its first arrival), criterion 5''s
+      one verification: `mothman pipeline bootstrap --collection cp --checkpoint-before
+      60` moved to 55 (the start of its group), took the checkpoint mid-replay
+      and finished in 929s; `mothman pipeline resume` of it then answered ''Nothing
+      differs from the checkpoint - nothing to replay'' and copied nothing (inputs
+      unchanged - REQ-TEST-160 criterion 4); forced past that answer, a resume
+      from the checkpoint into its own copy replayed arrivals 55-108 in 461s and
+      recorded EXACTLY what the full replay did - every qa table and every supply
+      table identical by tests/equiv_support.snapshot, no difference at all. Recording
+      and staging per arrival, compared as a whole bootstrap (927s) against the
+      previous one: every difference a check''s failing-row sample, now sorted
+      (post-build-review #129), or the generator''s receipt counter - after the
+      comparison first caught the #117 D5 cap switched off (#130), fixed with
+      a failing test first; and staging per delivery rather than per instant changed
+      nothing recorded (only the receipt counter differed between the two builds).'
+    implemented_by:
+    - qa_tools/common/checkpoints.py::save
+    - qa_tools/common/checkpoints.py::listed
+    - qa_tools/common/checkpoints.py::delete
+    - qa_tools/common/checkpoints.py::prune
+    - qa_tools/common/checkpoints.py::copy_for_resume
+    - qa_tools/common/checkpoints.py::snapped
+    - qa_tools/common/checkpoints.py::taking_checkpoint
+    - qa_tools/common/checkpoints.py::require_synthetic
+    - qa_tools/common/bootstrap.py::bootstrap
+    - qa_tools/common/bootstrap.py::resume
+    - qa_tools/common/arrival_lifecycle.py::process_all
+    - qa_tools/common/arrival_lifecycle.py::staged_as_it_arrives
+    - qa_tools/common/delivery_log.py::record_arrival
+    - qa_tools/common/processing_pass.py::pass_lock
+    - qa_tools/common/promotion.py::next_receipt
+    - cli/pipeline.py::resume_command
+    - cli/pipeline.py::checkpoint_list_command
+    - cli/pipeline.py::checkpoint_delete_command
+    linked_tests:
+    - tests/test_checkpoints.py
+    - tests/test_bootstrap_equivalence.py
+    - tests/test_promotion_waits_for_next_receipt.py
+    - tests/test_ci_on_demand.py
+    - tests/test_processing_pass.py
     source: 'Keith, 2026-10-05 evening ("is there a way you can regenerate just the failing slices") and
       2026-10-06 ("all four"), plans/running-thoughts.md #65. Drafted by delivery-scoper 2026-10-06. Signed
       by Keith 2026-10-06.'
@@ -29536,6 +29595,24 @@ requirements:
       existing ON CONFLICT DO NOTHING).'
     - 'ANSWERED 2026-10-06 (Keith): a resume lands in a SCRATCH DATABASE a person points MOTHMAN_SUPPLY_DSN
       at; the real supply database is never touched.'
+    - 'STAGED AS WELL AS RECORDED AT FIRST ARRIVAL, A WHOLE DELIVERY AT A TIME: the batch staged every arrival up front too, so a checkpoint would have held the future''s staged tables. Each delivery is now staged and recorded just before its first arrival is processed, together with anything received at the same instant (arrival_lifecycle.arriving_with). PER DELIVERY, NOT PER INSTANT, because REQ-PIPE-035 criterion 10 loads every table in a delivery before QA runs over any of it and a delivery''s files can land minutes apart (REQ-GEN-044) - the first build grouped by instant and the gate''s pin on that criterion caught it; and a zip''s files are filed together (REQ-PIPE-105 criterion 5).'
+    - 'A CHECKPOINT SITS AT A GROUP BOUNDARY: a ''before N'' inside a delivery or a receipt instant moves back to where it begins and says so - earlier is the safe direction.'
+    - 'THE DESCRIPTION IS THE DATABASE''S OWN COMMENT: collection, N, recorded
+      inputs and the scripted decisions not yet played, so a checkpoint cannot
+      lose it and listing needs only the server. Pending scripts are carried so
+      a resume never plays one twice.'
+    - 'PRUNED PER SOURCE DATABASE, not server-wide: a test''s scratch database
+      taking a checkpoint must never prune a person''s on a shared cluster.'
+    - THE PASS LOCK PAUSES FOR THE COPY (PostgreSQL refuses CREATE DATABASE ...
+      TEMPLATE while anything is connected to the source) and is taken back after
+      - refused if another pass got in between.
+    - 'A RESUME COMPARES BEFORE IT CHANGES ANYTHING: regenerated into a temporary
+      directory first, so a refusal leaves data/ untouched; only a replay that
+      will happen regenerates data/ for real. Its DSN is printed redacted, and
+      its results file is rebuilt from the whole recorded history rather than
+      left partial.'
+    - 'next_receipt READS THE TREE AS WELL AS THE RECORDS: the set the batch used
+      to record up front, so a replay caps promotions exactly as before (#130).'
     open_questions:
     - Is judging a scenario from mothman's own output enough, or must a resumed copy also build the dashboard?
       Not asked.
@@ -29546,7 +29623,39 @@ requirements:
       my change can affect and refuse when it cannot, so that a resume never quietly keeps results the change
       would have altered.
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-06: tests/test_replay_inputs.py written first and failing (no module),
+      then 19 passed: the input list is REQ-TEST-117 criterion 1''s, a replay
+      compares it less the generators, ignored files (dbt_packages, target) are
+      not inputs, CI keys its cache on the same list through `mothman pipeline
+      cache-key`, the key moves with any input and not otherwise; the deliveries
+      print is one entry per arrival in receipt order with each file''s content
+      and its receipt, the generator''s receipt counter excluded; nothing differing
+      is nothing to replay; a changed, added or removed delivery is the first
+      affected, named, from its delivery''s first arrival; any other input restarts
+      the collection and is named; an unreadable record resolves to the first
+      arrival; no parameter takes an arrival number; regenerating to compare leaves
+      data/ alone and is deterministic. Regenerating reproduced the real tree
+      exactly for both collections (108 of 108 Child Protection arrivals, 42 of
+      42 Birth Registrations). End to end at full size: a resume asked of a checkpoint
+      whose inputs were unchanged answered ''Nothing differs from the checkpoint
+      - nothing to replay'' and copied nothing (criterion 4).'
+    implemented_by:
+    - qa_tools/common/replay_inputs.py::INPUTS
+    - qa_tools/common/replay_inputs.py::input_files
+    - qa_tools/common/replay_inputs.py::cache_key
+    - qa_tools/common/replay_inputs.py::deliveries_print
+    - qa_tools/common/replay_inputs.py::regenerated_print
+    - qa_tools/common/replay_inputs.py::Recorded
+    - qa_tools/common/replay_inputs.py::first_affected
+    - generator/output.py::redirect
+    - generator/output.py::generated_into
+    - cli/pipeline.py::cache_key_command
+    linked_tests:
+    - tests/test_replay_inputs.py
+    - tests/test_ci_bootstrap_cache.py
+    - tests/test_checkpoints.py
     source: 'Keith, 2026-10-06, scoping plans/running-thoughts.md #65 ("a rule for knowing which arrival
       is the first a change can affect"). Drafted by delivery-scoper the same day. Signed by Keith 2026-10-06.'
     signed_off:
@@ -29579,6 +29688,24 @@ requirements:
       looks exactly like a correct one.'
     - 'SIGNED AS DRAFTED 2026-10-06 (Keith): the first affected arrival is computed and never typed in;
       any doubt resolves earlier. A manual N was offered and not chosen.'
+    - 'THE RECEIPT COUNTER IS NOT COMPARED: the generator''s `sequence` moves
+      on every regeneration of identical data (measured 5929 against 5971 for
+      one file), so comparing it would make every resume a full replay. Order
+      is still compared - it is the print''s order.'
+    - 'FILES, NOT PATTERNS: every file git considers part of the checkout under
+      the list - tracked, or new and not ignored - hashed as it stands in the
+      working tree. A new module not yet added is an input; dbt_packages/ and
+      target/ are not, or CI''s key would never hit after dbt deps.'
+    - CI's KEY STEP MOVED after `uv sync` so mothman exists to compute it; the
+      prefix became bootstrap-v2-, so the first CI run after this change misses
+      the cache once (REQ-TEST-117's awaited hit is one run further away, told
+      to Keith beforehand).
+    - 'REGENERATES BOTH COLLECTIONS, in the bootstrap''s order, into a temporary
+      directory (generator/output.generated_into, moved out of tests/generator_isolation):
+      a delivery''s name depends on what the other generator has on disk.'
+    - 'REASONS ARE FINISHED SENTENCES, shown as they are: capitalising the first
+      letter after the fact turned a path into ''Contract/data-asset.yaml'' (found
+      by test).'
     open_questions:
     - REQ-TEST-117 (built but not yet flipped) owns the input list; build the shared list here and have
       117 adopt it.

@@ -532,29 +532,27 @@ def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
 # replay's simulated time rather than today's; on a real one, the wall clock.
 @replay_clock.on_replay_clock
 def run_pipeline(sequential: bool = False,
-                 record_deliveries: bool = True) -> dict:
+                 record_deliveries: bool = True,
+                 *, start_at: int = 1, after_each=None,
+                 player=None) -> dict:
     # A RUN'S TOOLS OVERLAP unless told not to (REQ-TEST-116 criteria 3, 5).
     parallel_orchestrate.TOOLS_CONCURRENTLY = not sequential
-    build_per_run_warehouses.build_all()
 
     # RECOGNISED FROM DISK, never read from a declaration
     # (REQ-GEN-043). The generator's manifest.json is bookkeeping, and
     # a pipeline reading it would be filing supplies from what it was
     # told rather than from what arrived.
     found_arrivals = arrivals.arrivals_for("civil-registration", "run_")
+    # A RESUME'S CLOCK STARTS AT ITS FIRST ARRIVAL (REQ-TEST-159 criterion
+    # 4): anchored at arrival N's receipt before this writes anything.
+    if start_at > 1 and replay_clock.active():
+        replay_clock.anchor(found_arrivals[start_at - 1].received_at)
 
-    # ONE COMMITTED FILE PER DELIVERY, WRITTEN ONCE (REQ-PIPE-069).
-    # Recognition facts only - what arrived and what we thought it was.
-    # A delivery spanning collections is recognised by both
-    # orchestrators, so the second write being a no-op is the ordinary
-    # case rather than a guard against a bug.
-    #
-    # UNLESS THE CALLER ALREADY DID (REQ-TEST-116): a bootstrap running
-    # both collections side by side records every delivery once before
-    # either starts, because "the second write is a no-op" is a race
-    # when the two writes are simultaneous.
-    if record_deliveries:
-        delivery_log.record_all()
+    # EACH DELIVERY IS RECORDED AT ITS FIRST ARRIVAL, and each arrival
+    # STAGED as it comes (REQ-TEST-159, reversing REQ-TEST-116's
+    # record-everything-up-front): see arrival_lifecycle.staged_as_it_arrives.
+    # Write-once, so a delivery both collections claim is recorded by
+    # whichever reaches it first, in one transaction.
 
     # WHAT THIS RUN SAW IN FLIGHT (REQ-PIPE-057 criteria 5 and 7).
     # Reported on EVERY run, with no interval and no threshold -
@@ -616,7 +614,14 @@ def run_pipeline(sequential: bool = False,
 
     all_results = arrival_lifecycle.process_all(
         found_arrivals, steps=STEPS, run_by=run_by, run_timestamp=run_timestamp,
-        player=scripted_decisions.Player(COLLECTION_ID))
+        player=player if player is not None else scripted_decisions.Player(COLLECTION_ID),
+        prepare=arrival_lifecycle.staged_as_it_arrives(build_per_run_warehouses.stage_arrival),
+        start_at=start_at, after_each=after_each)
+
+    # A DELIVERY NO ARRIVAL CLAIMED is recorded once the arrivals are done
+    # (REQ-TEST-159): everything that was claimed was recorded as it arrived.
+    if record_deliveries:
+        delivery_log.record_all()
 
     # THE TICKETS CATCH UP WITH THE SLOTS (REQ-PIPE-083 criteria 13 and
     # 16). After promotion rather than beside it, because a ticket that

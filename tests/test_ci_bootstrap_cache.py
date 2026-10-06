@@ -38,18 +38,28 @@ def _index(fragment: str) -> int:
 
 
 class TestTheKey:
+    """Criterion 1. The list is held once, in replay_inputs (REQ-TEST-160's
+    NFR), and the workflow asks mothman for the key rather than copying the
+    list into hashFiles()."""
+
     def test_it_hashes_every_input_criterion_1_names(self):
+        from qa_tools.common import replay_inputs
+
+        assert set(replay_inputs.INPUTS) == set(INPUTS)
+
+    def test_the_workflow_takes_the_key_from_that_list(self):
         run = _named("Key the bootstrap cache")["run"]
-        for path in INPUTS:
-            assert f"'{path}'" in run, f"{path} is not in the cache key"
+        assert "mothman pipeline cache-key" in run and "hashFiles" not in run
 
     def test_no_other_cli_file_is_in_it(self):
-        run = _named("Key the bootstrap cache")["run"]
-        assert "'cli/**'" not in run and "'cli/*'" not in run
+        from qa_tools.common import replay_inputs
 
-    def test_it_is_computed_before_anything_installs(self):
-        assert _index("Key the bootstrap cache") < _index("Sync dependencies")
-        assert _index("Key the bootstrap cache") < _index("Install dbt_utils")
+        assert not [p for p in replay_inputs.input_files()
+                    if p.startswith("cli/") and p != "cli/pipeline.py"]
+
+    def test_it_is_computed_before_the_restore_and_after_mothman_exists(self):
+        assert _index("Sync dependencies") < _index("Key the bootstrap cache")
+        assert _index("Key the bootstrap cache") < _index("Restore the bootstrapped database")
 
 
 class TestOnlyAnExactMatchRestores:

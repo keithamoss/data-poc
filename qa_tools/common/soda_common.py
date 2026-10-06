@@ -87,7 +87,11 @@ class CaptureSampler(Sampler):
     def store_sample(self, sample_context) -> SampleRef:
         columns = [c.name for c in sample_context.sample.get_schema().columns]
         rows = sample_context.sample.get_rows()
-        self.captured[sample_context.check_name] = [dict(zip(columns, row)) for row in rows[:FAILING_SAMPLE_LIMIT]]
+        # EVERYTHING SODA RETURNED, not its first few: failing_sample_keys
+        # sorts before it keeps FAILING_SAMPLE_LIMIT, so the same data records
+        # the same sample (post-build-review #129). Bounded by Soda's own
+        # sample limit, and only the key column ever leaves this module.
+        self.captured[sample_context.check_name] = [dict(zip(columns, row)) for row in rows]
         return SampleRef(
             name=sample_context.sample_name,
             schema=sample_context.sample.get_schema(),
@@ -106,7 +110,8 @@ def failing_sample_keys(captured: dict[str, list[dict]], check_name: str, pk_col
     column its own fail query selected. Either way, only pk_column's
     value ever leaves this function - never other row content."""
     rows = captured.get(check_name, [])
-    return [str(row[pk_column]) for row in rows if row.get(pk_column) is not None]
+    keys = sorted(str(row[pk_column]) for row in rows if row.get(pk_column) is not None)
+    return keys[:FAILING_SAMPLE_LIMIT]
 
 
 def check_id_from_resource_attributes(check: dict) -> str | None:

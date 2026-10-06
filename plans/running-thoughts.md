@@ -4543,7 +4543,43 @@ Belongs with batch 5's check work.
     now"). Per run: today ~8.0s, B (keep dbt's partial parse) ~7.0s, A (a
     long-lived dbt worker, parsed once) ~3.5s with identical verdicts. Its
     target is now the whole bootstrap at 10 minutes or less. Full numbers
-    are in the requirement's decisions.
+    are in the requirement's decisions. UNPARKED the same evening (Keith:
+    "stay in v1 and do the change") - an in-process dbt worker per
+    collection with dbt's own partial parse, nothing pinned, measured at
+    ~3.8s a run against ~8-9s; next to build.
+
+    **REQ-TEST-159 AND 160 BUILT, 2026-10-06** (checkpoint replay): proven at
+    full size - a resume from arrival 55 recorded exactly what the full
+    replay did, in 457s against 923s. Each arrival is now staged and its
+    delivery recorded as it arrives rather than up front.
+
+    **THE OTHER THREE TOOLS, PROFILED 2026-10-06** (Keith's ask; the
+    12-arrival Child Protection replay with the tools one after another and
+    a cProfile each, so Python-heavy figures read ~20-40% high). Per run:
+    dbt 9.1s (all but 0.1s its own process); **datacontract-cli 2.9s** -
+    0.8s checking the contract (0.44s re-compiling a JSON-schema validator
+    every run, the rest PyYAML's pure-Python loader and dumper round-tripping
+    the contract), ~1.5s on the checks (building the SQL ~0.45s, building it
+    AGAIN only to record it ~0.4s, running it ~0.5s); **Soda 1.3s** - 0.68s
+    parsing the SodaCL checks file with ruamel's pure-Python YAML every run,
+    ~0.33s dumping every check definition back to YAML for its results, the
+    queries ~0.46s; **Evidently 0.83s mean, but 8.4s of its 9.1s total is
+    one `import evidently` on the first run** - ~0.06s a run after. Our own
+    steps (staging, filing, promotion, statistics) ~0.3s an arrival. So once
+    dbt is fast, the critical path is Soda + datacontract-cli, and most of
+    THEIR time is re-reading the same configuration every run - the same
+    shape REQ-PIPE-156 fixed in our own code. Not scoped; brought to Keith.
+
+    **SCOPED AND DECLINED, 2026-10-06** (Keith: "Sounds too risky. That's
+    not approved."). delivery-scoper drafted it as REQ-PIPE-161 - datacontract-
+    cli handed a contract already resolved once per process, through its own
+    resolver, a copy per run - and re-measured WITHOUT a profiler, which
+    shrank everything above: re-resolving the contract is 0.21-0.46s a run
+    (checked by the main session), not 0.8s; Soda's re-parse is 0.17-0.25s
+    with no supported reuse (deep-copying its parsed config raises); Evidently
+    needs nothing. So the realistic saving was ~0.3s a run, about a minute of
+    CPU per bootstrap split over two processes. The id REQ-PIPE-161 was never
+    written to requirements.yaml. Do not re-propose without new numbers.
 
     THE COST IS NOT JUST THIS SANDBOX - measured the same night, at
     Keith's question "why is GitHub so much faster?". It is not, any

@@ -269,6 +269,60 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
+  # THE TESTS MARKED on_demand, ON EVERY PUSH (post-build-review #128, Keith
+  # 2026-10-06). They are deselected from a plain `uv run pytest` because
+  # they are slow, which keeps a person's local run quick - and the
+  # bootstrap-equivalence one then failed on every run for two days with
+  # nothing running it. A test nobody runs is not a check. They build their
+  # own small corpus, so this needs PostgreSQL and dbt_utils but not the
+  # deployment bootstrap, and runs beside the longer jobs rather than after.
+  on-demand:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-not-a-secret
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
+      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      MOTHMAN_ENVIRONMENT: ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Create the warehouse database
+        run: |
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c 'CREATE DATABASE supply'
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
+            -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
+            -c 'SELECT pg_reload_conf()'
+
+      - name: Install dbt_utils
+        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
+
+      - name: Mark the warehouse database as CI's
+        run: uv run mothman env mark --confirm ci
+
+      - name: Run the tests marked on_demand
+        run: uv run pytest --run-on-demand -m on_demand
+
   test-deployment:
     # THE SLOW HALF, and the only job that pays for a bootstrap. It runs
     # beside `test` rather than after it, so nineteen minutes of serial
@@ -298,17 +352,22 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
 
+      - name: Sync dependencies
+        run: uv sync --dev
+
       # THE BOOTSTRAP IS CACHED, KEYED ON EVERY INPUT THAT SHAPES IT
-      # (REQ-TEST-117). Computed HERE, before dbt deps or anything else adds
-      # files, so the key is the checkout's alone. cli/pipeline.py and no
-      # other cli/ file: the bootstrap enters through it, and a terminal
-      # change must not cost a full bootstrap. EXACT KEY ONLY - no
-      # restore-keys, so a dump made from different inputs is never used
-      # (criterion 3): a new check can turn a supply red and change every
-      # filing after it.
+      # (REQ-TEST-117). The list is qa_tools/common/replay_inputs.py's -
+      # the same one a checkpoint replay compares (REQ-TEST-160), so it is
+      # held once rather than copied here. It hashes what git considers
+      # part of the checkout (ignored files excluded), so dbt deps and
+      # .venv cannot move it. cli/pipeline.py and no other cli/ file: the
+      # bootstrap enters through it, and a terminal change must not cost
+      # a full bootstrap. EXACT KEY ONLY - no restore-keys, so a dump made
+      # from different inputs is never used (criterion 3): a new check
+      # can turn a supply red and change every filing after it.
       - name: Key the bootstrap cache
         id: key
-        run: echo "key=bootstrap-v1-${{ hashFiles('generator/**', 'synthetic_data_generator/**', 'pipeline/**', 'qa_tools/**', 'contract/**', 'dbt_project/**', 'cli/pipeline.py', 'pyproject.toml', 'uv.lock', '.github/workflows/test.yml') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=$(uv run mothman pipeline cache-key)" >> "$GITHUB_OUTPUT"
 
       - name: Restore the bootstrapped database, if these inputs made one
         id: cache
@@ -321,9 +380,6 @@ jobs:
             data/receipts
             data/generator_bookkeeping.json
             data/scenario_placements.json
-
-      - name: Sync dependencies
-        run: uv sync --dev
 
       # AND QUIETENS THE SERVER'S OWN LOG. GitHub prints the container's
       # log after every step, and the API returns only a job's last 5000

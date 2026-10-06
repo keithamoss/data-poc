@@ -363,22 +363,39 @@ def effective_at_for(received_at: datetime, *, now: datetime | None = None,
 
 
 def next_receipt(arrival) -> datetime | None:
-    """When the next file for this arrival's dataset was received, from the
-    recorded deliveries - which the batch records in full before it processes
-    the first (delivery_log.record_all). None where there is none yet, which
-    live is the normal case."""
+    """When the next file for this arrival's dataset was received - from the
+    recorded deliveries, and from the delivery tree a replay is reading.
+
+    BOTH, since REQ-TEST-159. The batch used to record every delivery before
+    it processed the first (delivery_log.record_all), so the database alone
+    answered this. It now records each at its first arrival, so in a replay
+    the next delivery is not recorded yet when this one is promoted - and
+    the cap of Keith's #117 D5 silently stopped applying (caught by the
+    whole-bootstrap comparison: 29 promotions moved past the next receipt).
+    The tree is the same set the batch used to record up front, so a replay
+    answers exactly as before; the live processing pass, which has no tree,
+    still answers from what it recorded. None where there is no next one,
+    which live is the normal case."""
     received = getattr(arrival, "received_at", None)
     datasets = list((getattr(arrival, "files_by_dataset", None) or {}).keys())
     if received is None or len(datasets) != 1:
         return None
-    from qa_tools.common import qa_store, supply_db
+    from qa_tools.common import arrivals, hierarchy, qa_store, supply_db
 
     with supply_db.connect(read_only=True, label="mothman:next-receipt") as conn:
         rows = conn.execute(
             f'SELECT min(received_instant) FROM "{qa_store.SCHEMA}".delivery_file '
             "WHERE dataset_id = ? AND received_instant > ?",
             [datasets[0], received]).fetchall()
-    return rows[0][0] if rows and rows[0][0] is not None else None
+    found = [rows[0][0]] if rows and rows[0][0] is not None else []
+    try:
+        collection_id = hierarchy.dataset(datasets[0]).collection_id
+    except hierarchy.UnknownDatasetError:
+        collection_id = None  # no tree can carry a dataset the hierarchy does not know
+    if collection_id is not None:
+        found += [a.received_at for a in arrivals.arrivals_for(collection_id, "")
+                  if datasets[0] in a.files_by_dataset and a.received_at > received]
+    return min(found) if found else None
 
 
 def should_promote(*, status: str,

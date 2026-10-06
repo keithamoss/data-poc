@@ -192,7 +192,10 @@ def failing_sample_keys_direct(conn, relation_name: str, pk_column: str,
     relation_name comes from the test's own manifest node (already
     fully-qualified/quoted for this warehouse), not constructed by hand."""
     try:
-        rows = conn.execute(f"SELECT {pk_column} FROM {relation_name} LIMIT {limit}").fetchall()
+        # ORDERED, so the same data records the same sample (post-build-review
+        # #129): without it LIMIT took whichever rows came first.
+        rows = conn.execute(f"SELECT {pk_column} FROM {relation_name} "
+                            f"ORDER BY {pk_column} LIMIT {limit}").fetchall()
     except Exception:
         return []
     return [str(r[0]) for r in rows if r[0] is not None]
@@ -209,7 +212,7 @@ def failing_sample_keys_via_values(conn, relation_name: str, value_column: str,
     try:
         rows = conn.execute(
             f"SELECT {pk_column} FROM {model} WHERE {filter_column} "
-            f"IN (SELECT {value_column} FROM {relation_name}) LIMIT {limit}"
+            f"IN (SELECT {value_column} FROM {relation_name}) ORDER BY {pk_column} LIMIT {limit}"
         ).fetchall()
     except Exception:
         return []

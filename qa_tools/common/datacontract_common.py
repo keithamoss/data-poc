@@ -206,4 +206,5 @@ def failing_sample_keys(check, pk_column: str) -> list[str]:
     column, matching every other tool's samples. Empty when the tool
     didn't capture any (metric not sampleable, or a passing check)."""
     samples = getattr(check, "failedSamples", None) or []
-    return [str(s[pk_column]) for s in samples if pk_column in s]
+    # SORTED, so the same data records the same sample (post-build-review #129).
+    return sorted(str(s[pk_column]) for s in samples if pk_column in s)

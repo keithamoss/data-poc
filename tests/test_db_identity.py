@@ -275,8 +275,11 @@ class TestEveryPlaceMarksItsOwn:
             checked += 1
             runs = [s.get("run", "") for s in job["steps"]]
             mark = next(i for i, r in enumerate(runs) if "mothman env mark --confirm ci" in r)
+            # `pipeline cache-key` hashes files and never connects - which
+            # tests/test_replay_inputs.py asserts - so it may key the cache
+            # before the database exists.
             later = [i for i, r in enumerate(runs) if "mothman" in r and i != mark
-                     and "env mark" not in r]
+                     and "env mark" not in r and "pipeline cache-key" not in r]
             assert all(i > mark for i in later), f"{name} uses the database before marking it"
         assert checked >= 2, "no CI job with a database was found - this checked nothing"
 

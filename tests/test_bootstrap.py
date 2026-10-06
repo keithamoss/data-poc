@@ -112,7 +112,9 @@ class TestWhatItRuns:
 
     def test_all_does_both_collections(self, spy):
         boot.bootstrap(collection="all")
-        assert spy == ["gen-bdm", "gen-cp", "record", "concurrently", "bdm", "cp"]
+        # Each collection records a delivery at its first arrival; the ones
+        # neither claimed are recorded once both finish (REQ-TEST-159).
+        assert spy == ["gen-bdm", "gen-cp", "concurrently", "bdm", "cp", "record"]
 
     def test_sequential_does_one_collection_then_the_other(self, spy):
         """REQ-TEST-116 criterion 5 - the reference a parallel bootstrap
@@ -181,13 +183,16 @@ class TestCollectionsRunSideBySide:
         boot.bootstrap(collection="all")
         assert dispatched == [["bdm", "cp"]]
 
-    def test_the_delivery_log_is_recorded_once_before_either_runs(self, spy):
-        """Both orchestrators record every delivery and relied on the
-        second write being a no-op - a race once they run together."""
+    def test_the_unclaimed_deliveries_are_recorded_once_after_both_run(self, spy):
+        """REQ-TEST-159 reversed REQ-TEST-116's record-everything-first: each
+        collection records a delivery at its first arrival (one transaction,
+        ON CONFLICT DO NOTHING, so two collections sharing one is not a
+        race), and the deliveries NEITHER claims are recorded once, after
+        both have finished - not by either child."""
         called, _ = spy
         boot.bootstrap(collection="all")
         assert called.count("record") == 1
-        assert called.index("record") < min(
+        assert called.index("record") > max(
             i for i, c in enumerate(called) if isinstance(c, tuple))
         assert all(c[1]["record_deliveries"] is False for c in called if isinstance(c, tuple))
 
@@ -200,8 +205,8 @@ class TestCollectionsRunSideBySide:
         called, dispatched = spy
         boot.bootstrap(collection="cp")
         assert dispatched == []
-        assert ("cp", {"sequential": False, "record_deliveries": True}) in called, \
-            "alone, a collection records its own deliveries as it always did"
+        assert ("cp", {"sequential": False, "record_deliveries": True, "after_each": None}) \
+            in called, "alone, a collection records its own deliveries as it always did"
 
     def test_the_wall_clock_is_reported(self, spy):
         """Criterion 6: the gain is measured rather than estimated."""
