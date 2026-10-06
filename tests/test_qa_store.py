@@ -28,6 +28,8 @@ The four, because each is a criterion rather than a preference:
 """
 from __future__ import annotations
 
+from conftest import drop_qa_schema
+
 import pytest
 
 from qa_tools.common import qa_store, supply_db
@@ -352,7 +354,7 @@ class TestTwoWorkersCanCreateTheSchemaAtOnce:
         from qa_tools.common import supply_db as db_mod
 
         with db_mod.connect(label="test-drop-qa") as conn:
-            conn.execute(f'DROP SCHEMA IF EXISTS "{qa_store.SCHEMA}" CASCADE')
+            drop_qa_schema(conn)
 
         failures: list[BaseException] = []
         start = threading.Barrier(8)
@@ -423,7 +425,7 @@ class TestEnsureSchemaIsCheapOnceTheSchemaExists:
         from qa_tools.common import supply_db as db_mod
 
         with db_mod.connect(label="test-rebuild") as conn:
-            conn.execute(f'DROP SCHEMA IF EXISTS "{qa_store.SCHEMA}" CASCADE')
+            drop_qa_schema(conn)
             qa_store.ensure_schema(conn)
             assert conn.execute(
                 f"SELECT to_regclass('{qa_store.SCHEMA}.check_result')").fetchall()[0][0]

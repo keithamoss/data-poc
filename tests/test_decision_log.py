@@ -670,3 +670,48 @@ class TestRejectingAnotherSupplyLeavesTheSlotFilled:
             pass
 
         assert dl.promoted_into(conn, dataset, "2026-Q3") == "first"
+
+
+class TestWhenWorkFollowingADecisionTakesEffect:
+    """Keith, 2026-10-06 (post-build-review #117 D7): a re-check's promotion
+    was stamped at its cause decision's instant, so live it was recorded as in
+    place before the checks justifying it had run. It now takes effect as long
+    after its cause as it really ran: live that is when it ran; in a replay,
+    whose decisions are recorded now but take effect years ago, it is the
+    cause's instant plus the moments between."""
+
+    def _decision(self, conn, dataset, *, effective_at):
+        """One decision; returns its id and the instant the log recorded it -
+        append-only, so `recorded_at` is the database's own clock."""
+        with dl.apply_decision(conn, a_decision(dataset, effective_at=effective_at)):
+            pass
+        return conn.execute(f"SELECT id, recorded_at FROM {dl.TABLE} WHERE dataset_id = ?",
+                            [dataset]).fetchone()
+
+    def test_live_it_is_when_the_work_ran(self, conn, dataset, monkeypatch):
+        from datetime import datetime, timedelta, timezone
+
+        from qa_tools.common import asset_time
+
+        decided = datetime.now(timezone.utc).replace(microsecond=0)
+        did, recorded = self._decision(conn, dataset, effective_at=decided)
+        ran = recorded + timedelta(hours=3)
+        monkeypatch.setattr(asset_time, "now", lambda: ran)
+        took = asset_time.parse_instant(dl.follows(conn, did), "t")
+        assert abs(took - ran) < timedelta(seconds=5), "three hours later, not at the decision"
+
+    def test_in_a_replay_it_is_the_causes_instant(self, conn, dataset, monkeypatch):
+        from datetime import datetime, timedelta, timezone
+
+        from qa_tools.common import asset_time
+
+        effective = datetime(2023, 4, 2, 10, 0, tzinfo=timezone.utc)
+        did, recorded = self._decision(conn, dataset, effective_at=effective)
+        monkeypatch.setattr(asset_time, "now", lambda: recorded + timedelta(seconds=40))
+        took = asset_time.parse_instant(dl.follows(conn, did), "t")
+        assert took == effective + timedelta(seconds=40)
+
+    def test_with_no_cause_it_is_now(self, conn):
+        from qa_tools.common import asset_time
+
+        assert asset_time.parse_instant(dl.follows(conn, None), "t") <= asset_time.now()

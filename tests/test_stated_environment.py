@@ -192,3 +192,111 @@ def test_every_spelling_of_the_password_is_scrubbed(dsn, echoed):
     through untouched."""
     out = supply_db._scrub(f"could not parse 'u:{echoed}@h'", dsn)
     assert echoed not in out and "***" in out
+
+
+class TestDroppingThingsNeedsTheTypedId:
+    """Keith, 2026-10-06 (post-build-review #119 D2): `supply tidy` and
+    `supply discard-sample` delete, so in an environment that confirms
+    changes they need its typed id like any other change by hand - and
+    --yes cannot skip it."""
+
+    @pytest.fixture
+    def confirming(self, monkeypatch, supply_dsn):
+        import dataclasses
+
+        from cli import common
+
+        real = environments.current()
+        monkeypatch.setattr(environments, "current",
+                            lambda *a, **k: dataclasses.replace(real, confirm_changes=True))
+        asked = []
+        monkeypatch.setattr(common, "confirm_change",
+                            lambda message, *, yes, **k: asked.append((message, yes)) or False)
+        return asked
+
+    def test_tidy_with_yes_still_asks(self, confirming):
+        from click.testing import CliRunner
+
+        from cli.supply import supply_group
+        from qa_tools.common import supply_db
+
+        leftover = supply_db.run_schema("cp_clients__20990101000000000001")
+        with supply_db.connect(label="test-tidy") as conn:
+            conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{leftover}"')
+        try:
+            CliRunner().invoke(supply_group, ["tidy", "--yes"])
+            assert confirming and confirming[0][1] is True
+            with supply_db.connect(label="test-tidy") as conn:
+                assert conn.execute("SELECT 1 FROM pg_namespace WHERE nspname = ?",
+                                    [leftover]).fetchall(), "refused, so nothing dropped"
+        finally:
+            with supply_db.connect(label="test-tidy") as conn:
+                conn.execute(f'DROP SCHEMA IF EXISTS "{leftover}"')
+
+    def test_discard_sample_asks_through_the_same_confirmation(self):
+        import inspect
+
+        from cli import supply
+
+        source = inspect.getsource(supply.discard_sample_command.callback)
+        assert "confirm_drop(" in source and "click.confirm(" not in source
+
+
+class TestInProductionTheTypedIdIsTheKeepDecision:
+    """Keith, 2026-10-06 (post-build-review #119 D10): where the environment
+    confirms changes, hand-filing asks for the typed id IN PLACE OF "Keep this
+    check?" - one deliberate act, not a y/N followed by the id."""
+
+    @pytest.fixture
+    def production_terminal(self, monkeypatch):
+        import dataclasses
+        import sys
+
+        from cli import common
+
+        real = environments.current()
+        monkeypatch.setattr(environments, "current",
+                            lambda *a, **k: dataclasses.replace(real, confirm_changes=True))
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+        monkeypatch.setattr(common, "require_tty", lambda hint: None)
+        monkeypatch.setattr(common, "describe_keep_choice", lambda paths: "")
+        monkeypatch.setattr(common, "confirm",
+                            lambda *a, **k: pytest.fail("a y/N was asked"))
+        typed = []
+        return typed
+
+    def _answer(self, monkeypatch, typed, answer):
+        from cli import common
+
+        monkeypatch.setattr(common, "_ask_text", lambda m: typed.append(m) or answer)
+
+    def test_typing_the_id_keeps_it(self, production_terminal, monkeypatch):
+        from cli import common
+
+        self._answer(monkeypatch, production_terminal, environments.current().id)
+        assert common.decide_keep(["/x/a.csv"], keep=None) is True
+        assert len(production_terminal) == 1
+
+    def test_anything_else_runs_a_trial(self, production_terminal, monkeypatch):
+        from cli import common
+
+        self._answer(monkeypatch, production_terminal, "")
+        assert common.decide_keep(["/x/a.csv"], keep=None) is False
+
+    def test_once_typed_filing_does_not_ask_again(self, production_terminal, monkeypatch):
+        from cli import common
+
+        self._answer(monkeypatch, production_terminal, environments.current().id)
+        assert common.decide_keep(["/x/a.csv"], keep=None) is True
+        monkeypatch.setattr(common, "confirm_change",
+                            lambda *a, **k: pytest.fail("asked for the id twice"))
+        assert common.keep_was_typed() is True
+
+    def test_a_flag_is_still_not_the_confirmation(self, production_terminal, monkeypatch):
+        """REQ-PIPE-093 criterion 6: --commit decides to keep and is not
+        allowed to be the confirmation too, so filing still asks."""
+        from cli import common
+
+        assert common.decide_keep(["/x/a.csv"], keep=True) is True
+        assert common.keep_was_typed() is False

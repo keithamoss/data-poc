@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 30
+SCHEMA_VERSION = 31
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -770,6 +770,14 @@ ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS replacement_setting tex
 ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS replacement_level text;
 ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS replacement_version text;
 ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS caused_by_decision bigint;
+-- caused_by_supply - the supply whose promotion opened the period an
+--   INHERIT filled (REQ-TEST-150 criterion 6; Keith, 2026-10-06, over a
+--   time window): what the kept-run report reads to say which inheritances
+--   a kept arrival caused. NULL where a person opened the period. Schema 31.
+ALTER TABLE "{SCHEMA}".decision ADD COLUMN IF NOT EXISTS caused_by_supply text;
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_caused_by_supply_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_caused_by_supply_shape
+    CHECK (caused_by_supply IS NULL OR action = 'inherit');
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_promoted_status_shape;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_promoted_status_shape
     CHECK (promoted_status IS NULL OR action = 'promote');
@@ -986,11 +994,25 @@ CREATE OR REPLACE VIEW "{SCHEMA}".run_visible AS
 -- never a readers-only one, which is not about the supply. The gate, the
 -- dashboard and the terminal read a supply's verdict from this run;
 -- every earlier run stays in qa.run as history.
-CREATE OR REPLACE VIEW "{SCHEMA}".supply_current_run AS
-SELECT DISTINCT ON (dataset_id, supply_id) *
-FROM "{SCHEMA}".run_visible
-WHERE supply_id IS NOT NULL AND scope <> 'readers'
-ORDER BY dataset_id, supply_id, run_instant DESC, run_key DESC;
+--
+-- NEWEST ON THE ASSET'S TIMELINE (Keith, 2026-10-06, post-build-review #117
+-- D6): a re-run by when the decision that caused it took effect, an
+-- arrival's run by when its supply was received, the run's own instant only
+-- where neither is known - the order supply_status.runs_about already used.
+-- It was the wall clock, which a replay stamps in processing order, so the
+-- two definitions named different runs current.
+-- DROP first: CREATE OR REPLACE VIEW cannot reorder a view's columns.
+DROP VIEW IF EXISTS "{SCHEMA}".supply_current_run;
+CREATE VIEW "{SCHEMA}".supply_current_run AS
+SELECT DISTINCT ON (r.dataset_id, r.supply_id) r.*
+FROM "{SCHEMA}".run_visible r
+LEFT JOIN "{SCHEMA}".decision d ON d.id = r.caused_by_decision
+LEFT JOIN "{SCHEMA}".supply_receipt rc
+    ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id
+WHERE r.supply_id IS NOT NULL AND r.scope <> 'readers'
+ORDER BY r.dataset_id, r.supply_id,
+         COALESCE(d.effective_at, rc.received_instant, r.run_instant) DESC,
+         r.run_key DESC;
 
 -- A RE-RUN THAT IS OWED (REQ-PIPE-140 criterion 7). Recorded in the
 -- transaction of the decision (or the load) that causes it, and cleared

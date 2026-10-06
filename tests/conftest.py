@@ -147,6 +147,19 @@ def stated_test_environment():
         os.environ[environments.ENVIRONMENT_ENV] = before
 
 
+def drop_qa_schema(conn) -> None:
+    """Drop the qa schema the way a test wanting it rebuilt from nothing
+    does - and put the database's identity back, which lives in it since
+    2026-10-06 (REQ-PIPE-107). Without that every later connection to this
+    worker's database refuses, which is the guard working, not the test."""
+    from qa_tools.common import db_identity, qa_store
+
+    _, identity = db_identity.read(conn)
+    conn.execute(f'DROP SCHEMA IF EXISTS "{qa_store.SCHEMA}" CASCADE')
+    if identity is not None:
+        db_identity.mark(conn, identity)
+
+
 def mark_test_database(admin_conn, name: str) -> None:
     """Record a scratch database's identity as this asset's `test`
     environment (REQ-PIPE-107 criterion 12), from a connection to another

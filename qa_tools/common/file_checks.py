@@ -30,6 +30,8 @@ the file is recorded.
 """
 from __future__ import annotations
 
+import re
+
 import csv
 from dataclasses import dataclass
 from pathlib import Path
@@ -198,15 +200,39 @@ def _header_row(p: _Pass, expected) -> tuple[str, str]:
         return FAIL, "the file is empty: it has no header row"
     if _delimiter(p, expected)[0] == FAIL:
         return NODATA, "not evaluated: the first line could not be split"
-    # ANY ONE OF THE CONTRACT'S COLUMNS makes it a header. A stricter rule
-    # was tried for post-build-review #118 D-E and reverted the same night: it
-    # refused a file for MISSING columns, which is a data check's question
-    # (criterion 2). The false green D-E found - a headerless first row
-    # holding a value equal to a column name - is with Keith.
+    # A HEADER NAMES A CONTRACT COLUMN AND HOLDS NO VALUE (Keith, 2026-10-06,
+    # post-build-review #118 D-E). Naming one column alone let a headerless
+    # file through when its first row happened to hold a value equal to a
+    # column name, and its first row was then taken for the names - a false
+    # green. A column name is never a date, a number or true/false, so a
+    # first line with any such field is data. MISSING columns stay a data
+    # check's question (criterion 2) - the "most columns named" rule was
+    # tried and reverted for refusing exactly those - and a REPEATED name stays
+    # header_names_unique's, which could never fail if this refused it. The
+    # value itself is never quoted: it is a row of somebody's data.
     if expected and not set(p.header) & set(expected):
         return FAIL, ("the first line names none of the contract's columns, so it is a "
                       "row of data rather than a header")
+    shaped = [i for i, field in enumerate(p.header, start=1) if _value_shaped(field)]
+    if shaped:
+        return FAIL, (f"the first line holds {_count(len(shaped), 'value', 'values')} - "
+                      f"field {shaped[0]} is shaped like a date, a number or true/false, "
+                      f"which no column name is - so it is a row of data rather than a "
+                      f"header")
     return PASS, "the first line is a header naming the columns"
+
+
+_VALUE_SHAPES = (
+    re.compile(r"[+-]?\d+([.,]\d+)?"),                      # a number
+    re.compile(r"\d{4}-\d{2}-\d{2}([ T].*)?"),              # an ISO date or timestamp
+    re.compile(r"\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}"),          # a day-month-year date
+    re.compile(r"(?i)true|false"),
+)
+
+
+def _value_shaped(field: str) -> bool:
+    text = (field or "").strip()
+    return bool(text) and any(shape.fullmatch(text) for shape in _VALUE_SHAPES)
 
 
 def _header_ready(p: _Pass, expected) -> str | None:

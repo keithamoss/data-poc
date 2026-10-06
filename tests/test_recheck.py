@@ -229,3 +229,71 @@ class TestOnAFreshDatabase:
 
         dbsupport.use_empty_supply_db(monkeypatch)
         assert recheck.run_all_owed() == []
+
+
+class TestALiveRecheckTakesEffectWhenItRan:
+    """post-build-review #117 D7 (Keith, 2026-10-06): live, a re-check's
+    promotion is recorded as in place when it ran, never at the earlier
+    instant of the decision that owed it."""
+
+    def test_three_hours_later_is_three_hours_later(self, supply_dsn, monkeypatch):
+        import uuid
+        from datetime import datetime, timedelta, timezone
+        from types import SimpleNamespace
+
+        from qa_tools.common import asset_time, qa_store, recheck, supply_db
+        from qa_tools.common import decision_log as dl
+
+        ds = f"cp-{uuid.uuid4().hex[:10]}"
+        with supply_db.connect(label="test-recheck") as conn:
+            qa_store.ensure_schema(conn)
+            with dl.apply_decision(conn, dl.Decision(
+                    agency_id="a", collection_id="c", dataset_id=ds, action=dl.PROMOTE,
+                    supply=f"{ds}@1", actor="k@x", actor_kind=dl.PERSON, to_slot="2099-Q1",
+                    effective_at=datetime.now(timezone.utc).isoformat())):
+                pass
+            did, recorded = conn.execute(f"SELECT id, recorded_at FROM {dl.TABLE} "
+                                         "WHERE dataset_id = ?", [ds]).fetchone()
+        ran = recorded + timedelta(hours=3)
+        monkeypatch.setattr(asset_time, "now", lambda: ran)
+        took = asset_time.parse_instant(
+            recheck._cause_instant(SimpleNamespace(caused_by_decision=did)), "t")
+        assert abs(took - ran) < timedelta(seconds=5)
+
+
+class TestOneDefinitionOfASupplysCurrentRun:
+    """post-build-review #117 D6 (Keith, 2026-10-06): the current run is the
+    newest on the ASSET'S timeline - a re-run by when the decision that caused
+    it took effect - as supply_status.runs_about already orders them, never
+    by the wall clock a replay stamps years later in processing order."""
+
+    def test_the_later_cause_is_current_whatever_ran_last(self, supply_dsn):
+        import uuid
+
+        from qa_tools.common.qa_results_writer import finish_run
+
+        ds = f"cp-{uuid.uuid4().hex[:10]}"
+        supply = f"{ds}@2024070100000000"
+        with supply_db.connect(label="test-current-run") as conn:
+            qa_store.ensure_schema(conn)
+            ids = {}
+            for name, effective in (("august", "2024-08-01T09:00:00+08:00"),
+                                    ("july", "2024-07-15T09:00:00+08:00")):
+                with dl.apply_decision(conn, dl.Decision(
+                        agency_id="a", collection_id="c", dataset_id=ds, action=dl.PROMOTE,
+                        supply=f"{supply}-{name}", actor="k@x", actor_kind=dl.PERSON,
+                        to_slot=f"2099-{name}", effective_at=effective)):
+                    pass
+                ids[name] = conn.execute(f"SELECT max(id) FROM {dl.TABLE} WHERE dataset_id = ?",
+                                         [ds]).fetchone()[0]
+            # Processed in the other order: july's re-run has the later wall clock.
+            for name, ran in (("august", "2026-10-06T10:00:00+08:00"),
+                              ("july", "2026-10-06T10:05:00+08:00")):
+                key = f"recheck_{name}_{uuid.uuid4().hex[:6]}"
+                qa_store.record_run(conn, run_key=key, agency_id="a", collection_id="c",
+                                    run_timestamp=ran, run_by="t@x", environment="test")
+                qa_store.set_run_purpose(conn, key, dataset_id=ds, supply_id=supply,
+                                         scope="full", caused_by_decision=ids[name])
+                finish_run(key)
+                ids[f"run_{name}"] = key
+            assert qa_store.current_run(conn, ds, supply) == ids["run_august"]

@@ -216,7 +216,7 @@ def _physical_in(conn, *, period: str, logical: str) -> str:
 
 
 def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
-                 effective_at: str) -> Outcome:
+                 effective_at: str, caused_by: str | None = None) -> Outcome:
     """Fill this newly-opened period for every dataset that owes it
     nothing.
 
@@ -268,7 +268,7 @@ def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
                     f'"{period_schema.period_schema(stands_on)}"."{physical}"')
                 _record(conn, entry, action=decision_log.INHERIT, supply=supply,
                         period=period_name, stands_on=stands_on, reason=reason,
-                        effective_at=effective_at)
+                        effective_at=effective_at, caused_by=caused_by)
         except InheritanceRefused as exc:
             # THE LOG SAYS A SUPPLY IS THERE AND THE SCHEMA DOES NOT.
             # Recorded as a refusal rather than raised, on criterion
@@ -288,7 +288,8 @@ def inherit_into(conn: supply_db.SupplyConnection, period_name: str, *,
 
 
 def _record(conn, entry, *, action: str, supply: str, period: str,
-            stands_on: str | None, reason: str, effective_at: str) -> None:
+            stands_on: str | None, reason: str, effective_at: str,
+            caused_by: str | None = None) -> None:
     """One decision-log entry, with THE RULE as the actor (criterion 8).
 
     An INHERIT is recorded inside the transaction that created its view
@@ -300,7 +301,7 @@ def _record(conn, entry, *, action: str, supply: str, period: str,
         dataset_id=entry.dataset_id, action=action, supply=supply,
         actor=RULE_ACTOR, actor_kind=decision_log.RULE,
         effective_at=effective_at, to_slot=period, stands_on=stands_on,
-        reason=reason)
+        reason=reason, caused_by_supply=caused_by)
     with decision_log.apply_decision(conn, decision):
         pass
 

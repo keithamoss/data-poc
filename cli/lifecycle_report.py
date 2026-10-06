@@ -48,7 +48,7 @@ def _supply_of(arrival, dataset_id) -> str:
     return base if len(names) <= 1 else f"{base}#1"
 
 
-def outcome_of(conn, arrival, since=None) -> Outcome:
+def outcome_of(conn, arrival) -> Outcome:
     """Criterion 9's single source: the recorded rows for one arrival."""
     from qa_tools.common import decision_log, filing, supply_holds
 
@@ -79,14 +79,16 @@ def outcome_of(conn, arrival, since=None) -> Outcome:
         extra.append(f"contested - {', '.join(sorted(names))} were staged for the same table "
                      f"and period; nothing chooses between them")
     gate = _gate_line(conn, dataset_id, supply)
-    if since is not None:
-        for slot, stands_on in conn.execute(
-                f"SELECT to_slot, stands_on FROM {decision_log.TABLE} WHERE dataset_id = ? "
-                "AND action = ? AND actor_kind = ? AND recorded_at >= ? ORDER BY id",
-                [dataset_id, decision_log.INHERIT, decision_log.RULE, since]).fetchall():
-            # CRITERION 6: an inheritance the cadence made, as the rule's.
-            extra.append(f"the rule inherited {stands_on}'s supply into {slot}, which "
-                         f"filing opened")
+    # CRITERION 6: the inheritances THIS arrival's promotion caused, as the
+    # rule's - read by the link each entry records (Keith, 2026-10-06, over
+    # a recorded_at window, which would claim whatever a concurrent pass
+    # inherited too). They are other datasets', into the period it opened.
+    for inherited, slot, stands_on in conn.execute(
+            f"SELECT dataset_id, to_slot, stands_on FROM {decision_log.TABLE} "
+            "WHERE action = ? AND split_part(caused_by_supply, '#', 1) = ? ORDER BY id",
+            [decision_log.INHERIT, base]).fetchall():
+        extra.append(f"the rule inherited {inherited}'s {stands_on} supply into {slot}, "
+                     f"which this promotion opened")
     return Outcome(arrival.run_id, dataset_id, filed, gate, tuple(extra))
 
 
@@ -109,13 +111,13 @@ def _gate_line(conn, dataset_id: str, supply: str) -> str:
     return f"{said} by the rule ({actor}), not by you - {(reason or '').strip()}"
 
 
-def report(found, *, since=None, say=None) -> list[Outcome]:
+def report(found, *, say=None) -> list[Outcome]:
     """Criteria 1 to 8 for the arrivals one kept supply became."""
     from qa_tools.common import supply_db
 
     say = say or (lambda line: console.print(line, markup=False, highlight=False))
     with supply_db.connect(read_only=True, label="mothman:kept-report") as conn:
-        outcomes = [outcome_of(conn, a, since) for a in found]
+        outcomes = [outcome_of(conn, a) for a in found]
     say("What the lifecycle decided:")
     for line, who in _grouped(outcomes):
         say(f"  {who}: {line}" if who else f"  {line}")

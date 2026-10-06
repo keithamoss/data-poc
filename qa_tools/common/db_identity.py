@@ -6,19 +6,25 @@ different hostnames from inside and outside, and two environments can differ
 only by a hostname somebody mistypes. Asking the database who it is answers
 the question that matters: is this the database this checkout means to act on.
 
-WHERE IT LIVES: two database-level settings, `mothman.data_asset_id` and
-`mothman.environment`, written by `ALTER DATABASE ... SET` and read back from
-the catalogue (`pg_db_role_setting`), never from `current_setting()`.
-- A database-level setting is outside every schema, so REQ-PIPE-144's reset,
-  which drops the QA history schema by schema, leaves it in place
-  (criterion 11) without being taught to.
-- Reading the catalogue rather than the session's value means a connection
-  string carrying `options=-c mothman.environment=...` cannot claim an
-  identity the database does not have - which would be exactly the adoption
-  from configuration criterion 7 forbids.
-- It shares REQ-PIPE-146's round trip: the server version and the identity
-  come back in one statement, the first one a connection runs (criterion 5,
-  NFR 1).
+WHERE IT LIVES: one row in `qa.identity` (Keith, 2026-10-06, over the
+database-level settings it was first built as).
+- A ROW TRAVELS WITH THE DATABASE: a dump carries it and so does a database
+  copied from a template, where a database-level setting does neither.
+- ONE ROW AT MOST, enforced by the table rather than by care.
+- REQ-PIPE-144's reset drops the qa schema whole, so it reads the row first
+  and puts it back in the same transaction (criterion 11).
+- In the qa schema itself, so anything that can write QA history could
+  relabel the database. Accepted by Keith over a schema of its own writable
+  only by the owner; the guard is against a checkout pointed at the wrong
+  database, not against someone already holding write access to it.
+- The old settings are not read at all, so a database marked that way is
+  unmarked now and refuses until `mothman env mark` (regenerate, never
+  migrate).
+- STILL ONE ROUND TRIP with REQ-PIPE-146's server version (NFR 1). An
+  unmarked database has no qa schema, and naming a missing table is an
+  error rather than an empty answer, so the table is read through
+  query_to_xml() behind a to_regclass() test - evaluated only when it
+  exists, in the same statement.
 
 FAILS CLOSED (NFR 3). Missing, half-recorded or unreadable is a refusal, and a
 refusal never carries any part of the connection string (criterion 6) - it is
@@ -28,17 +34,30 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-ASSET_SETTING = "mothman.data_asset_id"
-ENVIRONMENT_SETTING = "mothman.environment"
+SCHEMA = "qa"
+TABLE = f'"{SCHEMA}".identity'
+
+#: The table, created by marking - before anything else has made the qa
+#: schema - and by the qa schema's own DDL. One row: `only_row` can only be
+#: true and is the key.
+DDL = (
+    f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"',
+    f"""CREATE TABLE IF NOT EXISTS {TABLE} (
+    only_row      boolean PRIMARY KEY DEFAULT true CHECK (only_row),
+    data_asset_id text NOT NULL CHECK (data_asset_id <> ''),
+    environment   text NOT NULL CHECK (environment <> ''),
+    marked_at     timestamptz NOT NULL DEFAULT now()
+)""",
+)
 
 #: One statement, the first a connection runs: the server's version
-#: (REQ-PIPE-146) and the database's own recorded settings.
-PROBE = """
+#: (REQ-PIPE-146) and the recorded identity, read only where the table is.
+PROBE = f"""
 SELECT current_setting('server_version_num'),
-       (SELECT s.setconfig
-          FROM pg_catalog.pg_db_role_setting s
-          JOIN pg_catalog.pg_database d ON d.oid = s.setdatabase
-         WHERE d.datname = current_database() AND s.setrole = 0)
+       CASE WHEN to_regclass('{SCHEMA}.identity') IS NULL THEN NULL
+            ELSE query_to_xml('SELECT data_asset_id, environment FROM {TABLE}',
+                              true, false, '')
+       END
 """
 
 
@@ -56,21 +75,25 @@ class Identity:
         return f"data asset {self.data_asset_id!r}, environment {self.environment!r}"
 
 
-def parse(setconfig) -> Identity | None:
-    """The recorded identity from `pg_db_role_setting.setconfig`, None when
-    neither half is recorded. Half of one is unreadable, not absent."""
-    values = {}
-    for item in setconfig or []:
-        key, _, value = str(item).partition("=")
-        values[key] = value
-    asset, env = values.get(ASSET_SETTING), values.get(ENVIRONMENT_SETTING)
-    if asset is None and env is None:
+def parse(recorded) -> Identity | None:
+    """The recorded identity from PROBE's second column, None when there is
+    no table or no row. Anything else unreadable is a refusal."""
+    if recorded is None:
         return None
+    import xml.etree.ElementTree as ET
+
+    try:
+        rows = ET.fromstring(str(recorded)).findall("row")
+    except ET.ParseError:
+        raise IdentityRefused("this database's recorded identity could not be read - "
+                              "refusing.") from None
+    if not rows:
+        return None
+    row = rows[0]
+    asset, env = row.findtext("data_asset_id"), row.findtext("environment")
     if not asset or not env:
-        raise IdentityRefused(
-            "this database's recorded identity is incomplete (it names "
-            f"{'only a data asset' if asset else 'only an environment'}), so it cannot be "
-            "read - refusing. Re-mark it with `mothman env mark`.")
+        raise IdentityRefused("this database's recorded identity is incomplete, so it "
+                              "cannot be read - refusing. Re-mark it with `mothman env mark`.")
     return Identity(asset, env)
 
 
@@ -107,24 +130,29 @@ def read(conn) -> tuple[str, Identity | None]:
 
 
 def mark(conn, identity: Identity) -> None:
-    """Write the identity. ONLY `mothman env mark` and the fixtures and setup
-    scripts named in criterion 12 call this (criterion 4). The database name
-    comes from the server, never from the connection string."""
-    from psycopg import sql
-
-    name = conn.execute("SELECT current_database()").fetchone()[0]
-    for setting, value in ((ASSET_SETTING, identity.data_asset_id),
-                           (ENVIRONMENT_SETTING, identity.environment)):
-        conn.execute(sql.SQL("ALTER DATABASE {} SET {} = {}").format(
-            sql.Identifier(name), sql.SQL(setting), sql.Literal(value)))
+    """Write the identity. ONLY `mothman env mark`, the reset putting it back,
+    and the fixtures and setup scripts named in criterion 12 call this
+    (criterion 4)."""
+    raw = getattr(conn, "raw", conn)  # a SupplyConnection, or psycopg's own
+    for statement in DDL:
+        raw.execute(statement)
+    raw.execute(
+        f"INSERT INTO {TABLE} (data_asset_id, environment) VALUES (%s, %s) "
+        "ON CONFLICT (only_row) DO UPDATE SET data_asset_id = EXCLUDED.data_asset_id, "
+        "environment = EXCLUDED.environment, marked_at = now()",
+        [identity.data_asset_id, identity.environment])
 
 
 def mark_by_admin(admin_conn, database: str, identity: Identity) -> None:
     """Mark a database from a connection to ANOTHER one - how a test fixture
-    marks the scratch database it has just created (criterion 12)."""
-    from psycopg import sql
+    marks the scratch database it has just created (criterion 12). A row has
+    to be written from inside the database, so this opens a connection to it
+    with the same credentials."""
+    import psycopg
 
-    for setting, value in ((ASSET_SETTING, identity.data_asset_id),
-                           (ENVIRONMENT_SETTING, identity.environment)):
-        admin_conn.execute(sql.SQL("ALTER DATABASE {} SET {} = {}").format(
-            sql.Identifier(database), sql.SQL(setting), sql.Literal(value)))
+    info = psycopg.conninfo.conninfo_to_dict(admin_conn.info.dsn)
+    info["dbname"] = database
+    if admin_conn.info.password:
+        info["password"] = admin_conn.info.password
+    with psycopg.connect(psycopg.conninfo.make_conninfo(**info), autocommit=True) as conn:
+        mark(conn, identity)

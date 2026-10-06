@@ -480,7 +480,8 @@ def promote_after(arrival, got: list[dict], run_by: str) -> None:
         agency_id=AGENCY_ID, collection_id=COLLECTION_ID,
         actor=promotion.RULE_ACTOR, actor_kind=decision_log.RULE,
         effective_at=promotion.effective_at_for(
-            arrival.received_at, seed=arrival.run_id).isoformat()))
+            arrival.received_at, seed=arrival.run_id,
+            before=promotion.next_receipt(arrival)).isoformat()))
     # THE KNOCK-ON OF WHAT IT PROMOTED (REQ-PIPE-121): every period the
     # promotions moved a table into owes its readers a re-evaluation, owed in
     # the promotion's own transaction and completed here.

@@ -273,18 +273,14 @@ def run(owed_id: int, *, run_by: str | None = None, on_step=None) -> Outcome:
 
 
 def _cause_instant(item) -> str:
-    """When the gate's decision takes effect: when the decision that owed
-    this re-check did - not now. A replay of four years must not stamp a
-    re-check's promotion with today (#116, the same rule knock_on follows)."""
-    from qa_tools.common import asset_time, decision_log
+    """When the gate's decision takes effect: as long after the decision that
+    owed this re-check as it really ran (decision_log.follows - Keith,
+    2026-10-06, post-build-review #117 D7). Live that is when it ran; a replay
+    of four years still stamps the cause's instant, never today (#116)."""
+    from qa_tools.common import decision_log
 
-    if item.caused_by_decision is not None:
-        with supply_db.connect(label="mothman:recheck") as conn:
-            rows = conn.execute(f"SELECT effective_at FROM {decision_log.TABLE} WHERE id = ?",
-                                [item.caused_by_decision]).fetchall()
-        if rows and rows[0][0]:
-            return rows[0][0].isoformat()
-    return asset_time.now().isoformat()
+    with supply_db.connect(label="mothman:recheck") as conn:
+        return decision_log.follows(conn, item.caused_by_decision)
 
 
 def _filing_current() -> str:

@@ -69,16 +69,25 @@ class TestEachOutcomeIsSaid:
 
     def test_an_inheritance_is_the_rules(self):
         o = lr.outcome_of(_Conn(filing=("2026-Q2", "on_time", []),
-                                inherits=[("2026-Q2", "cp-clients@2026Q1")]),
-                          _arrival(), since=WHEN)
-        assert any("the rule inherited cp-clients@2026Q1's supply into 2026-Q2" in line
+                                inherits=[("cp-carers", "2026-Q2", "2026-Q1")]),
+                          _arrival())
+        assert any("the rule inherited cp-carers's 2026-Q1 supply into 2026-Q2" in line
                    for line in o.extra)
+
+    def test_inheritances_are_read_by_link_not_by_time(self):
+        """Keith, 2026-10-06 (criterion 6, over the time window): the
+        inheritances this arrival's promotion caused, named on the entry -
+        never whatever the rule happened to record after its receipt."""
+        conn = _Conn(filing=("2026-Q2", "on_time", []))
+        lr.outcome_of(conn, _arrival())
+        inherit_sql = [q for q in conn.sql if "caused_by_supply" in q]
+        assert inherit_sql and all("recorded_at" not in q for q in inherit_sql)
 
     def test_it_reads_only_recorded_rows(self):
         """Criterion 9: three reads of the record - the filing, the gate's
         entry, the inheritances - and nothing worked out again."""
         conn = _Conn(filing=("2026-Q1", "on_time", []), gate=("promote", "ok", "r"))
-        lr.outcome_of(conn, _arrival(), since=WHEN)
+        lr.outcome_of(conn, _arrival())
         assert len(conn.sql) == 3
 
 
@@ -162,7 +171,7 @@ class TestSeveralArrivalsAreReportedCompactly:
         shown = []
         monkeypatch.setattr(common.hand_filing, "arrivals_of",
                             lambda filed, c, p: [_arrival(), _arrival("cp-carers", "cp_carers")])
-        monkeypatch.setattr(lr, "report", lambda found, since=None: shown.append("summary"))
+        monkeypatch.setattr(lr, "report", lambda found: shown.append("summary"))
         filed = SimpleNamespace(run_id="cp_clients__1", delivery_name="d", received_at=WHEN)
         common.finish_kept(self._results(), filed, collection_id="child-protection",
                            run_id_prefix="cp_run_",
@@ -176,7 +185,7 @@ class TestSeveralArrivalsAreReportedCompactly:
         shown = []
         monkeypatch.setattr(common.hand_filing, "arrivals_of",
                             lambda filed, c, p: [_arrival(), _arrival("cp-carers", "cp_carers")])
-        monkeypatch.setattr(lr, "report", lambda found, since=None: None)
+        monkeypatch.setattr(lr, "report", lambda found: None)
         filed = SimpleNamespace(run_id="cp_clients__1", delivery_name="d", received_at=WHEN)
         common.finish_kept(self._results(), filed, collection_id="child-protection",
                            run_id_prefix="cp_run_", all_checks=True,
@@ -204,14 +213,13 @@ class TestAKeptSyntheticArrivalIsReportedToo:
         monkeypatch.setattr(arrivals, "arrivals_for",
                             lambda c, p: [mine] if c == collection else [])
         shown = []
-        monkeypatch.setattr(lr, "report", lambda found, since=None: shown.append(
-            ([a.run_id for a in found], since)))
+        monkeypatch.setattr(lr, "report", lambda found: shown.append([a.run_id for a in found]))
         monkeypatch.setattr(mod, "report_table", lambda results, run_id: "")
         monkeypatch.setattr(mod.filing_tui, "offer_after_run", lambda *a: None)
         monkeypatch.setattr(common, "offer_to_publish", lambda: None)
         monkeypatch.setattr(common, "report_recorded", lambda *a: None)
         mod._report_synthetic([], mine.run_id, True, interactive=interactive)
-        assert shown == [([mine.run_id], WHEN)]
+        assert shown == [[mine.run_id]]
 
     def test_a_trial_has_no_lifecycle_to_report(self, monkeypatch):
         from cli import bdm

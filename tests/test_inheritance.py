@@ -753,3 +753,31 @@ class TestDeliveryMonthsAreNonParticipationToo:
         from qa_tools.common import inheritance
 
         assert inheritance._does_not_participate("cp-clients", "2023-Q2") == (False, "")
+
+
+class TestAnInheritanceNamesThePromotionThatCausedIt:
+    """REQ-TEST-150 criterion 6, Keith 2026-10-06 (over a time window): an
+    inheritance the cadence made when a promotion opened its period records
+    WHICH supply's promotion that was, so the kept-run report reads a link
+    rather than guessing by time."""
+
+    def _caused_by(self, conn, annual, period):
+        return conn.execute(
+            f"SELECT caused_by_supply FROM {dl.TABLE} "
+            "WHERE dataset_id = ? AND action = ? AND to_slot = ?",
+            [annual.dataset_id, dl.INHERIT, period]).fetchall()
+
+    def test_a_promotion_that_opened_the_period_is_named(self, conn, annual, periods,
+                                                          owes_nothing):
+        first, second = periods
+        _promote_into(conn, annual, first)
+        other = hierarchy.dataset("cp-clients")
+        opener = _promote_into(conn, other, second)
+        assert self._caused_by(conn, annual, second) == [(opener,)]
+
+    def test_a_period_a_person_opened_names_no_supply(self, conn, annual, periods,
+                                                      owes_nothing):
+        first, second = periods
+        _promote_into(conn, annual, first)
+        period_schema.open_period(conn, second, opened_by="Keith")
+        assert self._caused_by(conn, annual, second) == [(None,)]

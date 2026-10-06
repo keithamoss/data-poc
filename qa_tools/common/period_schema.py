@@ -242,7 +242,7 @@ def opened(conn, period_name: str) -> bool:
 
 
 def open_period(conn, period_name: str, *, opened_by: str,
-                effective_at: str | None = None) -> bool:
+                effective_at: str | None = None, caused_by: str | None = None) -> bool:
     """Bring a period into existence, once, and fill what it owes
     nothing for. Returns True where THIS call opened it.
 
@@ -273,8 +273,11 @@ def open_period(conn, period_name: str, *, opened_by: str,
     if not opened(conn, period_name):
         # Somebody else won the race. Theirs inherited; ours must not.
         return False
+    # `caused_by` is the supply whose promotion is opening it, recorded on
+    # each inheritance (REQ-TEST-150 criterion 6); None for a person's open.
     inheritance.inherit_into(conn, period_name,
-                              effective_at=effective_at or asset_time.now().isoformat())
+                              effective_at=effective_at or asset_time.now().isoformat(),
+                              caused_by=caused_by)
     return bool(schema)
 
 

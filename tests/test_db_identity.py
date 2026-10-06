@@ -108,11 +108,23 @@ class TestAnUnmarkedDatabase:
         with pytest.raises(supply_db.SupplyDbError, match="no recorded identity"):
             supply_db.connect(dsn=spoof)
 
-    def test_half_an_identity_cannot_be_read(self, unmarked_dsn):
+    def test_the_old_database_settings_are_not_an_identity(self, unmarked_dsn):
+        """Keith, 2026-10-06: the identity moved from database-level settings
+        to a table. A database marked the old way is unmarked now, refused
+        like any other - never read back as an identity."""
         with psycopg.connect(unmarked_dsn, autocommit=True) as conn:
             name = conn.execute("SELECT current_database()").fetchone()[0]
-            conn.execute(f'ALTER DATABASE "{name}" SET mothman.environment = \'test\'')
-        with pytest.raises(supply_db.SupplyDbError, match="incomplete"):
+            for setting, value in (("mothman.data_asset_id", hierarchy.data_asset_id()),
+                                   ("mothman.environment", "test")):
+                conn.execute(f"ALTER DATABASE \"{name}\" SET {setting} = '{value}'")
+        with pytest.raises(supply_db.SupplyDbError, match="no recorded identity"):
+            supply_db.connect(dsn=unmarked_dsn)
+
+    def test_an_empty_identity_table_is_no_identity(self, unmarked_dsn):
+        with psycopg.connect(unmarked_dsn, autocommit=True) as conn:
+            for statement in db_identity.DDL:
+                conn.execute(statement)
+        with pytest.raises(supply_db.SupplyDbError, match="no recorded identity"):
             supply_db.connect(dsn=unmarked_dsn)
 
     def test_an_unreadable_identity_is_a_refusal(self, supply_dsn, monkeypatch):
@@ -170,7 +182,57 @@ class TestMarking:
             if re.search(r"db_identity\.mark(_by_admin)?\(|mothman\.(environment|data_asset_id)",
                          text):
                 writers.add(path.relative_to(ROOT).as_posix())
-        assert writers == {"cli/env.py"}
+        # The reset drops the qa schema the identity lives in, and puts the
+        # SAME identity straight back in the same transaction (criterion 11)
+        # - preserving it, never changing it.
+        assert writers == {"cli/env.py", "qa_tools/common/synthetic_reset.py"}
+
+
+class TestItLivesInATable:
+    """Keith, 2026-10-06 (REQ-PIPE-107's provisional, over database-level
+    settings): the identity is ONE ROW in the qa schema, so it travels with
+    a dump and with a database copied from a template."""
+
+    def test_marking_writes_one_row(self, unmarked_dsn):
+        from qa_tools.common import qa_store
+
+        assert _mark("--confirm", "test").exit_code == 0
+        with psycopg.connect(unmarked_dsn, autocommit=True) as conn:
+            rows = conn.execute(f'SELECT data_asset_id, environment FROM '
+                                f'"{qa_store.SCHEMA}".identity').fetchall()
+        assert rows == [(hierarchy.data_asset_id(), "test")]
+
+    def test_a_second_row_cannot_exist(self, unmarked_dsn):
+        from qa_tools.common import qa_store
+
+        assert _mark("--confirm", "test").exit_code == 0
+        with psycopg.connect(unmarked_dsn, autocommit=True) as conn:
+            with pytest.raises(psycopg.errors.IntegrityError):
+                conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".identity '
+                             "(data_asset_id, environment) VALUES ('other', 'production')")
+
+    def test_a_template_copy_carries_it(self, unmarked_dsn):
+        assert _mark("--confirm", "test").exit_code == 0
+        admin = os.environ["MOTHMAN_TEST_DSN"]
+        source = psycopg.conninfo.conninfo_to_dict(unmarked_dsn)["dbname"]
+        copy = f"{source}_copy"
+        with psycopg.connect(admin, autocommit=True) as conn:
+            conn.execute(f'DROP DATABASE IF EXISTS "{copy}" WITH (FORCE)')
+            conn.execute(f'CREATE DATABASE "{copy}" TEMPLATE "{source}"')
+        try:
+            info = psycopg.conninfo.conninfo_to_dict(unmarked_dsn)
+            info["dbname"] = copy
+            assert _recorded(psycopg.conninfo.make_conninfo(**info)) == \
+                db_identity.Identity(hierarchy.data_asset_id(), "test")
+        finally:
+            with psycopg.connect(admin, autocommit=True) as conn:
+                conn.execute(f'DROP DATABASE IF EXISTS "{copy}" WITH (FORCE)')
+
+    def test_one_statement_reads_it_and_the_version(self, supply_dsn):
+        """NFR 1: one round trip at connect time, the table read only where
+        it exists - an unmarked database has no qa schema to read."""
+        assert db_identity.PROBE.count(";") == 0
+        assert "to_regclass" in db_identity.PROBE
 
 
 class TestTheResetLeavesTheIdentity:

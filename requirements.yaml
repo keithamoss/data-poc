@@ -15538,6 +15538,14 @@ requirements:
         what was actually known as of that date'', the opposite of criterion 21;
         it now says the view uses everything known today and names the snapshot
         archive.'
+      - 'A REPLAYED PROMOTION''S INVENTED LAG STOPS AT THE NEXT ARRIVAL (Keith,
+        2026-10-06, post-build-review #117 D5, over leaving it until TS-45/TS-53
+        are unparked): effective_at_for() takes `before`, the next receipt of the
+        same dataset read from the recorded deliveries (promotion.next_receipt),
+        and caps the promotion one second before it, never earlier than the supply''s
+        own receipt - so the asset timeline never shows two versions waiting because
+        of a lag nobody measured. Live there is no next receipt yet, so nothing
+        changes.'
   - id: REQ-GHUB-082
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
@@ -18267,7 +18275,7 @@ requirements:
     - 'PROVISIONAL (overnight sprint 1): THE HAND-FILED BIRTH REGISTRATIONS PATH NOW CHECKS A CONTESTED FILE AS THE BATCH DOES, through the shared entry_for(), where it used to call path_for() and refuse. A behaviour change on the hand-filed route only, in the direction REQ-PIPE-105 criterion 6 already took for the batch; the batch is unchanged (proven above).'
     - 'BUILT 2026-10-06 overnight (sprint 14): criteria 1, 3-9, 12 and 14, on
       top of 2 and 13 (sprint 1).'
-    - 'PROVISIONAL (overnight): criterion 7 is met by REFUSAL - a recorded arrival
+    - 'SETTLED 2026-10-06 (Keith, over queueing a re-check with ''a person asked'' as its cause), was PROVISIONAL (overnight): criterion 7 is met by REFUSAL - a recorded arrival
       kept from the picker is refused naming --trial, and a further recorded check
       happens only through REQ-PIPE-140''s re-check, owed by the decision or reload
       that calls for it, under its own run id. REJECTED for tonight: routing a
@@ -20404,6 +20412,18 @@ requirements:
       env mark --confirm` stands in for typing only on an UNMARKED database; replacing
       an identity needs a terminal and the identity typed out, and --replacing
       is gone - criterion 6, which says no flag skips the typed id.'
+    - 'DELETING BY HAND NEEDS THE TYPED ID TOO (Keith, 2026-10-06, post-build-review
+      #119 D2): `supply tidy` and `supply discard-sample` confirm through common.confirm_drop
+      - where the environment confirms changes, confirm_change(), whose typed
+      id --yes cannot skip; elsewhere the plain y/N, --yes and all, unchanged.
+      Over leaving them a y/N because they only remove orphaned or sample data.'
+    - 'IN PRODUCTION THE TYPED ID IS THE KEEP DECISION (Keith, 2026-10-06, #119
+      D10, over a y/N followed by the id): hand-filing at a terminal asks for
+      the environment''s id in place of ''Keep this check?''; anything else runs
+      a trial, as ''no'' did, and filing does not ask again. A keep decided by
+      --commit still asks at filing, because criterion 6 forbids the flag being
+      the confirmation too. The synthetic route''s ''record this check?'' is unchanged
+      - synthetic data is not run in production.'
   - id: REQ-DASH-094
     title: "The dashboard says which environment's QA it is showing"
     date_written: "2026-09-26"
@@ -20961,6 +20981,19 @@ requirements:
       and NOT INDIVIDUALLY REVIEWED BY KEITH - writing a check's prose is ordinary
       work under that file's own rule; only the rules are gated. Rule 13's file-check
       exception is what lets them say 'file'.
+    - 'A HEADER NAMES A CONTRACT COLUMN AND HOLDS NO VALUE (Keith, 2026-10-06,
+      post-build-review #118 D-E, over leaving the false green and over a majority-of-columns
+      rule). Naming one contract column alone let a headerless file through when
+      its first row held a value equal to a column name, and that row was taken
+      for the names. A first line with any field shaped like a number, a date
+      or timestamp, or true/false is now data: no column name is any of those.
+      Built type-free rather than per column type, because a data row''s fields
+      need not be in contract order and the shapes alone separate the cases the
+      contracts have. Missing columns stay the data checks'' question (criterion
+      2), and a REPEATED name stays header_names_unique''s, which could never
+      fail if the header-row check refused repeats - the option Keith chose had
+      included ''no name repeats'', and this is the one place the build departs
+      from its wording, for that reason. The value is never quoted.'
   - id: REQ-DASH-097
     title: File-check results read as claims about the file, in their own section, and a failed one reads clearly on the dataset
     date_written: '2026-09-26'
@@ -24350,7 +24383,7 @@ requirements:
 
     - "CRITERIA 13 AND 14 BUILT 2026-10-04 inside REQ-PIPE-144 (its criterion 40, Keith's call): qa_store.ensure_schema refuses a NEWER recorded schema version naming both versions, and rewrites nothing. The downgrade was reproduced first - a database recorded at version 99 came back recorded at 17 - and tests/test_schema_version_refusal.py failed before the fix. The rest of this requirement is built after the batch."
     - BUILT 2026-10-05 overnight (sprint 13), criteria 1 to 12.
-    - 'PROVISIONAL (overnight, Keith''s standing ''take the recommended option''):
+    - 'SUPERSEDED 2026-10-06 by Keith''s answer below (a table in the qa schema), was PROVISIONAL (overnight, Keith''s standing ''take the recommended option''):
       THE IDENTITY IS TWO DATABASE-LEVEL SETTINGS, mothman.data_asset_id and mothman.environment,
       written by ALTER DATABASE ... SET and read back from pg_db_role_setting
       rather than current_setting(). Outside every schema, so the reset keeps
@@ -24359,7 +24392,7 @@ requirements:
       version. REJECTED: a table in its own schema - a reset or a tidy that drops
       schemas would have to be taught to spare it, and it costs a second statement
       when absent (a missing table is an error, not a NULL). Keith to confirm.'
-    - 'PROVISIONAL: `--confirm <environment id>` COUNTS AS TYPING IT, for the
+    - 'SETTLED 2026-10-06 (Keith, over setup scripts marking another way), was PROVISIONAL: `--confirm <environment id>` COUNTS AS TYPING IT, for the
       three setup scripts (session hook, CI, dev container) that have no terminal.
       Without the flag the command asks at a terminal and refuses without one.
       The id is still typed rather than defaulted; what a flag cannot do is replace
@@ -24380,6 +24413,23 @@ requirements:
       beside DEPLOYMENT_SUPPLY_DSN). Found while building: a test that switched
       itself to `production` and then wrote to its `test` database was refused
       - correctly - and was reordered so only the command under test acts as production.'
+    - 'THE IDENTITY IS ONE ROW IN qa.identity (Keith, 2026-10-06, over the database-level
+      settings it was built as). A row travels with a dump and with a database
+      copied from a template, where a setting does neither. One row at most, enforced
+      by the table. Follow-ups he answered: env reset-synthetic KEEPS it - the
+      reset drops the qa schema whole, so it reads the row first and puts it back
+      in the same transaction, never leaving a committed moment at which the database
+      is unmarked; and it lives IN the qa schema (over a schema of its own writable
+      only by the owner), so anything that can write QA history could relabel
+      the database - accepted, because the guard is against a checkout pointed
+      at the wrong database, not against someone already holding write access
+      to it. Still one round trip with the server version (NFR 1): an unmarked
+      database has no qa schema and naming a missing table is an error, so the
+      row is read through query_to_xml() behind a to_regclass() test in the same
+      statement. The old settings are not read at all, so a database marked that
+      way is unmarked and refuses until `mothman env mark` (regenerate, never
+      migrate). A test or command that drops the qa schema must put the identity
+      back (tests/conftest.py drop_qa_schema).'
   - id: REQ-QAC-108
     title: 'Drift and volume are measured against the last supply actually PROMOTED, never against a view or an arrival nobody promoted
   
@@ -24963,7 +25013,7 @@ requirements:
       prompt''s root is an HSplit (checked for select, text, confirm, path and
       checkbox), so the toolbar is one extra row appended to the layout, hidden
       once the prompt is answered so the scrollback keeps answers and not toolbars.'
-    - 'PROVISIONAL: A ONE-OFF COMMAND STATES THE ENVIRONMENT AT ITS FIRST CONNECTION,
+    - 'SETTLED 2026-10-06 (Keith, over naming it at every command''s start), was PROVISIONAL: A ONE-OFF COMMAND STATES THE ENVIRONMENT AT ITS FIRST CONNECTION,
       not at start - supply_db.on_first_connection, registered by the CLI for
       any subcommand. So a command that never connects (`env list`, `plans`, the
       validators) says nothing, which is criterion 2''s ''that connects to a database''
@@ -27738,6 +27788,20 @@ requirements:
     - 'CRITERION 8''s SECOND HALF DELIVERED 2026-10-06 by REQ-PIPE-151: `mothman
       pipeline process` completes every owed re-check and re-evaluation, clearing
       each only when its work completes.'
+    - 'A RE-CHECK TAKES EFFECT AS LONG AFTER ITS CAUSE AS IT REALLY RAN (Keith,
+      2026-10-06, post-build-review #117 D7, over always the cause''s instant):
+      decision_log.follows() - the cause''s effective instant plus how long after
+      the cause was recorded the work ran. Live a decision takes effect when it
+      is recorded, so that is when the re-check ran, never before its own checks.
+      In a replay a scripted decision is recorded now but takes effect years ago,
+      so it is the cause''s instant plus moments - never today (#116). One rule,
+      no replay flag. Knock-on re-evaluations use the same helper.'
+    - 'A SUPPLY''S CURRENT RUN IS THE NEWEST ON THE ASSET''S TIMELINE (Keith,
+      2026-10-06, #117 D6, over the wall clock): qa.supply_current_run orders
+      by the causing decision''s effective instant, else the supply''s receipt,
+      else the run''s own instant - the order supply_status.runs_about already
+      used. The two definitions named different runs current in a replay, which
+      stamps run instants in processing order.'
     open_questions: []
 
   - id: REQ-PIPE-141
@@ -28245,6 +28309,10 @@ requirements:
     - 'THE ROUTE IS A CLOSED SET OF FOUR - the four routes REQ-PIPE-103 criterion 7 names - plus automated. REJECTED a free-text note from the person (Keith, 2026-09-27): nothing can aggregate it.'
     - 'THE 2026-09-27 PLAN TO REGENERATE THE EXISTING RECORDS STANDS in its current form: regenerate rather than migrate, and every synthetic delivery is truthfully automated.'
     - 'BUILT 2026-10-04 (overnight sprint 5). PROVISIONAL: (1) "resolved through contract/people.yaml as the dashboard already resolves run_by" - the dashboard showed run_by RAW, so this shows the person''s people.yaml `name` where they have an entry and the identity otherwise, never refusing; (2) an automated delivery adds nothing visible to a dashboard row, only a tooltip, so the common case stays quiet at thirty datasets.'
+    - 'SOMEONE NOT IN people.yaml IS SHOWN BY THEIR RECORDED IDENTITY (Keith,
+      2026-10-06, post-build-review #117 D1, a privacy call): the dashboard falls
+      back to the email the record holds, over showing ''someone not on the people
+      list'' and over refusing to record their action. Kept as built.'
     open_questions: []
 
   - id: REQ-PIPE-146
@@ -28528,9 +28596,17 @@ requirements:
     - 'PROVISIONAL: the gate line reads the RULE''s newest promote / promotion-withheld
       / promotion-refused entry for the supply; with none it says the gate is
       owed to the next processing pass rather than guessing.'
-    - 'PROVISIONAL: inheritances are attributed to the kept run by being recorded
+    - 'SUPERSEDED 2026-10-06 by Keith''s answer below (a recorded link), was PROVISIONAL: inheritances are attributed to the kept run by being recorded
       at or after its receipt instant - the record carries no link from a filing
       to the inheritance its opening caused.'
+    - 'INHERITANCES ARE READ BY A RECORDED LINK (Keith, 2026-10-06, over the recorded_at
+      time window, which would claim whatever a concurrent pass inherited too).
+      Each inherit entry records caused_by_supply - the supply whose promotion
+      opened the period it filled (qa schema 31; NULL where a person opened the
+      period) - and the kept-run report lists the inheritances its arrival''s
+      supply caused, naming each one''s dataset. The link is the SUPPLY, not the
+      run: the promotion has it in hand when it opens the period, before its own
+      decision exists, so it needs no plumbing through the run.'
     open_questions: []
   - id: REQ-PIPE-151
     title: One processing pass handles what has arrived and finishes what is owed, never generates data, and is what a scheduler calls
@@ -28698,7 +28774,7 @@ requirements:
     - 'PROVISIONAL (overnight): an arrival another process holds is LEFT for the
       next pass (try-lock), never waited on - a pass never hangs behind a Lambda
       retry.'
-    - 'PROVISIONAL: the pass stages every still-unchecked arrival before the first
+    - 'SETTLED 2026-10-06 (Keith, over staging each arrival just before its check), was PROVISIONAL: the pass stages every still-unchecked arrival before the first
       is checked, as the batch does - a delivery''s later files are candidates
       the overlay sees.'
     - 'PROVISIONAL: the pass never plays scripted decisions (REQ-GEN-135) - playback

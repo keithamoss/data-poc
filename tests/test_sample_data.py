@@ -348,9 +348,11 @@ class TestDiscardingIsSomethingAPersonDoes:
         callers = {line.split(":")[0] for line in out.splitlines() if line.strip()}
         assert callers == {"cli/supply.py"}, out
         # AND THE COMMAND ASKS FIRST, like `mothman supply tidy` - the two
-        # destructive commands in this group behave the same way.
+        # destructive commands in this group behave the same way, through
+        # common.confirm_drop since 2026-10-06 (production's typed id, which
+        # --yes cannot skip - post-build-review #119 D2).
         source = pathlib.Path("cli/supply.py").read_text()
-        assert "click.confirm" in source.split("def discard_sample_command")[1]
+        assert "confirm_drop(" in source.split("def discard_sample_command")[1].split("\ndef ")[0]
 
 
 class TestACrossTableCheckMaySpanThem:

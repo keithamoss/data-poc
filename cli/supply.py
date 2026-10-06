@@ -618,7 +618,8 @@ def install_guard_command() -> None:
 
 
 @supply_group.command("tidy")
-@click.option("--yes", is_flag=True, help="Skip the confirmation.")
+@click.option("--yes", is_flag=True, help="Skip the confirmation - except where the "
+              "environment confirms changes (production), which always asks for its id.")
 def tidy_command(yes: bool) -> None:
     """Drop per-run schemas nothing is using any more.
 
@@ -652,12 +653,10 @@ def tidy_command(yes: bool) -> None:
         console.print(f"[yellow]{len(leftovers)} per-run schema(s) left over:[/yellow]")
         for schema in leftovers:
             console.print(f"  {schema}")
-        if not yes and not click.confirm(
-                # The environment named in the prompt (REQ-TEST-114 criterion 4,
-                # post-build-review #119 D2).
-                common._named("Drop these? Anything still running will lose the schema "
-                              "it is reading through"),
-                default=False):
+        # The environment named in the prompt (REQ-TEST-114 criterion 4), and
+        # its typed id where it confirms changes (post-build-review #119 D2).
+        if not common.confirm_drop("Drop these? Anything still running will lose the "
+                                   "schema it is reading through", yes=yes):
             console.print("[dim]Left alone.[/dim]")
             return
         for schema in leftovers:
@@ -670,7 +669,8 @@ def tidy_command(yes: bool) -> None:
 @supply_group.command("discard-sample")
 @click.option("--dataset", "dataset_id", required=True,
               help="The dataset whose pre-graduation data to discard.")
-@click.option("--yes", is_flag=True, help="Skip the confirmation.")
+@click.option("--yes", is_flag=True, help="Skip the confirmation - except where the "
+              "environment confirms changes (production), which always asks for its id.")
 def discard_sample_command(dataset_id: str, yes: bool) -> None:
     """Discard a dataset's pre-graduation data (REQ-PIPE-106 criteria 17, 18).
 
@@ -725,10 +725,8 @@ def discard_sample_command(dataset_id: str, yes: bool) -> None:
                        f"{sample_data.SCHEMA} for [bold]{dataset_id}[/bold] ({waiting}):")
         for physical in found:
             console.print(f"  {physical}")
-        if not yes and not click.confirm(
-                common._named("Discard these? The data goes, the QA record made against "
-                              "it stays"),
-                default=False):
+        if not common.confirm_drop("Discard these? The data goes, the QA record made "
+                                   "against it stays", yes=yes):
             console.print("[dim]Left alone.[/dim]")
             return
         dropped = sample_data.discard(conn, dataset_id)

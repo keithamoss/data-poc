@@ -262,6 +262,9 @@ class Decision:
     #: The decision a rule's STILL_FAILING record follows from
     #: (REQ-PIPE-121 criterion 12).
     caused_by_decision: int | None = None
+    #: The supply whose promotion opened the period an INHERIT filled
+    #: (REQ-TEST-150 criterion 6). None where a person opened it.
+    caused_by_supply: str | None = None
 
     @property
     def slots(self) -> tuple[str, ...]:
@@ -701,14 +704,40 @@ def _table_of(dataset_id: str) -> str | None:
         return None
 
 
+def follows(conn: supply_db.SupplyConnection, decision_id: int | None) -> str:
+    """When work that a decision caused takes effect: as long after the
+    decision took effect as it really ran after the decision was recorded
+    (Keith, 2026-10-06, post-build-review #117 D7).
+
+    Live, a decision takes effect when it is recorded, so this is the moment
+    the work ran - never before its own checks, which the cause's instant
+    alone claimed. In a replay a scripted decision is recorded now but takes
+    effect years ago, so this is the cause's instant plus the moments the work
+    took - never today, which is #116's reason for using the cause at all.
+    One rule, no flag saying which of the two this is. Now, where there is no
+    cause to follow.
+    """
+    from qa_tools.common import asset_time
+
+    now = asset_time.now()
+    if decision_id is not None:
+        rows = conn.execute(f"SELECT effective_at, recorded_at FROM {TABLE} WHERE id = ?",
+                            [decision_id]).fetchall()
+        if rows and rows[0][0] is not None and rows[0][1] is not None:
+            effective, recorded = rows[0]
+            lag = max(now - recorded, now - now)
+            return (effective + lag).astimezone(now.tzinfo).isoformat()
+    return now.isoformat()
+
+
 def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
     rows = conn.execute(
         f"INSERT INTO {TABLE} (agency_id, collection_id, dataset_id, action, supply, "
         "from_slot, to_slot, actor, actor_kind, reason, effective_at, stands_on, "
         "amber_setting, amber_level, amber_version, superseded_by, table_name, "
         "promoted_status, replaces, replacement_setting, replacement_level, "
-        "replacement_version, caused_by_decision) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "replacement_version, caused_by_decision, caused_by_supply) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "RETURNING id",
         [decision.agency_id, decision.collection_id, decision.dataset_id,
          decision.action, decision.supply or None, decision.from_slot, decision.to_slot,
@@ -718,7 +747,7 @@ def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
          decision.amber_version, decision.superseded_by, _table_of(decision.dataset_id),
          decision.promoted_status, decision.replaces, decision.replacement_setting,
          decision.replacement_level, decision.replacement_version,
-         decision.caused_by_decision]).fetchall()
+         decision.caused_by_decision, decision.caused_by_supply]).fetchall()
     return int(rows[0][0])
 
 

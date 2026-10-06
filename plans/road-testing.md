@@ -2511,8 +2511,14 @@ judgement about who reads the page rather than about the rule.
           everywhere.
         - #117 D5: a replayed rule promotion's invented lag is capped at the
           next arrival of the same dataset.
-        BUILDING NEXT, in this order: these answers (the identity table and
-        the inheritance link are the two schema changes), then
+        ALL EIGHT BUILT 2026-10-06 (qa schema 31; decisions recorded on
+        REQ-PIPE-107, 093, 140, 081, 147, REQ-QAC-096, REQ-TEST-150). Two
+        departures from the option wording, both in the decisions: the header
+        rule does not refuse a REPEATED name (header_names_unique could never
+        fail if it did), and it is type-free rather than per column type. D7's
+        "live: when it ran, replay: the cause" is one rule with no replay flag
+        (decision_log.follows), and knock-on re-evaluations use it too.
+        THEN, in this order:
         REQ-TEST-117 (CI reuses a bootstrapped database), then REQ-PIPE-152
         (the S3 Lambda handlers).
  All the old unsigned

@@ -248,6 +248,19 @@ def confirm_change(message: str, *, yes: bool, default: bool = False,
     return True
 
 
+def confirm_drop(message: str, *, yes: bool) -> bool:
+    """The confirmation before a command DELETES something by hand - `supply
+    tidy`, `supply discard-sample` (Keith, 2026-10-06, post-build-review #119
+    D2). Where the environment confirms changes it is confirm_change(): the
+    typed id, which --yes cannot skip. Elsewhere it stays the plain y/N it
+    was, --yes and all."""
+    from qa_tools.common import environments
+
+    if environments.current().confirm_changes:
+        return confirm_change(message, yes=yes)
+    return yes or click.confirm(_named(message), default=False)
+
+
 def report_recorded(run_id: str, count: int) -> None:
     """The real success affordance after an interactive check that was
     kept (Keith's own ask, 2026-09-19, about the step this replaces:
@@ -446,6 +459,8 @@ def decide_keep(paths, *, keep: bool | None) -> bool:
     and a delivery filed on somebody's behalf is a public record of an
     arrival they did not agree to.
     """
+    global _KEEP_TYPED
+    _KEEP_TYPED = False
     if keep is not None:
         return keep
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
@@ -455,7 +470,35 @@ def decide_keep(paths, *, keep: bool | None) -> bool:
             style="yellow")
         return False
     console.print(describe_keep_choice(paths))
+    from qa_tools.common import environments
+
+    env = environments.current()
+    if env.confirm_changes:
+        # THE TYPED ID IS THE DECISION (Keith, 2026-10-06, post-build-review
+        # #119 D10): where the environment confirms changes, typing its id is
+        # keeping the supply, in place of a y/N followed by the id. Anything
+        # else is a trial, as "no" was. Filing then does not ask again.
+        typed = (_ask_text(f"Keep this check as a real delivery in the {env.label} "
+                           f"database? Type {env.id} to keep it - anything else runs it "
+                           f"as a trial:") or "").strip()
+        if typed != env.id:
+            console.print(f"Not {env.id!r} - running it as a TRIAL, which records "
+                          f"nothing.", style="yellow")
+            return False
+        _KEEP_TYPED = True
+        return True
     return confirm("Keep this check?", yes=False, default=False)
+
+
+#: Whether the last keep decision was made by typing the environment's id
+#: (#119 D10) - so the filing that follows does not ask for it a second time.
+_KEEP_TYPED = False
+
+
+def keep_was_typed() -> bool:
+    return _KEEP_TYPED
+
+
 
 
 def offer_to_publish() -> None:
@@ -609,7 +652,8 @@ def _file_or_trial(paths, collection_id, run_id_prefix, *, keep, route, original
     # (REQ-PIPE-093 criterion 4): --commit decides to keep it, and is not
     # allowed to be the confirmation too (criterion 6). yes=True because
     # everywhere else keeping was already confirmed above.
-    if not confirm_change("File this supply as a real delivery?", yes=True):
+    if not keep_was_typed() and not confirm_change("File this supply as a real delivery?",
+                                                    yes=True):
         raise click.ClickException("not filed - the environment's id was not typed.")
     # WHO, AND WHEN IT WAS ORIGINALLY RECEIVED - both settled before
     # anything is written (REQ-PIPE-147 criterion 4, REQ-PIPE-103 criteria
@@ -758,7 +802,7 @@ def finish_kept(results: list[dict], filed, *, collection_id: str, run_id_prefix
         console.print(table(results, filed.run_id))
     say_what_it_did(filed.run_id, filed.delivery_name, [a.run_id for a in found])
     if found:
-        lifecycle_report.report(found, since=filed.received_at)
+        lifecycle_report.report(found)
 
 
 def kept_arrival(collection_id: str, run_id_prefix: str, run_id: str):
@@ -781,7 +825,7 @@ def report_kept_arrival(collection_id: str, run_id_prefix: str, run_id: str) -> 
     from cli import lifecycle_report
 
     arrival = kept_arrival(collection_id, run_id_prefix, run_id)
-    lifecycle_report.report([arrival], since=arrival.received_at)
+    lifecycle_report.report([arrival])
 
 
 def _compact_results(results, table, run_id) -> None:

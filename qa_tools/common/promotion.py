@@ -90,7 +90,7 @@ def promote(conn: supply_db.SupplyConnection, *,
     # inherits into it. Before the transaction below, because
     # inheritance writes decisions of its own.
     period_schema.open_period(conn, period, opened_by=actor,
-                               effective_at=effective_at)
+                               effective_at=effective_at, caused_by=supply)
     decision = decision_log.Decision(
         agency_id=agency_id,
         collection_id=collection_id,
@@ -312,7 +312,7 @@ _LAG_SPAN = timedelta(days=3) - _LAG_MIN
 
 
 def effective_at_for(received_at: datetime, *, now: datetime | None = None,
-                      seed: str = "") -> datetime:
+                      seed: str = "", before: datetime | None = None) -> datetime:
     """When a promotion of this supply took effect.
 
     TWO THINGS ARE TRUE OF ANY PROMOTION, synthetic or real, and this
@@ -352,7 +352,33 @@ def effective_at_for(received_at: datetime, *, now: datetime | None = None,
     # over hours - the window is a duration, so the lag should move
     # with it if it is ever retuned.
     fraction = int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
-    return min(now, received_at + _LAG_MIN + _LAG_SPAN * fraction)
+    took = min(now, received_at + _LAG_MIN + _LAG_SPAN * fraction)
+    # NEVER PAST THE NEXT ARRIVAL OF THE SAME DATASET (Keith, 2026-10-06,
+    # post-build-review #117 D5): an invented lag that outlived the next
+    # supply's receipt showed two versions waiting at once on the asset
+    # timeline. Just before it, and never earlier than this supply's own.
+    if before is not None and took >= before:
+        took = max(received_at, before - timedelta(seconds=1))
+    return took
+
+
+def next_receipt(arrival) -> datetime | None:
+    """When the next file for this arrival's dataset was received, from the
+    recorded deliveries - which the batch records in full before it processes
+    the first (delivery_log.record_all). None where there is none yet, which
+    live is the normal case."""
+    received = getattr(arrival, "received_at", None)
+    datasets = list((getattr(arrival, "files_by_dataset", None) or {}).keys())
+    if received is None or len(datasets) != 1:
+        return None
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(read_only=True, label="mothman:next-receipt") as conn:
+        rows = conn.execute(
+            f'SELECT min(received_instant) FROM "{qa_store.SCHEMA}".delivery_file '
+            "WHERE dataset_id = ? AND received_instant > ?",
+            [datasets[0], received]).fetchall()
+    return rows[0][0] if rows and rows[0][0] is not None else None
 
 
 def should_promote(*, status: str,

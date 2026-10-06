@@ -98,3 +98,44 @@ class TestItIsSeededLikeEverythingElseHere:
         for i in range(50):
             got = promotion.effective_at_for(LONG_AGO, now=now, seed=f"run_{i}")
             assert timedelta(hours=1) <= got - LONG_AGO <= timedelta(days=3), got - LONG_AGO
+
+
+class TestTheLagNeverRunsPastTheNextArrival:
+    """Keith, 2026-10-06 (post-build-review #117 D5): the invented lag could
+    carry a promotion past the next arrival of the same dataset, so the asset
+    timeline showed two versions waiting for days. It is capped just before
+    the next arrival, and never earlier than its own."""
+
+    def test_capped_before_the_next_arrival(self):
+        nxt = LONG_AGO + timedelta(minutes=30)
+        got = promotion.effective_at_for(LONG_AGO, now=datetime(2026, 10, 2, tzinfo=PERTH),
+                                         seed="x", before=nxt)
+        assert LONG_AGO <= got < nxt
+
+    def test_no_next_arrival_leaves_the_lag_alone(self):
+        now = datetime(2026, 10, 2, tzinfo=PERTH)
+        assert promotion.effective_at_for(LONG_AGO, now=now, seed="x", before=None) == \
+            promotion.effective_at_for(LONG_AGO, now=now, seed="x")
+
+    def test_the_next_arrival_is_read_from_the_recorded_deliveries(self, supply_dsn):
+        import uuid
+        from types import SimpleNamespace
+
+        from qa_tools.common import qa_store, supply_db
+
+        ds = f"cp-{uuid.uuid4().hex[:10]}"
+        with supply_db.connect(label="test-next-receipt") as conn:
+            qa_store.ensure_schema(conn)
+            for n, minutes in enumerate((0, 45, 90)):
+                name = f"d-{ds}-{n}"
+                at = (LONG_AGO + timedelta(minutes=minutes)).isoformat()
+                conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".delivery '
+                             "(name, received_at, received_instant) VALUES (?, ?, ?)",
+                             [name, at, at])
+                conn.execute(f'INSERT INTO "{qa_store.SCHEMA}".delivery_file (delivery, '
+                             "filename, dataset_id, received_at, received_instant, "
+                             "received_from, receipt_sequence) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                             [name, "f.csv", ds, at, at, "our-clock", 1])
+        arrival = SimpleNamespace(received_at=LONG_AGO, files_by_dataset={ds: ("f.csv",)})
+        assert promotion.next_receipt(arrival) == LONG_AGO + timedelta(minutes=45)
+        assert promotion.next_receipt(SimpleNamespace(received_at=None)) is None

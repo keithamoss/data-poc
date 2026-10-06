@@ -329,3 +329,27 @@ class TestCriticFindings118:
         finding = fc.Finding(fc.FIELDS_PER_ROW, fc.FAILURE, fc.FAIL, "line 3 is short")
         assert fc.reason_for(finding, "cp_clients.csv") == \
             "cp_clients.csv failed the file check Fields per row: line 3 is short."
+
+
+class TestAHeaderIsNotValueShaped:
+    """Keith, 2026-10-06 (post-build-review #118 D-E): a first line is a
+    header only if it names a contract column AND none of its fields is
+    shaped like a value - so a headerless file whose first row happens to
+    hold a column name as a value is refused, not read as its own names."""
+
+    @pytest.mark.parametrize("first", [b"7,name,2020", b"7,name,2020-01-01",
+                                       b"id,name,2020-01-01T09:00:00", b"id,name,1.5",
+                                       b"id,name,true", b"id,name,03/04/2021"])
+    def test_a_data_row_holding_a_column_name_is_not_a_header(self, tmp_path, first):
+        f = _by_check(fc.evaluate(_write(tmp_path, first + b"\n1,Ann,2020\n"), COLUMNS))
+        assert f[fc.HEADER_ROW].status == fc.FAIL
+        assert "value" in f[fc.HEADER_ROW].words
+
+    def test_missing_columns_are_still_the_data_checks_job(self, tmp_path):
+        f = _by_check(fc.evaluate(_write(tmp_path, b"id,name\n1,Ann\n"), COLUMNS))
+        assert f[fc.HEADER_ROW].status == fc.PASS
+
+    def test_the_refusal_never_quotes_the_value(self, tmp_path):
+        f = _by_check(fc.evaluate(_write(tmp_path, b"7,name,1987-02-03\n1,Ann,2020\n"),
+                                  COLUMNS))
+        assert "1987-02-03" not in f[fc.HEADER_ROW].words

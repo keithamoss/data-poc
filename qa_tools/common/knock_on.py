@@ -155,7 +155,7 @@ def complete(item, *, run_by: str | None = None, on_step=None):
     failing, and clear it. A failure leaves it owed and reported (criterion
     14): the promotion that caused it stands, and each waiting reader keeps
     its earlier verdict."""
-    from qa_tools.common import (asset_time, decision_log, hierarchy, promotion, recheck,
+    from qa_tools.common import (decision_log, hierarchy, promotion, recheck,
                                  supply_status)
 
     period, tables = item.period, list(item.tables or [])
@@ -186,13 +186,11 @@ def complete(item, *, run_by: str | None = None, on_step=None):
                                f"and it is still owed")
     failing: list[tuple[str, str, str]] = []
     with supply_db.connect(label="mothman:knock-on") as conn:
-        # AT THE INSTANT ITS CAUSE TOOK EFFECT, not when this ran: a knock-on
-        # follows its decision, and a bootstrap replaying four years must not
-        # stamp every re-gated promotion with today (REQ-PIPE-081).
-        cause = conn.execute(f"SELECT effective_at FROM {decision_log.TABLE} WHERE id = ?",
-                             [item.caused_by_decision]).fetchall()
-        now = (cause[0][0].isoformat() if cause and cause[0][0]
-               else asset_time.now().isoformat())
+        # AS LONG AFTER ITS CAUSE AS IT REALLY RAN (decision_log.follows, the
+        # one rule re-checks use too - #117 D7): live, when it ran; in a
+        # bootstrap replaying four years, the cause's instant, never today
+        # (REQ-PIPE-081).
+        now = decision_log.follows(conn, item.caused_by_decision)
         for reader in touched:
             if not reader.waiting:
                 continue  # criterion 6: a promoted reader is shown, never acted on

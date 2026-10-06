@@ -91,6 +91,16 @@ def schemas_to_drop(conn: supply_db.SupplyConnection) -> list[str]:
     ours |= set(supply_db.run_schemas(conn))
     ours |= set(supply_db.dbt_schemas(conn))
     ours |= set(supply_db.schemas_with_prefix(conn, supply_db.TRIAL_SCHEMA_PREFIX))
+    # A QA SCHEMA HOLDING ONLY THE IDENTITY IS NOT HISTORY (REQ-PIPE-107
+    # criterion 11): it is what a reset leaves behind on purpose, so it is not
+    # something still to drop.
+    from qa_tools.common import qa_store
+
+    if qa_store.SCHEMA in ours and {row[0] for row in conn.execute(
+            "SELECT relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = ? AND c.relkind IN ('r', 'v', 'm', 'p', 'f')",
+            [qa_store.SCHEMA]).fetchall()} <= {"identity"}:
+        ours.discard(qa_store.SCHEMA)
     return sorted(ours)
 
 
@@ -155,7 +165,17 @@ def reset(conn: supply_db.SupplyConnection, typed: str,
     # cascaded drop of a period's view unless its own schema goes in the
     # same statement (REQ-PIPE-129 criterion 17), so dropping one at a time
     # failed on the first period another stood on.
+    # THE IDENTITY STAYS (REQ-PIPE-107 criterion 11). It is a row in the qa
+    # schema the reset drops (Keith, 2026-10-06), so it is read first and put
+    # back in the SAME TRANSACTION: there is never a committed moment at which
+    # this database is unmarked, which every other connection would refuse.
+    from qa_tools.common import db_identity
+
+    _, identity = db_identity.read(conn)
     if dropped:
-        conn.execute("DROP SCHEMA " + ", ".join(f'"{name}"' for name in dropped)
-                     + " CASCADE")
+        with conn.raw.transaction():
+            conn.execute("DROP SCHEMA " + ", ".join(f'"{name}"' for name in dropped)
+                         + " CASCADE")
+            if identity is not None:
+                db_identity.mark(conn, identity)
     return dropped

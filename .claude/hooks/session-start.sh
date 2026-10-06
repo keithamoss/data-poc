@@ -100,7 +100,7 @@ fi
 # Every connection checks the database's recorded identity and refuses one
 # with none, so the sandbox marks its own - a no-op once it is. A database
 # marked as something else is reported, never re-marked: that is a person's
-# decision (`mothman env mark --replacing ...`).
+# decision (`mothman env mark` at a terminal).
 if [ "${PG_UP:-}" = "1" ]; then
   if MOTHMAN_ENVIRONMENT=sandbox \
      MOTHMAN_SUPPLY_DSN="postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/supply" \
