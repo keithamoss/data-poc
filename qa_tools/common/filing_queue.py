@@ -176,21 +176,6 @@ def waiting_over_promoted(conn: supply_db.SupplyConnection,
     return out
 
 
-def periods_needing_a_person(conn: supply_db.SupplyConnection, collection_id: str, *,
-                             now: datetime | None = None) -> list[slot_state.SlotState]:
-    """Periods whose supply never came (criterion 31's own half).
-
-    NOT PART OF THE QUEUE ABOVE, and the separation is the criterion
-    rather than a layout preference: none of substitute, de-substitute,
-    inherit or un-inherit answers "what do I do with this arriving
-    supply", so offering them beside a supply invites somebody working
-    an arrival to reach for one.
-    """
-    states = [s for s in slot_state.states_for(conn, collection_id, now=now)
-              if s.state in WITHOUT_A_SUPPLY]
-    return sorted(states, key=lambda s: (s.period, s.dataset_id))
-
-
 @dataclass(frozen=True)
 class Gap:
     """Consecutive CLOSED, unfilled, unmarked periods of one dataset, as

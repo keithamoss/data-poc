@@ -144,7 +144,7 @@ class TestSeveralStagedVersionsAreContested:
         world.stage("cp_clients", red, value=1)
         world.stage("cp_clients", fix, value=2)
         out = world.build("cp_clients", fix)
-        assert not period_overlay.own_table_contested(out.resolution, "cp_clients")
+        assert "cp_clients" not in out.resolution.ambiguous
         assert world.read(f"cp_clients__{fix}", "cp_clients") == 2
 
     def test_two_files_in_one_arrival_are_still_contested(self, world):
@@ -154,7 +154,7 @@ class TestSeveralStagedVersionsAreContested:
         world.stage("cp_clients", f"{key}__1", period_to=None)
         world.stage("cp_clients", f"{key}__2", period_to=None)
         out = world.build("cp_clients", key)
-        assert period_overlay.own_table_contested(out.resolution, "cp_clients")
+        assert "cp_clients" in out.resolution.ambiguous
 
     def test_a_resupply_into_a_promoted_period_is_not_contested(self, world):
         """Promotion MOVES the first supply, so the resupply is alone in
@@ -163,7 +163,7 @@ class TestSeveralStagedVersionsAreContested:
         world.promote(world.stage("cp_clients", first, value=1))
         world.stage("cp_clients", again, value=2)
         out = world.build("cp_clients", again)
-        assert not period_overlay.own_table_contested(out.resolution, "cp_clients")
+        assert "cp_clients" not in out.resolution.ambiguous
         assert world.read(f"cp_clients__{again}", "cp_clients") == 2
 
 

@@ -162,18 +162,6 @@ def end_of_day(day: date) -> datetime:
     return start_of_day(day + timedelta(days=1)) - timedelta(microseconds=1)
 
 
-def as_of_instant(day: date) -> datetime:
-    """A bare as-of DATE as the instant a comparison should use.
-
-    A named alias for `end_of_day()`, because "runs on or before the
-    as-of date" is the single most common comparison in this repo and
-    reading `end_of_day` at the call site invites someone to wonder
-    whether the boundary is inclusive. It is: the whole of that day
-    counts.
-    """
-    return end_of_day(day)
-
-
 def local_date(value) -> date:
     """The calendar date an instant falls on, ON THE ASSET'S CLOCK.
 

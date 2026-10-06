@@ -22,7 +22,6 @@ other two run and the gap is reported.
 """
 from __future__ import annotations
 
-import contextlib
 
 from qa_tools.common import period_schema, supply_db
 
@@ -199,21 +198,6 @@ def guard_installed(conn) -> bool:
     rows = conn.execute("SELECT count(*) FROM pg_event_trigger WHERE evtname IN (?, ?) "
                         "AND evtenabled <> 'D'", [GUARD_TRIGGER, DROP_GUARD_TRIGGER]).fetchall()
     return bool(rows) and rows[0][0] == 2
-
-
-@contextlib.contextmanager
-def guard_disabled(conn):
-    """For a test proving another guard refuses on its own (criterion 12)."""
-    present = guard_installed(conn)
-    if present:
-        conn.execute(f"ALTER EVENT TRIGGER {GUARD_TRIGGER} DISABLE")
-        conn.execute(f"ALTER EVENT TRIGGER {DROP_GUARD_TRIGGER} DISABLE")
-    try:
-        yield
-    finally:
-        if present:
-            conn.execute(f"ALTER EVENT TRIGGER {GUARD_TRIGGER} ENABLE")
-            conn.execute(f"ALTER EVENT TRIGGER {DROP_GUARD_TRIGGER} ENABLE")
 
 
 # ---- reporting a missing guard (criterion 18) ----------------------------

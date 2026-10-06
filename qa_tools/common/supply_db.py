@@ -787,14 +787,6 @@ def run_schema(run_id: str) -> str:
     return RUN_SCHEMA_PREFIX + _ident(run_id, "run id")
 
 
-def run_id_of(schema: str) -> str | None:
-    """The exact inverse, for reporting an orphan in terms a person can
-    act on. Returns None for a schema that is not a run schema at all."""
-    if not schema.startswith(RUN_SCHEMA_PREFIX):
-        return None
-    return schema[len(RUN_SCHEMA_PREFIX):]
-
-
 #: A trial's own staging schema carries this prefix, and so - because
 #: a trial run id starts with it - do its view and dbt schemas, as
 #: `qa_trial_...` and `dbt_trial_...`. One prefix therefore finds
@@ -1277,13 +1269,6 @@ def borrow_views(conn, run_id: str, from_run_id: str, tables) -> list[str]:
     if borrowed:
         record_resolution(conn, mine)
     return borrowed
-
-
-def drop_run_schema(conn, run_id: str) -> None:
-    """Discard the run's schema once the run completes (criterion 1).
-    Idempotent, because the interesting caller is a cleanup path that
-    cannot know whether the run got far enough to create one."""
-    conn.execute(f'DROP SCHEMA IF EXISTS "{run_schema(run_id)}" CASCADE')
 
 
 def run_schemas(conn) -> list[str]:

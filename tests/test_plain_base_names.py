@@ -2,6 +2,8 @@
 Against a real database; each test mints its own periods."""
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import pytest
 
 import test_supersession as _base
@@ -19,6 +21,25 @@ def _tables_in(conn, schema):
         "SELECT table_name FROM information_schema.tables WHERE table_schema = ? "
         "AND table_name <> '_manifest'",  # a period's own account (REQ-PIPE-130)
         [schema]).fetchall())
+
+
+@contextmanager
+def _guard_disabled(conn):
+    """The database guard switched off for one block, so a test can prove
+    another guard refuses on its own (criterion 12) or that a missing
+    guard is reported (criterion 18)."""
+    from qa_tools.common import period_tables
+
+    present = period_tables.guard_installed(conn)
+    if present:
+        conn.execute(f"ALTER EVENT TRIGGER {period_tables.GUARD_TRIGGER} DISABLE")
+        conn.execute(f"ALTER EVENT TRIGGER {period_tables.DROP_GUARD_TRIGGER} DISABLE")
+    try:
+        yield
+    finally:
+        if present:
+            conn.execute(f"ALTER EVENT TRIGGER {period_tables.GUARD_TRIGGER} ENABLE")
+            conn.execute(f"ALTER EVENT TRIGGER {period_tables.DROP_GUARD_TRIGGER} ENABLE")
 
 
 def _promote(conn, supply, table, period, kind=dl.RULE):
@@ -85,7 +106,7 @@ class TestADependentViewBlocksAMove:
         from qa_tools.common import period_tables
 
         supply, table, other = self._with_a_view_on(conn, period)
-        with period_tables.guard_disabled(conn):
+        with _guard_disabled(conn):
             with pytest.raises(period_tables.DependentView, match=other):
                 with conn.raw.transaction():
                     period_tables.take_out(conn, period=period, logical=TABLE, supply=supply,
@@ -241,7 +262,7 @@ class TestAMissingGuardIsReported:
         from qa_tools.common import period_tables
 
         assert period_tables.guard_report(conn) is None
-        with period_tables.guard_disabled(conn):
+        with _guard_disabled(conn):
             problem = period_tables.guard_report(conn)
         assert problem and "NOT installed" in problem
 

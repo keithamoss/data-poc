@@ -51,10 +51,6 @@ class RecordedObject:
     newly_recorded: bool
 
 
-def local_uri(delivery_name: str, filename: str) -> str:
-    return f"{LOCAL_SCHEME}{delivery_name}/{filename}"
-
-
 def s3_uri(bucket: str, key: str) -> str:
     return f"{S3_SCHEME}{bucket}/{key}"
 

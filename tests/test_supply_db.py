@@ -200,42 +200,21 @@ class TestACandidateMustActuallyClaimTheName:
 class TestTheRunSchemaIsDisposable:
     """Criteria 1 and 6."""
 
-    def test_the_schema_goes_when_the_run_does(self, db):
-        _stage(db, "birth_registrations", "run_001")
-        supply_db.create_run_views(db, "run_001", supply_db.candidates_in(
-            db, supply_db.STAGING_SCHEMA, ["birth_registrations"]))
-        assert supply_db.run_schemas(db) == [supply_db.run_schema("run_001")]
-        supply_db.drop_run_schema(db, "run_001")
-        assert supply_db.run_schemas(db) == []
-
-    def test_dropping_a_schema_that_was_never_made_is_not_an_error(self, db):
-        """The caller that matters is a cleanup path, which cannot know
-        whether the run got far enough to create one."""
-        supply_db.drop_run_schema(db, "run_never")
-
     def test_dropping_the_view_schema_leaves_the_data_alone(self, db):
         _stage(db, "birth_registrations", "run_001", rows=5)
         supply_db.create_run_views(db, "run_001", supply_db.candidates_in(
             db, supply_db.STAGING_SCHEMA, ["birth_registrations"]))
-        supply_db.drop_run_schema(db, "run_001")
+        supply_db.drop_run_schemas(db, "run_001")
         still = db.execute(
             f'SELECT count(*) FROM "{supply_db.STAGING_SCHEMA}".'
             f'"birth_registrations__run_001"').fetchone()[0]
         assert still == 5, "a view schema is a lens, and dropping it must not drop the supply"
-
-    def test_an_orphan_is_identifiable_without_any_other_record(self, db):
-        """Criterion 6 in as many words: 'without reference to any other
-        record'. The schema name alone has to say which run it was."""
-        supply_db.create_run_views(db, "run_042", {})
-        [orphan] = supply_db.run_schemas(db)
-        assert supply_db.run_id_of(orphan) == "run_042"
 
     def test_a_schema_that_is_not_a_run_schema_is_left_alone(self, db):
         db.execute('CREATE SCHEMA IF NOT EXISTS "period_2026q1"')
         supply_db.create_run_views(db, "run_001", {})
         dropped = supply_db.drop_orphan_run_schemas(db)
         assert dropped == [supply_db.run_schema("run_001")]
-        assert supply_db.run_id_of("period_2026q1") is None
         schemas = [r[0] for r in db.execute(
             "SELECT schema_name FROM information_schema.schemata").fetchall()]
         assert "period_2026q1" in schemas
@@ -415,7 +394,7 @@ class TestWhatARunReadIsRecorded:
         res = supply_db.create_run_views(db, "run_001", supply_db.candidates_in(
             db, supply_db.STAGING_SCHEMA, ["birth_registrations"], arrival=supply_db.arrival_segment("run_001")))
         supply_db.record_resolution(db, res)
-        supply_db.drop_run_schema(db, "run_001")
+        supply_db.drop_run_schemas(db, "run_001")
 
         back = supply_db.resolution_for(db, "run_001")
         assert back.resolved == {"birth_registrations": "birth_registrations__run_001"}

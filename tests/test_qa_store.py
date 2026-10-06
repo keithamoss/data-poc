@@ -161,7 +161,7 @@ class TestRecordsThatSpanDatasetsStayDistinguishable:
         own = qa_store.results_for_run(db, run_key, dataset_id="birth-registrations")
         assert [r["check_id"] for r in own] == ["own_check"]
 
-        spanning = qa_store.cross_table_results(db, run_key)
+        spanning = qa_store.results_for_run(db, run_key, scope=qa_store.CROSS_TABLE_SCOPE)
         assert [r["check_id"] for r in spanning] == ["spanning_check"]
 
 
@@ -210,49 +210,6 @@ class TestTablesReadIsRowsRatherThanADocument:
         qa_store.complete_run(db, run_key)
 
         assert qa_store.tables_read_for_run(db, run_key)["births"] == "births__2026-09-01"
-
-    def test_the_same_logical_table_across_runs_is_one_query(self, db):
-        for n, physical in enumerate(("births__a", "births__b"), start=1):
-            run_key = _run(db, run_key=f"run_{n}",
-                           run_timestamp=f"2026-09-2{n}T10:00:00+08:00")
-            qa_store.record_tables_read(db, run_key, {"births": physical})
-            qa_store.complete_run(db, run_key)
-
-        history = qa_store.table_history(db, "births")
-        assert [row["physical_table"] for row in history] == ["births__a", "births__b"]
-
-
-class TestTheHistoryQuestionThisWholeChangeIsFor:
-    """The story: "every failure of this check since we started" as one
-    question rather than a walk of a file tree (criterion 4)."""
-
-    def test_one_checks_history_spans_runs(self, db):
-        for n, status in enumerate(("pass", "fail", "pass"), start=1):
-            run_key = _run(db, run_key=f"h{n}", run_timestamp=f"2026-09-2{n}T10:00:00+08:00")
-            # ONE CALL, because that is what a tool does - it hands over
-            # everything it found. Written as two calls first, which
-            # correctly lost the first: a second write from the same tool
-            # REPLACES that tool's results rather than adding to them,
-            # which is the file this replaces being overwritten.
-            qa_store.record_results(db, run_key, [_result("watched", status=status),
-                                                  _result("ignored")], tool="dbt", **_KEYS)
-            qa_store.complete_run(db, run_key)
-
-        history = qa_store.history_for_check(db, "watched")
-        assert [r["status"] for r in history] == ["pass", "fail", "pass"]
-
-    def test_an_unfinished_runs_verdict_is_not_in_that_history(self, db):
-        """Criterion 13 has to hold for every read, not just the obvious
-        one - a half-written run leaking into a check's history is the
-        same false green wearing a different hat."""
-        done = _run(db, run_key="done", run_timestamp="2026-09-21T10:00:00+08:00")
-        qa_store.record_results(db, done, [_result("watched", status="pass")], tool="dbt", **_KEYS)
-        qa_store.complete_run(db, done)
-
-        crashed = _run(db, run_key="crashed", run_timestamp="2026-09-22T10:00:00+08:00")
-        qa_store.record_results(db, crashed, [_result("watched", status="fail")], tool="dbt", **_KEYS)
-
-        assert [r["status"] for r in qa_store.history_for_check(db, "watched")] == ["pass"]
 
 
 class TestEachToolsOwnOutputIsKeptWholeAndApart:

@@ -4496,6 +4496,37 @@ Belongs with batch 5's check work.
     Pairs with #63: generating to the check rules would remove most of
     the trial and error these rebuilds were spent on.
 
+    **MEASURED 2026-10-06 - half the bootstrap is re-reading configuration.**
+    The last wall-clock rebuild: Child Protection's 108 arrivals took
+    1,630s (~15s each) and Birth Registrations' 42 took 413s beside them,
+    so CP alone sets the ~27 minutes. cProfile of a real 12-arrival CP
+    replay (first two deliveries, scratch database): of 473s, ~330s was
+    `yaml.safe_load` - 5,911 calls re-parsing files that never change
+    during a run. The biggest: the ODCS contract's cadence and claim window,
+    re-parsed per slot lookup (`slots._contract_timing`, 0.18s a call,
+    ~20 calls per arrival through filing); `postgres_version._data_asset_doc`
+    (1,432 calls); the check-lifecycle metadata parsers; the environments
+    file (1,520 calls). The four tools, by comparison: dbt ~97s, datacontract
+    ~47s, Soda ~25s, Evidently ~17s under the profiler.
+
+    **THE EXPERIMENT**: the same 12-arrival replay timed for real, once as is
+    and once with YAML parsing memoised by file content (a deep copy
+    returned each time, so nothing can mutate a shared result) - **178s ->
+    95s, 47% faster**. Extrapolated, a ~27-minute bootstrap to ~14. Nothing
+    built yet: it goes to Keith as a requirement first.
+
+    **PROFILED FURTHER (Keith: "profile further first"), same day.** With
+    YAML memoised, dbt is the critical path at ~7.8s a run: ~1.9s
+    interpreter start-up, ~4.6s re-parsing the whole project (every run has
+    its own --target-path and its own DBT_PG_SCHEMA, so dbt's partial parse
+    never applies - and changing the schema variable invalidates it anyway,
+    measured), and only a second or two of real SQL. The other three tools
+    take ~4.4s together beside it. ~60 database connections per arrival
+    (716 in 12 arrivals, ~11s). **KEITH'S SCOPE, 2026-10-06: all four** -
+    configuration parsed once per process, dbt's project parsed once per
+    process, connections reused, and a checkpoint replay - sent to
+    delivery-scoper for requirements before anything is built.
+
     THE COST IS NOT JUST THIS SANDBOX - measured the same night, at
     Keith's question "why is GitHub so much faster?". It is not, any
     more. The "about nine minutes" CI bootstrap that CLAUDE.md carries
@@ -4594,6 +4625,40 @@ Belongs with batch 5's check work.
     shape 10, `mothman plans` 4. None of it is the product. The review looks
     at internal process tooling as a category of its own: table-driven tests
     where one rule is tested many ways, and whether every rule earns its keep.
+
+    **PASS 1 DONE, 2026-10-06 - product code whose only callers are tests.**
+    A scan of every top-level function and class in qa_tools/, pipeline/,
+    cli/, dashboard/, generator/, synthetic_data_generator/ and aws/ (1,632)
+    for references outside tests/ - counting identifiers, so a name used by
+    another module, the template or a workflow counts. 40 had none; 26 are
+    click `*_command` functions, registered by decorator - false positives.
+    THE 14 REAL ONES, each waiting on Keith's yes per item (nothing deleted):
+    - NO REFERENCE AT ALL (dead outright): `qa_results_reader._datasets_in`,
+      `supersession.is_superseded_schema`, `s3_arrival.local_uri` (written
+      2026-10-06 for REQ-PIPE-152 and never used - delivery_log builds the
+      `local:` URI inline).
+    - ONLY TESTS CALL THEM (dead code kept alive by its tests):
+      `asset_time.as_of_instant` (test_asset_time), `filing_queue.
+      periods_needing_a_person` (test_filing_queue), `period_overlay.
+      own_table_contested` (test_period_overlay), `period_tables.
+      guard_disabled` (test_plain_base_names), `qa_store.cross_table_results`
+      (3 test modules), `qa_store.history_for_check` (2), `qa_store.
+      table_history` (1), `supply_db.run_id_of` (2), `supply_db.
+      drop_run_schema` (2), `tables_read.undeclared_in_this_repo` (1).
+    - TEST INFRASTRUCTURE LIVING IN PRODUCT CODE: `db_identity.mark_by_admin`,
+      called only by tests/conftest.py to mark test databases - a candidate to
+      MOVE to tests/ rather than delete.
+    Not covered by this pass: methods inside classes, and functions reached
+    only through other test-only functions (a second round once these go).
+    **KEITH'S YES TO ALL THREE GROUPS, 2026-10-06; DONE THE SAME DAY.** The 13
+    functions are deleted. Tests that existed only for one went with it; tests
+    of real behaviour that merely used one as a convenience were kept and
+    rewritten - `qa_store.results_for_run(..., scope=CROSS_TABLE_SCOPE)` for
+    cross_table_results, the real `supply_db.drop_run_schemas` for cleanup,
+    inline SQL for history_for_check, a test-local `_guard_disabled` for the
+    guard helper, and the repo-configuration check that every mechanical
+    cross-table check declares what it reads kept with its one-liner inlined.
+    `mark_by_admin` moved into tests/conftest.py's `mark_test_database`.
 
 68. **[todo, 2026-10-06]** **[Pipeline & publishing, QA checks & contract]**
     **No custom code per dataset - everything in configuration, if we can.**

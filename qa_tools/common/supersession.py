@@ -40,10 +40,6 @@ def superseded_schema(period: str) -> str:
     return period_schema.period_schema(period) + SUFFIX
 
 
-def is_superseded_schema(schema: str) -> bool:
-    return schema.startswith(period_schema.PERIOD_SCHEMA_PREFIX) and schema.endswith(SUFFIX)
-
-
 def _latest(conn, dataset_id: str, supply: str):
     """The latest supersession, un-supersession or re-file of this supply,
     as (action, superseded_by), or None.

@@ -144,16 +144,3 @@ def mark(conn, identity: Identity) -> None:
         [identity.data_asset_id, identity.environment])
 
 
-def mark_by_admin(admin_conn, database: str, identity: Identity) -> None:
-    """Mark a database from a connection to ANOTHER one - how a test fixture
-    marks the scratch database it has just created (criterion 12). A row has
-    to be written from inside the database, so this opens a connection to it
-    with the same credentials."""
-    import psycopg
-
-    info = psycopg.conninfo.conninfo_to_dict(admin_conn.info.dsn)
-    info["dbname"] = database
-    if admin_conn.info.password:
-        info["password"] = admin_conn.info.password
-    with psycopg.connect(psycopg.conninfo.make_conninfo(**info), autocommit=True) as conn:
-        mark(conn, identity)

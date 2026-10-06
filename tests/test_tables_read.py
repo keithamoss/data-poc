@@ -95,7 +95,7 @@ class TestTheDeclarationsInThisRepo:
     reader will actually meet."""
 
     def test_every_mechanical_cross_table_check_declares_what_it_reads(self):
-        assert tr.undeclared_in_this_repo() == []
+        assert tr.undeclared_cross_table(tr.DBT_SCHEMA, tr.SODA_CHECKS, tr.CONTRACTS) == []
 
     def test_the_gate_is_not_passing_vacuously(self, tmp_path):
         """A gate over a corpus that cannot fail is a gate that proves

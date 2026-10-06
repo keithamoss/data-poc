@@ -1701,33 +1701,6 @@ def results_for_run(conn: supply_db.SupplyConnection, run_key: str,
     return _dicts(conn.execute(sql + " ORDER BY r.id", params))
 
 
-def cross_table_results(conn: supply_db.SupplyConnection, run_key: str, *,
-                        supply_state: str | None = AGREED) -> list[dict]:
-    """The records that span datasets and belong to none of them."""
-    return results_for_run(conn, run_key, scope=CROSS_TABLE_SCOPE,
-                           supply_state=supply_state)
-
-
-def history_for_check(conn: supply_db.SupplyConnection, check_id: str,
-                      dataset_id: str | None = None, *,
-                      supply_state: str | None = AGREED) -> list[dict]:
-    """Every result this check has ever produced.
-
-    The question the file tree could only answer by being walked in full,
-    and the reason check_result_check_history exists.
-    """
-    sql = (f'SELECT r.*, run.run_timestamp FROM "{SCHEMA}".check_result_visible r '
-           f'JOIN "{SCHEMA}".run_visible run USING (run_key) WHERE r.check_id = ?')
-    params: list[Any] = [check_id]
-    if supply_state is not None:
-        sql += " AND r.supply_state = ?"
-        params.append(supply_state)
-    if dataset_id is not None:
-        sql += " AND r.dataset_id = ?"
-        params.append(dataset_id)
-    return _dicts(conn.execute(sql + " ORDER BY run.run_instant, r.id", params))
-
-
 def runs_for(conn: supply_db.SupplyConnection, agency_id: str,
              collection_id: str) -> list[dict]:
     return _dicts(conn.execute(
@@ -1752,14 +1725,6 @@ def tables_read_for_run(conn: supply_db.SupplyConnection, run_key: str) -> dict[
     return {logical: physical for logical, physical in conn.execute(
         f'SELECT logical_table, physical_table FROM "{SCHEMA}".tables_read_visible '
         "WHERE run_key = ? ORDER BY logical_table", [run_key]).fetchall()}
-
-
-def table_history(conn: supply_db.SupplyConnection, logical_table: str) -> list[dict]:
-    """Which version of one logical table each run read, oldest first."""
-    return _dicts(conn.execute(
-        f'SELECT t.*, run.run_timestamp FROM "{SCHEMA}".tables_read_visible t '
-        f'JOIN "{SCHEMA}".run_visible run USING (run_key) WHERE t.logical_table = ? '
-        "ORDER BY run.run_instant", [logical_table]))
 
 
 def tool_output_for(conn: supply_db.SupplyConnection, run_key: str, tool: str,

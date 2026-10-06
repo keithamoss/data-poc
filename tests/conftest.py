@@ -164,10 +164,21 @@ def mark_test_database(admin_conn, name: str) -> None:
     """Record a scratch database's identity as this asset's `test`
     environment (REQ-PIPE-107 criterion 12), from a connection to another
     database - the one that just created it."""
+    # A row has to be written from INSIDE the database, so this opens a
+    # connection to it with the admin connection's credentials. Lived in
+    # db_identity as mark_by_admin until 2026-10-06, when the test review
+    # (plans/running-thoughts.md #67) found nothing but this fixture called
+    # it - test infrastructure belongs with the tests.
+    import psycopg
+
     from qa_tools.common import db_identity, hierarchy
 
-    db_identity.mark_by_admin(admin_conn, name,
-                              db_identity.Identity(hierarchy.data_asset_id(), "test"))
+    info = psycopg.conninfo.conninfo_to_dict(admin_conn.info.dsn)
+    info["dbname"] = name
+    if admin_conn.info.password:
+        info["password"] = admin_conn.info.password
+    with psycopg.connect(psycopg.conninfo.make_conninfo(**info), autocommit=True) as conn:
+        db_identity.mark(conn, db_identity.Identity(hierarchy.data_asset_id(), "test"))
 
 
 @pytest.fixture(scope="session", autouse=True)

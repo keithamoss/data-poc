@@ -232,12 +232,6 @@ def _withhold_if_held(arrival, dataset_id: str, own_table: str, *,
         conn.close()
 
 
-def own_table_contested(res: supply_db.Resolution, own_table: str) -> bool:
-    """Whether this run's own table is contested - REQ-PIPE-079
-    criterion 13's trigger for withholding its own checks."""
-    return own_table in res.ambiguous
-
-
 def rebuild_for_arrival(arrival, *, tables: Sequence[str],
                         dsn: str | None = None) -> period_schema.PeriodResolution | None:
     """The batch's one call: after an arrival is filed, give its run

@@ -137,7 +137,12 @@ class TestTheRecordSaysWhetherItIsRealQualityHistory:
         finish_runs("run_1", agency="a", collection="b")
 
         assert qa_store.results_for_run(clean_qa_history, "run_1") == []
-        assert qa_store.history_for_check(clean_qa_history, "referrals_not_null") == []
+        # Nor does a check's whole history, read the default (agreed) way.
+        assert clean_qa_history.execute(
+            f'SELECT r.id FROM "{qa_store.SCHEMA}".check_result_visible r '
+            f'JOIN "{qa_store.SCHEMA}".run_visible run USING (run_key) '
+            "WHERE r.check_id = ? AND r.supply_state = ?",
+            ["referrals_not_null", qa_store.AGREED]).fetchall() == []
 
     def test_its_verdict_is_the_real_one(
             self, tmp_path, monkeypatch, clean_qa_history, finish_runs):
@@ -385,8 +390,9 @@ class TestACrossTableCheckMaySpanThem:
                         [_result("cp-referrals", "referrals_match_outcomes")])
         finish_runs("run_1", agency="a", collection="b")
 
-        spanning = qa_store.cross_table_results(clean_qa_history, "run_1",
-                                               supply_state=qa_store.IN_DEVELOPMENT)
+        spanning = qa_store.results_for_run(clean_qa_history, "run_1",
+                                            scope=qa_store.CROSS_TABLE_SCOPE,
+                                            supply_state=qa_store.IN_DEVELOPMENT)
         assert [r["check_id"] for r in spanning] == ["referrals_match_outcomes"]
         assert qa_store.results_for_run(clean_qa_history, "run_1",
                                         supply_state=None) == []
@@ -405,9 +411,11 @@ class TestACrossTableCheckMaySpanThem:
                         [_result("birth-registrations", "births_match_referrals")])
         finish_runs("run_1", agency="a", collection="b")
 
-        assert qa_store.cross_table_results(clean_qa_history, "run_1") == []
-        spanning = qa_store.cross_table_results(clean_qa_history, "run_1",
-                                                supply_state=qa_store.IN_DEVELOPMENT)
+        assert qa_store.results_for_run(clean_qa_history, "run_1",
+                                        scope=qa_store.CROSS_TABLE_SCOPE) == []
+        spanning = qa_store.results_for_run(clean_qa_history, "run_1",
+                                            scope=qa_store.CROSS_TABLE_SCOPE,
+                                            supply_state=qa_store.IN_DEVELOPMENT)
         assert [r["check_id"] for r in spanning] == ["births_match_referrals"]
 
     def test_a_check_among_agreed_datasets_only_is_unaffected(
@@ -421,7 +429,8 @@ class TestACrossTableCheckMaySpanThem:
         finish_runs("run_1", agency="a", collection="b")
 
         assert [r["check_id"] for r in
-                qa_store.cross_table_results(clean_qa_history, "run_1")] == ["births_self"]
+                qa_store.results_for_run(clean_qa_history, "run_1",
+                                         scope=qa_store.CROSS_TABLE_SCOPE)] == ["births_self"]
 
     def test_a_declared_table_no_dataset_maps_cannot_make_it_in_development(
             self, tmp_path, monkeypatch, clean_qa_history, finish_runs):
@@ -436,7 +445,8 @@ class TestACrossTableCheckMaySpanThem:
         finish_runs("run_1", agency="a", collection="b")
 
         assert [r["check_id"] for r in
-                qa_store.cross_table_results(clean_qa_history, "run_1")] == ["births_self"]
+                qa_store.results_for_run(clean_qa_history, "run_1",
+                                         scope=qa_store.CROSS_TABLE_SCOPE)] == ["births_self"]
 
 
 class TestARunCanReadBothSchemasAtOnce:
@@ -471,7 +481,7 @@ class TestARunCanReadBothSchemasAtOnce:
                     "WHERE table_schema = ?", [schema]).fetchall()}
                 assert views == {"birth_registrations", "cp_referrals"}
             finally:
-                supply_db.drop_run_schema(conn, "run_two_source")
+                supply_db.drop_run_schemas(conn, "run_two_source")
                 conn.execute(f'DROP TABLE IF EXISTS "{supply_db.STAGING_SCHEMA}"."{agreed}" CASCADE')
                 conn.execute(f'DROP TABLE IF EXISTS "{supply_db.SAMPLE_SCHEMA}"."{sample}" CASCADE')
 
@@ -492,7 +502,7 @@ class TestARunCanReadBothSchemasAtOnce:
                                                 first)
                 assert after.resolved == {"birth_registrations": physical}
             finally:
-                supply_db.drop_run_schema(conn, "run_keeps")
+                supply_db.drop_run_schemas(conn, "run_keeps")
                 conn.execute(
                     f'DROP TABLE IF EXISTS "{supply_db.STAGING_SCHEMA}"."{physical}" CASCADE')
 

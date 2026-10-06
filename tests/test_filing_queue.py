@@ -69,26 +69,10 @@ class TestTheQueueHoldsOnlySuppliesSomebodyMustDecideAbout:
         got = filing_queue.awaiting(None, "child-protection")
         assert [s.period for s in got] == ["2025-Q3", "2026-Q1"]
 
-    def test_the_empty_periods_are_the_other_doors_business(self, states):
-        """Criterion 31: none of substitute/inherit answers "what do I do
-        with this arriving supply", so they are reached per period."""
-        got = filing_queue.periods_needing_a_person(None, "child-protection")
-        assert [(s.dataset_id, s.period) for s in got] == [
-            ("cp-clients", "2024-Q1"), ("cp-carers", "2026-Q2")]
-        assert {s.state for s in got} == {slot_state.OVERDUE,
-                                           slot_state.NEVER_SUPPLIED}
-
-    def test_between_them_they_are_the_whole_needs_action_set(self, states):
-        both = (filing_queue.awaiting(None, "child-protection")
-                 + filing_queue.periods_needing_a_person(None, "child-protection"))
-        assert {s.state for s in both} == {
-            s.state for s in states if s.state in slot_state.NEEDS_ACTION}
-
-    def test_nothing_quiet_reaches_either(self, states):
-        both = (filing_queue.awaiting(None, "child-protection")
-                 + filing_queue.periods_needing_a_person(None, "child-protection"))
-        assert slot_state.PROMOTED not in {s.state for s in both}
-        assert slot_state.NOT_YET_DUE not in {s.state for s in both}
+    def test_nothing_quiet_reaches_it(self, states):
+        got = filing_queue.awaiting(None, "child-protection")
+        assert slot_state.PROMOTED not in {s.state for s in got}
+        assert slot_state.NOT_YET_DUE not in {s.state for s in got}
 
 
 class TestWhatASlotOffers:

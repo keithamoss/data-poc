@@ -29217,3 +29217,281 @@ requirements:
       normally.'
     - 'BUILT 2026-10-06. The page learns when a schedule ends from configuration - SCHEDULE_RUNWAY carries each dataset''s `endsOn`, the asset-local date its last slot closes, computed by runway.schedule_ends_on, which the CLI warning and the gate now share - so the notice still cannot go quiet when nothing has run. The BACKLOG sentence is the one part that reads recorded state: each dataset''s JSON carries its schedule-ended holds as receipt and resolution instants (schedule_ended.for_dataset, one query over qa.hold and the receipt view, no supply rows), and the page counts those held as at the date on show. Aggregated in the one executive notice. A dataset whose slots cannot be built (no contract timing) falls back to its last owed date rather than raising - the filing rule holds everything for it anyway. An older build with no `endsOn` keeps the dates rule.'
     open_questions: []
+  - id: REQ-PIPE-156
+    title: Configuration files are parsed once per process while their content is unchanged
+    date_written: '2026-10-06'
+    story: As someone regenerating or processing QA history, I want each configuration file parsed once
+      per process rather than thousands of times, so that a bootstrap stops spending about half its time
+      re-reading files that do not change during a run.
+    moscow: should
+    status: not_started
+    source: 'Keith, 2026-10-06, scoping plans/running-thoughts.md #65 after its profile ("all four"). Drafted
+      by delivery-scoper the same day. Signed by Keith 2026-10-06.'
+    signed_off:
+      by: Keith
+      date: '2026-10-06'
+    acceptance_criteria:
+    - THE SYSTEM SHALL read every YAML configuration file on the pipeline's run path (the ODCS contracts,
+      the Soda checks files, and contract/data-asset.yaml, environments.yaml, file-checks.yaml and scripted_decisions.yaml)
+      through one shared loader.
+    - WHEN the loader is asked for a file whose path and byte content match an earlier parse in the same
+      process, THE SYSTEM SHALL return that result without parsing again.
+    - IF a file's byte content differs from every earlier parse of that path, THEN THE SYSTEM SHALL parse
+      it afresh, whether or not its size or modification time changed.
+    - THE SYSTEM SHALL give every caller its own copy of a parsed document.
+    - WHEN several threads ask for the same file at once, THE SYSTEM SHALL return each a correct document.
+    - THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a full bootstrap
+      from empty as the commit before this change, compared by tests/equiv_support.snapshot with only the
+      columns it already excludes allowed to differ.
+    - 'THE SYSTEM SHALL complete the 12-arrival Child Protection replay #65 measured at 178s in no more
+      than 110s, both commits measured on the same machine on the same day.'
+    - THE SYSTEM SHALL report a full bootstrap's wall-clock time from empty before and after, using REQ-TEST-116
+      criterion 6's timing output, same machine, same day, nothing else running.
+    non_functional_requirements:
+    - 'STALENESS: tests copy contract directories, monkeypatch DATA_ASSET_YAML and edit files in place;
+      every one must pass unchanged.'
+    - 'MEMORY: a bounded number of cached documents (proposed 64); contract/ totals about 220KB of YAML.'
+    - No new dependency. Configuration only, never supply data.
+    - 'CI: changes qa_tools/, so REQ-TEST-117''s key misses once, as intended.'
+    dependencies: []
+    decisions:
+    - 'KEYED ON CONTENT, NOT MODIFICATION TIME AND SIZE: a test changing ''14d'' to ''21d'' within one filesystem
+      time tick keeps both the same. Hashing the bytes costs microseconds; parsing the Child Protection
+      contract costs 87ms.'
+    - 'A COPY PER CALLER, measured 2026-10-06: deep-copying the parsed Child Protection contract takes 0.85ms
+      against 87ms to parse.'
+    - 'PyYAML''s C LOADER IS A REAL ALTERNATIVE, NOT A REJECTED ONE. Measured 2026-10-06 (PyYAML 6.0.3,
+      libyaml present): CSafeLoader parses all 13 contract/ files in 23ms against 222ms, identical results
+      on every file. Alone it would remove roughly 85-90% of the parse time with no staleness risk. Open
+      question 1.'
+    - 'WHERE THE CALLS COME FROM, verified: slots._contract_timing parses the whole contract twice (cadence,
+      then claim window - about 0.17s for Child Protection); every supply_db.connect parses environments.yaml
+      and, via postgres_version.declared_major, data-asset.yaml twice. So REQ-PIPE-158 removes many of these
+      calls too; measure the two apart.'
+    - 'REJECTED: another unkeyed lru_cache - sample_data.py records that missing one in a fixture silently
+      tests the real asset, and tests already call cache_clear() 61 times across 12 files.'
+    - 'ANSWERED 2026-10-06 (Keith, signing): BOTH the C loader and the content-keyed cache - CSafeLoader
+      makes every parse ~9x faster (verified the same hour: 13 contract files 218ms -> 24ms, identical results)
+      and the cache removes the repeats.'
+    open_questions:
+    - Whether the existing unkeyed lru_caches (schedule, hierarchy, asset_time, arrival_patterns) should
+      key on content too, so tests stop needing cache_clear(). Not asked; out of this requirement unless
+      Keith widens it.
+  - id: REQ-PIPE-157
+    title: dbt parses the project once per collection process rather than once per run
+    date_written: '2026-10-06'
+    story: As someone regenerating or processing QA history, I want dbt to parse the project once and reuse
+      it for every run after, so that a run stops paying about 6.5 of its 7.8 seconds of dbt time before
+      any SQL executes.
+    moscow: should
+    status: not_started
+    source: 'Keith, 2026-10-06, scoping plans/running-thoughts.md #65 after its further profile ("all four").
+      Drafted by delivery-scoper the same day. Signed by Keith 2026-10-06.'
+    signed_off:
+      by: Keith
+      date: '2026-10-06'
+    acceptance_criteria:
+    - WHILE one process runs a collection's arrivals, THE SYSTEM SHALL parse the dbt project at most once,
+      and again only if dbt_project/, the profile or a dbt package changes.
+    - THE SYSTEM SHALL keep each run's dbt models and audit tables apart from every other run's that may
+      overlap it in time.
+    - THE SYSTEM SHALL write each run's run_results.json and manifest.json to its own target path, removing
+      stale ones first, as today.
+    - IF dbt leaves no readable run_results.json or reports an errored node, THEN THE SYSTEM SHALL refuse
+      the run as _refuse_a_build_that_did_not_run does today.
+    - THE SYSTEM SHALL NOT run dbt in the same interpreter at the same time as Soda Core, datacontract-cli
+      or Evidently.
+    - THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a full bootstrap
+      from empty as the commit before this change, compared by tests/equiv_support.snapshot with only the
+      columns it already excludes allowed to differ.
+    - THE SYSTEM SHALL bring mean dbt wall time per run over the 12-arrival Child Protection replay from
+      about 7.8s to no more than 3s, both commits measured on the same machine on the same day.
+    non_functional_requirements:
+    - 'dbt VERSION: docs.getdbt.com/reference/programmatic-invocations (read 2026-10-06) says injecting
+      a pre-parsed Manifest into dbtRunner is not supported in dbt v2. pyproject.toml has dbt-core>=1.12
+      with no upper bound. Either pin below 2, with the reason beside the pin, or do not depend on injection.'
+    - 'CONCURRENCY: the same page says dbt does not support concurrent invocations in one process. dbt runs
+      in a background thread beside the in-process tools (parallel_orchestrate.beside), and Soda Core reloads
+      .env into os.environ (plans/tooling.md #26) - where an in-process dbt would read its schema.'
+    - 'SECURITY: a test SHALL check no reused parse artefact carries the database password; DBT_PG_PASSWORD
+      is not a DBT_ENV_SECRET_ name, so dbt does not scrub it.'
+    - 'DISK: per-run target directories are removed with a run''s schemas; a shared parse must survive that
+      tidy-up without becoming a leak itself.'
+    dependencies: []
+    decisions:
+    - 'WHY IT RE-PARSES, verified: run_dbt passes a per-run --target-path, where dbt keeps its partial-parse
+      file, and sets DBT_PG_SCHEMA (profile) and DBT_RUN_SCHEMA (sources.yml) per run - both parse-relevant;
+      #65 measured the schema change invalidating partial parsing.'
+    - 'THE SAVING IS ABOUT 3.4s A RUN, NOT 6.5: the other three tools take ~4.4s beside dbt, and become
+      the critical path. Estimate after REQ-PIPE-156 and this: a full bootstrap of about 8-10 minutes.'
+    - 'REJECTED: dbtRunner in the run''s own process. Contradicts bootstrap.py ("dbt and datacontract-cli
+      were never written to share an interpreter"), dbt''s documentation, and the os.environ problem above.'
+    - 'REJECTED: rewriting schema names inside a parsed manifest per run - couples this project to dbt''s
+      internal manifest shape.'
+    - One dbt project serves both collections, so one parse could serve both.
+    - 'ANSWERED 2026-10-06 (Keith, signing): SPIKE BOTH FIRST - a short timed spike of mechanism A (a long-lived
+      dbt worker per collection with an injected pre-parsed manifest, dbt-core pinned <2) and B (stable
+      schema names per collection so dbt''s partial parse stays valid) on the 12-arrival replay, results
+      brought back for Keith to choose before the real build. The mechanism criterion is therefore not built
+      until he has chosen.'
+    open_questions:
+    - Which mechanism, A or B - to be chosen by Keith on the spike's measurements.
+  - id: REQ-PIPE-158
+    title: A process reuses its database connections instead of opening about sixty per arrival
+    date_written: '2026-10-06'
+    story: As someone regenerating or processing QA history, I want a process to reuse connections it has
+      already opened and checked, so that an arrival stops paying for about sixty connection set-ups, each
+      with its own environment, version and identity check.
+    moscow: should
+    status: not_started
+    source: 'Keith, 2026-10-06, scoping plans/running-thoughts.md #65 after its further profile ("all four").
+      Drafted by delivery-scoper the same day. Signed by Keith 2026-10-06.'
+    signed_off:
+      by: Keith
+      date: '2026-10-06'
+    acceptance_criteria:
+    - WHEN supply_db.connect is asked for a connection and an idle one that has passed this process's checks
+      is available, THE SYSTEM SHALL hand that over rather than open another.
+    - THE SYSTEM SHALL run the stated-environment, PostgreSQL-version and database-identity checks (REQ-PIPE-093,
+      REQ-PIPE-146, REQ-PIPE-107) before a connection is first used, and refuse in the same words as today.
+    - WHEN a reused connection is handed over, THE SYSTEM SHALL give it the session state a new one would
+      have - autocommit, lock_timeout, read-only or not as asked, the caller's application_name, and the
+      default search_path.
+    - IF a connection comes back inside an open or failed transaction, THEN THE SYSTEM SHALL roll it back
+      or close it before anyone else gets it.
+    - IF a reused connection is broken, THEN THE SYSTEM SHALL open a new one to the same database, never
+      another.
+    - THE SYSTEM SHALL NOT let two threads use one connection at once.
+    - WHEN the process ends, or when asked to release its connections, THE SYSTEM SHALL close every connection
+      it holds.
+    - THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a full bootstrap
+      from empty as the commit before this change, compared by tests/equiv_support.snapshot with only the
+      columns it already excludes allowed to differ.
+    - THE SYSTEM SHALL open no more than 72 connections over the 12-arrival Child Protection replay (716
+      measured 2026-10-06), and report the count.
+    non_functional_requirements:
+    - 'SECURITY: reuse never widens what a caller can do - a read-only request never gets a writable session,
+      and a writer never inherits a read-only one.'
+    - 'OBSERVABILITY: application_name names the caller of the moment, so CLAUDE.md''s lock-wait diagnosis
+      still identifies the holder.'
+    - 'SCALE: bounded per process; a processing pass or Lambda handler holds nothing after it finishes.'
+    - No new dependency unless Keith chooses one (open question 1); psycopg_pool is not installed today.
+    dependencies: []
+    decisions:
+    - 'BEHIND supply_db.connect, NOT AT EVERY CALL SITE: connect() is called at 95 sites in 46 modules (counted
+      2026-10-06). Threading one connection through every call chain was rejected as far larger for the
+      same saving.'
+    - 'SESSION STATE IS REAL, verified: both orchestrators and both collections'' Soda and Evidently runners
+      SET search_path; connect() sets lock_timeout and, for readers, READ ONLY; decision_log uses SET LOCAL.
+      Criterion 3 exists for this.'
+    - 'OVERLAPS REQ-PIPE-156: each connect() parses environments.yaml and data-asset.yaml about twice each,
+      most of #65''s 1,432 and 1,520 calls. Measure the two apart.'
+    - dbt, Soda Core and datacontract-cli open their own connections; out of scope.
+    - 'ANSWERED 2026-10-06 (Keith, signing): a small per-thread cache inside supply_db, no new dependency
+      (psycopg_pool rejected for what it adds to keep current); the environment, version and identity checks
+      run once per connection opened, as now, not on every hand-over.'
+    open_questions: []
+  - id: REQ-TEST-159
+    title: A replay of one collection can keep a checkpoint and resume from it
+    date_written: '2026-10-06'
+    story: As someone getting a planted scenario to land as intended, I want to replay only the arrivals
+      from the first one my change can affect, starting from a saved copy of the database just before it,
+      so that each attempt costs minutes rather than a 27-minute rebuild.
+    moscow: should
+    status: not_started
+    source: 'Keith, 2026-10-05 evening ("is there a way you can regenerate just the failing slices") and
+      2026-10-06 ("all four"), plans/running-thoughts.md #65. Drafted by delivery-scoper 2026-10-06. Signed
+      by Keith 2026-10-06.'
+    signed_off:
+      by: Keith
+      date: '2026-10-06'
+    acceptance_criteria:
+    - WHEN a person replays one collection asking for a checkpoint before arrival N, THE SYSTEM SHALL save
+      a copy of the database as it stood once arrival N-1 was fully processed, recording with it the collection,
+      N, and the inputs REQ-TEST-160 compares.
+    - WHEN a person asks to resume from a checkpoint, THE SYSTEM SHALL copy it into a database of its own
+      and replay into that copy only arrival N and those after it, in receipt order, leaving the checkpoint
+      unchanged.
+    - IF REQ-TEST-160 finds the first affected arrival is before N, or cannot tell, THEN THE SYSTEM SHALL
+      refuse, name that arrival, and change nothing.
+    - WHEN a resumed replay starts on a synthetic asset, THE SYSTEM SHALL start the simulated clock (REQ-PIPE-081
+      criteria 27-31) and anchor it at arrival N's receipt before writing any record.
+    - THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a resume as from
+      a full replay of the same inputs, compared by tests/equiv_support.snapshot - verified once on the
+      full corpus, kept as a test on a reduced one as REQ-TEST-116 criterion 4 is.
+    - IF a checkpoint or resume is asked for on an asset not declared synthetic, THEN THE SYSTEM SHALL refuse
+      and copy nothing.
+    - THE SYSTEM SHALL list checkpoints, delete one on request, and keep no more than a configured number.
+    non_functional_requirements:
+    - 'MEASURED, 2026-10-06: CREATE DATABASE ... TEMPLATE copied a 55MB bootstrapped database in 7.4s here
+      (supply is 59MB). PostgreSQL refuses the copy while anything is connected to the source, so the replay
+      closes its connections first (REQ-PIPE-158 criterion 7).'
+    - 'SAFETY: REQ-PIPE-144 criterion 38''s refusal over recorded history is not relaxed for this.'
+    - 'CLUTTER: this sandbox''s cluster already holds 61 databases; checkpoints and resumes are named so
+      they can be found and cleared.'
+    - Only through mothman. A developer tool; CI's reuse is REQ-TEST-117.
+    dependencies:
+    - REQ-TEST-160
+    - REQ-PIPE-158
+    decisions:
+    - 'A SLICE IS A REPLAY FROM A POINT, NOT OF SOME ARRIVALS ALONE (#65): row-count and drift checks read
+      the previous supply, and filing depends on what is promoted.'
+    - 'ONE COLLECTION AT A TIME: a bootstrap runs both side by side in separate processes, so there is no
+      instant when both are between arrivals and neither is connected.'
+    - 'TEMPLATE COPY over pg_dump and restore: inside the server, no new tool, measured.'
+    - NOT the same as mothman bdm qa --trial, a verdict probe that records nothing and exercises no filing,
+      promotion or scripted decision (#65).
+    - 'ANSWERED 2026-10-06 (Keith, signing): each delivery is RECORDED AT ITS FIRST ARRIVAL rather than
+      all up front - reversing REQ-TEST-116''s record-once-before-either-collection decision - so a checkpoint
+      holds only what had arrived and nothing ever deletes a delivery record (REQ-PIPE-144 criteria 19 and
+      23 stand). REQ-TEST-116''s reason for recording up front - two collections writing the same delivery
+      at once is a race - has to be answered by the per-arrival recording (an idempotent insert under the
+      existing ON CONFLICT DO NOTHING).'
+    - 'ANSWERED 2026-10-06 (Keith): a resume lands in a SCRATCH DATABASE a person points MOTHMAN_SUPPLY_DSN
+      at; the real supply database is never touched.'
+    open_questions:
+    - Is judging a scenario from mothman's own output enough, or must a resumed copy also build the dashboard?
+      Not asked.
+  - id: REQ-TEST-160
+    title: The first arrival a change can affect is worked out from the inputs, not chosen by hand
+    date_written: '2026-10-06'
+    story: As someone resuming a replay from a checkpoint, I want the tool to work out the earliest arrival
+      my change can affect and refuse when it cannot, so that a resume never quietly keeps results the change
+      would have altered.
+    moscow: should
+    status: not_started
+    source: 'Keith, 2026-10-06, scoping plans/running-thoughts.md #65 ("a rule for knowing which arrival
+      is the first a change can affect"). Drafted by delivery-scoper the same day. Signed by Keith 2026-10-06.'
+    signed_off:
+      by: Keith
+      date: '2026-10-06'
+    acceptance_criteria:
+    - THE SYSTEM SHALL record with each checkpoint a digest of every delivery's files and receipt in the
+      collection, in receipt order, and one digest of every other input that shapes a replay - REQ-TEST-117
+      criterion 1's input list, less generator/ and synthetic_data_generator/.
+    - WHEN a resume is asked for, THE SYSTEM SHALL regenerate the collection's deliveries, compare them
+      with the checkpoint's in receipt order, and take the first added, removed or changed delivery's first
+      arrival as the first affected.
+    - IF any input other than the generated deliveries differs, THEN THE SYSTEM SHALL take the collection's
+      first arrival as the first affected, and name the input.
+    - IF nothing differs, THEN THE SYSTEM SHALL say there is nothing to replay, and replay nothing.
+    - THE SYSTEM SHALL NOT accept an arrival number from a person in place of this rule.
+    non_functional_requirements:
+    - 'FAILS SAFE: doubt resolves to an earlier arrival, never a later one - a wasted minute is cheap, a
+      stale verdict is the failure this project exists to prevent.'
+    - 'Regenerating to compare is cheap: 4.6s for both collections (measured for REQ-TEST-117).'
+    - One input list shared with REQ-TEST-117, not a copy.
+    dependencies:
+    - REQ-TEST-117
+    decisions:
+    - 'CONSERVATIVE BY CONSTRUCTION: only a change to the generated data has a knowable first effect. A
+      change to a check, contract, pipeline code or calendar can alter any arrival, so it restarts the collection.
+      Rejected: inferring a later start from which dataset a contract change touches - easy to get wrong
+      for a small saving at this scale.'
+    - 'REJECTED: a person naming N. The fast path most likely used wrongly late in an evening, and its result
+      looks exactly like a correct one.'
+    - 'SIGNED AS DRAFTED 2026-10-06 (Keith): the first affected arrival is computed and never typed in;
+      any doubt resolves earlier. A manual N was offered and not chosen.'
+    open_questions:
+    - REQ-TEST-117 (built but not yet flipped) owns the input list; build the shared list here and have
+      117 adopt it.

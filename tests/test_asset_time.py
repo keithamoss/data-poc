@@ -135,9 +135,6 @@ class TestDatesAsInstants:
         for hour in (0, 9, 14, 23):
             assert asset_time.wall_clock(day, f"{hour:02d}:00") <= end
 
-    def test_as_of_instant_is_end_of_day_under_a_name_that_says_so(self):
-        assert asset_time.as_of_instant(date(2026, 9, 1)) == asset_time.end_of_day(date(2026, 9, 1))
-
     def test_localise_changes_the_clock_not_the_instant(self):
         utc = datetime(2026, 9, 1, 6, 0, tzinfo=UTC)
         got = asset_time.localise(utc)

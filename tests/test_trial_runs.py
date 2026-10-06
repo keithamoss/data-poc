@@ -64,7 +64,7 @@ class TestATrialIsNamedForWhatItIs:
 
     def test_a_trial_run_id_is_a_usable_schema_name(self):
         run_id = trial.trial_run_id()
-        assert supply_db.run_id_of(supply_db.run_schema(run_id)) == run_id
+        assert supply_db.run_schema(run_id) == supply_db.RUN_SCHEMA_PREFIX + run_id
 
     def test_a_trial_staged_table_fits_an_identifier(self):
         name = supply_db.staged_table("birth_registrations", trial.trial_run_id())

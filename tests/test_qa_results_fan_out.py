@@ -93,7 +93,7 @@ def test_the_spanning_record_is_in_neither_datasets_results(written):
 
 
 def test_the_spanning_record_is_in_the_cross_table_scope(written):
-    assert _ids(qa_store.cross_table_results(written, RUN)) == [SPANNING]
+    assert _ids(qa_store.results_for_run(written, RUN, scope=qa_store.CROSS_TABLE_SCOPE)) == [SPANNING]
 
 
 def test_no_record_is_lost_or_duplicated_across_the_fan_out(written):
@@ -102,7 +102,7 @@ def test_no_record_is_lost_or_duplicated_across_the_fan_out(written):
     conn = written
     everywhere = sorted(
         _ids(qa_store.results_for_run(conn, RUN))
-        + _ids(qa_store.cross_table_results(conn, RUN)))
+        + _ids(qa_store.results_for_run(conn, RUN, scope=qa_store.CROSS_TABLE_SCOPE)))
     assert everywhere == sorted(r["check_id"] for r in VERIFIED)
 
 
@@ -146,4 +146,4 @@ def test_a_second_write_of_the_same_tool_replaces_rather_than_doubles(written):
     qa_store.complete_run(conn, RUN)
 
     assert len(qa_store.results_for_run(conn, RUN)) == 3
-    assert len(qa_store.cross_table_results(conn, RUN)) == 1
+    assert len(qa_store.results_for_run(conn, RUN, scope=qa_store.CROSS_TABLE_SCOPE)) == 1

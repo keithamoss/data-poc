@@ -386,7 +386,3 @@ SODA_CHECKS = (ROOT / "contract" / "child-protection-soda-checks.yml",
 CONTRACTS = (ROOT / "contract" / "child-protection-contract.yaml",
               ROOT / "contract" / "bdm-birth-registrations-contract.yaml")
 
-
-def undeclared_in_this_repo() -> list[str]:
-    """The gate over this repo's own real check sources."""
-    return undeclared_cross_table(DBT_SCHEMA, SODA_CHECKS, CONTRACTS)

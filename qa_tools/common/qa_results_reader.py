@@ -162,13 +162,6 @@ def _conn(given=None):
     return conn, True
 
 
-def _datasets_in(conn, agency: str, collection: str) -> list[str]:
-    return [row[0] for row in conn.execute(
-        f'SELECT DISTINCT dataset_id FROM "{qa_store.SCHEMA}".check_result_visible '
-        "WHERE agency_id = ? AND collection_id = ? AND dataset_id IS NOT NULL "
-        "ORDER BY dataset_id", [agency, collection]).fetchall()]
-
-
 def missing_tools(agency: str, collection: str, run_id: str,
                   conn=None) -> list[str]:
     """What this run still owes, or [] where it owes nothing.
