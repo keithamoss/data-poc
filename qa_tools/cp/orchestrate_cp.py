@@ -391,6 +391,7 @@ def run_single(entry: dict, reference_run_id: str | None = None, run_by: str | N
     manifest.json's own real shape for the full convention; row_counts
     isn't required, dataset_stats.compute_dataset_stats() derives its own
     counts from the live warehouse instead of trusting a passed-in one)."""
+    trial.require_trial(entry["run_id"], "orchestrate_cp.run_single")
     run_timestamp = asset_time.now().isoformat()
     run_by = run_by or get_run_by()
     return _run_one(entry, run_timestamp, run_by, reference_run_id, on_step=on_step)

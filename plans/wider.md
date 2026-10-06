@@ -1534,8 +1534,11 @@ check_lifecycle.py`'s own `check_id` convention.
        end-to-end test through all four, which now exists.
     5. REQ-DASH-148 criterion 12 - a reload owes a re-check. BUILT 2026-10-06.
     6. REQ-QAC-039 - a dataset's hierarchy identifiers in one place (survey
-       first).
-    7. REQ-PIPE-086 criterion 11, REQ-PIPE-140 criterion 5's terminal half,
+       first). SURVEYED 2026-10-06 and HELD at Keith's "talk it through
+       first" - the survey, his answers so far and the open fork are in
+       plans/post-build-review.md #36.
+    7. REQ-PIPE-086 criterion 11 (and criterion 10, unblocked by
+       REQ-PIPE-152) - BUILT 2026-10-06. REQ-PIPE-140 criterion 5's terminal half,
        then REQ-PIPE-081 criterion 6 with REQ-DASH-126 criterion 3.
     8. Bootstrap speed and the test review together
        (plans/running-thoughts.md #65 and #67).

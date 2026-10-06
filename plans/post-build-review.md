@@ -2382,6 +2382,75 @@ here as its own question, not acted on.
     string - left alone because the literals are the substance of the
     criterion and moving one of them is not the fix.
 
+    **SURVEY, 2026-10-06 (Keith's queue, "survey first").** The count
+    has grown, not shrunk: **~70 inline literals across 23 files**
+    (`grep` for every collection, agency and dataset id in `qa_tools/`,
+    `pipeline/`, `cli/`, `generator/`, `dashboard/`, `aws/`, excluding
+    `hierarchy.py` and comments). They fall into five kinds, and only
+    two of them are the defect the criterion names:
+
+    1. **A COLLECTION REGISTRY, STATED FOUR TIMES - the real defect.**
+       `processing_pass.COLLECTIONS`, `recheck._ORCHESTRATORS`, and
+       `cli/supply.py`'s `_SHORT_COLLECTION` and its `known` map each
+       say, per collection: its orchestrator module, its warehouse
+       builder, its run-id prefix (`run_`/`cp_run_`) and its short CLI
+       name (`bdm`/`cp`). `github_links.AGENCY_QA_FOLDER` says the
+       short name a fifth time, keyed by agency. A third collection
+       means editing five places, and forgetting one is silent in the
+       same way the old `CONTRACTS` tuple was. None of this is in the
+       hierarchy, and arguably should not be - a module path is code
+       layout, which is `AGENCY_QA_FOLDER`'s own stated reason.
+    2. **Per-collection code re-spelling its OWN collection** - ~35 of
+       the ~70. `qa_tools/bdm/*`, `cli/bdm.py`, `cli/cp.py`, the
+       `arrivals_for("civil-registration", "run_")` calls, and
+       `pipeline/build_dashboard_data.py`'s 14 `"birth-registrations"`.
+       Each module is about one collection by construction; the fault
+       is that it spells it rather than importing the one constant its
+       package already has (`bdm_common`/`cp_common`), and
+       `build_per_run_warehouses.DATASET_ID` and
+       `generate_runs.DATASET_ID` are second and third copies of
+       `bdm_common.DATASET_ID`.
+    3. **The Evidently check ids** - the whole tree spelled into two
+       constants. Derivable from the hierarchy plus a suffix.
+    4. **Scenario definitions** - `generator/scenario_injection.py`'s
+       six `dataset_id=` values. These are scenario CONFIGURATION, the
+       same kind of thing REQ-GEN-045's map is, and naming a dataset is
+       what a scenario is for. Not a defect if validated against the
+       hierarchy.
+    5. **Comments** that use an id as an example. Not code.
+
+    **The forks, for Keith before building** (asked 2026-10-06): where
+    the one collection registry (kind 1) lives, and whether kind 2 is
+    satisfied by "one constant per collection package, imported
+    everywhere" or needs every per-collection module to resolve through
+    `hierarchy.py` at runtime.
+
+    **KEITH'S ANSWERS SO FAR, 2026-10-06 - HELD, "talk it through
+    first".**
+    - **Registry: SPLIT, config plus code.** Each collection's short name
+      (`bdm`/`cp`) and run-id prefix become collection attributes in
+      `contract/data-asset.yaml`. Module paths go in ONE Python registry,
+      checked against the config.
+    - **Own-id: his question back was "why can't they read that from the
+      data?"** The answer given: mostly they can. Records carry their
+      collection and dataset, and a builder can iterate
+      `hierarchy.datasets_in_collection()` rather than naming its
+      dataset. The one fact a module cannot read from data is which
+      collection IT is, because `mothman bdm qa` runs before any record
+      exists. Proposed anchor: the package's own folder name
+      (`qa_tools/bdm` -> `bdm`) looked up against the config's `short:`,
+      so no id is spelled in code at all. A gate fails if a folder and the
+      config disagree in either direction, and a test refuses a new
+      inline id.
+    - The alternative put to him and not chosen yet: fold the
+      per-collection packages into one generic orchestrator, so there is
+      no `bdm`/`cp` folder to anchor. That is
+      `plans/publishing-and-history.md` item 6's code-architecture
+      question and a much bigger piece, to be scoped separately if
+      wanted.
+
+    Nothing is built until he has talked it through.
+
 37. **[done, 2026-09-24]** **[Data generation]** **[A6/B3] Three
     `REQ-GEN-040` criteria describe capabilities no operator can reach.**
 

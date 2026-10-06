@@ -11,6 +11,8 @@ reason to stub any of them out here."""
 from __future__ import annotations
 import os
 
+from qa_tools.common import supply_db, trial
+
 import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
 import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
@@ -19,7 +21,7 @@ import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
 import qa_tools.bdm.run_soda_bdm as run_soda_bdm
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
-from fixture_ids import (BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _REF_RUN_ID,
+from fixture_ids import (BDM_REF_RUN_ID as _REF_RUN_ID,
                           CP_DIRTY_RUN_ID as _CP_DIRTY_RUN_ID, CP_REF_RUN_ID as _CP_REF_RUN_ID)
 
 # The flat CSVs tests/conftest.py writes alongside its deliveries - the
@@ -80,12 +82,18 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
     # No injected severity is passed - run_single() has nowhere to put
     # one any more (REQ-GEN-043), which is the point: a real arriving
     # file carries no such label.
-    results = orchestrate_bdm.run_single(
-        _DIRTY_RUN_ID, str(arrived_csv), "2026-01-02",
-        reference_run_id=_REF_RUN_ID, run_by="test@example.com")
+    # A TRIAL ID: run_single runs trials only (REQ-PIPE-086 criterion 10).
+    run_id = trial.trial_run_id()
+    try:
+        results = orchestrate_bdm.run_single(
+            run_id, str(arrived_csv), "2026-01-02",
+            reference_run_id=_REF_RUN_ID, run_by="test@example.com")
+    finally:
+        with supply_db.connect(label="test-bdm-trial") as conn:
+            trial.discard(conn, run_id)
 
     assert results, "run_single() produced no real check results at all"
-    assert all(r["run_id"] == _DIRTY_RUN_ID for r in results)
+    assert all(r["run_id"] == run_id for r in results)
     assert all(r["check_id"] for r in results)
     failing = [r for r in results if r["status"] == "fail"]
     assert failing, "the real red-severity dirty run produced no failures via run_single()"
@@ -95,7 +103,7 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
     # Evidently could resolve a bare filename. Nothing reads a file
     # now, so nothing is copied.
     assert arrived_csv.exists(), "the file handed in should be left alone, not moved"
-    assert not os.path.exists(os.path.join(raw_dir, f"{_DIRTY_RUN_ID}.csv")), \
+    assert not os.path.exists(os.path.join(raw_dir, f"{run_id}.csv")), \
         "run_single() still copies the arriving file into a directory of its own"
 
 
@@ -130,10 +138,22 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
 
     # An ARRIVAL RECORD, not a manifest entry: what we observed, and
     # nothing the generator knew (REQ-GEN-043).
-    entry = {"run_id": _CP_DIRTY_RUN_ID, "run_index": 2,
+    # A TRIAL ID, staged the way the terminal's trial route stages one:
+    # run_single runs trials only (REQ-PIPE-086 criterion 10).
+    import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
+    run_id = trial.trial_run_id()
+    for table in build_cp_warehouses.TABLES:
+        build_cp_warehouses.add_table_to_run(
+            run_id, table, os.path.join(cp_raw_dir, _CP_DIRTY_RUN_ID, f"{table}.csv"))
+    entry = {"run_id": run_id, "run_index": 2,
              "received_at": "2026-04-01T09:00:00+08:00",
              "delivery": "cp-drop-9104"}
-    results = orchestrate_cp.run_single(entry, reference_run_id=_CP_REF_RUN_ID, run_by="test@example.com")
+    try:
+        results = orchestrate_cp.run_single(entry, reference_run_id=_CP_REF_RUN_ID,
+                                            run_by="test@example.com")
+    finally:
+        with supply_db.connect(label="test-cp-trial") as conn:
+            trial.discard(conn, run_id)
 
     assert results, "run_single() produced no real CP check results at all"
     assert all(r["check_id"] for r in results)

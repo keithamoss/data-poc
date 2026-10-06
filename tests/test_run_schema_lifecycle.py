@@ -177,12 +177,16 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
     with supply_db.connect(read_only=True, label="test-before") as conn:
         before = _schemas(conn)
 
-    run_id = "lifecycle_run"
+    # A TRIAL ID: run_single runs trials only (REQ-PIPE-086 criterion 10).
+    from qa_tools.common import trial
+    run_id = trial.trial_run_id()
     orchestrate_bdm.run_single(
         run_id, str(arrived), "2026-01-02", BDM_REF_RUN_ID, run_by="test@example.com")
 
     with supply_db.connect(read_only=True, label="test-after") as conn:
         after = _schemas(conn)
+    with supply_db.connect(label="test-tidy") as conn:
+        trial.discard(conn, run_id)
 
     assert supply_db.run_schema(run_id) not in after, \
         "the run finished and left its view schema behind"

@@ -187,7 +187,9 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
     # runs under a TRIAL identity instead, which records nothing that
     # survives it (REQ-PIPE-103). Same choice, moved to the only place it
     # can still be made.
-    recorded_run_id = run_id if keep else trial_mod.trial_run_id()
+    # A kept arrival returned above, so this is always a trial - and
+    # run_single refuses anything else (REQ-PIPE-086 criterion 10).
+    recorded_run_id = trial_mod.trial_run_id()
 
     results = _run_single_preserving_manifest(
         recorded_run_id, csv_path, asset_time.local_date(entry["received_at"]).isoformat(),

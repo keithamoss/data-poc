@@ -81,6 +81,27 @@ def is_trial(run_id: str) -> bool:
     return supply_db.is_trial_run(run_id)
 
 
+class NotATrial(ValueError):
+    """A single-run entry point was asked to record under a real identity."""
+
+
+def require_trial(run_id: str, entry_point: str) -> None:
+    """Refuse a real run id at the single-run entry point (REQ-PIPE-086
+    criterion 10).
+
+    Every route that KEEPS a supply processes it through the per-arrival
+    lifecycle - filed, overlaid on its period, checked and gated - and
+    since REQ-PIPE-152 the Lambda handlers do too. A real id reaching
+    run_single would be checked outside all of that and recorded under an
+    identity the batch will later treat as its own, so it is refused
+    before anything is staged or recorded."""
+    if not is_trial(run_id):
+        raise NotATrial(
+            f"{entry_point} runs trials only, and {run_id!r} is not a trial id. A supply "
+            f"that is kept goes through the per-arrival lifecycle (run_arrivals); a check "
+            f"that is not kept takes an id from trial.trial_run_id().")
+
+
 def scope_for(run_id: str) -> str | None:
     """The scope a run's load records are written under.
 

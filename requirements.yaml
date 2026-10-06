@@ -18211,28 +18211,6 @@ requirements:
     story: As a data engineer who will be running this from a terminal long before any of it is automated, I want every way I can keep a supply from the terminal - a file, a folder, one table, an S3 object, or an arrival I picked from the ones on disk - to go through exactly the steps the pipeline takes for an arrival (file it, overlay its period, check it, apply the promotion gate), so that what I do by hand today is the thing the automation will do later, rather than a narrower version of it that quietly behaves differently.
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 10 - run_single used for trials only, refusing a non-trial
-        identity.
-      why: Every terminal route that keeps a supply now goes through the lifecycle,
-        so run_single is called from the terminal for trials only - but the Lambda
-        ingest handlers (aws/lambda_handlers/*_ingest_handler.py) still call it
-        with real ids, and a guard would break them before REQ-PIPE-152 moves
-        them onto the per-arrival function.
-      owner: REQ-PIPE-152.
-      blocked_by:
-        requirements:
-        - REQ-PIPE-152
-    - criterion: Criterion 11 - a test that one delivery kept through the terminal
-        in one database and processed by the batch in another produces the same
-        filings, decisions and verdicts.
-      why: 'Not written tonight: it needs two real runs of the tools in two databases
-        (tests/equiv_support.snapshot is the comparison to reuse). Every kept
-        route now calls the same per-arrival function, so the equivalence holds
-        by construction; the test that would prove it is the open work.'
-      owner: unowned - morning report.
-      blocked_by:
-        unowned: true
     evidence:
     - '2026-10-06 overnight (sprint 14): tests/test_terminal_routes.py 14 passed,
       tests/test_hand_filing.py 13; tests/test_cli_bdm.py and tests/test_cli_cp.py
@@ -18251,6 +18229,20 @@ requirements:
       saying why, and --commit is refused naming --trial; an unrecorded one, kept,
       is recorded, staged and processed through the lifecycle (test_cli_bdm/test_cli_cp''s
       kept tests now take that path).'
+    - '2026-10-06: criteria 10 and 11. tests/test_run_single_is_for_trials.py
+      4 passed - both orchestrators'' run_single refuse a non-trial id with NotATrial
+      naming it, with no qa.run row and no staged table written, and a trial id
+      passes; written first and failing (no require_trial). The real-chain tests
+      that called run_single under real ids (test_orchestrate_single_run.py, test_run_schema_lifecycle.py)
+      now use trial ids, staged as the terminal''s trial route stages them, 22
+      passed. tests/test_kept_routes_agree.py 3 passed in 43s: one real Birth
+      Registrations delivery kept through the batch (run_pipeline), the terminal
+      (cli.bdm.run_check, keep=True) and the Lambda route (s3_arrival.handle_event,
+      object LastModified = the delivery''s receipt) into three empty databases
+      - qa.filing, qa.decision and qa.check_result identical apart from written
+      instants and surrogate ids, and for the Lambda route the delivery''s name.
+      Mutation-checked: moving the object''s LastModified by seven seconds makes
+      the Lambda comparison fail.'
     implemented_by:
     - qa_tools/common/arrival_lifecycle.py::process
     - qa_tools/common/hand_filing.py::check_collection
@@ -18266,6 +18258,10 @@ requirements:
     - cli/bdm.py::run_check
     - cli/bdm.py::run_check_local_file
     - cli/bdm.py::run_check_s3
+    - qa_tools/common/trial.py::require_trial
+    - qa_tools/common/trial.py::NotATrial
+    - qa_tools/bdm/orchestrate_bdm.py::run_single
+    - qa_tools/cp/orchestrate_cp.py::run_single
     linked_tests:
     - tests/test_terminal_routes.py::TestAReferenceIsATrialsOnly
     - tests/test_terminal_routes.py::TestAKeptFolderIsWhateverRecognitionPlaces
@@ -18276,6 +18272,9 @@ requirements:
     - tests/test_cli_bdm.py
     - tests/test_cli_cp.py
     - tests/test_arrival_lifecycle.py
+    - tests/test_run_single_is_for_trials.py
+    - tests/test_kept_routes_agree.py
+    - tests/test_orchestrate_single_run.py
     source: 'Keith, 2026-09-26, mid sign-off of REQ-GHUB-082: "data engineers will start by using the TUI for QA and then we''ll wire in an automated path later", so "the TUI MUST offer 100% the same functionality end to end as the automated pathway - deliveries, matching files, running QA, and all of the automation logic around what goes where". Split out of REQ-GHUB-082 the same day at his own call. REFRESHED by delivery-scoper 2026-10-04 against everything built and signed since, and narrowed at Keith''s answers the same day (questions Q1-Q5): most of the original twelve criteria are now carried by REQ-PIPE-103 and by the shared per-arrival functions REQ-PIPE-105 introduced; what remains is every route that still goes round them. The Lambda handlers were added at Keith''s Q2 answer and then split out to REQ-PIPE-152 at his follow-up answer the same day.'
     acceptance_criteria:
     - THE SYSTEM SHALL process every arrival a person keeps from the terminal - through a single file, a folder, one table on its own, an S3 object or an S3 delivery prefix, from the TUI or from flags - by calling the same per-arrival function the pipeline calls for each arrival, which files it, overlays its period, runs its checks and applies the promotion gate.
@@ -18366,6 +18365,7 @@ requirements:
       extract. Not refused, because a covering note is an ordinary thing to find
       in a delivery. Applies to the S3 delivery route too, which goes through
       the same folder path.
+    - 'CRITERIA 10 AND 11 BUILT, 2026-10-06. run_single refuses a non-trial id through trial.require_trial, called first in both orchestrators so a refused call stages and records nothing; the id is read rather than a flag passed, as everywhere trials are recognised. The criterion-11 test compares three routes rather than two because REQ-PIPE-152 is built, over ONE Birth Registrations delivery: each further arrival is another full four-tool chain per route, and the routes share every step after recording, so length adds minutes without adding a way for them to differ. In the normal suite rather than on demand (43s). The Lambda route is compared without the delivery NAME - an S3 object is named from bucket, key and LastModified by REQ-PIPE-152, a transport fact the criterion is not about - and its LastModified is set to the delivery receipt so it is the same supply. Scripted decisions are switched off in all three routes: they replay synthetic scenarios over the whole corpus and refuse a one-delivery history.'
     open_questions: []
   - id: REQ-PIPE-087
     title: "PostgreSQL is the one warehouse engine, and DuckDB keeps only the job of reading what arrives"

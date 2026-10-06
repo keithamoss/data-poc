@@ -403,6 +403,7 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
     simplification as before, reached by a different route: knowing what
     preceded an arrival that was never filed as a delivery still needs
     something this function does not have."""
+    trial.require_trial(run_id, "orchestrate_bdm.run_single")
     run_timestamp = asset_time.now().isoformat()
     run_by = run_by or get_run_by()
 
