@@ -30,6 +30,7 @@ import sys
 
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 from qa_tools.common import arrivals, asset_time, file_checks, load_log, sample_data, supply_db, supply_holds, trial
+from qa_tools.common import replay_clock
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
@@ -81,6 +82,9 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
     `mothman supply failures` is the queue it lands in.
     """
     arrival = received_at if received_at is not None else run_id
+    # A REPLAY STAMPS THE LOAD AS RECEIVED (REQ-PIPE-081 criteria 27-31).
+    if received_at is not None:
+        replay_clock.anchor(received_at)
     physical = supply_db.staged_table(TABLE, arrival, ordinal)
     # THE SAME SEGMENT staged_table() names the physical table with -
     # not arrival_key() directly. They disagreed for one commit and
@@ -153,7 +157,7 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
             conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
             screening.record_against(load_log.record_load(
                 delivery_name, DATASET_ID, physical, load_log.FAILED,
-                asset_time.now().isoformat(), reason=load_log.own_words(exc),
+                replay_clock.now().isoformat(), reason=load_log.own_words(exc),
                 trial=trial_scope), conn=conn)
             # THE LIBRARY'S OWN MESSAGE ONLY HERE, on standard error, for
             # whoever ran the load - it can quote a row, and the recorded
@@ -166,7 +170,7 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
         # other order skips one that never loaded.
         screening.record_against(load_log.record_load(
             delivery_name, DATASET_ID, physical, load_log.LOADED,
-            asset_time.now().isoformat(), row_count=rows, trial=trial_scope), conn=conn)
+            replay_clock.now().isoformat(), row_count=rows, trial=trial_scope), conn=conn)
         # A HELD SUPPLY GETS NO VIEW (REQ-PIPE-078 criterion 9) - see
         # build_cp_warehouses.py's identical call for why this extends
         # the ambiguity rule rather than adding a second mechanism.

@@ -34,6 +34,7 @@ import importlib
 from dataclasses import dataclass
 from types import SimpleNamespace
 
+from qa_tools.common import replay_clock as _replay_clock
 from qa_tools.common import qa_store, supply_db
 
 RECHECK = "recheck"
@@ -100,8 +101,9 @@ def owe(conn: supply_db.SupplyConnection, *, dataset_id: str, supply_id: str,
         return int(rows[0][0])
     return int(conn.execute(
         f"INSERT INTO {TABLE} (kind, dataset_id, supply_id, caused_by_decision, "
-        "caused_by_load) VALUES (?, ?, ?, ?, ?) RETURNING id",
-        [RECHECK, dataset_id, supply_id, decision_id, load_id]).fetchall()[0][0])
+        "caused_by_load, owed_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        [RECHECK, dataset_id, supply_id, decision_id, load_id,
+         _replay_clock.now()]).fetchall()[0][0])
 
 
 def owed(conn: supply_db.SupplyConnection, dataset_id: str | None = None) -> list[Owed]:
@@ -170,7 +172,7 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     filed supply, as a run of its own, against its filed period's overlay -
     exactly as an arrival's run is built. Returns (arrival, results). Raises
     whatever the run raises; the caller decides what owing it means."""
-    from qa_tools.common import asset_time, filing, hierarchy, period_overlay
+    from qa_tools.common import filing, hierarchy, period_overlay
     from qa_tools.common.git_identity import get_run_by
 
     with supply_db.connect(label="mothman:recheck") as conn:
@@ -204,7 +206,7 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
         # that broke half-built never reaches (#114, minor).
         module._discard_this_runs_schemas(run_key)
         raise
-    results = module._run_one(entry, asset_time.now().isoformat(),
+    results = module._run_one(entry, _replay_clock.now().isoformat(),
                               run_by or get_run_by(), on_step=on_step)
     return arrival, results
 
@@ -298,8 +300,8 @@ def fail(owed_id: int, message: str) -> None:
 def clear(owed_id: int, run_key: str) -> None:
     """Cleared only once its work - run AND gate - is done (criterion 7)."""
     with supply_db.connect(label="mothman:recheck") as conn:
-        conn.execute(f"UPDATE {TABLE} SET cleared_at = now(), cleared_by_run = ?, "
-                     "last_failure = NULL WHERE id = ?", [run_key, owed_id])
+        conn.execute(f"UPDATE {TABLE} SET cleared_at = ?, cleared_by_run = ?, "
+                     "last_failure = NULL WHERE id = ?", [_replay_clock.now(), run_key, owed_id])
 
 
 def run_all_owed(*, collection_id: str | None = None, kinds=(REEVALUATE,),

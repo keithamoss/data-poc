@@ -2451,6 +2451,13 @@ here as its own question, not acted on.
 
     Nothing is built until he has talked it through.
 
+    **KEITH, 2026-10-06 13:47, deferring it deliberately:** "why can't they
+    read that information in the data asset YAML file?" - and the thing he
+    wants to talk through is the larger aim behind it: **everything in
+    configuration and no custom code per dataset, if we can.** Parked to be
+    discussed alongside the calendar group (plans/wider.md #11, item 9), not
+    before. `plans/running-thoughts.md` #68 carries the aim itself.
+
 37. **[done, 2026-09-24]** **[Data generation]** **[A6/B3] Three
     `REQ-GEN-040` criteria describe capabilities no operator can reach.**
 
@@ -2520,6 +2527,20 @@ here as its own question, not acted on.
     **Recommendation:** this is sprint 8's work and it is already
     scoped - the finding is the DATE. It stops being theoretical when
     the calendar runs out, which is a known, computable day.
+
+    **RE-SCOPED 2026-10-06 (delivery-scoper) AND ANSWERED (Keith).** The stop
+    this entry warned about was settled differently: REQ-PIPE-131 c16 holds a
+    post-schedule supply rather than failing the dataset. Scoper also found
+    the hold's reason claims a next period opened (an exhausted calendar has
+    none), and `runway.exhausted_datasets` fires about a period before the
+    last slot closes. Keith's answers: (1) the hold IS the hard failure -
+    staged, checked, held, labelled schedule-ended with an honest reason and
+    the fix; (2) once dates are added, held supplies are RE-FILED
+    AUTOMATICALLY by the next pass in receipt order; (3) the dashboard says
+    exhausted when the last slot CLOSES, agreeing with the pipeline. Retention
+    of held supplies was not asked. Drafts (REQ-PIPE-154, REQ-DASH-155, and
+    053 c4-6 restated) are to be revised for (2) and (3) and brought for
+    sign-off.
 
 39. **[done, 2026-09-25]** **[Pipeline & publishing]** **[B1/B2] Three
     model functions built in this batch have zero production callers.**
@@ -6379,3 +6400,43 @@ twice. It deliberately did not re-find the `TypeError`.
       "originally received", the no-environment first screen, `pipeline
       process` not naming what is red, one UTC refusal, REQ ids in help, the
       publish offer only on the synthetic route): recorded, not changed.
+
+125. **[todo, 2026-10-06]** **[Pipeline & publishing]** **REQ-PIPE-057
+    criterion 19's guard has done nothing since REQ-PIPE-089, and its tests
+    stay green.** Found by the delivery-scoper while re-scoping REQ-PIPE-057
+    criterion 18; confirmed against the code the same hour.
+
+    `qa_tools/common/run_id_guard.py::committed_deliveries` reads
+    `QA_RESULTS_DIR = ROOT / "qa_results"` - the committed tree
+    REQ-PIPE-089 deleted. A missing directory returns `{}`, so `check()`
+    returns early on every run, and both orchestrators still call it.
+    `tests/test_run_id_guard.py` builds its JSON fixtures in `tmp_path`, so
+    it is green against a guard that guards nothing in production - the
+    "a passing test proving nothing" shape again.
+
+    **Why it still matters**: run ids no longer come from position
+    (REQ-PIPE-105 made them `<table>__<receipt key>`), so the original
+    fragility is gone, but a run id can still change under recorded history
+    through a table rename or a changed receipt instant. The guard should
+    read `qa.run` - or be retired with the criterion amended, if Keith
+    judges the receipt-keyed id makes it moot. **A defect against a built
+    criterion, so his call before the fix.**
+
+    **A neighbouring gap the same pass raised, unverified**: two separate
+    deliveries of the SAME dataset with the same receipt instant (plausible
+    off S3, whose LastModified is to the second) would get the same run id,
+    and `qa.run.run_key` is a primary key. Not yet checked what happens.
+
+    **KEITH, 2026-10-06: RETIRE IT.** Run ids are receipt-keyed since
+    REQ-PIPE-105, so the positional renumbering the guard existed for is
+    gone; criterion 19 is amended as moot and the guard and its tests are
+    deleted rather than repointed at `qa.run`. The same-instant collision
+    above is NOT covered by that answer and stays open.
+
+126. **[todo, 2026-10-06]** **[Docs & process]** **REQ-PIPE-068's NFR 2
+    still says a build "may never open or query any database, including
+    this one"** - the wording REQ-DOCS-101's sweep replaced everywhere else
+    with "a build may read recorded QA results, never actual data, and never
+    anything else". Found by the delivery-scoper 2026-10-06. Wording only,
+    but it states the opposite of the built design, so it is a claim in
+    requirements.yaml and is written up here rather than quietly fixed.

@@ -167,8 +167,8 @@ def supply_states(dataset_id: str,
             return supply_states(dataset_id, conn=opened)
     actions = tuple(_STATE_AFTER)
     out: dict[str, list[dict]] = {}
-    for supply, action, at, kind, newer in conn.execute(
-            f"SELECT supply, action, effective_at, actor_kind, superseded_by "
+    for supply, action, at, kind, newer, recorded in conn.execute(
+            f"SELECT supply, action, effective_at, actor_kind, superseded_by, recorded_at "
             f"FROM {decision_log.TABLE} "
             f"WHERE dataset_id = ? AND supply IS NOT NULL AND action IN "
             f"({', '.join('?' * len(actions))}) ORDER BY effective_at, id",
@@ -178,7 +178,11 @@ def supply_states(dataset_id: str,
         # waiting - is read from its action, and superseded and rejected are
         # both "withdrawn" for the verdict but are different outcomes.
         entry = {"at": at.isoformat() if hasattr(at, "isoformat") else str(at),
-                 "state": _STATE_AFTER[action], "action": action, "by": kind}
+                 "state": _STATE_AFTER[action], "action": action, "by": kind,
+                 # WHEN IT WAS WRITTEN DOWN (REQ-PIPE-081 criterion 6): a
+                 # decision recorded after the date on show changed it.
+                 "recordedAt": recorded.isoformat() if hasattr(recorded, "isoformat")
+                               else str(recorded)}
         if action == decision_log.SUPERSEDE:
             entry["supersededBy"] = newer
             setting = _replaced_under(conn, dataset_id, supply)

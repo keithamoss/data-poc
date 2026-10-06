@@ -140,6 +140,19 @@ releases:
               what recognition would make of each file.
       - category: Improved
         items:
+          - headline: A rebuilt synthetic history keeps its own dates
+            components: ["Pipeline & publishing", "Data generation"]
+            description: >
+              Rebuilding the synthetic history now stamps every decision,
+              filing, run and load with when it happened in that history, not
+              with the day you rebuilt it. Anything you decide afterwards still
+              carries the real time.
+          - headline: A past date says what has changed it since
+            components: ["Dashboard UI"]
+            description: >
+              Viewing what was in place on a past date, the page now lists the
+              decisions made after that date that changed what it shows, naming
+              the dataset, the supply and when each was made.
           - headline: A promoted supply's pill shows how it stands now
             components: ["Dashboard UI"]
             description: >

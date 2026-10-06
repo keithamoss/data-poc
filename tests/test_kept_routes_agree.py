@@ -27,19 +27,15 @@ for them to differ.
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import psycopg
 import pytest
 
 import equiv_support
-from conftest import mark_test_database
 
-ADMIN_DSN_ENV = "MOTHMAN_TEST_DSN"
 RUN_ID = "run_001"
 COMPARED = ("qa.filing", "qa.decision", "qa.check_result")
 
@@ -64,52 +60,6 @@ def corpus(tmp_path_factory):
             if d.name != first:
                 shutil.rmtree(d)
     return root, first
-
-
-def _fresh_database(name: str) -> str:
-    admin = os.environ[ADMIN_DSN_ENV]
-    with psycopg.connect(admin, autocommit=True) as conn:
-        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
-        conn.execute(f'CREATE DATABASE "{name}"')
-        mark_test_database(conn, name)
-    info = psycopg.conninfo.conninfo_to_dict(admin)
-    info["dbname"] = name
-    return psycopg.conninfo.make_conninfo(**info)
-
-
-def _drop_database(name: str) -> None:
-    with psycopg.connect(os.environ[ADMIN_DSN_ENV], autocommit=True) as conn:
-        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
-
-
-def _route(tree: Path, db_name: str, run) -> dict:
-    """`run()` against a new database with every on-disk path under `tree`."""
-    from qa_tools.common import supply_db
-
-    mp = pytest.MonkeyPatch()
-    original = equiv_support.apply_redirects(tree)
-    dsn = _fresh_database(db_name)
-    scratch = None
-    try:
-        mp.setenv("MOTHMAN_SUPPLY_DSN", dsn)
-        scratch = supply_db.scratch_dir()
-        mp.delenv("GITHUB_REPOSITORY", raising=False)
-        # NO SCRIPTED DECISIONS: they replay the synthetic scenarios over the
-        # whole corpus, and would refuse a one-delivery history for missing
-        # the rest. Not what any route is being compared on.
-        from qa_tools.common import scripted_decisions
-        mp.setattr(scripted_decisions, "SCRIPT_PATH", tree / "no_scripted_decisions.yaml")
-        with supply_db.connect(label="test-kept-routes") as conn:
-            from qa_tools.common import qa_store
-            qa_store.ensure_schema(conn)
-        run()
-        return equiv_support.snapshot(dsn)
-    finally:
-        mp.undo()
-        equiv_support.restore(original)
-        if scratch is not None:
-            shutil.rmtree(scratch, ignore_errors=True)
-        _drop_database(db_name)
 
 
 def _batch():
@@ -173,10 +123,10 @@ def routes(corpus, worker_id, tmp_path_factory):
     for tree in ("deliveries", "receipts"):
         (empty / tree).mkdir()
     return {
-        "batch": _route(root, f"kept_batch_{worker_id}", _batch),
-        "terminal": _route(root, f"kept_terminal_{worker_id}", _terminal),
+        "batch": equiv_support.run_into_fresh_database(root, f"kept_batch_{worker_id}", _batch),
+        "terminal": equiv_support.run_into_fresh_database(root, f"kept_terminal_{worker_id}", _terminal),
         # NOTHING ON DISK: the Lambda route's only arrival is the object.
-        "lambda": _route(empty, f"kept_lambda_{worker_id}", _lambda(root, delivery_name)),
+        "lambda": equiv_support.run_into_fresh_database(empty, f"kept_lambda_{worker_id}", _lambda(root, delivery_name)),
     }
 
 

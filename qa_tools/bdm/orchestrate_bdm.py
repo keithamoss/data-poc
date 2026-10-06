@@ -44,7 +44,7 @@ from datetime import date
 
 from . import bdm_common
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
-                              run_id_guard, supply_db)
+                              supply_db)
 from qa_tools.common import decision_log
 from qa_tools.common import drift_reference
 from qa_tools.common import held_blast_radius
@@ -67,6 +67,7 @@ from . import run_soda_bdm
 from . import run_datacontract_bdm
 from . import run_evidently_bdm
 from qa_tools.common import arrival_lifecycle
+from qa_tools.common import replay_clock
 from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -526,6 +527,10 @@ def run_arrivals(found_arrivals, run_by: str, on_step=None) -> list[dict]:
         exclusive=True)
 
 
+# ON THE REPLAY'S OWN CLOCK (REQ-PIPE-081 criteria 27-31): the batch is always
+# a replay, so on a synthetic asset every record it writes is stamped with the
+# replay's simulated time rather than today's; on a real one, the wall clock.
+@replay_clock.on_replay_clock
 def run_pipeline(sequential: bool = False,
                  record_deliveries: bool = True) -> dict:
     # A RUN'S TOOLS OVERLAP unless told not to (REQ-TEST-116 criteria 3, 5).
@@ -590,11 +595,6 @@ def run_pipeline(sequential: bool = False,
     # in `qa.filing` (REQ-PIPE-104), which is why that destination was
     # built before this switch was flipped rather than with it.
 
-    # BEFORE ANY REAL TOOL RUNS (REQ-PIPE-057 criterion 19). Run ids
-    # are positional, so a change in what recognition returns renames
-    # committed history - a failure that would otherwise be found when
-    # CI went red on paths nothing in this file mentions.
-    run_id_guard.check(AGENCY_ID, COLLECTION_ID, found_arrivals)
     run_timestamp = asset_time.now().isoformat()
 
     # Fails loudly here, before any real tool runs, if git identity isn't

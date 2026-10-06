@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from qa_tools.common import replay_clock as _replay_clock
 from qa_tools.common import period_schema, qa_store, supply_db
 
 MISSING, WRONG_KIND, STRAY = "missing", "wrong-kind", "stray"
@@ -132,8 +133,9 @@ def take(conn: supply_db.SupplyConnection, *, trigger: str, run_key: str | None 
         conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
         found = compare(conn, periods)
         census_id = conn.execute(
-            f'INSERT INTO "{qa_store.SCHEMA}".census (trigger, run_key, periods) '
-            "VALUES (?, ?, ?) RETURNING id", [trigger, run_key, periods]).fetchall()[0][0]
+            f'INSERT INTO "{qa_store.SCHEMA}".census (trigger, run_key, periods, taken_at) '
+            "VALUES (?, ?, ?, ?) RETURNING id",
+            [trigger, run_key, periods, _replay_clock.now()]).fetchall()[0][0]
         for d in found:
             conn.execute(
                 f'INSERT INTO "{qa_store.SCHEMA}".census_discrepancy '

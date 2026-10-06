@@ -46,6 +46,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from qa_tools.common import replay_clock as _replay_clock
 from qa_tools.common import qa_store, supply_db
 from qa_tools.common.assignment import Assignment
 
@@ -118,13 +119,13 @@ def record(assignment: Assignment, delivery: str | None, conn=None) -> bool:
         assignment.dataset_id, assignment.slot, assignment.received_at)
     rows = conn.execute(
         f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, "
-        "delivery, classification) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?) "
+        "delivery, classification, recorded_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT (dataset_id, supply_id) WHERE refiled_by IS NULL DO NOTHING "
         "RETURNING dataset_id",
         [assignment.dataset_id, assignment.supply_id, assignment.slot,
          assignment.branch, list(assignment.considered), delivery,
-         verdict]).fetchall()
+         verdict, _replay_clock.now()]).fetchall()
     return bool(rows)
 
 
@@ -453,9 +454,9 @@ def refile(conn, dataset_id: str, supply_id: str, to_slot: str, *,
     # here. The delivery link is carried as it stands (REQ-PIPE-144 c17).
     conn.execute(
         f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, "
-        "delivery, classification, refiled_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "delivery, classification, refiled_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [dataset_id, supply_id, to_slot, "refiled-by-a-person", [to_slot],
-         current["delivery"], verdict, decision_id])
+         current["delivery"], verdict, decision_id, _replay_clock.now()])
     return {**current, "slot": to_slot, "branch": "refiled-by-a-person",
             "classification": verdict}
 

@@ -4595,3 +4595,20 @@ Belongs with batch 5's check work.
     at internal process tooling as a category of its own: table-driven tests
     where one rule is tested many ways, and whether every rule earns its keep.
 
+68. **[todo, 2026-10-06]** **[Pipeline & publishing, QA checks & contract]**
+    **No custom code per dataset - everything in configuration, if we can.**
+    Keith, 2026-10-06 13:47, prompted by the REQ-QAC-039 survey (hierarchy
+    ids restated in ~70 places, a per-collection registry stated in five):
+    his question back was why per-collection code can't read what it needs
+    from `contract/data-asset.yaml`, and the aim behind it is that a dataset
+    or collection is added by configuration alone, with no `qa_tools/<x>/`
+    package, CLI module or dashboard builder written for it. Not scoped.
+    **To talk through with him alongside the calendar group**
+    (`plans/wider.md` #11, item 9) - his own placement, so do not raise it
+    sooner and do not build towards it before then. Relevant prior art:
+    `plans/publishing-and-history.md` item 6 (how many near-identical
+    modules per dataset) and `plans/post-build-review.md` #36 (the survey,
+    his answers so far). At the scale this PoC is for - ~30 datasets on one
+    asset, a project-extraction shape with no cadence - this is likely the
+    larger question REQ-QAC-039 is a symptom of.
+

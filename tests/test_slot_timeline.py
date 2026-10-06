@@ -261,6 +261,17 @@ class TestEachSuppliesStateOverTime:
         assert [e["state"] for e in got] == ["promoted", "withdrawn"]
         assert got[1]["at"].startswith("2026-03-01")
 
+    def test_each_entry_says_when_it_was_recorded(self, clean, dataset):
+        """REQ-PIPE-081 criterion 6: the page names a decision recorded
+        after the date on show, so it needs when each was recorded."""
+        from qa_tools.common import asset_time
+        _decide(clean, dataset, decision_log.REJECT, supply="s5",
+                at="2026-02-01T09:00:00+08:00", from_slot="2026-Q1")
+        [entry] = slot_timeline.supply_states(dataset, conn=clean)["s5"]
+        recorded = asset_time.parse_instant(entry["recordedAt"], "recordedAt")
+        assert recorded > asset_time.parse_instant(entry["at"], "at"), \
+            "made today, about 1 February - outside a replay it is the wall clock"
+
     def test_a_withheld_note_leaves_it_waiting(self, clean, dataset):
         _decide(clean, dataset, decision_log.PROMOTION_WITHHELD, supply="s2",
                 at="2026-02-01T09:00:00+08:00", to_slot="2026-Q1", kind=decision_log.RULE)

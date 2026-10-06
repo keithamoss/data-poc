@@ -1498,7 +1498,7 @@ def record_run(conn: supply_db.SupplyConnection, *, run_key: str, agency_id: str
     conn.execute(
         f'INSERT INTO "{SCHEMA}".run '
         "(run_key, agency_id, collection_id, run_timestamp, run_instant, run_by, "
-        "environment, tool_versions) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+        "environment, tool_versions, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT (run_key) DO UPDATE SET "
         "run_timestamp = EXCLUDED.run_timestamp, "
         "run_instant = EXCLUDED.run_instant, "
@@ -1511,7 +1511,14 @@ def record_run(conn: supply_db.SupplyConnection, *, run_key: str, agency_id: str
         "tool_versions = CASE WHEN EXCLUDED.tool_versions = '{}'::jsonb "
         f'THEN "{SCHEMA}".run.tool_versions ELSE EXCLUDED.tool_versions END',
         [run_key, agency_id, collection_id, run_timestamp, run_timestamp, run_by,
-         environment, json.dumps(dict(tool_versions or {}))])
+         environment, json.dumps(dict(tool_versions or {})), _stamp()])
+
+
+def _stamp():
+    """Now - or the replay's own time in a replay of a synthetic history
+    (REQ-PIPE-081 criteria 27-31)."""
+    from qa_tools.common import replay_clock
+    return replay_clock.now()
 
 
 def complete_run(conn: supply_db.SupplyConnection, run_key: str) -> None:
@@ -1528,9 +1535,9 @@ def complete_run(conn: supply_db.SupplyConnection, run_key: str) -> None:
     without inventing an identity for it.
     """
     rows = conn.execute(
-        f'UPDATE "{SCHEMA}".run SET completed_at = now() '
+        f'UPDATE "{SCHEMA}".run SET completed_at = ? '
         "WHERE run_key = ? AND run_by IS NOT NULL AND environment IS NOT NULL "
-        "RETURNING run_key", [run_key]).fetchall()
+        "RETURNING run_key", [_stamp(), run_key]).fetchall()
     if not rows:
         raise UnattributedRun(
             f"run {run_key!r} cannot be completed: it is not registered, or it has "
@@ -1594,8 +1601,8 @@ def register_run_if_absent(conn: supply_db.SupplyConnection, *, run_key: str,
     counts."""
     conn.execute(
         f'INSERT INTO "{SCHEMA}".run (run_key, agency_id, collection_id, run_timestamp, '
-        "run_instant) VALUES (?, ?, ?, ?, ?) ON CONFLICT (run_key) DO NOTHING",
-        [run_key, agency_id, collection_id, run_timestamp, run_timestamp])
+        "run_instant, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (run_key) DO NOTHING",
+        [run_key, agency_id, collection_id, run_timestamp, run_timestamp, _stamp()])
 
 
 def record_file_results(conn: supply_db.SupplyConnection, run_key: str,

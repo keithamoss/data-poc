@@ -1538,11 +1538,15 @@ check_lifecycle.py`'s own `check_id` convention.
        first" - the survey, his answers so far and the open fork are in
        plans/post-build-review.md #36.
     7. REQ-PIPE-086 criterion 11 (and criterion 10, unblocked by
-       REQ-PIPE-152) - BUILT 2026-10-06. REQ-PIPE-140 criterion 5's terminal half,
-       then REQ-PIPE-081 criterion 6 with REQ-DASH-126 criterion 3.
+       REQ-PIPE-152) - BUILT 2026-10-06. REQ-PIPE-140 criterion 5's terminal half
+       (AMENDED AWAY, Keith), REQ-DASH-126 criterion 3 (BUILT) and REQ-PIPE-081
+       criterion 6 (BUILT, with a simulated clock for synthetic replays) - all
+       done 2026-10-06. Was:       then REQ-PIPE-081 criterion 6 with REQ-DASH-126 criterion 3.
     8. Bootstrap speed and the test review together
        (plans/running-thoughts.md #65 and #67).
-    9. The calendar group (REQ-PIPE-110 to 113, with road-testing #3).
+    9. The calendar group (REQ-PIPE-110 to 113, with road-testing #3) -
+       AND, with it, the talk Keith asked for on REQ-QAC-039 and "no custom
+       code per dataset" (plans/running-thoughts.md #68).
     10. A walk through plans/running-thoughts.md.
     11. Sprints planned around everything left in plans/road-testing.md.
     ALONGSIDE: delivery-scoper drafts for REQ-PIPE-053's five criteria,

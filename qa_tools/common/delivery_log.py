@@ -168,14 +168,14 @@ def record(delivery, recognition,
         written = db.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".delivery '
             "(name, received_at, received_instant, received_from, collections, "
-            "anomalies, filed_by_kind, filing_route, filed_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
+            "anomalies, filed_by_kind, filing_route, filed_by, recorded_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
             [payload["delivery"], payload["received_at"], delivery.received_at,
              payload["received_from"],
              json.dumps(payload["collections"]),
              json.dumps(payload["anomalies"]),
              payload["filed_by"]["kind"], payload["filed_by"].get("route"),
-             payload["filed_by"].get("who")]).fetchall()
+             payload["filed_by"].get("who"), _recorded_stamp(delivery)]).fetchall()
         if not written:
             return None
         for entry in payload["files"]:
@@ -363,6 +363,14 @@ def sql() -> str:
             f'd.anomalies, f.filename, f.dataset_id, f.contested_by '
             f'FROM "{qa_store.SCHEMA}".delivery d '
             f'LEFT JOIN "{qa_store.SCHEMA}".delivery_file f ON f.delivery = d.name')
+
+
+def _recorded_stamp(delivery):
+    """When the delivery is written down: now, or in a replay of a synthetic
+    history the moment it was received (REQ-PIPE-081 criteria 27-31)."""
+    from qa_tools.common import replay_clock
+    replay_clock.anchor(delivery.received_at)
+    return replay_clock.now()
 
 
 def record_all() -> None:

@@ -7432,6 +7432,47 @@ function boundInPlaceOnInput(){
 // to a real state at an uncovered date (each one rolls back to its own
 // newest run at or before it, or says No data), so replacing the page
 // would hide correct answers to make a point about the date.
+// EVERY REAL DATASET'S RAW DATA, in page order - one place to enumerate them.
+function rawRealDatasets(){
+  return [REAL_BIRTH_REG_DATA, ...((REAL_CP_DATA && REAL_CP_DATA.datasets) || [])].filter(Boolean);
+}
+const DECISION_DONE = {promote:"promoted", reject:"rejected", demote:"demoted",
+  supersede:"superseded", "un-supersede":"restored", refile:"re-filed",
+  substitute:"substituted", inherit:"carried forward", "promotion-withheld":"held back",
+  "promotion-refused":"refused promotion"};
+// DECISIONS THAT CHANGED AN EARLIER DATE (REQ-PIPE-081 criterion 6): taking
+// effect on or before the date on show, recorded after it - so the page now
+// shows that date differently from how it could have looked then. The plain
+// reading; a replay stamps its own records as they happen (criteria 27-31),
+// so only a genuinely later decision qualifies.
+function decisionsChangingDate(onDateStr){
+  if(!onDateStr) return [];
+  const out = [];
+  rawRealDatasets().forEach(raw=>{
+    const runs = Object.fromEntries((raw.runs || []).map(r=> [r.run_id, r]));
+    Object.entries(raw.runStates || {}).forEach(([runId, entries])=> (entries || []).forEach(e=>{
+      if(!e.at || !e.recordedAt) return;
+      if(assetDateStrOf(e.at) <= onDateStr && assetDateStrOf(e.recordedAt) > onDateStr){
+        out.push({datasetName: raw.name || raw.id, action: e.action, at: e.at,
+                  recordedAt: e.recordedAt, run: runs[runId] || null});
+      }
+    }));
+  });
+  return out.sort((a, b)=> a.recordedAt < b.recordedAt ? -1 : a.recordedAt > b.recordedAt ? 1 : 0);
+}
+function changedSinceNote(onDateStr){
+  const found = decisionsChangingDate(onDateStr);
+  if(!found.length) return "";
+  const SHOWN = 5;
+  const items = found.slice(0, SHOWN).map(d=>{
+    const received = d.run ? ` received ${d.run.arrivedAt ? fmtInstant(d.run.arrivedAt) : fmtDay(d.run.run_date)}` : "";
+    return `<li>${escHtml(d.datasetName)}: the supply${received} was ${escHtml(DECISION_DONE[d.action] || d.action)}
+      as from ${fmtDay(assetDateStrOf(d.at))}, a decision made ${fmtDay(assetDateStrOf(d.recordedAt))}</li>`;
+  }).join("");
+  const more = found.length > SHOWN ? `<li>and ${found.length - SHOWN} more</li>` : "";
+  return `<div data-changed-since style="margin-top:6px;">${found.length} ${pluralize(found.length, "decision")}
+    made since then ${found.length === 1 ? "has" : "have"} changed what this date shows:<ul style="margin:4px 0 0 18px; padding:0;">${items}${more}</ul></div>`;
+}
 function renderInPlaceOnPastNotice(){
   const notice = document.getElementById("in-place-on-past-notice");
   if(!notice) return;
@@ -7440,7 +7481,7 @@ function renderInPlaceOnPastNotice(){
   notice.hidden = false;
   notice.innerHTML = `Showing what was <b>in place on ${fmtDay(CURRENT_IN_PLACE_ON)}</b>, using
     everything known today - decisions made since that date included. The
-    snapshot archive (🕐 Past snapshots) shows what this page itself said then.`;
+    snapshot archive (🕐 Past snapshots) shows what this page itself said then.${changedSinceNote(CURRENT_IN_PLACE_ON)}`;
 }
 function renderInPlaceOnRangeNotice(){
   renderInPlaceOnPastNotice();

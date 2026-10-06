@@ -1131,28 +1131,9 @@ requirements:
         observed fact; re-deriving it afterwards against a staging
         schema that has moved on answers a different question and looks
         like the same one.
+      - 'CRITERION 2 MET, 2026-10-06 (Keith agreed, on the delivery-scoper''s evidence): REQ-QAC-088 (built) closed it - datacontract-cli runs against the run''s view schema as its server schema, Evidently reads the current run through the view schema and rebuilds its reference from recorded value counts, and dataset_stats connects with search_path set to the run schema. The unmet entry naming datacontract-cli and Evidently reading CSVs was stale.'
+      - 'WHAT CRITERION 2 DOES NOT COVER, recorded with Keith 2026-10-06: file checks (REQ-QAC-096) read the delivered bytes before load, by design - a question only the file can answer is not a data check; and the staging loader, the overlay that builds the view schema, and promotion and supersession moving tables between schemas are the resolution mechanism itself rather than readers of it. Not yet audited one by one: promotion.py, knock_on.py, trial.py and sample_data.py''s physical-table reads.'
     open_questions: []
-    unmet_criteria:
-      - criterion: >-
-          Criterion 2, in part - datacontract-cli and Evidently read
-          supply CSVs straight off disk rather than through the per-run
-          view schema, so two of the four tools are outside "every read
-          of supply data".
-        why: >-
-          Neither tool touches DuckDB at all today: datacontract-cli is
-          pointed at a CSV path and Evidently is handed a dataframe read
-          from one. Moving them is a real piece of work rather than a
-          repoint, and delivery sprint 15 rebuilds how QA is invoked
-          anyway. Flagged rather than quietly counted as done.
-        owner: >
-          Keith, to place at sprint 15 or sooner - and `unowned` rather
-          than sprint 15 is his own call, 2026-09-26, when the
-          resolvable field was introduced. Sprint 15 is where it would
-          most naturally land, not what it is waiting for: nothing in
-          that sprint has to finish before this can be picked up, it
-          needs a decision about when.
-        blocked_by:
-          unowned: true
     linked_tests:
       - tests/test_supply_db.py
       - tests/test_build_warehouses_rebuild.py
@@ -8419,98 +8400,6 @@ requirements:
       having gone wrong.
     moscow: must
     status: built
-    unmet_criteria:
-      # post-build-review #33, built 2026-09-25. These were named in a
-      # `decisions:` note - accurate, and in a field nobody has to read.
-      # A criterion this requirement does not meet now has somewhere
-      # structured to sit, and the gate can see it.
-      #
-      # ONE CAME OFF on 2026-09-25: "continue to accept that dataset's
-      # supplies while its schedule is exhausted" is now met and
-      # covered by tests/test_backlog.py. REQ-PIPE-061 built the
-      # staging that accepting a supply into a backlog needed, and its
-      # own criterion 9 is the same SHALL - the duplication was
-      # deliberate, because this requirement made the claim and that
-      # one is the mechanism.
-      - criterion: >-
-          IF a dataset has no slot covering the date being processed, THEN THE
-          SYSTEM SHALL fail for that dataset.
-        why: >-
-          Describes a filing layer that does not exist yet. Nothing files a
-          supply against a slot, so there is nothing to fail at.
-        owner: >
-          unowned - needs a requirement. Re-checked 2026-09-26 and the
-          blocker has SHIPPED: REQ-PIPE-062 is built, so the filing
-          layer these were waiting on exists and the original reason
-          ("there is no filing step to fail before") no longer holds.
-          They are still unmet, for a different reason - filing.py
-          NOTES a dataset with no slots and carries on where these
-          require it to FAIL for that dataset, and assign() raises
-          nothing on an empty slot list.
-        blocked_by:
-          unowned: true
-      - criterion: THE SYSTEM SHALL fail at filing, before QA runs for that dataset.
-        why: Same filing layer - there is no filing step to fail before.
-        owner: >
-          unowned - needs a requirement. Re-checked 2026-09-26 and the
-          blocker has SHIPPED: REQ-PIPE-062 is built, so the filing
-          layer these were waiting on exists and the original reason
-          ("there is no filing step to fail before") no longer holds.
-          They are still unmet, for a different reason - filing.py
-          NOTES a dataset with no slots and carries on where these
-          require it to FAIL for that dataset, and assign() raises
-          nothing on an empty slot list.
-        blocked_by:
-          unowned: true
-      - criterion: >-
-          THE SYSTEM SHALL scope that failure to the affected dataset, and SHALL
-          NOT stop processing any other dataset.
-        why: Scopes a failure that cannot occur yet.
-        owner: >
-          unowned - needs a requirement. Re-checked 2026-09-26 and the
-          blocker has SHIPPED: REQ-PIPE-062 is built, so the filing
-          layer these were waiting on exists and the original reason
-          ("there is no filing step to fail before") no longer holds.
-          They are still unmet, for a different reason - filing.py
-          NOTES a dataset with no slots and carries on where these
-          require it to FAIL for that dataset, and assign() raises
-          nothing on an empty slot list.
-        blocked_by:
-          unowned: true
-      - criterion: >-
-          THE SYSTEM SHALL state, in that message, how many supplies are waiting
-          and since when, and SHALL NOT state how many days have elapsed.
-        why: >-
-          The exhausted notice says how many datasets cannot be processed and
-          never what is piling up, because nothing tracks a backlog yet. Raised
-          independently as post-build-review #7.
-        owner: >
-          unowned - needs a requirement. Re-checked 2026-09-26 and the
-          blocker has SHIPPED: REQ-PIPE-062 is built, so the filing
-          layer these were waiting on exists and the original reason
-          ("there is no filing step to fail before") no longer holds.
-          They are still unmet, for a different reason - filing.py
-          NOTES a dataset with no slots and carries on where these
-          require it to FAIL for that dataset, and assign() raises
-          nothing on an empty slot list.
-        blocked_by:
-          unowned: true
-      - criterion: >-
-          WHEN a run skips a dataset because its schedule is exhausted, THE
-          SYSTEM SHALL state in that run's own summary how many datasets were
-          processed and how many were skipped.
-        why: No run currently skips a dataset for this reason, so no summary says so.
-        owner: >
-          unowned - needs a requirement. Re-checked 2026-09-26 and the
-          blocker has SHIPPED: REQ-PIPE-062 is built, so the filing
-          layer these were waiting on exists and the original reason
-          ("there is no filing step to fail before") no longer holds.
-          They are still unmet, for a different reason - filing.py
-          NOTES a dataset with no slots and carries on where these
-          require it to FAIL for that dataset, and assign() raises
-          nothing on an empty slot list.
-        blocked_by:
-          unowned: true
     source: >
       Keith, 2026-09-21, plans/supply-model.md Thread C - "exhausted
       schedule - hard failure, scoped per dataset", stronger than the
@@ -8527,12 +8416,9 @@ requirements:
       - THE SYSTEM SHALL NOT fail a build on the runway warning.
       - WHEN more than one dataset is low on runway, THE SYSTEM SHALL
         state how many rather than warning once per dataset.
-      - IF a dataset has no slot covering the date being processed, THEN
-        THE SYSTEM SHALL fail for that dataset.
-      - THE SYSTEM SHALL fail at filing, before QA runs for that
-        dataset.
-      - THE SYSTEM SHALL scope that failure to the affected dataset, and
-        SHALL NOT stop processing any other dataset.
+      - 'IF a supply arrives for a dataset whose authored schedule has ended, THEN THE SYSTEM SHALL hold that supply for a person rather than file it, so that it cannot be checked into a period that does not exist. RESTATED 2026-10-06 (Keith): it was a hard failure for the dataset; superseded by the hold chosen 2026-10-05 (REQ-PIPE-131 criterion 16), with the labelling it needs owned by REQ-PIPE-154.'
+      - 'THE SYSTEM SHALL decide that hold at filing, before the promotion gate, so that no supply for an ended schedule is promoted. RESTATED 2026-10-06 (Keith): it read ''fail at filing, before QA runs for that dataset''; a held supply is still staged and checked, which is what lets a person decide it.'
+      - 'THE SYSTEM SHALL scope that hold to the affected dataset, and SHALL NOT stop processing any other dataset. RESTATED 2026-10-06 (Keith): ''failure'' became ''hold''.'
       - WHILE a dataset's schedule is exhausted, THE SYSTEM SHALL
         continue to accept that dataset's supplies, so that the backlog
         can be filed correctly once dates are added.
@@ -8540,9 +8426,7 @@ requirements:
         exhausted-schedule condition from configuration alone, and SHALL
         show it even though the run that would have produced new results
         did not happen.
-      - THE SYSTEM SHALL state, in that message, how many supplies are
-        waiting and since when, and SHALL NOT state how many days have
-        elapsed.
+      - 'MOVED 2026-10-06 (Keith) to REQ-DASH-155 criteria 1 and 2. It read: THE SYSTEM SHALL state, in that message, how many supplies are waiting and since when, and SHALL NOT state how many days have elapsed.'
       - WHERE a calendar is an authored date list, THE SYSTEM SHALL warn
         when fewer than a configured number of future slots remain for a
         dataset naming it.
@@ -8575,9 +8459,7 @@ requirements:
       - THE SYSTEM SHALL NOT offer a way to dismiss or hide the
         exhausted-schedule notice, and SHALL NOT persist any such
         dismissal in browser storage.
-      - WHEN a run skips a dataset because its schedule is exhausted,
-        THE SYSTEM SHALL state in that run's own summary how many
-        datasets were processed and how many were skipped.
+      - 'MOVED 2026-10-06 (Keith) to REQ-PIPE-154 criterion 6. It read: WHEN a run skips a dataset because its schedule is exhausted, THE SYSTEM SHALL state in that run''s own summary how many datasets were processed and how many were skipped - and no run skips a dataset any more; it holds the supply.'
     non_functional_requirements:
       - This is the whole reason authored dates are safe. Without it, a
         date list running out means nothing is ever expected, so nothing
@@ -8715,6 +8597,7 @@ requirements:
         not satisfied by one banner: a collection reading red because
         five datasets are red still has to say that a sixth stopped
         being processed entirely."
+      - 'CRITERIA 4-6 RESTATED AND 9, 22 MOVED, 2026-10-06 (Keith, signing REQ-PIPE-154 and REQ-DASH-155 the same hour). The hard failure at filing he chose on 2026-09-21, because it cannot be ignored, is realised by the hold REQ-PIPE-131 criterion 16 built on 2026-10-05: a supply after the last authored slot is staged, checked and held for a person, per dataset. The original reason to fail BEFORE QA - results that could be filed nowhere - was overtaken by REQ-PIPE-064 and REQ-PIPE-105 criterion 13, under which a held supply is already checked and its results recorded. What the hold still lacked - an honest reason, a structured marker, the pass summary count, the backlog line and automatic re-filing once dates are added - is owned by REQ-PIPE-154 and REQ-DASH-155, so criteria 4-6 are met as restated and nothing here is left unmet. Rejected again: filing into the last authored period and relying on the runway warning, and reading UNKNOWN.'
     linked_tests:
       - tests/test_backlog.py
       - tests/test_runway.py
@@ -9270,18 +9153,7 @@ requirements:
       - "WHERE no deliveries are present at all, THE SYSTEM SHALL report no arrivals and SHALL NOT fail."
       - "THE SYSTEM SHALL expose delivery recognition as a subcommand of a mothman command group of its own, named supply, and SHALL NOT place it under a group documented as not human-facing."
       - "THE SYSTEM SHALL keep a run's identity stable against a change in which deliveries are recognised, and SHALL NOT derive a run id from a delivery's position in a list that recognition can reorder or shorten."
-      - >
-          IF a change to recognition would alter the run id of any run already
-          present in RECORDED history, THEN THE SYSTEM SHALL fail, naming the
-          affected runs, and SHALL NOT rewrite or silently re-key that history.
-          AMENDED 2026-09-28 (REQ-DOCS-101 criteria 4 and 5): "committed
-          history" became "recorded history".
-
-          THE GUARD IS THE SAME GUARD and matters MORE now, not less. While the
-          history was committed, a silent re-key showed up as a large diff
-          somebody might notice. It is rows now, so a re-key leaves no diff at
-          all - nothing to see, and a year of a check's history quietly attached
-          to the wrong run.
+      - 'RETIRED 2026-10-06 (Keith, post-build-review #125). It read: IF a change to recognition would alter the run id of any run already present in recorded history, THEN THE SYSTEM SHALL fail, naming the affected runs, and SHALL NOT rewrite or silently re-key that history. Moot since REQ-PIPE-105 made a run id the staged table''s name at its receipt instant rather than a position in recognition''s list (criterion 18), and its guard had read the qa_results/ tree REQ-PIPE-089 deleted, so it had guarded nothing since 2026-09-27.'
     non_functional_requirements:
       - "Recognition runs on every pipeline run and reads every delivery present. At ~30 datasets with years of history this is thousands of deliveries, and today's shape re-reads the whole tree once per collection - it must scale by reading each delivery once per run, not once per collection."
       - "Recognition must work on a freshly-cloned machine where data/ does not exist at all. A test that asserts a gitignored tree is present passes locally and fails in CI - a real red on 2026-09-23 - so absence is a state to handle, not a precondition to assert."
@@ -9746,95 +9618,54 @@ requirements:
         actually being asked. Recorded because the obvious spelling
         looks right, and the failure is a traceback from three frames
         down rather than a wrong answer.
-    unmet_criteria:
-      - criterion: >-
-          Criterion 18 - a run's identity is still derived from its
-          position in the receipt-ordered, collection-filtered list
-          that recognition produces.
-
-          AN AGREED ANSWER EXISTS SINCE 2026-10-02, though it is not
-          built: a run's id becomes its SUPPLY's id, which
-          REQ-PIPE-105 criterion 1 makes possible by collapsing one
-          arrival to one file and so to one supply. See that
-          requirement's own decisions. This stays unmet until that
-          change lands, because re-keying runs before the arrival unit
-          moves would be two migrations of one identity.
-        why: >-
-          The criterion forbids that derivation and names no
-          replacement. Keith's call, 2026-09-25, over two alternatives:
-          a committed run-id map built here would be absorbed almost
-          immediately by REQ-PIPE-069's delivery log, which is where a
-          delivery gets a durable record of its own, and deriving an id
-          from the delivery itself would re-key all 60 committed runs -
-          which criterion 19 exists to prevent happening as a side
-          effect. Criterion 19's guard IS built, so the fragile
-          derivation now fails loudly rather than silently renaming
-          history.
-        owner: >
-          the next session to pick it up - re-checked 2026-09-26 and
-          this is now ACTIONABLE. REQ-PIPE-069 is built, so a delivery
-          has the durable committed record this was waiting for. Still
-          unmet: arrivals.py line 266 derives run_id from list position
-          (`f"{run_id_prefix}{index:03d}"`) exactly as criterion 18
-          forbids. The replacement the deferral said it lacked now
-          exists.
-        blocked_by:
-          unowned: true
+      - 'CRITERION 19 RETIRED WITH ITS GUARD, 2026-10-06 (Keith, asked directly on post-build-review #125). The delivery-scoper found qa_tools/common/run_id_guard.py still read the deleted qa_results/ tree, so a missing directory returned nothing and check() passed every run since REQ-PIPE-089 - while its tests, built on tmp_path fixtures, stayed green. Offered repointing it at qa.run; Keith chose to retire it, because REQ-PIPE-105 made run ids receipt-keyed, which removed the positional renumbering the guard existed for. Criterion 18 is met by the same change. NOT covered by this: two deliveries of the same dataset with the same receipt instant would share a run id (post-build-review #125, open).'
     linked_tests:
-      - tests/test_arrivals.py
-      - tests/test_cli_supply.py
-      - tests/test_run_id_guard.py
-      - tests/test_delivery_boundary.py
-      - tests/test_in_flight_log.py
+    - tests/test_arrivals.py
+    - tests/test_cli_supply.py
+    - tests/test_delivery_boundary.py
+    - tests/test_in_flight_log.py
+    - tests/test_arrival_is_one_file.py
     implemented_by:
-      - qa_tools/common/arrivals.py::recognise
-      - qa_tools/common/delivery.py::survey
-      - qa_tools/common/delivery_boundary.py::check_all
-      - qa_tools/common/run_id_guard.py::check
-      - qa_tools/common/in_flight_log.py::record
-      - qa_tools/common/slots.py::is_owed_supplies
+    - qa_tools/common/arrivals.py::recognise
+    - qa_tools/common/delivery.py::survey
+    - qa_tools/common/delivery_boundary.py::check_all
+    - qa_tools/common/in_flight_log.py::record
+    - qa_tools/common/slots.py::is_owed_supplies
+    - qa_tools/common/arrivals.py::arrivals_for
+    - qa_tools/common/arrivals.py::arrivals_from_records
     evidence:
-      - >-
-        2026-09-25: criterion 19's guard was checked against the REAL
-        committed history, not a fixture - today's recognition still
-        assigns all 60 committed run ids to the same deliveries. It
-        holds because every delivery in this PoC has a receipt and none
-        spans collections, and the test says so in as many words, so a
-        future failure reads as "that stopped being true" rather than
-        as a mystery.
-      - >-
-        2026-09-25: that check was run BEFORE building anything, which
-        is what turned a blocker into a non-event. The architect called
-        run identity the likeliest "we found out when CI went red" item
-        in the batch; establishing first that neither behaviour change
-        touches a real run id meant the work could proceed without
-        waiting on REQ-PIPE-038's re-keying.
-      - >-
-        2026-09-25: a receipt-less delivery used to take every OTHER
-        delivery down with it - read_receipt() raises and the listing
-        read them in a comprehension, so one incomplete upload stopped
-        the whole pipeline. What did not change is the rule underneath:
-        a receipt instant is still never invented from a file's
-        modification time. Skipping and reporting keeps the rule and
-        drops the collateral damage.
-      - >-
-        2026-09-25: a latent bug in this batch's own earlier work was
-        found here and is worth recording as a testing lesson rather
-        than a fix. The arrival-pattern gate called a function that
-        does not exist, and nothing noticed: every real dataset
-        declares a pattern so the line never ran, and the test written
-        for it monkeypatched the function out. The test now exercises
-        the real one.
-      - >-
-        2026-09-25: recognition reads each delivery ONCE per
-        invocation. The CLI's first version called it three times per
-        delivery - three passes over every file and three copies of
-        every warning - against this requirement's own constraint to
-        read each delivery once per run rather than once per
-        collection.
-      - >-
-        2026-09-25: all ten mothman gates green, 1502 Python tests and
-        294 JS tests.
+    - '2026-09-25: criterion 19''s guard was checked against the REAL committed
+      history, not a fixture - today''s recognition still assigns all 60 committed
+      run ids to the same deliveries. It holds because every delivery in this
+      PoC has a receipt and none spans collections, and the test says so in as
+      many words, so a future failure reads as "that stopped being true" rather
+      than as a mystery.'
+    - '2026-09-25: that check was run BEFORE building anything, which is what
+      turned a blocker into a non-event. The architect called run identity the
+      likeliest "we found out when CI went red" item in the batch; establishing
+      first that neither behaviour change touches a real run id meant the work
+      could proceed without waiting on REQ-PIPE-038''s re-keying.'
+    - '2026-09-25: a receipt-less delivery used to take every OTHER delivery down
+      with it - read_receipt() raises and the listing read them in a comprehension,
+      so one incomplete upload stopped the whole pipeline. What did not change
+      is the rule underneath: a receipt instant is still never invented from a
+      file''s modification time. Skipping and reporting keeps the rule and drops
+      the collateral damage.'
+    - '2026-09-25: a latent bug in this batch''s own earlier work was found here
+      and is worth recording as a testing lesson rather than a fix. The arrival-pattern
+      gate called a function that does not exist, and nothing noticed: every real
+      dataset declares a pattern so the line never ran, and the test written for
+      it monkeypatched the function out. The test now exercises the real one.'
+    - '2026-09-25: recognition reads each delivery ONCE per invocation. The CLI''s
+      first version called it three times per delivery - three passes over every
+      file and three copies of every warning - against this requirement''s own
+      constraint to read each delivery once per run rather than once per collection.'
+    - '2026-09-25: all ten mothman gates green, 1502 Python tests and 294 JS tests.'
+    - '2026-10-06: criterion 18 met - arrivals.arrivals_for and arrivals_from_records
+      both name a run f''{table}__{receipt key}'', so nothing renumbers when a
+      delivery stops or starts being recognised; tests/test_arrival_is_one_file.py
+      with tests/test_arrivals.py 34 passed. Criterion 19 retired with its guard
+      (Keith).'
   - id: REQ-PIPE-058
     title: A file's dataset comes from that dataset's own declared pattern, and the patterns are gated
     date_written: "2026-09-23"
@@ -14871,18 +14702,6 @@ requirements:
       and whoever asks can see which decision changed it.
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 6 - where a decision has changed what an earlier date
-        now shows, say so and name the decision.
-      owner: unowned
-      why: 'Not built. Every decision carries effective_at and recorded_at (criterion
-        4), so the data is there, but what counts as ''changed'' needs Keith:
-        in a bootstrap replay EVERY decision is recorded after the date it took
-        effect, so the plain reading (recorded after the date on show, effective
-        on or before it) would flag every past date on a synthetic asset. Raised
-        rather than guessed.'
-      blocked_by:
-        unowned: true
     evidence:
     - '2026-10-05: built across sprints 7 (the page reads what was in place from
       the decision log), 8 (the census, criteria 12-16) and 10 (the ''In place
@@ -14891,6 +14710,24 @@ requirements:
       identifiers renamed across the template, both test suites and the Python
       that reads the page''s data, and the register''s own prose). tests-js/in-place-on-range.test.js
       asserts no ''asof'' identifier is left in the page.'
+    - '2026-10-06: criteria 6 and 27-31. tests/test_replay_clock.py 7 passed -
+      two written first and failing with 12 stamp columns carrying the wall clock:
+      a real two-delivery Birth Registrations replay stamps every qa column within
+      days of its receipts, and every rule decision is recorded within minutes
+      of taking effect; the clock refuses a non-synthetic asset and a real asset''s
+      replay keeps the wall clock. tests-js/changed-since.test.js 4 passed (written
+      first, failing): a decision recorded after the date on show and effective
+      on or before it is named in the past-date notice; a replayed decision, recorded
+      as it took effect, never is. tests/test_slot_timeline.py carries recordedAt
+      (failing first). Criterion 31 against the WHOLE history: the sandbox replayed
+      from empty on the simulated clock (1652s) and compared with the wall-clock
+      database by tests/equiv_support.snapshot - every table the same row count,
+      and every difference explained by a stamp, a surrogate id interleaved between
+      the two collections, or the generator''s receipt sequence (+152 corpus-wide);
+      filings, decisions and verdicts identical, the arrival golden re-captured
+      unchanged, and results unchanged (3599 / 3089 pass / 58 warn / 415 fail).
+      Decision lag fell from up to 1342 days to under a minute for every rule
+      decision.'
     implemented_by:
     - pipeline/slot_timeline.py::run_states
     - pipeline/slot_timeline.py::supply_states
@@ -14908,6 +14745,17 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::renderInPlaceOnPastNotice
     - qa_tools/common/promotion.py::next_receipt
     - qa_tools/common/promotion.py::effective_at_for
+    - qa_tools/common/replay_clock.py::now
+    - qa_tools/common/replay_clock.py::replaying
+    - qa_tools/common/replay_clock.py::anchor
+    - qa_tools/common/replay_clock.py::advance_to
+    - qa_tools/common/decision_log.py::_recorded_at
+    - qa_tools/common/decision_log.py::follows
+    - qa_tools/common/arrival_lifecycle.py::process_all
+    - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
+    - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
+    - dashboard/qa-reporting-dashboard.template.html::decisionsChangingDate
+    - dashboard/qa-reporting-dashboard.template.html::changedSinceNote
     linked_tests:
     - tests/test_slot_timeline.py
     - tests/test_census.py
@@ -14920,6 +14768,8 @@ requirements:
     - tests-js/in-place-on-range.test.js
     - tests/test_dashboard_e2e.py
     - tests/test_promotion_waits_for_next_receipt.py
+    - tests/test_replay_clock.py
+    - tests-js/changed-since.test.js
     source: >
       Keith, 2026-09-26, batch 4 scoping input (b): "we're going to have
       to work out how demotion fits in and keeps as-at-T stable." Thread
@@ -15077,6 +14927,11 @@ requirements:
         including requirements already signed off, to use the label the
         page now carries, and SHALL NOT change what any of those
         requirements requires while doing so.
+      - 'WHILE the batch replays the history of a data asset that declares itself synthetic, THE SYSTEM SHALL stamp every record it writes - deliveries, load outcomes, filings, runs, decisions, periods, holds, owed re-runs, re-checks and censuses - with the replay''s simulated clock rather than the wall clock. ADDED 2026-10-06 (Keith: "why can''t we just make the synthetic data record dates properly?", and "the other stamps too").'
+      - THE SYSTEM SHALL set the simulated clock to each delivery's and each arrival's receipt instant as it is recorded, loaded and processed, SHALL record a decision at the instant it takes effect (moving the clock forward to it, never back), and SHALL let the clock run on from each such instant at the speed of the wall clock, so that records written one after another are stamped one after another. ADDED 2026-10-06.
+      - IF a simulated clock is requested for a data asset that does not declare itself synthetic, THEN THE SYSTEM SHALL refuse; and WHERE the batch replays a real asset's history, THE SYSTEM SHALL stamp its records with the wall clock. ADDED 2026-10-06.
+      - THE SYSTEM SHALL stamp every record written outside the batch's replay - a person's decision, the processing pass, a terminal route, a Lambda handler - with the wall clock, on a synthetic asset as on any other. ADDED 2026-10-06.
+      - THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a replay on the simulated clock as from one on the wall clock, differing only in the stamps themselves. ADDED 2026-10-06.
     non_functional_requirements:
       - >
         Cost of the replay: this is a fold over one dataset's decision
@@ -15610,6 +15465,9 @@ requirements:
         because the pass records every delivery before it processes any, so a
         later receipt is already known and the cap applies. The behaviour stays,
         and the cap is right there too.'
+      - 'CRITERION 6 ON THE PLAIN RULE, MADE POSSIBLE BY CRITERIA 27-31, 2026-10-06. The plain reading - recorded after the date on show, effective on or before it - flagged every past date on a synthetic asset because a replay stamped everything today. Offered three readings; Keith asked instead ''why can''t we just make the synthetic data record dates properly?'', then chose ''and the other stamps too'' over decisions only. So a replay of a synthetic asset stamps its records with a simulated clock, and the plain rule means a genuinely later decision. Rejected: counting only back-dated person decisions (a rule decision recorded late is still a change); dropping criterion 6.'
+      - 'HOW THE CLOCK WORKS, and why not database defaults. Every stamp writer passes its instant explicitly from replay_clock.now(), which is the wall clock outside a replay - so live behaviour is unchanged, and no session setting or trigger has to reach every connection (a run''s four tools write from worker threads, and several connections stay open across arrivals). The clock is PROCESS-WIDE, not a context variable, for the same threads. It RUNS: anchored at each delivery''s and arrival''s receipt and moved forward (never back) to each decision''s effective instant, it advances at wall speed from there, so records written one after another keep their order and follows() keeps its rule unchanged - a cause recorded as it takes effect leaves a lag of the moments the work took. promotion.effective_at_for still caps at the wall clock, so the invented promotion lag is untouched; the batch is always a replay (both entry points refuse over recorded history), so run_pipeline is where the clock is turned on.'
+      - 'NOT SIMULATED, deliberately: the in-flight observations file (on disk, not a record of the history) and qa.identity.marked_at (when this database was marked, which is real). A scripted person decision can be recorded up to an hour after it takes effect when it was waiting on the arrival it names - honest, and on the same day, so criterion 6 never reads it as a change.'
   - id: REQ-GHUB-082
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
@@ -29167,3 +29025,132 @@ requirements:
       reads what its period''s own state says (never green while unfilled - an
       unfilled period has no green verdict to show); and the automatic gate already
       defers to any person''s decision about a supply for its whole life (rejection.decided_by_a_person).'
+  - id: REQ-PIPE-154
+    title: A supply arriving after its dataset's schedule has ended is held as schedule-ended, and says
+      what to edit
+    date_written: '2026-10-06'
+    story: As a data team leader, I want a supply that arrives after my dataset's authored dates have run
+      out to be held and labelled as a schedule problem, not a generic filing problem, so that whoever resolves
+      it knows the fix is our configuration rather than the supplier's file.
+    moscow: must
+    status: not_started
+    source: Keith, re-scoping REQ-PIPE-053's five unmet criteria (4, 5, 6, 9, 22) against the system as
+      built after REQ-PIPE-131 criterion 16 (2026-10-05); drafted by delivery-scoper 2026-10-06 at the main
+      session's request. Signed by Keith 2026-10-06.
+    signed_off:
+      by: Keith
+      date: '2026-10-06'
+    acceptance_criteria:
+    - IF a supply arrives after the last slot of its dataset's authored calendar has closed, THEN THE SYSTEM
+      SHALL hold it for a person under REQ-PIPE-064 with a reason stating that the dataset's delivery schedule
+      has ended and naming that dataset's own last authored period.
+    - THE SYSTEM SHALL record whether a hold was raised because the schedule ended as a structured field
+      of the hold, and SHALL NOT require any reader to parse the hold's prose to tell.
+    - THE SYSTEM SHALL name, in a schedule-ended hold's reason, the configuration file a person must edit
+      to add dates and the mothman command that proposes them.
+    - THE SYSTEM SHALL NOT state, in a schedule-ended hold's reason, that the last slot closed because a
+      next period's claim window opened.
+    - WHILE a dataset's schedule has ended, THE SYSTEM SHALL continue to stage and check each supply that
+      arrives for it, and SHALL NOT stop processing any other dataset or delivery.
+    - WHEN a processing pass holds one or more supplies because their dataset's schedule has ended, THE
+      SYSTEM SHALL state in that pass's own summary how many datasets and how many supplies were held for
+      that reason, separately from any other holds.
+    - WHEN dates are added to a dataset's calendar that cover the receipt instant of a supply held because
+      its schedule ended, THE SYSTEM SHALL re-file that supply by the filing rule on the next processing
+      pass, in receipt order with every other supply so held, and SHALL resolve its hold naming the filing
+      that replaced it.
+    non_functional_requirements:
+    - Scale. At ~30 datasets the pass summary must aggregate - one line naming counts, never one line per
+      held supply (REQ-PIPE-064 criterion 8's rule, carried here).
+    - Blast radius. One exhausted dataset must never fail the pass or any other dataset; a schedule-ended
+      hold is a per-dataset outcome, never a run-level error (REQ-PIPE-053 NFR 2).
+    - Privacy. A hold's reason names datasets, periods, configuration and commands only - never a supplier
+      filename's contents or any row value - because hold reasons are stored and rendered verbatim on a
+      dashboard that is public in this PoC.
+    - Security. The reason reaches the page through text, never as markup, the same rule REQ-PIPE-057's
+      security decision set for anything recognition reports.
+    - Observability. A schedule-ended hold carries the run that raised it and the supply's own receipt instant,
+      so 'how long has this been waiting' is answerable from the record rather than from a clock.
+    - Configuration only. Whether a schedule has ended is computed from committed configuration plus the
+      receipt instant, never from supply rows.
+    dependencies:
+    - REQ-PIPE-053
+    - REQ-PIPE-064
+    - REQ-PIPE-131
+    decisions:
+    - 'SUPERSEDES the hard-failure-at-filing shape of REQ-PIPE-053 criteria 4 and 5, Keith decided HARD
+      FAILURE on 2026-09-21 because it cannot be ignored; on 2026-10-05 (REQ-PIPE-131 criterion 16, post-build-review
+      #93) he chose that a file arriving after an authored calendar runs out is HELD for a person. The hold
+      is what is built, so this requirement makes the hold carry the signal the failure was meant to carry
+      rather than building a second mechanism.'
+    - 'The original reason to fail BEFORE QA was that a supply with no slot produces results that can be
+      filed nowhere. That premise was overtaken by REQ-PIPE-064 and REQ-PIPE-105 criterion 13: every held
+      supply is already staged and checked, and its results are recorded and shown via held_blast_radius.
+      Checking an exhausted dataset''s supply is therefore the same as checking any other held supply, not
+      a special case.'
+    - 'REJECTED, carried from REQ-PIPE-131''s own decision: keep filing into the last authored period and
+      rely on the runway warning. That is the 2030-file-filed-to-2027-Q4 defect.'
+    - 'REJECTED reading UNKNOWN, carried from REQ-PIPE-053: it is ignorable, which is the failure the whole
+      requirement exists to prevent.'
+    - 'The backlog is counted in SUPPLIES, never in elapsed days, carried from REQ-PIPE-053: daily and quarterly
+      feeds pile up at very different rates, so a day count misstates urgency in both directions.'
+    - 'The hold reason today is actively wrong for this case, found while scoping: assignment._why_unavailable()
+      describes the last slot as ''closed - the next period''s claim window had opened'', and an exhausted
+      calendar has no next period. Criterion 4 exists for that sentence.'
+    - Draining a backlog CORRECTLY once dates are added depends on replaying in receipt order (REQ-PIPE-061,
+      REQ-PIPE-151), carried from REQ-PIPE-053's own dependency note. Adding dates DRAINS the backlog automatically
+      (criterion 7).
+    - 'ANSWERED 2026-10-06 (Keith): the hold IS the realisation of his 2026-09-21 hard-failure decision
+      - staged, checked and held, not left unchecked; and once dates are added, held supplies are re-filed
+      AUTOMATICALLY by the next pass in receipt order rather than each staying a person''s call, because
+      at ~30 datasets the manual route does not scale.'
+    open_questions:
+    - Held supplies stay in staging until someone resolves them. In a real Birth Registrations or Child
+      Protection deployment that is personal data with no end date - is there a retention bound, or is an
+      open-ended hold acceptable?
+  - id: REQ-DASH-155
+    title: The exhausted-schedule notice says how many supplies are waiting and since when
+    date_written: '2026-10-06'
+    story: As a data team leader, I want the schedule-ended notice to tell me what is piling up behind it,
+      so that I can judge how urgent fixing the dates is without opening the hold queue.
+    moscow: should
+    status: not_started
+    source: 'Keith, REQ-PIPE-053 criterion 9 re-scoped (also post-build-review #7); drafted by delivery-scoper
+      2026-10-06. Signed by Keith 2026-10-06.'
+    signed_off:
+      by: Keith
+      date: '2026-10-06'
+    acceptance_criteria:
+    - WHERE the dashboard shows the exhausted-schedule notice, THE SYSTEM SHALL state how many supplies
+      are held because a schedule ended and the receipt date of the earliest of them.
+    - THE SYSTEM SHALL NOT state a number of elapsed days in that notice.
+    - WHERE no supply is held because a schedule ended, THE SYSTEM SHALL state that nothing has arrived
+      since the schedule ended rather than omitting the backlog sentence.
+    - THE SYSTEM SHALL compute those figures from recorded hold records only, evaluated as at the in-place-on
+      date selected, and SHALL NOT read supply rows.
+    - THE SYSTEM SHALL aggregate those figures across datasets in the executive notice, and SHALL NOT list
+      one line per held supply.
+    - THE SYSTEM SHALL treat a dataset's schedule as ended, for the notice, from the moment its last authored
+      slot closes - the instant from which the pipeline holds rather than files - and SHALL NOT show the
+      notice while supplies for the last authored period are still being filed.
+    non_functional_requirements:
+    - A build may read recorded QA results, never actual data, and never anything else (Keith, 2026-09-27).
+      Hold records are recorded metadata; the staged rows behind them are off limits.
+    - Performance. Read with one aggregate query over the hold table (supply_holds.tally()'s shape), not
+      a fetch of every held supply - at 30 datasets over years that is the difference between a page that
+      builds and one that does not.
+    - Distinguish states in text as well as colour (REQ-PIPE-053 criterion 14).
+    dependencies:
+    - REQ-PIPE-154
+    - REQ-PIPE-053
+    decisions:
+    - Moved out of REQ-PIPE-053 as its own requirement because it needs recorded hold state, while REQ-PIPE-053
+      criterion 8 computes the notice from configuration alone. The notice itself stays configuration-only;
+      only the backlog sentence reads holds.
+    - '''Since when'' is the earliest held supply''s RECEIPT date - our instant - never the supplier''s
+      extract date and never the date the schedule ended.'
+    - 'ANSWERED 2026-10-06 (Keith): ''exhausted'' moves to when the last slot closes, so the page and the
+      pipeline agree on the day; the runway warning still gives notice before it. Found by the scoper: runway.exhausted_datasets
+      fired about a period early, so the page said ''cannot be processed'' while supplies were still filed
+      normally.'
+    open_questions: []

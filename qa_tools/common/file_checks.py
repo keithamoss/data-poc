@@ -400,7 +400,7 @@ def record(findings: list[Finding], *, run_id: str, dataset_id: str, delivery: s
     """
     if load_attempt is None or not findings:
         return 0
-    from qa_tools.common import asset_time, qa_store, sample_data, supply_db
+    from qa_tools.common import qa_store, replay_clock, sample_data, supply_db
 
     dataset = _dataset(dataset_id)
     by_check = {d.check: d for d in definitions()}
@@ -410,7 +410,7 @@ def record(findings: list[Finding], *, run_id: str, dataset_id: str, delivery: s
         qa_store.ensure_schema(db)
         qa_store.register_run_if_absent(
             db, run_key=run_id, agency_id=dataset.agency_id,
-            collection_id=dataset.collection_id, run_timestamp=asset_time.now().isoformat())
+            collection_id=dataset.collection_id, run_timestamp=replay_clock.now().isoformat())
         return qa_store.record_file_results(
             db, run_id, rows, agency_id=dataset.agency_id,
             collection_id=dataset.collection_id,
@@ -457,7 +457,7 @@ def screen(conn, csv_path, *, contract_path, table: str, run_id: str, dataset_id
     FileCheckCrashed is deliberately NOT caught here or by the callers'
     catch-all around the load, which this runs outside of (criterion 13).
     """
-    from qa_tools.common import asset_time, load_log
+    from qa_tools.common import load_log, replay_clock
 
     filename = Path(csv_path).name
     try:
@@ -471,7 +471,7 @@ def screen(conn, csv_path, *, contract_path, table: str, run_id: str, dataset_id
     if refused is not None:
         conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
         attempt = load_log.record_load(delivery, dataset_id, physical, load_log.FAILED,
-                                       asset_time.now().isoformat(),
+                                       replay_clock.now().isoformat(),
                                        reason=reason_for(refused, filename), trial=trial_scope)
         screening.record_against(attempt, conn=conn)
         import sys

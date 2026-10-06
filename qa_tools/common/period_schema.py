@@ -51,6 +51,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping, Sequence
 
+from qa_tools.common import replay_clock as _replay_clock
 from qa_tools.common import check_id as check_id_mod
 from qa_tools.common import qa_store
 from qa_tools.common import hierarchy
@@ -267,9 +268,9 @@ def open_period(conn, period_name: str, *, opened_by: str,
     if opened(conn, period_name):
         return False
     conn.execute(
-        f'INSERT INTO "{qa_store.SCHEMA}".period (name, opened_by) VALUES (?, ?) '
+        f'INSERT INTO "{qa_store.SCHEMA}".period (name, opened_by, opened_at) VALUES (?, ?, ?) '
         "ON CONFLICT (name) DO NOTHING",
-        [period_name, opened_by])
+        [period_name, opened_by, _replay_clock.now()])
     if not opened(conn, period_name):
         # Somebody else won the race. Theirs inherited; ours must not.
         return False

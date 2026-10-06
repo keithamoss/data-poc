@@ -56,6 +56,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 
+from qa_tools.common import replay_clock as _replay_clock
 from qa_tools.common.assignment import Assignment
 
 TABLE = "qa.hold"
@@ -231,10 +232,11 @@ def raise_hold(conn, *, dataset_id: str, supply_id: str, kind: str,
     if kind not in KINDS:
         raise ValueError(f"unknown hold kind {kind!r} - expected one of {KINDS}")
     rows = conn.execute(
-        f"INSERT INTO {TABLE} (dataset_id, supply_id, kind, reason, raised_by, delivery) "
-        "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO NOTHING "
+        f"INSERT INTO {TABLE} (dataset_id, supply_id, kind, reason, raised_by, delivery, "
+        "raised_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO NOTHING "
         "RETURNING dataset_id",
-        [dataset_id, supply_id, kind, json.dumps(reason), raised_by, delivery]).fetchall()
+        [dataset_id, supply_id, kind, json.dumps(reason), raised_by, delivery,
+         _replay_clock.now()]).fetchall()
     return bool(rows)
 
 
@@ -250,10 +252,10 @@ def resolve(conn, *, dataset_id: str, supply_id: str, decision_id: int) -> bool:
     and the record exists to answer exactly that.
     """
     rows = conn.execute(
-        f"UPDATE {TABLE} SET resolved_by = ?, resolved_at = now() "
+        f"UPDATE {TABLE} SET resolved_by = ?, resolved_at = ? "
         "WHERE dataset_id = ? AND supply_id = ? AND resolved_by IS NULL "
         "RETURNING dataset_id",
-        [decision_id, dataset_id, supply_id]).fetchall()
+        [decision_id, _replay_clock.now(), dataset_id, supply_id]).fetchall()
     return bool(rows)
 
 

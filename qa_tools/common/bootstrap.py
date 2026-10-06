@@ -201,9 +201,12 @@ _LABEL = {"bdm": "Birth Registrations", "cp": "Child Protection", "total": "in t
 
 
 def _record_deliveries() -> None:
-    from qa_tools.common import delivery_log
+    from qa_tools.common import delivery_log, replay_clock
 
-    delivery_log.record_all()
+    # Each delivery stamped as received, on a synthetic asset (REQ-PIPE-081
+    # criteria 27-31) - the replay's first records.
+    with replay_clock.replaying():
+        delivery_log.record_all()
 
 
 def _run_collection(name: str, sequential: bool, record_deliveries: bool = False) -> float:

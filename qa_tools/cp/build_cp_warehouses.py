@@ -20,7 +20,7 @@ import sys
 
 
 from qa_tools.common import arrivals
-from qa_tools.common import asset_time
+from qa_tools.common import replay_clock
 from qa_tools.common import file_checks
 from qa_tools.common import hierarchy
 from qa_tools.common import load_log
@@ -141,6 +141,9 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
     in step. Birth Registrations never had one.
     """
     arrival = received_at if received_at is not None else run_id
+    # A REPLAY STAMPS THE LOAD AS RECEIVED (REQ-PIPE-081 criteria 27-31).
+    if received_at is not None:
+        replay_clock.anchor(received_at)
     physical = supply_db.staged_table(table, arrival, ordinal)
     # THE SAME SEGMENT staged_table() names the physical table with -
     # not arrival_key() directly. They disagreed for one commit and
@@ -210,7 +213,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
             conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
             screening.record_against(load_log.record_load(
                 delivery_name, dataset_id, physical, load_log.FAILED,
-                asset_time.now().isoformat(), reason=load_log.own_words(exc),
+                replay_clock.now().isoformat(), reason=load_log.own_words(exc),
                 trial=trial_scope), conn=conn)
             # THE LIBRARY'S OWN MESSAGE ONLY HERE, on standard error, for
             # whoever ran the load - it can quote a row, and the recorded
@@ -221,7 +224,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
         # AFTER THE LOAD, NEVER BEFORE (criterion 14).
         screening.record_against(load_log.record_load(
             delivery_name, dataset_id, physical, load_log.LOADED,
-            asset_time.now().isoformat(), row_count=rows, trial=trial_scope), conn=conn)
+            replay_clock.now().isoformat(), row_count=rows, trial=trial_scope), conn=conn)
         res = _build_run_views(conn, run_id, key, trial_scope)
         # Recorded at staging time, which is the only moment this is an
         # observed fact rather than a re-derivation.

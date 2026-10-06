@@ -248,3 +248,71 @@ def differences(a: dict, b: dict, limit: int = 5) -> list[str]:
 
 def summary(snap: dict) -> dict[str, int]:
     return {k: sum(rows.values()) for k, (_c, rows) in snap.items()}
+
+
+# --------------------------------------------------------------------------
+# One route into a database of its own (tests/test_kept_routes_agree.py,
+# tests/test_replay_clock.py).
+# --------------------------------------------------------------------------
+
+def fresh_database(name: str) -> str:
+    import psycopg
+    from conftest import mark_test_database
+    admin = os.environ["MOTHMAN_TEST_DSN"]
+    with psycopg.connect(admin, autocommit=True) as conn:
+        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        conn.execute(f'CREATE DATABASE "{name}"')
+        mark_test_database(conn, name)
+    info = psycopg.conninfo.conninfo_to_dict(admin)
+    info["dbname"] = name
+    return psycopg.conninfo.make_conninfo(**info)
+
+
+def drop_database(name: str) -> None:
+    import psycopg
+    with psycopg.connect(os.environ["MOTHMAN_TEST_DSN"], autocommit=True) as conn:
+        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
+def run_into_fresh_database(tree: Path, db_name: str, run, inspect=None) -> dict:
+    """`run()` against a new, empty database with every on-disk path under
+    `tree`; that database's snapshot. Scripted decisions are switched off -
+    they replay the synthetic scenarios over the whole corpus and refuse a
+    cut-down history for missing the rest. `inspect(dsn)`, when given, is
+    called before the database is dropped and its answer kept under
+    "inspected"."""
+    import shutil
+
+    import pytest
+
+    from qa_tools.common import supply_db
+
+    mp = pytest.MonkeyPatch()
+    original = apply_redirects(tree)
+    dsn = fresh_database(db_name)
+    scratch = None
+    try:
+        mp.setenv("MOTHMAN_SUPPLY_DSN", dsn)
+        scratch = supply_db.scratch_dir()
+        mp.delenv("GITHUB_REPOSITORY", raising=False)
+        # NO SCRIPTED DECISIONS: they replay the synthetic scenarios over the
+        # whole corpus, and would refuse a one-delivery history for missing
+        # the rest. Not what any route is being compared on.
+        from qa_tools.common import scripted_decisions
+        mp.setattr(scripted_decisions, "SCRIPT_PATH", tree / "no_scripted_decisions.yaml")
+        with supply_db.connect(label="test-kept-routes") as conn:
+            from qa_tools.common import qa_store
+            qa_store.ensure_schema(conn)
+        run()
+        snap = snapshot(dsn)
+        if inspect is not None:
+            snap["inspected"] = inspect(dsn)
+        return snap
+    finally:
+        mp.undo()
+        restore(original)
+        if scratch is not None:
+            shutil.rmtree(scratch, ignore_errors=True)
+        drop_database(db_name)
+
+

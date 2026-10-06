@@ -29,7 +29,7 @@ import sys
 
 
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
-                              run_id_guard, supply_db)
+                              supply_db)
 from qa_tools.common import decision_log
 from qa_tools.common import drift_reference
 from qa_tools.common import filing
@@ -55,6 +55,7 @@ from . import run_soda_cp
 from . import run_datacontract_cp
 from . import run_evidently_cp
 from qa_tools.common import arrival_lifecycle
+from qa_tools.common import replay_clock
 from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -501,6 +502,10 @@ STEPS = arrival_lifecycle.Steps(
     promote_after=lambda arrival, got, run_by: promote_after(arrival, got, run_by))
 
 
+# ON THE REPLAY'S OWN CLOCK (REQ-PIPE-081 criteria 27-31): the batch is always
+# a replay, so on a synthetic asset every record it writes is stamped with the
+# replay's simulated time rather than today's; on a real one, the wall clock.
+@replay_clock.on_replay_clock
 def run_pipeline_cp(sequential: bool = False,
                     record_deliveries: bool = True) -> dict:
     # A RUN'S TOOLS OVERLAP unless told not to (REQ-TEST-116 criteria 3, 5).
@@ -559,7 +564,6 @@ def run_pipeline_cp(sequential: bool = False,
     # (REQ-PIPE-104) - which is why that destination was built before
     # this switch was flipped rather than with it.
 
-    run_id_guard.check(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, found_arrivals)
     # THE BATCH NO LONGER CHOOSES A REFERENCE RUN - see
     # orchestrate_bdm.py's identical note (REQ-QAC-108 criterion 4).
     run_timestamp = asset_time.now().isoformat()

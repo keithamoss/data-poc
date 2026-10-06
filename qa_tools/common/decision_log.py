@@ -717,9 +717,12 @@ def follows(conn: supply_db.SupplyConnection, decision_id: int | None) -> str:
     One rule, no flag saying which of the two this is. Now, where there is no
     cause to follow.
     """
-    from qa_tools.common import asset_time
+    # THE REPLAY'S CLOCK in a replay (REQ-PIPE-081 criteria 27-31), where a
+    # cause is recorded as it takes effect, so the lag is the moments the
+    # work took; the wall clock everywhere else, where it always was.
+    from qa_tools.common import replay_clock
 
-    now = asset_time.now()
+    now = replay_clock.now()
     if decision_id is not None:
         rows = conn.execute(f"SELECT effective_at, recorded_at FROM {TABLE} WHERE id = ?",
                             [decision_id]).fetchall()
@@ -733,14 +736,25 @@ def follows(conn: supply_db.SupplyConnection, decision_id: int | None) -> str:
     return now.isoformat()
 
 
+def _recorded_at(decision: Decision):
+    """When a decision is written down: now - or, in a replay of a synthetic
+    history, as it takes effect (REQ-PIPE-081 criteria 27-31). The replay's
+    clock moves forward to it, so what the decision causes is stamped after
+    it, as it would have been."""
+    from qa_tools.common import replay_clock
+    if replay_clock.active() and decision.effective_at:
+        replay_clock.advance_to(decision.effective_at)
+    return replay_clock.now()
+
+
 def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
     rows = conn.execute(
         f"INSERT INTO {TABLE} (agency_id, collection_id, dataset_id, action, supply, "
         "from_slot, to_slot, actor, actor_kind, reason, effective_at, stands_on, "
         "amber_setting, amber_level, amber_version, superseded_by, table_name, "
         "promoted_status, replaces, replacement_setting, replacement_level, "
-        "replacement_version, caused_by_decision, caused_by_supply) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "replacement_version, caused_by_decision, caused_by_supply, recorded_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "RETURNING id",
         [decision.agency_id, decision.collection_id, decision.dataset_id,
          decision.action, decision.supply or None, decision.from_slot, decision.to_slot,
@@ -750,7 +764,8 @@ def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:
          decision.amber_version, decision.superseded_by, _table_of(decision.dataset_id),
          decision.promoted_status, decision.replaces, decision.replacement_setting,
          decision.replacement_level, decision.replacement_version,
-         decision.caused_by_decision, decision.caused_by_supply]).fetchall()
+         decision.caused_by_decision, decision.caused_by_supply,
+         _recorded_at(decision)]).fetchall()
     return int(rows[0][0])
 
 

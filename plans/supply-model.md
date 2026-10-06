@@ -1751,7 +1751,7 @@ comparisons against the expected-supply sequence.
    gate: it is measured in slots, and slots do not exist until sprint
    6, so it belongs to `REQ-PIPE-053`.
 
-6. **[in-progress, 2026-09-26]** **[Pipeline & publishing]** **Periods and
+6. **[done, 2026-10-06]** **[Pipeline & publishing]** **Periods and
    slots.** All three parts BUILT, 2026-09-23. `REQ-PIPE-051`
    derives the period sequence version by version - which turned out to
    fix a real latent bug, not just add a function: authoring a second
@@ -1793,7 +1793,7 @@ comparisons against the expected-supply sequence.
    picker silently returns nothing on a quarterly asset until batch
    6.**
 
-7. **[in-progress, 2026-09-26]** **[Pipeline & publishing]** **Delivery
+7. **[done, 2026-10-06]** **[Pipeline & publishing]** **Delivery
    recognition and file mapping.** What constitutes a delivery for a
    given source (folder, prefix, session); the per-dataset filename
    pattern that maps a file to a table; the **hold for a human** when

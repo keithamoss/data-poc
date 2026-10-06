@@ -36,6 +36,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
 from qa_tools.common import asset_time
+from qa_tools.common import replay_clock
 
 
 @dataclass(frozen=True)
@@ -125,7 +126,14 @@ def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
         # the one caller that passes a player.
         if player is not None:
             player.before(arrival)
-        stamp = run_timestamp or asset_time.now().isoformat()
+        # A REPLAY PROCESSES EACH ARRIVAL AS IT IS RECEIVED (REQ-PIPE-081
+        # criteria 27-31): its run is stamped then, not with one instant for
+        # the whole pass - which was the wall clock, the day of the replay.
+        if replay_clock.active():
+            replay_clock.anchor(arrival.received_at)
+            stamp = replay_clock.now().isoformat()
+        else:
+            stamp = run_timestamp or asset_time.now().isoformat()
         results.extend(process(arrival, steps=steps, among=arrivals,
                                run_timestamp=stamp, run_by=run_by,
                                on_step=on_step))

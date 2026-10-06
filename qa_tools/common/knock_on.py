@@ -39,6 +39,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from qa_tools.common import replay_clock as _replay_clock
 from qa_tools.common import qa_store, supply_db
 
 
@@ -63,9 +64,9 @@ def owe(conn: supply_db.SupplyConnection, moves: list[tuple[int, str, str]]) -> 
     for period, slot in sorted(by_period.items()):
         out.append(int(conn.execute(
             f"INSERT INTO {recheck.TABLE} (kind, dataset_id, period, tables, "
-            "caused_by_decision) VALUES (?, ?, ?, ?, ?) RETURNING id",
+            "caused_by_decision, owed_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
             [recheck.REEVALUATE, slot["dataset"], period, sorted(slot["tables"]),
-             slot["decision"]]).fetchall()[0][0]))
+             slot["decision"], _replay_clock.now()]).fetchall()[0][0]))
     return out
 
 
