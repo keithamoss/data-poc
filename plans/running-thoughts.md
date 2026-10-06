@@ -4539,6 +4539,12 @@ Belongs with batch 5's check work.
     after REQ-PIPE-156 the connections were no longer where the time went;
     dbt (REQ-PIPE-157) is.
 
+    **REQ-PIPE-157 SPIKED AND PARKED, 2026-10-06** (Keith: "neither for
+    now"). Per run: today ~8.0s, B (keep dbt's partial parse) ~7.0s, A (a
+    long-lived dbt worker, parsed once) ~3.5s with identical verdicts. Its
+    target is now the whole bootstrap at 10 minutes or less. Full numbers
+    are in the requirement's decisions.
+
     THE COST IS NOT JUST THIS SANDBOX - measured the same night, at
     Keith's question "why is GitHub so much faster?". It is not, any
     more. The "about nine minutes" CI bootstrap that CLAUDE.md carries

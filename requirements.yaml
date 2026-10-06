@@ -29336,8 +29336,7 @@ requirements:
     - THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a full bootstrap
       from empty as the commit before this change, compared by tests/equiv_support.snapshot with only the
       columns it already excludes allowed to differ.
-    - THE SYSTEM SHALL bring mean dbt wall time per run over the 12-arrival Child Protection replay from
-      about 7.8s to no more than 3s, both commits measured on the same machine on the same day.
+    - THE SYSTEM SHALL bring a full bootstrap from empty to no more than 10 minutes on the machine that measured it at about 15, both commits measured on the same machine on the same day.
     non_functional_requirements:
     - 'dbt VERSION: docs.getdbt.com/reference/programmatic-invocations (read 2026-10-06) says injecting
       a pre-parsed Manifest into dbtRunner is not supported in dbt v2. pyproject.toml has dbt-core>=1.12
@@ -29366,6 +29365,8 @@ requirements:
       schema names per collection so dbt''s partial parse stays valid) on the 12-arrival replay, results
       brought back for Keith to choose before the real build. The mechanism criterion is therefore not built
       until he has chosen.'
+    - 'SPIKE RESULTS, 2026-10-06 (a scratch copy of supply, Child Protection''s six staging models and 61 nodes, two periods, four runs each): TODAY 7.95-8.27s a run. B (stable target path and stable schema names, view schema re-pointed per run, a dbt subprocess per run) 6.6-7.9s - only about 1s saved, because a partial parse with NOTHING changed still costs 2.85s (1.86s of it dbt starting) and changing DBT_RUN_SCHEMA alone costs 4.03s, nearly a full parse. A (one long-lived Python process, parsed once in ~6s, then dbtRunner(manifest=...) per run) 3.3-3.9s a run, of which ~2.9s is dbt executing its own 61 nodes'' SQL - so dbt''s overhead falls from ~5s to ~0.5s. A''s verdicts were IDENTICAL to today''s on both periods (61 nodes, the same six not passing, the same failure counts). A ALSO NEEDS STABLE SCHEMA NAMES: a parsed manifest has its schemas baked in, so the per-run names become per-process ones with the run''s views re-pointed. NEITHER meets criterion 7''s 3s: the SQL alone is ~2.9s here, not the 1-2s the criterion assumed. A spike artefact worth knowing: dbt''s plugin discovery imports every top-level module named dbt_* on sys.path, so scripts named that way beside a worker run on its first parse (an apparent 38s parse).'
+    - 'PARKED 2026-10-06 (Keith, on the spike results): NEITHER mechanism for now - dbt stays one subprocess per run. A (~3.5s a run, identical verdicts) remains the recommended one if it is picked up, B is not worth building alone (~1s a run). Criterion 7 amended the same day from a mean dbt time of 3s - unreachable by either, since dbt''s own SQL is ~2.9s - to the whole bootstrap at 10 minutes or less, which is the thing that was ever wanted.'
     open_questions:
     - Which mechanism, A or B - to be chosen by Keith on the spike's measurements.
   - id: REQ-PIPE-158
