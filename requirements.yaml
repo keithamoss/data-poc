@@ -26208,10 +26208,10 @@ requirements:
       the version-level part those inputs came from; and SHALL NOT record the whole content of the calendar
       version or the slot's closing instant.
     - THE SYSTEM SHALL keep verdict records append-only, and SHALL NOT overwrite or delete a recorded verdict.
-    - WHEN a declared correction (REQ-PIPE-111) is merged, THE SYSTEM SHALL work out every re-judgement it
-      makes and every filing move it proposes, SHALL apply none of them until the data asset's manager confirms
-      the correction in the terminal (REQ-PIPE-170) - whether or not it proposes any move - and SHALL then apply
-      its re-judgements and moves together, so that a correction is never applied in part or without a person.
+    - WHEN a declared correction (REQ-PIPE-111) is merged, THE SYSTEM SHALL apply nothing it changes until the
+      data asset's manager confirms it in the terminal (REQ-PIPE-170) - whether or not it proposes any move - and
+      SHALL then apply its re-judgements and moves together, so that a correction is never applied in part or
+      without a person.
     - THE SYSTEM SHALL record each re-judgement as a new verdict naming the correction's change reference
       and changelog entry, the old verdict and the new one.
     - THE SYSTEM SHALL apply each declared correction exactly once, recording that it has been applied,
@@ -26383,11 +26383,15 @@ requirements:
       for any reason, naming the role, its level and who holds it.
     - THE SYSTEM SHALL keep a correction among the states needing action until every proposed move, blocked
       ones included, has been moved or kept.
-    - WHILE any merged correction awaits confirmation - whether or not it proposes a move - THE SYSTEM SHALL leave
-      every supply it affects with its existing verdict and filing, SHALL mark each as pending that correction on
-      the dashboard and in the terminal, SHALL show on the confirmation screen every verdict the correction would
-      change alongside any moves, and WHEN the asset manager confirms, SHALL apply its re-judgements and moves in
-      one step, judging each supply against the period it ends up in.
+    - WHILE a merged correction awaits confirmation, THE SYSTEM SHALL have the processing pass only note it - marking
+      the datasets it affects as awaiting confirmation and listing it among the states needing action - and SHALL
+      NOT compute or store its re-judgements or moves; and WHEN the asset manager opens it in the terminal, THE
+      SYSTEM SHALL compute its re-judgements and moves live, by the same implementation as the impact preview
+      (REQ-PIPE-169), show every verdict it would change alongside any moves, and on confirmation apply them in one
+      step, judging each supply against the period it ends up in.
+    - WHILE a merged correction awaits confirmation, THE SYSTEM SHALL judge supplies arriving for the datasets it
+      affects against the corrected configuration now in force, and REQ-PIPE-173 SHALL treat the declared but
+      unapplied correction as accounting for the difference, so that a pending correction refuses no dataset.
     non_functional_requirements:
     - 'ONE CONFIRMATION, NOT ONE PER FILE: a correction to a daily feed''s due time can propose hundreds
       of moves, and a per-supply step is how a list like this is abandoned half-done.'
@@ -26424,6 +26428,7 @@ requirements:
       behind.'
     - 'ALL OR NOTHING (Keith, 2026-10-07): while moves await confirmation, every supply the correction affects keeps its existing verdict and filing, marked pending that correction; confirmation applies re-judgements and moves in one step, each supply judged against the period it ends up in. See REQ-PIPE-168''s decision of the same date for the alternatives rejected.'
     - 'ONE CONFIRMATION FOR EVERY CORRECTION (Keith, 2026-10-07): the confirmation screen covers verdict changes as well as moves, and is required even where nothing moves - see REQ-PIPE-168''s decision of the same date.'
+    - 'COMPUTED LIVE AT CONFIRMATION, NOT BY THE PASS (Keith, 2026-10-07, collapsing the pass''s step into the terminal''s): after a correction merges the processing pass only notes it - affected datasets read ''awaiting confirmation'' and it sits in needs-action - and the terminal works out the verdict changes and moves when the asset manager opens it, by the impact preview''s own implementation, then applies them on confirmation. Nothing stored can go stale; the CAB''s preview, the confirmation screen and the apply are one computation; there is no stored trial or pending-moves table to build. This criterion''s own trial-and-list wording (criteria 1-3) is read through this decision: the ''trial'' is the live computation at confirmation. Supplies arriving meanwhile are judged against the corrected agreement now in force, and the backstop treats the declared, unapplied correction as accounting for the difference.'
   - id: REQ-GHUB-171
     title: The people configuration names the data asset's manager, and a decision can require that role
     date_written: '2026-10-07'
