@@ -58,3 +58,31 @@ describe("decisions that changed an earlier date", () => {
     expect(said.textContent).toContain("20 March 2026");
   });
 });
+
+describe("scoped to what the page shows (post-build-review #132 A5)", () => {
+  const OTHER = {...RAW, id: "cp-clients", name: "Client Register"};
+
+  it("lists only the datasets in view", () => {
+    const w = loadDashboard().window;
+    w.rawRealDatasets = () => [RAW, OTHER];
+    const found = w.decisionsChangingDate("2026-02-15", new Set(["cp-carers"]));
+    expect(found.map(d=> d.datasetName)).toEqual(["Carers"]);
+  });
+
+  it("lists every one rather than a dead-end 'and N more'", () => {
+    const w = loadDashboard().window;
+    const many = Array.from({length: 7}, (_, i)=> ({...RAW, id: `d${i}`, name: `D${i}`}));
+    w.rawRealDatasets = () => many;
+    const html = w.changedSinceNote("2026-02-15");
+    expect(html).not.toContain("more</li>");
+    expect((html.match(/<li>/g) || []).length).toBe(7);
+  });
+
+  it("names the receipt instant the runs carry", () => {
+    const w = loadDashboard().window;
+    w.rawRealDatasets = () => [{...RAW, runs: [{run_id: "r1", run_date: "2026-01-10",
+      received_at: "2026-01-10T03:15:00+00:00"}]}];
+    const html = w.changedSinceNote("2026-02-15");
+    expect(html).toMatch(/received [^<]*11:15/);
+  });
+});

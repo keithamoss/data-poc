@@ -170,6 +170,14 @@ class TestAGapRedWarnsButDoesNotBlock:
         assert promotion.status_of("cp-carers", [r("pass", dataset_id="cp-carers"),
                                                  self._gap("fail")], reads={}) == "red"
 
+    def test_for_display_a_gap_red_stays_red(self):
+        """post-build-review #132 A1: what the dashboard SHOWS is the recorded
+        verdict - the gate's reading is for promotion only, and shown it read
+        green beside a page that said red."""
+        assert promotion.status_of("cp-carers", [r("pass", dataset_id="cp-carers"),
+                                                 self._gap("pass")], reads={},
+                                   for_gate=False) == "red"
+
     def test_no_reference_at_all_neither_passes_nor_blocks(self):
         rec = r("fail", dataset_id="cp-carers", check_id="drift")
         rec.update(measured_status=None, reference_gap=["2026-Q1"],

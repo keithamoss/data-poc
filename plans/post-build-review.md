@@ -6586,7 +6586,7 @@ twice. It deliberately did not re-find the `TypeError`.
     it replaced `next_receipt` with a stub, so it proved the call site and
     never what the function would see.
 
-131. **[in-progress, 2026-10-07]** **[Pipeline & publishing]** **The delivery
+131. **[done, 2026-10-07]** **[Pipeline & publishing]** **The delivery
     critic on five builds of 2026-10-06** - REQ-PIPE-157 (the dbt worker),
     REQ-TEST-159/160 (checkpoint and resume), REQ-PIPE-152 (the S3 handlers),
     REQ-PIPE-154/REQ-DASH-155 (held after the schedule ends) and 15edf01 (a
@@ -6659,9 +6659,31 @@ twice. It deliberately did not re-find the `TypeError`.
     TO FIX in one batch once the two UX critics running alongside it have
     KEITH, 2026-10-07, on D3: WAIT for a real AWS deployment, and collect
     this and the other AWS items in their own file - `plans/aws.md`.
+    OUTCOME, 2026-10-07, each defect with a failing test first: D1 FIXED -
+    the print is counted in distinct arrivals, and a changed file reads
+    "changed" (`TestAnArrivalHoldingSeveralFiles`). D2 FIXED - keys
+    URL-decoded, and an object that cannot be recorded no longer stops the
+    rest; the pass still runs and the invocation then fails for retry
+    (`TestEveryObjectInAnEventIsTried`). D3 to plans/aws.md (Keith). D4 FIXED
+    - worker schemas carry a per-process random token beside the PID, a
+    worker that died idle is stopped before another starts, and a failed
+    start removes its process and directory (`TestNamesAndLeaks`). D5 FIXED
+    - resume databases are listed (never pruned, Keith), deletes confirm
+    and refuse an unknown name, and a resume that fails names the database
+    it left. D6 FIXED - the partition is stripped from the table, the column
+    is read wherever the call sits, and an unattributable check raises
+    instead of vanishing; an id-less check was already refused at config
+    time by the check-lifecycle gate's `MissingCheckIdError`, so no second
+    guard was added. D7 FIXED - held supplies are re-filed before the pass's
+    new arrivals. D8 KEPT AS BUILT - one query per dataset is how every
+    per-dataset builder on the page reads, about thirty small indexed
+    queries at full scale; an aggregate here alone would be the odd one out.
+    D9 FIXED for `require_synthetic` (`is True`); the lock pause around a
+    copy is unchanged - the copy refuses rather than proceeds if anything
+    connects, which `_copy` already names. D10 FIXED with #132 A4.
     reported, failing test first for each defect.
 
-132. **[in-progress, 2026-10-07]** **[Dashboard UI]** **The dashboard UX
+132. **[done, 2026-10-07]** **[Dashboard UI]** **The dashboard UX
     critic on four small changes** - REQ-DASH-155's schedule-ended notice,
     REQ-PIPE-140 criterion 5's newest-result pill, REQ-PIPE-081 criterion 6's
     "decisions made since then" note, and #129's fine print. Scope chosen by
@@ -6723,8 +6745,25 @@ twice. It deliberately did not re-find the `TypeError`.
     window until the next rebuild. A3 - a schedule-ended hold offers
     ADD-DATES ONLY: "file it yourself" and "reject" are removed for this
     kind of hold, not kept as secondary options.
+    OUTCOME, 2026-10-07: A1 FIXED at both ends - `promotion.status_of`
+    takes `for_gate=False` for display and `pipeline/red_promoted.py` builds
+    the timeline with it, and the page moves the pill only for a reading
+    after the arrival, naming when and what changed it (Python and JS tests
+    first). A2 - the deployment is rebuilt with the new limit (Keith's
+    choice). A3 FIXED - a schedule-ended hold offers only adding dates, in
+    the terminal and on the page ("Held: schedule ended"), names the
+    dataset, says "until its next delivery dates are added" rather than
+    "until a person resolves it", and shows a recorded command as code. A4
+    FIXED - the notice names each dataset and its own last period, says
+    "cannot be filed" (#131 D10: supplies are still received and checked),
+    and agrees "it"/"them" with the count. A5 FIXED - the note lists only
+    the datasets in view, all of them, with the receipt instant the runs
+    carry. A6 - the fine print is reworded ("Soda returns up to 100 of the
+    failing rows and chooses which; these are the lowest 5 keys of those")
+    and moved from the faint to the muted ink; `dbt:unique` repeating a key
+    is correct - each duplicate row is a failing row - and is left.
 
-133. **[in-progress, 2026-10-07]** **[Testing & dev tooling]** **The CLI UX
+133. **[done, 2026-10-07]** **[Testing & dev tooling]** **The CLI UX
     critic on checkpoint and resume** (REQ-TEST-159/160), driven for real
     against its own scratch database - a ~10-minute bootstrap with a
     checkpoint, template copies with doctored descriptions for the failure
@@ -6780,3 +6819,20 @@ twice. It deliberately did not re-find the `TypeError`.
     next step; nothing-changed answers in 5 seconds; snapping explains
     itself; `delete supply` is refused.
     TO FIX in the same batch as #131 and #132.
+    OUTCOME, 2026-10-07: B1 FIXED - one unwrapped `export
+    MOTHMAN_SUPPLY_DSN=postgresql://user:<password>@host:port/db` line, and
+    how to go back. B2 FIXED - an impossible N and an unreadable checkpoint
+    are refused in a sentence (`TestARefusalChangesNothing`). B3 FIXED - N
+    is checked against a regeneration somewhere of its own before data/ is
+    touched. B4 FIXED - `mothman pipeline checkpoint arrivals --collection
+    cp` lists every arrival number with its delivery and receipt, and
+    messages name the delivery beside an arrival number. B5 FIXED - a
+    populated database refuses a checkpoint, non-zero, with the three
+    steps. B6 FIXED - the closing line repeats the checkpoint and the
+    resume command. B7 and B8 as #131 D5. B9 FIXED - a resume says what
+    changed, which arrivals and into what, before copying (no time estimate
+    - a number not measured would be invented). B10 with #131 D1. B11 help
+    text no longer cites requirement ids and says where NAME comes from and
+    where a resume lands. B12 FIXED - the rebuild's count line is quiet and
+    says "recorded history". B13 FIXED - times on the asset clock; a
+    statement keeps its full stop instead of a trailing "...".

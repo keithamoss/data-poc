@@ -165,3 +165,31 @@ class TestTheHandlerOnlyRecordsThenRunsThePass:
             _s3_created_event("raw-w", "elsewhere/cp_clients.csv"), _client(),
             prefix="cp/")["body"])
         assert body["skipped"] == 1 and body["recorded"] == 0
+
+
+class TestEveryObjectInAnEventIsTried:
+    """post-build-review #131 D2: S3 event notifications URL-encode the key,
+    and one object that cannot be read must not stop the event's others."""
+
+    def test_an_encoded_key_is_decoded_before_it_is_read(self, supply_dsn, no_pass):
+        bucket = f"raw-{__import__('uuid').uuid4().hex[:8]}"
+        client = _client()
+        s3_arrival.handle_event(_s3_created_event(bucket, "cp/cp_carers+%282%29.csv"),
+                                client, prefix="cp/")
+        assert client.head_object.call_args.kwargs["Key"] == "cp/cp_carers (2).csv"
+
+    def test_one_unreadable_object_does_not_stop_the_rest_and_still_fails_for_retry(
+            self, supply_dsn, no_pass):
+        bucket = f"raw-{__import__('uuid').uuid4().hex[:8]}"
+        client = _client()
+
+        def head(**kw):
+            if kw["Key"] == "cp/gone.csv":
+                raise RuntimeError("NoSuchKey")
+            return {"LastModified": LANDED}
+        client.head_object.side_effect = head
+        with pytest.raises(s3_arrival.ObjectsNotRecorded, match="gone.csv"):
+            s3_arrival.handle_event(_s3_created_event(bucket, "cp/gone.csv", "cp/cp_carers.csv"),
+                                    client, prefix="cp/")
+        assert _files(s3_arrival.delivery_name_for(bucket, "cp/cp_carers.csv", LANDED))
+        assert len(no_pass) == 1, "the pass still runs for what was recorded"

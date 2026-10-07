@@ -23,7 +23,7 @@ describe("the fine print under the example failing rows", () => {
   it("says Soda chose them past that", () => {
     const w = load();
     const fp = w.sampleFinePrint("soda:missing_count", 5, 101);
-    expect(fp).toContain("Soda chooses which 100");
+    expect(fp).toContain("Soda returns up to 100 of the failing rows and chooses which");
     expect(fp).toContain("can show different rows");
   });
 

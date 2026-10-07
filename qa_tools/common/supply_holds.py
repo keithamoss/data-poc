@@ -183,6 +183,13 @@ class Held:
 
     @property
     def responses(self) -> tuple[str, ...]:
+        # ADD DATES, AND NOTHING ELSE (Keith, 2026-10-07, post-build-review
+        # #132 A3): a supply held because its schedule ended files itself
+        # once the dates exist, so filing it by hand or rejecting it is the
+        # wrong fix to offer.
+        if self.schedule_ended:
+            return (f"add the next delivery dates to {SCHEDULE_FILE} - it files itself "
+                    f"on the next processing pass",)
         return RESPONSES.get(self.kind, ())
 
     @property
@@ -210,7 +217,14 @@ class Held:
             # and 3), so the reason says where to make it.
             command = self.reason.get("fix_command")
             how = f" `{command}` proposes them." if command else ""
-            return (f"{self.supply_id} arrived after {self.dataset_id}'s schedule ended - "
+            from qa_tools.common import hierarchy
+
+            try:
+                name = hierarchy.dataset(self.dataset_id).dataset_name
+            except Exception:  # noqa: BLE001 - a dataset since removed keeps its id
+                name = self.dataset_id
+            # THE DATASET'S NAME, not its id (#132 A3 - it read "cp-clients's").
+            return (f"{self.supply_id} arrived after the {name} schedule ended - "
                     f"its last authored period is {self.reason.get('last_period')}, and "
                     f"there is no later date to file it to. Add dates to the dataset's "
                     f"calendar in {SCHEDULE_FILE}.{how} The next processing pass then "

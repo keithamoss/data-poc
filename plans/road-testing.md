@@ -1612,6 +1612,30 @@ two levels) and #17.
       replacement settings' changelogs move to the structured shape IN THIS
       BATCH (against the recommendation of a separate change). No open
       question remains on the batch once these are folded in.
+      **AFTER THE PRE-BUILD UX REVIEWS, Keith 2026-10-07:** an excused late
+      supply reads as a NEUTRAL "Late (excused)" tag - the accepted-gap
+      pattern, never green, never the red Late pill with a tag beside it; a
+      dataset refused for an undeclared calendar change (REQ-PIPE-173) is
+      RED, worded as a configuration problem on our side, never showing its
+      last verdict as current; and YES, the queue NUDGES a bulk re-check when
+      a check's definition changed after supplies were checked by it
+      ("N supplies were checked before <check> changed"). To fold into the
+      batch with the reviewers' findings.
+      **AFTER THE ARCHITECT'S REVIEW, Keith 2026-10-07:** `participates`
+      names the CALENDAR DATE's month even where days_before is set; a
+      COLLECTION MAY default days_before, nearest wins - this REVERSES his
+      2026-09-24 "per dataset, never per collection" (REQ-PIPE-167's NFR 1);
+      and a participation version that OWES MORE PERIODS than the one before
+      is refused unless it says so explicitly (rather than restating every
+      field, or carrying unstated fields over). Where a declared correction
+      lives in the YAML: he asked to see options, proposed a list per
+      calendar himself, and settled on the generalisation of it - EACH
+      OWNING ITEM CARRIES ITS OWN `corrections:` LIST beside its versions: a
+      calendar's on the calendar, a dataset's (due time, participates,
+      not_expected) on its dataset entry, the zone's on the timezone.
+      Rejected: one register per file, a separate corrections file, and
+      corrections inside a version's changelog (no home for a not_expected
+      entry or a removed version).
       SETTLED THE SAME AFTERNOON AND NOT IN QUESTION: 110 - `participates`
       replaces `delivery_months`, `not_expected` stays (one-off decisions);
       `slaProperties` deleted entirely including `frequency`. 112 - the

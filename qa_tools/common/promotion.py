@@ -620,7 +620,7 @@ def _contributing_records(dataset_id: str, results: Sequence[dict],
 
 
 def status_of(dataset_id: str, results: Sequence[dict], *,
-              reads: dict[str, list[str]]) -> str | None:
+              reads: dict[str, list[str]], for_gate: bool = True) -> str | None:
     """This dataset's status, from EVERY check that contributes to it
     (criterion 2).
 
@@ -654,7 +654,12 @@ def status_of(dataset_id: str, results: Sequence[dict], *,
         # vocabulary, so EVERY real result raised. Found by writing a
         # test against the shape qa.check_result actually holds rather
         # than the shape the gate wished for.
-        verdict = dataset_status.dashboard_status(_gating_status(record))
+        # THE GATE'S READING OR THE RECORDED ONE: the gate reads a gap red as
+        # its measurement (REQ-QAC-108 criterion 15); a DISPLAY must show
+        # what was recorded, or a supply reads green beside a page that says
+        # red (post-build-review #132 A1, Keith 2026-10-07).
+        verdict = dataset_status.dashboard_status(
+            _gating_status(record) if for_gate else record.get("status"))
         if verdict is None:
             # AN UNREADABLE VERDICT IS NOT EVIDENCE OF HEALTH, and
             # dropping it would be exactly that - the supply would

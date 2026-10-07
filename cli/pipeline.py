@@ -254,9 +254,10 @@ def cache_key_command() -> None:
 @click.option("--checkpoint-before", "checkpoint_before", type=int, default=None,
               metavar="N",
               help="Keep a copy of the database as it stood once arrival N-1 was processed, "
-                   "to resume from later with `mothman pipeline resume` (synthetic asset, "
-                   "one collection). N moves back to the start of its receipt instant if "
-                   "it falls inside one.")
+                   "to resume from later with `mothman pipeline resume`. A synthetic asset, "
+                   "one collection, an empty database. If N falls inside a delivery it "
+                   "moves back to where that delivery begins. `mothman pipeline checkpoint "
+                   "arrivals --collection cp` lists the arrival numbers.")
 def bootstrap_command(collection: str, force: bool, sequential: bool,
                       checkpoint_before: int | None) -> None:
     """Take an empty environment to one with data and QA results in it.
@@ -273,8 +274,7 @@ def bootstrap_command(collection: str, force: bool, sequential: bool,
     from qa_tools.common.bootstrap import bootstrap
 
     result = bootstrap(collection=collection, force=force, sequential=sequential,
-                        on_step=lambda msg: console.print(f"{msg}...", style="dim"),
-                        checkpoint_before=checkpoint_before)
+                        on_step=_step, checkpoint_before=checkpoint_before)
     if result.refused:
         raise click.ClickException(result.reason)
     if not result.populated:
@@ -283,6 +283,17 @@ def bootstrap_command(collection: str, force: bool, sequential: bool,
     console.print(
         f"Populated: {result.staged_after} staged table(s) in this environment.",
         style="green")
+    if result.checkpoint:
+        # REPEATED AT THE END (post-build-review #133 B6) - the line that
+        # took it is hundreds of lines up.
+        console.print(f"Checkpoint kept: {result.checkpoint}. Resume from it with "
+                      f"`mothman pipeline resume {result.checkpoint}`.", style="green")
+
+
+def _step(msg: str) -> None:
+    """A progress line. A statement keeps its own full stop; only work still
+    under way trails off (#133 B13)."""
+    console.print(msg if msg.endswith((".", ")")) else f"{msg}...", style="dim", soft_wrap=True)
 
 
 @pipeline_group.group("checkpoint")
@@ -293,31 +304,64 @@ def checkpoint_group() -> None:
 
 @checkpoint_group.command("list")
 def checkpoint_list_command() -> None:
-    """Every checkpoint on this server, oldest first."""
+    """Every checkpoint on this server, oldest first, then every resume's
+    database."""
     from qa_tools.common import checkpoints
 
     found = checkpoints.listed()
     if not found:
         console.print("No checkpoints. Take one with `mothman pipeline bootstrap "
                       "--collection cp --checkpoint-before N`.")
-        return
     for cp in found:
         if not cp.collection_id:
-            console.print(f"{cp.name}  (its description cannot be read - a resume would "
-                          f"replay from the first arrival)", style="yellow")
+            console.print(f"{cp.name}  (its description cannot be read - a resume from it "
+                          f"would be refused)", style="yellow")
             continue
+        taken = _on_asset_clock(cp.taken_at) if cp.taken_at else "?"
         console.print(f"{cp.name}  {cp.collection_id}, before arrival {cp.before} of "
-                      f"{len(cp.recorded.arrivals)}, taken {cp.taken_at} from {cp.source}")
-    console.print(f"Keeping the newest {checkpoints.keep()} "
-                  f"({checkpoints.KEEP_ENV} changes it).", style="dim")
+                      f"{len(dict.fromkeys(a.run_id for a in cp.recorded.arrivals))}, "
+                      f"taken {taken} from {cp.source}")
+    if found:
+        console.print(f"Keeping the newest {checkpoints.keep()} checkpoints of each database "
+                      f"({checkpoints.KEEP_ENV} changes it).", style="dim")
+    # RESUMES ARE LISTED, NEVER PRUNED (#133 B8, Keith 2026-10-07): a person
+    # may be pointed at one.
+    made = checkpoints.resumes()
+    if made:
+        console.print("Resume databases (never removed automatically):")
+        for r in made:
+            console.print(f"  {r.name}")
+
+
+@checkpoint_group.command("arrivals")
+@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
+              help="bdm = civil-registration, cp = child-protection.")
+def checkpoint_arrivals_command(collection: str) -> None:
+    """The arrival numbers `--checkpoint-before N` counts, with the delivery
+    and receipt instant of each - from a regeneration, never data/."""
+    from qa_tools.common import checkpoints
+
+    found = checkpoints.arrivals_of(checkpoints.COLLECTIONS[collection])
+    for i, a in enumerate(found, start=1):
+        files = ", ".join(f for names in a.files_by_dataset.values() for f in names)
+        console.print(f"{i:>4}  {_on_asset_clock(a.received_at)}  "
+                      f"{a.delivery_name}  {files}", soft_wrap=True)
+    console.print(f"{len(found)} arrivals. A checkpoint can be taken before 2 to {len(found)}; "
+                  "one inside a delivery moves back to where it begins.", style="dim")
 
 
 @checkpoint_group.command("delete")
 @click.argument("name")
-def checkpoint_delete_command(name: str) -> None:
-    """Delete one checkpoint, or a resume's database, by name."""
+@click.option("--yes", is_flag=True, help="Delete without asking.")
+def checkpoint_delete_command(name: str, yes: bool) -> None:
+    """Delete one checkpoint, or a resume's database, by name (from
+    `mothman pipeline checkpoint list`). Anything connected to it is cut off."""
     from qa_tools.common import checkpoints
 
+    if not yes and not click.confirm(
+            f"Delete {name}? Anything connected to it is disconnected, and a checkpoint takes "
+            "a bootstrap to make again", default=False):
+        raise click.ClickException("nothing was deleted")
     try:
         checkpoints.delete(name)
     except checkpoints.CheckpointRefused as exc:
@@ -330,7 +374,9 @@ def checkpoint_delete_command(name: str) -> None:
 @click.option("--sequential", is_flag=True,
               help="Run each arrival's tools one after another rather than dbt beside the rest.")
 def resume_command(name: str, sequential: bool) -> None:
-    """Replay a collection from a checkpoint into a database of its own.
+    """Replay a collection from checkpoint NAME (see `mothman pipeline
+    checkpoint list`) into a NEW database of its own, which you then point
+    MOTHMAN_SUPPLY_DSN at - the line to paste is printed at the end.
 
     The first arrival a change can affect is worked out by regenerating the
     deliveries and comparing them, and every other input, with what the
@@ -339,8 +385,7 @@ def resume_command(name: str, sequential: bool) -> None:
     the database you were using, are never written to."""
     from qa_tools.common.bootstrap import resume
 
-    result = resume(name, sequential=sequential,
-                    on_step=lambda msg: console.print(f"{msg}...", style="dim"))
+    result = resume(name, sequential=sequential, on_step=_step)
     if result.refused:
         raise click.ClickException(result.reason)
     if not result.replayed:
@@ -349,6 +394,29 @@ def resume_command(name: str, sequential: bool) -> None:
     from qa_tools.common import supply_db
 
     console.print(result.reason + ".", style="green")
-    # REDACTED: the DSN carries the password, and this line is the one most
-    # likely to be pasted somewhere.
-    console.print(f"Point MOTHMAN_SUPPLY_DSN at {supply_db._redact(result.dsn)} to use it.")
+    # ONE LINE THAT CAN BE PASTED (#133 B1): URL form like every other DSN in
+    # this project, never wrapped, the password left as a placeholder because
+    # this is the line most likely to be pasted somewhere.
+    console.print("To use it:")
+    console.print(f"  export {supply_db.SUPPLY_DSN_ENV}={_pasteable(result.dsn)}",
+                  soft_wrap=True, highlight=False)
+    console.print("To go back, set it to your previous value again.", style="dim")
+
+
+def _on_asset_clock(value) -> str:
+    """An instant on the asset's own clock, as a person reads it (#133 B13)."""
+    from qa_tools.common import asset_time
+
+    return asset_time.localise(value).strftime("%Y-%m-%d %H:%M %Z")
+
+
+def _pasteable(dsn: str) -> str:
+    """postgresql://user:<password>@host:port/db - the password a placeholder."""
+    import psycopg
+
+    info = psycopg.conninfo.conninfo_to_dict(dsn)
+    who = info.get("user", "")
+    if info.get("password"):
+        who += ":<password>"
+    host = info.get("host", "localhost") + (f":{info['port']}" if info.get("port") else "")
+    return f"postgresql://{who}{'@' if who else ''}{host}/{info.get('dbname', '')}"

@@ -117,7 +117,7 @@ def build_results_from_history() -> dict:
     print(f"\n{len(all_results)} real check results ({n_pass} pass / {n_warn} warn / {n_fail} fail"
           f"{f' / {n_error} error' if n_error else ''}"
           f"{f' / {n_nodata} no reference' if n_nodata else ''}) across {len(manifest)} runs, "
-          f"from committed history -> {RESULTS_PATH}")
+          f"from recorded history -> {RESULTS_PATH}")
     return output
 
 

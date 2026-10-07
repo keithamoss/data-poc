@@ -85,7 +85,10 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
             for record in _results_of(conn, run_key):
                 latest[record["check_id"]] = record
             try:
-                status = promotion.status_of(dataset_id, list(latest.values()), reads=reads)
+                # FOR DISPLAY, the recorded verdict - never the gate's reading
+                # (post-build-review #132 A1).
+                status = promotion.status_of(dataset_id, list(latest.values()), reads=reads,
+                                             for_gate=False)
             except promotion.UnreadableVerdictError:
                 continue
             if timeline and timeline[-1]["status"] == status:

@@ -160,11 +160,17 @@ def handle_event(event: dict, s3_client, *, prefix: str, say=print,
 
     from qa_tools.common import processing_pass
 
+    from urllib.parse import unquote_plus
+
     started = time.monotonic()
     summary = {"recorded": 0, "already_recorded": 0, "unplaceable": 0, "skipped": 0}
+    not_recorded: list[str] = []
     for record in event.get("Records", []):
         bucket = record["s3"]["bucket"]["name"]
-        key = record["s3"]["object"]["key"]
+        # S3 EVENT NOTIFICATIONS URL-ENCODE THE KEY (spaces as "+"), so a
+        # name with a space or a bracket would fail on every retry read raw
+        # (post-build-review #131 D2).
+        key = unquote_plus(record["s3"]["object"]["key"])
         if not key.startswith(prefix):
             # WHICH OBJECTS ARE THIS HANDLER'S AT ALL is a transport concern
             # (REQ-PIPE-152's decision on whole-key matching); which DATASET
@@ -172,7 +178,15 @@ def handle_event(event: dict, s3_client, *, prefix: str, say=print,
             say(f"{key!r} is outside {prefix!r} - not this handler's")
             summary["skipped"] += 1
             continue
-        got = record_object(s3_client, bucket, key)
+        try:
+            got = record_object(s3_client, bucket, key)
+        except Exception as exc:  # noqa: BLE001 - named below, and the invocation fails
+            # ONE OBJECT THAT CANNOT BE READ DOES NOT STOP THE REST (#131 D2):
+            # they are recorded and passed, and the invocation still fails at
+            # the end so the platform retries - a retry records nothing twice.
+            say(f"{key!r} could not be recorded: {_redact_error(exc)}")
+            not_recorded.append(key)
+            continue
         summary["recorded" if got.newly_recorded else "already_recorded"] += 1
         if got.dataset_id is None:
             # UNPLACEABLE, ON THE PIPELINE'S OWN TERMS (criterion 9): recorded
@@ -188,4 +202,26 @@ def handle_event(event: dict, s3_client, *, prefix: str, say=print,
     summary.update(processed=len(report.processed), gated_only=len(report.gated_only),
                    left_for_next_pass=len(report.left_for_budget),
                    failures=len(report.failures), exit_status=report.exit_status)
+    if not_recorded:
+        raise ObjectsNotRecorded(
+            f"{len(not_recorded)} object(s) could not be recorded and will be tried again: "
+            + ", ".join(repr(k) for k in not_recorded))
     return {"statusCode": 200, "body": json.dumps(summary)}
+
+
+def _redact_error(exc: BaseException) -> str:
+    """An error for a log line, without the database password should one have
+    found its way into the message."""
+    from qa_tools.common import supply_db
+
+    text = f"{type(exc).__name__}: {exc}"
+    try:
+        password = supply_db.connection_fields().get("password")
+    except Exception:  # noqa: BLE001 - no DSN configured, nothing to hide
+        password = None
+    return text.replace(password, "***") if password else text
+
+
+class ObjectsNotRecorded(RuntimeError):
+    """Some of an event's objects could not be recorded; the rest were, and
+    the pass ran. Raised so the invocation fails and the platform retries."""

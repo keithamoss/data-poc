@@ -62,7 +62,9 @@ def require_synthetic() -> None:
     from qa_tools.common.hierarchy import DATA_ASSET_YAML
 
     doc = config_yaml.parse(Path(DATA_ASSET_YAML).read_text()) or {}
-    if not doc.get("synthetic"):
+    # `is True`, NOT TRUTHINESS, as the reset command and the replay clock read
+    # it - a string "false" is truthy (post-build-review #131 D9).
+    if doc.get("synthetic") is not True:
         raise CheckpointRefused(
             "checkpoints and resumes are for a synthetic history only, and this data asset "
             "does not declare `synthetic: true` - nothing was copied")
@@ -178,6 +180,41 @@ def listed(dsn: str | None = None, prefix: str = PREFIX) -> list[Checkpoint]:
     return sorted(found, key=lambda c: (c.taken_at, c.name))
 
 
+def resumes(dsn: str | None = None) -> list[Checkpoint]:
+    """Every resume's database on this server (#133 B8). Listed, never
+    pruned: a person may be pointed at one. A resume carries no description
+    of its own, so only its name is meaningful."""
+    return listed(dsn, RESUME_PREFIX)
+
+
+def arrivals_of(collection_id: str) -> list:
+    """The collection's arrivals as a regeneration would produce them, in
+    receipt order - generated somewhere of its own, never data/ - so an
+    arrival number can be checked, and shown, before anything is touched
+    (#133 B3 and B4). About five seconds."""
+    import contextlib
+    import io
+    import tempfile
+    import warnings
+
+    from cli.pipeline import generated_into
+    from qa_tools.common import arrivals
+
+    with tempfile.TemporaryDirectory(prefix="mothman-ckpt-") as tmp, \
+            contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        with generated_into(Path(tmp)) as root:
+            return arrivals.arrivals_for(collection_id, "", root / "deliveries",
+                                         root / "receipts")
+
+
+def named(arrivals: list, n: int) -> str:
+    """Arrival n with the delivery it belongs to, for every message that
+    names an arrival number (#133 B4)."""
+    a = arrivals[n - 1] if 1 <= n <= len(arrivals) else None
+    return f"arrival {n}" + (f" (delivery {a.delivery_name!r})" if a is not None else "")
+
+
 def find(name: str, dsn: str | None = None) -> Checkpoint:
     for cp in listed(dsn):
         if cp.name == name:
@@ -193,8 +230,13 @@ def delete(name: str, dsn: str | None = None) -> None:
         raise CheckpointRefused(f"{name!r} is not a checkpoint or a resume's database - "
                                 "nothing was deleted")
     with _admin(dsn) as admin:
-        admin.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(
-            sql.Identifier(name)))
+        # A NAME THAT IS NOT THERE IS REFUSED, never reported deleted - a typo
+        # must not read as success (post-build-review #133 B7).
+        if not admin.execute("SELECT 1 FROM pg_database WHERE datname = %s", [name]).fetchone():
+            raise CheckpointRefused(
+                f"there is no checkpoint or resume database called {name!r} - nothing was "
+                "deleted; `mothman pipeline checkpoint list` shows those there are")
+        admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
 
 
 def prune(keep_n: int, dsn: str | None = None, *, source: str) -> list[str]:

@@ -8,6 +8,7 @@ plans/qa-pipeline.md #84.
 from __future__ import annotations
 
 import os
+import re
 
 from soda.sampler.sampler import Sampler
 from soda.sampler.sample_ref import SampleRef
@@ -361,7 +362,10 @@ def unreported_checks(yaml_text: str, scan_results: dict, scan) -> list[dict]:
     for key, checks in doc.items():
         if not (isinstance(key, str) and key.startswith("checks for ")):
             continue
-        table = key[len("checks for "):].strip()
+        # THE TABLE WITHOUT ITS PARTITION: `checks for t [recent]` is Soda's
+        # partition syntax, and read raw the table was "t [recent]", which a
+        # runner's table filter then dropped (post-build-review #131 D6).
+        table = key[len("checks for "):].split("[", 1)[0].strip()
         for item in checks or ():
             check_id = _check_id_of(item)
             if not check_id or check_id in reported:
@@ -372,9 +376,10 @@ def unreported_checks(yaml_text: str, scan_results: dict, scan) -> list[dict]:
             mine = [e for e in errors if line in e or (name and name in e)]
             reason = (mine or errors or ["Soda reported no result for it"])[0]
             reason = " ".join(reason.split())[:300]
-            column = None
-            if "(" in line and line.endswith(")"):
-                column = line[line.index("(") + 1:-1].split(",")[0].strip() or None
+            # THE FIRST ARGUMENT, wherever the call sits: `missing_count(c) = 0`
+            # carries a threshold after it, which an ends-with test missed.
+            call = re.search(r"\(([^()]*)\)", line)
+            column = (call.group(1).split(",")[0].strip() or None) if call else None
             missing.append({"check_id": check_id, "table": table,
                             "check_name": name or line, "column": column or "(table)",
                             "reason": reason})

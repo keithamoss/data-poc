@@ -192,3 +192,28 @@ class TestRegeneratingToCompare:
         assert after == before
         assert regenerated and all(a.content for a in regenerated)
         assert ri.regenerated_print("child-protection") == regenerated, "not deterministic"
+
+
+class TestAnArrivalHoldingSeveralFiles:
+    """post-build-review #131 D1: the print is one entry per FILE, and an
+    arrival can hold several files for one dataset (the contested case), so
+    counting entries as arrivals reported every later arrival too late - the
+    one direction the fail-safe NFR forbids."""
+
+    def _prints(self, second_content="b"):
+        mk = ri.ArrivalPrint
+        return [mk("r1", "d1", "clients.csv", "a1", "x"),
+                mk("r1", "d1", "clients (2).csv", "a2", "x"),
+                mk("r2", "d2", "clients.csv", second_content, "x")]
+
+    def test_a_change_after_a_two_file_arrival_is_arrival_two(self):
+        rec = ri.Recorded(collection_id="child-protection", arrivals=self._prints(),
+                          inputs={"q.py": "1"})
+        got = ri.first_affected(rec, arrivals=self._prints("changed"), inputs={"q.py": "1"})
+        assert got.arrival == 2, got
+
+    def test_a_changed_file_is_called_changed_not_removed(self):
+        rec = ri.Recorded(collection_id="child-protection", arrivals=self._prints(),
+                          inputs={"q.py": "1"})
+        got = ri.first_affected(rec, arrivals=self._prints("changed"), inputs={"q.py": "1"})
+        assert "was changed" in got.reason, got.reason

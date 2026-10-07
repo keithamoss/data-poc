@@ -56,6 +56,9 @@ class Blocker:
     #: Who ended it, where a PERSON's rejection did (REQ-PIPE-153
     #: criterion 16): {"actor", "at", "reason"}.
     rejected: dict | None = None
+    #: Held because the dataset's schedule ended (REQ-PIPE-154): fixed by
+    #: adding dates, never by a person filing or rejecting it (#132 A3).
+    schedule_ended: bool = False
 
     @property
     def is_open(self) -> bool:
@@ -74,7 +77,8 @@ class Blocker:
                 "openedAt": self.opened_at, "resolvedAt": self.resolved_at,
                 "reason": self.reason, "files": list(self.files),
                 "loadFailures": [{"file": f, "why": w} for f, w in self.load_failures],
-                "delivery": self.delivery, "rejected": self.rejected}
+                "delivery": self.delivery, "rejected": self.rejected,
+                "scheduleEnded": self.schedule_ended}
 
 
 def _iso(value) -> str | None:
@@ -105,7 +109,8 @@ def _holds(db) -> list[Blocker]:
             opened_at=received_at or _iso(held.raised_at),
             resolved_at=(_iso(effective_at or held.resolved_at)
                          if held.resolved_by is not None else None),
-            reason=held.describe(), delivery=held.delivery))
+            reason=held.describe(), delivery=held.delivery,
+            schedule_ended=held.schedule_ended))
     return out
 
 

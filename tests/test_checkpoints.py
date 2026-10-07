@@ -214,6 +214,76 @@ class TestAResumeIsRefusedBeforeItCopiesAnything:
         assert self._resumes(scratch_source) == before
 
 
+class TestARefusalChangesNothing:
+    """post-build-review #133 B2, B3, B5 and B7: each refusal is a sentence,
+    never a traceback, and comes before anything is generated, copied or
+    dropped."""
+
+    @pytest.fixture
+    def no_generating(self, monkeypatch):
+        from cli import bdm, cp
+
+        def refuse():
+            raise AssertionError("the synthetic data was regenerated before the refusal")
+        monkeypatch.setattr(bdm, "generate_synthetic_data", refuse)
+        monkeypatch.setattr(cp, "generate_synthetic_data", refuse)
+
+    @pytest.mark.parametrize("before", [0, 1, 999])
+    def test_an_impossible_arrival_is_refused_before_data_is_generated(
+            self, scratch_source, monkeypatch, no_generating, before):
+        monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV, scratch_source)
+        got = bootstrap.bootstrap(collection="cp", checkpoint_before=before)
+        assert got.refused and "choose 2 to" in got.reason, got.reason
+
+    def test_a_populated_database_is_refused_a_checkpoint_with_the_steps(
+            self, scratch_source, monkeypatch, no_generating):
+        monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV, scratch_source)
+        monkeypatch.setattr(bootstrap, "staged_table_count", lambda conn: 33)
+        got = bootstrap.bootstrap(collection="cp", checkpoint_before=60)
+        assert got.refused and "empty database" in got.reason and "env mark" in got.reason
+
+    def test_an_unreadable_checkpoint_is_refused_not_crashed(self, scratch_source, monkeypatch):
+        cp = checkpoints.save("child-protection", 5, recorded=_recorded(), pending_scripts=[],
+                              dsn=scratch_source)
+        with checkpoints._admin(scratch_source) as admin:
+            admin.execute(f'COMMENT ON DATABASE "{cp.name}" IS \'not json\'')
+        monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV, scratch_source)
+        before = [c.name for c in checkpoints.listed(scratch_source, checkpoints.RESUME_PREFIX)]
+        try:
+            got = bootstrap.resume(cp.name)
+            assert got.refused and "cannot be read" in got.reason
+            assert [c.name for c in checkpoints.listed(scratch_source,
+                                                       checkpoints.RESUME_PREFIX)] == before
+        finally:
+            # ITS DESCRIPTION NO LONGER NAMES ITS SOURCE, so the fixture's
+            # tidy-up cannot find it - this test removes its own.
+            checkpoints.delete(cp.name, scratch_source)
+
+    def test_deleting_a_name_that_does_not_exist_is_refused(self, scratch_source):
+        with pytest.raises(checkpoints.CheckpointRefused, match="checkpoint list"):
+            checkpoints.delete("mothman_ckpt_doesnotexist", scratch_source)
+
+    def test_a_resume_database_is_listed(self, scratch_source):
+        cp = checkpoints.save("child-protection", 5, recorded=_recorded(), pending_scripts=[],
+                              dsn=scratch_source)
+        dsn = checkpoints.copy_for_resume(cp, scratch_source)
+        name = psycopg.conninfo.conninfo_to_dict(dsn)["dbname"]
+        try:
+            assert name in [r.name for r in checkpoints.resumes(scratch_source)]
+        finally:
+            checkpoints.delete(name, scratch_source)
+
+    def test_only_a_declared_true_counts_as_synthetic(self, tmp_path, monkeypatch):
+        """#131 D9: a string "false" is truthy."""
+        from qa_tools.common import hierarchy
+
+        doc = hierarchy.DATA_ASSET_YAML.read_text().replace("synthetic: true", 'synthetic: "false"')
+        (tmp_path / "data-asset.yaml").write_text(doc)
+        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", tmp_path / "data-asset.yaml")
+        with pytest.raises(checkpoints.CheckpointRefused, match="synthetic"):
+            checkpoints.require_synthetic()
+
+
 # --------------------------------------------------------------------------
 # Criterion 5, on the reduced corpus REQ-TEST-116 criterion 4 uses.
 # --------------------------------------------------------------------------

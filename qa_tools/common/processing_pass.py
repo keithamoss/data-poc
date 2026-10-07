@@ -340,6 +340,18 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         say(f"{arrival.run_id}: FAILED - {type(exc).__name__}: {exc}; it and every "
             f"later {arrival.collection_id} arrival are left for the next pass")
 
+    # HELD UNTIL DATES EXISTED (REQ-PIPE-154 criterion 7): re-filed by the
+    # rule BEFORE this pass's new arrivals, which were all received later -
+    # after them, a newer supply of the same dataset was filed first and
+    # receipt order broke across the two (post-build-review #131 D7). Still
+    # before the owed work, so the re-check each is owed runs - and applies
+    # the gate - in this same pass.
+    try:
+        from qa_tools.common import schedule_ended
+        report.refiled.extend(schedule_ended.refile_covered(say=say))
+    except Exception as exc:  # noqa: BLE001 - the holds are durable; the next pass retries
+        failed("schedule-ended holds", exc)
+
     # STAGED FIRST, as the batch stages first: a delivery's later files are
     # candidates the overlay sees when its first is checked. Only what is
     # still owed its checks - a gated arrival's table has moved on. A
@@ -398,13 +410,10 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
                          run_by, report, say)
                 except Exception as exc:  # noqa: BLE001 - criterion 14: reported, left owed
                     fail_arrival(arrival, exc)
-    # HELD UNTIL DATES EXISTED (REQ-PIPE-154 criterion 7): re-filed by the
-    # rule before the owed work, so the re-check each is owed runs - and
-    # applies the gate - in this same pass. And what this pass's own runs
-    # held because a schedule ended, counted apart (criterion 6).
+    # What this pass's own runs held because a schedule ended, counted apart
+    # (REQ-PIPE-154 criterion 6).
     try:
         from qa_tools.common import schedule_ended
-        report.refiled.extend(schedule_ended.refile_covered(say=say))
         with supply_db.connect(read_only=True, label="mothman:process") as conn:
             report.schedule_ended = schedule_ended.raised_by_runs(conn, report.processed)
     except Exception as exc:  # noqa: BLE001 - the holds are durable; the next pass retries

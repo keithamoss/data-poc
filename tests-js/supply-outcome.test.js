@@ -179,6 +179,23 @@ describe("a promoted supply's pill", () => {
     expect(got.arrived.textContent).toBe("Arrived Red");
   });
 
+  it("never reads greener than the page at the arrival itself (post-build-review #132 A1)", () => {
+    // The arrival's own reading came from the gate, which reads a gap red as
+    // its measurement - so it said green where the page says red.
+    const w = withRaw({...raw, promotedHealth: {r1: {promotedOn: "green",
+      promotedAt: "2026-01-20T01:00:00+00:00", timeline: [
+        {at: "2026-01-10T01:00:00+00:00", status: "green", cause: "the arrival of Carers"}]}}});
+    const got = pillOf(w, w.supplyRowStatus("cp-carers", {run_id: "r1", status: "red"}, "2026-03-05"));
+    expect(got.pill).toContain("red");
+    expect(got.arrived).toBeNull();
+  });
+
+  it("names what changed it (Keith, 2026-10-07)", () => {
+    const w = withRaw(raw);
+    const html = w.supplyRowStatus("cp-carers", {run_id: "r1", status: "green"}, "2026-03-05");
+    expect(html).toContain("the promote of Client Register");
+  });
+
   it("a supply not promoted on the date keeps its own verdict", () => {
     const w = withRaw(raw);
     const got = pillOf(w, w.supplyRowStatus("cp-carers", {run_id: "r1", status: "amber"}, "2026-01-15"));

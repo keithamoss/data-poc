@@ -123,3 +123,25 @@ class TestNothingIsLeftBehind:
                 "SELECT nspname FROM pg_namespace WHERE nspname LIKE ?",
                 [supply_db.dbt_worker_schema() + "%"]).fetchall()]
         assert left == []
+
+
+class TestNamesAndLeaks:
+    """post-build-review #131 D4."""
+
+    def test_two_processes_with_the_same_pid_get_different_schemas(self, monkeypatch):
+        """PIDs repeat across containers and Lambda sandboxes, and two such
+        processes on one database would empty each other's schemas."""
+        first = supply_db.dbt_worker_schema()
+        monkeypatch.setattr(supply_db, "_WORKER_TOKEN", None)
+        assert supply_db.dbt_worker_schema() != first
+        assert str(os.getpid()) in supply_db.dbt_worker_schema()
+
+    def test_a_worker_that_died_idle_leaves_nothing_behind(self, fresh_worker):
+        # THE DIRTY RUN, because TestNothingIsLeftBehind above tidies the
+        # reference run's schemas away and this file runs in order.
+        run_dbt_cp.evaluate_dbt_cp(CP_DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
+        proc, _conn, pp_dir = dbt_worker._worker
+        proc.kill()
+        proc.wait()
+        run_dbt_cp.evaluate_dbt_cp(CP_DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
+        assert not os.path.exists(pp_dir), "the dead worker's parse directory leaked"

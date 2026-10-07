@@ -176,7 +176,13 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
         # by left_out, not here.
         for missing in unreported_checks(handed, scan_results, scan):
             if missing["table"] not in cp_common.TABLES:
-                continue
+                # NEVER SKIPPED QUIETLY (#131 D6): a check this runner cannot
+                # attribute is a configuration fault, and dropping it would
+                # be the very false green this record exists to prevent.
+                raise ValueError(
+                    f"Soda check {missing['check_id']!r} is declared on "
+                    f"{missing['table']!r}, which is not a Child Protection table - it "
+                    f"could not be evaluated and cannot be recorded against a dataset")
             results.append(not_evaluated_record(
                 missing, agency_id=cp_common.AGENCY_ID, collection_id=cp_common.COLLECTION_ID,
                 dataset_id=hierarchy.dataset_for_table(missing["table"]).dataset_id,

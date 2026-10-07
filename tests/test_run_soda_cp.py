@@ -69,3 +69,24 @@ class TestAnUnreadableTableDoesNotTakeTheScanDown:
             with supply_db.connect(label="test-held-soda") as conn:
                 conn.execute(
                     f'DROP SCHEMA IF EXISTS "{supply_db.run_schema(mine)}" CASCADE')
+
+
+class TestAPartitionedCheckIsNotDropped:
+    """post-build-review #131 D6: `checks for t [recent]` is Soda's partition
+    syntax (BDM uses it today). Its table is `t`; read raw it was
+    "t [recent]", which the CP runner's table filter then dropped - a check
+    that could not run vanishing, the false green 15edf01 exists to stop."""
+
+    def test_its_table_is_the_bare_name(self):
+        from types import SimpleNamespace
+
+        from qa_tools.common import soda_common
+
+        yaml_text = ("checks for cp_clients [recent]:\n"
+                     "  - missing_count(given_name) = 0:\n"
+                     "      attributes:\n"
+                     "        check_id: x.cp-clients.given_name.missing_count_soda\n")
+        [missing] = soda_common.unreported_checks(
+            yaml_text, {"checks": []}, SimpleNamespace(get_error_logs=lambda: []))
+        assert missing["table"] == "cp_clients"
+        assert missing["column"] == "given_name"

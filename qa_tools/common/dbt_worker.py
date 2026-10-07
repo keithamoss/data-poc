@@ -123,10 +123,16 @@ def _start():
         sock = getattr(getattr(listener, "_listener", None), "_socket", None)
         if sock is not None:
             sock.settimeout(60)
+        from multiprocessing import AuthenticationError
+
         try:
             conn = listener.accept()
-        except OSError as exc:
+        except (OSError, AuthenticationError) as exc:
+            # A STRAY LOCAL CONNECTION FAILS AUTHENTICATION rather than
+            # timing out; either way the process and its directory go
+            # (#131 D4).
             proc.kill()
+            shutil.rmtree(pp_dir, ignore_errors=True)
             raise WorkerLost(f"the dbt worker did not start (exit {proc.poll()})") from exc
     return proc, conn, pp_dir
 
@@ -141,7 +147,11 @@ def invoke(args: list[str], env: dict, target_path: str) -> SimpleNamespace:
     dbt_common._refuse_a_build_that_did_not_run."""
     global _worker
     with _lock:
-        if _worker is None or _worker[0].poll() is not None:
+        if _worker is not None and _worker[0].poll() is not None:
+            # DIED WHILE IDLE: let go of its connection and parse directory
+            # before starting another (#131 D4 - they leaked).
+            stop()
+        if _worker is None:
             _worker = _start()
         proc, conn, _pp = _worker
         try:

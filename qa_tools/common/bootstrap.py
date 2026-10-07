@@ -35,6 +35,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
+import psycopg
+
 from qa_tools.common import supply_db
 
 
@@ -56,6 +58,9 @@ class BootstrapResult:
     #: True where it REFUSED rather than found nothing to do - a database
     #: already holding QA history (REQ-PIPE-144 criterion 38).
     refused: bool = False
+    #: The checkpoint taken, if one was asked for - repeated in the closing
+    #: summary so it is not lost in the run's output (#133 B6).
+    checkpoint: str | None = None
 
 
 #: Why a re-run over recorded history is refused (REQ-PIPE-144 criteria
@@ -135,6 +140,12 @@ def bootstrap(collection: str = "all", force: bool = False,
                                           "choose --collection bdm or --collection cp")
         try:
             checkpoints.require_synthetic()
+            # N IS CHECKED BEFORE ANYTHING IS TOUCHED (post-build-review #133
+            # B3): against a regeneration somewhere of its own, so a refusal
+            # never follows a rewritten data/ tree.
+            say("Checking where the checkpoint can be taken")
+            checkpoints.snapped(checkpoints.arrivals_of(checkpoints.COLLECTIONS[collection]),
+                                checkpoint_before)
         except checkpoints.CheckpointRefused as exc:
             return BootstrapResult(populated=False, staged_before=0, staged_after=0,
                                    refused=True, reason=str(exc))
@@ -144,6 +155,16 @@ def bootstrap(collection: str = "all", force: bool = False,
         supply_db.ensure_schemas(conn)
         before = staged_table_count(conn)
         history = holds_history(conn)
+
+    if checkpoint_before is not None and before:
+        # ASKED FOR A CHECKPOINT AND GOT NONE is a refusal, not "nothing to
+        # do" (#133 B5): a checkpoint is taken during a bootstrap from empty.
+        return BootstrapResult(
+            populated=False, staged_before=before, staged_after=before, refused=True,
+            reason=f"this database already holds {before} staged table(s), and a checkpoint "
+                   "is taken during a bootstrap from an empty database - nothing was run. "
+                   "Create an empty database, point MOTHMAN_SUPPLY_DSN at it, run `mothman "
+                   "env mark --confirm sandbox`, then run this bootstrap again")
 
     if before and not force:
         return BootstrapResult(
@@ -161,6 +182,7 @@ def bootstrap(collection: str = "all", force: bool = False,
     # arrivals. Refused at once, naming the holder, with nothing changed.
     from qa_tools.common import processing_pass
 
+    taken: list[str] = []
     try:
         lock = processing_pass.pass_lock("bootstrap")
         held = lock.__enter__()
@@ -188,7 +210,8 @@ def bootstrap(collection: str = "all", force: bool = False,
                 generate[name]()
                 after_each = None
                 if checkpoint_before is not None:
-                    after_each = _checkpoint_hook(name, checkpoint_before, held, say)
+                    after_each = _checkpoint_hook(name, checkpoint_before, held, say,
+                                                  taken.append)
                 say(f"Running the real checks against every {_LABEL[name]} supply")
                 timings[name] = _run_collection(name, sequential, record_deliveries=True,
                                                 after_each=after_each)
@@ -215,7 +238,7 @@ def bootstrap(collection: str = "all", force: bool = False,
     with supply_db.connect(label="mothman:bootstrap") as conn:
         after = staged_table_count(conn)
     return BootstrapResult(populated=True, staged_before=before, staged_after=after,
-                           timings=timings)
+                           timings=timings, checkpoint=taken[0] if taken else None)
 
 
 _LABEL = {"bdm": "Birth Registrations", "cp": "Child Protection", "total": "in total"}
@@ -247,21 +270,25 @@ def _run_collection(name: str, sequential: bool, record_deliveries: bool = False
     return time.monotonic() - started
 
 
-def _checkpoint_hook(name: str, before: int, held, say):
+def _checkpoint_hook(name: str, before: int, held, say, on_name=None):
     """The after_each that takes the checkpoint, with `before` snapped back
-    to the start of its receipt instant - said aloud when it moves."""
+    to where its delivery or receipt instant begins - said aloud when it
+    moves, and every arrival named with its delivery (#133 B4)."""
     from qa_tools.common import arrivals, checkpoints
 
     collection_id = checkpoints.COLLECTIONS[name]
     found = arrivals.arrivals_for(collection_id, "")
     at = checkpoints.snapped(found, before)
     if at != before:
-        say(f"Arrival {before} belongs with the arrivals before it (the same delivery or the "
-            f"same receipt instant), so the checkpoint is taken before arrival {at}, where "
-            f"they begin")
-    return checkpoints.taking_checkpoint(
-        collection_id, at, held.paused,
-        on_taken=lambda cp: say(f"Checkpoint {cp.name} taken before arrival {cp.before}"))
+        say(f"{checkpoints.named(found, before).capitalize()} belongs with the arrivals before "
+            f"it (the same delivery or the same receipt instant), so the checkpoint is taken "
+            f"before {checkpoints.named(found, at)}, where they begin.")
+
+    def taken(cp) -> None:
+        say(f"Checkpoint {cp.name} taken before {checkpoints.named(found, cp.before)}.")
+        if on_name is not None:
+            on_name(cp.name)
+    return checkpoints.taking_checkpoint(collection_id, at, held.paused, on_taken=taken)
 
 
 @dataclass(frozen=True)
@@ -292,6 +319,17 @@ def resume(name: str, sequential: bool = False,
     except checkpoints.CheckpointRefused as exc:
         return ResumeResult(replayed=False, refused=True, reason=str(exc))
 
+    if not cp.recorded.readable or not cp.collection_id:
+        # AN UNREADABLE DESCRIPTION IS A REFUSAL, never a crash (#133 B2):
+        # nothing says where a change begins, so it would be the first
+        # arrival - before any checkpoint.
+        return ResumeResult(
+            replayed=False, refused=True, first_affected=1,
+            reason=f"{name}'s record of what it was made from cannot be read, so a resume "
+                   "would have to start from the first arrival, which is before this "
+                   "checkpoint - nothing was copied or replayed. Start again with a "
+                   "bootstrap from empty")
+
     say("Regenerating the deliveries to compare them with the checkpoint's")
     first = replay_inputs.first_affected(cp.recorded)
     if first.arrival is None:
@@ -311,8 +349,12 @@ def resume(name: str, sequential: bool = False,
     say("Generating the synthetic data the replay reads")
     bdm.generate_synthetic_data()
     cp_cli.generate_synthetic_data()
-    say(f"Copying {cp.name} into a database of the resume's own")
+    total = len(dict.fromkeys(a.run_id for a in cp.recorded.arrivals))
+    # SAID BEFORE THE COPY, so a wrong resume can be stopped early (#133 B9).
+    say(f"{first.reason}. Replaying arrivals {cp.before} to {total} of {_LABEL[short]} into "
+        f"a new database of the resume's own, copied from {cp.name}.")
     dsn = checkpoints.copy_for_resume(cp)
+    resume_db = psycopg.conninfo.conninfo_to_dict(dsn)["dbname"]
 
     previous = os.environ.get(supply_db.SUPPLY_DSN_ENV)
     os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
@@ -326,6 +368,12 @@ def resume(name: str, sequential: bool = False,
             _run_collection(short, sequential, record_deliveries=True,
                             start_at=cp.before, player=player)
         _rebuild_results(short)
+    except BaseException:
+        # A FAILED RESUME NAMES WHAT IT LEFT (#131 D5): its database is kept
+        # for whoever investigates, and listed by `checkpoint list`.
+        say(f"The resume stopped part-way; its database {resume_db} is left as it stood - "
+            f"`mothman pipeline checkpoint delete {resume_db}` removes it.")
+        raise
     finally:
         supply_db.release_connections()
         if previous is None:
@@ -338,12 +386,18 @@ def resume(name: str, sequential: bool = False,
 
 def _rebuild_results(short: str) -> None:
     """A resume processed only part of the collection, so its results file
-    is rebuilt from the whole recorded history rather than left partial."""
+    is rebuilt from the whole recorded history rather than left partial.
+    QUIETLY: its own count line, printed beside the replay's, read as two
+    disagreeing totals (post-build-review #133 B12)."""
+    import contextlib
+    import io
+
     if short == "bdm":
         from qa_tools.bdm.build_results_from_history import build_results_from_history
     else:
         from qa_tools.cp.build_results_from_history import build_results_from_history
-    build_results_from_history()
+    with contextlib.redirect_stdout(io.StringIO()):
+        build_results_from_history()
 
 
 def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:

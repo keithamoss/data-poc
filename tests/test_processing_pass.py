@@ -381,6 +381,18 @@ class TestThePassItself:
         monkeypatch.setattr(ticket_reconciler, "service_from_env", lambda: world.tickets)
         return world
 
+    def test_supplies_held_until_dates_existed_are_filed_before_new_arrivals(
+            self, world, monkeypatch):
+        """post-build-review #131 D7: re-filed AFTER the arrival loop, a newer
+        supply of the same dataset arriving in the same pass was filed before
+        the older held one - receipt order broken across the two."""
+        from qa_tools.common import schedule_ended
+
+        monkeypatch.setattr(schedule_ended, "refile_covered",
+                            lambda say: world.processed.append("held refiled") or [])
+        pp.run_pass(run_by="me", say=lambda m: None)
+        assert world.processed[0] == "held refiled", world.processed
+
     def test_every_arrival_in_the_order_given(self, world):
         report = pp.run_pass(run_by="me", say=lambda m: None)
         assert world.processed == [a.run_id for a in world.arrivals]

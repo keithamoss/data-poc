@@ -1289,10 +1289,10 @@ function sampleFinePrint(toolRef, shown, failing){
   if (!shown || !(failing > shown)) return "";
   const tool = String(toolRef || "").split(":")[0];
   if (tool === "soda" && failing > SODA_SAMPLES_ASKED)
-    return `The lowest keys among the ${SODA_SAMPLES_ASKED} failing rows Soda returned, in key order - Soda chooses which ${SODA_SAMPLES_ASKED}, so another run of the same data can show different rows.`;
+    return `Soda returns up to ${SODA_SAMPLES_ASKED} of the failing rows and chooses which; these are the lowest ${shown} keys of those, in key order - so another run of the same data can show different rows.`;
   if (tool === "datacontract" && failing > DATACONTRACT_SAMPLES_RETURNED)
     return `The ${DATACONTRACT_SAMPLES_RETURNED} failing rows datacontract-cli returned, in key order - it chooses which ${DATACONTRACT_SAMPLES_RETURNED} itself, so another run of the same data can show different rows.`;
-  return "The lowest keys among the failing rows, in key order - the same data always shows the same rows.";
+  return `The lowest ${shown} keys among the failing rows, in key order - the same data always shows the same rows.`;
 }
 // REQ-DASH-071. lastArrival.arrivedAt is a real INSTANT and now reads
 // as one, in the single form this project uses everywhere. What it used
@@ -4256,23 +4256,35 @@ function exhaustedNotice(runwayState, onDateStr){
     : ((DATA && DATA.scheduleRunway) || null);
   if(!runway || !runway.exhaustedCount) return "";
   const on = onDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
-  const backlog = scheduleEndedBacklog(Object.keys(runway.exhausted), on);
+  const ids = Object.keys(runway.exhausted);
+  const backlog = scheduleEndedBacklog(ids, on);
+  const n = runway.exhaustedCount;
   const piled = backlog.count
     ? `${backlog.count} ${backlog.count===1?"supply is":"supplies are"} held because of it, the
       earliest received ${fmtDay(backlog.earliest)}.`
-    : `Nothing has arrived for them since the schedule ended.`;
-  const n = runway.exhaustedCount;
-  const calendars = [...new Set(Object.values(runway.exhausted).map(e=>e.calendar))];
-  const which = calendars.map(c=>`<b style="display:inline">${c}</b>`).join(", ");
+    : `Nothing has arrived for ${n===1?"it":"them"} since.`;
+  // NAMED, AND BY THEIR OWN DATES (post-build-review #132 A4): it is a
+  // dataset's own dates that run out - a calendar can still have dates its
+  // dataset does not take - so the notice names each dataset and its last
+  // period, never the calendar as though the whole calendar had ended.
+  const name = id => { const raw = rawRealDatasetById(id); return (raw && raw.name) || id; };
+  const which = ids.map(id=>{
+    const e = runway.exhausted[id];
+    return `<li><b style="display:inline">${escHtml(name(id))}</b> - its last delivery date is for
+      ${escHtml(String(e.lastPeriod || "?"))} (${escHtml(String(e.calendar))} calendar)</li>`;
+  }).join("");
   const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/data-asset.yaml";
+  // "CANNOT BE FILED", NOT "PROCESSED" (#131 D10): an arriving supply is
+  // still received and its files checked (REQ-PIPE-154 criterion 5); it is
+  // filing it to a period that waits for dates.
   return `<div class="notice-exhausted" role="status">
-    <b>${n} dataset${n===1?"":"s"} cannot be processed — the delivery schedule has ended</b>
+    <b>${n} dataset${n===1?"":"s"} cannot be filed — ${n===1?"its":"their"} delivery dates have run out</b>
+    <ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${which}</ul>
     <div style="color:var(--ink-muted); font-size:13px;">
-      The ${calendars.length===1?"calendar":"calendars"} ${which} ${calendars.length===1?"has":"have"}
-      no delivery dates after the date being viewed, so nothing is expected and nothing can be
-      filed. This is a configuration task, not a problem with anyone's data.
-      Add the next dates to <code>${file}</code> — <code>mothman schedule candidate-dates</code>
-      proposes them for review.
+      A supply that arrives now is still received and its files checked, then held until there is
+      a period to file it to. This is a configuration task, not a problem with anyone's data:
+      add the next dates to <code>${file}</code> (<code>mothman schedule candidate-dates</code>
+      proposes them for review), and the held supplies file themselves on the next processing pass.
     </div>
     <div data-schedule-backlog style="margin-top:4px; font-size:13px;">${piled}</div>
   </div>`;
@@ -4427,7 +4439,26 @@ function blockerWithoutARunOfItsOwn(ds, inPlaceOnDateStr, source){
 // colour alone (REQ-DASH-133 criterion 11's rule, applied here).
 function blockerReasonText(b){
   const many = b.count > 1 ? ` (${b.count} supplies)` : "";
-  return `${BLOCKER_LABEL[b.kind] || b.kind}${many} — ${BLOCKER_SAYS[b.kind] || "it cannot be read"}`;
+  return `${blockerLabel(b)}${many} — ${blockerSays(b)}`;
+}
+// A HOLD BECAUSE THE SCHEDULE ENDED IS ITS OWN KIND IN WORDS (post-build-
+// review #132 A3, Keith 2026-10-07: add dates only): nobody files or
+// rejects it - adding the next dates files it on the next pass.
+function blockerLabel(b){
+  return b.scheduleEnded ? "Held: schedule ended" : (BLOCKER_LABEL[b.kind] || b.kind);
+}
+function blockerSays(b){
+  return b.scheduleEnded
+    ? "add the next delivery dates; it files itself on the next processing pass"
+    : (BLOCKER_SAYS[b.kind] || "it cannot be read");
+}
+function blockerUntil(b){
+  return b.scheduleEnded ? "until its next delivery dates are added" : "until a person resolves it";
+}
+// A `command` in a recorded reason, shown as code rather than with its
+// backticks escaped into the text (#132 A3).
+function withCode(text){
+  return escHtml(text || "").replace(/`([^`]+)`/g, "<code>$1</code>");
 }
 // A PERIOD THAT CLOSED WITH NO SUPPLY (REQ-DASH-133). The build embeds,
 // per dataset, every slot that was a gap when it closed and the instants
@@ -5158,15 +5189,23 @@ function supplyRowStatus(datasetId, entry, inPlaceOnDateStr){
   const raw = rawRealDatasetById(datasetId);
   const h = raw && raw.promotedHealth && raw.promotedHealth[entry.run_id];
   const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
-  let shown = entry.status;
+  let shown = entry.status, changed = null;
   if(h && runStateInPlaceOn(raw, entry.run_id, on) === "promoted"){
-    (h.timeline || []).forEach(t=>{
-      if(t.at && t.status && (!on || assetDateStrOf(t.at) <= on)) shown = t.status;
+    // ONLY A READING AFTER THE ARRIVAL moves the pill (post-build-review
+    // #132 A1, Keith 2026-10-07). The arrival's own reading is the page's
+    // status already, and where the two ever disagreed the page's stands -
+    // the timeline's first point read a gap red as green.
+    const tl = (h.timeline || []).filter(t=> t.at && t.status);
+    tl.slice(1).forEach(t=>{
+      if(!on || assetDateStrOf(t.at) <= on){ shown = t.status; changed = t; }
     });
+    if(changed && changed.status === entry.status) changed = null;
   }
-  const arrived = shown !== entry.status && STATUS_LABEL[entry.status]
-    ? ` <span class="arrived-as" data-arrived-as style="color:var(--ink-muted); font-size:12px;">Arrived ${STATUS_LABEL[entry.status]}</span>` : "";
-  return pill(shown, "sm") + arrived;
+  const arrived = changed && STATUS_LABEL[entry.status]
+    ? ` <span class="arrived-as" data-arrived-as style="color:var(--ink-muted); font-size:12px;">Arrived ${STATUS_LABEL[entry.status]}</span>`
+      + ` <span class="changed-by" data-changed-by style="color:var(--ink-muted); font-size:12px;">· changed ${escHtml(fmtDay(changed.at))} after ${escHtml(changed.cause || "a later check")}</span>`
+    : "";
+  return pill(changed ? shown : entry.status, "sm") + arrived;
 }
 // RED PROMOTED AS A KIND ON THE AGENCY AND COLLECTION CARDS (#123 A1, Keith
 // 2026-10-06): a dataset whose newer supply awaits a decision reads Green on
@@ -5254,7 +5293,7 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
           return `<tr data-blocker="${b.kind}">
             <td>${fmtInstant(b.openedAt)}</td>
             <td>${resolved ? pill("nodata","sm") : pill("red","sm")}</td>
-            <td><b>${escHtml(BLOCKER_LABEL[b.kind] || b.kind)}</b>${resolved
+            <td><b>${escHtml(blockerLabel(b))}</b>${resolved
               ? (b.rejected
                   ? ` <span style="color:var(--ink-faint);">— rejected by ${escHtml(b.rejected.actor)}, ${fmtInstant(b.rejected.at)}${b.rejected.reason ? ": "+escHtml(b.rejected.reason) : ""}</span>`
                   : ` <span style="color:var(--ink-faint);">— resolved ${fmtInstant(b.resolvedAt)}</span>`)
@@ -5434,9 +5473,9 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // supply's figures shown as this period's.
   const blockedBanner = ds.blocked ? `
       <div class="notice-exhausted" role="status" data-blocked="${ds.blocked.kind}">
-        <b>${escHtml(BLOCKER_LABEL[ds.blocked.kind] || ds.blocked.kind)} — nothing is checked for this dataset until a person resolves it.</b>
+        <b>${escHtml(blockerLabel(ds.blocked))} — nothing is checked for this dataset ${blockerUntil(ds.blocked)}.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
-          ${escHtml(ds.blocked.reason)}<br><br>
+          ${withCode(ds.blocked.reason)}<br><br>
           ${ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
           check below reads <b style="display:inline">No data</b> for this period: none of
           them ran, and no earlier supply's result stands in for it.
@@ -5449,9 +5488,9 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div class="notice-exhausted" role="status" data-waiting-blocker="${ds.waitingBlocker.kind}">
         <b>${escHtml(blockerReasonText(ds.waitingBlocker))}.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
-          ${escHtml(ds.waitingBlocker.reason || "")}${ds.waitingBlocker.reason ? "<br><br>" : ""}
+          ${withCode(ds.waitingBlocker.reason || "")}${ds.waitingBlocker.reason ? "<br><br>" : ""}
           ${ds.waitingBlocker.count > 1 ? `${ds.waitingBlocker.count} supplies are waiting — ${escHtml(blockerReceivedText(ds.waitingBlocker))}` : `Received <b style="display:inline">${fmtInstant(ds.waitingBlocker.openedAt)}</b>`}.
-          The dataset stays red until a person resolves it. The checks below are the
+          The dataset stays red ${blockerUntil(ds.waitingBlocker)}. The checks below are the
           latest supply that could be checked, received ${fmtInstant(ds.lastArrival.arrivedAt)}.
         </div>
       </div>` : "";
@@ -5574,7 +5613,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     <div class="sla-strip">
       <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${cadenceLabel(ds.sla.cadence)}</div></div>
       ${ds.blocked ? `
-      <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono" title="When we received the supply that is waiting for a person">${fmtInstant(ds.blocked.openedAt)} (${escHtml(BLOCKER_LABEL[ds.blocked.kind] || ds.blocked.kind)})</div></div>
+      <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono" title="When we received the supply that is waiting for a person">${fmtInstant(ds.blocked.openedAt)} (${escHtml(blockerLabel(ds.blocked))})</div></div>
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>` : `
       <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)} <span title="${ARRIVAL_FOLLOWS_FILING}">${ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : ""}</span></div></div>
@@ -6188,7 +6227,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
         <div style="display:flex; flex-wrap:wrap; gap:5px;">
           ${sampleKeys.map(k => `<span style="font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--panel-2, rgba(127,127,127,.12)); border-radius:4px; padding:2px 6px;">${k}</span>`).join("")}
         </div>
-        ${(fp => fp ? `<div class="sample-fine-print" style="font-size:10.5px; color:var(--ink-faint); margin-top:5px;">${fp}</div>` : "")(sampleFinePrint(check.tool_ref, sampleKeys.length, currentPoint.row_count_invalid))}
+        ${(fp => fp ? `<div class="sample-fine-print" style="font-size:11px; color:var(--ink-muted); margin-top:5px;">${fp}</div>` : "")(sampleFinePrint(check.tool_ref, sampleKeys.length, currentPoint.row_count_invalid))}
       </div>` : (currentPoint.row_count_invalid ? `
       <div style="font-size:11.5px; color:var(--ink-faint); margin-top:8px;">No failing-row sample available for this check - not every check type this pipeline runs supports per-row samples yet (see plans/qa-pipeline.md #15).</div>` : "");
 
@@ -7500,10 +7539,23 @@ const DECISION_DONE = {promote:"promoted", reject:"rejected", demote:"demoted",
 // shows that date differently from how it could have looked then. The plain
 // reading; a replay stamps its own records as they happen (criteria 27-31),
 // so only a genuinely later decision qualifies.
-function decisionsChangingDate(onDateStr){
+// THE DATASETS THE PAGE IS SHOWING, or null for the whole asset - so a
+// note on one dataset's page is about that dataset (post-build-review #132
+// A5: it listed every dataset's, which at thirty is noise).
+function datasetIdsInView(){
+  const st = typeof STATE !== "undefined" ? STATE : null;
+  if(!st || !st.agencyId || typeof DATA === "undefined" || !DATA || !DATA.agencies) return null;
+  const ag = DATA.agencies.find(a=> a.id === st.agencyId);
+  if(!ag) return null;
+  const cols = st.collectionId ? ag.collections.filter(c=> c.id === st.collectionId) : ag.collections;
+  return new Set(cols.flatMap(c=> c.datasets || [])
+    .filter(d=> !st.datasetId || d.id === st.datasetId).map(d=> d.id));
+}
+function decisionsChangingDate(onDateStr, inView){
   if(!onDateStr) return [];
+  const ids = inView === undefined ? datasetIdsInView() : inView;
   const out = [];
-  rawRealDatasets().forEach(raw=>{
+  rawRealDatasets().filter(raw=> !ids || ids.has(raw.id)).forEach(raw=>{
     const runs = Object.fromEntries((raw.runs || []).map(r=> [r.run_id, r]));
     Object.entries(raw.runStates || {}).forEach(([runId, entries])=> (entries || []).forEach(e=>{
       if(!e.at || !e.recordedAt) return;
@@ -7518,15 +7570,18 @@ function decisionsChangingDate(onDateStr){
 function changedSinceNote(onDateStr){
   const found = decisionsChangingDate(onDateStr);
   if(!found.length) return "";
-  const SHOWN = 5;
-  const items = found.slice(0, SHOWN).map(d=>{
-    const received = d.run ? ` received ${d.run.arrivedAt ? fmtInstant(d.run.arrivedAt) : fmtDay(d.run.run_date)}` : "";
+  // EVERY ONE, NOT FIVE AND A DEAD END (#132 A5): the list is already
+  // scoped to the page, and "and 1 more" offered nothing to open.
+  const items = found.map(d=>{
+    // THE RECEIPT INSTANT, which the runs carry as received_at - a day
+    // alone cannot tell two same-day resupplies apart (#132 A5).
+    const at = d.run && (d.run.received_at || d.run.arrivedAt);
+    const received = d.run ? ` received ${at ? fmtInstant(at) : fmtDay(d.run.run_date)}` : "";
     return `<li>${escHtml(d.datasetName)}: the supply${received} was ${escHtml(DECISION_DONE[d.action] || d.action)}
       as from ${fmtDay(assetDateStrOf(d.at))}, a decision made ${fmtDay(assetDateStrOf(d.recordedAt))}</li>`;
   }).join("");
-  const more = found.length > SHOWN ? `<li>and ${found.length - SHOWN} more</li>` : "";
   return `<div data-changed-since style="margin-top:6px;">${found.length} ${pluralize(found.length, "decision")}
-    made since then ${found.length === 1 ? "has" : "have"} changed what this date shows:<ul style="margin:4px 0 0 18px; padding:0;">${items}${more}</ul></div>`;
+    made since then ${found.length === 1 ? "has" : "have"} changed what this date shows:<ul style="margin:4px 0 0 18px; padding:0;">${items}</ul></div>`;
 }
 function renderInPlaceOnPastNotice(){
   const notice = document.getElementById("in-place-on-past-notice");

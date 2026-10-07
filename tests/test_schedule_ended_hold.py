@@ -83,6 +83,24 @@ class TestTheHoldSaysWhatToEdit:
         assert "2027-Q4" in said
         assert "next period's claim window" not in said
 
+    def test_the_only_thing_offered_is_adding_dates(self, conn):
+        """Keith, 2026-10-07 (post-build-review #132 A3): it files itself once
+        the dates exist, so filing it by hand or rejecting it is the wrong
+        fix to offer."""
+        [only] = self._held(conn).responses
+        assert "add the next delivery dates" in only and "files itself" in only
+
+    def test_it_names_the_dataset_not_its_id(self, conn):
+        said = self._held(conn).describe()
+        assert "cp-carers's" not in said and "Carer Register" in said
+
+    def test_the_page_is_told_it_is_this_kind(self, conn):
+        from qa_tools.common import dataset_blockers
+
+        self._held(conn)
+        [b] = [b for b in dataset_blockers._holds(conn) if b.dataset_id == "cp-carers"]
+        assert b.as_record()["scheduleEnded"] is True
+
     def test_the_tally_counts_them_apart(self, conn):
         """Criterion 6's count, read as one aggregate."""
         self._held(conn, "cp-carers@a")

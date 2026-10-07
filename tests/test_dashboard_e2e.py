@@ -1502,13 +1502,14 @@ class TestAnExhaustedScheduleIsLoud:
         notice = page.locator(".notice-exhausted")
         assert notice.count() == 1
         text = " ".join(notice.inner_text().split())
-        assert "1 dataset cannot be processed" in text
-        assert "schedule has ended" in text
+        assert "1 dataset cannot be filed" in text
+        assert "delivery dates have run out" in text
+        assert "Case Workers" in text, "the dataset is named (post-build-review #132 A4)"
 
     def test_the_count_tracks_the_in_place_on_date(self, page, dashboard_html_without_blockers):
         _goto(page, dashboard_html_without_blockers, in_place_on=self.ALL_EXHAUSTED)
         text = " ".join(page.locator(".notice-exhausted").inner_text().split())
-        assert "6 datasets cannot be processed" in text
+        assert "6 datasets cannot be filed" in text
 
     def test_the_notice_names_the_file_to_edit(self, page, dashboard_html_without_blockers):
         _goto(page, dashboard_html_without_blockers, in_place_on=self.ONE_EXHAUSTED)
@@ -3823,4 +3824,4 @@ class TestSampleFinePrint:
           const fp = document.querySelector('#check-panel-body .sample-fine-print');
           return fp ? fp.textContent : null;
         }""")
-        assert text and "Soda chooses which 100" in text
+        assert text and "Soda returns up to 100 of the failing rows" in text

@@ -54,6 +54,36 @@ describe("the notice counts what is held behind it", () => {
   it("says nothing has arrived when nothing is held", () => {
     const w = page();
     const html = w.exhaustedNotice(w.scheduleRunwayInPlaceOn("2028-02-01", RUNWAY), "2028-02-01");
-    expect(html).toContain("Nothing has arrived for them since the schedule ended");
+    expect(html).toContain("Nothing has arrived for them since.");
+  });
+});
+
+describe("the notice names each dataset by its own dates (post-build-review #132 A4)", () => {
+  it("names the dataset and its last period, and says filing waits rather than processing", () => {
+    const w = page();
+    w.rawRealDatasetById = id => ({id, name: id === "cp-clients" ? "Client Register" : "Carers"});
+    const html = w.exhaustedNotice(w.scheduleRunwayInPlaceOn("2028-02-01", RUNWAY), "2028-02-01");
+    expect(html).toContain("Client Register");
+    expect(html).toContain("its last delivery date is for");
+    expect(html).toContain("cannot be filed");
+    expect(html).not.toContain("cannot be processed");
+    expect(html).toContain("still received and its files checked");
+  });
+});
+
+describe("a supply held because its schedule ended (Keith, 2026-10-07: add dates only)", () => {
+  it("says to add dates, not that a person must resolve it", () => {
+    const w = loadDashboard().window;
+    const b = {kind: "held", scheduleEnded: true, count: 1};
+    expect(w.blockerReasonText(b)).toContain("Held: schedule ended");
+    expect(w.blockerReasonText(b)).toContain("files itself on the next processing pass");
+    expect(w.blockerUntil(b)).not.toContain("a person");
+  });
+  it("leaves any other hold as it was", () => {
+    const w = loadDashboard().window;
+    expect(w.blockerReasonText({kind: "held", count: 1})).toContain("waiting for a person");
+  });
+  it("shows a recorded command as code", () => {
+    expect(loadDashboard().window.withCode("run `mothman x` now")).toBe("run <code>mothman x</code> now");
   });
 });

@@ -111,11 +111,23 @@ intro: >
 releases:
   - date: "2026-10-07"
     summary: >
-      The example failing rows on a check are the same on every run of the
-      same data, and say which rows they are.
+      A promoted supply's colour now matches the page, held supplies say how
+      to unblock them, and example failing rows are stable.
     changes:
       - category: Fixed
         items:
+          - headline: Promoted pill matches the page
+            components: ["Dashboard UI"]
+            description: >
+              A promoted supply could read green in its history while the page
+              above said red. Its colour now follows the page, and changes only
+              when something after its arrival changes it - saying what.
+          - headline: Odd file names from S3
+            components: ["Pipeline & publishing"]
+            description: >
+              A file whose name has a space or bracket is now read correctly when
+              it arrives through S3, and one unreadable file no longer stops the
+              others in the same upload being recorded.
           - headline: Same data, same example rows
             components: ["QA checks & contract"]
             description: >
@@ -124,6 +136,18 @@ releases:
               order, so two runs of the same data show the same rows.
       - category: Improved
         items:
+          - headline: Held until dates exist
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              A supply held because its dataset's delivery dates ran out now
+              says so by name, and that adding the next dates files it
+              automatically - not that someone has to file or reject it.
+          - headline: Checkpoints explain themselves
+            components: ["Testing & dev tooling"]
+            description: >
+              Checkpoint and resume refuse a bad request in a sentence before
+              touching anything, list the arrival numbers you can choose, and
+              end a resume with one line you can paste.
           - headline: Fine print on example rows
             components: ["Dashboard UI"]
             description: >

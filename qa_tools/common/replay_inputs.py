@@ -218,18 +218,31 @@ def first_affected(recorded: Recorded, *, arrivals: list[ArrivalPrint] | None = 
                   if i >= len(old) or i >= len(new) or old[i] != new[i]), None)
     if first is None:
         return FirstAffected(None, "Nothing differs from the checkpoint - nothing to replay")
-    # WHICH DELIVERY: one only in the checkpoint was removed, one only in the
-    # regenerated tree was added, anything else at this position changed.
-    if first < len(old) and old[first] not in new:
-        differing, what = old[first], "removed"
-    elif first < len(new) and new[first] not in old:
-        differing, what = new[first], "added" if first >= len(old) else "changed"
+    # WHICH FILE, AND WHAT HAPPENED TO IT, by its identity (arrival,
+    # delivery, file) rather than the whole entry - a changed digest is a
+    # CHANGED file, never a removed one (post-build-review #131 D1).
+    def key(p: ArrivalPrint) -> tuple[str, str, str]:
+        return (p.run_id, p.delivery, p.file)
+    old_keys, new_keys = {key(p) for p in old}, {key(p) for p in new}
+    if first < len(old) and key(old[first]) not in new_keys:
+        differing, what, side = old[first], "removed", old
+    elif first < len(new) and key(new[first]) not in old_keys:
+        differing, what, side = new[first], "added", new
+    elif first < len(new) and first < len(old) and key(old[first]) == key(new[first]):
+        differing, what, side = new[first], "changed", new
     else:
-        differing, what = (new if first < len(new) else old)[first], "moved"
+        differing, what, side = (new if first < len(new) else old)[first], "moved", (
+            new if first < len(new) else old)
     # A DELIVERY IS AFFECTED FROM ITS FIRST ARRIVAL: its files are one
     # delivery's, so its effect can begin at the earliest of them. Everything
-    # before `first` is the same in both, so either list answers it.
-    earliest = next((i for i, a in enumerate(new[:first]) if a.delivery == differing.delivery),
+    # before `first` is the same in both lists.
+    earliest = next((i for i, a in enumerate(side[:first]) if a.delivery == differing.delivery),
                     first)
-    return FirstAffected(earliest + 1, f"Delivery {differing.delivery!r} ({differing.file}) "
-                                       f"was {what} - from arrival {earliest + 1}")
+    # AN ARRIVAL NUMBER, NOT A FILE POSITION: the print has one entry per
+    # file and an arrival can carry several files for one dataset, so the
+    # position is counted in distinct arrivals (#131 D1 - counting files
+    # reported every later arrival too late, the direction the fail-safe
+    # NFR forbids).
+    arrival = len(dict.fromkeys(p.run_id for p in side[:earliest + 1]))
+    return FirstAffected(arrival, f"Delivery {differing.delivery!r} ({differing.file}) "
+                                  f"was {what} - from arrival {arrival}")

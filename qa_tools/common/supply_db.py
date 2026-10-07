@@ -1554,8 +1554,21 @@ def dbt_worker_schema() -> str:
     for the process's life so dbt's partial parse stays valid - a schema
     that changes forces a full parse - and distinct per process, so two
     collections running side by side never share one. Emptied before each
-    build, so nothing one run built is read as another's."""
-    return f"{DBT_SCHEMA_PREFIX}w{os.getpid()}"
+    build, so nothing one run built is read as another's.
+
+    DISTINCT ACROSS MACHINES TOO (post-build-review #131 D4): a PID repeats
+    across containers and Lambda sandboxes, so it carries a random token
+    drawn once per process - re-drawn if the PID changes, as in a fork."""
+    global _WORKER_TOKEN
+    if _WORKER_TOKEN is None or _WORKER_TOKEN[0] != os.getpid():
+        import secrets
+
+        _WORKER_TOKEN = (os.getpid(), secrets.token_hex(3))
+    pid, token = _WORKER_TOKEN
+    return f"{DBT_SCHEMA_PREFIX}w{pid}_{token}"
+
+
+_WORKER_TOKEN: tuple[int, str] | None = None
 
 
 def dbt_source_schema() -> str:
