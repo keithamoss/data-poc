@@ -7724,273 +7724,209 @@ requirements:
         it."
   - id: REQ-PIPE-050
     title: A config error can never silently produce zero slots, and a past date cannot move quietly
-    date_written: "2026-09-22"
-    story: >
-      As whoever maintains 30 datasets' schedules, I want a typo to fail
-      a build, so that a dataset does not quietly stop expecting anything
-      and sit green for a year because somebody wrote Febuary.
+    date_written: '2026-09-22'
+    story: 'As whoever maintains 30 datasets'' schedules, I want a typo to fail a build, so that a dataset
+      does not quietly stop expecting anything and sit green for a year because somebody wrote Febuary.
+
+      '
     moscow: must
     status: built
-    source: >
-      Keith, 2026-09-21, plans/supply-model.md Thread K - the new asset
-      and schedule YAML gets validated like everything else, as a
-      validate-config gate alongside validate-requirements and
-      validate-changelog. Delivery sprint 5, and test scenario register
-      TS-25. Scoped by delivery-scoper, batch 1+2 pass, 2026-09-22.
+    source: 'Keith, 2026-09-21, plans/supply-model.md Thread K - the new asset and schedule YAML gets validated
+      like everything else, as a validate-config gate alongside validate-requirements and validate-changelog.
+      Delivery sprint 5, and test scenario register TS-25. Scoped by delivery-scoper, batch 1+2 pass, 2026-09-22.
+
+      '
     signed_off:
       by: Keith
-      date: "2026-09-22"
+      date: '2026-09-22'
     acceptance_criteria:
-      - WHEN the repository's gates run, THE SYSTEM SHALL validate the
-        asset and schedule configuration and SHALL exit non-zero on any
-        error.
-      - IF a configuration error would leave a dataset expecting nothing
-        at all, THEN THE SYSTEM SHALL exit non-zero.
-      - THE SYSTEM SHALL reject an unrecognised configuration key rather
-        than ignoring it.
-      - THE SYSTEM SHALL reject a month name that is not a real, full
-        month name.
-      - THE SYSTEM SHALL reject a dataset naming a delivery month for
-        which its own calendar has no date.
-      - THE SYSTEM SHALL reject schedule versions that overlap or are
-        out of order on their effective-from dates.
-      - THE SYSTEM SHALL reject duplicate calendar names, duplicate
-        dates within a calendar, and duplicate period names.
-      - THE SYSTEM SHALL reject a dataset that both subsets and
-        overrides its own calendar.
-      - THE SYSTEM SHALL reject a dataset named in asset configuration
-        that has no contract, and a contract that has no asset
-        configuration entry.
-      - THE SYSTEM SHALL reject a negative grace allowance or claim
-        window, an unparseable date, and a missing required value.
-      - THE SYSTEM SHALL report every offending item rather than
-        stopping at the first.
-      - THE SYSTEM SHALL validate configuration without opening or
-        querying anything under data/.
-      - THE SYSTEM SHALL be invoked as a mothman subcommand.
-      - THE SYSTEM SHALL reject a dataset naming a calendar the asset
-        does not define.
-      - THE SYSTEM SHALL reject a dataset that names delivery months
-        against a cadence-rule calendar.
-      - THE SYSTEM SHALL reject a claim window that is not a duration
-        with a recognised unit, and SHALL NOT coerce one.
-      - THE SYSTEM SHALL be invoked as a command in a schedule command
-        group, and SHALL NOT be placed in a group documented as not
-        human-facing.
-      - THE SYSTEM SHALL be registered as a gate that runs alongside the
-        repository's other sub-second gates.
-      - THE SYSTEM SHALL report every offending item individually, and
-        SHALL NOT collapse repeated instances of one rule into a single
-        line.
-      - THE SYSTEM SHALL name, in each error, the correction to make,
-        not only the rule that was broken.
-      - THE SYSTEM SHALL group reported errors by the file and the
-        calendar or dataset they belong to, and SHALL state, before the
-        detail, how many errors affect how many datasets.
-      - WHEN the configuration cannot be parsed at all, THE SYSTEM SHALL
-        name the file and the location, and SHALL NOT then report the
-        absence of every value it could not read.
+    - WHEN the repository's gates run, THE SYSTEM SHALL validate the asset and schedule configuration and
+      SHALL exit non-zero on any error.
+    - IF a configuration error would leave a dataset expecting nothing at all, THEN THE SYSTEM SHALL exit
+      non-zero.
+    - THE SYSTEM SHALL reject an unrecognised configuration key rather than ignoring it.
+    - THE SYSTEM SHALL reject a month name that is not a real, full month name.
+    - THE SYSTEM SHALL reject a dataset naming a delivery month for which its own calendar has no date.
+    - THE SYSTEM SHALL reject schedule versions that overlap or are out of order on their effective-from
+      dates.
+    - THE SYSTEM SHALL reject duplicate calendar names, duplicate dates within a calendar, and duplicate
+      period names.
+    - THE SYSTEM SHALL reject a dataset that both subsets and overrides its own calendar.
+    - THE SYSTEM SHALL reject a dataset named in asset configuration that has no contract, and a contract
+      that has no asset configuration entry.
+    - THE SYSTEM SHALL reject a negative grace allowance or claim window, an unparseable date, and a missing
+      required value.
+    - THE SYSTEM SHALL report every offending item rather than stopping at the first.
+    - THE SYSTEM SHALL validate configuration without opening or querying anything under data/.
+    - THE SYSTEM SHALL be invoked as a mothman subcommand.
+    - THE SYSTEM SHALL reject a dataset naming a calendar the asset does not define.
+    - THE SYSTEM SHALL reject a dataset that names delivery months against a cadence-rule calendar.
+    - THE SYSTEM SHALL reject a claim window that is not a duration with a recognised unit, and SHALL NOT
+      coerce one.
+    - THE SYSTEM SHALL be invoked as a command in a schedule command group, and SHALL NOT be placed in a
+      group documented as not human-facing.
+    - THE SYSTEM SHALL be registered as a gate that runs alongside the repository's other sub-second gates.
+    - THE SYSTEM SHALL report every offending item individually, and SHALL NOT collapse repeated instances
+      of one rule into a single line.
+    - THE SYSTEM SHALL name, in each error, the correction to make, not only the rule that was broken.
+    - THE SYSTEM SHALL group reported errors by the file and the calendar or dataset they belong to, and
+      SHALL state, before the detail, how many errors affect how many datasets.
+    - WHEN the configuration cannot be parsed at all, THE SYSTEM SHALL name the file and the location, and
+      SHALL NOT then report the absence of every value it could not read.
     non_functional_requirements:
-      - This gate runs on every push and inside mothman check, whose own
-        gates are ordered cheapest-first so the fast ones report while
-        the slow ones are still ahead. A config-only validation should
-        stay in that fast group - well under a second - rather than
-        joining the slow tail.
-      - Config only, no data access, so it is safe in CI under the
-        standing rule.
-      - At 30 datasets the referential check is where a typo would
-        otherwise hide indefinitely. It is the check that justifies one
-        calendar over 30 date lists, so it has to actually run.
-      - Build on the existing pattern rather than new machinery -
-        qa_tools/common/schemas.py's _Strict base already forbids extra
-        keys, which is what catches a mistyped KEY rather than a
-        mistyped value.
-      - Failing a build is a real interruption, so every error here must
-        be one a human can act on immediately. Name the file, the
-        dataset and the value.
-    dependencies: [REQ-PIPE-049, REQ-QAC-039]
+    - This gate runs on every push and inside mothman check, whose own gates are ordered cheapest-first
+      so the fast ones report while the slow ones are still ahead. A config-only validation should stay
+      in that fast group - well under a second - rather than joining the slow tail.
+    - Config only, no data access, so it is safe in CI under the standing rule.
+    - At 30 datasets the referential check is where a typo would otherwise hide indefinitely. It is the
+      check that justifies one calendar over 30 date lists, so it has to actually run.
+    - Build on the existing pattern rather than new machinery - qa_tools/common/schemas.py's _Strict base
+      already forbids extra keys, which is what catches a mistyped KEY rather than a mistyped value.
+    - Failing a build is a real interruption, so every error here must be one a human can act on immediately.
+      Name the file, the dataset and the value.
+    dependencies:
+    - REQ-PIPE-049
+    - REQ-QAC-039
     decisions:
-      - Decided the organising idea is one sentence rather than a
-        checklist - every check here exists to stop a config error
-        silently producing ZERO SLOTS, which is the exhausted-schedule
-        state arriving by accident on a dataset nobody is watching. Most
-        of the validations are variations on that one failure, and a
-        future addition should be justified against it.
-      - Decided a mistyped KEY must fail, not just a mistyped value. A
-        silently-dropped delivery_months key gives a dataset all four
-        dates when it should have one - the error is invisible and the
-        result looks plausible.
-      - Decided runway is a WARNING and does NOT live here, which is a
-        change from the sprint plan. Thread K lists runway as this
-        gate's one warning, but runway is measured in SLOTS and slots do
-        not exist until sprint 6, so it lands in REQ-PIPE-053 instead.
-        Failing an otherwise-fine build on runway is also how a gate
-        gets disabled.
-      - "[A2] Decided the gate validates the claim-window duration rather
-        than coercing it. A parser that accepts 14, 14d, 14 days and P14D
-        is four ways for 30 datasets' config to read differently for no
-        gain - the same reasoning that limited month names to one
-        accepted form."
-
-      - "[A4] Decided to REJECT building any technical mechanism for this,
-        and to rely on review instead (Keith, 2026-09-22): \"let's just
-        catch that and review. I don't need to invent a technical
-        mechanism to handle that.\" The policy stands - Thread E's rule
-        that config must never be edited to make red history disappear is
-        real - but it is enforced by people reading a diff, as it is
-        today, not by the gate."
-      - "[A4] Rejected TWO mechanisms, both worked through before the
-        decision, and both recorded because they are the obvious things
-        to re-propose. (1) A recorded content record per calendar version
-        plus a changelog entry naming it, checked locally: editing a past
-        date breaks the record, updating the record breaks the changelog
-        check, so the only route through is writing down what changed.
-        Genuinely airtight, and real machinery for a rule that bites
-        rarely. (2) Diffing the config against git history. Simpler to
-        understand, and possible - CI clones at fetch-depth 2 today,
-        which is a config line rather than a law - but this repo has a
-        recorded performance incident from walking its own git history,
-        so a deeper clone on every push is not free. Neither earns its
-        cost against a reviewer reading the diff."
-      - "[A4] REOPENED and DEFERRED 2026-09-23. delivery-architect found
-        the cost estimate this was rejected on was too high:
-        validate_check_lifecycle.py already runs `git show HEAD~1:<path>`
-        on a single file at the fetch-depth 2 CI is already configured
-        for - materially cheaper than the deep-clone git diff that was
-        put to Keith and rejected on performance grounds. Keith's call
-        was to defer rather than decide either way, so this is an open
-        question on this requirement rather than a settled decision. The
-        original reasoning still stands on its own terms - his words
-        were \"I do not need to invent a technical mechanism to handle
-        that\", which is a simplicity preference, not only a cost one."
-      - "Decided this lives in a new `mothman schedule` command group,
-        Tier 1 (Keith, 2026-09-23). The two pre-build reviewers
-        DISAGREED here and this is the one place they did:
-        delivery-architect said fold it into `pipeline` (both commands
-        are PIPE by the taxonomy, `pipeline` holds exactly one command,
-        and putting a config gate under `dashboard` deepens an existing
-        misfiling); delivery-cli-ux said make a new group. The CLI
-        reviewer won on a point the architect did not weigh: Keith's own
-        docstring in cli/pipeline.py calls that group \"not
-        human-facing - for integration tests and for yourself\", and
-        someone editing 30 delivery calendars is exactly a human.
-        Rejected also the architect's synthesis - fold in now, move to a
-        `mothman supply` group when batches 3-6 justify one - because
-        moving a command later breaks whatever docs and muscle memory
-        have formed, and renames are how a CLI surface rots."
-      - "Decided every offending item is reported INDIVIDUALLY (Keith,
-        2026-09-23), against the recommendation. delivery-cli-ux argued
-        for compiler-style cause suppression - report the root once,
-        then \"30 datasets name this calendar and were not checked
-        further\" - on the grounds that one asset-level mistake produces
-        30 downstream errors and a reader who meets the 30 first fixes
-        30 things. Keith took the literal reading of the existing
-        criterion instead: nothing is ever hidden, and the count in the
-        header is the true count. The grouping and ordering criteria
-        above are what carry the scale problem instead."
-      - "[BUILD] The retrospective-edit guard IS BUILT (Keith,
-        2026-09-23), closing the question this requirement carried. He
-        took the reopened option once the cost was confirmed rather
-        than estimated: one `git show HEAD~1:<path>` of a single file,
-        measured at about 3ms, at the fetch-depth CI already sets for
-        validate_check_lifecycle.py''s own old-vs-new diff. The version
-        rejected on 2026-09-22 needed a deep clone and a history walk,
-        which is a different thing."
-      - "[BUILD] Decided the guard is deliberately NARROW, because a
-        gate that fires on legitimate work gets turned off. It is
-        silent for: a date still in the FUTURE (editing those is the
-        whole point of `mothman schedule candidate-dates`), a date that
-        differs between VERSIONS (authoring a new effective-dated
-        version is the sanctioned way to change a schedule), and a
-        missing previous commit (a shallow checkout is not a finding).
-        A changelog entry on the version clears it - this is a say-what-you-did gate, not a freeze, which is what Thread E actually
-        asks for."
-      - "[BUILD] Decided the organising sentence is also asked
-        DIRECTLY, not only enforced through the specific rules. Each
-        rule catches one way a dataset ends up expecting nothing; a
-        final check derives what each dataset actually expects and says
-        so if the answer is nothing. That catches the combinations no
-        single rule does - every month real, every month on the
-        calendar, and every resulting period then excluded by
-        not_expected. It stays silent where an earlier error already
-        fired for the same dataset, so one mistake is one error."
-      - "[BUILD] Decided the schema lives in qa_tools/common/schemas.py
-        beside requirements.yaml''s and CHANGELOG.yaml''s, rather than
-        inside the gate. That module exists so a hand-authored file''s
-        shape is stated once, and _Strict''s extra=\"forbid\" is what
-        makes a mistyped KEY fail - which is the failure this whole
-        requirement is about."
-      - "[BUILD] Decided every error carries a separate `fix` alongside
-        its `problem`. Naming the rule that was broken leaves the
-        reader to work out what to type, and a gate that interrupts a
-        build owes them better - the NFR asks for an error a human can
-        act on immediately, which is a shape, not an aspiration."
-      - 'PENDING AMENDMENT, NOT YET APPLIED (2026-10-07): the calendar batch (REQ-PIPE-110 to 113 and 161 to 174, re-scoped through delivery-scoper 2026-10-07, unsigned) changes this requirement when REQ-PIPE-110 and REQ-PIPE-111 are built - criteria 1, 5, 8 and 15 follow the rename of delivery_months to participates, criterion 8 becomes rejecting a dataset that has both a participates list and its own authored dates, and the two [BUILD] guard decisions are superseded by REQ-PIPE-111 (a past change needs a declared, approved correction; an ordinary added changelog line no longer clears it). Applied in the change that builds 110 and 111, not before, because until then this requirement describes the code as it runs.'
+    - Decided the organising idea is one sentence rather than a checklist - every check here exists to stop
+      a config error silently producing ZERO SLOTS, which is the exhausted-schedule state arriving by accident
+      on a dataset nobody is watching. Most of the validations are variations on that one failure, and a
+      future addition should be justified against it.
+    - Decided a mistyped KEY must fail, not just a mistyped value. A silently-dropped delivery_months key
+      gives a dataset all four dates when it should have one - the error is invisible and the result looks
+      plausible.
+    - Decided runway is a WARNING and does NOT live here, which is a change from the sprint plan. Thread
+      K lists runway as this gate's one warning, but runway is measured in SLOTS and slots do not exist
+      until sprint 6, so it lands in REQ-PIPE-053 instead. Failing an otherwise-fine build on runway is
+      also how a gate gets disabled.
+    - '[A2] Decided the gate validates the claim-window duration rather than coercing it. A parser that
+      accepts 14, 14d, 14 days and P14D is four ways for 30 datasets'' config to read differently for no
+      gain - the same reasoning that limited month names to one accepted form.'
+    - '[A4] Decided to REJECT building any technical mechanism for this, and to rely on review instead (Keith,
+      2026-09-22): "let''s just catch that and review. I don''t need to invent a technical mechanism to
+      handle that." The policy stands - Thread E''s rule that config must never be edited to make red history
+      disappear is real - but it is enforced by people reading a diff, as it is today, not by the gate.'
+    - '[A4] Rejected TWO mechanisms, both worked through before the decision, and both recorded because
+      they are the obvious things to re-propose. (1) A recorded content record per calendar version plus
+      a changelog entry naming it, checked locally: editing a past date breaks the record, updating the
+      record breaks the changelog check, so the only route through is writing down what changed. Genuinely
+      airtight, and real machinery for a rule that bites rarely. (2) Diffing the config against git history.
+      Simpler to understand, and possible - CI clones at fetch-depth 2 today, which is a config line rather
+      than a law - but this repo has a recorded performance incident from walking its own git history, so
+      a deeper clone on every push is not free. Neither earns its cost against a reviewer reading the diff.'
+    - '[A4] REOPENED and DEFERRED 2026-09-23. delivery-architect found the cost estimate this was rejected
+      on was too high: validate_check_lifecycle.py already runs `git show HEAD~1:<path>` on a single file
+      at the fetch-depth 2 CI is already configured for - materially cheaper than the deep-clone git diff
+      that was put to Keith and rejected on performance grounds. Keith''s call was to defer rather than
+      decide either way, so this is an open question on this requirement rather than a settled decision.
+      The original reasoning still stands on its own terms - his words were "I do not need to invent a technical
+      mechanism to handle that", which is a simplicity preference, not only a cost one.'
+    - 'Decided this lives in a new `mothman schedule` command group, Tier 1 (Keith, 2026-09-23). The two
+      pre-build reviewers DISAGREED here and this is the one place they did: delivery-architect said fold
+      it into `pipeline` (both commands are PIPE by the taxonomy, `pipeline` holds exactly one command,
+      and putting a config gate under `dashboard` deepens an existing misfiling); delivery-cli-ux said make
+      a new group. The CLI reviewer won on a point the architect did not weigh: Keith''s own docstring in
+      cli/pipeline.py calls that group "not human-facing - for integration tests and for yourself", and
+      someone editing 30 delivery calendars is exactly a human. Rejected also the architect''s synthesis
+      - fold in now, move to a `mothman supply` group when batches 3-6 justify one - because moving a command
+      later breaks whatever docs and muscle memory have formed, and renames are how a CLI surface rots.'
+    - 'Decided every offending item is reported INDIVIDUALLY (Keith, 2026-09-23), against the recommendation.
+      delivery-cli-ux argued for compiler-style cause suppression - report the root once, then "30 datasets
+      name this calendar and were not checked further" - on the grounds that one asset-level mistake produces
+      30 downstream errors and a reader who meets the 30 first fixes 30 things. Keith took the literal reading
+      of the existing criterion instead: nothing is ever hidden, and the count in the header is the true
+      count. The grouping and ordering criteria above are what carry the scale problem instead.'
+    - '[BUILD] The retrospective-edit guard IS BUILT (Keith, 2026-09-23), closing the question this requirement
+      carried. He took the reopened option once the cost was confirmed rather than estimated: one `git show
+      HEAD~1:<path>` of a single file, measured at about 3ms, at the fetch-depth CI already sets for validate_check_lifecycle.py''''s
+      own old-vs-new diff. The version rejected on 2026-09-22 needed a deep clone and a history walk, which
+      is a different thing.'
+    - '[BUILD] Decided the guard is deliberately NARROW, because a gate that fires on legitimate work gets
+      turned off. It is silent for: a date still in the FUTURE (editing those is the whole point of `mothman
+      schedule candidate-dates`), a date that differs between VERSIONS (authoring a new effective-dated
+      version is the sanctioned way to change a schedule), and a missing previous commit (a shallow checkout
+      is not a finding). A changelog entry on the version clears it - this is a say-what-you-did gate, not
+      a freeze, which is what Thread E actually asks for.'
+    - '[BUILD] Decided the organising sentence is also asked DIRECTLY, not only enforced through the specific
+      rules. Each rule catches one way a dataset ends up expecting nothing; a final check derives what each
+      dataset actually expects and says so if the answer is nothing. That catches the combinations no single
+      rule does - every month real, every month on the calendar, and every resulting period then excluded
+      by not_expected. It stays silent where an earlier error already fired for the same dataset, so one
+      mistake is one error.'
+    - '[BUILD] Decided the schema lives in qa_tools/common/schemas.py beside requirements.yaml''''s and
+      CHANGELOG.yaml''''s, rather than inside the gate. That module exists so a hand-authored file''''s
+      shape is stated once, and _Strict''''s extra="forbid" is what makes a mistyped KEY fail - which is
+      the failure this whole requirement is about.'
+    - '[BUILD] Decided every error carries a separate `fix` alongside its `problem`. Naming the rule that
+      was broken leaves the reader to work out what to type, and a gate that interrupts a build owes them
+      better - the NFR asks for an error a human can act on immediately, which is a shape, not an aspiration.'
+    - 'PENDING AMENDMENT, NOT YET APPLIED (2026-10-07): the calendar batch (REQ-PIPE-110 to 113 and 161
+      to 174, re-scoped through delivery-scoper 2026-10-07, unsigned) changes this requirement when REQ-PIPE-110
+      and REQ-PIPE-111 are built - criteria 1, 5, 8 and 15 follow the rename of delivery_months to participates,
+      criterion 8 becomes rejecting a dataset that has both a participates list and its own authored dates,
+      criterion 9''s test of whether a file is a dataset contract moves from the presence of slaProperties
+      to `kind: DataContract` (REQ-PIPE-110; delivery-architect B4, verified at validate_schedule.py:683
+      - deleting slaProperties would otherwise silently switch that check off), and the two [BUILD] guard
+      decisions are superseded by REQ-PIPE-111 (a past change needs a declared, approved correction; an
+      ordinary added changelog line no longer clears it). Applied in the change that builds 110 and 111,
+      not before, because until then this requirement describes the code as it runs.'
     linked_tests:
-      - tests/test_validate_schedule.py
-      - tests/test_schedule.py
+    - tests/test_validate_schedule.py
+    - tests/test_schedule.py
     implemented_by:
-      - qa_tools/common/validate_schedule.py::validate
-      - qa_tools/common/validate_schedule.py::_schema_errors
-      - qa_tools/common/validate_schedule.py::_calendar_errors
-      - qa_tools/common/validate_schedule.py::_dataset_errors
-      - qa_tools/common/validate_schedule.py::_expects_nothing_errors
-      - qa_tools/common/validate_schedule.py::_contract_errors
-      - qa_tools/common/validate_schedule.py::_retrospective_edit_errors
-      - qa_tools/common/schemas.py::DataAsset
-      - cli/schedule.py::validate_command
+    - qa_tools/common/validate_schedule.py::validate
+    - qa_tools/common/validate_schedule.py::_schema_errors
+    - qa_tools/common/validate_schedule.py::_calendar_errors
+    - qa_tools/common/validate_schedule.py::_dataset_errors
+    - qa_tools/common/validate_schedule.py::_expects_nothing_errors
+    - qa_tools/common/validate_schedule.py::_contract_errors
+    - qa_tools/common/validate_schedule.py::_retrospective_edit_errors
+    - qa_tools/common/schemas.py::DataAsset
+    - cli/schedule.py::validate_command
     evidence:
-      - >
-        2026-09-23: every rule is tested by BREAKING the real committed
-        configuration in one specific way and requiring the gate to say
-        so - a misspelt month, a month the calendar has no date in, a
-        calendar that does not exist, a mistyped key, duplicate
-        calendars, duplicate periods, duplicate dates, out-of-order
-        versions, a bare claim window, delivery_months against a
-        cadence rule, a contract that does not exist and a contract
-        nothing names. A validator tested only against valid input has
-        never been shown to do anything.
-      - >
-        2026-09-23: the past-date guard was proved end to end against
-        REAL git, not only against a stubbed comparison - moving
-        2026-Q1 from 1 February to the 15th in the working tree made
-        the real `mothman schedule validate` exit 1 and name the
-        period, the old date, the new one and the version with no
-        changelog entry.
-      - >
-        2026-09-23: and it stays quiet for every legitimate edit, which
-        is the half that decides whether a gate survives - editing a
-        future date, adding future dates, authoring a new
-        effective-dated version, adding a changelog entry alongside the
-        change, an unchanged file, a missing previous commit, and a
-        previous version that does not parse.
-      - >
-        2026-09-23: it reads ONE file at ONE ref. Asserted by watching
-        subprocess calls during a real validate() - exactly one git
-        call, `git show HEAD~1:...` - because the deep-clone history
-        walk this was rejected on in September is precisely what it
-        must not become.
-      - >
-        2026-09-23: runtime is in line with the other fast gates -
-        1339ms end to end against 1275ms for hierarchy and 1237ms for
-        changelog, nearly all of it `uv run` startup; validate() itself
-        is 141ms. It stays in the cheap-first group rather than joining
-        the slow tail.
-      - >
-        2026-09-23: it opens nothing under data/, asserted by watching
-        every Path.open during a real run rather than by reading the
-        code. This gate runs on every push, and a config validator that
-        reached into data/ would be exactly the accident the standing
-        rule exists for.
-      - >
-        2026-09-23: every offending item is reported individually and
-        the header count is the true count - seven datasets naming a
-        missing calendar produce seven errors, not one summary. Keith's
-        own call against a recommendation to suppress caused errors.
-      - >
-        2026-09-23: 1114 Python tests, 166 JS tests, all nine mothman
-        gates - this one now among them.
+    - '2026-09-23: every rule is tested by BREAKING the real committed configuration in one specific way
+      and requiring the gate to say so - a misspelt month, a month the calendar has no date in, a calendar
+      that does not exist, a mistyped key, duplicate calendars, duplicate periods, duplicate dates, out-of-order
+      versions, a bare claim window, delivery_months against a cadence rule, a contract that does not exist
+      and a contract nothing names. A validator tested only against valid input has never been shown to
+      do anything.
 
+      '
+    - '2026-09-23: the past-date guard was proved end to end against REAL git, not only against a stubbed
+      comparison - moving 2026-Q1 from 1 February to the 15th in the working tree made the real `mothman
+      schedule validate` exit 1 and name the period, the old date, the new one and the version with no changelog
+      entry.
+
+      '
+    - '2026-09-23: and it stays quiet for every legitimate edit, which is the half that decides whether
+      a gate survives - editing a future date, adding future dates, authoring a new effective-dated version,
+      adding a changelog entry alongside the change, an unchanged file, a missing previous commit, and a
+      previous version that does not parse.
+
+      '
+    - '2026-09-23: it reads ONE file at ONE ref. Asserted by watching subprocess calls during a real validate()
+      - exactly one git call, `git show HEAD~1:...` - because the deep-clone history walk this was rejected
+      on in September is precisely what it must not become.
+
+      '
+    - '2026-09-23: runtime is in line with the other fast gates - 1339ms end to end against 1275ms for hierarchy
+      and 1237ms for changelog, nearly all of it `uv run` startup; validate() itself is 141ms. It stays
+      in the cheap-first group rather than joining the slow tail.
+
+      '
+    - '2026-09-23: it opens nothing under data/, asserted by watching every Path.open during a real run
+      rather than by reading the code. This gate runs on every push, and a config validator that reached
+      into data/ would be exactly the accident the standing rule exists for.
+
+      '
+    - '2026-09-23: every offending item is reported individually and the header count is the true count
+      - seven datasets naming a missing calendar produce seven errors, not one summary. Keith''s own call
+      against a recommendation to suppress caused errors.
+
+      '
+    - '2026-09-23: 1114 Python tests, 166 JS tests, all nine mothman gates - this one now among them.
+
+      '
   - id: REQ-PIPE-051
     title: Periods are derived from the schedule, and never move
     date_written: "2026-09-22"
@@ -25006,8 +24942,9 @@ requirements:
     - THE SYSTEM SHALL carry, on each participation version, the dataset's expected time of day and its
       grace allowance, and SHALL let that version override its calendar's default claim window.
     - THE SYSTEM SHALL state, on each participation version under the key participates, which of its calendar's
-      periods the dataset owes a supply in, by naming delivery months in full and case-insensitively, and
-      SHALL NOT accept a month number, an abbreviation or a positional index.
+      periods the dataset owes a supply in, by naming delivery months in full and case-insensitively, naming
+      the month of each period's CALENDAR DATE even where the version states days before, and SHALL NOT
+      accept a month number, an abbreviation or a positional index.
     - WHERE a participation version states no participates list, THE SYSTEM SHALL treat the dataset as owing
       a supply in every period its calendar generates.
     - IF a participation version names delivery months against a cadence-rule calendar, THEN THE SYSTEM
@@ -25040,7 +24977,7 @@ requirements:
       or contract/calendar.yaml names a dataset or collection the hierarchy does not hold, THEN THE SYSTEM
       SHALL reject the configuration naming both files.
     - WHEN the repository's gates run, THE SYSTEM SHALL validate contract/calendar.yaml under the existing
-      schedule gate, naming the file, the calendar or dataset at fault, and the correction to make.
+      schedule gate, naming the file, the calendar or dataset at fault, and the fix to make.
     - THE SYSTEM SHALL produce, for the configuration in force on the day of the move, exactly the periods,
       slots, due instants, claim-opening and closing instants, holds and arrival verdicts it produced before
       the move.
@@ -25066,6 +25003,23 @@ requirements:
       before and claim-window override - as effective-dated versions, and SHALL resolve each value for a
       dataset from the nearest level that states it, dataset before collection, as REQ-PIPE-122's settings
       resolve.
+    - THE SYSTEM SHALL read the delivery agreement - calendars, participation, not_expected, dataset date
+      overrides, corrections and timezone versions - through one loader into one parsed, immutable agreement
+      value, and SHALL pass that value as an argument to every consumer (slots, schedule, the overlap gate,
+      the freeze gate, the impact preview, the backstop and the dashboard build), so that two agreement
+      values - before and after a change - can be held side by side in one process.
+    - 'THE SYSTEM SHALL decide whether a file in contract/ is a dataset contract from its `kind: DataContract`,
+      and SHALL NOT decide it from the presence of slaProperties.'
+    - IF a participation version owes a supply in any period its predecessor did not, THEN THE SYSTEM SHALL
+      reject it unless the version states explicitly which months it adds.
+    - IF a dataset's own authored dates use a period name that any calendar in the file also uses, THEN
+      THE SYSTEM SHALL reject the configuration.
+    - WHERE every dataset of the asset declares no calendar, THE SYSTEM SHALL accept an empty list of calendars.
+    - WHERE the dashboard shows a dataset's delivery time or cycle, THE SYSTEM SHALL take it from the participation
+      version in force on the date on show, reflecting its participates list and days before.
+    - WHERE the dashboard shows a period a dataset owes nothing in, THE SYSTEM SHALL show it as a quiet
+      row stating the reason, group consecutive ones in supply history under 'Periods owed nothing', and
+      SHALL NOT show it red, among things needing action, or as 'No supply'.
     non_functional_requirements:
     - 'CORRECTNESS OVER CONVENIENCE, and a half-done move is worse than none: the whole point is that a
       delivery agreement is stated once, so a state in which two files both plausibly own a dataset''s expected
@@ -25101,6 +25055,9 @@ requirements:
     - 'What a wrong answer costs is why this is a must: a supply judged against dates nobody agreed. That
       failure is silent, looks exactly like a correct verdict, and the supplier is the one it is unfair
       to.'
+    - BUILD THE AGREEMENT VALUE FIRST (delivery-architect B1). Today schedule._load, asset_time and slots._contract_timing
+      each read one fixed path behind lru_cache, so no process can hold the agreement before and after a
+      change - which REQ-PIPE-111, 169, 170 and 173 all need. Every later step takes the value as an argument.
     dependencies:
     - REQ-PIPE-049
     - REQ-PIPE-050
@@ -25194,8 +25151,38 @@ requirements:
       share a due time, and stating it thirty times is thirty chances to disagree. One resolution rule in
       the file - the one REQ-PIPE-122''s settings already use - rather than a second.'
     - 'participates LISTS DELIVERY MONTHS (Keith, 2026-10-07), in full and case-insensitively, as criterion
-      5 already states. REJECTED Thread C''s ''participates: {slots, reason}'' reading as period or slot
-      names: a period name is one year''s, and the list states a recurring pattern.'
+      5 already states - the month of each period''s CALENDAR DATE, even where days before is set (Keith,
+      2026-10-07). REJECTED Thread C''s ''participates: {slots, reason}'' reading as period or slot names:
+      a period name is one year''s, and the list states a recurring pattern.'
+    - 'participates NAMES THE CALENDAR DATE''S MONTH EVEN WHERE days_before IS SET (Keith, 2026-10-07):
+      the period is identified by its calendar date; days before moves only when the slot is due.'
+    - A COLLECTION MAY DEFAULT days_before, NEAREST WINS (Keith, 2026-10-07) - criterion 28 stands. This
+      REVERSES his 2026-09-24 'per dataset, never per collection' for the following-period offset; the reversal
+      is recorded on REQ-PIPE-167.
+    - 'A PARTICIPATION VERSION THAT OWES MORE PERIODS THAN THE ONE BEFORE IS REFUSED UNLESS IT SAYS SO EXPLICITLY
+      (Keith, 2026-10-07). REJECTED requiring every version to restate every field, and REJECTED carrying
+      unstated fields over silently: widening what a dataset owes is the one change that creates obligations,
+      so it is the one that must be stated.'
+    - 'ONE LOADER, ONE IMMUTABLE AGREEMENT VALUE, PASSED AS AN ARGUMENT (delivery-architect pre-build review,
+      2026-10-07), B1 - see the NFR. Also from that review, as guidance rather than criteria: one CALENDAR_YAML
+      constant; one in_force helper replacing the three behaviours that resolve ''in force on'' today; pipeline/cadence.py
+      becomes dead once slaProperties goes and is DELETED, not left; schedule.owes_from is parsed but never
+      called, so folding owes_from into the first participation version is new wiring, not a move.'
+    - 'CONTRACT DETECTION KEYS ON `kind: DataContract` (delivery-architect pre-build review, 2026-10-07),
+      B4, verified: validate_schedule.py:683 treats a file as a contract only if it has slaProperties, so
+      deleting slaProperties would silently switch off REQ-PIPE-050 criterion 9''s orphan-contract check.'
+    - A DATES-OVERRIDE'S PERIOD NAMES ARE DISJOINT FROM EVERY CALENDAR'S, and an asset where every dataset
+      is no_calendar may have no calendars at all (delivery-architect pre-build review, 2026-10-07), S8
+      - the latter is the project-extraction asset shape CLAUDE.md says is coming.
+    - 'PERIODS OWED NOTHING ARE QUIET, NEVER RED (delivery-dashboard-ux pre-build review, 2026-10-07): a
+      reason row, grouped in supply history, never ''No supply'' and never in needs-action. The SLA label
+      follows the participation version in force on the date on show.'
+    - 'THE ARCHITECT''S DATA-MODEL SKETCH AND BUILD ORDER, carried as guidance for the build, not as criteria
+      (delivery-architect pre-build review, 2026-10-07): qa.verdict append-only, carrying an inputs fingerprint
+      and what it supersedes; qa.agreement_input for the resolved inputs; qa.correction with an exactly-once
+      identity and its confirmation; new qa.decision actions and columns for excuse, place, re-check, keep
+      and withdrawals; qa.agreement_block as a new blocker kind; build in stages S0 (the agreement value
+      and loader) to S4.'
   - id: REQ-PIPE-111
     title: A delivery agreement's past changes only by a declared, approved correction
     date_written: '2026-09-28'
@@ -25217,17 +25204,21 @@ requirements:
       if any rule below is broken.
     - THE SYSTEM SHALL treat each dated calendar entry, each dated entry of a dataset's own authored dates,
       calendar version, participation version (including a collection's default participation), not_expected
-      entry and timezone version as FROZEN from the first instant it can govern a filing - for a dated entry
-      or a not_expected entry, the earliest claim-opening instant any dataset it concerns has for that period;
-      for a version, the earlier of the start of its effective-from date and the earliest claim-opening
-      instant of any period it governs.
+      entry and timezone version as FROZEN from the first instant it can govern a filing - for a dated entry,
+      the earliest claim-opening instant that EVERY dataset on its calendar would have for that period,
+      participating or not, since that instant also closes each one's previous period; for a not_expected
+      entry, that dataset's claim-opening instant for the period; for a version, the earlier of the start
+      of its effective-from date and the earliest claim-opening instant of any period it governs.
     - IF a frozen item is changed or removed, THEN THE SYSTEM SHALL refuse the commit unless the same change
-      adds a declared correction for it.
-    - THE SYSTEM SHALL accept as a declared correction only a changelog entry marked as a correction that
-      names the item corrected, its old value, its new value, the reason, a named approver who is a person
-      in contract/people.yaml, and a change reference, and SHALL refuse a correction missing any of them.
-    - IF a declared correction's old value or item does not match the change actually made, THEN THE SYSTEM
-      SHALL refuse the commit naming the difference.
+      appends a declared correction listing that exact change to the corrections list of the item that owns
+      it.
+    - THE SYSTEM SHALL carry declared corrections in a `corrections:` list on each OWNING ITEM, beside its
+      versions - a calendar's on that calendar; a dataset's (its participation, due time, participates,
+      not_expected and own authored dates) on that dataset's entry; the zone's on the timezone - each correction
+      stating change_reference, date, author, approver, reason, and a list of changes each naming the item,
+      its old value and its new value; and SHALL refuse a correction missing any of them.
+    - IF a declared correction's item, old value or new value does not match the change actually made, THEN
+      THE SYSTEM SHALL refuse the commit, saying 'you declared <X>; the file had <Y>'.
     - THE SYSTEM SHALL NOT accept a changelog entry that is not a declared correction as licence for any
       change to a frozen item, and SHALL remove, in the same change, the route of the guard REQ-PIPE-050
       built (validate_schedule.py::_retrospective_edit_errors) by which any added changelog line cleared
@@ -25236,25 +25227,30 @@ requirements:
       the commit unless the same change declares it as a correction, except as the two criteria below allow.
     - WHERE an authored calendar has no dated entry later than the latest one its previous state held, THE
       SYSTEM SHALL allow appending entries dated after that latest entry even where already frozen, without
-      a declared correction, provided the earliest appended claim-opening instant is no earlier than the
-      closing instant the previous last period had.
+      a declared correction, provided that FOR EACH DATASET on that calendar the earliest claim-opening
+      instant of the appended entries is no earlier than the closing instant that dataset's previous last
+      period had - so that a schedule that ran out can be extended without moving any supply already filed.
     - WHERE the data asset's configuration declares it synthetic both before and after the change, THE SYSTEM
       SHALL allow ADDING a calendar, participation or timezone version with a past effective date without
       a declared correction, and SHALL still require one to change or remove a frozen item.
     - WHILE an item is not yet frozen, THE SYSTEM SHALL allow it to be added, changed or removed freely.
     - THE SYSTEM SHALL NOT offer any flag, environment variable, configuration key or documented procedure
       that commits a change to a frozen item other than by a declared correction.
-    - THE SYSTEM SHALL decide whether an item is frozen on the data asset's own clock, as at the date of
-      the commit that introduced the change, and SHALL NOT use the date the gate runs, the machine's clock,
-      or a replay's simulated clock.
-    - THE SYSTEM SHALL run this check at commit time through the repository's existing pre-commit hook,
-      and in the repository's configuration gates so that a commit made without the hook is still caught.
+    - THE SYSTEM SHALL decide whether an item is frozen on the data asset's own clock, as at the COMMITTER
+      instant of the commit that introduced the change, floored at the instant of the change's base commit,
+      and SHALL NOT use the commit's author date (which can be backdated), the instant the gate runs, the
+      machine's clock or a replay's simulated clock.
+    - THE SYSTEM SHALL run this check at commit time through the existing pre-commit hook, comparing the
+      staged content against HEAD, and in the repository's configuration gates against the base of the whole
+      push, so that a commit made without the hook is still caught.
     - IF there is no previous committed state available to compare against, THEN THE SYSTEM SHALL pass rather
       than fail.
-    - 'WHEN a change is refused, THE SYSTEM SHALL name the item, what it was, what it became, and the two
-      routes open: a new version effective after the item froze, or a declared correction with the fields
-      it lacks and the impact preview command (REQ-PIPE-169) to produce for its approver - and, for a not_expected
-      entry, mark as not supplied (REQ-PIPE-132) as the after-the-fact route.'
+    - WHEN a change is refused, THE SYSTEM SHALL report it as the existing configuration errors do (file,
+      where, problem, fix), grouped by item, saying that nothing was committed, naming the item in exactly
+      the syntax a correction uses, printing a ready-to-paste correction entry with the item, old and new
+      values filled in and reason, approver and change_reference as placeholders, listing who may approve,
+      naming the impact preview command (REQ-PIPE-169), and - for a not_expected entry - naming mark as
+      not supplied (REQ-PIPE-132) as the after-the-fact route.
     - THE SYSTEM SHALL decide whether a change is legal from committed configuration alone, and SHALL NOT
       open or query any database, warehouse schema or anything under data/.
     - WHERE a calendar is expressed as a cadence rule, THE SYSTEM SHALL apply the version rule to it and
@@ -25265,6 +25261,11 @@ requirements:
       meet.
     - THE SYSTEM SHALL show a refused undeclared change to the person refused and in the gate's output,
       and SHALL NOT record it anywhere else.
+    - IF a committed correction is later changed or removed, THEN THE SYSTEM SHALL refuse the commit - a
+      corrections list is append-only.
+    - THE SYSTEM SHALL check that a correction's approver is a person, a code owner and allowed to approve
+      using contract/people.yaml and CODEOWNERS as they stood at the base of the change, and SHALL NOT accept
+      an approver the same change adds.
     non_functional_requirements:
     - A GATE THAT FIRES ON LEGITIMATE WORK GETS TURNED OFF. Authoring next year's dates stays four appended
       lines plus one ordinary changelog entry; extending an exhausted calendar needs no correction ceremony;
@@ -25290,10 +25291,11 @@ requirements:
     decisions:
     - A DECLARED CORRECTION UNDER CAB (Keith, 2026-10-07, reopening and deciding the same morning; option
       (b) of 2026-10-04, refined). A change to a frozen item is allowed only as its own declared act - a
-      correction-marked changelog entry naming the item, old and new values, reason, approver and change
-      reference - previewed before approval (REQ-PIPE-169), recorded and re-judged visibly afterwards (REQ-PIPE-168),
-      reconciled into filings only on a asset manager's confirmation (REQ-PIPE-170), and backstopped where
-      git is bypassed (REQ-PIPE-173).
+      declared correction naming the change reference, date, author, approver, reason and each changed item
+      with its old and new value - carried, since 2026-10-07 afternoon, in a corrections list on the item
+      that owns the change rather than in a changelog - previewed before approval (REQ-PIPE-169), recorded
+      and re-judged visibly afterwards (REQ-PIPE-168), reconciled into filings only on a asset manager's
+      confirmation (REQ-PIPE-170), and backstopped where git is bypassed (REQ-PIPE-173).
     - 'REJECTED ''STRICT, NO ESCAPE HATCH'' - this requirement''s own wording from 2026-09-28 to the morning
       of 2026-10-07, accepted that morning and REVERSED within hours. Why: legitimate reassessments should
       be possible, visibly and under governance. Keith''s mistyped-date case decided it - amending the date
@@ -25352,6 +25354,32 @@ requirements:
       stays that item''s.'
     - 'THE PER-DATASET dates: OVERRIDE IS FROZEN AND CORRECTED ON THE SAME TERMS AS A CALENDAR (Keith, 2026-10-07)
       (REQ-PIPE-110). It closes a hole in the built guard, which never looked at it.'
+    - 'CORRECTIONS LIVE ON EACH OWNING ITEM, BESIDE ITS VERSIONS (Keith, 2026-10-07): a calendar''s on the
+      calendar, a dataset''s on its dataset entry, the zone''s on the timezone. He asked to see options,
+      proposed a list per calendar himself, and settled on its generalisation. REJECTED one register per
+      file, a separate corrections file, and corrections inside a version''s changelog - which has no home
+      for a not_expected entry or a removed version.'
+    - 'A CORRECTIONS LIST IS APPEND-ONLY (scoper''s call): a correction that could later be edited would
+      make the record of a governed change itself editable without governance.'
+    - 'A DATE FREEZES FOR EVERY DATASET ON ITS CALENDAR, participant or not (delivery-architect pre-build
+      review, 2026-10-07), S5: under REQ-PIPE-131 a period''s claim-opening closes the previous period of
+      every dataset on the calendar.'
+    - 'THE FREEZE CLOCK IS THE COMMITTER INSTANT, FLOORED AT THE BASE COMMIT (delivery-architect pre-build
+      review, 2026-10-07), S6, verified: validate_schedule.py:757 reads the AUTHOR date (%aI), which a person
+      can set to anything. ''Date'' became ''instant'' because the freeze point is now an instant, not a
+      day.'
+    - 'APPROVER, CODEOWNERS, PEOPLE AND ROLE CHECKS READ THE BASE STATE (delivery-architect pre-build review,
+      2026-10-07), S7: otherwise one commit could add a person and name them as its own approver.'
+    - 'THE CARVE-OUT IS CHECKED PER DATASET (delivery-architect pre-build review, 2026-10-07), S10 (the
+      architect''s example 8c): the appended date''s earliest claim-opening must be no earlier than each
+      dataset''s previous last-period close, so an append never moves a supply already filed.'
+    - 'THE HOOK DIFFS HEAD TO THE INDEX; THE GATES DIFF AGAINST diff_base (delivery-architect pre-build
+      review, 2026-10-07): at commit time the staged content is what is about to become history.'
+    - 'THE REFUSAL IS A READY-TO-PASTE CORRECTION (delivery-cli-ux pre-build review, 2026-10-07): grouped
+      by item, in the correction''s own item syntax, with who may approve and ''nothing was committed'',
+      through the existing ConfigError(file, where, problem, fix) shape.'
+    - 'A SYNTHETIC PAST-DATED VERSION ADDED AFTER HISTORY EXISTS IS REFUSED UNTIL THE HISTORY IS REGENERATED (Keith, 2026-10-07): the affected datasets are not processed until `mothman env reset-synthetic` and `mothman pipeline bootstrap`, through REQ-PIPE-173''s refusal, which names regenerating as the remedy on a synthetic asset. Synthetic history is regenerated, never repaired (REQ-GEN-136). Rejected: re-judging it automatically as a ''synthetic era'' recorded like a correction with no approver - more to build for a case regeneration already answers.'
+    - 'THE BUILT SETTINGS GUARD IS FIXED IN THE SAME CHANGE (Keith, 2026-10-07): REQ-PIPE-122''s guard dates a settings version by the commit''s AUTHOR date (validate_schedule._version_added_on, %aI), which can be backdated - the hole this requirement closes for calendars by using the committer instant floored at the base commit. Both freeze rules move to the one clock in the change that builds this requirement, with REQ-PIPE-122 amended alongside and the defect recorded in plans/post-build-review.md.'
   - id: REQ-PIPE-112
     title: The asset's timezone is versioned, and every reader asks as at when
     date_written: '2026-09-28'
@@ -25402,8 +25430,12 @@ requirements:
       versions (REQ-PIPE-122, REQ-PIPE-123), at every level, as a date, an author and a description of the
       change, and IF one of them is a plain string, THEN THE SYSTEM SHALL reject the configuration.
     - THE SYSTEM SHALL convert every existing settings changelog entry in contract/data-asset.yaml to that
-      shape in the same change, without altering any version's effective date or value, and SHALL NOT treat
-      that conversion as a change to a frozen setting version.
+      shape in the same change, stating the author the conversion supplies, without altering any version's
+      effective date or value; and THE SYSTEM SHALL make the settings' frozen-past guard (REQ-PIPE-122 criterion
+      6) compare normalised changelog entries and treat a changelog as append-only, so that the conversion
+      is accepted and a later edit to a past entry is still refused.
+    - WHERE the dashboard shows a supply's receipt beside the due time it was judged against, THE SYSTEM
+      SHALL render both in the same timezone version.
     non_functional_requirements:
     - 'SMALLER THAN THE FIRST DRAFT SAID, measured 2026-10-07 rather than estimated. Nearly every reader
       already passes the date or instant it is asking about: asset_time.wall_clock takes a day (6 calls
@@ -25473,9 +25505,17 @@ requirements:
       Carried HERE rather than in REQ-PIPE-110 (scoper's call) because this requirement already changes
       data-asset.yaml's changelog shape for the timezone; and as criteria here rather than amendments to
       REQ-PIPE-122/123, because neither states the shape of a changelog entry - their criteria need no rewording.
-    - 'THE CONVERSION IS NOT A CHANGE TO A FROZEN VERSION (scoper''s call): REQ-PIPE-122 criterion 6 refuses
-      altering a past setting version, and its guard must compare the parsed version''s effective date and
-      value, which the conversion leaves untouched, not the text of its changelog.'
+    - 'THE CONVERSION WOULD BE REFUSED BY THE BUILT GUARD AS WRITTEN (delivery-architect pre-build review,
+      2026-10-07), S1: amber_setting.past_change_problems compares (value, changelog), so reshaping a past
+      changelog reads as altering a frozen version. The guard compares normalised entries instead, and an
+      appended entry is allowed; the conversion states the author it supplies, since the old strings have
+      none. This replaces the earlier decision that the guard compares only effective date and value.'
+    - 'DAYLIGHT-SAVING ARITHMETIC (delivery-architect pre-build review, 2026-10-07): a ''d'' duration means
+      calendar days and an ''h'' duration elapsed hours; a gap or overlap is detected by round-tripping
+      the wall-clock time through the zone, not by consulting offsets.'
+    - A RECEIPT AND THE DUE TIME IT WAS JUDGED AGAINST RENDER IN ONE ZONE VERSION (delivery-dashboard-ux
+      pre-build review, 2026-10-07) - consistent with REQ-DASH-071's no-label rule, which stands (Keith,
+      2026-10-07).
   - id: REQ-PIPE-113
     title: A slot's due instant comes from the participation in force on its period's date, and a later
       change never moves an earlier slot
@@ -25514,6 +25554,12 @@ requirements:
     - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-052 criterion 3 so that a due instant is computed
       from the participation version and timezone version in force rather than the dataset's contract and
       a single zone.
+    - THE SYSTEM SHALL compute every slot's instants - from a calendar or from a dataset's own authored
+      dates - through one slot-instants function that filing, the overlap gate (REQ-PIPE-134), the impact
+      preview, the backstop and the dashboard build all call.
+    - THE SYSTEM SHALL extend every slot-generation horizon - the claim reach REQ-PIPE-062 offers a supply,
+      and the overlap gate's horizon - by the largest days before in force, so that a supply due ahead of
+      its period's date finds its slot.
     non_functional_requirements:
     - Config only, no data access, so the gate and the dashboard build can compute it under the standing
       rule.
@@ -25568,6 +25614,12 @@ requirements:
     - 'Recorded because a quarterly gap is NOT uniform and an implementation will assume it is: February
       to May is 89 days, May to August 92, November to February 92. The overlap gate (REQ-PIPE-134) checks
       real consecutive dates; this requirement must not reintroduce a nominal quarter anywhere.'
+    - 'ONE SLOT-INSTANTS FUNCTION (delivery-architect pre-build review, 2026-10-07): period_overlap re-derives
+      slot instants itself and ignores a dataset''s own authored dates, so the overlap gate checks a different
+      schedule from the one filing uses.'
+    - 'GENERATION HORIZONS ADD THE LARGEST days_before (delivery-architect pre-build review, 2026-10-07),
+      S4, verified: slots.claimable_until is arrival plus claim window, so a supply due ninety days ahead
+      of its period would be held. period_overlap''s horizon has the same gap.'
   - id: REQ-PIPE-161
     title: A person can excuse a late supply, with a reason, without changing the calendar it was judged
       against
@@ -25607,6 +25659,15 @@ requirements:
     - THE SYSTEM SHALL list excuses and their withdrawals in mothman supply decisions like every other decision.
     - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
       to list excuse lateness and its withdrawal among the filing decisions.
+    - THE SYSTEM SHALL name the operations excuse-lateness and withdraw-excuse.
+    - THE SYSTEM SHALL take a range excuse through one shared pair of range flags, and SHALL NOT use --to-period,
+      which is a re-file's target.
+    - WHEN a range excuse is proposed, THE SYSTEM SHALL show which supplies it would excuse and which it
+      skips and why, in the existing consequences panel, and SHALL require --yes with --acknowledge KEY
+      on the flag route, refusing if the set has changed since it was shown, and the asset's production
+      confirmation where that applies.
+    - IF a range excuse would excuse nothing, THEN THE SYSTEM SHALL refuse it and say why.
+    - WHEN the reason is asked for, THE SYSTEM SHALL say that it is published on the dashboard.
     non_functional_requirements:
     - THIS IS AN ANNOTATION, NOT A HOLDING DECISION. qa.slot_holds must ignore it by construction, as it
       already ignores acknowledge and mark-not-supplied (REQ-PIPE-132 criterion 8), or an excuse could change
@@ -25662,6 +25723,9 @@ requirements:
     - 'A RE-FILE DOES NOT CARRY THE EXCUSE: classification follows the filing (REQ-PIPE-141 criterion 2),
       so a supply re-filed to another period is judged afresh against that slot; an excuse written about
       the old slot says nothing about the new one.'
+    - OPERATION IDS AS ONE FAMILY - excuse-lateness, withdraw-excuse, and REQ-PIPE-166's withdraw-acknowledgement
+      and withdraw-not-supplied (delivery-cli-ux pre-build review, 2026-10-07). The range reuses the consequences
+      panel and --acknowledge KEY rather than a new confirmation shape.
   - id: REQ-DASH-162
     title: The dashboard shows an excused late supply as late and excused, naming the reason
     date_written: '2026-10-07'
@@ -25675,17 +25739,24 @@ requirements:
       rather than plain late'), plans/road-testing.md 'RESOLVED, Keith 2026-10-07' point 2. Split out of
       REQ-PIPE-161 by delivery-scoper, 2026-10-07, on the REQ-PIPE-154 / REQ-DASH-155 pattern.
     acceptance_criteria:
-    - WHERE a supply's lateness is excused, THE SYSTEM SHALL show it, wherever the dashboard shows that
-      supply's punctuality, as late and excused, with the reason, the person and the date of the excuse.
-    - THE SYSTEM SHALL NOT show an excused late supply as on time, and SHALL NOT show it identically to
-      an unexcused late one.
+    - WHERE a supply's lateness is excused, THE SYSTEM SHALL show it - on the dataset list's arrival pill,
+      the supply-history row and the dataset's latest-arrival tile - as a NEUTRAL 'Late (excused)' tag in
+      the existing accepted-gap pattern (pill tag sm), and SHALL show the reason, the person and the date
+      as visible text on the supply-history row.
+    - THE SYSTEM SHALL NOT show an excused late supply as on time, in green, or as the red Late pill with
+      a tag beside it, and SHALL NOT show it identically to an unexcused late one.
     - WHERE an excuse was withdrawn, THE SYSTEM SHALL show the supply as late, and SHALL show the excuse
       and its withdrawal in the supply history.
-    - WHERE the dashboard counts or summarises late supplies, THE SYSTEM SHALL count excused ones separately
-      from unexcused ones, and SHALL NOT fold them into on time.
+    - THE SYSTEM SHALL NOT add a punctuality count or figure as part of this requirement, none existing
+      today; WHERE one is added later, it SHALL count excused lateness separately from unexcused lateness
+      and from on time.
     - THE SYSTEM SHALL show an excuse on every in-place-on date the supply is in place, as the as-corrected
       view (REQ-PIPE-081 criterion 5) does for every other decision.
     - THE SYSTEM SHALL compute all of this from recorded decisions only, and SHALL NOT read supply rows.
+    - THE SYSTEM SHALL carry an excuse BESIDE a supply's arrival classification, and SHALL NOT add it as
+      a new arrival-status value, so that any surface that does not render the excuse still reads Late.
+    - WHERE an excuse has lapsed, THE SYSTEM SHALL say so on the supply-history row - 'Excuse lapsed - re-filed
+      to <period>' or 'Excuse lapsed - re-judged on time by <change reference>'.
     non_functional_requirements:
     - A DIFFERENCE A GLANCING READER CAN SEE WITHOUT READING. The data team leader's frustration is noise;
       'late' and 'late, excused' must be told apart at a glance and the reason one interaction away, not
@@ -25702,6 +25773,14 @@ requirements:
     - 'COUNTED SEPARATELY, NEVER AS ON TIME OR AS PLAIN LATE (Keith, 2026-10-07): in any punctuality figure
       or trend, excused lateness is its own count. A figure that improves because a person forgave lateness,
       or that blames a supplier for forgiven lateness, is a figure nobody can trust.'
+    - 'A NEUTRAL ''Late (excused)'' TAG (Keith, 2026-10-07): the accepted-gap pattern, never green, never
+      the red Late pill plus a tag; reason, person and date as visible text on the supply-history row.'
+    - 'BESIDE THE CLASSIFICATION, NEVER A NEW arrivalStatus VALUE (delivery-dashboard-ux pre-build review,
+      2026-10-07): a surface that does not know about excuses then degrades to the truth (Late) rather than
+      to ''Unknown'' through arrivalStatusLabel''s fallback.'
+    - 'NO PUNCTUALITY FIGURE IS ADDED NOW (delivery-dashboard-ux pre-build review, 2026-10-07): checked
+      2026-10-07, the page shows punctuality on three surfaces (the dataset list pill, the supply-history
+      row, the latest-arrival tile) and counts it nowhere.'
   - id: REQ-PIPE-163
     title: A person can place a held supply into a period, from the terminal
     date_written: '2026-10-07'
@@ -25745,6 +25824,12 @@ requirements:
       decide - and SHALL NOT offer it on the GitHub route; THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082
       criterion 3 to name place, beside REQ-PIPE-170's correction confirmation, as an operation offered
       on the terminal route only.
+    - THE SYSTEM SHALL take a placement through --supply and --to-period, and SHALL NOT require --period,
+      which a held supply does not have.
+    - WHEN the terminal asks for the period to place a supply in, or to re-file one to, THE SYSTEM SHALL
+      offer the dataset's periods as a choice, marking those closed and those not yet open, rather than
+      asking for a typed period.
+    - THE SYSTEM SHALL list held supplies in the queue of supplies waiting on a decision, grouped together.
     non_functional_requirements:
     - AT THE TARGET SCALE THIS IS NOT RARE. The current synthetic database holds 9 assignment-rule holds
       for Case Workers alone (ran `mothman supply holds`, 2026-10-07), and every one is waiting on an action
@@ -25778,6 +25863,8 @@ requirements:
     - PLACE IS TERMINAL ONLY (Keith, 2026-10-07), against the recommendation to raise it on the target period's
       ticket. A held supply has no slot and so no ticket, and the GitHub route is disabled. REQ-GHUB-082
       criterion 3 is amended to name it beside REQ-PIPE-170's confirmation, rather than broken silently.
+    - PLACE REUSES --to-period, NOT --period; PERIODS ARE CHOSEN, NOT TYPED, for place and re-file alike;
+      held supplies are grouped in the waiting-on-a-decision queue (delivery-cli-ux pre-build review, 2026-10-07).
   - id: REQ-PIPE-164
     title: A person can have a supply's checks run again without moving it, singly or for every supply a
       fixed check affects
@@ -25828,6 +25915,22 @@ requirements:
       WHERE it is promoted, THE SYSTEM SHALL record its new verdict and SHALL NOT re-gate it.
     - IF any re-run in a bulk re-check fails to complete, THEN THE SYSTEM SHALL leave it owed under REQ-PIPE-140
       criterion 8 and SHALL continue with the rest.
+    - THE SYSTEM SHALL offer the bulk re-check as its own command, `mothman supply recheck`, taking the
+      check and the shared pair of range flags.
+    - WHEN a bulk re-check is proposed, THE SYSTEM SHALL show the count by dataset and period and the check
+      changelog entry it acts on in the existing consequences panel, and SHALL require --yes with --acknowledge
+      KEY on the flag route, refusing if the set has changed since it was shown, and the asset's production
+      confirmation where that applies.
+    - IF a bulk re-check selects no supplies, THEN THE SYSTEM SHALL refuse it and say why.
+    - WHILE a bulk re-check runs, THE SYSTEM SHALL show its progress (k of N), and WHEN it ends, a summary
+      of verdicts changed, unchanged and still owed.
+    - WHERE a promoted supply's re-check comes back red, THE SYSTEM SHALL say that it is still promoted
+      and the period keeps it, and SHALL name demote as the decision that would take it out.
+    - WHERE a check's definition has a changelog entry newer than the current run of any filed supply that
+      recorded it, THE SYSTEM SHALL say so in the terminal's queue - 'N supplies were checked before <check>
+      changed' - and SHALL name the bulk re-check that would re-run them.
+    - THE SYSTEM SHALL treat a check changelog entry's date as the end of that day on the data asset's clock
+      when comparing it with a run's instant.
     non_functional_requirements:
     - 'No new execution path: REQ-PIPE-140 already built the run identity, the owed record, the failure
       handling and the ''most recent run is current'' rule. This adds a decision that owes one, nothing
@@ -25866,6 +25969,13 @@ requirements:
       supplies because a check was reworded is a decision somebody should make in so many words.'
     - 'ONE ENTRY PER SUPPLY, as REQ-PIPE-161''s range excuse is recorded: every re-run carries its own cause
       (REQ-PIPE-140 criterion 4).'
+    - 'THE QUEUE NUDGES A BULK RE-CHECK (Keith, 2026-10-07): ''N supplies were checked before <check> changed''.
+      A nudge, not an automatic re-run - re-judging promoted data stays a person''s call.'
+    - ITS OWN COMMAND, THE SHARED RANGE FLAGS, THE CONSEQUENCES PANEL, PROGRESS AND A SUMMARY (delivery-cli-ux
+      pre-build review, 2026-10-07). A promoted supply re-checked red says the period keeps it and names
+      demote, so 'still red' is never read as 'already taken out'.
+    - 'A CHANGELOG DATE IS END OF DAY ON THE ASSET CLOCK (delivery-architect pre-build review, 2026-10-07):
+      a check fixed on a day and a run later that same day must not both count as ''before the fix''.'
   - id: REQ-GHUB-165
     title: The terminal offers every filing decision that applies, wherever it applies
     date_written: '2026-10-07'
@@ -25889,6 +25999,10 @@ requirements:
     - THE SYSTEM SHALL be covered by a test that, for every slot state and every filing decision, fails
       where the flag route would accept a decision the terminal does not offer on that state, unless the
       test names the decision as deliberately terminal-hidden with a reason.
+    - THE SYSTEM SHALL extend that test to every operation this batch adds - excuse-lateness, withdraw-excuse,
+      place, re-check and its bulk form, keep, the correction confirmation, withdraw-acknowledgement and
+      withdraw-not-supplied - and SHALL assert that every terminal-only operation is absent from the GitHub
+      route.
     non_functional_requirements:
     - 'THE TEST IS THE DELIVERABLE as much as the screens: REQ-GHUB-082 criterion 3 guarantees parity between
       GitHub and the terminal''s IMPLEMENTATION, not between the flag form and the wizard''s MENUS, and
@@ -25920,6 +26034,9 @@ requirements:
       2026-10-07 audit of automated decisions that is deliberate rather than a gap. A file the file checks
       refuse (a ragged row, for instance) has no loadable data to promote; the remedy is reject and resend,
       and the terminal offers reject on it.
+    - 'THE PARITY TEST COVERS THIS BATCH, AND THE TERMINAL-ONLY ONES ARE ASSERTED ABSENT FROM GITHUB (delivery-cli-ux
+      pre-build review, 2026-10-07): REQ-GHUB-082 criterion 3 is being amended to allow terminal-only operations,
+      and a test that only checked presence would let one leak onto GitHub unnoticed.'
   - id: REQ-PIPE-166
     title: A person can withdraw a mark-as-not-supplied or an acknowledgement recorded by mistake
     date_written: '2026-10-07'
@@ -25949,6 +26066,7 @@ requirements:
       to, and through mothman supply decide.
     - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
       to list the two withdrawals.
+    - THE SYSTEM SHALL name the operations withdraw-acknowledgement and withdraw-not-supplied.
     non_functional_requirements:
     - 'Annotations only: a withdrawal, like the annotation it withdraws, changes no data and nothing a period
       resolves to (REQ-PIPE-132 criterion 8).'
@@ -25985,11 +26103,14 @@ requirements:
     - THE SYSTEM SHALL NOT add any exception to REQ-PIPE-062 criterion 5 for such a dataset.
     - THE SYSTEM SHALL check such a dataset's slots for overlap exactly as for any other (REQ-PIPE-134),
       including where a version change moves its due instants by most of a period.
-    - THE SYSTEM SHALL show, wherever a slot's due date is shown, the slot's own due date rather than its
-      period's date where the two differ.
+    - THE SYSTEM SHALL show, wherever a slot's due date is shown - including the dashboard's cycle heading
+      for a following-period dataset - the slot's own due date rather than its period's date where the two
+      differ.
+    - THE SYSTEM SHALL name, in such a dataset's participates list, the month of each period's calendar
+      date, not the month the supply is due.
     non_functional_requirements:
-    - 'Configured per dataset, never per collection (Keith, 2026-09-24): one rule applies consistently even
-      where a whole collection happens to share it.'
+    - A collection may state a default days before, which a dataset may override, nearest wins (REQ-PIPE-110
+      criterion 28). AMENDED 2026-10-07 (Keith), reversing his 2026-09-24 'per dataset, never per collection'.
     - No dataset needs it today; it is drafted so the participation shape REQ-PIPE-110 introduces can express
       it without a second mechanism later.
     dependencies:
@@ -26022,6 +26143,13 @@ requirements:
     - 'BUILT NOW, IN THIS BATCH (Keith, 2026-10-07), rather than left in the future log. Raised from could
       to SHOULD (scoper''s call): in this batch, but nothing reads wrong today without it, since no dataset
       delivers for the following period - MoSCoW states what omitting it costs, build order states when.'
+    - 'PER DATASET, NEVER PER COLLECTION IS REVERSED (Keith, 2026-10-07): a collection may default days
+      before, nearest wins. His 2026-09-24 reason - one rule applied consistently even where a whole collection
+      shares it - is met by nearest-wins, where a dataset''s own value still decides.'
+    - participates NAMES THE CALENDAR DATE'S MONTH (Keith, 2026-10-07), even where the supply is due months
+      earlier.
+    - THE CLAIM REACH MUST INCLUDE days_before, or such a supply is held (REQ-PIPE-113's horizon criterion;
+      delivery-architect S4).
   - id: REQ-PIPE-168
     title: An arrival verdict is a recorded fact naming the agreement that judged it, and a correction re-judges
       it visibly
@@ -26037,8 +26165,10 @@ requirements:
       and recorded as such). Scoped by delivery-scoper, 2026-10-07.'
     acceptance_criteria:
     - THE SYSTEM SHALL record, with each supply's arrival classification (REQ-PIPE-080 criterion 1), the
-      identity and content of the calendar version, participation version and timezone version that judged
-      it, and the due, late-after and claim-opening instants it was judged against.
+      slot's RESOLVED INPUTS - period date, due date, expected time, days before, grace, claim window and
+      timezone - the due, late-after and claim-opening instants derived from them, and a fingerprint of
+      the version-level part those inputs came from; and SHALL NOT record the whole content of the calendar
+      version or the slot's closing instant.
     - THE SYSTEM SHALL keep verdict records append-only, and SHALL NOT overwrite or delete a recorded verdict.
     - WHEN a declared correction (REQ-PIPE-111) is merged, THE SYSTEM SHALL, on the next run of the processing
       pass, re-judge every supply whose recorded inputs the correction changes, without waiting for any
@@ -26074,9 +26204,6 @@ requirements:
       REQ-PIPE-080 criterion 1) - what it lacks is the agreement that produced it, and qa_tools/common/filing.py''s
       classification_of still computes from the current filing on read. So this extends a built record rather
       than introducing one.'
-    - 'THE CONTENT AND THE INSTANTS ARE RECORDED, NOT ONLY A VERSION''S EFFECTIVE DATE: a correction changes
-      a frozen version in place, so its effective-from does not change and could not tell a reader the inputs
-      differ.'
     - 'RE-JUDGEMENT IS AUTOMATIC, FILING IS NOT (Keith, 2026-10-07): a lateness verdict follows mechanically
       from an approved agreement, so asking someone to confirm it adds a click and no judgement; moving
       a supply between periods can be wrong for a reason the calendar does not know (genuine Q3 data sent
@@ -26084,6 +26211,11 @@ requirements:
     - 'AN EXCUSE SURVIVES A RE-JUDGEMENT ONLY WHILE THE SUPPLY IS STILL LATE (scoper''s call, PROVISIONAL):
       an excuse (REQ-PIPE-161) of a supply the correction makes on time has nothing left to excuse and is
       reported lapsed, never deleted.'
+    - RESOLVED INPUTS AND A VERSION-LEVEL FINGERPRINT, NOT THE WHOLE VERSION AND NOT closes_at (delivery-architect
+      pre-build review, 2026-10-07), B3. The whole version changes every time a future date is appended,
+      and closes_at changes when the next period is authored, so recording either would make REQ-PIPE-173
+      refuse every dataset after every legitimate append. This replaces the earlier decision to record 'the
+      content' of each version.
   - id: REQ-PIPE-169
     title: A calendar correction's impact can be previewed before anyone approves it
     date_written: '2026-10-07'
@@ -26096,7 +26228,8 @@ requirements:
       ''the CAB approves the calendar change with the impact preview''). Scoped by delivery-scoper, 2026-10-07.'
     acceptance_criteria:
     - THE SYSTEM SHALL offer a mothman command, in the schedule group, that compares the working configuration
-      against the committed one and reports the impact of every change to a frozen item.
+      against the same base REQ-PIPE-111's gate uses, or against a ref the person states, and reports the
+      impact of every change to a frozen item.
     - THE SYSTEM SHALL list, in that report, every slot whose due, late-after, claim-opening or closing
       instant moves, with old and new instants.
     - THE SYSTEM SHALL list every supply whose arrival verdict would change, with old and new verdict.
@@ -26106,13 +26239,16 @@ requirements:
     - THE SYSTEM SHALL list every period that gains or loses an obligation.
     - THE SYSTEM SHALL compute the filing outcomes with the same implementation REQ-PIPE-170's trial uses,
       so that what the board approves is what the asset manager is later shown.
-    - THE SYSTEM SHALL state, in the report, the instant it was produced as at and the database it read,
-      and SHALL write it in a form that can be attached to the change reference.
+    - THE SYSTEM SHALL state, in the report, the instant it was produced as at and which database it read
+      without printing its connection string, and SHALL write, where asked for an output file, Markdown
+      with the summary first that can be attached to the change reference.
     - THE SYSTEM SHALL read configuration and recorded facts only - filings, receipts, recorded verdicts
       and decisions - and SHALL NOT read supply rows.
     - IF the recorded facts cannot be reached, THEN THE SYSTEM SHALL refuse and say so, and SHALL NOT report
       an impact computed from configuration alone as complete.
     - THE SYSTEM SHALL NOT record the preview in the database.
+    - WHERE nothing frozen changed, THE SYSTEM SHALL say so in one line.
+    - THE SYSTEM SHALL say in the command's help that it reads the database.
     non_functional_requirements:
     - THE REPORT IS FOR PEOPLE WHO DO NOT KNOW THE FILE CONTENTS. Summary first - counts by dataset - then
       the detail, in the language of the dashboard, not of the configuration.
@@ -26131,6 +26267,9 @@ requirements:
       computations of the same move, or the confirmation would be of something nobody approved.'
     - 'THE PREVIEW IS NOT RECORDED (Keith, 2026-10-07): REQ-PIPE-170 re-computes the trial after merge and
       the asset manager sees the list as it stands, including anything that arrived since the board approved.'
+    - 'AGAINST diff_base OR A STATED REF, NOT ''THE COMMITTED ONE'' (delivery-cli-ux pre-build review, 2026-10-07):
+      once the correction is committed, working tree and HEAD agree and the impact reads empty. Never prints
+      the DSN (supply_db._redact, delivery-architect S9).'
   - id: REQ-PIPE-170
     title: After a correction, the data asset's manager confirms the proposed filing moves all at once,
       and may keep any supply where it is
@@ -26176,6 +26315,21 @@ requirements:
     - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
       to list keep and the correction confirmation among the filing decisions, and REQ-GHUB-082 criterion
       3 to name the correction confirmation as the one operation offered on the terminal route only.
+    - THE SYSTEM SHALL offer the listing as `mothman supply corrections` and the confirmation as `mothman
+      supply confirm-correction`, naming the change reference and each kept supply.
+    - THE SYSTEM SHALL list pending corrections in the terminal's filing menu above the choice of collection,
+      since a correction is asset-wide.
+    - THE SYSTEM SHALL show a summary of the moves by dataset before the per-supply choice of which to keep.
+    - THE SYSTEM SHALL call the act of leaving a supply where it is 'keep' in both the prompt and the record,
+      and SHALL let one reason cover several kept supplies, recorded as one entry each.
+    - THE SYSTEM SHALL show the confirmation's consequences in the existing consequences panel, and SHALL
+      require --yes with --acknowledge KEY on the flag route, refusing if the moves have changed since they
+      were shown, and the asset's production confirmation where that applies.
+    - THE SYSTEM SHALL let any allowlisted person view a correction's proposed moves.
+    - IF a person other than the asset manager tries to confirm, THEN THE SYSTEM SHALL refuse before asking
+      for any reason, naming the role, its level and who holds it.
+    - THE SYSTEM SHALL keep a correction among the states needing action until every proposed move, blocked
+      ones included, has been moved or kept.
     non_functional_requirements:
     - 'ONE CONFIRMATION, NOT ONE PER FILE: a correction to a daily feed''s due time can propose hundreds
       of moves, and a per-supply step is how a list like this is abandoned half-done.'
@@ -26205,6 +26359,11 @@ requirements:
       and the next reader re-proposes the move.'
     - 'TERMINAL ONLY (Keith, 2026-10-07): a correction has no slot ticket, and the GitHub route is disabled
       anyway. REQ-GHUB-082 criterion 3''s parity rule is amended to name it, rather than broken silently.'
+    - 'ITS OWN COMMANDS, ABOVE THE COLLECTION PICKER, VIEW FOR ALL, CONFIRM FOR ONE (delivery-cli-ux pre-build
+      review, 2026-10-07): the filing menu picks a collection first and a correction is asset-wide; a refusal
+      comes before a reason is typed, naming who holds the role; ''keep'' is one word in prompt and record.
+      A blocked move holds the correction open until someone moves or keeps it, so nothing is silently left
+      behind.'
   - id: REQ-GHUB-171
     title: The people configuration names the data asset's manager, and a decision can require that role
     date_written: '2026-10-07'
@@ -26221,8 +26380,8 @@ requirements:
     acceptance_criteria:
     - THE SYSTEM SHALL declare the roles a person may hold, and SHALL reject in the people gate a role or
       an assignment role that is not declared.
-    - THE SYSTEM SHALL let a role be assigned for the whole data asset as well as per agency, and SHALL
-      reject an assignment naming neither or both.
+    - THE SYSTEM SHALL let a role be assigned at exactly one of three levels - the whole data asset, an
+      agency, or a dataset - and SHALL reject an assignment naming none or more than one.
     - THE SYSTEM SHALL let a decision require a role at data-asset level or for the agency of the dataset
       it concerns, and SHALL refuse a person without that role and assignment, naming the role and the level.
     - THE SYSTEM SHALL use the manager role assigned at data-asset level as the asset manager REQ-PIPE-170
@@ -26255,6 +26414,8 @@ requirements:
     - THE SCRIPTED ACTOR MAY HOLD THE ASSET MANAGER ROLE DURING PLAYBACK ONLY, ON A SYNTHETIC ASSET (Keith,
       2026-10-07), so a generated history can include a confirmed correction (REQ-PIPE-170). Outside playback,
       or on a real asset, it is refused like any non-person.
+    - EXACTLY ONE LEVEL PER ASSIGNMENT, three levels (delivery-architect pre-build review, 2026-10-07),
+      S8.
   - id: REQ-DASH-172
     title: The dashboard shows the corrected verdict, and keeps the original and the correction in the supply's
       history
@@ -26278,6 +26439,14 @@ requirements:
     - WHERE a supply was kept in place against a correction's proposed move, THE SYSTEM SHALL show it as
       kept, with the reason.
     - THE SYSTEM SHALL compute all of this from recorded facts only, and SHALL NOT read supply rows.
+    - WHERE a correction re-judged a supply, THE SYSTEM SHALL show it on the supply-history row in the existing
+      'changed after' shape - 'Late at the time · re-judged <date> by correction <ref>, approved by <person>'.
+    - THE SYSTEM SHALL list each correction once, asset-wide, in the changelog panel.
+    - WHERE the past-date note lists changes a correction made, THE SYSTEM SHALL group them into one item
+      per correction per dataset.
+    - THE SYSTEM SHALL give every action this batch adds a completed-action wording in the page's existing
+      decision-wording table.
+    - WHERE an asset-level notice names datasets, THE SYSTEM SHALL make each a link to that dataset.
     non_functional_requirements:
     - The data team leader sees one answer; the history is for the data owner and the auditor. Keep the
       correction out of the glance and one interaction away.
@@ -26292,6 +26461,9 @@ requirements:
       call on re-checks (REQ-PIPE-140). 'What we believed then' is the snapshot archive's job. REJECTED
       showing the verdict as believed on that date, which would have made a correction the one decision
       the page applies as-known and needed 081 amended.
+    - THE EXISTING 'changed after' ROW SHAPE, ONE CHANGELOG ENTRY PER CORRECTION, ONE PAST-DATE ITEM PER
+      CORRECTION PER DATASET, DECISION_DONE WORDING FOR EVERY NEW ACTION, AND REAL LINKS (delivery-dashboard-ux
+      pre-build review, 2026-10-07).
   - id: REQ-PIPE-173
     title: The pipeline refuses a dataset whose judged past changed without a declared correction
     date_written: '2026-10-07'
@@ -26304,18 +26476,24 @@ requirements:
       changed without one''), originally option (b)''s backstop of 2026-10-04. Scoped by delivery-scoper,
       2026-10-07.'
     acceptance_criteria:
-    - WHEN the processing pass runs, THE SYSTEM SHALL compare, for each dataset, the configuration's current
-      view of every period with a recorded judgement against the agreement content recorded with that judgement
-      (REQ-PIPE-168).
+    - WHEN the processing pass runs, THE SYSTEM SHALL compare, for each dataset, the resolved inputs and
+      version fingerprint the configuration now gives every period with a recorded judgement against those
+      recorded with it (REQ-PIPE-168), and SHALL NOT compare anything a future append legitimately changes.
     - IF they differ and no declared correction in the configuration accounts for exactly that difference,
       THEN THE SYSTEM SHALL refuse to process that dataset, naming the item, its recorded value and its
       current value, and saying that the remedy is to restore the value or declare the correction.
     - THE SYSTEM SHALL continue processing every other dataset.
-    - THE SYSTEM SHALL state a refused dataset in the pass's own summary and show it on the dashboard as
-      blocked, with the reason.
+    - THE SYSTEM SHALL state a refused dataset in the pass's own summary, and SHALL show it on the dashboard
+      as RED through the existing blocked-and-waiting banner, worded as a configuration problem on our side,
+      and SHALL NOT show its last verdict as current.
     - THE SYSTEM SHALL apply the same check to timezone and participation versions.
     - THE SYSTEM SHALL decide this from configuration and recorded facts only, and SHALL NOT read supply
       rows.
+    - WHERE one undeclared change refuses several datasets, THE SYSTEM SHALL show it as one asset-level
+      notice - a heading, the affected datasets as links, and one action - counted once by kind on each
+      card's markers.
+    - WHERE the data asset declares itself synthetic, THE SYSTEM SHALL name regenerating its history as
+      the remedy.
     non_functional_requirements:
     - 'Scoped to the dataset, never the run: at thirty datasets one broken agreement must not stop twenty-nine
       (Thread C''s exhausted-schedule rule).'
@@ -26334,6 +26512,12 @@ requirements:
       it would be the silent re-judgement this batch exists to prevent.'
     - 'A FIRST, CALENDAR-SHAPED STEP TOWARD THE SEAL (plans/running-thoughts.md #44), deliberately not the
       general check-configuration seal.'
+    - RED, IN THE EXISTING BLOCKED BANNER, WORDED AS OUR CONFIGURATION PROBLEM, NEVER SHOWING THE LAST VERDICT
+      AS CURRENT (Keith, 2026-10-07).
+    - 'ONE ROOT CAUSE, ONE ASSET-LEVEL NOTICE (delivery-dashboard-ux pre-build review, 2026-10-07), in exhaustedNotice''s
+      shape: thirty refused datasets from one edit are one problem, not thirty banners.'
+    - COMPARE RESOLVED INPUTS, NOT WHOLE VERSIONS (delivery-architect pre-build review, 2026-10-07), B3
+      - see REQ-PIPE-168.
   - id: REQ-GHUB-174
     title: A calendar correction needs the named approver's review on GitHub
     date_written: '2026-10-07'
@@ -26346,10 +26530,12 @@ requirements:
       on the calendar file (it checks the fields exist, not that the CAB met)''). Scoped by delivery-scoper,
       2026-10-07.'
     acceptance_criteria:
-    - THE SYSTEM SHALL commit a CODEOWNERS file naming, for contract/calendar.yaml and contract/data-asset.yaml,
-      the GitHub accounts of the people who may approve a correction.
+    - THE SYSTEM SHALL commit a CODEOWNERS file naming, for contract/calendar.yaml, contract/data-asset.yaml,
+      contract/people.yaml and the CODEOWNERS file itself, the GitHub accounts of the people who may approve
+      a correction.
     - THE SYSTEM SHALL refuse in the configuration gate a declared correction whose named approver is not
-      one of those code owners, matched through contract/people.yaml's github field.
+      one of those code owners, matched through contract/people.yaml's github field, reading both files
+      as they stood at the base of the change.
     - THE SYSTEM SHALL document, in the repository, that requiring code-owner review on the default branch
       is a GitHub branch-protection setting the repository cannot set or verify itself, and how to turn
       it on.
@@ -26372,6 +26558,8 @@ requirements:
       deployment turns it on, and the documentation says so.'
     - 'FILE-LEVEL REVIEW OF EVERY contract/data-asset.yaml EDIT IS ACCEPTED (Keith, 2026-10-07): CODEOWNERS
       cannot scope to a key, and everything in that file is asset governance.'
+    - 'CODEOWNERS COVERS ITSELF AND contract/people.yaml, AND IS READ AT THE BASE (delivery-architect pre-build
+      review, 2026-10-07), S7: otherwise a change could make its own approver a code owner.'
   - id: REQ-PIPE-115
     title: A table a run cannot read never stops the run - its own dataset reads red through its existing outstanding item, saying why, and every other check reading it is recorded once as not evaluated, in its own run
     date_written: '2026-10-04'
@@ -27387,6 +27575,7 @@ requirements:
         so the gate keeps its single `git show` otherwise. Not yet covered: the
         wiring inside _amber_setting_errors has no test of its own - the two pieces
         are tested separately.'
+      - 'PENDING AMENDMENT, NOT YET APPLIED (Keith, 2026-10-07): criterion 7''s guard dates a version by the commit''s author date (%aI), which anyone can backdate. It moves to the committer instant floored at the base commit, and to comparing normalised changelog entries with the changelog append-only (REQ-PIPE-112), in the change that builds REQ-PIPE-111 and REQ-PIPE-112 - not before, so until then this requirement describes the code as it runs. Recorded in plans/post-build-review.md #134.'
     open_questions: []
 
 

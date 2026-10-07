@@ -6836,3 +6836,21 @@ twice. It deliberately did not re-find the `TypeError`.
     where a resume lands. B12 FIXED - the rebuild's count line is quiet and
     says "recorded history". B13 FIXED - times on the asset clock; a
     statement keeps its full stop instead of a trailing "...".
+
+134. **[todo, 2026-10-07]** **[Pipeline & publishing]** **The built settings
+    guard dates a change by the commit's author date, which can be
+    backdated.** Found by delivery-scoper while folding the architect's
+    review of the calendar batch into REQ-PIPE-111 (the architect's S6),
+    and checked against the code by the main session:
+    `validate_schedule._version_added_on` reads `git log --format=%H %aI`
+    (validate_schedule.py:757), and REQ-PIPE-122's amber/replacement guard
+    uses it to decide whether a version was added after the date it took
+    effect. `GIT_AUTHOR_DATE` sets that freely, so a backdated commit
+    would pass as not past-dated. Low impact as built - a settings
+    version's past is recorded on every decision it governed, so a
+    backdated one re-judges nothing - but the same clock is about to
+    govern calendar freezes, where it would matter.
+    KEITH, 2026-10-07: fix it IN THE SAME CHANGE as REQ-PIPE-111, which
+    moves both freeze rules to the committer instant floored at the base
+    commit. REQ-PIPE-122 carries a pending-amendment decision saying so.
+    Failing test first when it is built.

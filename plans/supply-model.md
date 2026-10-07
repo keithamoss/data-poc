@@ -4756,7 +4756,10 @@ REQ-PIPE-164, REQ-GHUB-165, REQ-PIPE-166, REQ-PIPE-167, REQ-PIPE-168 to
 REQ-PIPE-170, REQ-GHUB-171, REQ-DASH-172, REQ-PIPE-173 and REQ-GHUB-174,
 plus a pending amendment to built REQ-PIPE-050 recorded on it. All are
 unsigned; the sign-off gate applies. No open question remains on any of
-them. The older "Config sketch" subsection is SUPERSEDED by REQ-PIPE-110.
+them. Revised twice more the same day, after Keith's answers and the
+pre-build reviews (delivery-architect, delivery-dashboard-ux,
+delivery-cli-ux) - their findings are folded into the criteria, and the
+architect's data-model sketch and build order are decisions on REQ-PIPE-110. The older "Config sketch" subsection is SUPERSEDED by REQ-PIPE-110.
 Delete this thread whole once the batch's last dependent requirement is
 built (CLAUDE.md's rule 4) - the analysis below is kept until then.
 
