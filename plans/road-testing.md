@@ -1535,6 +1535,74 @@ two levels) and #17.
       and lateness verdicts, but if we freeze it we're safe from that. Then
       again, those would all be legitimate reassessments") - thinking aloud,
       put back to him rather than read as a change to the strict rule.
+      **REOPENED AND DECIDED THE SAME MORNING (Keith, 2026-10-07): a
+      DECLARED CORRECTION UNDER CAB** - this REPLACES point 1 of the
+      RESOLVED block above ("strict, no escape hatch"); excuse lateness
+      (point 2) stays, for supplier-side cases. Shape put to him and
+      accepted in outline: a correction is its own declared act (a
+      changelog entry marked as a correction, naming the entry, old and new
+      values, reason, approver and a change reference); its impact is
+      previewed before approval; verdicts become RECORDED facts with the
+      calendar version that judged them, so a correction adds a
+      "re-judged by correction #N" event rather than silently changing an
+      answer; a backstop refuses a dataset whose past changed without one.
+      His answers: the dashboard shows the CORRECTED verdict by default
+      with the original kept in the supply's history; the tooling enforces
+      a change reference and a named approver, with GitHub requiring that
+      approver's review on the calendar file (it checks the fields exist,
+      not that the CAB met). Still open: what happens to a filed supply the
+      correction leaves outside its period - he asked for an example.
+      ANSWERED (Keith, 2026-10-07), proposing a third way himself: the
+      affected supplies are REPROCESSED UNDER THE CORRECTED CALENDAR AS A
+      TRIAL, what would change is REPORTED, and the moves are APPLIED
+      AUTOMATICALLY ONCE A PERSON CONFIRMS. The CAB approves the calendar
+      change with the impact preview; after merge the proposed moves are
+      listed in the terminal, and the TEAM MANAGER - not the CAB, not any
+      allowlisted person - confirms them ALL AT ONCE, able to exclude
+      individual supplies first (an excluded supply stays where it is,
+      recorded as kept; the worked case is genuine Q3 data sent early).
+      Confirmed moves re-file, re-run QA and re-gate. Lateness verdicts are
+      re-judged automatically and recorded as such. Back to the scoper with
+      all of this, since it reshapes 111 and adds recorded verdicts, the
+      impact preview and the confirmation step.
+      **SET 2/3 ANSWERS, Keith 2026-10-07:** `not_expected` is FROZEN like
+      dates once its claim window opens (after the fact: mark-not-supplied,
+      or a declared correction); the following-period offset (sighting #3,
+      REQ-PIPE-167) is a DAYS offset and is BUILT NOW, in this batch;
+      collection-level participation defaults - YES, nearest wins;
+      excused lateness counts SEPARATELY in any punctuality figure; a
+      second timezone is NEVER LABELLED on the dashboard (REQ-DASH-071's
+      no-label stays, against the recommendation to label only a
+      non-current zone). Asked back: why the per-dataset `dates:` override
+      exists (answer: no scenario - future-proofing, "cheap now, awkward
+      to retrofit", no such dataset), and whether resume databases are only
+      a local, synthetic-data concern (yes - `require_synthetic` gates
+      checkpoints and resumes).
+      FOLLOW-UPS, same conversation: the per-dataset `dates:` override is
+      KEPT AND PROTECTED - the freeze and correction rules extend to it
+      (against the recommendation to retire it); resume databases are
+      LISTED in `checkpoint list`, never auto-pruned, deletes confirmed and
+      an unknown name refused; a past in-place-on date shows the CORRECTED
+      verdict, with REQ-PIPE-081's notice that a correction changed it since
+      (consistent with the as-of view and his 2026-10-05 call on re-checks;
+      "what we believed then" is the snapshot archive's job); and the
+      person who confirms a correction's filing moves is THE MANAGER OF THE
+      OVERALL DATA ASSET - not a per-agency team manager - which
+      `contract/people.yaml` cannot express today (its assignments are per
+      agency only), so an asset-level role assignment is needed.
+      LAST ROUND, same conversation: the asset manager is KEITH (an
+      asset-level assignment in people.yaml); GitHub side - commit a
+      CODEOWNERS file and have the gate check the approver is a code owner,
+      leave branch protection OFF in the PoC (a sole author cannot approve
+      his own pull request) and document that a real deployment turns it
+      on; a refused undeclared change is JUST SHOWN, not recorded (declared
+      corrections are); the synthetic past-dated exception COVERS
+      PARTICIPATION versions too; `no_calendar` moves into calendar.yaml
+      unchanged but `owes_from` is FOLDED IN as the effective date of the
+      dataset's first participation version (against the recommendation to
+      move both unchanged); file-check refusals are NOT overridable, by
+      design - reject and resend; the impact preview is NOT recorded; and
+      confirming a correction's moves is TERMINAL ONLY.
       SETTLED THE SAME AFTERNOON AND NOT IN QUESTION: 110 - `participates`
       replaces `delivery_months`, `not_expected` stays (one-off decisions);
       `slaProperties` deleted entirely including `frequency`. 112 - the
