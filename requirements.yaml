@@ -26290,6 +26290,11 @@ requirements:
     - THE SYSTEM SHALL NOT record the preview in the database.
     - WHERE nothing frozen changed, THE SYSTEM SHALL say so in one line.
     - THE SYSTEM SHALL say in the command's help that it reads the database.
+    - THE SYSTEM SHALL offer, in the terminal's main menu, a Calendar entry that shows the delivery agreement in
+      force for a chosen dataset on a chosen date - its calendar, participation, due time, grace, claim window,
+      days before and the reason for any period it owes nothing in - lists pending and applied corrections, and
+      runs this impact preview against the working copy, offering to write it to a file; and SHALL NOT edit
+      contract/calendar.yaml or any other configuration from the terminal.
     non_functional_requirements:
     - THE REPORT IS FOR PEOPLE WHO DO NOT KNOW THE FILE CONTENTS. Summary first - counts by dataset - then
       the detail, in the language of the dashboard, not of the configuration.
@@ -26311,6 +26316,7 @@ requirements:
     - 'AGAINST diff_base OR A STATED REF, NOT ''THE COMMITTED ONE'' (delivery-cli-ux pre-build review, 2026-10-07):
       once the correction is committed, working tree and HEAD agree and the impact reads empty. Never prints
       the DSN (supply_db._redact, delivery-architect S9).'
+    - 'A CALENDAR ENTRY IN THE TERMINAL (Keith, 2026-10-07, after sign-off - ''the primary tool humans will use apart from the dashboard''): the agreement in force for a dataset on a date, pending and applied corrections, and this preview are reachable from the main menu, not only as a command, since a preview that is only a command is easy to forget before a CAB request. Viewing and previewing only: configuration is still edited in git, where it is reviewed and where REQ-PIPE-111''s gate runs - an editing screen in the terminal would be a second, unreviewed route into the agreement.'
   - id: REQ-PIPE-170
     title: After a correction, the data asset's manager confirms the proposed filing moves all at once,
       and may keep any supply where it is
