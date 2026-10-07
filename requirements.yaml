@@ -25010,8 +25010,11 @@ requirements:
       values - before and after a change - can be held side by side in one process.
     - 'THE SYSTEM SHALL decide whether a file in contract/ is a dataset contract from its `kind: DataContract`,
       and SHALL NOT decide it from the presence of slaProperties.'
-    - IF a participation version owes a supply in any period its predecessor did not, THEN THE SYSTEM SHALL
-      reject it unless the version states explicitly which months it adds.
+    - IF a participation version leaves out any value its dataset's previous participation version stated
+      - its participates list (stated as a list or as all), expected time, grace, days before or claim-window
+      override - THEN THE SYSTEM SHALL reject the configuration, naming the dataset, the version and each value
+      left out, so that every version restates everything it governs and a value is never silently dropped to a
+      collection or calendar default.
     - IF a dataset's own authored dates use a period name that any calendar in the file also uses, THEN
       THE SYSTEM SHALL reject the configuration.
     - WHERE every dataset of the asset declares no calendar, THE SYSTEM SHALL accept an empty list of calendars.
@@ -25183,6 +25186,7 @@ requirements:
       identity and its confirmation; new qa.decision actions and columns for excuse, place, re-check, keep
       and withdrawals; qa.agreement_block as a new blocker kind; build in stages S0 (the agreement value
       and loader) to S4.'
+    - 'EVERY PARTICIPATION VERSION RESTATES EVERYTHING ITS PREDECESSOR STATED (Keith, 2026-10-07, while signing this off - ''that''s probably safer''), REPLACING the ''states which months it adds'' wording of criterion 31. Leaving `participates` out meant ''every period'', so a version that only changed the due time silently widened what a dataset owes - the trap REQ-PIPE-050 exists for. A version that leaves out anything its predecessor stated is refused, naming each value, so a version always reads as complete on its own. Widening is written as the list it widens to, or `participates: all`. Rejected: (a) an `adds:` field naming the new months - redundant once the list itself is restated; (b) carrying unstated values over from the previous version - less typing and no guard needed, but a version would no longer say on its own what was in force, and Keith preferred the safer, explicit form.'
   - id: REQ-PIPE-111
     title: A delivery agreement's past changes only by a declared, approved correction
     date_written: '2026-09-28'
