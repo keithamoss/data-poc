@@ -7925,6 +7925,7 @@ requirements:
         reader to work out what to type, and a gate that interrupts a
         build owes them better - the NFR asks for an error a human can
         act on immediately, which is a shape, not an aspiration."
+      - 'PENDING AMENDMENT, NOT YET APPLIED (2026-10-07): the calendar batch (REQ-PIPE-110 to 113 and 161 to 174, re-scoped through delivery-scoper 2026-10-07, unsigned) changes this requirement when REQ-PIPE-110 and REQ-PIPE-111 are built - criteria 1, 5, 8 and 15 follow the rename of delivery_months to participates, criterion 8 becomes rejecting a dataset that has both a participates list and its own authored dates, and the two [BUILD] guard decisions are superseded by REQ-PIPE-111 (a past change needs a declared, approved correction; an ordinary added changelog line no longer clears it). Applied in the change that builds 110 and 111, not before, because until then this requirement describes the code as it runs.'
     linked_tests:
       - tests/test_validate_schedule.py
       - tests/test_schedule.py
@@ -24980,189 +24981,1396 @@ requirements:
       here rather than claimed as evidence.'
   - id: REQ-PIPE-110
     title: contract/calendar.yaml is the one place a delivery agreement lives
-    date_written: "2026-09-28"
-    story: "As the person who agreed a delivery with a supplier, I want the whole agreement for an asset written in one file, so that a dataset's cadence and its calendar can never quietly disagree about what was promised."
+    date_written: '2026-09-28'
+    story: As the person who agreed a delivery with a supplier, I want the whole agreement for an asset
+      - its calendars, which datasets are on which, and when each dataset is due - written in one file,
+      so that a dataset's cadence, its participation and its due time can never quietly disagree about what
+      was promised.
     moscow: must
     status: not_started
-    source: "Keith, designed in conversation across the morning of 2026-09-28 and written into plans/supply-model.md Thread C that evening (the subsection `contract/calendar.yaml` - one file per asset, and `slaProperties` goes). Scoped by delivery-scoper, 2026-09-28."
+    source: Keith, designed in conversation across the morning of 2026-09-28 and written into plans/supply-model.md
+      Thread C that evening (the subsection `contract/calendar.yaml` - one file per asset, and `slaProperties`
+      goes). Scoped by delivery-scoper, 2026-09-28. RE-SCOPED by delivery-scoper 2026-10-07 against Keith's
+      decisions of 2026-09-29 (expected time is a versioned property of participation), 2026-10-04 (participates
+      replaces delivery_months, not_expected stays, slaProperties deleted entirely including frequency;
+      plans/road-testing.md 'CALENDAR DRAFTS 110-113, PART-SETTLED') and the nine days of building since
+      the first draft.
     acceptance_criteria:
-      - "THE SYSTEM SHALL hold every delivery agreement belonging to a data asset in one file, contract/calendar.yaml."
-      - "THE SYSTEM SHALL carry each named calendar in that file as effective-dated versions, in the same shape check lifecycle and today's calendars already use."
-      - "THE SYSTEM SHALL carry each dataset's own expected time of day and its own grace allowance in that file."
-      - "THE SYSTEM SHALL NOT read a dataset's expected time, grace allowance, claim window or cadence from an ODCS contract."
-      - "THE SYSTEM SHALL let a collection name a calendar, and SHALL apply that calendar to every dataset in the collection that names none of its own."
-      - "WHERE a dataset names its own calendar, THE SYSTEM SHALL use it in preference to the one its collection names."
-      - "THE SYSTEM SHALL let a dataset state which of its calendar's slots it participates in, and SHALL let it state a reason for a period in which it is owed nothing."
-      - "THE SYSTEM SHALL show a period a dataset is owed nothing in, together with that reason, and SHALL NOT omit it."
-      - "IF a dataset declares neither participation nor an exclusion, THEN THE SYSTEM SHALL treat it as participating in every period its calendar generates."
-      - "THE SYSTEM SHALL express each version's changelog as entries carrying a date, an author and a description of the change."
-      - "IF a changelog entry is a plain string rather than those three fields, THEN THE SYSTEM SHALL reject the configuration."
-      - "THE SYSTEM SHALL delete the slaProperties block from every ODCS contract in the repository."
-      - "WHEN slaProperties is deleted, THE SYSTEM SHALL repoint every reader of it at contract/calendar.yaml, and SHALL NOT leave any reader falling back to a default or to a hardcoded value."
-      - "IF a fact contract/calendar.yaml now owns is also stated in an ODCS contract, THEN THE SYSTEM SHALL reject the configuration rather than choosing between the two."
-      - "WHEN the repository's gates run, THE SYSTEM SHALL validate contract/calendar.yaml under the existing schedule gate, naming the file, the calendar or dataset at fault, and the correction to make."
-      - "THE SYSTEM SHALL produce, for the configuration in force on the day of the move, exactly the periods, slots, due instants and arrival verdicts it produced before the move."
-      - "THE SYSTEM SHALL NOT change any period name or any warehouse schema name as part of this move."
-      - "WHEN each ODCS contract has had slaProperties removed, THE SYSTEM SHALL still lint that contract against datacontract-cli's own bundled ODCS schema."
-      - "THE SYSTEM SHALL read contract/calendar.yaml without opening or querying any database, any warehouse schema or anything under data/."
+    - THE SYSTEM SHALL hold every delivery agreement belonging to a data asset in one file, contract/calendar.yaml
+      - its named calendars, which calendar each collection and dataset is on, and each dataset's participation.
+    - THE SYSTEM SHALL carry each named calendar as effective-dated versions, each version holding either
+      its authored dates or its cadence rule, and its default claim window.
+    - THE SYSTEM SHALL carry, for every dataset that is on a calendar, a participation entry made of effective-dated
+      versions.
+    - THE SYSTEM SHALL carry, on each participation version, the dataset's expected time of day and its
+      grace allowance, and SHALL let that version override its calendar's default claim window.
+    - THE SYSTEM SHALL state, on each participation version under the key participates, which of its calendar's
+      periods the dataset owes a supply in, by naming delivery months in full and case-insensitively, and
+      SHALL NOT accept a month number, an abbreviation or a positional index.
+    - WHERE a participation version states no participates list, THE SYSTEM SHALL treat the dataset as owing
+      a supply in every period its calendar generates.
+    - IF a participation version names delivery months against a cadence-rule calendar, THEN THE SYSTEM
+      SHALL reject the configuration.
+    - WHERE a participation version owes supplies in only some of its calendar's periods, THE SYSTEM SHALL
+      require a reason on that version, and SHALL show that reason wherever a period the dataset does not
+      participate in is shown.
+    - THE SYSTEM SHALL keep not_expected as its own list, separate from participation, of once-off periods
+      a dataset owes nothing in, each carrying a reason, which a person may add ahead of the period.
+    - THE SYSTEM SHALL show every period a dataset owes nothing in - whether by participation or by not_expected
+      - together with its reason, and SHALL NOT omit it.
+    - THE SYSTEM SHALL let a collection name a calendar, and SHALL apply that calendar to every dataset
+      in the collection that names none of its own.
+    - WHERE a dataset names its own calendar, THE SYSTEM SHALL use it in preference to the one its collection
+      names.
+    - THE SYSTEM SHALL express every changelog entry in contract/calendar.yaml as a date, an author and
+      a description of the change, and IF an entry there is a plain string, THEN THE SYSTEM SHALL reject
+      the configuration.
+    - IF the configuration states delivery_months anywhere, THEN THE SYSTEM SHALL reject it, naming participates
+      in contract/calendar.yaml as the key that replaced it.
+    - THE SYSTEM SHALL delete the whole slaProperties block, every property in it including frequency, from
+      every ODCS contract in the repository.
+    - IF an ODCS contract states slaProperties, THEN THE SYSTEM SHALL reject the configuration naming contract/calendar.yaml
+      as where those facts now live, and SHALL NOT read any value from it.
+    - WHEN slaProperties is deleted, THE SYSTEM SHALL repoint every reader of it - including the dashboard's
+      per-dataset delivery-time label and the inheritance rule's reading of participation - at contract/calendar.yaml,
+      and SHALL NOT leave any reader falling back to a default, a hardcoded value or a hardcoded configuration-file
+      name.
+    - IF a dataset in the asset's hierarchy has neither a calendar nor a deliberate no-calendar declaration,
+      or contract/calendar.yaml names a dataset or collection the hierarchy does not hold, THEN THE SYSTEM
+      SHALL reject the configuration naming both files.
+    - WHEN the repository's gates run, THE SYSTEM SHALL validate contract/calendar.yaml under the existing
+      schedule gate, naming the file, the calendar or dataset at fault, and the correction to make.
+    - THE SYSTEM SHALL produce, for the configuration in force on the day of the move, exactly the periods,
+      slots, due instants, claim-opening and closing instants, holds and arrival verdicts it produced before
+      the move.
+    - THE SYSTEM SHALL NOT change any period name or any warehouse schema name as part of this move.
+    - WHEN each ODCS contract has had slaProperties removed, THE SYSTEM SHALL still lint that contract against
+      datacontract-cli's own bundled ODCS schema.
+    - THE SYSTEM SHALL read contract/calendar.yaml without opening or querying any database, any warehouse
+      schema or anything under data/.
+    - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-049 criteria 8 and 9, REQ-PIPE-052 criterion
+      10, REQ-PIPE-134 criterion 2, REQ-PIPE-156 criterion 1, REQ-PIPE-106 criterion 16 (a dataset's graduation
+      is the effective date of its first participation version) and REQ-PIPE-050's criteria naming delivery
+      months, so that no built requirement still places a delivery fact in an ODCS contract, names delivery_months
+      or names owes_from.
+    - WHERE a dataset states its own authored dates in place of its calendar's, THE SYSTEM SHALL hold them
+      as effective-dated versions with a structured changelog, as a calendar's are, and SHALL protect them
+      with REQ-PIPE-111's freeze and declared-correction rules.
+    - THE SYSTEM SHALL carry a dataset's deliberate no-calendar declaration (REQ-PIPE-106) in contract/calendar.yaml,
+      unchanged in meaning.
+    - THE SYSTEM SHALL treat the effective date of a dataset's first participation version as the date it
+      began owing supplies, and SHALL NOT carry a separate owes_from key; IF owes_from is stated anywhere,
+      THEN THE SYSTEM SHALL reject the configuration naming the first participation version as its replacement.
+    - THE SYSTEM SHALL let a collection state default participation values - expected time, grace, days
+      before and claim-window override - as effective-dated versions, and SHALL resolve each value for a
+      dataset from the nearest level that states it, dataset before collection, as REQ-PIPE-122's settings
+      resolve.
     non_functional_requirements:
-      - "CORRECTNESS OVER CONVENIENCE, and a half-done move is worse than none: the whole point of this requirement is that a delivery agreement is stated once, so a state in which two files both plausibly own a dataset's expected time is worse than today's, where at least one file is unambiguously the source. The rejection criterion above is what makes the difference, and it has to be mechanical rather than a matter of review."
-      - "At the real target of ~30 datasets on the quarterly asset, this file has to stay readable by eye - that readability is the whole anti-drift argument for one calendar over thirty date lists. If 30 datasets times four dates times several versions cannot be read in one sitting, the shape is wrong and it is cheaper to find that out now than after the second asset exists."
-      - "BEHAVIOUR-PRESERVING, and provably so: pin the current verdicts BEFORE the move rather than after, the way REQ-PIPE-048 did. tests/fixtures/arrival_semantics_golden.json already pins every arrival's classification and is the natural pin; confirm it actually bites by perturbing a value and watching it fail, rather than trusting that it would."
-      - "This is a shape change with several consumers, so enumerate them mechanically before calling it done - pipeline/cadence.py, qa_tools/common/slots.py, qa_tools/common/schedule.py, both dashboard data builders, dashboard/embed_dashboard_data.py's PERIOD_SEQUENCES and SCHEDULE_RUNWAY embeds, cli/schedule.py, and the validators. Assert at the last transform before a reader, not only at the parser."
-      - "Config only, no data access, so both the schedule gate and the dashboard build can read this file under the standing rule that a build may read recorded QA results, never actual data, and never anything else."
-      - "The 188 staged tables and every recorded QA result are keyed on period names and schema names. Nothing here may rename either, because a rename is a re-key of recorded history rather than an edit."
-      - "One file PER ASSET, which means the path is a property of a deployment rather than of this repository. Nothing may hardcode a per-dataset or per-collection path to it, because the second asset is a separate deployment of the same codebase."
-      - "The file is read on a laptop with no database, inside a pre-commit hook, and inside a build. It must need nothing but `uv run mothman` and the committed tree."
-      - "What a wrong answer costs is the reason this is a must rather than a should: a supply judged against dates nobody agreed. That failure is silent, it looks exactly like a correct verdict, and the supplier is the one it is unfair to."
+    - 'CORRECTNESS OVER CONVENIENCE, and a half-done move is worse than none: the whole point is that a
+      delivery agreement is stated once, so a state in which two files both plausibly own a dataset''s expected
+      time is worse than today''s. The rejection criteria are what make the difference, and they have to
+      be mechanical rather than a matter of review.'
+    - READABLE BY EYE AT ~30 DATASETS. Participation now carries versions AND the due time, so the per-dataset
+      block is bigger than the delivery_months line it replaces. If thirty datasets times several participation
+      versions cannot be read in one sitting, the shape is wrong - and it is cheaper to find that out on
+      the two real collections than after the second asset exists.
+    - 'BEHAVIOUR-PRESERVING, AND PROVABLY SO: pin the current verdicts BEFORE the move, the way REQ-PIPE-048
+      did. tests/fixtures/arrival_semantics_golden.json is the natural pin, plus the 9 assignment-rule holds
+      and the period-closing instants REQ-PIPE-131 added since the first draft. Confirm the pin bites by
+      perturbing one value and watching it fail.'
+    - THE MOVE COMMIT IS THE ONE COMMIT THE FREEZE GATE CANNOT SEE (REQ-PIPE-111 passes where there is no
+      previous committed state, and contract/calendar.yaml has none on the day it is created). The behaviour-preserving
+      pin is therefore not a nice-to-have here - it is the only guard on the riskiest commit in the batch.
+    - 'A SHAPE CHANGE WITH MANY CONSUMERS - enumerate them mechanically before calling it done, and assert
+      at the last transform before a reader. Measured 2026-10-07: slaProperties is read by pipeline/cadence.py
+      (both parsers), qa_tools/common/slots.py, schedule.py, validate_schedule.py and both dashboard data
+      builders; delivery_months by schedule.py, validate_schedule.py, period_overlap.py, inheritance.py
+      and cli/schedule.py; not_expected additionally by decision_log.py; the template still renders ds.sla.cadence
+      and falls back to the literal ''contract/data-asset.yaml'' in three places.'
+    - Config only, no data access, so the schedule gate, the pre-commit hook and the dashboard build can
+      all read this file under the standing rule that a build may read recorded QA results, never actual
+      data, and never anything else.
+    - 'Nothing may rename a period or a schema: every staged table and every recorded QA result is keyed
+      on them, and a rename is a re-key of recorded history rather than an edit.'
+    - ONE FILE PER ASSET, so its path is a property of a deployment rather than of this repository. Nothing
+      may hardcode a per-dataset or per-collection path to it, because the second asset is a separate deployment
+      of the same codebase.
+    - Read on a laptop with no database, inside a pre-commit hook, and inside a build - it must need nothing
+      but `uv run mothman` and the committed tree, and must stay in the gate's fast group.
+    - 'What a wrong answer costs is why this is a must: a supply judged against dates nobody agreed. That
+      failure is silent, looks exactly like a correct verdict, and the supplier is the one it is unfair
+      to.'
     dependencies:
-      - REQ-PIPE-049
-      - REQ-PIPE-050
-      - REQ-PIPE-051
-      - REQ-PIPE-052
+    - REQ-PIPE-049
+    - REQ-PIPE-050
+    - REQ-PIPE-051
+    - REQ-PIPE-052
     decisions:
-      - "THE PROBLEM THIS SOLVES is that the same facts are configured twice. An asset's delivery calendars live in contract/data-asset.yaml while each dataset's cadence, expected time and latency live in that dataset's own ODCS contract under slaProperties. The two can disagree, nothing checks that they do not, and slaProperties cannot be versioned - so changing a cadence silently re-judges history."
-      - "Decided slaProperties is DELETED rather than left in place as a deprecated copy. A second copy nobody reads is a second copy somebody edits, and the version that is read is decided by whichever parser ran - which is precisely the class of disagreement this requirement exists to end."
-      - "Decided a COLLECTION may name a calendar, not only a dataset (Keith, 2026-09-28), because a whole collection usually shares one. Child Protection's six datasets naming `quarterly` six times is six chances to disagree for no gain, and at thirty datasets that arithmetic gets worse rather than better."
-      - "Decided the changelog becomes STRUCTURED - date, author and change per entry - rather than the prose strings contract/data-asset.yaml carries today (Keith asked for this specifically, 2026-09-28). A prose string cannot be filtered, attributed or rendered, and the immutability gate's error messages read better when they can name who last changed a version."
-      - "Decided a dataset that is owed nothing in a period says so WITH A REASON rather than being silently absent. The reason is not decoration: `no November file` with nothing beside it is indistinguishable, six months later, from somebody having forgotten to configure November, and those are opposite problems. This preserves the rule REQ-PIPE-049 already settled for not_expected."
-      - "CARRIED FORWARD from REQ-PIPE-049 and not reopened by this move: quarterly uses authored dates and daily uses a cadence rule; the asset owns the calendar and a dataset owns its participation; month names in full only; a calendar date carries NO time of day; a period's name is authored rather than derived; the dates ARE the supplier agreement, so a holiday library predicts it and never constitutes it."
-      - "CARRIED FORWARD and specifically at risk in this move: per-dataset expected times are a definite need (Keith, 2026-09-22). The case that decided it is worth restating because a single file invites re-flattening - three slots in one period, births due 09:00, cp_clients due 09:00, cp_placements due 17:00; births arriving at 16:00 reads ON TIME with the deadline on the period and LATE with it on the slot, and the wrong one is a FALSE GREEN."
-      - "Decided the Child Protection override is about HOW EARLY a supply may arrive, not about its expected time (Keith corrected this explicitly, 2026-09-28). It widens the claim window; it does not move the deadline. Recorded here because a single file makes the two look like the same kind of setting."
-      - "Rejected moving the asset's timezone into this file, which a first reading of `one place a delivery agreement lives` suggests. The zone is asset-wide - the dashboard's asset clock, REQ-DASH-071's timestamps, arrival classification - so putting a general fact inside one consumer's file would misplace it. See REQ-PIPE-112, which is where the zone's own versioning lands."
-      - "ANSWERED 2026-09-29 (Keith): a dataset's expected time is a VERSIONED PROPERTY OF THAT DATASET'S PARTICIPATION, sited within the calendar file. His own words: `the expected time is a versioned property of the dataset's participation within the calendar`. So it is the second of the two options - the due time travels with the dataset rather than with the shared calendar version - and the cost accepted with it is the one the question named: two versioning axes to reason about when asking what was in force on a date."
-      - "WHY THAT WAY ROUND, restated so it is not re-litigated: the rejected option put the due time inside the calendar VERSION, which means one dataset moving its deadline by an hour authors a new version of a calendar that thirty datasets share. At two datasets that reads fine; at thirty it makes every dataset's history carry version boundaries that had nothing to do with it, and it makes a routine per-dataset change look like an asset-wide event."
-      - "WHAT THIS DOES NOT ANSWER, flagged rather than inferred: the first open question below - where participation lives, and whether `participates` replaces today's `delivery_months` and `not_expected` - is still open. This answer presumes participation is expressed in the calendar file, because that is what it is a property OF, but it says nothing about which keys express it. Reading more into it than that is how a decision acquires clauses nobody agreed."
-      - "IT UNBLOCKS REQ-PIPE-113, which is what makes it worth having early: that requirement's criterion 14 exists to give REQ-GEN-044's generated history somewhere effective-dated to state a due time, so REQ-GEN-044 criteria 8 to 11 wait on 113 and 113 waited on this."
-      - "Recorded because the move is the risky part rather than the file: pipeline/cadence.py's _sla_properties_to_dict already had a real defect of exactly this shape, keying on `property` alone and discarding `element:`, so Child Protection's single expectedTime block silently governed all six datasets. That was found by reading the parser rather than the config, and the same discipline applies here - reading the new file and inferring what the code does with it is not verification."
-    open_questions:
-      - "WHERE PARTICIPATION LIVES, and whether `participates: {slots, reason}` REPLACES today's `delivery_months` and `not_expected`. Thread C's newest subsection names `participates` per dataset without saying whether it supersedes the two keys that already do this job in contract/data-asset.yaml's hierarchy, or sits beside them, or whether participation moves into calendar.yaml at all. This changes what gets built: `delivery_months` carries its own reasoned naming decision (it names when a supply ARRIVES, not the period it covers) and replacing it with a slot list would retire that decision rather than restate it."
-      - "WHETHER slaProperties GOES ENTIRELY or only its five schedule properties. `frequency` is an ODCS-standard property that says something a human reader of the contract wants (this feed is daily), and deleting it removes that statement from the contract even though nothing computes with it."
+    - THE PROBLEM THIS SOLVES is that the same facts are configured twice. Calendars live in contract/data-asset.yaml
+      while each dataset's cadence, expected time and grace live in its ODCS contract under slaProperties.
+      The two can disagree, nothing checks that they do not, and slaProperties cannot be versioned - so
+      changing a due time silently re-judges history.
+    - Decided slaProperties is DELETED rather than left as a deprecated copy. A second copy nobody reads
+      is a second copy somebody edits.
+    - 'Decided slaProperties goes ENTIRELY, frequency included (Keith, 2026-10-04 afternoon, settling this
+      requirement''s former second open question). The cost accepted: an ODCS contract no longer tells its
+      reader that the feed is daily, because nothing computes with frequency and a statement nothing checks
+      is a statement that drifts - Child Protection''s frequency sat at a stale ''7 d'' through two cadence
+      migrations before anyone noticed. A reader looks in contract/calendar.yaml.'
+    - Decided participates REPLACES delivery_months (Keith, 2026-10-04, settling the former first open question).
+      REJECTED keeping both keys side by side - two keys answering 'which periods does this dataset owe'
+      is the drift this requirement exists to end.
+    - 'CARRIED ACROSS FROM delivery_months, so the rename does not retire the reasoning: participates names
+      when a supply ARRIVES, not the period it covers - a February delivery is often for the November-January
+      window. Month NAMES in full, case-insensitive, never numbers, abbreviations or positions, because
+      an index breaks silently when the calendar is reordered and two accepted spellings across thirty datasets
+      is config reading differently for no gain. A typo must fail the gate, because a dataset whose participation
+      matches nothing has zero slots - the exhausted-schedule state reached by accident (REQ-PIPE-050).
+      PROVISIONAL that the values stay month names - see open questions.'
+    - 'Decided not_expected STAYS as its own thing (Keith, 2026-10-04): participation is an ONGOING statement
+      of which periods a dataset owes, while not_expected is ''a once-off decision, or a series of once-off
+      decisions we might make ahead of time''. REJECTED folding not_expected into participates, which would
+      make every one-off pause a new participation version.'
+    - 'ANSWERED 2026-09-29 (Keith): a dataset''s expected time is a VERSIONED PROPERTY OF THAT DATASET''S
+      PARTICIPATION within the calendar file - ''the expected time is a versioned property of the dataset''s
+      participation within the calendar''. REJECTED putting it on the calendar VERSION: one dataset moving
+      its deadline by an hour would author a new version of a calendar thirty datasets share, give every
+      dataset''s history a version boundary unrelated to it, and make a routine per-dataset change look
+      like an asset-wide event. The cost accepted is two versioning axes to reason about when asking what
+      was in force on a date.'
+    - 'Decided grace and the claim-window override travel with the expected time on the participation version,
+      rather than staying unversioned. They are the other two inputs to a slot''s instants (REQ-PIPE-113),
+      and versioning one of three inputs would leave the other two able to re-judge history - the slots.py
+      comment that hoisting the claim window out of the period loop ''made a new calendar version move every
+      historical slot''s claim_opens_at'' (post-build-review #42) is the same failure.'
+    - 'Decided a COLLECTION may name a calendar, not only a dataset (Keith, 2026-09-28): Child Protection''s
+      six datasets naming quarterly six times is six chances to disagree, and at thirty that arithmetic
+      worsens.'
+    - 'Decided the changelog becomes STRUCTURED - date, author, change - rather than the ''YYYY-MM-DD: text''
+      strings contract/data-asset.yaml carries today (Keith asked for this, 2026-09-28): a prose string
+      cannot be filtered, attributed or rendered, and the freeze gate''s refusals read better naming who
+      last changed a version.'
+    - 'Decided a dataset owed nothing in a period says so WITH A REASON (REQ-PIPE-049''s rule, carried):
+      ''no November file'' with nothing beside it is indistinguishable, six months later, from somebody
+      forgetting to configure November. Today that reason for Case Workers lives in a YAML comment; it becomes
+      data.'
+    - 'CARRIED FORWARD from REQ-PIPE-049 and not reopened: quarterly uses authored dates and daily a cadence
+      rule; the asset owns the calendar and a dataset owns its participation; a calendar date carries NO
+      time of day; a period''s name is authored rather than derived; the dates ARE the supplier agreement,
+      so a holiday library predicts it and never constitutes it; runway_warning_slots stays unversioned
+      because it is our operational threshold, not the agreement.'
+    - 'CARRIED FORWARD and specifically at risk in a single file: per-dataset expected times are a definite
+      need (Keith, 2026-09-22). The deciding case - births due 09:00, cp_clients 09:00, cp_placements 17:00
+      in one period; births arriving 16:00 reads ON TIME with the deadline on the period and LATE with it
+      on the slot - and the wrong one is a FALSE GREEN.'
+    - 'Decided the Child Protection override is about HOW EARLY a supply may arrive, not its expected time
+      (Keith corrected this explicitly, 2026-09-28): it widens the claim window and does not move the deadline.
+      NOTE, verified 2026-10-07: no claimWindow override exists in either committed contract today - the
+      capability (pipeline/cadence.py''s parse_claim_window_from_contract) is real and unused, and it moves
+      to the participation version.'
+    - 'Decided the timezone STAYS in contract/data-asset.yaml (Keith, 2026-10-04, confirming the 2026-09-28
+      scoping call): the zone is asset-wide - the asset clock, REQ-DASH-071''s timestamps, hand-filing -
+      so moving it into this file would put a general fact inside one consumer''s file. Its versioning is
+      REQ-PIPE-112.'
+    - SUPERSEDES Thread C's older 'Config sketch' subsection, which still draws expectedTime, latency and
+      claimWindow inside slaProperties beside delivery_months. That sketch is history; the shape is this
+      requirement's.
+    - 'Recorded because the move is the risky part rather than the file: pipeline/cadence.py''s _sla_properties_to_dict
+      had a real defect of exactly this shape, keying on `property` alone and discarding `element:`, so
+      one expectedTime silently governed all six Child Protection datasets. Found by reading the parser
+      rather than the config - reading the new file and inferring what the code does with it is not verification.'
+    - 'THE PER-DATASET dates: OVERRIDE IS KEPT AND PROTECTED (Keith, 2026-10-07), against the recommendation
+      to retire it in favour of a one-dataset named calendar. No dataset uses it and no scenario needs it
+      - it is future-proofing, ''cheap now, awkward to retrofit'' (Thread C) - so it gains versions and
+      a changelog and falls under the freeze and the declared-correction route. Today it has neither: validate_schedule._authored_dates
+      reads calendars only.'
+    - 'no_calendar MOVES INTO contract/calendar.yaml UNCHANGED; owes_from IS FOLDED IN as the effective
+      date of the dataset''s first participation version (Keith, 2026-10-07), against the recommendation
+      to move both unchanged. One date stating when a dataset began owing, not two that can disagree. BEHAVIOUR-PRESERVING:
+      a dataset that has always had a calendar gets a first participation version effective no later than
+      its calendar''s first period, so it owes exactly what it owed before.'
+    - 'COLLECTION-LEVEL PARTICIPATION DEFAULTS, NEAREST WINS (Keith, 2026-10-07): at thirty datasets most
+      share a due time, and stating it thirty times is thirty chances to disagree. One resolution rule in
+      the file - the one REQ-PIPE-122''s settings already use - rather than a second.'
+    - 'participates LISTS DELIVERY MONTHS (Keith, 2026-10-07), in full and case-insensitively, as criterion
+      5 already states. REJECTED Thread C''s ''participates: {slots, reason}'' reading as period or slot
+      names: a period name is one year''s, and the list states a recurring pattern.'
   - id: REQ-PIPE-111
-    title: A calendar's history cannot be edited, and there is no way round it
-    date_written: "2026-09-28"
-    story: "As whoever is accountable for a red supply history, I want a delivery date that has already passed to be impossible to change, so that nobody can make a breach disappear by editing what we agreed after the fact."
+    title: A delivery agreement's past changes only by a declared, approved correction
+    date_written: '2026-09-28'
+    story: As whoever is accountable for a red supply history, I want any part of a delivery agreement that
+      has already governed a supply to change only through a declared correction that names what changed,
+      who approved it and under which change reference, so that a legitimate reassessment can happen visibly
+      and under governance, and nobody can quietly make a breach disappear or invent one.
     moscow: must
     status: not_started
-    source: "Keith, 2026-09-28 evening - the first of two decisions added to plans/supply-model.md Thread C, with the freeze rule chosen as option B of three and the no-escape-hatch fork settled the same evening. Scoped by delivery-scoper, 2026-09-28."
+    source: 'Keith, 2026-09-28 evening (plans/supply-model.md Thread C: history immutable, freeze by what
+      the thing governs, commit-time gate). Scoped by delivery-scoper, 2026-09-28. RE-SCOPED by delivery-scoper
+      2026-10-07 twice: first to ''strict, no escape hatch'' (Keith, 2026-10-07 morning), then to a DECLARED
+      CORRECTION UNDER CAB when Keith reopened and decided it the same morning (plans/road-testing.md, ''REOPENED
+      AND DECIDED THE SAME MORNING''), with the freeze point, the append-only carve-out and parallel build
+      order settled alongside.'
     acceptance_criteria:
-      - "WHEN a commit changes the calendar configuration, THE SYSTEM SHALL compare it against the previously committed state of that file and SHALL refuse the commit if any rule below is broken."
-      - "IF an entry whose own date has already passed is changed, THEN THE SYSTEM SHALL refuse the commit."
-      - "IF an entry whose own date has already passed is removed, THEN THE SYSTEM SHALL refuse the commit."
-      - "IF an entry carrying a date already in the past is ADDED, THEN THE SYSTEM SHALL refuse the commit."
-      - "WHILE an entry's own date is still in the future, THE SYSTEM SHALL allow that entry to be added, changed or removed freely."
-      - "IF a version-level property is changed on a version whose effective-from date has already passed, THEN THE SYSTEM SHALL refuse the commit."
-      - "WHILE a version's effective-from date is still in the future, THE SYSTEM SHALL allow that version's own properties to be changed freely."
-      - "THE SYSTEM SHALL NOT offer any flag, environment variable, configuration key or documented procedure that allows a refused change to be committed."
-      - "THE SYSTEM SHALL NOT accept a new changelog entry as licence for a change these rules refuse."
-      - "THE SYSTEM SHALL run this check at commit time, through the repository's existing pre-commit hook."
-      - "THE SYSTEM SHALL run the same check in the repository's gates, so that a commit made without the hook is still caught."
-      - "THE SYSTEM SHALL decide whether a date is past or future on the data asset's own clock, and SHALL NOT use the machine's."
-      - "THE SYSTEM SHALL compare against the base of the whole push rather than only against its most recent commit."
-      - "IF there is no previous committed state available to compare against, THEN THE SYSTEM SHALL pass rather than fail."
-      - "WHEN a change is refused, THE SYSTEM SHALL name the entry or property, what it was, what it became, and that authoring a new effective-dated version is how to make the correction."
-      - "THE SYSTEM SHALL decide whether a change is legal from committed configuration alone, and SHALL NOT open or query any database, warehouse schema or anything under data/."
-      - "WHERE a calendar is expressed as a cadence rule rather than authored dates, THE SYSTEM SHALL apply the version-level rule to it and SHALL have no dated entries to freeze."
-      - "WHERE the asset carries any other effective-dated configuration, including its versioned timezone, THE SYSTEM SHALL apply the same freeze rule to it."
-      - "THE SYSTEM SHALL complete within the time budget the repository's other config-only gates already meet, so that it stays in the fast group rather than joining the slow tail."
+    - WHEN a commit changes contract/calendar.yaml or the asset's timezone versions, THE SYSTEM SHALL compare
+      the parsed configuration against its state at the base of the whole push, and SHALL refuse the commit
+      if any rule below is broken.
+    - THE SYSTEM SHALL treat each dated calendar entry, each dated entry of a dataset's own authored dates,
+      calendar version, participation version (including a collection's default participation), not_expected
+      entry and timezone version as FROZEN from the first instant it can govern a filing - for a dated entry
+      or a not_expected entry, the earliest claim-opening instant any dataset it concerns has for that period;
+      for a version, the earlier of the start of its effective-from date and the earliest claim-opening
+      instant of any period it governs.
+    - IF a frozen item is changed or removed, THEN THE SYSTEM SHALL refuse the commit unless the same change
+      adds a declared correction for it.
+    - THE SYSTEM SHALL accept as a declared correction only a changelog entry marked as a correction that
+      names the item corrected, its old value, its new value, the reason, a named approver who is a person
+      in contract/people.yaml, and a change reference, and SHALL refuse a correction missing any of them.
+    - IF a declared correction's old value or item does not match the change actually made, THEN THE SYSTEM
+      SHALL refuse the commit naming the difference.
+    - THE SYSTEM SHALL NOT accept a changelog entry that is not a declared correction as licence for any
+      change to a frozen item, and SHALL remove, in the same change, the route of the guard REQ-PIPE-050
+      built (validate_schedule.py::_retrospective_edit_errors) by which any added changelog line cleared
+      a past-date edit.
+    - IF an item is ADDED that was already frozen on the day it was added, THEN THE SYSTEM SHALL refuse
+      the commit unless the same change declares it as a correction, except as the two criteria below allow.
+    - WHERE an authored calendar has no dated entry later than the latest one its previous state held, THE
+      SYSTEM SHALL allow appending entries dated after that latest entry even where already frozen, without
+      a declared correction, provided the earliest appended claim-opening instant is no earlier than the
+      closing instant the previous last period had.
+    - WHERE the data asset's configuration declares it synthetic both before and after the change, THE SYSTEM
+      SHALL allow ADDING a calendar, participation or timezone version with a past effective date without
+      a declared correction, and SHALL still require one to change or remove a frozen item.
+    - WHILE an item is not yet frozen, THE SYSTEM SHALL allow it to be added, changed or removed freely.
+    - THE SYSTEM SHALL NOT offer any flag, environment variable, configuration key or documented procedure
+      that commits a change to a frozen item other than by a declared correction.
+    - THE SYSTEM SHALL decide whether an item is frozen on the data asset's own clock, as at the date of
+      the commit that introduced the change, and SHALL NOT use the date the gate runs, the machine's clock,
+      or a replay's simulated clock.
+    - THE SYSTEM SHALL run this check at commit time through the repository's existing pre-commit hook,
+      and in the repository's configuration gates so that a commit made without the hook is still caught.
+    - IF there is no previous committed state available to compare against, THEN THE SYSTEM SHALL pass rather
+      than fail.
+    - 'WHEN a change is refused, THE SYSTEM SHALL name the item, what it was, what it became, and the two
+      routes open: a new version effective after the item froze, or a declared correction with the fields
+      it lacks and the impact preview command (REQ-PIPE-169) to produce for its approver - and, for a not_expected
+      entry, mark as not supplied (REQ-PIPE-132) as the after-the-fact route.'
+    - THE SYSTEM SHALL decide whether a change is legal from committed configuration alone, and SHALL NOT
+      open or query any database, warehouse schema or anything under data/.
+    - WHERE a calendar is expressed as a cadence rule, THE SYSTEM SHALL apply the version rule to it and
+      SHALL have no dated entries to freeze.
+    - THE SYSTEM SHALL compare parsed entries rather than text, so that reordering or reformatting the file
+      refuses nothing.
+    - THE SYSTEM SHALL complete within the time budget the repository's other config-only gates already
+      meet.
+    - THE SYSTEM SHALL show a refused undeclared change to the person refused and in the gate's output,
+      and SHALL NOT record it anywhere else.
     non_functional_requirements:
-      - "A GATE THAT FIRES ON LEGITIMATE WORK GETS TURNED OFF, and the common case here is legitimate: authoring next year's dates. Keith's own words on the choice were that he does not want adding future days to the quarterly calendar to be that annoying, and the freeze rule was chosen to make that four appended lines plus one changelog entry inside the existing version. Any implementation that makes the ordinary case harder has misread the requirement."
-      - "A pre-commit hook runs on a laptop with no database, no network and possibly no populated data/ - which is why the freeze rule is `freeze by what the thing governs` rather than `freeze by what has been judged`. That constraint is load-bearing, not incidental, and it is the same rule as this repository holding configuration and not state."
-      - "NO ESCAPE HATCH MEANS THE ERROR MESSAGE IS THE DOCUMENTATION. A person who has just been refused a commit has to be able to see the sanctioned route from what they are told, because there is nowhere else for them to look and no flag for them to reach for."
-      - "The hook is not a security control and should not be described as one: anyone can bypass a pre-commit hook. The gate in the repository's CI is the actual backstop, and the honest framing is that the hook is there to catch the mistake early, not to stop a determined person."
-      - "Comparison must stay one read of one file at the depth CI already checks out. The existing sibling guard measures about 3ms for exactly that, and the deep-clone version of this idea was rejected once already on cost - re-adopting it by accident would be a real regression."
-      - "Git history is the comparison basis, so a shallow checkout and a branch's first push must both degrade to passing. A checkout that cannot see far enough is a weaker check, never a broken build."
-      - "At thirty datasets and years of authored dates the file keeps growing, so the comparison should be on parsed entries rather than on text, or the first reordering of the file produces a wall of false refusals."
+    - A GATE THAT FIRES ON LEGITIMATE WORK GETS TURNED OFF. Authoring next year's dates stays four appended
+      lines plus one ordinary changelog entry; extending an exhausted calendar needs no correction ceremony;
+      only changing something that has already governed a filing does.
+    - THE GATE CHECKS THAT THE FIELDS EXIST, NOT THAT THE CAB MET (Keith, 2026-10-07). It can verify that
+      an approver is a real person and that a change reference is present; whether the meeting happened,
+      and whether that approver actually reviewed, is GitHub's to enforce (REQ-GHUB-174) and the organisation's
+      to audit.
+    - A pre-commit hook runs on a laptop with no database and no network, so freezing is computed from configuration
+      alone - the same rule as this repository holding configuration and not state.
+    - The hook is not a security control; CI's configuration gate is the backstop for a skipped hook, and
+      REQ-PIPE-173 is the backstop for anything that bypasses git altogether.
+    - One read of the previous file per configuration file at the depth CI checks out (about 3ms, REQ-PIPE-050),
+      plus REQ-PIPE-122's git-log walk only where an item dated before today is added. No deep-clone history
+      walk.
+    - A shallow checkout or a branch's first push degrades to passing - a weaker check, never a broken build.
+    - Parsed rather than textual comparison, because at thirty datasets and years of dates the first reordering
+      would otherwise produce a wall of false refusals.
     dependencies:
-      - REQ-PIPE-110
+    - REQ-PIPE-110
+    - REQ-PIPE-112
+    - REQ-PIPE-050
     decisions:
-      - "THIS IS THE LOAD-BEARING COMPLEMENT TO A REJECTION ALREADY RECORDED, and the pair only makes sense together. Thread C rejected `derive the date at runtime and freeze the computed due instant onto the result` on the grounds that the dates ARE the supplier agreement and QA judges against the agreement. But that rejection removed the thing that was protecting history: if a judgement does not carry its own frozen inputs, then editing the agreement retroactively re-judges every past supply against dates nobody agreed at the time. Immutability puts that protection back, on the config rather than on the record."
-      - "IT HAS TO BE A COMMIT-TIME GATE rather than a runtime one, because by the time anything runs the damage is already committed and the old values are only recoverable by reading git."
-      - "THE FREEZE RULE IS `FREEZE BY WHAT THE THING GOVERNS` (Keith, 2026-09-28, option B of three shown to him). An entry is frozen once its OWN date has passed; a version-level property such as the claim window is frozen once THAT VERSION takes effect, because it already governed periods that have been judged. It rests on one observation that an earlier draft missed: ADDING A FUTURE DATE IS NOT A CHANGE TO HISTORY, and `editing a version` and `changing what a past supply was judged against` are different things."
-      - "THE THIRD CLAUSE IS THE ONE A NAIVE WORDING LOSES: everything future-dated is freely editable. A rule phrased as `existing entries cannot change` would forbid exactly the maintenance task this design depends on somebody doing once a year."
-      - "REJECTED (A) FREEZE THE WHOLE VERSION once its effective-from has passed. A version is a complete statement of the agreement, so adding four dates would mean restating all twenty you did not touch - an unreadable diff, and two copies of the same dates that can silently disagree. Its obvious escape, letting each version state only its DELTA, is worse: `what was in force on 3 May 2025` then needs versions replayed in order, and the file stops being readable by eye."
-      - "REJECTED (C) FREEZE BY WHETHER ANYTHING HAS BEEN JUDGED against an entry - a slot existing in the database for that period. Theoretically the most precise rule and practically the wrong one: a pre-commit hook has to run on a laptop with no database, and a config gate that queries the warehouse to decide whether a config edit is legal inverts this project's own rule that the repository holds configuration, not state."
-      - "NO ESCAPE HATCH (Keith, explicitly, 2026-09-28). There is no flag, no override and no `I know what I am doing` path. A past date that was wrong is exactly the case immutability exists for: supplies were judged against it, and quietly changing it makes the record disagree with what happened. A correction that genuinely needs making is a new version with its own effective-from and its own changelog entry, which is visible rather than silent - and the real history stays in git either way."
-      - "THIS SUPERSEDES THE GUARD REQ-PIPE-050 ALREADY BUILT, and that is a change to shipped, signed behaviour rather than a new capability beside it. qa_tools/common/validate_schedule.py's _retrospective_edit_errors is deliberately a SAY-WHAT-YOU-DID gate - its own docstring says so - where a new changelog entry on the version clears a past-date edit. Under this requirement a changelog entry clears nothing, and the gate also has to cover two cases it does not see today: a past-dated entry being ADDED, and a version-level property changing. REQ-PIPE-050's criteria and its [BUILD] decisions need amending in the same change, or the register carries two contradictory accounts of one gate."
-      - "Decided the daily calendar is untouched by the entry rule, because it is a cadence rule rather than a date list and has no dated entries to freeze. Its version-level properties are still frozen on the same terms."
-      - "NOT BUILT HERE, deliberately: the SEAL (plans/running-thoughts.md #44) - a committed record of what a calendar was when it was last used to judge data, so the gate needs no git history at all. That is the stronger mechanism and it is the same artefact as the check-configuration seal that item exists to design; building a calendar-shaped copy of it now would be building the throwaway version."
-    open_questions:
-      - "WHETHER A REFUSAL IS A GOVERNANCE EVENT worth recording anywhere beyond the terminal of the person refused. A supplier agreement being edited retrospectively is the kind of thing an auditor would want to see attempted, not only prevented - but recording it needs somewhere to record it, and the pre-commit hook has no database. Left open because it changes scope rather than detail."
-      - "WHETHER `git commit --no-verify` IS ACCEPTED as out of scope. The no-escape-hatch decision is about this tool offering no override; it cannot stop a person bypassing the hook entirely, and the gate in CI is what catches that. Worth Keith confirming that reading, because `no escape hatch` could reasonably be read as a stronger promise than the mechanism can make."
+    - A DECLARED CORRECTION UNDER CAB (Keith, 2026-10-07, reopening and deciding the same morning; option
+      (b) of 2026-10-04, refined). A change to a frozen item is allowed only as its own declared act - a
+      correction-marked changelog entry naming the item, old and new values, reason, approver and change
+      reference - previewed before approval (REQ-PIPE-169), recorded and re-judged visibly afterwards (REQ-PIPE-168),
+      reconciled into filings only on a asset manager's confirmation (REQ-PIPE-170), and backstopped where
+      git is bypassed (REQ-PIPE-173).
+    - 'REJECTED ''STRICT, NO ESCAPE HATCH'' - this requirement''s own wording from 2026-09-28 to the morning
+      of 2026-10-07, accepted that morning and REVERSED within hours. Why: legitimate reassessments should
+      be possible, visibly and under governance. Keith''s mistyped-date case decided it - amending the date
+      ''would change filing decisions and lateness verdicts, but... those would all be legitimate reassessments''.
+      Strict made a known-wrong date permanent, with only an excuse decision to paper over it.'
+    - 'REJECTED REQ-PIPE-050''s built rule, where ANY added changelog line clears a past-date edit (option
+      (c) of 2026-10-04). It is removed, not kept beside the correction route: an undeclared line is the
+      quiet edit this whole requirement exists to stop, and two accounts of one gate must not coexist (REQ-DOCS-101
+      precedent).'
+    - 'THE FREEZE POINT IS THE CLAIM-WINDOW OPENING (Keith, 2026-10-07, taking the recommendation): an entry
+      becomes ''past'' at the first instant it can govern a filing, not on its own date. The ''noticed on
+      1 August'' case decided it - REQ-PIPE-131 closes a period when the next period''s claim window opens,
+      so on 1 August Q3''s window, open since 18 July, had already closed Q2 and filed early Q3 supplies.'
+    - 'THE NARROW APPEND-ONLY CARVE-OUT (Keith, 2026-10-07): dates may be added after a calendar''s last
+      date even when already past, to extend an exhausted schedule, so REQ-PIPE-154 criterion 7''s held
+      supplies can be filed. It is NOT a correction and needs none of the ceremony, because it moves no
+      supply that was ever filed or judged. Existing dates never change except by correction. REJECTED leaving
+      schedule-ended supplies rejectable only, and a synthetic-only carve-out.'
+    - 'THE SAME ROUTE FOR TIMEZONE AND PARTICIPATION VERSIONS (Keith, 2026-10-07): expected time, grace,
+      days before and claim-window override are as able to re-judge history as a date is.'
+    - BUILT IN PARALLEL with REQ-PIPE-161 and REQ-PIPE-163 (Keith, 2026-10-07). The earlier NFR making this
+      wait for them belonged to the strict design, where those decisions were the only remedy; under a correction
+      route they are not.
+    - 'THE FREEZE RULE IS `FREEZE BY WHAT THE THING GOVERNS` (Keith, 2026-09-28, option B of three): adding
+      a future date is not a change to history, and everything not yet frozen is freely editable. REJECTED
+      (A) freezing the whole version at its effective-from (restating twenty untouched dates to add four;
+      delta versions make ''what was in force on 3 May 2025'' a replay) and (C) freezing by whether anything
+      was judged (a pre-commit hook has no database).'
+    - 'IT HAS TO BE A COMMIT-TIME GATE rather than a runtime one: by the time anything runs the change is
+      committed. The runtime backstop (REQ-PIPE-173) exists for the case the gate cannot see, not instead
+      of it.'
+    - 'A SYNTHETIC ASSET MAY ADD PAST-DATED CALENDAR, PARTICIPATION AND TIMEZONE VERSIONS without a correction,
+      never change or remove one (Keith, 2026-10-07), matching REQ-PIPE-122 criterion 8. PARTICIPATION IS
+      COVERED (Keith, 2026-10-07), confirming the scoper''s inference: the evening-before due time REQ-GEN-044
+      needs lives on a participation version. The synthetic declaration must hold before AND after the change
+      (REQ-PIPE-122''s rule).'
+    - PAST IS JUDGED BY THE COMMIT THAT INTRODUCED THE CHANGE (REQ-PIPE-122 criterion 7 as amended 2026-10-05),
+      via validate_schedule._version_added_on; judged by run date, a late-night push went red.
+    - COMPARED AGAINST diff_base(), the base of the whole push, never HEAD~1 alone - the multi-commit hole
+      qa_tools/common/diff_base.py documents.
+    - 'not_expected IS FROZEN LIKE A DATE once its claim window opens (Keith, 2026-10-07): adding one for
+      a period whose window has opened erases an obligation already owed. After the fact, a person marks
+      the period not supplied (REQ-PIPE-132), or a declared correction removes the obligation if the agreement
+      never had it.'
+    - '`git commit --no-verify` IS OUT OF SCOPE AS UNDERSTOOD (Keith, 2026-10-07): CI catches a commit that
+      skipped the hook; REQ-PIPE-173 catches a past that changed with no commit gate at all.'
+    - 'A REFUSED UNDECLARED CHANGE IS JUST SHOWN, NOT RECORDED (Keith, 2026-10-07): it changed nothing,
+      the hook has no database, and a CI refusal is already in the workflow run. What IS recorded is every
+      declared correction that was made (REQ-PIPE-168) - the act, not the attempt.'
+    - 'REQ-PIPE-122 AND REQ-PIPE-123 ARE UNCHANGED: their settings are frozen outright with no correction
+      route, because every automatic decision records the setting it acted under, so a setting''s past is
+      inert. A calendar''s past is not inert - verdicts and filings follow from it - which is why it has
+      a correction route and they do not.'
+    - 'NOT BUILT HERE: the SEAL (plans/running-thoughts.md #44). REQ-PIPE-173''s record of which versions
+      judged each period is a first, calendar-shaped step toward it; the general check-configuration seal
+      stays that item''s.'
+    - 'THE PER-DATASET dates: OVERRIDE IS FROZEN AND CORRECTED ON THE SAME TERMS AS A CALENDAR (Keith, 2026-10-07)
+      (REQ-PIPE-110). It closes a hole in the built guard, which never looked at it.'
   - id: REQ-PIPE-112
     title: The asset's timezone is versioned, and every reader asks as at when
-    date_written: "2026-09-28"
-    story: "As whoever reads a due instant computed years from now, I want it computed in the timezone that was in force when the supply was due, so that moving an asset's clock does not silently re-judge everything that already happened."
+    date_written: '2026-09-28'
+    story: As whoever reads a due instant computed years from now, I want it computed in the timezone that
+      was in force when the supply was due, so that moving an asset's clock does not silently re-judge everything
+      that already happened.
     moscow: must
     status: not_started
-    source: "Keith, 2026-09-28 evening - the second of two decisions added to plans/supply-model.md Thread C, settled the same evening as `the timezone IS versioned`. Scoped by delivery-scoper, 2026-09-28."
+    source: 'Keith, 2026-09-28 evening - the second of two decisions added to plans/supply-model.md Thread
+      C, settled the same evening as `the timezone IS versioned`. Scoped by delivery-scoper, 2026-09-28.
+      RE-SCOPED by delivery-scoper 2026-10-07: Keith settled both former open questions on 2026-10-04 (it
+      stays in contract/data-asset.yaml; it is worth versioning now) and the synthetic exception on 2026-10-07.'
     acceptance_criteria:
-      - "THE SYSTEM SHALL express the data asset's timezone as effective-dated versions rather than as a single value."
-      - "WHEN a wall-clock time is interpreted as an instant, THE SYSTEM SHALL use the timezone version in force on the date being interpreted."
-      - "WHEN the current instant or today's date is needed, THE SYSTEM SHALL use the timezone version in force now."
-      - "THE SYSTEM SHALL require every caller to state the date or instant its answer is as at, and SHALL NOT offer a timezone lookup that takes none."
-      - "IF no timezone version covers the date being interpreted, THEN THE SYSTEM SHALL fail loudly naming that date, and SHALL NOT fall back to the newest version."
-      - "THE SYSTEM SHALL NOT reinterpret any already-stored instant when a timezone version is added or changed."
-      - "THE SYSTEM SHALL produce, for the single version the asset carries today, exactly the instants it produces before this change."
-      - "THE SYSTEM SHALL name an IANA zone in each version, and SHALL NOT accept a fixed UTC offset."
-      - "THE SYSTEM SHALL carry each timezone version's own changelog entry in the same structured shape a calendar version's changelog uses."
-      - "WHEN the dashboard is built, THE SYSTEM SHALL embed enough of the timezone history for the page to interpret a past date without asking a backend."
-      - "THE SYSTEM SHALL repoint every consumer of the asset's timezone at the as-at form, including the value embedded into the built dashboard."
-      - "THE SYSTEM SHALL read the timezone configuration without opening or querying any database, warehouse schema or anything under data/."
+    - THE SYSTEM SHALL express the data asset's timezone in contract/data-asset.yaml as effective-dated
+      versions, each naming an IANA zone and carrying a structured changelog of date, author and change,
+      and SHALL NOT accept a fixed UTC offset.
+    - THE SYSTEM SHALL bring each timezone version into force at the start of its effective-from date in
+      that version's own zone, so that every instant belongs to exactly one version.
+    - WHEN a wall-clock time on a date is interpreted as an instant, THE SYSTEM SHALL use the timezone version
+      in force on that date.
+    - WHEN an instant is shown or reduced to a date, THE SYSTEM SHALL use the timezone version in force
+      at that instant.
+    - WHEN the current instant or today's date is needed, THE SYSTEM SHALL use the timezone version in force
+      now - and, while a synthetic replay runs on its simulated clock (REQ-PIPE-081 criterion 27), the version
+      in force at that simulated instant.
+    - THE SYSTEM SHALL NOT offer a timezone lookup that takes no date or instant.
+    - IF no timezone version covers the date or instant being interpreted, THEN THE SYSTEM SHALL fail loudly
+      naming it, and SHALL NOT fall back to the newest or the oldest version.
+    - IF a dataset's expected time of day does not exist, or occurs twice, on a period's due date in the
+      zone in force then, THEN THE SYSTEM SHALL reject the configuration in the schedule gate naming the
+      dataset, the period and the time.
+    - THE SYSTEM SHALL NOT reinterpret any already-stored instant when a timezone version is added.
+    - THE SYSTEM SHALL produce, for the single version the asset carries today, exactly the instants, dates
+      and verdicts it produces before this change.
+    - WHEN the dashboard is built, THE SYSTEM SHALL embed every timezone version, and the page SHALL interpret
+      each past date in the version in force on it and its asset clock in the version in force now, without
+      asking a backend.
+    - THE SYSTEM SHALL repoint every consumer of the asset's timezone at the as-at form, including the hand-filing
+      path and the value embedded into the built dashboard.
+    - THE SYSTEM SHALL protect timezone versions with REQ-PIPE-111's freeze rule and its declared-correction
+      route, including its synthetic exception for adding a past-dated version, and SHALL re-judge, preview
+      and backstop a timezone correction as REQ-PIPE-168, 169 and 173 do any other.
+    - THE SYSTEM SHALL read the timezone configuration without opening or querying any database, warehouse
+      schema or anything under data/.
+    - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-048 criterion 1 and REQ-PIPE-103 criterion 16
+      so that each names the version in force rather than a single value.
+    - THE SYSTEM SHALL express every changelog entry of the amber setting's and the replacement setting's
+      versions (REQ-PIPE-122, REQ-PIPE-123), at every level, as a date, an author and a description of the
+      change, and IF one of them is a plain string, THEN THE SYSTEM SHALL reject the configuration.
+    - THE SYSTEM SHALL convert every existing settings changelog entry in contract/data-asset.yaml to that
+      shape in the same change, without altering any version's effective date or value, and SHALL NOT treat
+      that conversion as a change to a frozen setting version.
     non_functional_requirements:
-      - "THIS IS A SHAPE CHANGE WITH MANY CONSUMERS, which is the class CLAUDE.md's own item-74 lesson covers: enumerate every caller mechanically rather than by memory, and assert at the LAST transform before a reader rather than at the parser. There are roughly twenty-three references to the asset timezone in Python plus one embedded const in the dashboard template, and the page has its own separate interpretation of it."
-      - "A BARE NO-ARGUMENT LOOKUP IS THE BUG THIS INVITES, and Thread C says so in as many words. The API should make the wrong call impossible rather than discouraged - remove the zero-argument function rather than deprecating it, so a caller that has not thought about `as at when` does not compile rather than quietly getting today's answer for a date in 2024."
-      - "PIN THE CURRENT VERDICTS BEFORE THE CHANGE, not after, the way REQ-PIPE-048 did for the same value. tests/fixtures/arrival_semantics_golden.json is the natural pin, and it should be confirmed to bite by perturbing the zone and watching real verdicts move."
-      - "The cost today is essentially all API churn and none of it benefit: the asset carries one zone, Western Australia does not observe daylight saving, and no second version exists. That is worth stating plainly at sign-off, because the argument for doing it now is that it is cheap while there is one version and expensive once instants have been computed under two."
-      - "The dashboard's asset clock updates in the browser, so resolving a version must not become a per-render cost. Resolve once per page rather than per timestamp."
-      - "Config only, no data access, so the gate, the pipeline and the build can all read it under the standing rule."
-      - "A second asset in a daylight-saving jurisdiction is the case this exists for, and it is the case with no test data. Whatever is built should be exercised against a zone that actually observes daylight saving, even if only in tests, or the first real deployment is the first real test."
+    - 'SMALLER THAN THE FIRST DRAFT SAID, measured 2026-10-07 rather than estimated. Nearly every reader
+      already passes the date or instant it is asking about: asset_time.wall_clock takes a day (6 calls
+      in 5 files), local_date and isoformat take an instant (33 calls), now() is by definition as-at now
+      (43 calls in 27 files). Only asset_time.asset_timezone() is a bare lookup, called directly in three
+      places - qa_tools/common/hand_filing.py:184 and dashboard/embed_dashboard_data.py:295-296. The first
+      draft''s ''about twenty-three references'' figure is superseded.'
+    - THE BARE LOOKUP IS THE BUG THIS INVITES - remove asset_timezone() rather than deprecate it, so a caller
+      that has not thought about 'as at when' fails rather than quietly getting today's zone for a date
+      in 2024.
+    - PIN THE CURRENT VERDICTS BEFORE THE CHANGE (tests/fixtures/arrival_semantics_golden.json), and confirm
+      the pin bites by perturbing the zone and watching verdicts move.
+    - EXERCISE A ZONE THAT OBSERVES DAYLIGHT SAVING in tests, including a version change across a transition
+      and an expected time inside a gap and an overlap. A second asset in such a jurisdiction is why this
+      exists, and it has no real data to find the bugs for it.
+    - 'Resolving a version must not become a per-render cost in the browser: resolve once per page for the
+      clock and per distinct date for history, not per timestamp.'
+    - Config only, no data access, so the gate, the pipeline and the build can all read it under the standing
+      rule.
+    - The benefit is entirely in the future - the asset has one zone and Western Australia has no daylight
+      saving. Keith judged it worth building now (2026-10-04) because it is cheap while there is one version
+      and expensive once instants have been computed under two.
     dependencies:
-      - REQ-PIPE-048
+    - REQ-PIPE-048
+    - REQ-PIPE-111
     decisions:
-      - "THE TIMEZONE IS VERSIONED (Keith, 2026-09-28), which makes it the same shape as everything else in this design: a wall-clock expected time is interpreted in the zone in force when the supply was DUE, exactly as a date is read from the calendar version in force then. Without that, changing an asset's zone would silently move every past due instant - the same retroactive re-judgement the calendar freeze rule exists to prevent, arriving by a different door."
-      - "IT STAYS IN contract/data-asset.yaml, becoming a versioned list rather than the scalar `timezone: Australia/Perth` there today. This was the scoping session's call rather than Keith's and is easily reversed: the zone is asset-wide and used well beyond the calendars - the dashboard's asset clock, REQ-DASH-071's timestamps, arrival classification - so moving it into contract/calendar.yaml would put a general fact inside one consumer's file."
-      - "EVERY READER BECOMES `AS AT WHEN`. A due instant asks for the zone in force at its own date; a display clock asks for the current one. That is a real cost of versioning and is written down because a bare timezone lookup with no instant is the bug this invites."
-      - "THE FREEZE RULE APPLIES TO TIMEZONE VERSIONS TOO, on the same freeze-by-what-it-governs line: a timezone version that has taken effect is frozen, because it already governed instants that have been judged. The mechanism is REQ-PIPE-111's; this requirement only supplies the thing to freeze."
-      - "Rejected a per-calendar or per-dataset timezone (Keith, 2026-09-28: not per-calendar, not per-dataset, and never the timezone of whatever machine happens to be running). An asset is a deployment rather than a row in the data, so its clock is a property of the deployment."
-      - "CARRIED FORWARD from contract/data-asset.yaml's existing comment, because it is still true and answers a DIFFERENT question: changing the zone reinterprets nothing ALREADY STORED, since every recorded instant carries its own offset. That covers recorded facts. Versioning covers instants COMPUTED from config, which had nothing protecting them."
-      - "CARRIED FORWARD from REQ-PIPE-048 and not reopened: an IANA zone name rather than an offset, because an offset is one zone's answer for one moment; a naive timestamp is an error rather than something to interpret; and `as at a date` means end of day in the asset's own timezone."
-    open_questions:
-      - "WHETHER THE ZONE STAYS IN contract/data-asset.yaml or moves into contract/calendar.yaml. The recommendation above is that it stays, on the grounds that it is used well beyond the calendars, but the counter-argument is real: this batch's organising idea is that one file holds the delivery agreement, and a wall-clock expected time is meaningless without the zone that interprets it. It is a cheap decision to take now and an annoying one to reverse later."
-      - "WHETHER THE API CHURN IS WORTH IT TODAY, given that there is exactly one timezone version and a second is hypothetical. The alternative is to leave the scalar in place and revisit if an asset ever needs a second zone, accepting that the instants computed in the meantime would be re-judged by that change. Recorded as a genuine fork rather than presented as settled, because it is the only requirement in this batch whose benefit is entirely in the future."
+    - 'THE TIMEZONE IS VERSIONED (Keith, 2026-09-28): a wall-clock expected time is interpreted in the zone
+      in force when the supply was DUE, exactly as a date is read from the calendar version in force then.
+      Without it, changing the zone silently moves every past due instant - the retroactive re-judgement
+      REQ-PIPE-111 prevents, arriving by a different door.'
+    - WORTH BUILDING NOW (Keith, 2026-10-04, settling the former second open question). REJECTED leaving
+      the scalar and revisiting when a second zone is needed, which accepts that instants computed meanwhile
+      are re-judged by that change.
+    - 'IT STAYS IN contract/data-asset.yaml (Keith, 2026-10-04, settling the former first open question):
+      the zone is wider than the calendar - the asset clock, REQ-DASH-071''s timestamps, hand-filing''s
+      naive-timestamp reading, arrival keys. REJECTED moving it into contract/calendar.yaml on the ''one
+      file holds the agreement'' argument: a wall-clock expected time is meaningless without a zone, but
+      so is every other wall-clock fact the asset records.'
+    - 'EVERY READER BECOMES ''AS AT WHEN'': a due instant asks for the zone in force at its own date, a
+      display clock for the current one.'
+    - 'A VERSION STARTS AT THE START OF ITS OWN DAY IN ITS OWN ZONE (2026-10-07, scoper''s call, to be read
+      to Keith): the alternative, the previous version''s midnight, leaves the hours between the two midnights
+      belonging to neither or both when the offset changes. Any rule works if it is one rule; this one reads
+      naturally in the file.'
+    - 'AN EXPECTED TIME THAT FALLS IN A DAYLIGHT-SAVING GAP OR OVERLAP IS A CONFIGURATION ERROR (2026-10-07,
+      scoper''s call): 02:30 on a spring-forward day does not exist and on a fall-back day exists twice,
+      and choosing one silently is a guess presented as a due instant. Refused at config time, consistent
+      with REQ-PIPE-134 refusing an ambiguous overlap rather than resolving it at runtime.'
+    - THE FREEZE RULE AND THE DECLARED-CORRECTION ROUTE APPLY TO TIMEZONE VERSIONS, and a SYNTHETIC asset
+      may add a past-dated one (Keith, 2026-10-07) - REQ-PIPE-111 owns the mechanism; this supplies the
+      thing to freeze.
+    - 'Rejected a per-calendar or per-dataset timezone (Keith, 2026-09-28: not per-calendar, not per-dataset,
+      never the machine''s): an asset is a deployment, so its clock is a property of the deployment.'
+    - 'CARRIED FORWARD from contract/data-asset.yaml''s own comment: changing the zone reinterprets nothing
+      ALREADY STORED, because every recorded instant carries its own offset. That covers recorded facts;
+      versioning covers instants COMPUTED from config. Note the comment itself still says ''every instant
+      in qa_results/'', a tree that no longer exists (REQ-PIPE-089) - the claim holds for the qa schema.'
+    - 'CARRIED FORWARD from REQ-PIPE-048: an IANA name rather than an offset; a naive timestamp is an error
+      rather than something to interpret; ''as at a date'' means end of that day in the asset''s zone -
+      now the zone in force on that date.'
+    - 'A SECOND TIMEZONE IS NEVER LABELLED ON THE DASHBOARD (Keith, 2026-10-07): REQ-DASH-071 criterion
+      6 stands and this requirement does not amend it, against the recommendation to label an instant falling
+      under a non-current version. Accepted consequence: once a second version exists, an instant shown
+      in its own zone carries no label saying it is not today''s clock.'
+    - THE SETTINGS' CHANGELOGS MOVE TO THE STRUCTURED SHAPE IN THIS BATCH (Keith, 2026-10-07), against the
+      recommendation of a separate later change, so contract/data-asset.yaml never holds two changelog shapes.
+      Carried HERE rather than in REQ-PIPE-110 (scoper's call) because this requirement already changes
+      data-asset.yaml's changelog shape for the timezone; and as criteria here rather than amendments to
+      REQ-PIPE-122/123, because neither states the shape of a changelog entry - their criteria need no rewording.
+    - 'THE CONVERSION IS NOT A CHANGE TO A FROZEN VERSION (scoper''s call): REQ-PIPE-122 criterion 6 refuses
+      altering a past setting version, and its guard must compare the parsed version''s effective date and
+      value, which the conversion leaves untouched, not the text of its changelog.'
   - id: REQ-PIPE-113
-    title: "A slot's due instant comes from the delivery agreement in force on its period's date, and a later change never moves an earlier slot"
-    date_written: "2026-09-28"
-    story: "As whoever has to explain why a supply was judged on time or late, I want each slot's due instant computed from the agreement in force on that period's own date, so that changing a dataset's expected time or claim window going forward never re-judges a slot that has already been due."
+    title: A slot's due instant comes from the participation in force on its period's date, and a later
+      change never moves an earlier slot
+    date_written: '2026-09-28'
+    story: As whoever has to explain why a supply was judged on time or late, I want each slot's due instant
+      computed from the agreement in force on that period's own date, so that changing a dataset's due time,
+      grace or claim window going forward never re-judges a slot that has already been due.
     moscow: must
     status: not_started
-    source: "Keith, 2026-09-28 - the gap invariant recorded in plans/supply-model.md Thread C's `contract/calendar.yaml` subsection, stated as `claim_window + grace < the gap between consecutive due instants`, concretely `claim_opens_at(N+1) > late_after(N)`. Scoped by delivery-scoper, 2026-09-28."
+    source: Keith, 2026-09-28 - plans/supply-model.md Thread C's `contract/calendar.yaml` subsection. Scoped
+      by delivery-scoper, 2026-09-28. Its overlap invariant moved to REQ-PIPE-134 (Keith, 2026-10-04, deduplicated).
+      RE-SCOPED by delivery-scoper 2026-10-07 against REQ-PIPE-110's re-scope (due time on the participation
+      version) and REQ-PIPE-131's period closing.
     acceptance_criteria:
-      - "THE SYSTEM SHALL compute each slot's due instant from its period's date, its dataset's expected time of day, and the timezone version in force on that date."
-      - "THE SYSTEM SHALL take a slot's expected time of day and its grace allowance from the calendar configuration in force on that period's own date."
-      - "WHEN a calendar version changes a dataset's expected time of day, THE SYSTEM SHALL leave every earlier slot's due instant unchanged."
-      - "THE SYSTEM SHALL express a supply due on the evening before its period's date, and SHALL NOT require a separate rule to reinterpret the arrival afterwards."
-      - "WHERE a dataset widens its claim window, THE SYSTEM SHALL treat that as changing how early a supply may arrive, and SHALL NOT let it move that dataset's due instant."
-      - "THE SYSTEM SHALL give REQ-GEN-044's generated history somewhere effective-dated to state a due time, so that its criteria 8 to 11 can be built."
-      - "THE SYSTEM SHALL read the due instant, the expected time, the grace allowance and the claim window from configuration alone, without opening or querying any database, warehouse schema or anything under data/."
+    - THE SYSTEM SHALL compute each slot's due instant from its period's date, less the participation version's
+      whole number of days before (zero unless stated), at the participation version's expected time of
+      day, in the timezone version in force on the day that falls on.
+    - THE SYSTEM SHALL take a slot's expected time, days before, grace allowance and claim-window override
+      from its dataset's participation version in force on that period's own date, and its default claim
+      window from the calendar version in force on that date.
+    - WHEN a later participation or calendar version changes any of those inputs, THE SYSTEM SHALL leave
+      the due instant, grace and claim-opening instant of every slot whose period date precedes that version's
+      effective-from unchanged.
+    - THE SYSTEM SHALL compute each slot's closing instant (REQ-PIPE-131) from the next calendar period's
+      claim-opening instant as that next period's own inputs give it, so that a version change takes effect
+      at its own boundary and nowhere before it.
+    - THE SYSTEM SHALL express a supply due on the evening before its period's date as one day before at
+      that evening's time, and SHALL NOT require a separate rule to reinterpret the arrival afterwards.
+    - WHERE a dataset widens its claim window, THE SYSTEM SHALL treat that as changing how early a supply
+      may arrive, and SHALL NOT let it move that dataset's due instant.
+    - THE SYSTEM SHALL let REQ-GEN-044's generated history state each era's due time, days before and grace
+      as effective-dated participation versions, so that its criteria 8 to 11 can be built.
+    - THE SYSTEM SHALL compute every one of these instants from configuration alone, without opening or
+      querying any database, warehouse schema or anything under data/, by the one implementation filing,
+      the overlap gate (REQ-PIPE-134) and the dashboard build all use.
+    - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-052 criterion 3 so that a due instant is computed
+      from the participation version and timezone version in force rather than the dataset's contract and
+      a single zone.
     non_functional_requirements:
-      - "Config only, no data access, so both the gate and the dashboard build can compute it under the standing rule."
+    - Config only, no data access, so the gate and the dashboard build can compute it under the standing
+      rule.
+    - ONE IMPLEMENTATION OF 'WHICH VERSION IS IN FORCE'. REQ-PIPE-123 rejected a copy of the amber module
+      for exactly this; participation versions, calendar versions and timezone versions should resolve through
+      one helper, or three answers to 'in force on' will eventually disagree.
+    - Resolve per period by index, never by walking the version list per slot - REQ-PIPE-131's NFR 1 for
+      the same loop, and a daily calendar at thirty datasets is where a per-slot walk would show.
     dependencies:
-      - REQ-PIPE-110
-      - REQ-PIPE-112
-      - REQ-PIPE-052
+    - REQ-PIPE-110
+    - REQ-PIPE-112
+    - REQ-PIPE-052
+    - REQ-PIPE-134
     decisions:
-      - "THE INVARIANT IS `claim_window + grace < the gap between consecutive due instants`, stated concretely as `claim_opens_at(N+1) > late_after(N)` (Keith, 2026-09-28). Without it, a slot's claim window overlaps the previous slot's lateness and an arrival is ambiguous between two slots."
-      - "IT IS REFUSED AT CONFIG TIME rather than handled at runtime (Keith, 2026-09-28). A runtime resolution would have to pick one of the two slots, and any rule for picking is a guess presented as a fact - the config that made it possible is the thing that is actually wrong."
-      - "A CORRECTION TO THREAD C, recorded because the thread states it the other way and somebody will read it: a due instant IS computed today. qa_tools/common/slots.py already gives every slot a due_at, a derived late_after and a claim_opens_at (REQ-PIPE-052, built). What Thread C's sentence is true of is qa_tools/common/schedule.py, which deliberately knows periods and not slots. So this requirement changes where a due instant's INPUTS come from and makes them versioned; it does not introduce the due instant."
-      - "THE CLAIM WINDOW OPENS BEFORE DUE AND NEVER CLOSES (REQ-PIPE-052), and this invariant is what makes that safe. There is no closes_at, deliberately: closing the window is the tempting fix for a boundary misfile and it is what would break late filing, since late is always allowed."
-      - "THIS ANSWERS THE FORK REQ-GEN-044 RECORDED and could not resolve. Its criteria 8 to 11 need the supply for day D due 22:00 on D-1, and a calendar version carried the claim window, the dates or the cadence rule and NOT the due time - which lived unversioned in each ODCS contract. The three options recorded there were to move the due time onto the calendar version, duplicate it there, or express the evening-before shape some third way. The answer is MOVE, which is REQ-PIPE-110's deletion of slaProperties, and this requirement is where the moved value becomes effective-dated."
-      - "THE EVENING-BEFORE SHAPE NEEDS NO CUTOFF RULE, which REQ-PIPE-052 already decided and this requirement inherits: `arrives 10pm, so it is for tomorrow` is not special handling, it is a due instant that genuinely falls on the previous calendar day, with the window opening accordingly."
-      - "Decided the Child Protection override widens the claim window and does not move the deadline (Keith corrected this explicitly, 2026-09-28). Recorded on this requirement as well as REQ-PIPE-110 because it is the override most likely to breach the invariant, and the two facts have to be read together."
-      - "Recorded because a quarterly gap is NOT uniform and an implementation will assume it is: February to May is 89 days, May to August is 92, and November to February is 92. An invariant checked against a nominal quarter rather than against real consecutive dates would pass a configuration that fails on the shortest gap of the year."
-      - "DEDUPLICATED AGAINST REQ-PIPE-134 (Keith, 2026-10-04). Its overlap check - each slot's claim window opening strictly after the previous slot's lateness begins, refused at config time, checked over every period the configuration generates including across version boundaries - is now REQ-PIPE-134's, signed that day, so those criteria and their NFRs came out of this requirement. Both of this draft's open questions are answered there: the whole configuration is checked, and CI refuses a breach. What stays here is what 134 does not say - where a due instant comes from, and that a later change never moves an earlier slot."
-      - "STALE DECISION FLAGGED FOR THE SCOPER (2026-10-04): the decision above that the claim window 'opens before due and NEVER CLOSES' (REQ-PIPE-052) is reversed by REQ-PIPE-131, signed 2026-10-04 - a period now closes when its calendar's next period's claim window opens. To be rewritten on the scoper pass, not deleted, since its reasoning is history."
-    open_questions: []
+    - 'A DUE INSTANT IS ALREADY COMPUTED TODAY (verified 2026-09-28 and again 2026-10-07): qa_tools/common/slots.py
+      gives every slot a due_at, a derived late_after, a claim_opens_at and, since REQ-PIPE-131, a closes_at.
+      Thread C''s sentence that nothing computes one was true only of schedule.py. So this requirement changes
+      where a due instant''s INPUTS come from and makes them versioned; it does not introduce the due instant.'
+    - 'THE GAP TODAY, measured: slots.py''s _contract_timing reads expected time and grace from the ODCS
+      contract once per dataset, unversioned, and hands them to every period; only the claim window is resolved
+      per period on the period''s date. So a due-time change today re-judges every past slot - exactly what
+      criterion 3 forbids.'
+    - 'THE EVENING-BEFORE SHAPE NEEDS A FIELD, not a rule (decided 2026-10-07, PROVISIONAL): slots.py computes
+      due_at as wall_clock(period date, expected time), which cannot fall on the previous day, so REQ-GEN-044''s
+      ''supply for day D due 22:00 on D-1'' is not expressible today. A whole-number ''days before'' on
+      the participation version expresses it with no cutoff rule - REQ-PIPE-052''s ''a due instant that
+      genuinely falls on the previous calendar day''. REJECTED an expected time written as ''22:00 the day
+      before'', which is a second syntax for one number; and REJECTED shifting the daily calendar''s own
+      dates, which would move every dataset on it.'
+    - 'THIS ANSWERS THE FORK REQ-GEN-044 RECORDED: a calendar version carried the claim window and dates
+      but not the due time, which lived unversioned in each contract. The options were move, duplicate or
+      a third way; the answer is MOVE (REQ-PIPE-110), onto the participation version (Keith, 2026-09-29),
+      and this requirement is where the moved value becomes effective-dated.'
+    - Decided the Child Protection override widens the claim window and does not move the deadline (Keith,
+      2026-09-28). Recorded here and on REQ-PIPE-110 because it is the override most likely to breach the
+      overlap invariant.
+    - 'DEDUPLICATED AGAINST REQ-PIPE-134 (Keith, 2026-10-04): the overlap check - each slot''s claim window
+      opening strictly after the previous slot''s lateness, refused at config time, across version boundaries,
+      over every period the configuration generates - is REQ-PIPE-134''s, built that day. What stays here
+      is where a due instant''s inputs come from and that a later change never moves an earlier slot. REQ-PIPE-134
+      already resolves each period''s claim window on that period''s own date; once this lands it must resolve
+      expected time and grace the same way, which its criterion 2 (''exactly as filing does'') then guarantees.'
+    - 'HISTORY, REWRITTEN RATHER THAN DELETED (the 2026-10-04 stale-decision flag): this requirement used
+      to say the claim window ''opens before due and NEVER CLOSES'' (REQ-PIPE-052). REQ-PIPE-131 (signed
+      and built 2026-10-04) reversed that - a period now closes when its calendar''s next period''s claim
+      window opens, and an authored calendar''s last period closes as long after it opened as the one before
+      it did. The reason the old rule existed - late filing is always allowed - survives WITHIN a period''s
+      open interval. Criterion 4 is what this requirement now owes REQ-PIPE-131.'
+    - 'A DECLARED CORRECTION (REQ-PIPE-111) IS THE ONE WAY AN EARLIER SLOT''S INPUTS CHANGE (Keith, 2026-10-07):
+      criterion 3 protects slots from new versions, and a correction changes a frozen version itself. Its
+      re-judgement is recorded (REQ-PIPE-168), never silent.'
+    - 'Recorded because a quarterly gap is NOT uniform and an implementation will assume it is: February
+      to May is 89 days, May to August 92, November to February 92. The overlap gate (REQ-PIPE-134) checks
+      real consecutive dates; this requirement must not reintroduce a nominal quarter anywhere.'
+  - id: REQ-PIPE-161
+    title: A person can excuse a late supply, with a reason, without changing the calendar it was judged
+      against
+    date_written: '2026-10-07'
+    story: As the person who knows why a supplier was late - an outage, an agreed delay, anything the agreement
+      itself does not record - I want to record that the supply's lateness is excused and why, so that the
+      record stops counting it against the supplier while the agreement and the verdict computed from it
+      stay exactly as they are.
+    moscow: must
+    status: not_started
+    source: Keith, 2026-10-07 morning, option (a)'s second half in plans/road-testing.md's parked 'CHANGING
+      A PAST DELIVERY AGREEMENT' entry ('RESOLVED, Keith 2026-10-07', point 2), accepted as the answer to
+      the 'noticed on 2 August' scenario. Scoped by delivery-scoper, 2026-10-07.
+    acceptance_criteria:
+    - THE SYSTEM SHALL offer EXCUSE LATENESS as a filing decision a person raises, on the same terms as
+      every other - actor from identity, a mandatory reason, the contract/people.yaml allowlist, refusal,
+      and one implementation behind every route (REQ-GHUB-082).
+    - THE SYSTEM SHALL record an excuse as one decision-log entry naming the dataset, the period and the
+      supply whose lateness it excuses.
+    - IF a person excuses a supply whose arrival does not classify as late against the slot it is filed
+      to, or one already excused, THEN THE SYSTEM SHALL refuse it and say why.
+    - THE SYSTEM SHALL NOT change any configuration, any data, any check result, any filing or what any
+      period resolves to on an excuse, and SHALL NOT re-run anything.
+    - THE SYSTEM SHALL keep classifying an excused supply as late, and SHALL report it as late and excused,
+      naming the reason, wherever its punctuality is reported.
+    - THE SYSTEM SHALL NOT let an excuse be raised by any automatic rule.
+    - WHEN a supply is re-filed to another period, THE SYSTEM SHALL NOT carry an excuse to its new filing,
+      and SHALL report the excuse as lapsed in the period it left.
+    - THE SYSTEM SHALL let the person who recorded an excuse, or any person on the allowlist, withdraw it
+      with a reason, recorded as its own decision-log entry, after which the supply reads late and not excused.
+    - THE SYSTEM SHALL let one excuse decision name a dataset and a range of periods with one reason, and
+      SHALL record it as one excuse entry for each late supply filed in that range.
+    - THE SYSTEM SHALL offer excuse lateness, and its withdrawal, in the terminal's filing-decisions door
+      on every slot whose current supply classifies as late, and through mothman supply decide.
+    - THE SYSTEM SHALL remove a slot from the states needing action (REQ-PIPE-083's needs-action policy)
+      where lateness was its only reason to be there and that lateness is excused.
+    - THE SYSTEM SHALL list excuses and their withdrawals in mothman supply decisions like every other decision.
+    - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
+      to list excuse lateness and its withdrawal among the filing decisions.
+    non_functional_requirements:
+    - THIS IS AN ANNOTATION, NOT A HOLDING DECISION. qa.slot_holds must ignore it by construction, as it
+      already ignores acknowledge and mark-not-supplied (REQ-PIPE-132 criterion 8), or an excuse could change
+      what a period holds.
+    - 'SURVIVES A CORRECTION ONLY WHILE THE SUPPLY IS STILL LATE (REQ-PIPE-168): a correction that re-judges
+      it on time leaves the excuse lapsed, never deleted.'
+    - A JUDGEMENT ABOUT A SUPPLIER'S PERFORMANCE, so it must stay distinguishable from 'on time' forever
+      - in the record, on the page and in any future supplier-performance figure. Turning late into on-time
+      silently is the retroactive re-judgement REQ-PIPE-111 exists to stop, done through a different door.
+    - 'AUDITABLE: who, when (effective and recorded instants, REQ-PIPE-081 criterion 4) and why, from the
+      decision log alone. A withdrawn excuse stays in the log; nothing about it is deleted.'
+    - THE REASON IS SHOWN ON THE DASHBOARD. On this public PoC that is fine; a real deployment's reasons
+      are visible to everyone who can read its dashboard, and the terminal prompt should say so the way
+      any other published reason is handled.
+    - At thirty datasets on a daily feed a month-long outage is thirty late supplies - hence the range form,
+      recorded one entry per supply.
+    dependencies:
+    - REQ-PIPE-074
+    - REQ-GHUB-082
+    - REQ-PIPE-066
+    decisions:
+    - FOR SUPPLIER-SIDE LATENESS (Keith, 2026-10-07). It was first scoped that morning as the answer to
+      a calendar authored wrong under a strict no-correction rule; when Keith replaced that rule with a
+      declared correction (REQ-PIPE-111), a wrong calendar became the correction's to fix and this decision
+      stayed for the other case - the agreement was right and the supplier was late for a reason the agency
+      accepts. A person records it with a reason; the log keeps it; the dashboard shows late-but-excused
+      naming the reason.
+    - 'A NEW REQUIREMENT RATHER THAN AN AMENDMENT, because no existing decision requirement owns it: REQ-PIPE-132
+      (mark as not supplied) is about a slot nothing filled, REQ-PIPE-122''s acknowledge is about amber
+      quality, and REQ-GHUB-082 owns the routes rather than any one operation. Same pattern as REQ-PIPE-120,
+      122 and 132, each of which added operations and amended REQ-GHUB-082 and REQ-PIPE-074 criterion 1
+      in the same change.'
+    - 'THE VERDICT IS NOT REWRITTEN (scoper''s call, 2026-10-07): the supply still classifies as late and
+      reads ''late, excused''. REJECTED reclassifying it as on time, which would make the page say something
+      the agreement as written contradicts, and would make this decision a back door to the very re-judgement
+      the freeze rule forbids.'
+    - 'ANY CAUSE, NOT ONLY A WRONG CALENDAR (scoper''s call): the reason says why. Restricting an excuse
+      to ''the calendar was wrong'' cannot be enforced - the system cannot tell a calendar error from a
+      supplier''s outage the agency chose to forgive - and a rule nobody can check is a rule that reads
+      as stronger than it is.'
+    - 'PER SUPPLY, NOT PER SLOT (Keith, 2026-10-07): lateness is a property of one arrival against one slot
+      (REQ-PIPE-066), and a slot can receive several supplies. An excuse attached to the slot would silently
+      excuse a later, genuinely late resupply nobody looked at.'
+    - WITHDRAWABLE, because the decision is a person's judgement and judgements can be wrong - the same
+      reasoning as REQ-PIPE-166 for the other two annotations. Withdrawal is its own entry, never a delete.
+    - NOT FOR AN OVERDUE OR NEVER-SUPPLIED SLOT. Nothing arrived, so there is no lateness to excuse. A period
+      the agreement wrongly owed is now a declared correction's to remove (REQ-PIPE-111); one it rightly
+      owed and nobody supplied is mark as not supplied (REQ-PIPE-132).
+    - 'A RANGE FORM, RECORDED ONE ENTRY PER SUPPLY (Keith, 2026-10-07): one decision may name a dataset
+      and a range of periods with one reason, and the log records an excuse for each late supply in it.
+      REJECTED one-at-a-time only (thirty clicks for a month of a daily feed) and a dataset-wide excuse
+      (it would cover supplies nobody looked at).'
+    - 'A RE-FILE DOES NOT CARRY THE EXCUSE: classification follows the filing (REQ-PIPE-141 criterion 2),
+      so a supply re-filed to another period is judged afresh against that slot; an excuse written about
+      the old slot says nothing about the new one.'
+  - id: REQ-DASH-162
+    title: The dashboard shows an excused late supply as late and excused, naming the reason
+    date_written: '2026-10-07'
+    story: As a data team leader glancing at a dataset, I want a late supply whose lateness was excused
+      to read differently from one that was simply late, and to see why, so that I neither chase a supplier
+      for our own calendar mistake nor lose sight of the fact that the file did arrive after the agreed
+      time.
+    moscow: must
+    status: not_started
+    source: Keith, 2026-10-07 morning ('the dashboard shows the slot late-but-excused naming the reason
+      rather than plain late'), plans/road-testing.md 'RESOLVED, Keith 2026-10-07' point 2. Split out of
+      REQ-PIPE-161 by delivery-scoper, 2026-10-07, on the REQ-PIPE-154 / REQ-DASH-155 pattern.
+    acceptance_criteria:
+    - WHERE a supply's lateness is excused, THE SYSTEM SHALL show it, wherever the dashboard shows that
+      supply's punctuality, as late and excused, with the reason, the person and the date of the excuse.
+    - THE SYSTEM SHALL NOT show an excused late supply as on time, and SHALL NOT show it identically to
+      an unexcused late one.
+    - WHERE an excuse was withdrawn, THE SYSTEM SHALL show the supply as late, and SHALL show the excuse
+      and its withdrawal in the supply history.
+    - WHERE the dashboard counts or summarises late supplies, THE SYSTEM SHALL count excused ones separately
+      from unexcused ones, and SHALL NOT fold them into on time.
+    - THE SYSTEM SHALL show an excuse on every in-place-on date the supply is in place, as the as-corrected
+      view (REQ-PIPE-081 criterion 5) does for every other decision.
+    - THE SYSTEM SHALL compute all of this from recorded decisions only, and SHALL NOT read supply rows.
+    non_functional_requirements:
+    - A DIFFERENCE A GLANCING READER CAN SEE WITHOUT READING. The data team leader's frustration is noise;
+      'late' and 'late, excused' must be told apart at a glance and the reason one interaction away, not
+      a wall of text on every row.
+    - Rendered from data another component computed - the excuse is REQ-PIPE-161's; this only consumes it
+      (docs/components.md).
+    - Same date and person formatting as everything else on the page (REQ-DASH-071).
+    dependencies:
+    - REQ-PIPE-161
+    - REQ-PIPE-081
+    decisions:
+    - 'SPLIT FROM THE DECISION REQUIREMENT, as REQ-DASH-155 was split from REQ-PIPE-154: the decision and
+      its record are one reviewable unit, the rendering another, and each has its own acceptance criteria.'
+    - 'COUNTED SEPARATELY, NEVER AS ON TIME OR AS PLAIN LATE (Keith, 2026-10-07): in any punctuality figure
+      or trend, excused lateness is its own count. A figure that improves because a person forgave lateness,
+      or that blames a supplier for forgiven lateness, is a figure nobody can trust.'
+  - id: REQ-PIPE-163
+    title: A person can place a held supply into a period, from the terminal
+    date_written: '2026-10-07'
+    story: As the person working through supplies the filing rule refused to place, I want to say which
+      period a held supply belongs to and have it filed, checked and gated there, so that a supply held
+      because of a calendar mistake - ours or the supplier's - is not stuck forever with rejection as the
+      only way out.
+    moscow: must
+    status: not_started
+    source: 'delivery-scoper, 2026-10-07 - a gap found auditing Keith''s condition on REQ-PIPE-111 (''assuming
+      the TUI offers users ALL of the tools a human would need to undo mistakes ... and otherwise undo and
+      fix up everything that automated rules decide''). Verified against built code: qa_tools/common/refiling.py
+      refuses a held supply with ''Place it instead; `mothman supply holds` shows how'', no filing decision
+      named place exists (filing_decisions.OPERATIONS), and `mothman supply holds` lists ''file it to a
+      slot yourself'' with no command.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL offer PLACE as a filing decision a person raises about a supply held by the assignment
+      rule (REQ-PIPE-064), naming the period it is to be filed to, on the same terms as every other filing
+      decision - actor, mandatory reason, allowlist, refusal, one implementation behind every route.
+    - WHEN a person places a held supply, THE SYSTEM SHALL record a filing of it to the named period, resolve
+      its hold naming that decision (REQ-PIPE-078 criterion 6), and run its QA against that period and apply
+      the promotion gate exactly as for a re-filed supply (REQ-PIPE-141 criteria 6, 7, 9, 13, 15 and 18).
+    - THE SYSTEM SHALL allow placing into a closed period and into a period whose claim window had not opened
+      at the supply's receipt instant, because a person deciding is not the assignment rule (REQ-PIPE-062
+      criterion 5 and REQ-PIPE-064 criterion 2 bind the rule).
+    - IF the named period is not one the dataset's calendar generates and the dataset participates in, THEN
+      THE SYSTEM SHALL refuse it, naming the command that lists its periods.
+    - IF the named period's slot is resolved by inheritance, THEN THE SYSTEM SHALL refuse it and name un-inherit
+      as the step that must come first, as a re-file does (REQ-PIPE-141 criterion 12).
+    - THE SYSTEM SHALL compute the placed supply's arrival classification against the slot it was placed
+      in, so that a supply placed after its slot closed reads late.
+    - THE SYSTEM SHALL list every held supply in the terminal's filing-decisions door, with why it was held,
+      and SHALL offer place and reject on each.
+    - THE SYSTEM SHALL let a person reject a held supply from the terminal and through mothman supply decide,
+      with a reason, ending its hold.
+    - THE SYSTEM SHALL name, in `mothman supply holds` and in every refusal that points at placing, the
+      exact command that places a held supply.
+    - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
+      to list place among the filing decisions.
+    - THE SYSTEM SHALL offer place on the terminal route only - the filing-decisions door and mothman supply
+      decide - and SHALL NOT offer it on the GitHub route; THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082
+      criterion 3 to name place, beside REQ-PIPE-170's correction confirmation, as an operation offered
+      on the terminal route only.
+    non_functional_requirements:
+    - AT THE TARGET SCALE THIS IS NOT RARE. The current synthetic database holds 9 assignment-rule holds
+      for Case Workers alone (ran `mothman supply holds`, 2026-10-07), and every one is waiting on an action
+      no route offers. A schedule-ended backlog (REQ-PIPE-154) on a daily feed is a hold per day.
+    - A person's placement is the strongest form of 'I know which period this is', and it is recorded with
+      actor and reason like everything else - no placement without a reason, because a year later somebody
+      will ask why a supply that arrived in March sits in January.
+    - Gated exactly as a first arrival, under the settings in force at the instant of placing (REQ-PIPE-122,
+      REQ-PIPE-123) - a person placing a supply is not a person promoting it.
+    dependencies:
+    - REQ-PIPE-064
+    - REQ-PIPE-078
+    - REQ-PIPE-141
+    - REQ-GHUB-082
+    decisions:
+    - 'A GAP IN BUILT BEHAVIOUR, NOT A NEW IDEA: REQ-PIPE-064''s hold record already names ''file it to
+      a slot yourself'' as the resolution, and qa_tools/common/refiling.py (post-build-review #114) already
+      refuses a held supply by name and points at placing - an operation that was never built. So the system
+      today tells a person to do something it offers no way to do.'
+    - 'PLACE, NOT RE-FILE (REQ-PIPE-141, post-build-review #114): a held supply has no period to leave,
+      and re-file''s whole contract - the old filing kept as history, the old period''s slot emptied and
+      re-checked - has nothing to act on. A separate word keeps both honest.'
+    - 'ALLOWED FORWARD AND INTO A CLOSED PERIOD: criterion 5 of REQ-PIPE-062 is absolute for the RULE because
+      a rule that claims forward silently marks a future obligation met; a person naming a period, with
+      a reason, on the record, is the opposite of silent. Re-file already allows both (REQ-PIPE-141 criterion
+      17; post-build-review #115 D2).'
+    - 'STILL NEEDED UNDER THE CORRECTION ROUTE (Keith, 2026-10-07): the hold exists today, whatever happens
+      to calendars - 9 Case Workers supplies sit in it - and a correction can itself leave a supply with
+      no period (REQ-PIPE-170 criterion 8). Originally scoped as what made a strict REQ-PIPE-111 survivable;
+      built in parallel with it, not before.'
+    - PLACE IS TERMINAL ONLY (Keith, 2026-10-07), against the recommendation to raise it on the target period's
+      ticket. A held supply has no slot and so no ticket, and the GitHub route is disabled. REQ-GHUB-082
+      criterion 3 is amended to name it beside REQ-PIPE-170's confirmation, rather than broken silently.
+  - id: REQ-PIPE-164
+    title: A person can have a supply's checks run again without moving it, singly or for every supply a
+      fixed check affects
+    date_written: '2026-10-07'
+    story: As the person who has just fixed a check that was wrong - our mistake, not the supplier's - I
+      want to ask for a waiting supply's QA to be run again in the period it is filed to, so that a verdict
+      produced by our own fault does not stand, and nobody has to re-file a supply to the same place or
+      promote a red one to get past it.
+    moscow: should
+    status: not_started
+    source: 'delivery-scoper, 2026-10-07 - a gap found auditing Keith''s condition on REQ-PIPE-111. Verified
+      against built code: REQ-PIPE-140''s re-check runs only when a decision or a reload owes one (cli/common.py
+      refuses a recorded re-run of an arrival and names the re-check as ''owed by the decision that calls
+      for it''); no decision exists whose purpose is the re-check itself.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL offer RE-CHECK as a filing decision a person raises about a supply that is filed
+      and waiting, or filed and promoted, on the same terms as every other - actor, mandatory reason, allowlist,
+      refusal, one implementation behind every route.
+    - WHEN a person re-checks a supply, THE SYSTEM SHALL run its QA through REQ-PIPE-140's mechanism - a
+      run of its own, the supply's own checks and the cross-table checks that read it, against its filed
+      period - and SHALL record that decision as the run's cause.
+    - WHERE the re-checked supply is waiting, THE SYSTEM SHALL apply the promotion gate to the new verdict
+      exactly as for a first arrival, under the settings in force at that instant.
+    - WHERE the re-checked supply is promoted, THE SYSTEM SHALL record the new verdict as its current one
+      and SHALL NOT demote, move or re-gate it, leaving any change of what the period holds to a person's
+      decision.
+    - THE SYSTEM SHALL NOT move the supply, change its filing or change what any period resolves to on a
+      re-check.
+    - THE SYSTEM SHALL offer re-check in the terminal's filing-decisions door on every slot with a filed
+      supply, and through mothman supply decide.
+    - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
+      to list re-check among the filing decisions.
+    - THE SYSTEM SHALL offer a BULK re-check, raised by a person naming one check by its check_id and a
+      period range, with a mandatory reason.
+    - THE SYSTEM SHALL choose the supplies a bulk re-check covers as every supply that, within the named
+      period range, is filed and waiting or promoted, whose current run recorded a result for that check,
+      and whose current run is older than the newest changelog entry of that check's definition - and SHALL
+      include none other.
+    - IF the named check has no changelog entry newer than the current run of any supply in the range, THEN
+      THE SYSTEM SHALL refuse the bulk re-check, saying that nothing about the check has changed since those
+      supplies were checked.
+    - THE SYSTEM SHALL show the number of supplies a bulk re-check covers, by dataset and period, and SHALL
+      require the person to confirm that number before anything runs.
+    - THE SYSTEM SHALL record a bulk re-check as one re-check decision-log entry per supply, each naming
+      the check, its changelog entry and the reason, and SHALL run each as REQ-PIPE-140's re-check with
+      that entry as its cause.
+    - WHERE a supply in a bulk re-check is waiting, THE SYSTEM SHALL re-gate it as for a single re-check;
+      WHERE it is promoted, THE SYSTEM SHALL record its new verdict and SHALL NOT re-gate it.
+    - IF any re-run in a bulk re-check fails to complete, THEN THE SYSTEM SHALL leave it owed under REQ-PIPE-140
+      criterion 8 and SHALL continue with the rest.
+    non_functional_requirements:
+    - 'No new execution path: REQ-PIPE-140 already built the run identity, the owed record, the failure
+      handling and the ''most recent run is current'' rule. This adds a decision that owes one, nothing
+      more.'
+    - Only the orchestrator path that legitimately holds a supply-row connection runs it (REQ-PIPE-140 criterion
+      6); on the GitHub route the decision is recorded and the processing pass runs it, as for a re-file.
+    - 'BOUNDED THREE WAYS, because at thirty datasets and years of daily history ''every supply that check
+      ever touched'' is unbounded: by the one named check, by a period range the person must state, and
+      by the check''s own changelog - only supplies checked before the fix are re-run. The count is shown
+      and confirmed before anything runs.'
+    - Runs through the processing pass's orchestrator path, one supply at a time like any owed re-check,
+      so a large bulk re-check is slow rather than unsafe; owed re-checks survive an interrupted run (REQ-PIPE-140).
+    dependencies:
+    - REQ-PIPE-140
+    - REQ-GHUB-082
+    decisions:
+    - 'A DECISION, NOT A BARE COMMAND (scoper''s call): every recorded re-run must carry the decision that
+      caused it (REQ-PIPE-140 criterion 4). A re-check with no cause would be the first recorded QA run
+      nobody can explain, which is what that criterion exists to prevent.'
+    - 'A PROMOTED SUPPLY IS RE-CHECKED BUT NOT RE-GATED (scoper''s call, PROVISIONAL): the gate decides
+      whether to promote what waits; it has no rule for taking back what a person or the rule already accepted,
+      and inventing one here would let a check fix demote data downstream readers depend on without anybody
+      choosing to.'
+    - 'REJECTED re-filing a supply to its own period as the workaround: refiling.plan refuses it (''already
+      filed to'') and would rightly do so - it is not a move.'
+    - 'SHOULD RATHER THAN MUST: a person can already promote a red supply with a reason, so our check mistake
+      is survivable today; what is missing is a way to put the honest verdict on the record.'
+    - BULK RE-CHECK IS IN THIS BATCH (Keith, 2026-10-07), against the recommendation to leave it to check-lifecycle
+      work.
+    - 'THE AFFECTED SET IS CHOSEN BY THE CHECK''S OWN CHANGELOG (scoper''s call): a check whose definition
+      changes must already carry a new changelog entry (qa_tools/common/check_lifecycle.py), so ''fixed
+      after this supply was checked'' is a recorded fact, not a guess. REJECTED selecting only supplies
+      whose result for that check was red or amber: a fix can turn a false pass into a fail as easily as
+      the reverse.'
+    - 'A PERIOD RANGE IS REQUIRED, NOT DEFAULTED TO ALL HISTORY (scoper''s call): re-judging years of promoted
+      supplies because a check was reworded is a decision somebody should make in so many words.'
+    - 'ONE ENTRY PER SUPPLY, as REQ-PIPE-161''s range excuse is recorded: every re-run carries its own cause
+      (REQ-PIPE-140 criterion 4).'
+  - id: REQ-GHUB-165
+    title: The terminal offers every filing decision that applies, wherever it applies
+    date_written: '2026-10-07'
+    story: As a person fixing something an automated rule decided, I want the terminal's filing-decisions
+      door to offer every decision the flags can take wherever it applies, so that undoing a mistake never
+      depends on knowing a command line the screen did not show me.
+    moscow: should
+    status: not_started
+    source: delivery-scoper, 2026-10-07 - gaps found auditing Keith's condition on REQ-PIPE-111 ('the TUI
+      offers users ALL of the tools...'). Verified by running qa_tools/common/filing_queue.operations_for
+      against every slot state, and `mothman supply queue --collection child-protection`, 2026-10-07.
+    acceptance_criteria:
+    - THE SYSTEM SHALL offer un-supersede in the terminal on every slot for which a superseded version of
+      the dataset's table exists in that period, and SHALL NOT restrict it to a slot whose supply was rejected.
+    - THE SYSTEM SHALL let a person reach, from the terminal's filing-decisions door, the list of superseded
+      supplies for a dataset and period that mothman supply superseded prints.
+    - WHERE a slot holds a contested pair, THE SYSTEM SHALL offer the terminal's decisions on each file
+      of the pair, naming which file each applies to, and SHALL NOT offer them on one file only.
+    - THE SYSTEM SHALL list held supplies in the terminal's filing-decisions door (REQ-PIPE-163 criterion
+      7).
+    - THE SYSTEM SHALL be covered by a test that, for every slot state and every filing decision, fails
+      where the flag route would accept a decision the terminal does not offer on that state, unless the
+      test names the decision as deliberately terminal-hidden with a reason.
+    non_functional_requirements:
+    - 'THE TEST IS THE DELIVERABLE as much as the screens: REQ-GHUB-082 criterion 3 guarantees parity between
+      GitHub and the terminal''s IMPLEMENTATION, not between the flag form and the wizard''s MENUS, and
+      the gaps below grew in exactly that seam.'
+    - Offering more must not mean showing more by default - at thirty datasets a menu listing every decision
+      on every slot is noise. Offer by state, as operations_for already does; the fix is in what the state
+      logic knows.
+    dependencies:
+    - REQ-GHUB-082
+    - REQ-PIPE-120
+    - REQ-PIPE-163
+    decisions:
+    - 'WHAT THE AUDIT FOUND, run rather than read (2026-10-07): operations_for offers un-supersede only
+      on a REJECTED slot. After a newer file superseded a waiting one, or after an automatic replacement
+      (REQ-PIPE-123) superseded a promoted one, the only terminal path back is to REJECT the newer supply
+      first - recording a quality judgement that was never made, which REQ-PIPE-118 says supersession is
+      not. The flag form (`mothman supply decide --operation un-supersede`) and `mothman supply superseded`
+      reach it directly.'
+    - 'HELD SUPPLIES ARE INVISIBLE TO THE TERMINAL DOOR: the standing queue for Child Protection listed
+      24 supplies on 2026-10-07 and none of the 9 assignment-rule holds `mothman supply holds` reported,
+      because a held supply has no slot and the door is built from slots.'
+    - 'A CONTESTED PAIR SHOWS ONE FILE: slot_state carries one filed supply per slot, so the door offers
+      decisions on one file of the pair (read in code, not run - the current database holds no contested
+      pair). Recorded as a likely gap to confirm, not a measured one.'
+    - 'PARITY BY TEST, NOT BY CARE: REQ-PIPE-140 criterion 5 was amended the day before this was written
+      because a criterion named a terminal reader that did not exist; menus drift from flags the same way,
+      quietly.'
+    - FILE-CHECK REFUSALS ARE NOT OVERRIDABLE, BY DESIGN (Keith, 2026-10-07) - the one 'not at all' in the
+      2026-10-07 audit of automated decisions that is deliberate rather than a gap. A file the file checks
+      refuse (a ragged row, for instance) has no loadable data to promote; the remedy is reject and resend,
+      and the terminal offers reject on it.
+  - id: REQ-PIPE-166
+    title: A person can withdraw a mark-as-not-supplied or an acknowledgement recorded by mistake
+    date_written: '2026-10-07'
+    story: As a person who recorded an annotation on the wrong slot, or before the facts were in, I want
+      to withdraw it with a reason, so that the record reads what is true without my having to stage some
+      other decision just to paper over the first.
+    moscow: could
+    status: not_started
+    source: 'delivery-scoper, 2026-10-07 - a gap found auditing Keith''s condition on REQ-PIPE-111 (''undo
+      mistakes (ours ...)''). Verified: filing_decisions.OPERATIONS has no withdrawal for mark-not-supplied
+      or acknowledge, and operations_for offers only substitute on a not-supplied-accepted slot and nothing
+      that withdraws an acknowledgement.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL offer a person the withdrawal of a mark as not supplied (REQ-PIPE-132) and of an
+      acknowledgement (REQ-PIPE-122), each with a mandatory reason, on the same terms as every other filing
+      decision.
+    - THE SYSTEM SHALL record a withdrawal as its own decision-log entry naming the entry it withdraws,
+      and SHALL NOT delete or alter the entry withdrawn.
+    - WHEN a mark as not supplied is withdrawn, THE SYSTEM SHALL report the slot as it would read had the
+      mark never been made - overdue or never-supplied and closed - and SHALL return it to the states needing
+      action.
+    - WHEN an acknowledgement is withdrawn, THE SYSTEM SHALL report the supply as awaiting acknowledgement
+      again, where it is still what its period holds.
+    - IF there is no standing annotation of that kind to withdraw, THEN THE SYSTEM SHALL refuse and say
+      why.
+    - THE SYSTEM SHALL offer each withdrawal in the terminal's filing-decisions door on the slots it applies
+      to, and through mothman supply decide.
+    - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
+      to list the two withdrawals.
+    non_functional_requirements:
+    - 'Annotations only: a withdrawal, like the annotation it withdraws, changes no data and nothing a period
+      resolves to (REQ-PIPE-132 criterion 8).'
+    dependencies:
+    - REQ-PIPE-132
+    - REQ-PIPE-122
+    decisions:
+    - 'COULD, NOT MUST: neither annotation changes data, and both are overtaken by later decisions today
+      (a re-file or substitution supersedes a mark; an acknowledgement lapses when its supply leaves the
+      period). What a mistaken one costs is a wrong sentence on the record, not a wrong table - real, but
+      survivable.'
+    - THE SAME SHAPE AS REQ-PIPE-161's withdrawal of an excuse, so the three annotations behave alike. REJECTED
+      a generic 'undo last decision', which for a holding decision would mean reversing table moves and
+      is exactly what demote, un-supersede, de-substitute and un-inherit already do with their own guards.
+  - id: REQ-PIPE-167
+    title: A dataset whose supplies are for the following period says so in its participation
+    date_written: '2026-10-07'
+    story: As the person configuring a dataset that delivers in January for the period after the one January
+      falls in, I want its participation to say its slot is due ahead of the period's date, so that its
+      supplies file to the period they are for without the never-claim-forward rule gaining an exception.
+    moscow: should
+    status: not_started
+    source: 'Keith, 2026-09-24, plans/road-testing.md item 3 (''A regularly scheduled dataset whose supplies
+      are FOR THE FOLLOWING PERIOD''); design settled at REQ-PIPE-062''s sign-off the same day; placed with
+      the calendar group by Keith (''#3 following-period datasets: scoped with the calendar group (REQ-PIPE-110
+      to 113), not on its own'', plans/road-testing.md). Scoped by delivery-scoper, 2026-10-07.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL let a dataset's participation version state that its supply for a period is due a
+      stated whole number of days before that period's date, using the same days-before value REQ-PIPE-113
+      computes due instants from.
+    - WHERE a participation version states days before, THE SYSTEM SHALL open that slot's claim window and
+      compute its grace from the earlier due instant, so that a supply arriving on that schedule finds its
+      slot already open.
+    - THE SYSTEM SHALL NOT add any exception to REQ-PIPE-062 criterion 5 for such a dataset.
+    - THE SYSTEM SHALL check such a dataset's slots for overlap exactly as for any other (REQ-PIPE-134),
+      including where a version change moves its due instants by most of a period.
+    - THE SYSTEM SHALL show, wherever a slot's due date is shown, the slot's own due date rather than its
+      period's date where the two differ.
+    non_functional_requirements:
+    - 'Configured per dataset, never per collection (Keith, 2026-09-24): one rule applies consistently even
+      where a whole collection happens to share it.'
+    - No dataset needs it today; it is drafted so the participation shape REQ-PIPE-110 introduces can express
+      it without a second mechanism later.
+    dependencies:
+    - REQ-PIPE-110
+    - REQ-PIPE-113
+    - REQ-PIPE-062
+    - REQ-PIPE-134
+    decisions:
+    - 'IT IS NOT AN EXCEPTION TO NEVER-CLAIM-FORWARD (Keith, settled at REQ-PIPE-062''s sign-off, 2026-09-24):
+      the SCHEDULE expresses it, not the assignment rule. That dataset''s slot for the following period
+      carries a due instant and claim window already open when the supply arrives, so nothing claims forward.
+      ''An absolute rule with one exception is how forward-claiming comes back.'''
+    - 'THE SAME FIELD AS THE EVENING-BEFORE SHAPE (2026-10-07, scoper''s call): REQ-PIPE-113''s days-before
+      already moves a due instant ahead of its period''s date by a day for REQ-GEN-044; a following-period
+      dataset is the same number made larger. REJECTED a separate ''following period'' flag, which would
+      be a second way of saying the same thing.'
+    - REJECTED giving such a dataset its own calendar whose period NAMES are shifted (January's date named
+      2026-Q2). It needs no new field, but two calendars would then give one period name - one warehouse
+      schema - two different dates, and a period is defined as carrying one date (Thread C, 'PERIOD and
+      SLOT').
+    - 'NOT THE SAME AS SPRINT 25''s ''carry forward'' (NAME COLLISION, Keith 2026-09-24): that is a human
+      decision that a supply is never coming. This is a scheduling property of a healthy, punctual dataset.'
+    - 'NOT as_of_offset_days EITHER: road-testing item 3 asked whether the two were the same idea. That
+      key was removed from the system on 2026-09-17 (contract/data-asset.yaml''s own header), so there is
+      nothing to conflate.'
+    - 'A DAYS OFFSET (Keith, 2026-10-07), the same days-before field as REQ-PIPE-113''s evening-before case.
+      REJECTED ''due on the previous period''s date'' as its own value. Accepted: against an authored quarterly
+      calendar a fixed day count drifts by up to three days a year relative to the real dates, which is
+      right where the supplier agreement names a day.'
+    - 'BUILT NOW, IN THIS BATCH (Keith, 2026-10-07), rather than left in the future log. Raised from could
+      to SHOULD (scoper''s call): in this batch, but nothing reads wrong today without it, since no dataset
+      delivers for the following period - MoSCoW states what omitting it costs, build order states when.'
+  - id: REQ-PIPE-168
+    title: An arrival verdict is a recorded fact naming the agreement that judged it, and a correction re-judges
+      it visibly
+    date_written: '2026-10-07'
+    story: As whoever is asked why a supply was late, I want each lateness verdict recorded with the calendar,
+      participation and timezone versions that judged it, and any later re-judgement by a correction recorded
+      beside it, so that no verdict ever changes silently and I can always show what it was, what it is,
+      and which approved correction changed it.
+    moscow: must
+    status: not_started
+    source: 'Keith, 2026-10-07 morning (plans/road-testing.md, ''REOPENED AND DECIDED THE SAME MORNING'':
+      verdicts become RECORDED facts with the calendar version that judged them; lateness is re-judged automatically
+      and recorded as such). Scoped by delivery-scoper, 2026-10-07.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL record, with each supply's arrival classification (REQ-PIPE-080 criterion 1), the
+      identity and content of the calendar version, participation version and timezone version that judged
+      it, and the due, late-after and claim-opening instants it was judged against.
+    - THE SYSTEM SHALL keep verdict records append-only, and SHALL NOT overwrite or delete a recorded verdict.
+    - WHEN a declared correction (REQ-PIPE-111) is merged, THE SYSTEM SHALL, on the next run of the processing
+      pass, re-judge every supply whose recorded inputs the correction changes, without waiting for any
+      person.
+    - THE SYSTEM SHALL record each re-judgement as a new verdict naming the correction's change reference
+      and changelog entry, the old verdict and the new one.
+    - THE SYSTEM SHALL apply each declared correction exactly once, recording that it has been applied,
+      so that a later pass neither repeats nor skips it.
+    - THE SYSTEM SHALL treat a supply's newest recorded verdict for its current filing as its verdict, and
+      SHALL keep every earlier one readable as history.
+    - THE SYSTEM SHALL NOT move a supply, change its filing or change what any period holds as part of a
+      re-judgement - moving a filing is REQ-PIPE-170's, and only on a person's confirmation.
+    - THE SYSTEM SHALL re-judge from recorded receipt instants and configuration only, and SHALL NOT read
+      supply rows.
+    - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-080 criteria 1 and 5 so that a recorded verdict
+      carries the agreement that judged it and may be superseded by a correction's re-judgement as well
+      as by a new filing.
+    non_functional_requirements:
+    - 'AUDITABLE FROM THE RECORD ALONE: what the verdict was, what it is, which correction changed it, who
+      approved that correction and under which reference - without reading git.'
+    - AT YEARS OF DAILY HISTORY a correction to a long-lived participation version can touch thousands of
+      supplies. Re-judgement must work from the recorded inputs by version, touching only the supplies whose
+      inputs changed, never replaying a dataset's whole history.
+    - Runs only where the processing pass legitimately holds a database connection; the dashboard build
+      only reads what it recorded.
+    dependencies:
+    - REQ-PIPE-111
+    - REQ-PIPE-080
+    - REQ-PIPE-113
+    decisions:
+    - 'VERDICTS BECOME RECORDED FACTS WITH THEIR INPUTS (Keith, 2026-10-07). A CORRECTION TO THE SCOPER''S
+      OWN EARLIER REPORT: classification is already recorded once per filing (qa.filing.classification,
+      REQ-PIPE-080 criterion 1) - what it lacks is the agreement that produced it, and qa_tools/common/filing.py''s
+      classification_of still computes from the current filing on read. So this extends a built record rather
+      than introducing one.'
+    - 'THE CONTENT AND THE INSTANTS ARE RECORDED, NOT ONLY A VERSION''S EFFECTIVE DATE: a correction changes
+      a frozen version in place, so its effective-from does not change and could not tell a reader the inputs
+      differ.'
+    - 'RE-JUDGEMENT IS AUTOMATIC, FILING IS NOT (Keith, 2026-10-07): a lateness verdict follows mechanically
+      from an approved agreement, so asking someone to confirm it adds a click and no judgement; moving
+      a supply between periods can be wrong for a reason the calendar does not know (genuine Q3 data sent
+      early), so it waits for the asset manager (REQ-PIPE-170).'
+    - 'AN EXCUSE SURVIVES A RE-JUDGEMENT ONLY WHILE THE SUPPLY IS STILL LATE (scoper''s call, PROVISIONAL):
+      an excuse (REQ-PIPE-161) of a supply the correction makes on time has nothing left to excuse and is
+      reported lapsed, never deleted.'
+  - id: REQ-PIPE-169
+    title: A calendar correction's impact can be previewed before anyone approves it
+    date_written: '2026-10-07'
+    story: As a member of the change board asked to approve a correction to a delivery agreement, I want
+      a list of exactly what it would change - which slots move, which verdicts flip, which supplies would
+      land in another period - so that I approve a known consequence rather than a diff of dates.
+    moscow: must
+    status: not_started
+    source: 'Keith, 2026-10-07 morning (plans/road-testing.md: ''its impact is previewed before approval'';
+      ''the CAB approves the calendar change with the impact preview''). Scoped by delivery-scoper, 2026-10-07.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL offer a mothman command, in the schedule group, that compares the working configuration
+      against the committed one and reports the impact of every change to a frozen item.
+    - THE SYSTEM SHALL list, in that report, every slot whose due, late-after, claim-opening or closing
+      instant moves, with old and new instants.
+    - THE SYSTEM SHALL list every supply whose arrival verdict would change, with old and new verdict.
+    - THE SYSTEM SHALL list every supply whose filing rule would, under the corrected configuration, place
+      it in a different period or hold it, and SHALL mark those a later period stands on, which could not
+      move without another decision first.
+    - THE SYSTEM SHALL list every period that gains or loses an obligation.
+    - THE SYSTEM SHALL compute the filing outcomes with the same implementation REQ-PIPE-170's trial uses,
+      so that what the board approves is what the asset manager is later shown.
+    - THE SYSTEM SHALL state, in the report, the instant it was produced as at and the database it read,
+      and SHALL write it in a form that can be attached to the change reference.
+    - THE SYSTEM SHALL read configuration and recorded facts only - filings, receipts, recorded verdicts
+      and decisions - and SHALL NOT read supply rows.
+    - IF the recorded facts cannot be reached, THEN THE SYSTEM SHALL refuse and say so, and SHALL NOT report
+      an impact computed from configuration alone as complete.
+    - THE SYSTEM SHALL NOT record the preview in the database.
+    non_functional_requirements:
+    - THE REPORT IS FOR PEOPLE WHO DO NOT KNOW THE FILE CONTENTS. Summary first - counts by dataset - then
+      the detail, in the language of the dashboard, not of the configuration.
+    - It needs the database, so it cannot run in CI or the pre-commit hook; the gate's refusal names it
+      instead (REQ-PIPE-111).
+    - 'Deterministic: the same configuration and recorded facts give the same report, so two board members
+      comparing copies see the same thing.'
+    dependencies:
+    - REQ-PIPE-111
+    - REQ-PIPE-168
+    decisions:
+    - 'A PREVIEW, NOT A GATE (Keith''s ''tooling checks the fields exist, not that the CAB met''): nothing
+      refuses a correction for lacking a preview, because the preview needs a database the gate cannot reach.
+      It exists so the approver approves a consequence.'
+    - 'ONE IMPLEMENTATION WITH THE POST-MERGE TRIAL: the board and the asset manager must not be shown two
+      computations of the same move, or the confirmation would be of something nobody approved.'
+    - 'THE PREVIEW IS NOT RECORDED (Keith, 2026-10-07): REQ-PIPE-170 re-computes the trial after merge and
+      the asset manager sees the list as it stands, including anything that arrived since the board approved.'
+  - id: REQ-PIPE-170
+    title: After a correction, the data asset's manager confirms the proposed filing moves all at once,
+      and may keep any supply where it is
+    date_written: '2026-10-07'
+    story: As the manager of the data asset whose calendar was corrected, I want the supplies the corrected
+      calendar would move shown to me as one list I confirm at once, with the right to keep any of them
+      where they are, so that genuinely early data is not moved by a rule while everything else is put right
+      without a decision per file.
+    moscow: must
+    status: not_started
+    source: 'Keith, 2026-10-07 morning, proposing the third way himself (plans/road-testing.md: affected
+      supplies REPROCESSED UNDER THE CORRECTED CALENDAR AS A TRIAL, moves listed in the terminal, the TEAM
+      MANAGER confirms ALL AT ONCE; changed the same day to THE MANAGER OF THE OVERALL DATA ASSET, terminal
+      only with exclusions; an excluded supply stays, recorded as kept - the worked case is genuine Q3 data
+      sent early). Scoped by delivery-scoper, 2026-10-07.'
+    acceptance_criteria:
+    - WHEN a declared correction is merged, THE SYSTEM SHALL run the filing rule as a trial, under the corrected
+      configuration, over every supply whose filed period it could change, and SHALL record no filing from
+      that trial.
+    - THE SYSTEM SHALL list the trial's proposed moves in the terminal - each supply, its current period,
+      the period it would move to or that it would be held, its re-judged verdict, and any later period
+      standing on it - grouped by correction and dataset.
+    - THE SYSTEM SHALL show a correction with unconfirmed moves among the states needing action (REQ-PIPE-083),
+      and SHALL leave every affected supply where it is until they are confirmed.
+    - THE SYSTEM SHALL let only the person holding the data asset's manager role (REQ-GHUB-171) confirm
+      the list, and SHALL refuse anyone else, including a manager of one agency, naming the role required.
+    - THE SYSTEM SHALL let the asset manager exclude individual supplies and then confirm every remaining
+      move, across every dataset and agency the correction touches, in one action.
+    - THE SYSTEM SHALL record each excluded supply as KEPT - a decision-log entry naming the supply, its
+      period, the correction's change reference, the actor and a mandatory reason - and SHALL leave it filed
+      where it is.
+    - WHEN moves are confirmed, THE SYSTEM SHALL re-file each moved supply as a person's re-file (REQ-PIPE-141)
+      with the asset manager as actor and the correction named in the reason, and SHALL then re-run its
+      QA and re-gate it automatically.
+    - WHERE the corrected configuration offers a supply no period, THE SYSTEM SHALL hold it on confirmation
+      (REQ-PIPE-064), naming the correction in the hold's reason.
+    - IF a proposed move is refused by a re-file rule - a later period stands on the supply, the target
+      is inherited, the supply is one of a contested pair - THEN THE SYSTEM SHALL list it as blocked, naming
+      the decision that would unblock it, and SHALL NOT move it or drop it silently.
+    - THE SYSTEM SHALL offer the listing and confirmation only in the terminal - the filing-decisions door
+      and a mothman command with flags naming excluded supplies and reasons - and SHALL NOT offer them on
+      the GitHub route.
+    - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
+      to list keep and the correction confirmation among the filing decisions, and REQ-GHUB-082 criterion
+      3 to name the correction confirmation as the one operation offered on the terminal route only.
+    non_functional_requirements:
+    - 'ONE CONFIRMATION, NOT ONE PER FILE: a correction to a daily feed''s due time can propose hundreds
+      of moves, and a per-supply step is how a list like this is abandoned half-done.'
+    - Every move is still an ordinary, individually recorded re-file - all at once is about the person's
+      action, not about collapsing the record.
+    - Uses REQ-PIPE-141's re-file and REQ-PIPE-140's re-run machinery, unchanged.
+    dependencies:
+    - REQ-PIPE-111
+    - REQ-PIPE-168
+    - REQ-PIPE-169
+    - REQ-PIPE-141
+    - REQ-GHUB-171
+    decisions:
+    - TRIAL, REPORT, THEN APPLY ON A PERSON'S CONFIRMATION (Keith, 2026-10-07, his own proposal).
+    - 'REJECTED AUTOMATIC RE-FILE WITHOUT CONFIRMATION: it would move genuinely-early data with nobody deciding
+      - the worked case is genuine Q3 data sent early, which a corrected date would otherwise pull into
+      Q2.'
+    - 'REJECTED THE CAB''S APPROVAL AS THE CONFIRMATION: the board approves an agreement change and does
+      not know file contents; whether a particular file is really next quarter''s data is the team''s knowledge.'
+    - 'REJECTED PER-SUPPLY-ONLY CONFIRMATION: at a daily feed''s volume it is a click per file, and the
+      exclusion list gives the same control for the few that need it.'
+    - THE MANAGER OF THE OVERALL DATA ASSET, ONE CONFIRMATION (Keith, 2026-10-07) - not a per-agency team
+      manager, not the CAB, not any allowlisted person. A calendar is the asset's, so a correction's consequences
+      are the asset's to confirm, and a correction spanning several agencies' datasets is one list, one
+      confirmation. REJECTED one confirmation per agency's manager, which the first draft proposed.
+    - 'AN EXCLUDED SUPPLY IS RECORDED AS KEPT, not merely left alone: otherwise it reads as an oversight,
+      and the next reader re-proposes the move.'
+    - 'TERMINAL ONLY (Keith, 2026-10-07): a correction has no slot ticket, and the GitHub route is disabled
+      anyway. REQ-GHUB-082 criterion 3''s parity rule is amended to name it, rather than broken silently.'
+  - id: REQ-GHUB-171
+    title: The people configuration names the data asset's manager, and a decision can require that role
+    date_written: '2026-10-07'
+    story: As whoever administers who may do what, I want the data asset's manager declared in the people
+      configuration and checked when a decision requires it, so that confirming a correction's filing moves
+      is limited to the person accountable for the whole asset.
+    moscow: must
+    status: not_started
+    source: 'delivery-scoper, 2026-10-07, from Keith''s ''the TEAM MANAGER - not the CAB, not any allowlisted
+      person - confirms'', changed the same day to the MANAGER OF THE OVERALL DATA ASSET, who is Keith.
+      Checked against the built code: contract/people.yaml already carries a `manager` role with per-agency
+      assignments, but nothing authorises by role - filing decisions accept any non-placeholder person (qa_tools/common/people.py
+      person_by_email), and validate_people.py does not check role names.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL declare the roles a person may hold, and SHALL reject in the people gate a role or
+      an assignment role that is not declared.
+    - THE SYSTEM SHALL let a role be assigned for the whole data asset as well as per agency, and SHALL
+      reject an assignment naming neither or both.
+    - THE SYSTEM SHALL let a decision require a role at data-asset level or for the agency of the dataset
+      it concerns, and SHALL refuse a person without that role and assignment, naming the role and the level.
+    - THE SYSTEM SHALL use the manager role assigned at data-asset level as the asset manager REQ-PIPE-170
+      requires, and SHALL leave per-agency manager assignments in force for their own agency's decisions.
+    - THE SYSTEM SHALL assign Keith as the data asset's manager in contract/people.yaml.
+    - IF no non-placeholder person holds the manager role at data-asset level, THEN THE SYSTEM SHALL fail
+      the people gate.
+    - THE SYSTEM SHALL continue to refuse a placeholder person, and SHALL let the scripted history's synthetic
+      actor hold the data asset's manager role during scripted playback only, and only on a data asset that
+      declares itself synthetic.
+    non_functional_requirements:
+    - Configuration only; the role check is made where the decision is judged, in the one implementation
+      every route shares (REQ-GHUB-082 criterion 13).
+    dependencies:
+    - REQ-GHUB-082
+    decisions:
+    - THE ASSET MANAGER, NOT A PER-AGENCY TEAM MANAGER (Keith, 2026-10-07), replacing the first draft's
+      per-agency team manager. contract/people.yaml's assignments are per agency only, so an asset-level
+      assignment is new; the asset manager today is Keith (Keith, 2026-10-07).
+    - 'REUSE THE EXISTING manager ROLE RATHER THAN ADD A NEW ROLE NAME (scoper''s call, carried): the role
+      already exists and means the same thing at a different level. The LEVEL of the assignment, not the
+      name of the role, says whose decision it is.'
+    - 'AN ERROR, NOT A WARNING, for an asset with no real manager: REQ-PIPE-170''s confirmation cannot happen
+      without one, so a missing asset manager is a configuration that cannot complete a correction. The
+      first draft''s per-agency warning is dropped - no decision requires an agency manager, so Child Protection''s
+      placeholder manager blocks nothing.'
+    - 'WHAT EXISTS TODAY, checked 2026-10-07: roles qa, manager and peer_review in contract/people.yaml
+      with per-agency assignments; nothing authorises by role (filing decisions accept any non-placeholder
+      person, qa_tools/common/people.py person_by_email); validate_people.py does not check role names.'
+    - THE SCRIPTED ACTOR MAY HOLD THE ASSET MANAGER ROLE DURING PLAYBACK ONLY, ON A SYNTHETIC ASSET (Keith,
+      2026-10-07), so a generated history can include a confirmed correction (REQ-PIPE-170). Outside playback,
+      or on a real asset, it is refused like any non-person.
+  - id: REQ-DASH-172
+    title: The dashboard shows the corrected verdict, and keeps the original and the correction in the supply's
+      history
+    date_written: '2026-10-07'
+    story: As a reader of a dataset's page after its calendar was corrected, I want the corrected verdict
+      shown, with the original verdict and the approved correction that changed it one step away, so that
+      I see the current answer without losing how it came to be.
+    moscow: must
+    status: not_started
+    source: 'Keith, 2026-10-07 morning (plans/road-testing.md: ''the dashboard shows the CORRECTED verdict
+      by default with the original kept in the supply''s history''). Scoped by delivery-scoper, 2026-10-07.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL show each supply's current recorded verdict (REQ-PIPE-168) by default.
+    - WHERE a correction re-judged a supply, THE SYSTEM SHALL show in its supply history the original verdict,
+      the new one, the change reference, the approver and the date the correction applied.
+    - WHERE a past in-place-on date is shown, THE SYSTEM SHALL show the corrected verdict on it, with REQ-PIPE-081
+      criterion 6's notice that a correction changed it since, naming the correction - and SHALL leave what
+      the page said at the time to the snapshot archive.
+    - WHERE a correction's moves await the asset manager's confirmation (REQ-PIPE-170), THE SYSTEM SHALL
+      say so on the affected dataset.
+    - WHERE a supply was kept in place against a correction's proposed move, THE SYSTEM SHALL show it as
+      kept, with the reason.
+    - THE SYSTEM SHALL compute all of this from recorded facts only, and SHALL NOT read supply rows.
+    non_functional_requirements:
+    - The data team leader sees one answer; the history is for the data owner and the auditor. Keep the
+      correction out of the glance and one interaction away.
+    dependencies:
+    - REQ-PIPE-168
+    - REQ-PIPE-170
+    - REQ-PIPE-081
+    decisions:
+    - CORRECTED BY DEFAULT, ORIGINAL KEPT (Keith, 2026-10-07).
+    - A PAST IN-PLACE-ON DATE SHOWS THE CORRECTED VERDICT (Keith, 2026-10-07), with REQ-PIPE-081's notice
+      that a correction changed it since - consistent with 081 criteria 5 and 21 and with his 2026-10-05
+      call on re-checks (REQ-PIPE-140). 'What we believed then' is the snapshot archive's job. REJECTED
+      showing the verdict as believed on that date, which would have made a correction the one decision
+      the page applies as-known and needed 081 amended.
+  - id: REQ-PIPE-173
+    title: The pipeline refuses a dataset whose judged past changed without a declared correction
+    date_written: '2026-10-07'
+    story: As whoever relies on the commit gate, I want the pipeline itself to notice when an agreement
+      it has already judged against has changed with no declared correction - a skipped hook, a force-push,
+      an edit made outside git - so that the record cannot be quietly rewritten by going around the gate.
+    moscow: must
+    status: not_started
+    source: 'Keith, 2026-10-07 morning (plans/road-testing.md: ''a backstop refuses a dataset whose past
+      changed without one''), originally option (b)''s backstop of 2026-10-04. Scoped by delivery-scoper,
+      2026-10-07.'
+    acceptance_criteria:
+    - WHEN the processing pass runs, THE SYSTEM SHALL compare, for each dataset, the configuration's current
+      view of every period with a recorded judgement against the agreement content recorded with that judgement
+      (REQ-PIPE-168).
+    - IF they differ and no declared correction in the configuration accounts for exactly that difference,
+      THEN THE SYSTEM SHALL refuse to process that dataset, naming the item, its recorded value and its
+      current value, and saying that the remedy is to restore the value or declare the correction.
+    - THE SYSTEM SHALL continue processing every other dataset.
+    - THE SYSTEM SHALL state a refused dataset in the pass's own summary and show it on the dashboard as
+      blocked, with the reason.
+    - THE SYSTEM SHALL apply the same check to timezone and participation versions.
+    - THE SYSTEM SHALL decide this from configuration and recorded facts only, and SHALL NOT read supply
+      rows.
+    non_functional_requirements:
+    - 'Scoped to the dataset, never the run: at thirty datasets one broken agreement must not stop twenty-nine
+      (Thread C''s exhausted-schedule rule).'
+    - Compare by version fingerprint rather than period by period, so a daily feed with years of history
+      costs one comparison per version per pass.
+    - Needs no git history - it works where a force-push or an out-of-band edit has left git unable to say
+      what changed.
+    dependencies:
+    - REQ-PIPE-168
+    - REQ-PIPE-111
+    decisions:
+    - THE DATABASE REMEMBERS WHAT JUDGED EACH PERIOD (Keith, 2026-10-07; option (b)'s backstop, 2026-10-04).
+      It is the runtime half of REQ-PIPE-111's commit-time gate, for exactly the paths that gate cannot
+      see.
+    - 'REFUSE THE DATASET, NOT RE-JUDGE IT: an undeclared change has no approver and no reference, so applying
+      it would be the silent re-judgement this batch exists to prevent.'
+    - 'A FIRST, CALENDAR-SHAPED STEP TOWARD THE SEAL (plans/running-thoughts.md #44), deliberately not the
+      general check-configuration seal.'
+  - id: REQ-GHUB-174
+    title: A calendar correction needs the named approver's review on GitHub
+    date_written: '2026-10-07'
+    story: As the change board, I want GitHub to require the named approver's review before a correction
+      to a delivery agreement can merge, so that the approver named in the correction is a person who actually
+      reviewed it rather than a name typed into a file.
+    moscow: should
+    status: not_started
+    source: 'Keith, 2026-10-07 morning (plans/road-testing.md: ''GitHub requiring that approver''s review
+      on the calendar file (it checks the fields exist, not that the CAB met)''). Scoped by delivery-scoper,
+      2026-10-07.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL commit a CODEOWNERS file naming, for contract/calendar.yaml and contract/data-asset.yaml,
+      the GitHub accounts of the people who may approve a correction.
+    - THE SYSTEM SHALL refuse in the configuration gate a declared correction whose named approver is not
+      one of those code owners, matched through contract/people.yaml's github field.
+    - THE SYSTEM SHALL document, in the repository, that requiring code-owner review on the default branch
+      is a GitHub branch-protection setting the repository cannot set or verify itself, and how to turn
+      it on.
+    - THE SYSTEM SHALL leave code-owner review OFF in this proof of concept, and SHALL document that a real
+      deployment turns it on.
+    non_functional_requirements:
+    - 'Honest about the boundary: CODEOWNERS and the approver check are enforceable from this repository;
+      required review is a repository setting outside it. Neither proves the board met.'
+    dependencies:
+    - REQ-PIPE-111
+    - REQ-GHUB-171
+    decisions:
+    - 'WHAT IS ENFORCEABLE HERE, checked 2026-10-07: no .github/CODEOWNERS exists today, and branch protection
+      is a GitHub setting not held in the tree, so it was not checked. The configuration gate can check
+      the named approver is a code owner; only GitHub can require their review.'
+    - 'SHOULD, NOT MUST: REQ-PIPE-111 already refuses a correction without an approver and a reference;
+      this makes the approver''s name mean a review happened, where branch protection is on.'
+    - 'CODEOWNERS NOW, APPROVER CHECKED BY THE GATE, BRANCH PROTECTION OFF IN THE POC (Keith, 2026-10-07):
+      this project pushes direct to a branch, and a sole author cannot approve his own pull request. A real
+      deployment turns it on, and the documentation says so.'
+    - 'FILE-LEVEL REVIEW OF EVERY contract/data-asset.yaml EDIT IS ACCEPTED (Keith, 2026-10-07): CODEOWNERS
+      cannot scope to a key, and everything in that file is asset governance.'
   - id: REQ-PIPE-115
     title: A table a run cannot read never stops the run - its own dataset reads red through its existing outstanding item, saying why, and every other check reading it is recorded once as not evaluated, in its own run
     date_written: '2026-10-04'

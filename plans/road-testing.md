@@ -1603,6 +1603,15 @@ two levels) and #17.
       move both unchanged); file-check refusals are NOT overridable, by
       design - reject and resend; the impact preview is NOT recorded; and
       confirming a correction's moves is TERMINAL ONLY.
+      THE FINAL FIVE, same conversation: `participates` lists DELIVERY
+      MONTHS; "place a held supply" (163) is TERMINAL ONLY (against the
+      scoper's pick of the target period's ticket); the scripted actor MAY
+      hold the asset manager role during playback only; a BULK re-check
+      after a check is fixed is built IN THIS BATCH (against the
+      recommendation to leave it to check-lifecycle work); and the amber and
+      replacement settings' changelogs move to the structured shape IN THIS
+      BATCH (against the recommendation of a separate change). No open
+      question remains on the batch once these are folded in.
       SETTLED THE SAME AFTERNOON AND NOT IN QUESTION: 110 - `participates`
       replaces `delivery_months`, `not_expected` stays (one-off decisions);
       `slaProperties` deleted entirely including `frequency`. 112 - the

@@ -4746,6 +4746,20 @@ them.
 
 ### Where the calendar batch actually stands - read this before picking it up
 
+**SUPERSEDED IN PART, 2026-10-07 - read this paragraph first.** Re-scoped
+twice by `delivery-scoper` on 2026-10-07 against Keith's decisions that
+day (`plans/road-testing.md`, from "RESOLVED, Keith 2026-10-07" onwards).
+"Strict, no escape hatch" below was REPLACED the same morning by a
+DECLARED CORRECTION UNDER CAB. The batch in `requirements.yaml` is now
+REQ-PIPE-110 to 113 (rewritten), REQ-PIPE-161, REQ-DASH-162, REQ-PIPE-163,
+REQ-PIPE-164, REQ-GHUB-165, REQ-PIPE-166, REQ-PIPE-167, REQ-PIPE-168 to
+REQ-PIPE-170, REQ-GHUB-171, REQ-DASH-172, REQ-PIPE-173 and REQ-GHUB-174,
+plus a pending amendment to built REQ-PIPE-050 recorded on it. All are
+unsigned; the sign-off gate applies. No open question remains on any of
+them. The older "Config sketch" subsection is SUPERSEDED by REQ-PIPE-110.
+Delete this thread whole once the batch's last dependent requirement is
+built (CLAUDE.md's rule 4) - the analysis below is kept until then.
+
 **Status:** in-progress (2026-09-28) · **Category:** Pipeline & publishing
 
 Written at the end of 2026-09-28 at Keith's own ask, because the next
