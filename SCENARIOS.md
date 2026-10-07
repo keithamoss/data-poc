@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**8 of 31 scenarios marked for injection have data behind them today.** 67 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**8 of 37 scenarios marked for injection have data behind them today.** 75 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -545,6 +545,78 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 | Supplies | `cp_carers__202411010900000800` |
 | Period | 2024-Q4 |
 | Set the in-place-on date to | 2024-11-01 |
+
+## Calendar corrections
+
+### TS-57 - A correction that only re-judges
+
+**What it demonstrates.** After merge, the dataset reads awaiting confirmation and nothing else changes. In the terminal the correction shows one verdict change (late -> on time) and NO moves, and still needs confirming. On confirmation a new verdict is recorded naming the change reference; the late verdict stays readable as history (REQ-PIPE-168 criteria 3-6).
+
+**What it would look like if the rule were wrong.** Applied on merge with nobody confirming because there were no moves; or the late verdict overwritten.
+
+**not injected - nothing to look at yet**
+
+### TS-58 - A correction that moves supplies, all confirmed
+
+**What it demonstrates.** The terminal proposes moving it May -> August with its re-judged verdict; on confirmation it is re-filed as a person's re-file naming the correction, re-QA'd and re-gated automatically, and judged against August (REQ-PIPE-170 criteria 2, 7).
+
+**What it would look like if the rule were wrong.** Moved with the verdict computed against May; or not re-QA'd.
+
+*Config: the August period's claim window opens two weeks earlier.*
+
+**not injected - nothing to look at yet**
+
+### TS-59 - The asset manager keeps a supply
+
+**What it demonstrates.** The kept supply stays filed where it is, with a KEPT decision-log entry naming it, its period, the change reference, the actor and the reason, and its verdict judged against the period it stays in; the other moves as in TS-58. The applied-summary lists both (REQ-PIPE-170 criteria 5, 6, 22).
+
+**What it would look like if the rule were wrong.** The kept supply moved anyway, kept silently with no reason, or re-judged against the period it did not go to.
+
+**not injected - nothing to look at yet**
+
+### TS-60 - A correction that leaves a supply with no period
+
+**What it demonstrates.** Proposed as "would be held"; on confirmation it is held (REQ-PIPE-064), the hold's reason naming the correction.
+
+**What it would look like if the rule were wrong.** Left filed in a period the corrected agreement does not give it; or dropped.
+
+*Config: the period's claim window is shortened so an early supply no longer falls in any window.*
+
+**not injected - nothing to look at yet**
+
+### TS-61 - A move that is blocked
+
+**What it demonstrates.** Listed as blocked, naming the decision that would unblock it; not moved, not dropped; the correction stays among the states needing action until it is moved or kept (REQ-PIPE-170 criteria 9, 19).
+
+**What it would look like if the rule were wrong.** Moved out from under the inheriting period; or the correction marked done with the supply silently left.
+
+**not injected - nothing to look at yet**
+
+### TS-62 - A correction merged and not yet confirmed
+
+**What it demonstrates.** Affected datasets read awaiting confirmation and the correction is listed as needing action; the new arrival is judged against the corrected configuration; REQ-PIPE-173's backstop does NOT go red, because a declared but unapplied correction accounts for the difference (REQ-PIPE-170 criteria 20-21).
+
+**What it would look like if the rule were wrong.** The backstop's "configuration problem on our side" red; or the arrival judged against the old date.
+
+**not injected - nothing to look at yet**
+
+### TS-63 - A dataset turned off for a while
+
+**What it demonstrates.** Periods in the gap owe nothing and read quiet grey; a supply that arrives in the gap is received, file-checked and held, not filed (REQ-PIPE-110).
+
+**What it would look like if the rule were wrong.** The gap reads as missed supplies; or a gap arrival filed into a period.
+
+*Config: a participation version with effective_to and a reason, then a later version turning it back on.*
+
+*unit test - no generated data, nothing to navigate to*
+
+### TS-64 - An undeclared change to a frozen date
+
+**What it demonstrates.** The draft-correction command prints a correction entry for it; committing without one is refused by the pre-commit hook with the same entry, and CI refuses it if the hook was skipped (REQ-PIPE-111, REQ-PIPE-169).
+
+**What it would look like if the rule were wrong.** Committed; or the hook's entry and the command's entry differ.
+
+*unit test - no generated data, nothing to navigate to*
 
 
 <!-- scenario-map-data
@@ -1446,6 +1518,112 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
     "period": "2024-Q4",
     "inPlaceOn": "2024-11-01"
    }
+  },
+  {
+   "id": "TS-57",
+   "mode": "INJECT",
+   "title": "A correction that only re-judges",
+   "section": "Calendar corrections",
+   "demonstrates": "After merge, the dataset reads awaiting confirmation and nothing else changes. In the terminal the correction shows one verdict change (late -> on time) and NO moves, and still needs confirming. On confirmation a new verdict is recorded naming the change reference; the late verdict stays readable as history (REQ-PIPE-168 criteria 3-6).",
+   "breaksAs": "Applied on merge with nobody confirming because there were no moves; or the late verdict overwritten.",
+   "config": null,
+   "requirements": [
+    "REQ-PIPE-168"
+   ],
+   "coordinates": null
+  },
+  {
+   "id": "TS-58",
+   "mode": "INJECT",
+   "title": "A correction that moves supplies, all confirmed",
+   "section": "Calendar corrections",
+   "demonstrates": "The terminal proposes moving it May -> August with its re-judged verdict; on confirmation it is re-filed as a person's re-file naming the correction, re-QA'd and re-gated automatically, and judged against August (REQ-PIPE-170 criteria 2, 7).",
+   "breaksAs": "Moved with the verdict computed against May; or not re-QA'd.",
+   "config": "Config: the August period's claim window opens two weeks earlier.",
+   "requirements": [
+    "REQ-PIPE-170"
+   ],
+   "coordinates": null
+  },
+  {
+   "id": "TS-59",
+   "mode": "INJECT",
+   "title": "The asset manager keeps a supply",
+   "section": "Calendar corrections",
+   "demonstrates": "The kept supply stays filed where it is, with a KEPT decision-log entry naming it, its period, the change reference, the actor and the reason, and its verdict judged against the period it stays in; the other moves as in TS-58. The applied-summary lists both (REQ-PIPE-170 criteria 5, 6, 22).",
+   "breaksAs": "The kept supply moved anyway, kept silently with no reason, or re-judged against the period it did not go to.",
+   "config": null,
+   "requirements": [
+    "REQ-PIPE-170"
+   ],
+   "coordinates": null
+  },
+  {
+   "id": "TS-60",
+   "mode": "INJECT",
+   "title": "A correction that leaves a supply with no period",
+   "section": "Calendar corrections",
+   "demonstrates": "Proposed as \"would be held\"; on confirmation it is held (REQ-PIPE-064), the hold's reason naming the correction.",
+   "breaksAs": "Left filed in a period the corrected agreement does not give it; or dropped.",
+   "config": "Config: the period's claim window is shortened so an early supply no longer falls in any window.",
+   "requirements": [
+    "REQ-PIPE-064"
+   ],
+   "coordinates": null
+  },
+  {
+   "id": "TS-61",
+   "mode": "INJECT",
+   "title": "A move that is blocked",
+   "section": "Calendar corrections",
+   "demonstrates": "Listed as blocked, naming the decision that would unblock it; not moved, not dropped; the correction stays among the states needing action until it is moved or kept (REQ-PIPE-170 criteria 9, 19).",
+   "breaksAs": "Moved out from under the inheriting period; or the correction marked done with the supply silently left.",
+   "config": null,
+   "requirements": [
+    "REQ-PIPE-170"
+   ],
+   "coordinates": null
+  },
+  {
+   "id": "TS-62",
+   "mode": "INJECT",
+   "title": "A correction merged and not yet confirmed",
+   "section": "Calendar corrections",
+   "demonstrates": "Affected datasets read awaiting confirmation and the correction is listed as needing action; the new arrival is judged against the corrected configuration; REQ-PIPE-173's backstop does NOT go red, because a declared but unapplied correction accounts for the difference (REQ-PIPE-170 criteria 20-21).",
+   "breaksAs": "The backstop's \"configuration problem on our side\" red; or the arrival judged against the old date.",
+   "config": null,
+   "requirements": [
+    "REQ-PIPE-173",
+    "REQ-PIPE-170"
+   ],
+   "coordinates": null
+  },
+  {
+   "id": "TS-63",
+   "mode": "both",
+   "title": "A dataset turned off for a while",
+   "section": "Calendar corrections",
+   "demonstrates": "Periods in the gap owe nothing and read quiet grey; a supply that arrives in the gap is received, file-checked and held, not filed (REQ-PIPE-110).",
+   "breaksAs": "The gap reads as missed supplies; or a gap arrival filed into a period.",
+   "config": "Config: a participation version with effective_to and a reason, then a later version turning it back on.",
+   "requirements": [
+    "REQ-PIPE-110"
+   ],
+   "coordinates": null
+  },
+  {
+   "id": "TS-64",
+   "mode": "unit",
+   "title": "An undeclared change to a frozen date",
+   "section": "Calendar corrections",
+   "demonstrates": "The draft-correction command prints a correction entry for it; committing without one is refused by the pre-commit hook with the same entry, and CI refuses it if the hook was skipped (REQ-PIPE-111, REQ-PIPE-169).",
+   "breaksAs": "Committed; or the hook's entry and the command's entry differ.",
+   "config": null,
+   "requirements": [
+    "REQ-PIPE-111",
+    "REQ-PIPE-169"
+   ],
+   "coordinates": null
   }
  ]
 }

@@ -3664,6 +3664,100 @@ dataset's status is unchanged by it (REQ-QAC-096 criteria 12 and 18,
 REQ-DASH-097 criterion 7, REQ-GEN-044 criterion 16).
 **Breaks as**: refused, or the dataset turned amber or red by a warning.
 
+### Calendar corrections
+
+Keith, 2026-10-08, signing off the correction route (REQ-PIPE-110..113,
+REQ-PIPE-167..174): "make sure we have some test scenarios that we can
+look at that show the different shapes of calendar changes", including
+one where the asset manager keeps a supply rather than moving it, and
+ones that are only re-judged. All of these need a correction to happen
+PART WAY THROUGH the generated history - the configuration changes, is
+merged, and later confirmed - which the generator cannot express today.
+REQ-PIPE-111 already allows a synthetic asset to add past-dated versions,
+so the shape exists; how the generator stages a merge and a later
+confirmation is for whoever builds it (REQ-PIPE-170's own criterion).
+
+Unless stated, *Config: Child Protection, quarterly Feb/May/Aug/Nov,
+due 15th 17:00, grace 2 days, claim window 30 days, correction moves
+the due date of one already-frozen period.*
+
+**TS-57 `[INJECT]` A correction that only re-judges.**
+The August period's due date moves three days later. One supply that
+arrived a day after the old due date was judged late.
+**Expect**: after merge, the dataset reads awaiting confirmation and
+nothing else changes. In the terminal the correction shows one verdict
+change (late -> on time) and NO moves, and still needs confirming. On
+confirmation a new verdict is recorded naming the change reference; the
+late verdict stays readable as history (REQ-PIPE-168 criteria 3-6).
+**Breaks as**: applied on merge with nobody confirming because there
+were no moves; or the late verdict overwritten.
+
+**TS-58 `[INJECT]` A correction that moves supplies, all confirmed.**
+*Config: the August period's claim window opens two weeks earlier.*
+A supply filed as a resupply of May now falls in August's window.
+**Expect**: the terminal proposes moving it May -> August with its
+re-judged verdict; on confirmation it is re-filed as a person's re-file
+naming the correction, re-QA'd and re-gated automatically, and judged
+against August (REQ-PIPE-170 criteria 2, 7).
+**Breaks as**: moved with the verdict computed against May; or not
+re-QA'd.
+
+**TS-59 `[INJECT]` The asset manager keeps a supply.**
+Same correction shape as TS-58, but two supplies would move. The asset
+manager keeps one, with a reason, and confirms the other.
+**Expect**: the kept supply stays filed where it is, with a KEPT
+decision-log entry naming it, its period, the change reference, the
+actor and the reason, and its verdict judged against the period it
+stays in; the other moves as in TS-58. The applied-summary lists both
+(REQ-PIPE-170 criteria 5, 6, 22).
+**Breaks as**: the kept supply moved anyway, kept silently with no
+reason, or re-judged against the period it did not go to.
+
+**TS-60 `[INJECT]` A correction that leaves a supply with no period.**
+*Config: the period's claim window is shortened so an early supply no
+longer falls in any window.*
+**Expect**: proposed as "would be held"; on confirmation it is held
+(REQ-PIPE-064), the hold's reason naming the correction.
+**Breaks as**: left filed in a period the corrected agreement does not
+give it; or dropped.
+
+**TS-61 `[INJECT]` A move that is blocked.**
+A supply the correction would move has a later period inheriting from
+it.
+**Expect**: listed as blocked, naming the decision that would unblock
+it; not moved, not dropped; the correction stays among the states
+needing action until it is moved or kept (REQ-PIPE-170 criteria 9, 19).
+**Breaks as**: moved out from under the inheriting period; or the
+correction marked done with the supply silently left.
+
+**TS-62 `[INJECT]` A correction merged and not yet confirmed.**
+The correction is merged and a new supply arrives before anyone
+confirms it.
+**Expect**: affected datasets read awaiting confirmation and the
+correction is listed as needing action; the new arrival is judged
+against the corrected configuration; REQ-PIPE-173's backstop does NOT
+go red, because a declared but unapplied correction accounts for the
+difference (REQ-PIPE-170 criteria 20-21).
+**Breaks as**: the backstop's "configuration problem on our side" red;
+or the arrival judged against the old date.
+
+**TS-63 `[both]` A dataset turned off for a while.**
+*Config: a participation version with effective_to and a reason, then a
+later version turning it back on.*
+**Expect**: periods in the gap owe nothing and read quiet grey; a supply
+that arrives in the gap is received, file-checked and held, not filed
+(REQ-PIPE-110).
+**Breaks as**: the gap reads as missed supplies; or a gap arrival filed
+into a period.
+
+**TS-64 `[unit]` An undeclared change to a frozen date.**
+**Expect**: the draft-correction command prints a correction entry for
+it; committing without one is refused by the pre-commit hook with the
+same entry, and CI refuses it if the hook was skipped (REQ-PIPE-111,
+REQ-PIPE-169).
+**Breaks as**: committed; or the hook's entry and the command's entry
+differ.
+
 ### The activity feed
 
 Keith, 2026-09-22, arising from TS-10 and TS-15: the existing
