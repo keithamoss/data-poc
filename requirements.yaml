@@ -26208,11 +26208,10 @@ requirements:
       the version-level part those inputs came from; and SHALL NOT record the whole content of the calendar
       version or the slot's closing instant.
     - THE SYSTEM SHALL keep verdict records append-only, and SHALL NOT overwrite or delete a recorded verdict.
-    - WHEN a declared correction (REQ-PIPE-111) is merged and REQ-PIPE-170's trial proposes no move, THE SYSTEM
-      SHALL, on the next run of the processing pass, re-judge every supply whose recorded inputs the correction
-      changes, without waiting for any person; and WHERE the trial proposes any move, THE SYSTEM SHALL re-judge
-      nothing for that correction until the data asset's manager confirms it, and SHALL then apply its
-      re-judgements and its moves together - so that a correction is never applied in part.
+    - WHEN a declared correction (REQ-PIPE-111) is merged, THE SYSTEM SHALL work out every re-judgement it
+      makes and every filing move it proposes, SHALL apply none of them until the data asset's manager confirms
+      the correction in the terminal (REQ-PIPE-170) - whether or not it proposes any move - and SHALL then apply
+      its re-judgements and moves together, so that a correction is never applied in part or without a person.
     - THE SYSTEM SHALL record each re-judgement as a new verdict naming the correction's change reference
       and changelog entry, the old verdict and the new one.
     - THE SYSTEM SHALL apply each declared correction exactly once, recording that it has been applied,
@@ -26257,6 +26256,7 @@ requirements:
       refuse every dataset after every legitimate append. This replaces the earlier decision to record 'the
       content' of each version.
     - 'A CORRECTION APPLIES ALL OR NOTHING (Keith, 2026-10-07, after sign-off): where it proposes any filing move, no re-judgement happens until the asset manager confirms, and then re-judgements and moves apply together. Keith''s concern: re-judging at once and moving on confirmation could leave a correction applied in part forever - verdicts worked out under the new calendar for supplies still filed where the old one put them. Rejected: (a) re-judge everything at once, moves later (the stuck half-applied state); (b) split by supply - re-judge unaffected supplies at once and hold only those awaiting a move decision (principled, but Keith preferred one rule: a correction is applied whole or not at all). Accepted cost: every supply a correction touches waits on the slowest move decision; a correction proposing no move still applies on the next pass with no person involved.'
+    - 'EVERY CORRECTION IS CONFIRMED IN THE TERMINAL, IN ONE STEP (Keith, 2026-10-07, the same evening, refining ''all or nothing''): even a correction that moves nothing is applied only when the asset manager opens it in the terminal, reviews the verdicts it changes and confirms - re-judging and moving are one act, never two. SUPERSEDES the same evening''s ''a correction proposing no move still applies on the next pass with no person involved''. Accepted cost: every correction, however small, waits on a person, and its supplies read ''pending'' until then.'
   - id: REQ-PIPE-169
     title: A calendar correction's impact can be previewed before anyone approves it
     date_written: '2026-10-07'
@@ -26383,10 +26383,11 @@ requirements:
       for any reason, naming the role, its level and who holds it.
     - THE SYSTEM SHALL keep a correction among the states needing action until every proposed move, blocked
       ones included, has been moved or kept.
-    - WHILE a correction's proposed moves await confirmation, THE SYSTEM SHALL leave every supply that correction
-      affects - moved or not - with its existing verdict and filing, SHALL mark each as pending that correction
-      on the dashboard and in the terminal, and WHEN the asset manager confirms, SHALL apply the correction's
-      re-judgements and moves in one step, judging each supply against the period it ends up in.
+    - WHILE any merged correction awaits confirmation - whether or not it proposes a move - THE SYSTEM SHALL leave
+      every supply it affects with its existing verdict and filing, SHALL mark each as pending that correction on
+      the dashboard and in the terminal, SHALL show on the confirmation screen every verdict the correction would
+      change alongside any moves, and WHEN the asset manager confirms, SHALL apply its re-judgements and moves in
+      one step, judging each supply against the period it ends up in.
     non_functional_requirements:
     - 'ONE CONFIRMATION, NOT ONE PER FILE: a correction to a daily feed''s due time can propose hundreds
       of moves, and a per-supply step is how a list like this is abandoned half-done.'
@@ -26422,6 +26423,7 @@ requirements:
       A blocked move holds the correction open until someone moves or keeps it, so nothing is silently left
       behind.'
     - 'ALL OR NOTHING (Keith, 2026-10-07): while moves await confirmation, every supply the correction affects keeps its existing verdict and filing, marked pending that correction; confirmation applies re-judgements and moves in one step, each supply judged against the period it ends up in. See REQ-PIPE-168''s decision of the same date for the alternatives rejected.'
+    - 'ONE CONFIRMATION FOR EVERY CORRECTION (Keith, 2026-10-07): the confirmation screen covers verdict changes as well as moves, and is required even where nothing moves - see REQ-PIPE-168''s decision of the same date.'
   - id: REQ-GHUB-171
     title: The people configuration names the data asset's manager, and a decision can require that role
     date_written: '2026-10-07'
