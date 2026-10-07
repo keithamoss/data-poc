@@ -24925,6 +24925,9 @@ requirements:
       was promised.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-10-07"
     source: Keith, designed in conversation across the morning of 2026-09-28 and written into plans/supply-model.md
       Thread C that evening (the subsection `contract/calendar.yaml` - one file per asset, and `slaProperties`
       goes). Scoped by delivery-scoper, 2026-09-28. RE-SCOPED by delivery-scoper 2026-10-07 against Keith's
@@ -25023,6 +25026,21 @@ requirements:
     - WHERE the dashboard shows a period a dataset owes nothing in, THE SYSTEM SHALL show it as a quiet
       row stating the reason, group consecutive ones in supply history under 'Periods owed nothing', and
       SHALL NOT show it red, among things needing action, or as 'No supply'.
+    - WHERE a participation version states an effective_to date, THE SYSTEM SHALL treat its dataset as owing
+      nothing from the day after that date until a later participation version takes effect, and SHALL keep the
+      dataset and its configuration in contract/calendar.yaml throughout - a gap with no later version is a
+      dataset turned off permanently, a gap followed by one is a dataset turned off for that time.
+    - IF a participation version states an effective_to date without a reason for the dataset being turned off,
+      THEN THE SYSTEM SHALL reject the configuration; and WHERE no effective_to is stated, THE SYSTEM SHALL run
+      that version until the next one takes effect, so that a turned-off gap only ever exists where one was
+      written.
+    - WHEN a supply arrives for a dataset that is turned off on its receipt date, THE SYSTEM SHALL receive it,
+      record it and run its file checks, and SHALL hold it as turned off rather than file it; and WHEN a later
+      participation version turns the dataset back on, THE SYSTEM SHALL file each such held supply by the
+      filing rule on the next processing pass.
+    - WHILE a dataset is turned off on the date on show, THE SYSTEM SHALL show it on the dashboard quietly, as
+      turned off with its reason, SHALL NOT show it red, SHALL NOT count it among things needing a person, and
+      SHALL keep its history viewable.
     non_functional_requirements:
     - 'CORRECTNESS OVER CONVENIENCE, and a half-done move is worse than none: the whole point is that a
       delivery agreement is stated once, so a state in which two files both plausibly own a dataset''s expected
@@ -25187,6 +25205,7 @@ requirements:
       and withdrawals; qa.agreement_block as a new blocker kind; build in stages S0 (the agreement value
       and loader) to S4.'
     - 'EVERY PARTICIPATION VERSION RESTATES EVERYTHING ITS PREDECESSOR STATED (Keith, 2026-10-07, while signing this off - ''that''s probably safer''), REPLACING the ''states which months it adds'' wording of criterion 31. Leaving `participates` out meant ''every period'', so a version that only changed the due time silently widened what a dataset owes - the trap REQ-PIPE-050 exists for. A version that leaves out anything its predecessor stated is refused, naming each value, so a version always reads as complete on its own. Widening is written as the list it widens to, or `participates: all`. Rejected: (a) an `adds:` field naming the new months - redundant once the list itself is restated; (b) carrying unstated values over from the previous version - less typing and no guard needed, but a version would no longer say on its own what was in force, and Keith preferred the safer, explicit form.'
+    - 'A DATASET IS TURNED OFF BY effective_to ON ITS PARTICIPATION VERSION (Keith, 2026-10-07, while signing this off): he asked for a dataset to stay in the calendar and stay configured but be turned off, permanently or for a time, and proposed effective_to himself. The gap after a version''s effective_to and before the next version is the off period; no later version is permanent. A reason is required. Arrivals while off are received, file-checked and held as turned off, and filed by the rule once a later version turns it back on (Keith''s choice, over recording only or ignoring them). Shown quietly grey with its reason, never red, never needing a person (his choice, over hiding it from rollups). Rejected: an `active:`/`connected:`/`enabled:` flag - effective_to uses the versioning already there, so ''temporarily'' needs no second mechanism. A future effective_to is freely editable; once in effect it changes only by a declared correction (REQ-PIPE-111).'
   - id: REQ-PIPE-111
     title: A delivery agreement's past changes only by a declared, approved correction
     date_written: '2026-09-28'
@@ -25392,6 +25411,9 @@ requirements:
       that already happened.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-10-07"
     source: 'Keith, 2026-09-28 evening - the second of two decisions added to plans/supply-model.md Thread
       C, settled the same evening as `the timezone IS versioned`. Scoped by delivery-scoper, 2026-09-28.
       RE-SCOPED by delivery-scoper 2026-10-07: Keith settled both former open questions on 2026-10-04 (it
@@ -25529,6 +25551,9 @@ requirements:
       grace or claim window going forward never re-judges a slot that has already been due.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-10-07"
     source: Keith, 2026-09-28 - plans/supply-model.md Thread C's `contract/calendar.yaml` subsection. Scoped
       by delivery-scoper, 2026-09-28. Its overlap invariant moved to REQ-PIPE-134 (Keith, 2026-10-04, deduplicated).
       RE-SCOPED by delivery-scoper 2026-10-07 against REQ-PIPE-110's re-scope (due time on the participation
@@ -26093,6 +26118,9 @@ requirements:
       supplies file to the period they are for without the never-claim-forward rule gaining an exception.
     moscow: should
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-10-07"
     source: 'Keith, 2026-09-24, plans/road-testing.md item 3 (''A regularly scheduled dataset whose supplies
       are FOR THE FOLLOWING PERIOD''); design settled at REQ-PIPE-062''s sign-off the same day; placed with
       the calendar group by Keith (''#3 following-period datasets: scoped with the calendar group (REQ-PIPE-110
