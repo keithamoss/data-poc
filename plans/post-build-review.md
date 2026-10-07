@@ -6657,6 +6657,8 @@ twice. It deliberately did not re-find the `TypeError`.
     NOT VERIFIED by the critic: REQ-PIPE-157's equivalence and ten-minute
     target (both measured at build time), and anything against real AWS.
     TO FIX in one batch once the two UX critics running alongside it have
+    KEITH, 2026-10-07, on D3: WAIT for a real AWS deployment, and collect
+    this and the other AWS items in their own file - `plans/aws.md`.
     reported, failing test first for each defect.
 
 132. **[in-progress, 2026-10-07]** **[Dashboard UI]** **The dashboard UX
@@ -6713,6 +6715,14 @@ twice. It deliberately did not re-find the `TypeError`.
     Out of scope, a sighting only: Client Register at 2023-08-05 shows
     "What is in the warehouse is not the latest file - 2026-Q2 / 2026-Q3".
     TO FIX in the same batch as #131, failing test first for A1-A5.
+    KEITH, 2026-10-07: A1 - the pill shows the PAGE's own status, and
+    changes from the arrival colour only for a reading AFTER the arrival,
+    naming its cause; the gate keeps its own reading for promotion. A2 -
+    RE-BOOTSTRAP ONLY: no per-result record of the sample limit and no
+    "since" wording, accepting that a future limit change has the same
+    window until the next rebuild. A3 - a schedule-ended hold offers
+    ADD-DATES ONLY: "file it yourself" and "reject" are removed for this
+    kind of hold, not kept as secondary options.
 
 133. **[in-progress, 2026-10-07]** **[Testing & dev tooling]** **The CLI UX
     critic on checkpoint and resume** (REQ-TEST-159/160), driven for real

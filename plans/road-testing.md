@@ -1514,6 +1514,27 @@ two levels) and #17.
       scoper is to audit it against what is built, and name any gap as a
       requirement rather than assume it away.
       Sent to the scoper 2026-10-07 with these decisions.
+      **THE SCOPER CAME BACK THE SAME MORNING** (draft in the session
+      scratchpad: 110-113 and 050 amended; new 161 excuse lateness, DASH-162
+      its display, 163 place a held supply, 164 re-check without moving,
+      GHUB-165 terminal parity, 166 withdraw an annotation, 167 sighting #3).
+      The assumption FAILS in one place: a supply the filing rule HOLDS
+      cannot be undone by any route - re-file refuses it and
+      `refiling.py:83-86` tells people to "Place it instead", an operation
+      that does not exist. Keith's answers, 2026-10-07: FREEZE from the
+      claim-window opening (the first instant an entry can govern a filing),
+      not the entry's own date; EXCUSE LATENESS per supply, with a range
+      form recorded as one entry per supply; BUILD IN PARALLEL - 111 does not
+      wait for 161 and 163. Still open: the exhausted-schedule question
+      (strict 111 against REQ-PIPE-154 criterion 7), which he answered with
+      a question rather than an option. ANSWERED the same morning: the
+      NARROW APPEND-ONLY CARVE-OUT - dates may be added after a calendar's
+      last date even when now past, to extend an exhausted schedule only;
+      existing dates never change. Keith then raised the mistyped-date case
+      alongside it ("if we amend that date it would change filing decisions
+      and lateness verdicts, but if we freeze it we're safe from that. Then
+      again, those would all be legitimate reassessments") - thinking aloud,
+      put back to him rather than read as a change to the strict rule.
       SETTLED THE SAME AFTERNOON AND NOT IN QUESTION: 110 - `participates`
       replaces `delivery_months`, `not_expected` stays (one-off decisions);
       `slaProperties` deleted entirely including `frequency`. 112 - the
