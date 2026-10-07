@@ -4732,3 +4732,16 @@ Belongs with batch 5's check work.
     asset, a project-extraction shape with no cadence - this is likely the
     larger question REQ-QAC-039 is a symptom of.
 
+
+69. **[todo, 2026-10-08]** **[Pipeline & publishing, Data generation]**
+    **Revisit REQ-PIPE-170 once the calendar groups are signed off, and slot
+    its scenarios into the build.** Keith, 2026-10-08: "look at requirement
+    170 once we've done with these groups, and have that slotted in as part
+    of the experience to build this set of requirements." The gap it
+    carries: TS-57..TS-63 (plans/supply-model.md, "Calendar corrections")
+    need the generator to make a correction part way through the synthetic
+    history and confirm it later, which it cannot do today, and REQ-PIPE-170
+    leaves how to the builder. **When**: straight after group 3 (the undo
+    tools, REQ-PIPE-161..166) is signed off, before the calendar batch's
+    sprints are planned - so the scenario generation is a planned sprint
+    step, not an afterthought at the end.
