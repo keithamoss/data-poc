@@ -4745,3 +4745,42 @@ Belongs with batch 5's check work.
     tools, REQ-PIPE-161..166) is signed off, before the calendar batch's
     sprints are planned - so the scenario generation is a planned sprint
     step, not an afterthought at the end.
+
+70. **[todo, 2026-10-08]** **[Pipeline & publishing, Calendar]**
+    **Three ways a period can be judged, and which one to reach for.**
+    Keith, 2026-10-08, asking how REQ-PIPE-161 (excuse a late supply)
+    differs from `not_expected` in the calendar - and whether an excuse
+    should be written into the calendar YAML instead. Answer: no, it should
+    not. Recorded here as the rule of thumb to apply when someone asks
+    which route a case belongs on.
+
+    - **Calendar wrong** (a date or period was mistyped, or the agreement
+      itself is not what was meant): a declared correction (REQ-PIPE-111),
+      through the calendar file, approved in review, confirmed by the asset
+      manager (REQ-PIPE-170). The verdicts and filings it changes are
+      re-judged. This is the only route that changes a past verdict.
+    - **Calendar right, nothing owed** (a period nobody supplies by design,
+      e.g. Christmas): `not_expected` in the calendar, written in advance as
+      part of the agreement. The period reads quiet grey and is never late.
+      It is configuration, so it is locked once it can govern a filing like
+      any other frozen item.
+    - **Calendar right, supply late, and we forgive it** (an outage, an
+      agreed delay): an excuse (REQ-PIPE-161), a decision-log entry in the
+      database with a reason. The verdict stays "late" and reads "late,
+      excused". Nothing is re-judged.
+
+    Why an excuse does not go in the YAML: it is a person's judgement about
+    one supply, which is state, not configuration. Writing it into the
+    calendar would make a supplier's outage a change to the agreement, need
+    a correction and an approver for something that is not an error, and
+    re-judge a verdict that was right. It would also mix two concerns the
+    freeze rule keeps apart - what was agreed, and what happened.
+
+    The cost, stated plainly: every entry point that judges a supply reads
+    BOTH sources - the calendar for what was agreed and the decision log for
+    what a person has since recorded (excuses, kept supplies, holds). That
+    is two inputs to remember, and it is the reason REQ-PIPE-168 records the
+    resolved inputs and the agreement that judged each verdict, so a reader
+    can see which one a verdict leaned on. Worth checking against the
+    scenarios when the calendar build is planned (plans/supply-model.md's
+    "Calendar corrections").
