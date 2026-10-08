@@ -25930,15 +25930,9 @@ requirements:
       supply, and through mothman supply decide.
     - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
       to list re-check among the filing decisions.
-    - THE SYSTEM SHALL offer a BULK re-check, raised by a person naming one check by its check_id and a
-      period range, with a mandatory reason.
-    - THE SYSTEM SHALL choose the supplies a bulk re-check covers as every supply that, within the named
-      period range, is filed and waiting or promoted, whose current run recorded a result for that check,
-      and whose current run is older than the newest changelog entry of that check's definition - and SHALL
-      include none other.
-    - IF the named check has no changelog entry newer than the current run of any supply in the range, THEN
-      THE SYSTEM SHALL refuse the bulk re-check, saying that nothing about the check has changed since those
-      supplies were checked.
+    - THE SYSTEM SHALL offer a BULK re-check, raised by a person naming one check by its check_id, with a mandatory reason. A bulk re-check SHALL cover every dataset and every period that check touches, and SHALL NOT offer the person a period range on it.
+    - THE SYSTEM SHALL choose the supplies a bulk re-check covers as every supply, in any dataset and any period, that is filed and waiting or promoted, whose current run recorded a result for that check, and whose current run is older than the newest changelog entry of that check's definition - and SHALL include none other.
+    - IF the named check has no changelog entry newer than the current run of any supply it would cover, THEN THE SYSTEM SHALL refuse the bulk re-check, saying that nothing about the check has changed since those supplies were checked.
     - THE SYSTEM SHALL show the number of supplies a bulk re-check covers, by dataset and period, and SHALL
       require the person to confirm that number before anything runs.
     - THE SYSTEM SHALL record a bulk re-check as one re-check decision-log entry per supply, each naming
@@ -25948,8 +25942,7 @@ requirements:
       WHERE it is promoted, THE SYSTEM SHALL record its new verdict and SHALL NOT re-gate it.
     - IF any re-run in a bulk re-check fails to complete, THEN THE SYSTEM SHALL leave it owed under REQ-PIPE-140
       criterion 8 and SHALL continue with the rest.
-    - THE SYSTEM SHALL offer the bulk re-check as its own command, `mothman supply recheck`, taking the
-      check and the shared pair of range flags.
+    - THE SYSTEM SHALL offer the bulk re-check as its own command, `mothman supply recheck`, taking the check and no period range. A trial re-check takes the supplies or period range it is given, as the trial criteria below say.
     - WHEN a bulk re-check is proposed, THE SYSTEM SHALL show the count by dataset and period and the check
       changelog entry it acts on in the existing consequences panel, and SHALL require --yes with --acknowledge
       KEY on the flag route, refusing if the set has changed since it was shown, and the asset's production
@@ -25964,16 +25957,19 @@ requirements:
       changed' - and SHALL name the bulk re-check that would re-run them.
     - THE SYSTEM SHALL treat a check changelog entry's date as the end of that day on the data asset's clock
       when comparing it with a run's instant.
+    - THE SYSTEM SHALL offer a TRIAL re-check, raised by a person naming one check by its check_id and choosing either one or more supplies from a list, or a period range.
+    - WHEN a trial runs, THE SYSTEM SHALL run each chosen supply's QA through REQ-PIPE-140's mechanism against its filed period, SHALL show each resulting verdict and what the promotion gate would do with it, and SHALL record no QA run, no verdict, no decision-log entry and no change to any supply.
+    - THE SYSTEM SHALL state, before a trial runs, how many supplies it will run, by dataset and period, and SHALL require the person to confirm that number. A trial SHALL NOT be capped on how many supplies it can run.
+    - WHEN a trial is given a period range, THE SYSTEM SHALL say in the terminal that the range applies to the trial only, and that the real bulk re-check covers everything the check touches with no range.
+    - WHEN a trial shows a verdict, THE SYSTEM SHALL say that the verdict comes from a run that has been discarded, and that the real run may differ if the data changes before it runs.
+    - THE SYSTEM SHALL offer the trial on the terminal route only - the filing-decisions door and mothman supply decide - and SHALL NOT offer it on the GitHub route.
     non_functional_requirements:
     - 'No new execution path: REQ-PIPE-140 already built the run identity, the owed record, the failure
       handling and the ''most recent run is current'' rule. This adds a decision that owes one, nothing
       more.'
     - Only the orchestrator path that legitimately holds a supply-row connection runs it (REQ-PIPE-140 criterion
       6); on the GitHub route the decision is recorded and the processing pass runs it, as for a re-file.
-    - 'BOUNDED THREE WAYS, because at thirty datasets and years of daily history ''every supply that check
-      ever touched'' is unbounded: by the one named check, by a period range the person must state, and
-      by the check''s own changelog - only supplies checked before the fix are re-run. The count is shown
-      and confirmed before anything runs.'
+    - '''BOUNDED BY THE CHECK AND ITS OWN CHANGELOG, NOT BY A RANGE. At thirty datasets and years of daily history ''''every supply that check ever touched'''' is large, so the real run covers the one named check across everything it touches, and only supplies checked before the fix are re-run. There is no period range on the real run (Keith, 2026-10-08): a partial re-run after a fix is not a case anyone needs. The count is shown and confirmed before anything runs.'''
     - Runs through the processing pass's orchestrator path, one supply at a time like any owed re-check,
       so a large bulk re-check is slow rather than unsafe; owed re-checks survive an interrupted run (REQ-PIPE-140).
     dependencies:
@@ -26009,6 +26005,8 @@ requirements:
       demote, so 'still red' is never read as 'already taken out'.
     - 'A CHANGELOG DATE IS END OF DAY ON THE ASSET CLOCK (delivery-architect pre-build review, 2026-10-07):
       a check fixed on a day and a run later that same day must not both count as ''before the fix''.'
+    - 'AMENDED 2026-10-08 (Keith): supersedes the decision above that required a period range. The real run covers everything the check touches with no range at all. A period range now belongs to the TRIAL only, where it is a bounded look at a few supplies, and the screen says so plainly. The concern behind the old decision - not re-judging years of data without anyone deciding to - is met by the changelog cut-off and by the count-and-confirm step, not by a range.'
+    - 'TRIAL SHAPE (Keith, 2026-10-08): supplies chosen from a list, several at once, or a period range; the verdict and the gate''s outcome are shown; nothing is recorded. NO CAP on how many supplies a trial runs. Keith''s reason: a trial that refuses past some number pushes people into the real run to get round it. Instead the trial states how many it will run and asks the person to confirm, as the real run does. PROPOSED, NOT YET AGREED: the trial and the real run share one implementation, differing only in whether results are kept.'
   - id: REQ-GHUB-165
     title: The terminal offers every filing decision that applies, wherever it applies
     date_written: '2026-10-07'

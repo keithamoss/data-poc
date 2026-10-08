@@ -4851,3 +4851,6 @@ Belongs with batch 5's check work.
     bulk run shows its count by dataset and period and asks for confirmation
     (REQ-PIPE-164 criterion 11). Open: a cap on how many supplies one trial
     can run at once, since a range can select many.
+    **Update 2026-10-08:** no cap on a trial - it states how many supplies it
+    will run and asks the person to confirm, as the real run does. Written up
+    as part of REQ-PIPE-164's draft (not yet signed off).
