@@ -4814,3 +4814,40 @@ Belongs with batch 5's check work.
     own orchestrator-held connection, not the GitHub route, and it must not
     leave a QA run behind. Feeds REQ-PIPE-163 (placing) and REQ-PIPE-164
     (bulk re-check, as its first step).
+
+73. **[todo, 2026-10-08]** **[Pipeline & publishing, QA checks & contract]**
+    **Recalling a broad class of checks, and re-running everything it touches.**
+    Keith, 2026-10-08, after rejecting an automatic fingerprint of tool and
+    code versions in each check's hash (it would make every dbt, Soda or
+    Python upgrade a mass re-run with no change to any result). His view:
+    whether a tool or code change alters a check's outcome is a PROCESS
+    question, not a technical one, and the system cannot decide it. What he
+    wants is a way to recall a whole class at once - e.g. a dbt or server
+    bug that affects every allowed-values and required-values check - and
+    a TUI path to re-run that class across everything it touches.
+
+    Shape, as he described it: a changelog entry that can name a CHECK TYPE
+    (a label such as "allowed values" or "required values") as well as, or
+    instead of, individual checks; the bulk re-check (REQ-PIPE-164) selects
+    every check carrying that label across every dataset, and the TUI offers
+    it from the changelog entry itself. Also to settle: who labels a check
+    (a controlled vocabulary, not free text, or the label is useless); whether
+    a bug recall and a configuration change share one changelog; and how a
+    label applies to checks in a dataset that adds one later.
+
+    NOT for REQ-PIPE-164 as it stands. Keith, 2026-10-08: "a much bigger
+    issue than the requirements we're looking at here". Revisit as its own
+    item once the current re-check work is signed off.
+
+74. **[todo, 2026-10-08]** **[Pipeline & publishing, QA checks & contract]**
+    **Re-check trial and bulk shape, as agreed with Keith on 2026-10-08** -
+    the input to REQ-PIPE-164's next draft. TRIAL: choose one or more
+    supplies from a list (multi-select), or give a period range; the verdict
+    and the gate's outcome are shown and nothing is recorded. BULK (the real
+    run): always everything the named check touches, across every dataset
+    and period, with the system choosing the periods; there is NO range
+    option on the real run. The screen must say plainly that a range exists
+    only for a trial and that the real run always covers everything. The
+    bulk run shows its count by dataset and period and asks for confirmation
+    (REQ-PIPE-164 criterion 11). Open: a cap on how many supplies one trial
+    can run at once, since a range can select many.
