@@ -24925,9 +24925,6 @@ requirements:
       was promised.
     moscow: must
     status: not_started
-    signed_off:
-      by: Keith
-      date: "2026-10-07"
     source: Keith, designed in conversation across the morning of 2026-09-28 and written into plans/supply-model.md
       Thread C that evening (the subsection `contract/calendar.yaml` - one file per asset, and `slaProperties`
       goes). Scoped by delivery-scoper, 2026-09-28. RE-SCOPED by delivery-scoper 2026-10-07 against Keith's
@@ -25206,6 +25203,7 @@ requirements:
       and loader) to S4.'
     - 'EVERY PARTICIPATION VERSION RESTATES EVERYTHING ITS PREDECESSOR STATED (Keith, 2026-10-07, while signing this off - ''that''s probably safer''), REPLACING the ''states which months it adds'' wording of criterion 31. Leaving `participates` out meant ''every period'', so a version that only changed the due time silently widened what a dataset owes - the trap REQ-PIPE-050 exists for. A version that leaves out anything its predecessor stated is refused, naming each value, so a version always reads as complete on its own. Widening is written as the list it widens to, or `participates: all`. Rejected: (a) an `adds:` field naming the new months - redundant once the list itself is restated; (b) carrying unstated values over from the previous version - less typing and no guard needed, but a version would no longer say on its own what was in force, and Keith preferred the safer, explicit form.'
     - 'A DATASET IS TURNED OFF BY effective_to ON ITS PARTICIPATION VERSION (Keith, 2026-10-07, while signing this off): he asked for a dataset to stay in the calendar and stay configured but be turned off, permanently or for a time, and proposed effective_to himself. The gap after a version''s effective_to and before the next version is the off period; no later version is permanent. A reason is required. Arrivals while off are received, file-checked and held as turned off, and filed by the rule once a later version turns it back on (Keith''s choice, over recording only or ignoring them). Shown quietly grey with its reason, never red, never needing a person (his choice, over hiding it from rollups). Rejected: an `active:`/`connected:`/`enabled:` flag - effective_to uses the versioning already there, so ''temporarily'' needs no second mechanism. A future effective_to is freely editable; once in effect it changes only by a declared correction (REQ-PIPE-111).'
+    - 'REOPENED 2026-10-08 (Keith): the sign-off of 2026-10-07 is withdrawn. It was given with material added in the sign-off commit itself - the turn-off mechanism (effective_to) and its four criteria, and criterion 31 (every participation version restates its predecessor) - none of which had been through delivery-scoper, delivery-architect or the dashboard UX reviewer. Those agents are to review it; sign-off is sought again once they have reported. Keith''s own words: happy for it to go back, 2026-10-08.'
   - id: REQ-PIPE-111
     title: A delivery agreement's past changes only by a declared, approved correction
     date_written: '2026-09-28'
