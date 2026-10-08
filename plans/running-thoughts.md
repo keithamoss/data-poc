@@ -4784,3 +4784,33 @@ Belongs with batch 5's check work.
     can see which one a verdict leaned on. Worth checking against the
     scenarios when the calendar build is planned (plans/supply-model.md's
     "Calendar corrections").
+
+71. **[todo, 2026-10-08]** **[Pipeline & publishing, Security]**
+    **Letting someone use a GUI client locally when their code can differ from
+    what is running live.** Keith, 2026-10-08, while signing off the decision
+    to run filing placements inline (REQ-PIPE-163): a person may point a GUI
+    client on their own machine at the live supply database, but their local
+    checkout of the code - the checks, the filing rule, the calendar - may not
+    match what the pipeline is running. A decision recorded from a stale
+    checkout would be judged by rules nobody is running. Not scoped. Questions
+    to settle with him first: is a local GUI client a read path only, or can
+    it write decisions; should a decision carry the code version it was made
+    under and refuse when the live version differs; and what a read through a
+    client may see, given the staging schemas are supply rows and not for any
+    route but the orchestrator (CLAUDE.md, the "build may read recorded QA
+    results, never actual data" rule). Related: plans/aws.md #4 (where the
+    connection string lives).
+
+72. **[todo, 2026-10-08]** **[Pipeline & publishing, QA checks & contract]**
+    **A trial run that records nothing - one mechanism for previewing a
+    placement and checking a fix.** Keith, 2026-10-08: a predicted verdict is
+    possible, and the same mechanism covers "try a fix on one or two
+    supplies before running it everywhere". The trial runs a supply's QA
+    against a target period inside a transaction that is rolled back, shows
+    the verdict and the gate's outcome, and records nothing - the same
+    discard the correction trial already does (REQ-PIPE-170). It is exact
+    for the inputs it sees and can differ if the data changes before the
+    real run. Open: a trial reads supply rows, so it belongs on the terminal's
+    own orchestrator-held connection, not the GitHub route, and it must not
+    leave a QA run behind. Feeds REQ-PIPE-163 (placing) and REQ-PIPE-164
+    (bulk re-check, as its first step).
