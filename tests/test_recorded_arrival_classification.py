@@ -61,7 +61,7 @@ def clean(supply_dsn):
 
     with supply_db.connect(label="test-recorded-classification") as conn:
         qa_store.ensure_schema(conn)
-        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing')
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
         yield conn
 
 
@@ -139,9 +139,12 @@ class TestItFollowsAReFile:
         import inspect
         import textwrap
 
-        tree = ast.parse(textwrap.dedent(inspect.getsource(filing._classification_for)))
-        names = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
-        assert not {"promoted_at", "promoted_into", "effective_at"} & names
+        from qa_tools.common import verdict
+
+        for fn in (filing._judged_for, verdict.judge):
+            tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
+            names = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+            assert not {"promoted_at", "promoted_into", "effective_at"} & names
 
 
 class TestTheIntervalFromReceiptToPromotion:

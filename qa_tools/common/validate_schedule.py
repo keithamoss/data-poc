@@ -915,7 +915,11 @@ def _freeze_errors(raw: dict, cal_raw: dict, src: Source,
                 return max(at, base_at)
         return max(states()[-1][0], base_at)
 
-    findings = freeze.check(old_cal, cal_raw, old_asset, raw, people, instant_of=instant_of)
+    # CODEOWNERS AT THE BASE (REQ-GHUB-174 criterion 2), like people.yaml:
+    # a change cannot make its own approver a code owner.
+    codeowners = _content_at(freeze.CODEOWNERS_REL, ref)
+    findings = freeze.check(old_cal, cal_raw, old_asset, raw, people, instant_of=instant_of,
+                            base_codeowners=codeowners)
     names = {"calendar.yaml": src.calendar_name, "data-asset.yaml": src.name}
     return [ConfigError(names.get(f.file, f.file), f.scope, f.problem, f.fix)
             for f in findings]

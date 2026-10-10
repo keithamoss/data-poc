@@ -48,6 +48,7 @@ from datetime import datetime, timedelta
 
 from qa_tools.common import replay_clock as _replay_clock
 from qa_tools.common import qa_store, supply_db
+from qa_tools.common import verdict as verdict_mod
 from qa_tools.common.assignment import Assignment
 
 TABLE = f'"{qa_store.SCHEMA}".filing'
@@ -115,25 +116,31 @@ def record(assignment: Assignment, delivery: str | None, conn=None) -> bool:
         raise FilingWithoutDelivery(
             f"{assignment.supply_id} ({assignment.dataset_id}) names delivery "
             f"{delivery!r}, which has no delivery record, so it was not filed.")
-    verdict = _classification_for(
+    judged = _judged_for(
         assignment.dataset_id, assignment.slot, assignment.received_at)
+    at = _replay_clock.now()
     rows = conn.execute(
         f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, "
         "delivery, classification, recorded_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT (dataset_id, supply_id) WHERE refiled_by IS NULL DO NOTHING "
-        "RETURNING dataset_id",
+        "RETURNING id",
         [assignment.dataset_id, assignment.supply_id, assignment.slot,
          assignment.branch, list(assignment.considered), delivery,
-         verdict, _replay_clock.now()]).fetchall()
+         judged.classification, at]).fetchall()
+    if rows:
+        # THE VERDICT, WITH WHAT JUDGED IT (REQ-PIPE-168 criterion 1), in
+        # the same transaction as the filing it belongs to.
+        verdict_mod.record(conn, rows[0][0], assignment.dataset_id, assignment.supply_id,
+                           judged, recorded_at=at)
     return bool(rows)
 
 
-def _classification_for(dataset_id: str, slot_name: str | None,
-                         received_at: datetime | None) -> str | None:
-    """This supply's verdict against the slot it is filed to, or None
-    where there is no receipt instant to judge (REQ-PIPE-080
-    criterion 1).
+def _judged_for(dataset_id: str, slot_name: str | None,
+                received_at: datetime | None) -> "verdict_mod.Judged":
+    """This supply's verdict against the slot it is filed to, with the
+    inputs that judged it (REQ-PIPE-168), or no classification where
+    there is no receipt instant to judge (REQ-PIPE-080 criterion 1).
 
     OUR RECEIPT INSTANT, NEVER THE PROMOTION INSTANT (criterion 8), and
     never an instant out of the supplier's file (criterion 4). A
@@ -152,17 +159,15 @@ def _classification_for(dataset_id: str, slot_name: str | None,
     recording, and a classifier that took the write down with it would
     be the blast-radius rule broken for a presentational field.
     """
-    from qa_tools.common import arrival_classification
-
     if received_at is None:
-        return None
+        return verdict_mod.Judged(None, None, None)
     if not slot_name:
-        return arrival_classification.UNFILED
+        return verdict_mod.judge(dataset_id, None, received_at)
     try:
-        return arrival_classification.classify(
-            received_at, _slot_named(dataset_id, slot_name, received_at))
+        slot = _slot_named(dataset_id, slot_name, received_at)
     except Exception:  # noqa: BLE001 - see the docstring
-        return None
+        return verdict_mod.Judged(None, None, None)
+    return verdict_mod.judge(dataset_id, slot, received_at)
 
 
 def _slot_named(dataset_id: str, slot_name: str, received_at: datetime):
@@ -465,16 +470,21 @@ def refile(conn, dataset_id: str, supply_id: str, to_slot: str, *,
         f"SELECT received_instant FROM {RECEIPT} WHERE dataset_id = ? AND supply_id = ?",
         [dataset_id, supply_id]).fetchall()
     received_at = receipt[0][0] if receipt else None
-    verdict = _classification_for(dataset_id, to_slot, received_at)
+    judged = _judged_for(dataset_id, to_slot, received_at)
+    at = _replay_clock.now()
     # The rule's branch no longer describes where it sits: a person put it
     # here. The delivery link is carried as it stands (REQ-PIPE-144 c17).
-    conn.execute(
+    new_id = conn.execute(
         f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, "
-        "delivery, classification, refiled_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "delivery, classification, refiled_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "RETURNING id",
         [dataset_id, supply_id, to_slot, "refiled-by-a-person", [to_slot],
-         current["delivery"], verdict, decision_id, _replay_clock.now()])
+         current["delivery"], judged.classification, decision_id, at]).fetchall()[0][0]
+    # A NEW FILING, A NEW VERDICT (REQ-PIPE-168 criterion 6): the newest
+    # verdict for the current filing is the supply's verdict.
+    verdict_mod.record(conn, new_id, dataset_id, supply_id, judged, recorded_at=at)
     return {**current, "slot": to_slot, "branch": "refiled-by-a-person",
-            "classification": verdict}
+            "classification": judged.classification}
 
 
 @dataclass(frozen=True)

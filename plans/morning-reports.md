@@ -961,3 +961,38 @@ one or more component tags, and a date.
         history's cycle heading now names the slot's own due date where it
         differs from the period's. No dataset needs it today. Its collection
         default waits for REQ-PIPE-181.
+      - REQ-PIPE-168 BUILT (the verdict half): every early / on-time / late
+        verdict is now its own append-only row (qa.verdict) carrying the due
+        time, grace, claim window, days before and timezone it was measured
+        against, plus a fingerprint of the agreement versions they came from.
+        The fingerprint deliberately ignores the calendar's dates, so
+        appending a future date never makes a verdict look out of date. The
+        current verdict is the newest one for the supply's current filing.
+        Every existing reader picks that up through qa.filing_current, with
+        no changes to the readers. Re-judging under a corrected agreement is
+        worked out period by period, never by replaying all of history, and
+        recording a re-judgement names the correction and the verdict it
+        replaces. NOTHING APPLIES A CORRECTION YET: that is REQ-PIPE-170's
+        confirmation, so criteria 3 and 5 wait on it (PROVISIONAL). Also
+        PROVISIONAL: exactly what the fingerprint covers. REQ-PIPE-080
+        criteria 1 and 5 are amended in the same change, as 168's criterion 9
+        requires - the wording is in requirements.yaml for you to check.
+        Schema 34, so the sandbox database was reset and bootstrapped once.
+      - REQ-GHUB-174 BUILT: .github/CODEOWNERS names you as owner of
+        calendar.yaml, data-asset.yaml, people.yaml and the CODEOWNERS file
+        itself. The schedule gate now refuses a correction whose approver is
+        not a code owner of the file it is declared in, matched through
+        people.yaml's github field, and reads both files at the base.
+        docs/code-owner-review.md says required review is OFF here and how a
+        real deployment turns it on. REQ-PIPE-111's last deferral to 174 is
+        closed. TWO PROVISIONALS: the owners checked are those of the one
+        file holding the correction, and a base with no CODEOWNERS refuses
+        every correction rather than skipping the check.
+      - REQ-PIPE-167 CRITIC: one real gap in the dashboard heading (being
+        fixed test-first next), plus two medium items where the period date
+        still shows in place of the due date (the SLA tile, `schedule show`'s
+        next-due marker). Report in post-build-review once handled.
+      - REQ-PIPE-167 CRITIC HANDLED (post-build-review #142): the heading,
+        the SLA tile and `schedule show` now use each slot's DUE date. Two
+        low items are left dormant until a dataset actually declares
+        days_before.

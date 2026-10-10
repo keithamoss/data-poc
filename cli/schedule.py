@@ -231,7 +231,7 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
     from qa_tools.common import slots as slots_mod
     by_period = {s.name: s for s in slots_mod.slots_for_dataset(dataset, until=stop)}
 
-    shown, hidden = _window(periods, today, show_all or until is not None)
+    shown, hidden = _window(periods, today, show_all or until is not None, by_period)
 
     table = Table("", "Period", "Date", "Expected", "Due", "Claimable from",
                    box=None, pad_edge=False)
@@ -249,7 +249,7 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
         # I past it?" - so the next one owed is marked rather than left
         # to be worked out from the dates.
         marker = ""
-        if slot and p.date >= today:
+        if slot and _due_date(p, by_period) >= today:
             marker = "->" if p.name == _next_owed(shown, by_period, today) else ""
         # THE PERIOD'S DATE IS A CONFIG ECHO and keeps its written form
         # (criterion 8) - a reader comparing this table against
@@ -285,15 +285,26 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
                        f"`--all` for every one, `--until YYYY-MM-DD` for a horizon.[/dim]")
 
 
+def _due_date(period, by_period) -> date:
+    """The day a period's slot is DUE, in the asset's clock - its own date
+    where it has no slot. A following-period slot (REQ-PIPE-167) is due
+    weeks before its period's date, so "next" and "around today" are
+    measured by this, not the period's date (post-build-review #142)."""
+    from qa_tools.common import asset_time
+
+    slot = by_period.get(period.name)
+    return asset_time.local_date(slot.due_at) if slot else period.date
+
+
 def _next_owed(periods, by_period, today) -> str | None:
-    """The first period on or after today that this dataset owes."""
+    """The first period owed whose slot is due on or after today."""
     for p in periods:
-        if p.date >= today and p.name in by_period:
+        if p.name in by_period and _due_date(p, by_period) >= today:
             return p.name
     return None
 
 
-def _window(periods, today, everything: bool):
+def _window(periods, today, everything: bool, by_period=None):
     """(rows to show, how many were left out).
 
     A WINDOW AROUND TODAY rather than the whole sequence, because at
@@ -305,7 +316,7 @@ def _window(periods, today, everything: bool):
     """
     if everything or len(periods) <= WINDOW_BEFORE + WINDOW_AFTER:
         return periods, 0
-    after = [i for i, p in enumerate(periods) if p.date >= today]
+    after = [i for i, p in enumerate(periods) if _due_date(p, by_period or {}) >= today]
     pivot = after[0] if after else len(periods)
     start = max(0, pivot - WINDOW_BEFORE)
     end = min(len(periods), pivot + WINDOW_AFTER)

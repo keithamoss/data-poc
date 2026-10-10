@@ -55,6 +55,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 CALENDAR_REL = "contract/calendar.yaml"
 ASSET_REL = "contract/data-asset.yaml"
 PEOPLE_REL = "contract/people.yaml"
+CODEOWNERS_REL = ".github/CODEOWNERS"
 
 #: PROVISIONAL (overnight #3, 2026-10-11): the role in contract/people.yaml
 #: that may approve a correction. Criterion 22 says "allowed to approve"
@@ -397,9 +398,48 @@ def approvers(people_doc: dict) -> list[dict]:
 
 
 def _is_approver(name: str, allowed: list[dict]) -> bool:
+    return _person_named(name, allowed) is not None
+
+
+def _person_named(name: str, allowed: list[dict]) -> dict | None:
     name = str(name).strip().lower()
-    return any(name in {str(p.get("email", "")).lower(), str(p.get("github", "")).lower()}
-               for p in allowed)
+    return next((p for p in allowed
+                 if name in {str(p.get("email", "")).lower(), str(p.get("github", "")).lower()}),
+                None)
+
+
+def _pattern_matches(pattern: str, path: str) -> bool:
+    """One CODEOWNERS pattern against a repository-relative path, in
+    GitHub's terms: a leading `/` anchors it to the root, a trailing `/`
+    names a directory, `*` globs, and an unanchored pattern without a `/`
+    matches at any depth."""
+    from fnmatch import fnmatchcase
+
+    anchored = pattern.startswith("/")
+    pat = pattern.lstrip("/")
+    if not pat:
+        return False
+    if pat.endswith("/"):
+        return path.startswith(pat) if anchored else f"/{pat}" in f"/{path}"
+    if anchored or "/" in pat:
+        return fnmatchcase(path, pat) or path.startswith(pat.rstrip("*") + "/") and \
+            not any(c in pat for c in "*?[")
+    return any(fnmatchcase(part, pat) for part in path.split("/"))
+
+
+def code_owners(codeowners_text: str | None, path: str) -> set[str]:
+    """The GitHub accounts .github/CODEOWNERS makes owners of `path`,
+    lower-cased and without the `@` (REQ-GHUB-174 criterion 2). The LAST
+    matching line wins, as on GitHub; a line with no owners un-owns."""
+    owners: set[str] = set()
+    for raw in (codeowners_text or "").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        pattern, *who = line.split()
+        if _pattern_matches(pattern, path):
+            owners = {w[1:].lower() for w in who if w.startswith("@") and "/" not in w}
+    return owners
 
 
 # ---- the gate -------------------------------------------------------
@@ -448,11 +488,14 @@ def old_asset_like(new_asset: dict) -> dict:
 
 
 def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset: dict,
-          base_people: dict | None, instant_of=None, today: date | None = None) -> list[Finding]:
+          base_people: dict | None, instant_of=None, today: date | None = None, *,
+          base_codeowners: str | None) -> list[Finding]:
     """Every refusal for one change from (old_cal, old_asset) to (new_cal,
     new_asset). `instant_of(item_key) -> datetime` is when that change was
     introduced (criterion 12); a missing previous state passes (criterion
-    14)."""
+    14). `base_codeowners` is .github/CODEOWNERS's text at the base, or
+    None where it did not exist - REQUIRED, with no default, so no caller
+    can leave the code-owner check out by forgetting it (REQ-GHUB-174)."""
     from qa_tools.common import agreement
 
     if old_cal is None and old_asset is None:
@@ -527,17 +570,35 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
                                "Restore the corrections already committed, exactly as they were, "
                                "and append a new one if something more needs correcting."))
             continue
+        # A CODE OWNER OF THE FILE IT IS DECLARED IN (REQ-GHUB-174
+        # criterion 2), at the base - so a change cannot make its approver.
+        rel_file = ASSET_REL if owner[0] == "timezone" else CALENDAR_REL
+        owners = code_owners(base_codeowners, rel_file)
+        eligible = [p for p in allowed if str(p.get("github", "")).lower() in owners]
         for corr in entries[len(before):]:
             corr = corr or {}
             approver = corr.get("approver")
-            if approver and not _is_approver(approver, allowed):
+            person = _person_named(approver, allowed) if approver else None
+            if approver and person is None:
                 out.append(Finding(
                     file, where,
                     f"a correction names approver {approver!r}, who is not a person allowed to "
                     f"approve in contract/people.yaml as it stood before this change. Nothing "
                     f"was committed.",
-                    "Name one of: " + (", ".join(p.get("email") for p in allowed) or "nobody") +
+                    "Name one of: " + (", ".join(p.get("email") for p in eligible) or "nobody") +
                     ". An approver added in the same change does not count."))
+            elif approver and person not in eligible:
+                why = (f"there was no {CODEOWNERS_REL} before this change"
+                       if base_codeowners is None else
+                       f"their GitHub account ({person.get('github') or 'none in people.yaml'}) "
+                       f"is not a code owner of {rel_file} in {CODEOWNERS_REL} as it stood "
+                       f"before this change")
+                out.append(Finding(
+                    file, where,
+                    f"a correction names approver {approver!r}, but {why} - the approver must "
+                    f"be someone whose review GitHub can require. Nothing was committed.",
+                    "Name one of: " + (", ".join(p.get("email") for p in eligible) or "nobody") +
+                    ". A code owner added in the same change does not count."))
             for change in corr.get("changes") or []:
                 change = change or {}
                 key = str(change.get("item"))

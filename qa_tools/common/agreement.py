@@ -279,4 +279,9 @@ def cadence(dataset_id: str, agreement: Agreement | None = None) -> dict:
     newest = entry.participation[-1]
     out["expected_time"] = newest.expected_time
     out["latency_minutes"] = int(newest.grace.total_seconds() // 60)
+    # A FOLLOWING-PERIOD DATASET (REQ-PIPE-167) is due days before each
+    # period's date; without this the label names the period's date as
+    # the delivery time (post-build-review #142). Only where it is not 0.
+    if newest.days_before:
+        out["days_before"] = newest.days_before
     return out

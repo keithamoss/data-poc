@@ -80,7 +80,11 @@ describe("buildSupplyHistory", () => {
       ["r1", "2026-01-01", "green"],
       ["r2", "2026-01-02", "green"],
       ["r3", "2026-01-03", "green"],
-    ]);
+    ], undefined, {
+      // Each fresh daily arrival filed to its own day, as the rule files
+      // it - the heading is the FILED slot's (post-build-review #142).
+      r1: { slot: "2026-01-01" }, r2: { slot: "2026-01-02" }, r3: { slot: "2026-01-03" },
+    });
 
     const history = w.buildSupplyHistory(d);
 
@@ -150,7 +154,7 @@ describe("buildSupplyHistory", () => {
       ["r1", "2026-01-01", "red"],
       ["r2", "2026-01-02", "amber"], // closes the chain
       ["r3", "2026-01-03", "green"], // a fresh, unrelated arrival
-    ]);
+    ], undefined, { r3: { slot: "2026-01-03" } });
 
     const history = w.buildSupplyHistory(d);
 
@@ -168,7 +172,7 @@ describe("buildSupplyHistory", () => {
       ["r2", "2026-01-02", "green"], // closes chain 1
       ["r3", "2026-01-05", "red"], // starts chain 2
       ["r4", "2026-01-06", "green"], // closes chain 2
-    ]);
+    ], undefined, { r3: { slot: "2026-01-05" }, r4: { slot: "2026-01-05" } });
 
     const history = w.buildSupplyHistory(d);
 

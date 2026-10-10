@@ -14401,8 +14401,10 @@ requirements:
     acceptance_criteria:
       - >
         THE SYSTEM SHALL record each supply's arrival classification
-        against the slot it is filed to, so every consumer reads it
-        rather than recomputing it.
+        against the slot it is filed to, together with the agreement
+        that judged it - the slot's resolved inputs and a fingerprint of
+        the versions they came from (REQ-PIPE-168) - so every consumer
+        reads it rather than recomputing it.
       - >
         THE SYSTEM SHALL remove the derivation that infers a cycle from
         the arrival date.
@@ -14414,9 +14416,10 @@ requirements:
         arrival time, and SHALL remove the supplier-derived extract
         instant from that role.
       - >
-        THE SYSTEM SHALL present a classification computed from the
-        supply's CURRENT filing, and SHALL state, where a reader meets
-        one, that it follows that filing.
+        THE SYSTEM SHALL present the newest recorded verdict for the
+        supply's CURRENT filing - superseded by a new filing, or by a
+        declared correction's re-judgement (REQ-PIPE-168) - and SHALL
+        state, where a reader meets one, that it follows that filing.
       - >
         IF a supply has no filing, THEN THE SYSTEM SHALL present its
         classification as unfiled rather than as a punctuality verdict.
@@ -14472,7 +14475,7 @@ requirements:
       - qa_tools/common/filing.py::recorded_arrival
       - qa_tools/common/filing.py::recorded_arrival_at
       - qa_tools/common/filing.py::RecordedArrival
-      - qa_tools/common/filing.py::_classification_for
+      - qa_tools/common/filing.py::_judged_for
       - qa_tools/common/assignment.py::assign
       - pipeline/recorded_arrival.py::for_run
     evidence:
@@ -14637,6 +14640,15 @@ requirements:
         qa.delivery, so the interval is a subtraction of two existing
         columns - but nothing writes a promote row until REQ-PIPE-075
         is built, so the display would have nothing to render.
+      - >
+        CRITERIA 1 AND 5 AMENDED BY REQ-PIPE-168 (its criterion 9, built
+        2026-10-11): a verdict is recorded with the agreement that judged
+        it, as an append-only row in qa.verdict beside the filing, and
+        the supply's verdict is the newest for its current filing - so a
+        declared correction's re-judgement supersedes it as well as a new
+        filing. qa.filing.classification stays the verdict as first
+        recorded; qa.filing_current reads the newest verdict, so no reader
+        of "the" classification changed.
 
   - id: REQ-PIPE-081
     title: "\"As at T\" is answered from filing events, so a later decision cannot silently rewrite an earlier view"
@@ -25356,12 +25368,6 @@ requirements:
     - tests/test_agreement.py
     - tests/test_validate_schedule.py
     unmet_criteria:
-    - criterion: 'Criterion 22''s code-owner half - checking the approver against CODEOWNERS as it stood at the base.'
-      owner: REQ-GHUB-174
-      why: 'REQ-GHUB-174 (signed, not built) creates the CODEOWNERS file; none exists yet. The people.yaml half is built: a real, non-placeholder person with the manager role, read at the base.'
-      blocked_by:
-        requirements:
-        - REQ-GHUB-174
     - criterion: 'Criterion 15''s naming of the impact preview command.'
       owner: REQ-PIPE-169
       why: 'The preview is REQ-PIPE-169''s and does not exist; the refusal names it by requirement and says it is not built yet rather than naming a command that does not run.'
@@ -26545,7 +26551,7 @@ requirements:
       beside it, so that no verdict ever changes silently and I can always show what it was, what it is,
       and which approved correction changed it.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -26608,6 +26614,41 @@ requirements:
       content' of each version.
     - 'A CORRECTION APPLIES ALL OR NOTHING (Keith, 2026-10-07, after sign-off): where it proposes any filing move, no re-judgement happens until the asset manager confirms, and then re-judgements and moves apply together. Keith''s concern: re-judging at once and moving on confirmation could leave a correction applied in part forever - verdicts worked out under the new calendar for supplies still filed where the old one put them. Rejected: (a) re-judge everything at once, moves later (the stuck half-applied state); (b) split by supply - re-judge unaffected supplies at once and hold only those awaiting a move decision (principled, but Keith preferred one rule: a correction is applied whole or not at all). Accepted cost: every supply a correction touches waits on the slowest move decision; a correction proposing no move still applies on the next pass with no person involved.'
     - 'EVERY CORRECTION IS CONFIRMED IN THE TERMINAL, IN ONE STEP (Keith, 2026-10-07, the same evening, refining ''all or nothing''): even a correction that moves nothing is applied only when the asset manager opens it in the terminal, reviews the verdicts it changes and confirms - re-judging and moving are one act, never two. SUPERSEDES the same evening''s ''a correction proposing no move still applies on the next pass with no person involved''. Accepted cost: every correction, however small, waits on a person, and its supplies read ''pending'' until then.'
+    - 'BUILT 2026-10-11 (overnight #3) AS ITS OWN TABLE, qa.verdict, not columns on qa.filing: a re-judgement must not be a new filing (criterion 7), so a filing can have several verdicts and they need rows of their own. qa.filing.classification stays the verdict as first recorded; qa.filing_current''s classification is the newest verdict for that filing, so every existing reader (recorded_arrival, the dashboard build, the census) sees a re-judgement without changing. Schema 34; regenerate, never migrate.'
+    - 'THE FINGERPRINT (PROVISIONAL): a hash of the participation version in force on the period''s date (effective_from, participates, expected_time, grace, claim window override, days_before), the calendar version''s OWN settings (name, effective_from, default claim window, cadence rule - never its dates) and the timezone version on the due date. Changelog lines are left out: adding one changes nothing a verdict depends on. REQ-PIPE-173 compares exactly this.'
+    - 'CRITERIA 3 AND 5 WAIT ON REQ-PIPE-170 (PROVISIONAL, overnight): applying is the confirmation''s act, and building an apply step without it would be the unconfirmed application criterion 3 forbids. What 170 calls is built - rejudged() computes, record_rejudgement() records, refusing a stale computation.'
+    - 'RE-JUDGED BY PERIOD, NOT BY SUPPLY (NFR 2): current verdicts are grouped by the period they were judged for, the configuration resolved once per period, and only a period whose fingerprint moved is judged supply by supply.'
+    linked_tests:
+    - tests/test_verdict_record.py
+    - tests/test_recorded_arrival_classification.py
+    - tests/test_refiling.py
+    implemented_by:
+    - qa_tools/common/verdict.py::resolved
+    - qa_tools/common/verdict.py::judge
+    - qa_tools/common/verdict.py::record
+    - qa_tools/common/verdict.py::current
+    - qa_tools/common/verdict.py::history
+    - qa_tools/common/verdict.py::rejudged
+    - qa_tools/common/verdict.py::record_rejudgement
+    - qa_tools/common/filing.py::record
+    - qa_tools/common/filing.py::refile
+    - qa_tools/common/filing.py::_judged_for
+    - qa_tools/common/qa_store.py::SCHEMA_VERSION
+    evidence:
+    - '2026-10-11 (overnight #3): tests/test_verdict_record.py, test_recorded_arrival_classification.py and test_refiling.py 47 passed against real cp-clients configuration - a filing records its verdict with the exact resolved inputs and derived instants and no closing instant or calendar dates (c1); appending a future date leaves the fingerprint alone, a grace change moves it; UPDATE and DELETE on qa.verdict refused (c2); a re-file brings its own verdict and keeps the old (c6); re-judgement is computed not recorded, recording it names the correction, its changelog line and the verdict superseded, moves nothing and leaves one filing row (c4, c7); a half-named or stale re-judgement is refused; configuration resolved once per period for five supplies (NFR 2); reads qa metadata only (c8). The sandbox database bootstrapped from empty at schema 34 in 573s and recorded 150 verdicts, 141 with inputs (the other 9 unfiled), under 3 fingerprints.'
+    unmet_criteria:
+    - criterion: Criterion 3 - a merged correction applies nothing until the asset manager confirms it in the terminal, then re-judgements and moves together.
+      owner: REQ-PIPE-170
+      why: The confirmation is REQ-PIPE-170's door and does not exist. Built here are the computation it will call (verdict.rejudged, from configuration and receipt instants only) and the record it will write (verdict.record_rejudgement). Nothing outside the tests calls the record, so nothing is applied without a person - criterion 3's safe side.
+      blocked_by:
+        requirements:
+        - REQ-PIPE-170
+    - criterion: Criterion 5 - each declared correction applied exactly once, with a record that it has been applied.
+      owner: REQ-PIPE-170
+      why: Applying is REQ-PIPE-170's act, so the applied record belongs with it. record_rejudgement already refuses a re-judgement computed against a verdict since replaced, so a second pass cannot silently stack on the first.
+      blocked_by:
+        requirements:
+        - REQ-PIPE-170
   - id: REQ-PIPE-169
     title: A calendar correction's impact can be previewed before anyone approves it
     date_written: '2026-10-07'
@@ -26973,7 +27014,7 @@ requirements:
       to a delivery agreement can merge, so that the approver named in the correction is a person who actually
       reviewed it rather than a name typed into a file.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -27011,6 +27052,19 @@ requirements:
       cannot scope to a key, and everything in that file is asset governance.'
     - 'CODEOWNERS COVERS ITSELF AND contract/people.yaml, AND IS READ AT THE BASE (delivery-architect pre-build
       review, 2026-10-07), S7: otherwise a change could make its own approver a code owner.'
+    - 'BUILT 2026-10-11 (overnight #3). The approver must be BOTH the asset''s manager in people.yaml (REQ-GHUB-171) and a code owner of the file the correction is DECLARED IN - contract/calendar.yaml for a calendar''s or dataset''s corrections, contract/data-asset.yaml for the timezone''s (PROVISIONAL: the owners of that one file, not of every agreement file). The match is through people.yaml''s github field. CODEOWNERS is parsed with GitHub''s last-match-wins rule; team owners (@org/team) are not people and are ignored.'
+    - 'NO CODEOWNERS AT THE BASE REFUSES EVERY CORRECTION (PROVISIONAL), naming the reason: the alternative, skipping the check, would make deleting the file a way round it. agreement_freeze.check takes the base text as a REQUIRED keyword with no default, so no caller can omit the check by forgetting it.'
+    linked_tests:
+    - tests/test_codeowners.py
+    - tests/test_agreement_freeze.py
+    implemented_by:
+    - .github/CODEOWNERS
+    - docs/code-owner-review.md
+    - qa_tools/common/agreement_freeze.py::code_owners
+    - qa_tools/common/agreement_freeze.py::check
+    - qa_tools/common/validate_schedule.py::_freeze_errors
+    evidence:
+    - '2026-10-11 (overnight #3): tests/test_codeowners.py and test_agreement_freeze.py 60 passed - the committed CODEOWNERS owns the four files and only those (c1), every owner of the agreement is an approver in people.yaml; a manager who is not a code owner, a base with no CODEOWNERS, and a later line re-owning the file are each refused, while the asset manager by email or GitHub account passes (c2); the doc says review is off here and how to require it (c3, c4).'
   - id: REQ-PIPE-115
     title: A table a run cannot read never stops the run - its own dataset reads red through its existing outstanding item, saying why, and every other check reading it is recorded once as not evaluated, in its own run
     date_written: '2026-10-04'

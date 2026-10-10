@@ -173,6 +173,20 @@ releases:
               A dataset whose supply arrives weeks before the period it is for
               can now say so in its schedule, and the supply history heads that
               cycle with the day it is actually due.
+          - headline: A verdict remembers what judged it
+            components: ["Pipeline & publishing"]
+            description: >
+              Each early, on-time or late verdict is now kept with the due
+              time, grace and claim window it was measured against. If an
+              approved correction changes that, the new verdict is added
+              alongside the old one, naming the correction.
+          - headline: Corrections need a code owner
+            components: ["GitHub workflow & people", "Pipeline & publishing"]
+            description: >
+              The delivery agreement's files now have named code owners, and a
+              correction is refused unless its approver is one of them. Making
+              GitHub require their review is a repository setting; the new
+              docs/code-owner-review.md says how to turn it on.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

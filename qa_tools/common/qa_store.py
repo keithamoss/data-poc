@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 33
+SCHEMA_VERSION = 34
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -562,12 +562,67 @@ CREATE TRIGGER filing_append_only
     BEFORE UPDATE OR DELETE ON "{SCHEMA}".filing
     FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".filing_is_append_only();
 
+
+-- AN ARRIVAL VERDICT AS A RECORDED FACT (REQ-PIPE-168). One row per
+-- verdict a filing has had: the first written beside the filing, and one
+-- more for each re-judgement by a declared correction, naming it.
+--
+-- `inputs` holds the slot's RESOLVED inputs and the instants derived from
+-- them (criterion 1) - never the calendar version's whole content and
+-- never the slot's closing instant, both of which change on legitimate
+-- appends. `fingerprint` identifies the version-level part they came
+-- from, which is what REQ-PIPE-173's backstop compares.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".verdict (
+    id             bigserial PRIMARY KEY,
+    filing_id      bigint NOT NULL REFERENCES "{SCHEMA}".filing (id),
+    dataset_id     text NOT NULL,
+    supply_id      text NOT NULL,
+    classification text,
+    inputs         jsonb,
+    fingerprint    text,
+    -- A RE-JUDGEMENT names its correction and the verdict it replaced
+    -- (criterion 4); the first verdict of a filing has none of the three.
+    correction_ref       text,
+    correction_changelog text,
+    supersedes     bigint REFERENCES "{SCHEMA}".verdict (id),
+    recorded_at    timestamptz NOT NULL DEFAULT now(),
+    CHECK ((correction_ref IS NULL) = (supersedes IS NULL)),
+    CHECK ((correction_ref IS NULL) = (correction_changelog IS NULL))
+);
+CREATE INDEX IF NOT EXISTS verdict_filing ON "{SCHEMA}".verdict (filing_id, id);
+CREATE INDEX IF NOT EXISTS verdict_supply ON "{SCHEMA}".verdict (dataset_id, supply_id, id);
+
+-- APPEND-ONLY (criterion 2), as qa.filing is: UPDATE and DELETE refused.
+CREATE OR REPLACE FUNCTION "{SCHEMA}".verdict_is_append_only()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION
+        'qa.verdict is append-only: a % is not permitted. A re-judgement is a new '
+        'row naming its correction (REQ-PIPE-168)', TG_OP;
+END $$;
+DROP TRIGGER IF EXISTS verdict_append_only ON "{SCHEMA}".verdict;
+CREATE TRIGGER verdict_append_only
+    BEFORE UPDATE OR DELETE ON "{SCHEMA}".verdict
+    FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".verdict_is_append_only();
+
 -- A SUPPLY'S CURRENT FILING, DEFINED ONCE (REQ-PIPE-141 criterion 2 and
 -- NFR 6): its newest row. Every reader of "the" filing reads this.
+--
+-- ITS CLASSIFICATION IS THE NEWEST VERDICT FOR THAT FILING (REQ-PIPE-168
+-- criterion 6), so a correction's re-judgement reaches every reader of
+-- "the" classification without any of them changing. The filing's own
+-- column is the verdict as first recorded, kept as it was.
 CREATE OR REPLACE VIEW "{SCHEMA}".filing_current AS
-SELECT DISTINCT ON (dataset_id, supply_id) *
-FROM "{SCHEMA}".filing
-ORDER BY dataset_id, supply_id, id DESC;
+SELECT f.dataset_id, f.supply_id, f.slot, f.branch, f.considered, f.delivery,
+       f.recorded_at,
+       CASE WHEN v.id IS NULL THEN f.classification ELSE v.classification END
+           AS classification,
+       f.id, f.refiled_by
+FROM (SELECT DISTINCT ON (dataset_id, supply_id) *
+      FROM "{SCHEMA}".filing
+      ORDER BY dataset_id, supply_id, id DESC) f
+LEFT JOIN LATERAL (SELECT id, classification FROM "{SCHEMA}".verdict w
+                   WHERE w.filing_id = f.id ORDER BY w.id DESC LIMIT 1) v ON true;
 
 --   one dataset's filings, at a cost that does not grow with any other
 --   dataset's history - the per-dataset shape REQ-PIPE-034 established

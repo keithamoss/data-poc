@@ -1390,7 +1390,11 @@ function cadenceLabel(cadence){
   // contract/*.yaml authors it (criterion 8). It is a deadline out of a
   // config file, not an instant, and a reader checking this tile
   // against the contract is comparing those two strings.
-  const byTime = `by ${cadence.expected_time}`;
+  // A FOLLOWING-PERIOD DATASET (REQ-PIPE-167) is due days before each
+  // date the calendar names (post-build-review #142).
+  const ahead = cadence.days_before
+    ? `due ${cadence.days_before} day${cadence.days_before===1?"":"s"} before each date, ` : "";
+  const byTime = `${ahead}by ${cadence.expected_time}`;
   if(cadence.type==="daily") return `Daily, ${byTime}`;
   if(cadence.type==="weekly") return `Weekly (${WEEKDAY_NAMES[cadence.weekday]}), ${byTime}`;
   if(cadence.type==="quarterly"){
@@ -2221,6 +2225,15 @@ function periodStartDate(datasetId, dateStr){
   return found ? found.date : null;
 }
 
+// A period's NAME to its own date in this dataset's sequence, or null
+// where the sequence has no such period.
+function periodDateNamed(datasetId, name){
+  const periods = periodsFor(datasetId);
+  if(!periods || name==null) return null;
+  const found = periods.find(entry => entry.period === name);
+  return found ? found.date : null;
+}
+
 function periodNameFor(datasetId, dateStr){
   const periods = periodsFor(datasetId);
   if(!periods) return null;
@@ -2386,8 +2399,14 @@ function buildSupplyHistory(d){
       // anchored at ITS OWN cadence cycle (never the previous chain's -
       // a resolved chain is done, whatever cycle the next arrival lands
       // in is a new story).
-      current = {cycleStart: periodStartDate(d.id, run.run_date), period: periodOf(run),
-                 entries: [], open: false};
+      // HEADED BY THE FILED SLOT'S OWN DATE where the sequence knows it
+      // (delivery-critic on REQ-PIPE-167, post-build-review #142): a
+      // following-period supply arrives, on time, before its period's
+      // date, so the period its arrival date falls in is the PREVIOUS one
+      // - and its due date read three months late.
+      current = {cycleStart: periodDateNamed(d.id, periodOf(run))
+                             || periodStartDate(d.id, run.run_date),
+                 period: periodOf(run), entries: [], open: false};
       chains.push(current);
     }
     const idx = current.entries.length;

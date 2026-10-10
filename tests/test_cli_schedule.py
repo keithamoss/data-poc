@@ -430,3 +430,33 @@ class TestAnOwedNothingPeriodSaysWhatKindAndWhy:
         flat = " ".join(result.output.split())
         assert "participates in February, August only" in flat
         assert "staffing register" in flat
+
+
+class TestTheNextDueMarkerFollowsTheDueDate:
+    """delivery-critic on REQ-PIPE-167, finding 3 (post-build-review #142):
+    a following-period slot is due weeks before its period's date, so
+    "next" is chosen by the slot's due instant, not the period's date."""
+
+    def test_an_overdue_slot_whose_period_is_still_ahead_is_not_next(self):
+        from datetime import date, datetime, timedelta, timezone
+        from types import SimpleNamespace
+
+        from cli.schedule import _next_owed, _window
+
+        perth = timezone(timedelta(hours=8))
+        periods = [SimpleNamespace(name="2025-Q3", date=date(2025, 8, 1)),
+                   SimpleNamespace(name="2025-Q4", date=date(2025, 11, 1))]
+        by_period = {
+            "2025-Q3": SimpleNamespace(due_at=datetime(2025, 6, 2, 9, tzinfo=perth)),
+            "2025-Q4": SimpleNamespace(due_at=datetime(2025, 9, 2, 9, tzinfo=perth)),
+        }
+        assert _next_owed(periods, by_period, date(2025, 6, 10)) == "2025-Q4"
+        many = [SimpleNamespace(name=f"p{i}", date=date(2025, 1, 1) + timedelta(days=30 * i))
+                for i in range(40)]
+        due = {p.name: SimpleNamespace(due_at=datetime.combine(
+            p.date - timedelta(days=60), datetime.min.time(), tzinfo=perth)) for p in many}
+        shown, _ = _window(many, date(2026, 1, 1), False, due)
+        # centred on the first slot due on or after today, not the first period
+        today_index = next(i for i, p in enumerate(many)
+                           if due[p.name].due_at.date() >= date(2026, 1, 1))
+        assert many[today_index] in shown and shown.index(many[today_index]) > 0

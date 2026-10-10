@@ -146,7 +146,7 @@ def _clean_filings(supply_dsn):
 
     with supply_db.connect(label="test-outstanding-filings") as conn:
         qa_store.ensure_schema(conn)
-        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing')
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
         yield conn
 
 

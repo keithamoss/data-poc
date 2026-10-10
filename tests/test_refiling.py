@@ -57,7 +57,7 @@ def filings(supply_dsn):
 
     with supply_db.connect(label="test-clean-filings") as conn:
         qa_store.ensure_schema(conn)
-        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing')
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
         filing_support.file(assignment.Assignment(
             dataset_id="d", supply_id="s", slot="2026-Q2",
             branch=assignment.OPEN_UNFILLED, considered=("2026-Q2",)))

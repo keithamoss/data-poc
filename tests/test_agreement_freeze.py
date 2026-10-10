@@ -29,12 +29,17 @@ def _load(name):
     return yaml.safe_load((CONTRACT / name).read_text())
 
 
+#: The real committed .github/CODEOWNERS, as the base (REQ-GHUB-174).
+CODEOWNERS = (CONTRACT.parent / ".github" / "CODEOWNERS").read_text()
+
+
 @pytest.fixture
 def state():
     return _load("calendar.yaml"), _load("data-asset.yaml"), _load("people.yaml")
 
 
-def _check(state, change_cal=None, change_asset=None, at=NOW, people=None):
+def _check(state, change_cal=None, change_asset=None, at=NOW, people=None,
+           codeowners=CODEOWNERS):
     old_cal, old_asset, base_people = state
     new_cal, new_asset = copy.deepcopy(old_cal), copy.deepcopy(old_asset)
     if change_cal:
@@ -43,7 +48,8 @@ def _check(state, change_cal=None, change_asset=None, at=NOW, people=None):
         change_asset(new_asset)
     return freeze.check(old_cal, new_cal, old_asset, new_asset,
                         people if people is not None else base_people,
-                        instant_of=lambda key: at, today=at.date())
+                        instant_of=lambda key: at, today=at.date(),
+                        base_codeowners=codeowners)
 
 
 def _quarterly(doc):
@@ -89,7 +95,8 @@ class TestNothingToRefuse:
     def test_no_previous_state_passes(self, state):
         """Criterion 14 - a first commit or a shallow checkout."""
         _, asset, people = state
-        assert freeze.check(None, state[0], None, asset, people) == []
+        assert freeze.check(None, state[0], None, asset, people,
+                            base_codeowners=CODEOWNERS) == []
 
     def test_reordering_the_file_refuses_nothing(self, state):
         """Criterion 18 - parsed entries, not text."""
@@ -180,16 +187,38 @@ class TestAFrozenItemChangesOnlyByCorrection:
 
 
 class TestTheApprover:
-    """Criterion 22, the people.yaml half (the CODEOWNERS half is
-    REQ-GHUB-174's, which creates the file)."""
+    """Criterion 22, both halves: the asset's manager in people.yaml and
+    (REQ-GHUB-174 criterion 2) a code owner of the file in CODEOWNERS,
+    both as they stood at the base."""
 
-    def _corrected(self, state, approver, people=None):
+    def _corrected(self, state, approver, people=None, codeowners=CODEOWNERS):
         key = _past_key(state[0])
 
         def mutate(doc):
             _date_entry(doc, PAST)[1]["date"] = "2024-02-05"
             _correction(_quarterly(doc), (key, "2024-02-01", "2024-02-05"), approver=approver)
-        return _check(state, mutate, people=people)
+        return _check(state, mutate, people=people, codeowners=codeowners)
+
+    def test_the_approver_may_be_named_by_github_account(self, state):
+        assert self._corrected(state, "keithamoss") == []
+
+    def test_a_manager_who_is_not_a_code_owner_may_not(self, state):
+        """REQ-GHUB-174 criterion 2: GitHub could not require their review."""
+        others = "/contract/calendar.yaml @someone-else\n"
+        found = self._corrected(state, KEITH, codeowners=others)
+        assert any("not a code owner of contract/calendar.yaml" in f.problem
+                   for f in found), _text(found)
+
+    def test_no_codeowners_at_the_base_refuses_every_correction(self, state):
+        found = self._corrected(state, KEITH, codeowners=None)
+        assert any("no .github/CODEOWNERS before this change" in f.problem
+                   for f in found), _text(found)
+
+    def test_the_last_matching_codeowners_line_wins(self, state):
+        """As on GitHub: a later line un-owns the file."""
+        later = CODEOWNERS + "\n/contract/ @someone-else\n"
+        found = self._corrected(state, KEITH, codeowners=later)
+        assert any("not a code owner" in f.problem for f in found), _text(found)
 
     def test_a_real_manager_may_approve(self, state):
         assert self._corrected(state, KEITH) == []
@@ -438,7 +467,7 @@ class TestCriticFindingsOn111:
         cal, asset, people_doc = state
         asset = dict(asset, synthetic=False)
         assert freeze.check(None, cal, asset, asset, people_doc,
-                            instant_of=lambda key: NOW) == []
+                            instant_of=lambda key: NOW, base_codeowners=CODEOWNERS) == []
 
     def test_corrections_cannot_vanish_with_their_owner(self, state):
         """L4: removing an owner that carries corrections removes the record."""

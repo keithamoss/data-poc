@@ -40,6 +40,20 @@ class TestTheDashboardCadenceComesFromTheAgreement:
             "type": "quarterly", "anchor_months": [2, 5, 8, 11], "day_of_month": 1,
             "expected_time": "09:00", "latency_minutes": 480}
 
+    def test_a_following_period_dataset_says_how_far_ahead_it_is_due(self):
+        """delivery-critic on REQ-PIPE-167, finding 2 (post-build-review
+        #142): the tile named the period's date as the delivery time."""
+        import copy
+
+        import yaml
+
+        doc = copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text()))
+        entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
+        entry["participation"]["versions"] = copy.deepcopy(entry["participation"]["versions"])
+        entry["participation"]["versions"][0]["days_before"] = 60
+        got = agreement.cadence("cp-clients", agreement.from_doc(doc))
+        assert got["days_before"] == 60
+
     def test_every_real_dataset_has_one(self):
         from qa_tools.common import hierarchy
 

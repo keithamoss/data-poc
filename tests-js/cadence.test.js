@@ -46,6 +46,14 @@ describe("cadenceLabel", () => {
     const label = w.cadenceLabel({ type: "quarterly", anchor_months: [1, 4, 7, 10], day_of_month: 15, expected_time: "17:00" });
     expect(label).toBe("Quarterly (Jan/Apr/Jul/Oct, day 15), by 17:00");
   });
+
+  // delivery-critic on REQ-PIPE-167, finding 2 (post-build-review #142).
+  it("says a following-period dataset is due days before each date", () => {
+    const w = load();
+    const label = w.cadenceLabel({ type: "quarterly", anchor_months: [2, 5, 8, 11], day_of_month: 1,
+                                   expected_time: "09:00", days_before: 60 });
+    expect(label).toBe("Quarterly (Feb/May/Aug/Nov, day 1), due 60 days before each date, by 09:00");
+  });
 });
 
 describe("periodStartDate", () => {

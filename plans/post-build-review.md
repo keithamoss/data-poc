@@ -7104,3 +7104,36 @@ twice. It deliberately did not re-find the `TypeError`.
     - **#4, LEFT (dormant):** the terminal asks for a reason and a
       confirmation before apply() refuses on role. Nothing requires a role
       yet; REQ-PIPE-170, which adds the first, should check it up front.
+
+142. **[done, 2026-10-11]** **[Dashboard UI]** **[Pipeline & publishing]**
+    **The delivery critic on REQ-PIPE-167 as built (7b2ca89)** - overnight
+    #3; report saved in the session's reviews/2026-10-11-critic-167.md.
+    Each claim checked against the code; each fix has a test written to fail
+    first:
+    - **#1, FIXED - the cycle heading named the wrong period.**
+      `buildSupplyHistory` headed each chain with the period its ARRIVAL
+      DATE fell in, while grouping it by the slot it was FILED to. A
+      following-period supply arrives on time, before its period's date, so
+      its heading was the previous period's - "Cycle due 2 June" for a
+      supply due 2 September. The heading is now the filed slot's own date
+      (`periodDateNamed`), falling back to the arrival date's period where
+      the sequence has no such slot. The test runs the real
+      `buildSupplyHistory`, not `cycleLabel` alone
+      (tests-js/slot-due-dates.test.js). Three supply-history fixtures that
+      filed every daily run to one day were made realistic: each fresh run
+      is filed to its own day.
+    - **#2, FIXED - the SLA tile named the period's date as the delivery
+      time.** `agreement.cadence` now carries `days_before` where it is not
+      zero, and `cadenceLabel` says "due 60 days before each date".
+    - **#3, FIXED - `mothman schedule show`'s next-due marker and window.**
+      Both now follow each slot's due date, not the period's date, so an
+      overdue following-period slot is no longer marked as next.
+    - **#4, LEFT (low):** the "no data" banner says "current expected cycle
+      (started <period date>)" for the period containing the viewed date.
+      It is not a due date, and no dataset has days_before today.
+    - **#5, LEFT (low):** the runway count counts slots by period date, so
+      a following-period slot already due still counts as left. Same
+      reason: dormant until a dataset declares days_before.
+    - Not a defect, test gap noted: the embed's unit test has no
+      day-boundary case and ends with an `assert slots` that checks
+      nothing.
