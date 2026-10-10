@@ -24,8 +24,8 @@
 # between deliveries made this trip constantly even when nothing was
 # wrong (CP read "no data" on the plain default view for roughly
 # two-thirds of every quarter). Replaced by real, per-dataset,
-# computable cadence config living in each dataset's own ODCS contract
-# (`slaProperties:` - see pipeline/cadence.py) - "no data" now means
+# computable cadence config - each dataset's participation in
+# contract/calendar.yaml since REQ-PIPE-110 - "no data" now means
 # "nothing has landed yet in the CURRENT expected cycle," not "the
 # latest delivery is more than N days old." See that plan file's own
 # entry for the full design history (including the earlier "grow the

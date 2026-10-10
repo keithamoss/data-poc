@@ -399,3 +399,34 @@ class TestCandidateDatesCannotProposeAHole:
         parsed = _yaml.safe_load(result.output)
         assert isinstance(parsed, dict) and "dates" in parsed
         assert [d["period"] for d in parsed["dates"]][0] == "2028-Q1"
+
+
+class TestAnOwedNothingPeriodSaysWhatKindAndWhy:
+    """REQ-PIPE-110 criterion 37."""
+
+    def test_a_not_expected_period_shows_its_kind_and_reason(self, tmp_path, monkeypatch):
+        import agreement_split
+
+        doc = agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR)
+        for agency in doc["hierarchy"]["agencies"]:
+            for collection in agency["collections"]:
+                for dataset in collection["datasets"]:
+                    if dataset["id"] == "cp-clients":
+                        dataset["not_expected"] = [
+                            {"period": "2024-Q2", "reason": "agency shutdown"}]
+        agreement_split.repoint(monkeypatch, tmp_path, doc)
+        try:
+            result = _runner.invoke(schedule_cli.schedule_group,
+                                    ["show", "--dataset", "cp-clients", "--all"])
+        finally:
+            agreement_split.clear_caches()
+        assert result.exit_code == 0, result.output
+        assert "not expected" in result.output and "agency shutdown" in result.output
+
+    def test_a_partial_participation_says_which_months_and_why(self):
+        result = _runner.invoke(schedule_cli.schedule_group,
+                                ["show", "--dataset", "cp-case-workers"])
+        assert result.exit_code == 0, result.output
+        flat = " ".join(result.output.split())
+        assert "participates in February, August only" in flat
+        assert "staffing register" in flat

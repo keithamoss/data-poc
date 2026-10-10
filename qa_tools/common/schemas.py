@@ -636,7 +636,7 @@ class ParticipationVersionConfig(_Strict):
     effective_from: str = Field(pattern=_DATE_PATTERN)
     participates: list[NonEmptyStr] | Literal["all"] | None = None
     reason: NonEmptyStr | None = None
-    expected_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
+    expected_time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     grace: str | None = None
     claim_window: str | None = None
     #: A whole number of days before the period's date the supply is due

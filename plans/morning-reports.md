@@ -865,5 +865,14 @@ one or more component tags, and a date.
         against the newest participation version only; a dataset missing
         from calendar.yaml whose collection names a calendar passes the
         participation checks; three mistakes raise tracebacks instead of
-        gate errors; and weaker messages. The HIGH ones are defects against
-        signed criteria - fixing them next, test-first, before REQ-PIPE-111.
+        gate errors; and weaker messages. All defects against signed
+        criteria, so fixed without needing you: ten failing tests first,
+        then the fixes - written up as plans/post-build-review.md #137. Two
+        left for REQ-DASH-182 (unsigned): label shapes no calendar here has.
+      - A TIMING TEST WENT RED ONCE, NOT MINE: tests/test_dbt_worker.py's
+        `test_later_runs_reuse_the_parse` asserts a later dbt run is faster
+        than the first, and under the full parallel suite one later run took
+        7.7s against a 7.5s first. It passed twice alone (11/11 each). A
+        wall-clock assertion on a loaded 4-core machine; I have not changed
+        it. Worth deciding whether it should compare something the parse
+        reuse actually controls (a counter, a manifest mtime) instead.

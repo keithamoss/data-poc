@@ -24938,6 +24938,7 @@ requirements:
     - '2026-10-11 (overnight #3): pinned first - tests/test_calendar_move_pin.py (tests/fixtures/calendar_move_pin.json, every dataset''s periods and every slot''s instants to 2028) captured before the move in 569bcd8 and confirmed to bite; it passed unchanged after the move, and `mothman dashboard rebuild` reproduced results_*.json byte-identical and the dashboard JSON identical except the clock-relative waitedSeconds.'
     - '2026-10-11: the one rebuild - `mothman env reset-synthetic` then `mothman pipeline bootstrap` reading contract/calendar.yaml (587s, 47 staged tables, the count before), `mothman dashboard rebuild`, then the arrival-semantics golden and the pin: 11 passed - no arrival changed its verdict or its instant. datacontract-cli lint passes on both contracts with slaProperties removed (criterion 22).'
     - '2026-10-11: full `mothman check` 4019 passed with 2 failures, both this change''s and both fixed (a hold-message test asserting the old file name; plans/INDEX.md stale after the deletions), each rerun green, plus one defect found by the run''s review and fixed test-first (the exhausted-schedule notice named contract/data-asset.yaml - tests/test_embed_dashboard_data.py''s new test failed before the fix); `npm test` 581 passed; tests/test_agreement.py 27 passed.'
+    - '2026-10-11: delivery-critic findings fixed test-first (plans/post-build-review.md #137) - tests/test_agreement.py TestCriticFindingsOn110, ten tests failing before the fixes: a duplicate dataset, collection or not_expected period is refused; criterion 7 is checked per participation version against every calendar version it overlaps, at the gate and at runtime; a hierarchy dataset on a calendar with no entry is refused; an older version''s month typo and an impossible expected time are gate errors, not tracebacks; criterion 29''s message names the periods and where it looked; criterion 18''s names both files. Criteria 11 and 37 gained tests.'
     implemented_by:
     - qa_tools/common/agreement.py::load
     - qa_tools/common/agreement.py::current
@@ -24958,6 +24959,7 @@ requirements:
     - dashboard/embed_dashboard_data.py::embed
     - cli/schedule.py::show_command
     linked_tests:
+    - tests/test_cli_schedule.py
     - tests/test_agreement.py
     - tests/test_calendar_move_pin.py
     - tests/test_validate_schedule.py

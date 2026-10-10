@@ -183,11 +183,21 @@ def load(path: Path = CALENDAR_YAML) -> Agreement:
         if name in calendars:
             raise schedule.ScheduleConfigError(f"{path}: calendar {name!r} is defined twice")
         calendars[name] = schedule.parse_calendar(raw)
-    collections = {c.get("id"): c.get("calendar") for c in (doc.get("collections") or [])}
+    collections: dict = {}
+    for c in doc.get("collections") or []:
+        if c.get("id") in collections:
+            raise schedule.ScheduleConfigError(
+                f"{path}: collection {c.get('id')!r} is listed twice - the later entry would "
+                f"silently decide its calendar.")
+        collections[c.get("id")] = c.get("calendar")
     datasets: dict = {}
     for raw in doc.get("datasets") or []:
         ds = raw.get("id")
         where = f"dataset {ds!r}"
+        if ds in datasets:
+            raise schedule.ScheduleConfigError(
+                f"{path}: {where} is listed twice - the later entry would silently decide its "
+                f"due time.")
         versions = tuple(sorted(
             (_participation_version(v, f"{where} participation version {i + 1}")
              for i, v in enumerate(((raw.get("participation") or {}).get("versions")) or [])),
@@ -197,6 +207,9 @@ def load(path: Path = CALENDAR_YAML) -> Agreement:
             name, reason = entry.get("period"), (entry.get("reason") or "").strip()
             if not name:
                 raise schedule.ScheduleConfigError(f"{where} not_expected: an entry has no `period:`")
+            if name in not_expected:
+                raise schedule.ScheduleConfigError(
+                    f"{where} not_expected: period {name!r} is listed twice.")
             if not reason:
                 raise schedule.ScheduleConfigError(
                     f"{where} not_expected: period {name!r} has no `reason:`. A period with no "
@@ -251,6 +264,10 @@ def cadence(dataset_id: str, agreement: Agreement | None = None) -> dict:
         out = {"type": "quarterly" if len(months) == 4 else "authored",
                "anchor_months": months, "day_of_month": days.pop() if len(days) == 1 else None}
     entry = agreement.dataset(dataset_id)
+    if entry is None or not entry.participation:
+        raise schedule.ScheduleConfigError(
+            f"dataset {dataset_id!r} has no participation in contract/calendar.yaml, so it has "
+            f"no delivery time to label.")
     newest = entry.participation[-1]
     out["expected_time"] = newest.expected_time
     out["latency_minutes"] = int(newest.grace.total_seconds() // 60)

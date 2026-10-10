@@ -191,13 +191,18 @@ _SHAPES: dict[str, str] = {
     "data_asset_id": "a short identifier for this data asset, like 'wa-health-quarterly'",
     "name": "the calendar's name, as datasets refer to it - like 'quarterly'",
     "effective_from": "the date this version starts applying, as YYYY-MM-DD - like 2027-01-01",
-    "changelog": "a list of lines saying what changed, like ['2027-01-01: authored 2027 dates']",
+    "changelog": ("a list of entries, each a date, an author and the change - like "
+                  "[{date: 2027-01-01, author: Jo Bloggs, change: authored 2027 dates}]"),
     "claim_window": "a duration with its unit, like 14d or 4h",
     "cadence_rule": "a cadence, currently only 'daily'",
     "dates": "a list of period/date pairs, like [{period: 2027-Q1, date: 2027-02-01}]",
     "period": "the period's name, like 2027-Q1",
     "date": "the date the supply is expected, as YYYY-MM-DD",
     "delivery_months": "a list of full month names, like [February, August]",
+    "participates": "`all`, or a list of full month names, like [February, August]",
+    "expected_time": "a 24-hour time of day, like 09:00 or 14:00",
+    "days_before": "a whole number of days, 0 or more, like 1",
+    "grace": "a duration with its unit, like 1h or 8h",
     "versions": "a list of versions, each with its own effective_from and changelog",
     "calendar": "the name of a calendar defined in this file",
     "arrival_pattern": ("a regular expression matching this dataset's own "
@@ -547,8 +552,10 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
         if not named:
             out.append(ConfigError(
                 src.name, scope,
-                f"names no `calendar:` - neither in {src.calendar_name}, on the dataset or its "
-                f"collection, nor a deliberate no-calendar declaration.",
+                f"is in {DATA_ASSET_YAML.name}'s hierarchy and names no `calendar:` in "
+                f"{src.calendar_name} - "
+                f"neither on the dataset nor on its collection - and no deliberate no-calendar "
+                f"declaration.",
                 f"In {src.calendar_name}, name one of: {options} on the dataset or its "
                 f"collection, or declare "
                 f"`{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}` if no schedule has "
@@ -576,7 +583,9 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
                 "Keep one. Subsetting a calendar and replacing it are different acts, and "
                 "carrying both leaves no way to tell which was meant."))
 
-        out.extend(_month_errors(scope, named, calendars[named], months, src))
+        # Months are checked per participation version, against the calendar
+        # versions each overlaps, in _participation_errors (REQ-PIPE-110
+        # criterion 7) - not here on the newest version alone.
 
         if overrides is not None and not overrides:
             out.append(ConfigError(
@@ -1059,14 +1068,75 @@ def _merged_view(raw: dict, cal_raw: dict) -> dict:
 _RESTATED = ("participates", "reason", "expected_time", "grace", "claim_window", "days_before")
 
 
+def _version_windows(versions: list[dict]) -> list[tuple[str, str | None]]:
+    """(from, until-exclusive) as ISO strings for effective-dated versions
+    in file order - the last open-ended."""
+    starts = [str((v or {}).get("effective_from")) for v in versions]
+    return [(a, starts[i + 1] if i + 1 < len(starts) else None) for i, a in enumerate(starts)]
+
+
+def _overlapping(calendar: dict, start: str, end: str | None) -> list[dict]:
+    """The versions of a raw calendar whose period of effect overlaps
+    [start, end) - ISO date strings compare as dates."""
+    versions = [(v or {}) for v in (calendar.get("versions") or [])]
+    return [v for v, (c_start, c_end) in zip(versions, _version_windows(versions))
+            if (end is None or c_start < end) and (c_end is None or start < c_end)]
+
+
+def _governed_periods(calendar: dict, start: str, end: str | None, limit: int = 4) -> str:
+    """A short, readable list of the periods a participation version
+    governs - its calendar's authored periods inside [start, end), by name
+    and date, or the date range a cadence rule covers."""
+    named = []
+    rule = False
+    for version in _overlapping(calendar, start, end):
+        if version.get("cadence"):
+            rule = True
+            continue
+        for entry in (version.get("dates") or []):
+            when = str((entry or {}).get("date"))
+            if when >= start and (end is None or when < end):
+                named.append(f"{(entry or {}).get('period')} ({when})")
+    if rule and not named:
+        return f"every day from {start}" + (f" to before {end}" if end else "")
+    if not named:
+        return f"none authored yet from {start}"
+    more = f" and {len(named) - limit} more" if len(named) > limit else ""
+    return ", ".join(named[:limit]) + more
+
+
 def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]:
-    """REQ-PIPE-110's rules about each dataset's participation."""
+    """REQ-PIPE-110's rules about each dataset's participation, checked on
+    contract/calendar.yaml as written - every version, not the newest
+    alone (delivery-critic, 2026-10-11)."""
     out: list[ConfigError] = []
     file_name = src.calendar_name
-    hierarchy_ids = {(d or {}).get("id") for d, _c in _walk_datasets(raw)}
-    collection_ids = {(c or {}).get("id") for _d, c in _walk_datasets(raw)}
+    cal_src = replace(src, asset_path=src.agreement_path)
+    walked = [(d or {}, c or {}) for d, c in _walk_datasets(raw)]
+    hierarchy_ids = {d.get("id") for d, _c in walked}
+    collection_ids = {c.get("id") for _d, c in walked}
     calendars = {(c or {}).get("name"): (c or {}) for c in (cal_raw.get("calendars") or [])}
-    collections = {(c or {}).get("id"): (c or {}) for c in (cal_raw.get("collections") or [])}
+
+    # ONE ENTRY EACH: a second block is never "the last one wins", because
+    # nobody reviewing the first would know it was overruled.
+    collections: dict = {}
+    for c in (cal_raw.get("collections") or []):
+        cid = (c or {}).get("id")
+        if cid in collections:
+            out.append(ConfigError(
+                file_name, f"collection {cid!r}", f"is listed twice in {file_name}.",
+                "Keep one entry. With two, the later silently decides which calendar the "
+                "collection is on."))
+        collections[cid] = c or {}
+    entries: dict = {}
+    for e in (cal_raw.get("datasets") or []):
+        did = (e or {}).get("id")
+        if did in entries:
+            out.append(ConfigError(
+                file_name, f"dataset {did!r}", f"is listed twice in {file_name}.",
+                "Keep one entry and put every version in its one participation list. With two, "
+                "the later silently decides the dataset's due time."))
+        entries[did] = e or {}
 
     # CRITERION 18 - both files agree about what exists.
     for c in collections:
@@ -1076,33 +1146,48 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                 f"is named in {file_name} and is not a collection in {src.name}'s hierarchy.",
                 f"Correct the id, or add the collection to {src.name}. The two files have to "
                 f"agree about what exists."))
-    own_names: set[str] = set()
-    for entry in (cal_raw.get("datasets") or []):
-        entry = entry or {}
-        ds = entry.get("id")
-        scope = f"dataset {ds!r}"
-        if ds not in hierarchy_ids:
+    for did in entries:
+        if did not in hierarchy_ids:
             out.append(ConfigError(
-                file_name, scope,
+                file_name, f"dataset {did!r}",
                 f"is named in {file_name} and is not a dataset in {src.name}'s hierarchy.",
                 f"Correct the id, or add the dataset to {src.name}. The two files have to "
                 f"agree about what exists."))
-            continue
+
+    own_names: set[str] = set()
+    for dataset, collection in walked:
+        ds = dataset.get("id")
+        entry = entries.get(ds, {})
+        scope = f"dataset {ds!r}"
         for v in (((entry.get("dates") or {}).get("versions")) or []):
             own_names |= {str((d or {}).get("period")) for d in ((v or {}).get("dates") or [])}
+        seen_periods: set = set()
+        for item in (entry.get("not_expected") or []):
+            period = (item or {}).get("period")
+            if period in seen_periods:
+                out.append(ConfigError(
+                    file_name, scope, f"not_expected lists period {period!r} twice.",
+                    "Keep one entry with one reason - with two, the later reason silently "
+                    "replaces the first."))
+            seen_periods.add(period)
         if entry.get(schedule.NO_CALENDAR_KEY) is not None:
             continue
+        cal_name = entry.get("calendar") or collections.get(collection.get("id"), {}).get("calendar")
+        if not cal_name:
+            continue  # reported by the dataset checks, naming both files
         versions = [(v or {}) for v in (((entry.get("participation") or {}).get("versions")) or [])]
         if not versions:
             out.append(ConfigError(
                 file_name, scope,
-                "is on a calendar and has no participation versions.",
-                "Add `participation: {versions: [...]}` with at least one version, stating its "
-                "effective_from, expected_time and grace (criterion 3)."))
+                f"is on calendar {cal_name!r}"
+                + ("" if ds in entries else f" (through its collection) and has no entry in {file_name}")
+                + " - it has no participation versions, so nothing says when it is due.",
+                "Add it to `datasets:` with `participation: {versions: [...]}`, at least one "
+                "version stating its effective_from, expected_time and grace (criterion 3)."))
             continue
-        starts = []
-        for i, version in enumerate(versions, start=1):
-            starts.append(str(version.get("effective_from")))
+        calendar = calendars.get(cal_name, {})
+        windows = _version_windows(versions)
+        for i, (version, (start, end)) in enumerate(zip(versions, windows), start=1):
             months = version.get("participates")
             # CRITERION 8: a list of some months needs a reason.
             if isinstance(months, list) and not version.get("reason"):
@@ -1112,14 +1197,24 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                     f"no reason.",
                     "Add `reason:` saying why. A month owed nothing with nothing beside it is "
                     "indistinguishable, six months later, from somebody forgetting it."))
+            # CRITERIA 5 AND 7, PER VERSION: every month a real one the
+            # calendar carries, and no months at all against any cadence-rule
+            # calendar version this participation version overlaps.
+            if isinstance(months, list) and months and calendar:
+                window = {"versions": _overlapping(calendar, start, end)}
+                for e in _month_errors(scope, cal_name, window, months, cal_src):
+                    out.append(replace(e, problem=f"participation version {i} (effective "
+                                                  f"{start}) " + e.problem))
             # CRITERION 29: an expected time and grace for every period owed.
-            for key, what in (("expected_time", "an expected time"), ("grace", "a grace allowance")):
+            for key, what in (("expected_time", "expected time"), ("grace", "grace allowance")):
                 if version.get(key) is None:
                     out.append(ConfigError(
                         file_name, scope,
-                        f"participation version {i} (effective {version.get('effective_from')}) "
-                        f"states no {key}, so every period it governs has no {what} - and no "
-                        f"other level states one.",
+                        f"participation version {i} (effective {start}) states no {key}, so "
+                        f"the periods it governs have no {what}: "
+                        f"{_governed_periods(calendar, start, end)}. Looked in: the dataset's "
+                        f"participation versions in {file_name} (a collection's defaults "
+                        f"arrive with REQ-PIPE-181).",
                         f"Add `{key}:` to this version. A period owed with no {what} has no due "
                         f"instant to judge a supply against."))
             if version.get("grace") is not None:
@@ -1141,12 +1236,13 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                 if dropped:
                     out.append(ConfigError(
                         file_name, scope,
-                        f"participation version {i} (effective {version.get('effective_from')}) "
+                        f"participation version {i} (effective {start}) "
                         f"leaves out " + ", ".join(f"{k} (the previous version stated "
                                                    f"{previous[k]!r})" for k in dropped) + ".",
                         "Restate each value on this version. Every version reads as complete "
                         "on its own, so a value is never silently dropped to a default."))
         # CRITERION 34: one date per version, in order.
+        starts = [a for a, _b in windows]
         for a, b in zip(starts, starts[1:]):
             if b <= a:
                 out.append(ConfigError(

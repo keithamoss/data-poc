@@ -334,3 +334,135 @@ class TestDaysBeforeAtTheGate:
         errors = broken(mutate)
         assert any("leaves out" in e.problem and "days_before" in e.problem
                    for e in errors), _text(errors)
+
+
+class TestCriticFindingsOn110:
+    """delivery-critic, 2026-10-11, on REQ-PIPE-110 as built (9bc389e).
+    Each was a real gap against a signed criterion; each test failed
+    before its fix."""
+
+    def test_a_dataset_listed_twice_is_refused_not_last_one_wins(self, broken):
+        def mutate(doc):
+            doc["datasets"].append({**_entry(doc, "cp-clients")})
+            doc["datasets"][-1]["participation"]["versions"][0] = {
+                **_first(doc, "cp-clients"), "expected_time": "17:00"}
+        errors = broken(mutate)
+        assert any("cp-clients" in (e.scope or "") and "twice" in e.problem
+                   for e in errors), _text(errors)
+
+    def test_a_collection_listed_twice_is_refused(self, broken):
+        def mutate(doc):
+            doc["collections"].append({"id": "child-protection", "calendar": "daily"})
+        errors = broken(mutate)
+        assert any("child-protection" in (e.scope or "") and "twice" in e.problem
+                   for e in errors), _text(errors)
+
+    def test_a_not_expected_period_listed_twice_is_refused(self, broken):
+        def mutate(doc):
+            _entry(doc, "cp-clients")["not_expected"] = [
+                {"period": "2026-Q1", "reason": "one"}, {"period": "2026-Q1", "reason": "two"}]
+        errors = broken(mutate)
+        assert any("2026-Q1" in e.problem and "twice" in e.problem for e in errors), _text(errors)
+
+    def test_the_loader_refuses_a_duplicate_dataset_too(self, tmp_path):
+        doc = yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text())
+        doc["datasets"].append(dict(_entry(doc, "cp-clients")))
+        path = tmp_path / "calendar.yaml"
+        path.write_text(yaml.safe_dump(doc, sort_keys=False))
+        with pytest.raises(schedule.ScheduleConfigError, match="twice"):
+            agreement.load(path)
+
+    def test_months_on_an_older_version_against_a_cadence_rule_are_refused(self, broken):
+        """Criterion 7: EACH participation version, against every calendar
+        version it overlaps - not the newest alone."""
+        def mutate(doc):
+            first = _first(doc, "birth-registrations")
+            first.update({"participates": ["August"], "reason": "a test"})
+            second = {k: v for k, v in first.items() if k not in ("participates", "reason")}
+            second.update({"effective_from": "2026-09-01", "participates": "all",
+                           "reason": "back to every day",
+                           "changelog": [{"date": "2026-09-01", "author": "a test",
+                                          "change": "every day"}]})
+            _entry(doc, "birth-registrations")["participation"]["versions"].append(second)
+        errors = broken(mutate)
+        assert any("birth-registrations" in (e.scope or "") and "cadence" in e.problem
+                   for e in errors), _text(errors)
+
+    def test_a_dataset_on_a_calendar_with_no_entry_is_refused(self, broken):
+        """Criterion 3 - its collection names a calendar, so it is on one,
+        and it has no participation."""
+        def mutate(doc):
+            doc["datasets"] = [d for d in doc["datasets"] if d["id"] != "cp-carers"]
+        errors = broken(mutate)
+        assert any("cp-carers" in (e.scope or "") and "participation" in e.problem
+                   for e in errors), _text(errors)
+
+    def test_a_month_typo_on_an_older_version_is_a_gate_error_not_a_traceback(self, broken):
+        def mutate(doc):
+            first = _first(doc, "cp-case-workers")
+            second = dict(first, effective_from="2026-01-01", changelog=[
+                {"date": "2026-01-01", "author": "a test", "change": "second"}])
+            first["participates"] = ["Febuary", "August"]
+            _entry(doc, "cp-case-workers")["participation"]["versions"].append(second)
+        errors = broken(mutate)
+        assert any("Febuary" in e.problem for e in errors), _text(errors)
+
+    def test_an_impossible_expected_time_is_refused(self, broken):
+        def mutate(doc):
+            _first(doc, "cp-clients")["expected_time"] = "25:99"
+        errors = broken(mutate)
+        assert any("expected_time" in (e.problem + (e.field or "")) for e in errors), _text(errors)
+
+    def test_a_missing_due_time_names_the_periods_and_where_it_looked(self, broken):
+        """Criterion 29's message."""
+        def mutate(doc):
+            _first(doc, "cp-clients").pop("grace")
+        errors = broken(mutate)
+        hit = [e for e in errors if "grace" in e.problem and "cp-clients" in (e.scope or "")]
+        assert hit, _text(errors)
+        assert "2023-Q1" in hit[0].problem and "2023-02-01" in hit[0].problem, hit[0].problem
+        assert "participation versions" in hit[0].problem, hit[0].problem
+        assert "no a " not in hit[0].problem
+
+    def test_a_plain_string_changelog_is_told_the_structured_shape(self, broken):
+        def mutate(doc):
+            _first(doc, "cp-clients")["changelog"] = ["2026-10-11: moved"]
+        errors = broken(mutate)
+        assert any("author" in e.fix for e in errors), _text(errors)
+
+    def test_a_dataset_on_no_calendar_names_both_files(self, broken):
+        """Criterion 18 says both files."""
+        def mutate(doc):
+            doc["collections"] = [c for c in doc["collections"]
+                                  if c["id"] != "civil-registration"]
+        errors = broken(mutate)
+        hit = [e for e in errors if "birth-registrations" in (e.scope or "")]
+        assert hit, _text(errors)
+        both = hit[0].problem + hit[0].fix
+        assert "calendar.yaml" in both and "data-asset.yaml" in both, both
+
+    def test_a_datasets_own_calendar_beats_its_collections(self, tmp_path):
+        """Criterion 11, which had no test of its own."""
+        doc = yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text())
+        _entry(doc, "cp-clients")["calendar"] = "daily"
+        path = tmp_path / "calendar.yaml"
+        path.write_text(yaml.safe_dump(doc, sort_keys=False))
+        moved = agreement.load(path)
+        assert moved.calendar_name_for("cp-clients") == "daily"
+        assert moved.calendar_name_for("cp-carers") == "quarterly"
+
+
+def test_the_runtime_refuses_older_months_against_a_cadence_rule_too(tmp_path):
+    """Criterion 7 at runtime as well as at the gate: an older version's
+    months against the daily rule used to drop those days silently."""
+    doc = yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text())
+    first = _first(doc, "birth-registrations")
+    first.update({"participates": ["August"], "reason": "a test"})
+    second = dict(first, effective_from="2026-09-01", participates="all", changelog=[
+        {"date": "2026-09-01", "author": "a test", "change": "every day"}])
+    _entry(doc, "birth-registrations")["participation"]["versions"].append(second)
+    path = tmp_path / "calendar.yaml"
+    path.write_text(yaml.safe_dump(doc, sort_keys=False))
+    with pytest.raises(schedule.ScheduleConfigError, match="cadence rule"):
+        schedule.periods_for_dataset("birth-registrations", until=date(2026, 9, 10),
+                                     agreement=agreement.load(path))

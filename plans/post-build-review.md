@@ -6934,3 +6934,54 @@ twice. It deliberately did not re-find the `TypeError`.
     and `run` must not execute; it failed against the old code with 'a claimed
     owed item was executed by a second runner', and passes now, beside a test
     that the claim is released when a run ends.
+
+137. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-PIPE-110 as built (9bc389e)** - run in the overnight
+    (plans/morning-reports.md #3), against a `git archive` of that commit
+    rather than the working tree, because REQ-PIPE-113 was in progress
+    beside it. Report saved in the session's reviews/2026-10-11-critic-110.md.
+    Every finding was checked against the code before anything was fixed:
+    ten failing tests written first (tests/test_agreement.py
+    `TestCriticFindingsOn110`), ten failed, then the fixes. All are defects or
+    gaps against criteria Keith had signed, so none needed a fresh decision.
+    - **H1, FIXED: a dataset, collection or not_expected period listed twice
+      passed, and the last entry won.** Now refused by the gate (naming the
+      entry and "twice") and by the loader.
+    - **H2, FIXED: criterion 7 was checked against the newest participation
+      version only.** Months are now checked per participation version,
+      against every calendar version it overlaps, at the gate and at runtime
+      (`schedule.periods_for_dataset` refuses rather than dropping a cadence
+      period - its test confirmed failing without the fix).
+    - **H3, FIXED: a hierarchy dataset with no calendar.yaml entry, on a
+      calendar through its collection, passed criterion 3.** The gate now
+      walks the hierarchy, not calendar.yaml's own list, and says the dataset
+      is on the calendar through its collection and has no entry.
+    - **M4, FIXED: three mistakes raised tracebacks instead of gate errors.**
+      An older version's month typo is now a per-version gate error;
+      `expected_time` must be a real 24-hour time (`25:99` refused by the
+      schema); the missing entry is H3.
+    - **M5, FIXED: criterion 29's message** now names the periods left
+      uncovered by name and date and where it looked, and lost its "no a".
+    - **M6, FIXED in part:** the shape hint for a changelog now shows the
+      structured entry; `participates`, `expected_time`, `days_before` and
+      `grace` gained hints. The critic's main claim - that a plain-string
+      changelog is told to write a plain string - did not reproduce on the
+      gate's path (its fix line already named the author); the stale hint is
+      fixed anyway.
+    - **L7, FIXED: criterion 18's "naming both files"** - the no-calendar
+      message now names data-asset.yaml's hierarchy and calendar.yaml, and the
+      test asserts both (it asserted one while its name claimed two).
+    - **L8, FIXED in part:** `supply_holds.SCHEDULE_FILE` is now derived from
+      `agreement.CALENDAR_YAML` rather than a second literal; the template's
+      "no data embedded" panel no longer points at data-asset.yaml alone and
+      the retired qa_results/. KEPT: the template's literal fallback file
+      name, used only when the page is opened without its embedded data.
+    - **L9, FIXED in part:** `agreement.cadence()` raises a named error for a
+      dataset with no participation. LEFT for REQ-DASH-182 (unsigned), which
+      owns the delivery-time label: a calendar that is not
+      exactly four months a year labels as 'authored', which the page renders
+      blank, and a calendar on mixed days of the month gives `day_of_month`
+      None. Neither shape exists in this asset today.
+    - Untested criteria the critic listed now have tests: criterion 11 (a
+      dataset's own calendar beats its collection's) and criterion 37 (the
+      terminal's owed-nothing kind and reason, tests/test_cli_schedule.py).

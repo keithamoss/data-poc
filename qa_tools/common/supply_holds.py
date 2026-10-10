@@ -127,8 +127,18 @@ class Holds:
                 f"Each needs somebody to assign it to a slot or reject it.")
 
 
-#: Where a dataset's delivery dates are authored (REQ-PIPE-154 criterion 3).
-SCHEDULE_FILE = "contract/calendar.yaml"
+def _schedule_file() -> str:
+    from qa_tools.common import agreement
+
+    path = agreement.CALENDAR_YAML
+    root = path.parent.parent
+    return str(path.relative_to(root))
+
+
+#: Where a dataset's delivery dates are authored (REQ-PIPE-154 criterion 3):
+#: the agreement's own file, relative to the repository - one path, never a
+#: second literal copy of it (REQ-PIPE-110 criterion 17).
+SCHEDULE_FILE = _schedule_file()
 
 
 def reason_for(decided: Assignment) -> dict:

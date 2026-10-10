@@ -682,6 +682,14 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
             if begins is not None and p.date < begins:
                 continue
             on = delivery_months(dataset_id, p.date, agreement)
+            if on is not None and _version_in_force(cal, p.date).is_cadence_rule:
+                # CRITERION 7 PER VERSION: months mean nothing against a
+                # cadence rule, and dropping the period would leave the
+                # dataset silently owing nothing for it.
+                raise ScheduleConfigError(
+                    f"dataset {dataset_id!r}'s participation in force on {p.date.isoformat()} "
+                    f"names months, and calendar {cal.name!r} is a cadence rule on that date. "
+                    f"Rejected rather than ignored.")
             if on is not None and p.date.month not in on:
                 continue
             out.append(p)
