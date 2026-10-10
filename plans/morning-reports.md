@@ -1047,3 +1047,19 @@ one or more component tags, and a date.
         race, not a logic fault. Fixed at the source (post-build-review
         #144): every generated reports/ JSON is now written to a temporary
         file and renamed into place. In the same commit as 173.
+      - EXCUSE CRITIC (post-build-review #145), fixed test-first:
+        - an excuse now shows on resupply rows (most real late supplies are
+          resupplies);
+        - re-filing a supply away and back no longer revives its old excuse;
+        - a range excuse is all or nothing;
+        - `mothman supply decisions` no longer crashes on brackets in a
+          reason.
+        FOUR QUESTIONS FOR YOU:
+        (a) Should a range excuse cover superseded and rejected supplies
+            too? Today it does.
+        (b) An excuse lapsed by a correction stays lapsed even if a later
+            correction judges the supply late again. PROVISIONAL - OK?
+        (c) Should the range form also be offered in the terminal menu?
+            Today it is flags only.
+        (d) The excuse doesn't reach the slot's GitHub ticket; I've left
+            that until the GitHub route is back on.

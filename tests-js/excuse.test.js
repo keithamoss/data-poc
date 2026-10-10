@@ -97,3 +97,20 @@ describe("a reason with quotes or markup", () => {
     expect(w.excuseNote("cp-carers", "r1", "2026-03-10")).not.toContain("<img");
   });
 });
+
+// delivery-critic on REQ-DASH-162 (d6dce26), finding 1 (post-build-review
+// #145): a resupply row showed "N days since previous" and nothing about
+// the excuse - 15 of the 21 real late supplies are resupply rows.
+describe("an excused resupply row", () => {
+  it("shows the excuse tag and its note", () => {
+    const w = loadDashboard().window;
+    w.rawRealDatasetById = () => ({runs: [], excuses: {r2: [EXCUSED]}});
+    w.CURRENT_IN_PLACE_ON = "2026-03-10";
+    const html = w.renderSupplyCycleRows([{run_id: "r2", run_date: "2026-03-01", status: "green",
+      isResupply: true, attemptNumber: 2, daysSincePrevious: 7, arrivalStatus: "late"}],
+      "cp-carers", "2026-02-01");
+    expect(html).toContain("Late (excused)");
+    expect(html).toContain("Excused by Keith");
+    expect(html).toContain("7 days since previous");
+  });
+});

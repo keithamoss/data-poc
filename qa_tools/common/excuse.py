@@ -88,34 +88,68 @@ def history(conn, dataset_id: str, supply: str, as_at: str | None = None) -> lis
             out[-1] = Excuse(slot=last.slot, actor=last.actor, reason=last.reason,
                              at=last.at, withdrawn={"actor": actor, "reason": reason or "",
                                                     "at": _iso(at)})
-    now = _current(conn, dataset_id, supply)
-    slot, classification = now if now else (None, None)
     lapsed = []
     for e in out:
         why = at = None
-        if e.withdrawn is None and e.slot != slot:
-            why = f"re-filed to {slot}" if slot else "no longer filed to a period"
-            at = _refiled_after(conn, dataset_id, supply, e.at)
-        elif e.withdrawn is None and classification != LATE:
-            # RE-JUDGED BY A CORRECTION (REQ-PIPE-168), named where it was.
-            from qa_tools.common import verdict
-
-            v = verdict.current(conn, dataset_id, supply) or {}
-            said = (classification or "not judged").replace("_", " ")
-            why = f"re-judged {said}" + (f" by {v['correction_ref']}"
-                                         if v.get("correction_ref") else "")
-            at = _iso(v["recorded_at"]) if v.get("recorded_at") else None
+        if e.withdrawn is None:
+            why, at = _lapse(conn, dataset_id, supply, e.at, e.slot)
+        # AS AT A DATE BEFORE THE LAPSE, it had not lapsed yet
+        # (delivery-critic on 161, #11).
+        if why and as_at and at and _instant(at) > _instant(as_at):
+            why = at = None
         lapsed.append(Excuse(**{**e.__dict__, "lapsed": why, "lapsed_at": at})
                       if why else e)
     return lapsed
 
 
-def _refiled_after(conn, dataset_id: str, supply: str, after: str) -> str | None:
+def _instant(value):
+    """An instant to compare - never two ISO strings with different offsets."""
+    from datetime import datetime
+
+    return datetime.fromisoformat(value) if isinstance(value, str) else value
+
+
+def _lapse(conn, dataset_id: str, supply: str, after: str,
+           excused_slot: str) -> tuple[str | None, str | None]:
+    """Why and when an excuse recorded at `after` stopped applying, or
+    (None, None).
+
+    THE FIRST RE-FILE AFTER IT, wherever it went (delivery-critic on 161,
+    #2): a supply re-filed away and back has a NEW filing, and the excuse
+    was about the old one - comparing slot names revived it.
+
+    ELSE THE FIRST CORRECTION THAT RE-JUDGED IT NOT LATE (#3, PROVISIONAL):
+    a lapse is a fact about the past, so a later correction judging it late
+    again does not bring the old excuse back; a person excuses afresh.
+
+    ELSE, where the supply simply no longer reads late, that - with no
+    instant to put on it."""
     rows = conn.execute(
-        f"SELECT min(effective_at) FROM {decision_log.TABLE} WHERE dataset_id = ? "
-        "AND supply = ? AND action = ? AND effective_at > CAST(? AS timestamptz)",
+        f"SELECT effective_at, to_slot FROM {decision_log.TABLE} WHERE dataset_id = ? "
+        "AND supply = ? AND action = ? AND effective_at > CAST(? AS timestamptz) "
+        "ORDER BY effective_at, id LIMIT 1",
         [dataset_id, supply, decision_log.REFILE, after]).fetchall()
-    return _iso(rows[0][0]) if rows and rows[0][0] is not None else None
+    if rows:
+        return f"re-filed to {rows[0][1]}", _iso(rows[0][0])
+    from qa_tools.common import verdict
+
+    rows = conn.execute(
+        f"SELECT classification, correction_ref, recorded_at FROM {verdict.TABLE} "
+        "WHERE dataset_id = ? AND supply_id = ? AND correction_ref IS NOT NULL "
+        "AND recorded_at > CAST(? AS timestamptz) AND classification IS DISTINCT FROM ? "
+        "ORDER BY id LIMIT 1", [dataset_id, supply, after, LATE]).fetchall()
+    if rows:
+        said = (rows[0][0] or "not judged").replace("_", " ")
+        return f"re-judged {said} by {rows[0][1]}", _iso(rows[0][2])
+    now = _current(conn, dataset_id, supply)
+    slot, classification = now if now else (None, None)
+    if slot is None:
+        return "no longer filed to a period", None
+    if slot != excused_slot:
+        return f"re-filed to {slot}", None
+    if classification != LATE:
+        return f"re-judged {(classification or 'not judged').replace('_', ' ')}", None
+    return None, None
 
 
 def in_force(conn, dataset_id: str, supply: str, as_at: str | None = None) -> Excuse | None:

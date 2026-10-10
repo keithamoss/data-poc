@@ -7202,3 +7202,54 @@ twice. It deliberately did not re-find the `TypeError`.
     both dashboard-data builders use it. tests/test_atomic_file.py failed
     first: an interrupted write leaves the previous file whole, and both
     results writers go through it.
+
+145. **[done, 2026-10-11]** **[Pipeline & publishing]** **[Dashboard UI]**
+    **The delivery critic on REQ-PIPE-161 and REQ-DASH-162 as built
+    (d6dce26)** - overnight #3; report saved in the session's
+    reviews/2026-10-11-critic-161-162.md. Each fix has a test that failed
+    first (tests/test_excuse.py `TestCriticFindingsOn161`;
+    tests-js/excuse.test.js "an excused resupply row"):
+    - **#1, FIXED - an excuse was invisible on a resupply row.** That
+      covers 15 of the 21 real late supplies, and the case the decision
+      exists for. A resupply row now carries the Late (excused) tag and the
+      excuse note beside "N days since previous".
+    - **#2, FIXED - a supply re-filed away and back got its old excuse
+      back,** because the lapse compared slot names. An excuse now lapses
+      at the first re-file after it, wherever that re-file went.
+    - **#3, FIXED PROVISIONALLY - a lapse by correction is permanent:** if
+      a later correction judges the supply late again, the old excuse does
+      not come back, and a person excuses afresh. This is a question for
+      Keith.
+    - **#4, FIXED - a range could be half-applied** when someone excused
+      one of its supplies between the plan and the write. All the range's
+      entries are now written in one transaction, so the range is refused
+      whole.
+    - **#9, FIXED (pre-existing, every decision type):** `mothman supply
+      decisions` read free text as Rich markup and crashed on a reason
+      containing `[/]`. The reason, actor and supply are now escaped.
+    - **#10, FIXED:** a range refuses `--supply`, `--to-period` and
+      `--stands-on` instead of silently ignoring them.
+    - **#11, FIXED:** as at a date before a lapse, the excuse is still in
+      force. Lapse instants are compared as instants.
+    - **#5, FOR KEITH:** a range excuses every late supply currently filed
+      in its periods, including superseded and rejected ones.
+    - **#6, LEFT:** an excuse never reaches the slot's ticket, and a
+      GitHub-raised one gets no reply. The ticket body is built from slot
+      state, which an excuse does not change, and the GitHub route is
+      disabled today. Revisit when that route is turned back on.
+    - **#7, LEFT:** after a re-file, the lapse note shows on the supply's
+      row under its NEW period, because history rows group by the current
+      filing. Moving it would need the history to show a supply under the
+      period it left.
+    - **#8, FOR KEITH:** the range is offered only on the flags route. The
+      GitHub route and the interactive terminal take the single form. Does
+      that break REQ-GHUB-082 c3's parity, if the range counts as an
+      operation?
+    - **#12, NOT VERIFIED BY THE CRITIC:** hold resolution by arrival key.
+      An excuse needs a filed supply, so it cannot resolve that supply's own
+      hold. Left as the critic's open note.
+    - **Found by the gate, not the critic:** the excuse tests' cp-clients
+      decisions pushed tests/test_cli_supply.py's fixture row out of the
+      newest-twenty listing on a shared worker. The decision log is
+      append-only and shared, so that test now lists with a limit covering
+      the whole log rather than assuming it is alone.

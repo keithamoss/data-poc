@@ -548,7 +548,11 @@ def decisions_command(dataset_id: str | None, as_at: str | None, limit: int) -> 
         slot = (f"{entry['from_slot']} -> {entry['to_slot']}"
                  if entry["action"] == decision_log.REFILE
                  else (entry["to_slot"] or entry["from_slot"] or ""))
-        who = entry["actor"]
+        # FREE TEXT IS TEXT, NEVER MARKUP (delivery-critic on 161, #9): a
+        # reason containing "[/]" took the whole listing down.
+        from rich.markup import escape
+
+        who = escape(entry["actor"] or "")
         action = entry["action"]
         if entry["action"] == decision_log.STILL_FAILING:
             # FULL PROMINENCE, NEVER DIMMED (REQ-PIPE-121 criteria 12 and 13):
@@ -564,8 +568,8 @@ def decisions_command(dataset_id: str | None, as_at: str | None, limit: int) -> 
         # 9:30am promotion happened at 1:30am, which is the exact defect
         # the display standard exists to prevent.
         table.add_row(display_time.format_instant(entry["effective_at"]),
-                       action, entry["supply"] or "",
-                       slot, who, entry["reason"] or "[dim]-[/dim]")
+                       action, escape(entry["supply"] or ""),
+                       slot, who, escape(entry["reason"]) if entry["reason"] else "[dim]-[/dim]")
     console.print(table)
 
     if dataset_id:
@@ -987,6 +991,11 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
         if from_period is None or through_period is None or period is not None:
             raise click.UsageError("a range excuse takes both --from-period and "
                                    "--through-period, and no --period.")
+        ignored = [flag for flag, value in (("--supply", supply), ("--to-period", to_period),
+                                            ("--stands-on", stands_on)) if value]
+        if ignored:
+            raise click.UsageError(f"a range excuse names no single supply or target, so "
+                                   f"{', '.join(ignored)} cannot be used with it.")
         outcome = filing_tui.apply_decision(
             operation=operation.lower(), dataset_id=dataset_id, period=from_period,
             through_period=through_period, reason=reason, yes=yes,

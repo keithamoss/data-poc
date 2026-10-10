@@ -310,3 +310,105 @@ class TestTheDashboardEmbed:
         [e] = excuse.history(conn, DATASET, supply)
         assert e.lapsed == "re-filed to 2023-Q3"
         assert e.lapsed_at.startswith("2026-10-10T22:00")
+
+
+class TestCriticFindingsOn161:
+    """delivery-critic on REQ-PIPE-161 (d6dce26), post-build-review #145.
+    Each failed before its fix."""
+
+    def test_2_a_refile_away_and_back_does_not_revive_the_excuse(self, conn):
+        """Criterion 7: the second 2023-Q2 filing is a new filing."""
+        supply = _late()
+        _apply(conn, _req(fd.EXCUSE_LATENESS, supply))
+        filing.refile(conn, DATASET, supply, EARLY_SLOT, decision_id=1)
+        with dl.apply_decision(conn, dl.Decision(
+                agency_id="child-protection-family-support", collection_id="child-protection",
+                dataset_id=DATASET, action=dl.REFILE, supply=supply, actor=KEITH,
+                actor_kind=dl.PERSON, effective_at="2026-10-11T06:00:00+08:00",
+                from_slot=EARLY_SLOT, to_slot=LATE_SLOT, reason="back again")) as decided:
+            filing.refile(conn, DATASET, supply, LATE_SLOT, decision_id=decided)
+        assert excuse.in_force(conn, DATASET, supply) is None
+        [e] = excuse.history(conn, DATASET, supply)
+        assert e.lapsed is not None
+
+    def test_3_a_lapse_by_correction_stays_lapsed(self, conn):
+        """PROVISIONAL (a question for Keith): once a correction re-judged it
+        on time the excuse lapsed, and a later correction judging it late
+        again does not bring the old excuse back - a person excuses afresh."""
+        from qa_tools.common import verdict
+
+        supply = _late()
+        _apply(conn, _req(fd.EXCUSE_LATENESS, supply))
+        v = verdict.current(conn, DATASET, supply)
+        on_time = verdict.record(conn, v["filing_id"], DATASET, supply,
+                                 verdict.Judged("on_time", None, None),
+                                 recorded_at="2026-10-11T06:00:00+08:00",
+                                 correction_ref="CHG-1", correction_changelog="c",
+                                 supersedes=v["id"])
+        verdict.record(conn, v["filing_id"], DATASET, supply, verdict.Judged("late", None, None),
+                       recorded_at="2026-10-11T07:00:00+08:00", correction_ref="CHG-2",
+                       correction_changelog="c", supersedes=on_time)
+        assert excuse.in_force(conn, DATASET, supply) is None
+        [e] = excuse.history(conn, DATASET, supply)
+        assert "CHG-1" in e.lapsed
+
+    def test_4_a_range_is_applied_whole_or_not_at_all(self, conn, monkeypatch):
+        """Another person excusing one supply between the plan and the write
+        must not leave the range half-applied."""
+        a = self._late_carer("2024-Q1", datetime(2024, 3, 1, 9, tzinfo=PERTH))
+        b = self._late_carer("2024-Q2", datetime(2024, 6, 1, 9, tzinfo=PERTH))
+        _apply(conn, fd.Request(operation=fd.EXCUSE_LATENESS, dataset_id="cp-carers",
+                                actor=people.person_by_email(KEITH), reason="someone else",
+                                period="2024-Q2", supply=b))
+        real = excuse.range_plan
+        monkeypatch.setattr(excuse, "range_plan", lambda *args, **kw: excuse.RangePlan(
+            excuse=((a, "2024-Q1"), (b, "2024-Q2")), skipped=()))
+        request = fd.Request(operation=fd.EXCUSE_LATENESS, dataset_id="cp-carers",
+                             actor=people.person_by_email(KEITH), reason="the outage",
+                             period="2024-Q1", through_period="2024-Q2")
+        key = fd.consequences(conn, request).key
+        with pytest.raises(dl.DecisionRefused):
+            _apply(conn, fd.Request(**{**request.__dict__, "acknowledged": key}))
+        monkeypatch.setattr(excuse, "range_plan", real)
+        assert excuse.in_force(conn, "cp-carers", a) is None, "A must not be left excused alone"
+
+    def _late_carer(self, slot, received):
+        supply = f"cp-carers@crit-{uuid.uuid4().hex[:10]}"
+        filing_support.file(assignment.Assignment(
+            dataset_id="cp-carers", supply_id=supply, slot=slot,
+            branch=assignment.OPEN_UNFILLED, considered=(slot,), received_at=received))
+        return supply
+
+    def test_9_a_reason_with_markup_lists_without_crashing(self, conn):
+        from click.testing import CliRunner
+
+        from cli import supply as supply_cli
+        supply = _late()
+        _apply(conn, _req(fd.EXCUSE_LATENESS, supply, reason="outage [/] see [bold]x"))
+        got = CliRunner().invoke(supply_cli.supply_group, ["decisions", "--dataset", DATASET])
+        assert got.exit_code == 0, got.output
+        assert "outage [/] see [bold]x" in got.output.replace("\n", " ") or "see" in got.output
+
+    @pytest.mark.parametrize("extra", [["--supply", "s"], ["--to-period", "2024-Q3"],
+                                       ["--stands-on", "2024-Q1"]])
+    def test_10_a_range_refuses_flags_it_would_ignore(self, extra):
+        from click.testing import CliRunner
+
+        from cli import supply as supply_cli
+        got = CliRunner().invoke(supply_cli.supply_group, [
+            "decide", "--operation", "excuse-lateness", "--dataset", "cp-carers",
+            "--from-period", "2024-Q1", "--through-period", "2024-Q2", "--reason", "r",
+            "--yes", *extra])
+        assert got.exit_code != 0 and "range" in got.output
+
+    def test_11_as_at_before_a_refile_the_excuse_was_in_force(self, conn):
+        supply = _late()
+        _apply(conn, _req(fd.EXCUSE_LATENESS, supply))
+        with dl.apply_decision(conn, dl.Decision(
+                agency_id="child-protection-family-support", collection_id="child-protection",
+                dataset_id=DATASET, action=dl.REFILE, supply=supply, actor=KEITH,
+                actor_kind=dl.PERSON, effective_at="2026-10-11T08:00:00+08:00",
+                from_slot=LATE_SLOT, to_slot=EARLY_SLOT, reason="moved")) as decided:
+            filing.refile(conn, DATASET, supply, EARLY_SLOT, decision_id=decided)
+        assert excuse.in_force(conn, DATASET, supply, as_at="2026-10-11T06:00:00+08:00")
+        assert excuse.in_force(conn, DATASET, supply) is None

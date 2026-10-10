@@ -345,7 +345,11 @@ class TestReadingTheDecisionLog:
         UTC whatever offset it was written with. Printed raw, a 9:30am
         Perth promotion reads as 1:30am.
         """
-        result = _run(["decisions", "--dataset", "cp-clients"])
+        # A LIMIT THAT COVERS THE WHOLE LOG: qa.decision is append-only and
+        # shared by every module on this worker, so another module's later
+        # cp-clients decisions (tests/test_excuse.py, 2026-10-11) pushed this
+        # fixture's row out of the newest twenty.
+        result = _run(["decisions", "--dataset", "cp-clients", "--limit", "100000"])
         assert "9:30am" in result.output, result.output
         assert "1:30am" not in result.output
 

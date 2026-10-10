@@ -554,14 +554,18 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> int
             targets = list(plan.excuse)
         else:
             targets = [(request.supply, request.period)]
-        for supply, slot in targets:
-            with decision_log.apply_decision(conn, decision_log.Decision(
-                    agency_id=entry.agency_id, collection_id=entry.collection_id,
-                    dataset_id=request.dataset_id, action=request.operation,
-                    supply=supply, actor=request.actor_name,
-                    actor_kind=decision_log.PERSON, effective_at=effective_at,
-                    to_slot=slot, reason=reason)):
-                pass
+        # WHOLE OR NOT AT ALL (delivery-critic on 161, #4): one transaction
+        # round every entry, so a supply another person excused since the
+        # plan refuses the range rather than leaving it half-applied.
+        with conn.raw.transaction():
+            for supply, slot in targets:
+                with decision_log.apply_decision(conn, decision_log.Decision(
+                        agency_id=entry.agency_id, collection_id=entry.collection_id,
+                        dataset_id=request.dataset_id, action=request.operation,
+                        supply=supply, actor=request.actor_name,
+                        actor_kind=decision_log.PERSON, effective_at=effective_at,
+                        to_slot=slot, reason=reason)):
+                    pass
     elif request.operation in (SUPERSEDE, UN_SUPERSEDE):
         from qa_tools.common import supersession
 

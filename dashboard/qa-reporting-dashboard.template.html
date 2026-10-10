@@ -5496,10 +5496,15 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
     // arrivalStatus (item 69's own reasoning, now keyed off real chain
     // position) - shows how long it's been since the previous supply/
     // resupply attempt instead, not an arrival pill at all.
+    // AN EXCUSE SHOWS ON A RESUPPLY ROW TOO (delivery-critic on REQ-DASH-162,
+    // #1, post-build-review #145): most real late supplies are resupplies,
+    // and the decision exists precisely for a late resupply nobody looked at.
+    const excusedResupply = e.isResupply && e.arrivalStatus === "late"
+      && excuseInForce(datasetId, e.run_id) ? arrivalPillFor(datasetId, e.run_id, "late", "sm") + " " : "";
     const arrivalCell = e.isResupply
-      ? (e.daysSincePrevious!=null
+      ? excusedResupply + (e.daysSincePrevious!=null
           ? `<span class="mono" style="color:var(--ink-muted); font-size:12.5px;">${e.daysSincePrevious} ${pluralize(e.daysSincePrevious,"day")} since previous</span>`
-          : "")
+          : "") + excuseNote(datasetId, e.run_id)
       // e.arrivedAt used to be emitted RAW here - offset, microseconds
       // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
       // one column. REQ-DASH-071.
