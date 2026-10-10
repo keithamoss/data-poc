@@ -25081,6 +25081,18 @@ requirements:
     - REQ-PIPE-050
     - REQ-PIPE-051
     - REQ-PIPE-052
+    open_questions:
+    - 'Q-A (2026-10-10 review round, all four agents): while a dataset is turned off, what stays in needs-action and when does it leave the collection''s status? Proposed: only the gap''s periods are excluded; anything about a period still owed (an open late slot, a waiting resupply, an overdue close, a red verdict) still counts; the dataset leaves the collection status once its last owed slot has closed.'
+    - 'Q-B: a supply held as turned off - does it count as needing action (or a quiet count line on the dataset), and is it re-filed automatically when configuration later gives its receipt an open owed slot (REQ-PIPE-154''s re-file generalised) or only placed/rejected by a person?'
+    - 'Q-C: where may inherit be written (first versions too?), and once written must later versions keep writing it?'
+    - 'Q-D: what happens when nothing states a dataset''s expected time or grace (calendars carry neither) - refuse the configuration per owed period, or add an asset-level participation_defaults at the top of the chain?'
+    - 'Q-E: a collection''s participates (and other defaults) for a dataset in it that names its own calendar - refuse unless the dataset states the value itself, or skip the collection level for such datasets?'
+    - 'Q-F: may a collection''s participation_defaults carry effective_to (turning off every inheriting dataset)?'
+    - 'Q-G: do turned-off periods inherit the last promoted supply (REQ-PIPE-098) - yes, no, or only in a temporary gap?'
+    - 'Q-H: participates: inherit that WIDENS what a dataset owes (e.g. [February, August] becoming all) - allow and state the months, refuse unless written explicitly, or allow with a warning?'
+    - 'Q-I: does criterion 31''s restate rule apply to a collection''s participation_defaults versions too?'
+    - 'Q-J: what a collection or agency card shows when every dataset in it is left out of the rollup (post-build-review #135) - a quiet No data pill with an ''N not counted'' line, no pill and a line in words, or a new group status?'
+    - 'Q-K (wording to approve, not a fork): a change to effective_to is free only if, for every period whose owed status it flips, that period''s earliest claim-opening instant has not yet passed; otherwise it needs a declared correction.'
     decisions:
     - THE PROBLEM THIS SOLVES is that the same facts are configured twice. Calendars live in contract/data-asset.yaml
       while each dataset's cadence, expected time and grace live in its ODCS contract under slaProperties.
