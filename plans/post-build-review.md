@@ -6985,3 +6985,38 @@ twice. It deliberately did not re-find the `TypeError`.
     - Untested criteria the critic listed now have tests: criterion 11 (a
       dataset's own calendar beats its collection's) and criterion 37 (the
       terminal's owed-nothing kind and reason, tests/test_cli_schedule.py).
+
+138. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-PIPE-113 as built (70bdbe2)** - overnight #3, against a
+    `git archive` of that commit. Report saved in the session's
+    reviews/2026-10-11-critic-113.md. Four real defects, each with a failing
+    test first (tests/test_slot_instants.py `TestCriticFindingsOn113`, four
+    failed before the fixes), none needing a decision from Keith:
+    - **#1, FIXED: the claim reach used the CURRENT claim window**, so after
+      a window was narrowed, a supply inside an older period's genuine
+      (wider) window found no slot and was held - post-build-review #73 by
+      another door. `slots.claim_window` is now the widest window any
+      calendar or participation version has had - a generation bound, which
+      is all it is used for.
+    - **#3, FIXED: a sub-day window crossing midnight fell off the reach** -
+      a date plus four hours is the same date. The reach is now the last
+      period whose window can open by the end of the arrival's day:
+      floor(window - earliest expected time + a day, less an instant) whole
+      days. A first, blunter fix - round the window up to whole days - broke
+      tests/test_claim_window_lookahead.py's pin that the daily feed (4h at
+      14:00) never gains tomorrow as a candidate; the full run caught it.
+    - **#4, FIXED: a period before the first participation version mixed
+      its inputs** - the first version's expected time and grace, but the
+      calendar's claim window rather than the first version's override.
+      `schedule.claim_window(on=...)` now falls back to the first version
+      exactly as `slots._participation_for` does.
+    - **#2, FIXED: the daylight-saving gate checked owed periods only**,
+      while the slot path computes every calendar period (a non-owed
+      period's opening closes the slot before it), so `days_before` landing
+      a non-owed due day on a gap was a traceback in filing - swallowed
+      there, leaving the dataset with no slots - instead of a gate error. The
+      gate now walks the same sequence the slot path does.
+    - **#5, LEFT for REQ-DASH-182 (unsigned):** the dashboard's delivery-time
+      label ignores days_before - "by 22:00" for a supply due the evening
+      before. It is the label REQ-DASH-182 owns, along with which version's
+      label to show.

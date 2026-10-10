@@ -780,9 +780,15 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
     if contract_value is not None:
         return parse_duration(contract_value, f"dataset {dataset_id!r} claimWindow")
     # A PARTICIPATION VERSION MAY OVERRIDE IT (REQ-PIPE-110 criterion 4).
-    version = (_agreement(agreement).participation_on(dataset_id, on) if on is not None
-               else (lambda e: e.participation[-1] if e and e.participation else None)(
-                   _agreement(agreement).dataset(dataset_id)))
+    entry = _agreement(agreement).dataset(dataset_id)
+    if on is not None:
+        # A period before the first version takes that first version's
+        # inputs - all of them, this override included (REQ-PIPE-113's
+        # PROVISIONAL rule, as slots._participation_for applies it).
+        version = (_agreement(agreement).participation_on(dataset_id, on)
+                   or (entry.participation[0] if entry and entry.participation else None))
+    else:
+        version = entry.participation[-1] if entry and entry.participation else None
     if version is not None and version.claim_window is not None:
         return version.claim_window
     cal = calendar_for_dataset(dataset_id, agreement)

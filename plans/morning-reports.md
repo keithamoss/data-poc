@@ -876,3 +876,11 @@ one or more component tags, and a date.
         wall-clock assertion on a loaded 4-core machine; I have not changed
         it. Worth deciding whether it should compare something the parse
         reuse actually controls (a counter, a manifest mtime) instead.
+      - REQ-PIPE-113 CRITIC: four real defects, all fixed test-first
+        (plans/post-build-review.md #138) - the claim reach used the current
+        rather than the widest claim window, a sub-day window fell off the
+        reach at midnight, a period before the first version mixed its
+        inputs, and the daylight-saving gate missed non-owed periods. Latent
+        today (one version each, Perth has no daylight saving), real the day
+        either changes. One left for REQ-DASH-182: the delivery-time label
+        ignores days_before.

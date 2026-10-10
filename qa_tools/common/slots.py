@@ -192,23 +192,45 @@ def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
     """
     # PLUS THE LARGEST days_before (REQ-PIPE-113 criterion 11): a supply
     # due ninety days ahead of its period's date has to find that period.
-    return at + claim_window(dataset_id, agreement) + timedelta(
-        days=max_days_before(dataset_id, agreement))
+    # TO THE LAST PERIOD WHOSE WINDOW CAN OPEN BY THE END OF `at`. A period
+    # dated P opens at P + expected time - window, so the reach is
+    # floor(window - expected time + one day, less an instant) whole days:
+    # a 4h window at 14:00 reaches no further than today, at 01:00 it
+    # reaches tomorrow (it opens at 21:00 tonight), and the quarterly 14d at
+    # 09:00 reaches fourteen days. A date plus a sub-day window is the same
+    # date, which dropped the 01:00 case (delivery-critic on 113, #3); a
+    # blunt round-up added a day the daily feed can never claim. The
+    # EARLIEST expected time any version has is the conservative one.
+    window = claim_window(dataset_id, agreement)
+    entry = schedule._agreement(agreement).dataset(dataset_id)
+    times = [v.expected_time for v in (entry.participation if entry else ())
+             if v.expected_time]
+    earliest = min((timedelta(hours=int(t[:2]), minutes=int(t[3:5])) for t in times),
+                   default=timedelta(0))
+    reach = (window - earliest + timedelta(days=1) - timedelta(microseconds=1)) \
+        // timedelta(days=1)
+    return at + timedelta(days=max(reach, 0) + max_days_before(dataset_id, agreement))
 
 
 def claim_window(dataset_id: str, agreement=None) -> timedelta:
-    """This dataset's claim window, as things stand today.
+    """The WIDEST claim window this dataset has ever had - a bound on how
+    far ahead to generate slots, not a property of any one slot.
 
-    NOT EFFECTIVE-DATED, deliberately, and the difference from
-    `schedule.claim_window(on=...)` matters. That one answers "what
-    window applied to THIS period", which is what a slot's own
-    `claim_opens_at` needs. This one answers "how far ahead could any
-    slot's window reach", which is a bound on generation rather than a
-    property of a slot - so the widest current answer is the safe one,
-    and generating a period too many costs nothing because the slot it
-    makes is still filtered on its own `claim_opens_at`.
+    NOT the current one: a window narrowed later must not shrink the reach
+    for history replayed under the wider one, or a supply inside an older
+    period's genuine window finds no slot and is held (delivery-critic on
+    REQ-PIPE-113, #1 - post-build-review #73 again). Every calendar
+    version's default and every participation version's override is a
+    candidate; generating a period too many costs nothing, because the
+    slot it makes is still filtered on its own `claim_opens_at`.
     """
-    return schedule.claim_window(dataset_id, agreement=agreement)
+    agreement = schedule._agreement(agreement)
+    candidates = [v.claim_window for v in
+                  schedule.calendar_for_dataset(dataset_id, agreement).versions]
+    entry = agreement.dataset(dataset_id)
+    candidates += [v.claim_window for v in (entry.participation if entry else ())
+                   if v.claim_window is not None]
+    return max(candidates)
 
 
 def slots_for_dataset(dataset_id: str, until: date | None = None,

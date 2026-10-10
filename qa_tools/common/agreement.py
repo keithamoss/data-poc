@@ -171,10 +171,18 @@ def _own_dates(raw: dict, dataset_id: str):
 
 def load(path: Path = CALENDAR_YAML) -> Agreement:
     """Read one calendar.yaml into an `Agreement`. The one loader."""
-    from qa_tools.common import schedule
 
     with open(path) as f:
         doc = config_yaml.parse(f) or {}
+    return from_doc(doc, path)
+
+
+def from_doc(doc: dict, path: Path | str = "contract/calendar.yaml") -> Agreement:
+    """An `Agreement` from an already-parsed calendar.yaml document - what
+    REQ-PIPE-111's freeze gate needs for the file as it stood at an earlier
+    commit, which is text from git rather than a path."""
+    from qa_tools.common import schedule
+
     calendars: dict = {}
     for raw in doc.get("calendars") or []:
         name = raw.get("name")

@@ -1376,9 +1376,15 @@ def _daylight_saving_errors(src: Source) -> list[ConfigError]:
     out = []
     until = asset_time.local_date(asset_time.now()) + timedelta(days=DAYLIGHT_SAVING_HORIZON_DAYS)
     for entry in hierarchy.all_datasets():
+        # EVERY PERIOD THE SLOT PATH COMPUTES, owed or not: a non-owed
+        # period's claim-opening closes the slot before it, so its due
+        # instant is computed too, and a daylight-saving gap there was a
+        # traceback in filing rather than an error here (delivery-critic on
+        # REQ-PIPE-113, #2).
         try:
-            periods = schedule.periods_for_dataset(entry.dataset_id, until=until)
             agreement = schedule._agreement()
+            periods = [p for p in slots._calendar_periods(entry.dataset_id, until, agreement)
+                       if p.date <= until]
         except Exception:  # noqa: BLE001 - no calendar, or reported by another gate
             continue
         for period in periods:
@@ -1394,7 +1400,7 @@ def _daylight_saving_errors(src: Source) -> list[ConfigError]:
             if problem:
                 out.append(ConfigError(
                     src.name, f"dataset {entry.dataset_id!r}",
-                    f"its expected time {expected_time} on period {period.period.name}'s due date "
+                    f"its expected time {expected_time} on period {period.name}'s due date "
                     f"{due_day.isoformat()} {problem} in "
                     f"{asset_time.zone_on(due_day).key}, so that period has no single "
                     f"due instant.",
