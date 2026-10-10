@@ -195,6 +195,14 @@ releases:
               of periods. It still counts as late, and the dashboard shows it as
               Late (excused) with who excused it and why. An excuse can be
               withdrawn.
+          - headline: A changed agreement stops the pipeline for that dataset
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              If a dataset's agreed due time, grace or dates change without a
+              declared correction, its new supplies are now held and the
+              dashboard shows it red with what changed and how to fix it. Every
+              other dataset carries on. `mothman schedule check-agreement` says
+              which datasets are affected.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

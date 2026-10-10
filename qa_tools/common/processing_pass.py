@@ -256,10 +256,16 @@ class PassReport:
     #: one (criterion 7).
     schedule_ended: tuple[int, int] = (0, 0)
     refiled: list = field(default_factory=list)
+    #: Datasets the agreement backstop refused this pass (REQ-PIPE-173
+    #: criterion 4), each held rather than processed.
+    refused: list = field(default_factory=list)
+    #: What it re-filed once a dataset was no longer refused.
+    refiled_cleared: list = field(default_factory=list)
 
     @property
     def nothing_to_do(self) -> bool:
         return not (self.processed or self.gated_only or self.left_locked or self.refiled
+                    or self.refiled_cleared or self.refused
                     or self.left_behind_failure or self.left_behind_locked
                     or self.left_for_budget or self.failures or self.owed)
 
@@ -351,6 +357,25 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         report.refiled.extend(schedule_ended.refile_covered(say=say))
     except Exception as exc:  # noqa: BLE001 - the holds are durable; the next pass retries
         failed("schedule-ended holds", exc)
+    # THE AGREEMENT BACKSTOP (REQ-PIPE-173): a dataset whose recorded
+    # judgements no longer match the agreement, with nothing declared to
+    # account for it, is refused - said here, held at filing - and one
+    # cleared since the last pass has its held supplies filed by the rule.
+    try:
+        from qa_tools.common import agreement_drift
+        report.refiled_cleared.extend(agreement_drift.refile_cleared(say=say))
+        found = agreement_drift.refusals()
+        report.refused = sorted(found)
+        # RED, as the dashboard shows it (criterion 4; PROVISIONAL: the
+        # exit status a scheduler reads says so too).
+        report.red = report.red or bool(found)
+        line = agreement_drift.pass_line(found)
+        if line:
+            say(line)
+            for refusal in found.values():
+                say(refusal.message())
+    except Exception as exc:  # noqa: BLE001 - the next pass evaluates it again
+        failed("agreement backstop", exc)
 
     # STAGED FIRST, as the batch stages first: a delivery's later files are
     # candidates the overlay sees when its first is checked. Only what is

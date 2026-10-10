@@ -82,13 +82,27 @@ def _covering_slot(dataset_id: str, received_at):
 def refile_covered(*, say=print) -> list[tuple[str, str, str]]:
     """Re-file every schedule-ended hold whose receipt the calendar now
     covers, oldest receipt first. Returns (dataset, supply, period) for each."""
+    return refile_holds(
+        lambda conn: [h for h in supply_holds.outstanding(conn) if h.schedule_ended],
+        lambda h, slot: (f"Held because {h.dataset_id}'s schedule had ended; dates now "
+                         f"cover its receipt, so the rule files it to {slot}."),
+        lambda h, slot: (f"{h.supply_id}: its schedule now has {slot}, so it is filed "
+                         f"there and owed a re-check"),
+        say=say)
+
+
+def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str]]:
+    """Re-file the holds `select(conn)` returns into the slot open at each
+    one's receipt, oldest receipt first, as a rule re-file owing a re-check -
+    the one loop both a schedule-ended hold (REQ-PIPE-154) and a hold on a
+    refused dataset (REQ-PIPE-173) are drained by once their cause is gone."""
     from qa_tools.common import (decision_log, filing, hierarchy, qa_store, recheck,
                                  replay_clock)
 
     done: list[tuple[str, str, str]] = []
-    with supply_db.connect(label="mothman:schedule-ended") as conn:
+    with supply_db.connect(label="mothman:refile-holds") as conn:
         qa_store.ensure_schema(conn)
-        held = [h for h in supply_holds.outstanding(conn) if h.schedule_ended]
+        held = select(conn)
         if not held:
             return done
         received = {}
@@ -113,14 +127,11 @@ def refile_covered(*, say=print) -> list[tuple[str, str, str]]:
                     actor=ACTOR, actor_kind=decision_log.RULE,
                     effective_at=replay_clock.now().isoformat(),
                     from_slot=None, to_slot=slot.name,
-                    reason=(f"Held because {h.dataset_id}'s schedule had ended; dates now "
-                            f"cover its receipt, so the rule files it to {slot.name}."))
-                    ) as entry_id:
+                    reason=reason(h, slot.name))) as entry_id:
                 filing.refile(conn, h.dataset_id, h.supply_id, slot.name, decision_id=entry_id)
                 recheck.owe(conn, dataset_id=h.dataset_id, supply_id=h.supply_id,
                             decision_id=entry_id)
-            say(f"{h.supply_id}: its schedule now has {slot.name}, so it is filed there and "
-                f"owed a re-check")
+            say(said(h, slot.name))
             done.append((h.dataset_id, h.supply_id, slot.name))
     return done
 

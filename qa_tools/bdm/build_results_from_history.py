@@ -24,7 +24,6 @@ the exact same reports/results_bdm.json shape orchestrate_bdm.py does
 a warehouse of its own, which is Phase 3's other half.
 """
 from __future__ import annotations
-import json
 import os
 
 from . import bdm_common
@@ -111,8 +110,9 @@ def build_results_from_history() -> dict:
     }
 
     os.makedirs(os.path.dirname(RESULTS_PATH), exist_ok=True)
-    with open(RESULTS_PATH, "w") as f:
-        json.dump(output, f, indent=2, default=str)
+    # WHOLE OR NOT AT ALL: another process may be reading it (CI, 2026-10-11).
+    from qa_tools.common import atomic_file
+    atomic_file.write_json(RESULTS_PATH, output)
 
     print(f"\n{len(all_results)} real check results ({n_pass} pass / {n_warn} warn / {n_fail} fail"
           f"{f' / {n_error} error' if n_error else ''}"

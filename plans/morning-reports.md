@@ -1026,3 +1026,24 @@ one or more component tags, and a date.
         is not part of `mothman check`, which is why the local gate was
         green. Fixed: verdict is now compared by what its ids name. All 8
         on-demand tests pass locally, and the fix is in the next push.
+      - REQ-PIPE-173 BUILT (the backstop): each recorded verdict is compared
+        with what the agreement resolves now for the same slot. A change no
+        declared correction accounts for refuses that dataset only. Its new
+        supplies are held (never checked or promoted) and are filed by the
+        rule once the agreement matches again. The pass summary says so. The
+        dashboard shows the dataset red in the existing blocked banner,
+        worded as our configuration problem, plus one asset-level notice
+        linking every refused dataset. `mothman schedule check-agreement`
+        reports it: against the sandbox, nothing refused, in 1.4s.
+        PROVISIONALS, all in the requirement's decisions:
+        - what counts as a correction "accounting for" a change: one that
+          names one of the slot's input items with its current value;
+        - refusing means holding;
+        - a refusal makes the pass exit red;
+        - the dashboard shows a refusal on every in-place-on date;
+        - the comparison is per slot rather than per version.
+      - CI ON d6dce26 WENT RED in the test-deployment half: one test parsed
+        reports/results_cp.json while another worker was rewriting it - a
+        race, not a logic fault. Fixed at the source (post-build-review
+        #144): every generated reports/ JSON is now written to a temporary
+        file and renamed into place. In the same commit as 173.

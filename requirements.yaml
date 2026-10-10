@@ -26992,7 +26992,7 @@ requirements:
       it has already judged against has changed with no declared correction - a skipped hook, a force-push,
       an edit made outside git - so that the record cannot be quietly rewritten by going around the gate.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -27042,6 +27042,30 @@ requirements:
       shape: thirty refused datasets from one edit are one problem, not thirty banners.'
     - COMPARE RESOLVED INPUTS, NOT WHOLE VERSIONS (delivery-architect pre-build review, 2026-10-07), B3
       - see REQ-PIPE-168.
+    - 'BUILT 2026-10-11 (overnight #3). ONE COMPARISON WITH RE-JUDGEMENT: verdict.compared puts each current verdict beside what the configuration resolves for the same slot NAME - its date and its version fingerprint - so the backstop and REQ-PIPE-168 cannot disagree about what changed. A slot the configuration no longer has is a difference too. The refusal names each differing resolved input with its recorded and current value; where only the fingerprint moved (which months are owed, an effective date) it says the version''s own settings changed.'
+    - 'ACCOUNTED FOR (PROVISIONAL reading of criterion 2): a declared correction accounts for a slot''s difference where it names one of that slot''s input items - its participation version, calendar version or date, own date, membership, timezone version or not_expected entry, keyed as the freeze gate names them - with the value the configuration now holds. The same rule is REQ-PIPE-170 criterion 22''s: a merged correction awaiting the asset manager refuses nothing, and once applied the re-judged verdict carries the new fingerprint.'
+    - 'REFUSE = HOLD (PROVISIONAL): a refused dataset''s new supply is filed as held with the refusal in its hold reason - the schedule-ended hold''s mechanism, so it is never checked or promoted - and every other dataset of the same arrival files as usual (criterion 3). Once the dataset is no longer refused, the pass files its held supplies by the rule through the loop that drains a schedule-ended hold (schedule_ended.refile_holds), each owing a re-check. A refusal makes the pass''s exit status red.'
+    - 'THE DASHBOARD COMPUTES IT, the build reading configuration and recorded verdicts only (criterion 6): a refused dataset is RED with the blocked banner worded as our configuration problem and its checks not run - its last verdict is not shown as current (criterion 4); one asset-level notice lists every refused dataset as a link with one action (criterion 7); cards count refusals once by kind. PROVISIONAL: a refusal is a state of the configuration now, so it shows on every in-place-on date.'
+    - 'PER SLOT, NOT PER VERSION (NFR 2, PROVISIONAL): the comparison resolves the configuration once per slot, which on a daily feed is once per supply. Measured 2026-10-11 against the sandbox''s 150 verdicts: `mothman schedule check-agreement` over all seven datasets in 1.4s including start-up; 15ms for Birth Registrations'' whole history in the 168 critic''s measurement.'
+    linked_tests:
+    - tests/test_agreement_drift.py
+    - tests-js/agreement-refusal.test.js
+    - tests/test_verdict_record.py
+    implemented_by:
+    - qa_tools/common/agreement_drift.py::refusal_for
+    - qa_tools/common/agreement_drift.py::refusals
+    - qa_tools/common/agreement_drift.py::refile_cleared
+    - qa_tools/common/agreement_drift.py::pass_line
+    - qa_tools/common/verdict.py::compared
+    - qa_tools/common/filing.py::file_arrivals
+    - qa_tools/common/schedule_ended.py::refile_holds
+    - qa_tools/common/processing_pass.py::run_pass
+    - cli/schedule.py::check_agreement_command
+    - dashboard/qa-reporting-dashboard.template.html::agreementNotice
+    - dashboard/qa-reporting-dashboard.template.html::refusalReasonText
+    - dashboard/qa-reporting-dashboard.template.html::refusedMarker
+    evidence:
+    - '2026-10-11 (overnight #3): tests/test_agreement_drift.py with test_verdict_record.py, test_filing.py, test_schedule_ended_hold.py, test_processing_pass.py and test_cli_schedule.py 161 passed - against the real cp-clients agreement, the agreement that judged it and an appended date refuse nothing (c1); a changed grace, a moved date and a changed timezone are each refused naming the item and both values, with the remedy, worded as our configuration problem (c2, c5); a declared correction naming the version with its new value accounts for it, one naming something else does not (c2); only the changed dataset is refused (c3); in one arrival the refused dataset''s supply is held naming the refusal and the other files, and once restored the held supply is filed by the rule to 2023-Q4 (c2, c3); the pass summary states the refusal (c4); a synthetic asset''s remedy names regenerating and a real one''s does not (c8); the module issues no query of its own (c6). tests-js/agreement-refusal.test.js 6 passed: labels, reason text, one notice listing each refused dataset as a link with one action, the synthetic remedy, and the card marker (c4, c7, c8). `mothman schedule check-agreement` against the bootstrapped sandbox (150 verdicts, seven datasets): nothing refused, 1.4s.'
   - id: REQ-GHUB-174
     title: A calendar correction needs the named approver's review on GitHub
     date_written: '2026-10-07'

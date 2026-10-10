@@ -231,7 +231,7 @@ class TestReJudgement:
 
     def test_it_reads_recorded_metadata_and_configuration_only(self):
         """Criterion 8: never supply rows."""
-        source = inspect.getsource(verdict.rejudged)
+        source = inspect.getsource(verdict.compared)
         for table in ("filing_current", "supply_receipt", "{TABLE}"):
             assert table in source
         for forbidden in ("staging", "period_tables", "rows_of", "supply_rows"):

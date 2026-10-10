@@ -311,6 +311,13 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
 
     slots_by_dataset: dict[tuple, list] = {}
     written: list[Assignment] = []
+    found_arrivals = list(found_arrivals)
+    # A REFUSED DATASET IS HELD, NEVER FILED (REQ-PIPE-173 criteria 2 and 3):
+    # its recorded judgements no longer match the agreement and nothing
+    # declared accounts for it, so filing a new supply against the changed
+    # terms would be the silent re-judgement the backstop exists to stop.
+    # Every other dataset files as usual.
+    refused = _refused({d for a in found_arrivals for d in a.files_by_dataset})
 
     for arrival in found_arrivals:
         for dataset_id in sorted(arrival.files_by_dataset):
@@ -354,6 +361,16 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
             supply_id = _supply_id_for(arrival, dataset_id)
             if filing_for(dataset_id, supply_id) is not None:
                 continue
+            if dataset_id in refused:
+                decided = Assignment(
+                    dataset_id=dataset_id, supply_id=supply_id, slot=None,
+                    branch=assign_mod.HELD, considered=(), received_at=arrival.received_at,
+                    agreement_refused=refused[dataset_id].message())
+                with _connect("mothman:filing-record") as conn:
+                    record(decided, arrival.delivery_name, conn=conn)
+                _raise_assignment_hold(arrival, decided)
+                written.append(decided)
+                continue
             decided = assign_mod.assign(
                 dataset_id=dataset_id, supply_id=supply_id,
                 at=arrival.received_at, slots=slots_by_dataset[horizon],
@@ -374,6 +391,22 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                 _raise_assignment_hold(arrival, decided)
             written.append(decided)
     return written
+
+
+def _refused(dataset_ids) -> dict:
+    """{dataset_id: Refusal} for these datasets (REQ-PIPE-173). A backstop
+    that cannot be evaluated refuses nothing - it is the second line behind
+    the commit-time gate, and taking every filing down with it would be the
+    blast-radius rule broken."""
+    from qa_tools.common import agreement_drift
+
+    try:
+        with _connect("mothman:agreement-drift") as conn:
+            return agreement_drift.refusals(conn, sorted(dataset_ids))
+    except Exception as exc:  # noqa: BLE001 - see the docstring
+        print(f"note: the agreement backstop could not be evaluated ({exc}); "
+              f"nothing was refused.")
+        return {}
 
 
 def _supersede_earlier(conn, arrival, decided: Assignment) -> None:

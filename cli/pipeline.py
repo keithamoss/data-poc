@@ -213,6 +213,15 @@ def _say_pass(report) -> None:
     if report.refiled:
         console.print(f"{len(report.refiled)} supply/supplies held for an ended schedule were "
                       f"filed now that dates cover them.", style="green")
+    if report.refiled_cleared:
+        console.print(f"{len(report.refiled_cleared)} supply/supplies held while their dataset "
+                      f"was refused were filed now that the agreement matches again.",
+                      style="green")
+    # REQ-PIPE-173 criterion 4: a refused dataset is stated in the summary.
+    if report.refused:
+        console.print(f"REFUSED {len(report.refused)} dataset(s) - recorded judgements no "
+                      f"longer match the delivery agreement: {', '.join(report.refused)}. "
+                      f"`mothman schedule check-agreement` names each change.", style="red")
     for what, why in report.failures:
         console.print(f"FAILED {what}: {why}", style="red")
     for line in report.tickets:

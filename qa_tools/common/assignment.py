@@ -103,6 +103,11 @@ class Assignment:
     #: supplier's. `last_period` names that last slot.
     schedule_ended: bool = False
     last_period: str | None = None
+    #: HELD BECAUSE ITS DATASET IS REFUSED (REQ-PIPE-173 criterion 2): its
+    #: recorded judgements no longer match the agreement and no declared
+    #: correction accounts for it - our configuration problem. The refusal
+    #: in words, naming each changed item and the remedy.
+    agreement_refused: str | None = None
 
     @property
     def is_resupply(self) -> bool:

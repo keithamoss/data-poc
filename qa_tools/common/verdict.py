@@ -234,6 +234,63 @@ def rejudged(conn, dataset_id: str, agreement=None) -> list[Rejudgement]:
     """
     from qa_tools.common import arrival_classification, schedule, slots
 
+    out = []
+    for c in compared(conn, dataset_id, agreement):
+        if not c.moved or c.now is None or c.received is None:
+            continue
+        new_inputs, new_fingerprint, instants, when = c.now
+        slot = slots.Slot(dataset_id=dataset_id,
+                          period=schedule.Period(name=c.slot, date=when),
+                          due_at=instants.due_at, grace=instants.grace,
+                          claim_opens_at=instants.claim_opens_at)
+        new_class = arrival_classification.classify(c.received, slot)
+        if new_class == c.classification:
+            continue
+        new = Judged(new_class, new_inputs, new_fingerprint)
+        old = {"id": c.verdict_id, "classification": c.classification, "inputs": c.inputs,
+               "fingerprint": c.fingerprint}
+        out.append(Rejudgement(dataset_id, c.supply_id, c.slot, old, new))
+    return out
+
+
+@dataclass(frozen=True)
+class Compared:
+    """One supply's recorded verdict beside what the configuration now
+    resolves for its slot. `now` is (inputs, fingerprint, instants, date),
+    or None where the configuration has no such slot, or cannot build it."""
+
+    supply_id: str
+    slot: str
+    verdict_id: int
+    classification: str | None
+    inputs: dict
+    fingerprint: str
+    received: object
+    now: tuple | None
+    #: Why `now` is None - the slot is gone, or could not be built.
+    missing: str | None = None
+
+    @property
+    def moved(self) -> bool:
+        """Whether the slot's date or version-level inputs differ from what
+        was recorded - a missing slot counts as moved."""
+        if self.now is None:
+            return True
+        return (self.now[1] != self.fingerprint
+                or self.now[0]["period_date"] != self.inputs.get("period_date"))
+
+
+def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
+    """Every current verdict with recorded inputs, beside what the given
+    configuration resolves for the same slot NAME - the one comparison both
+    re-judgement (REQ-PIPE-168) and the backstop (REQ-PIPE-173) make.
+
+    By NAME under the agreement given (post-build-review #143, H1): a
+    correction can move a period's date, which the fingerprint leaves out.
+    Resolved once per slot (NFR 2). Recorded metadata and configuration only.
+    """
+    from qa_tools.common import schedule, slots
+
     agreement = schedule._agreement(agreement)
     rows = conn.execute(
         f"SELECT f.supply_id, f.slot, v.id, v.classification, v.inputs, v.fingerprint, "
@@ -257,37 +314,28 @@ def rejudged(conn, dataset_id: str, agreement=None) -> list[Rejudgement]:
     try:
         dated = {p.name: p.date for p in
                  schedule.periods_for_dataset(dataset_id, until=horizon, agreement=agreement)}
-    except Exception:  # noqa: BLE001 - no schedule now: nothing can be re-judged against it
-        return []
-    by_slot: dict[str, tuple[dict, str, slots.SlotInstants] | None] = {}
+    except Exception as exc:  # noqa: BLE001 - no schedule now: every slot is missing
+        dated, no_schedule = {}, f"the dataset has no schedule now ({exc})"
+    else:
+        no_schedule = None
+    by_slot: dict[str, tuple] = {}
     out = []
     for supply_id, slot_name, vid, classification, inputs, fingerprint, received in parsed:
         if slot_name not in by_slot:
             when = dated.get(slot_name)
-            try:
-                by_slot[slot_name] = None if when is None else (
-                    *resolved(dataset_id, when, agreement),
-                    slots.slot_instants(dataset_id, when, agreement))
-            except Exception:  # noqa: BLE001 - an unbuildable slot is not a re-judgement
-                by_slot[slot_name] = None
-        now = by_slot[slot_name]
-        if now is None or received is None:
-            continue
-        new_inputs, new_fingerprint, instants = now
-        if (new_fingerprint == fingerprint
-                and new_inputs["period_date"] == inputs.get("period_date")):
-            continue
-        slot = slots.Slot(dataset_id=dataset_id,
-                          period=schedule.Period(name=slot_name, date=dated[slot_name]),
-                          due_at=instants.due_at, grace=instants.grace,
-                          claim_opens_at=instants.claim_opens_at)
-        new_class = arrival_classification.classify(received, slot)
-        if new_class == classification:
-            continue
-        new = Judged(new_class, new_inputs, new_fingerprint)
-        old = {"id": vid, "classification": classification, "inputs": inputs,
-               "fingerprint": fingerprint}
-        out.append(Rejudgement(dataset_id, supply_id, slot_name, old, new))
+            if when is None:
+                by_slot[slot_name] = (None, no_schedule or
+                                      f"{slot_name} is no longer a period of its schedule")
+            else:
+                try:
+                    by_slot[slot_name] = ((*resolved(dataset_id, when, agreement),
+                                           slots.slot_instants(dataset_id, when, agreement),
+                                           when), None)
+                except Exception as exc:  # noqa: BLE001
+                    by_slot[slot_name] = (None, f"{slot_name} cannot be built now ({exc})")
+        now, missing = by_slot[slot_name]
+        out.append(Compared(supply_id, slot_name, vid, classification, inputs, fingerprint,
+                            received, now, missing))
     return out
 
 

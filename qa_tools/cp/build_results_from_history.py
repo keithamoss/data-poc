@@ -24,7 +24,6 @@ history. Same fix as the BDM builder - see that file's own docstring.
 Run as `python3 -m qa_tools.cp.build_results_from_history`.
 """
 from __future__ import annotations
-import json
 import os
 
 from qa_tools.common import hierarchy
@@ -116,8 +115,9 @@ def build_results_from_history() -> dict:
     }
 
     os.makedirs(os.path.dirname(RESULTS_PATH), exist_ok=True)
-    with open(RESULTS_PATH, "w") as f:
-        json.dump(output, f, indent=2, default=str)
+    # WHOLE OR NOT AT ALL: another process may be reading it (CI, 2026-10-11).
+    from qa_tools.common import atomic_file
+    atomic_file.write_json(RESULTS_PATH, output)
 
     print(f"\n{len(all_results)} real check results ({n_pass} pass / {n_warn} warn / {n_fail} fail"
           f"{f' / {n_error} error' if n_error else ''}"

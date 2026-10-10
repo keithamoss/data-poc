@@ -455,3 +455,40 @@ def validate_command() -> None:
     if configured.isdigit() and code == int(configured):
         sys.exit(code)
     raise click.ClickException("schedule validation failed - see output above.")
+
+
+@schedule_group.command("check-agreement")
+@click.option("--dataset", "dataset_id", default=None,
+              help="Check one dataset rather than every one.")
+def check_agreement_command(dataset_id: str | None) -> None:
+    """Say which datasets the processing pass would refuse, and why.
+
+    \b
+    Examples:
+      mothman schedule check-agreement
+      mothman schedule check-agreement --dataset cp-clients
+
+    Reads the database: each recorded verdict names the agreement that
+    judged it, and this compares that with the agreement as it stands. A
+    difference no declared correction accounts for refuses the dataset -
+    its new supplies are held until the agreement is restored or the change
+    is declared. Exits 1 where any dataset is refused.
+    """
+    # REQ-PIPE-173: the backstop's own report, the same computation the
+    # pass and the dashboard build make.
+    from qa_tools.common import agreement_drift, supply_db
+
+    try:
+        found = agreement_drift.refusals(dataset_ids=[dataset_id] if dataset_id else None)
+    except supply_db.SupplyDbError as exc:
+        console.print(f"The database cannot be read, so nothing was checked: {exc}",
+                      style="red")
+        raise SystemExit(2) from exc
+    if not found:
+        console.print("Every recorded judgement matches the delivery agreement, or a "
+                      "declared correction accounts for the difference. Nothing is refused.",
+                      style="green")
+        return
+    for refusal in found.values():
+        console.print(refusal.message(), style="red")
+    raise SystemExit(1)

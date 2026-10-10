@@ -3041,9 +3041,9 @@ function buildData(inPlaceOnDateStr){
   // (empty) columns list must never be re-derived over the top of that,
   // since worstOf([]) would silently default it back to "green".
   data.agencies.forEach(ag=>{
-    ag.exhaustedCount = 0; ag.noSupplyCount = 0; ag.acceptedCount = 0;
+    ag.exhaustedCount = 0; ag.noSupplyCount = 0; ag.acceptedCount = 0; ag.refusedCount = 0;
     ag.collections.forEach(col=>{
-      col.exhaustedCount = 0; col.noSupplyCount = 0; col.acceptedCount = 0;
+      col.exhaustedCount = 0; col.noSupplyCount = 0; col.acceptedCount = 0; col.refusedCount = 0;
       col.datasets.forEach(ds=>{
         const ended = runway.exhausted[ds.id];
         const blocked = blockerOpenInPlaceOn(ds.id, inPlaceOnDateStr);
@@ -3057,6 +3057,25 @@ function buildData(inPlaceOnDateStr){
         if(ds.noSupply){ col.noSupplyCount = (col.noSupplyCount||0) + gapItemCount(ds); ag.noSupplyCount = (ag.noSupplyCount||0) + gapItemCount(ds); }
         if(ds.acceptedGaps){ col.acceptedCount = (col.acceptedCount||0) + 1; ag.acceptedCount = (ag.acceptedCount||0) + 1; }
         const blanking = blocked && blockerWithoutARunOfItsOwn(ds, inPlaceOnDateStr);
+        // REFUSED BY THE AGREEMENT BACKSTOP (REQ-PIPE-173 criterion 4): RED,
+        // through the blocked banner, worded as our configuration problem -
+        // and its last verdict is NOT shown as current: every own check
+        // reads not run, as for any blocked dataset. Counted by kind on the
+        // cards (criterion 7). PROVISIONAL: it is a present state of the
+        // configuration, so it shows on every in-place-on date.
+        const refusal = agreementRefusalOf(ds.id);
+        if(refusal){
+          ds.blocked = {kind:"agreement-refused", count:1, openedAt:null,
+                        reason:refusalReasonText(refusal), refusal};
+          ds.status = "red";
+          (ds.columns||[]).forEach(c=>{
+            c.status = "nodata";
+            c.checks = (c.checks||[]).map(ck=> ({...ck, blockedThisPeriod:true}));
+          });
+          col.refusedCount = (col.refusedCount||0) + 1;
+          ag.refusedCount = (ag.refusedCount||0) + 1;
+          return;
+        }
         if(blocked && !blanking){
           // RED, BUT THE PERIOD'S OWN RESULTS STAND (REQ-PIPE-115
           // criterion 11 as amended 2026-10-05, Keith): a held supply has
@@ -3521,6 +3540,40 @@ function wireChart(id, history, warn, fail, unit, xs, ys, W, padL, padR, onPoint
 // would hide it completely - which is precisely the absorption
 // REQ-PIPE-053 exists to prevent. Redundancy is the test, not the
 // count.
+// REFUSED DATASETS, COUNTED ONCE BY KIND on a card (REQ-PIPE-173
+// criterion 7) - one marker however many datasets one change refused.
+function refusedMarker(count){
+  if(!count) return "";
+  return `<div style="margin-top:6px; font-size:12px; color:var(--ink); display:flex;
+    align-items:center; gap:5px;" data-refused-marker><span class="pill red sm"><span class="ico"></span>${count}
+    refused: agreement changed</span></div>`;
+}
+// ONE ASSET-LEVEL NOTICE FOR EVERY REFUSED DATASET (REQ-PIPE-173 criterion
+// 7, exhaustedNotice's shape): thirty refusals from one edit are one
+// problem - a heading, each dataset as a link, and one action.
+function agreementNotice(data){
+  const ids = [];
+  const source = data !== undefined ? data : (typeof DATA !== "undefined" ? DATA : null);
+  ((source && source.agencies) || []).forEach(ag=>
+    (ag.collections||[]).forEach(col=>(col.datasets||[]).forEach(ds=>{
+      if(agreementRefusalOf(ds.id)) ids.push([ag, col, ds]);
+    })));
+  if(!ids.length) return "";
+  const n = ids.length;
+  const synthetic = ids.some(([, , ds]) => /reset-synthetic/.test(agreementRefusalOf(ds.id).remedy||""));
+  const which = ids.map(([ag, col, ds])=>`<li>${datasetLink(ag, col, ds)}</li>`).join("");
+  return `<div class="notice-exhausted" role="status" data-agreement-refused>
+    <b>${n} dataset${n===1?" is":"s are"} refused — the delivery agreement changed without a declared correction</b>
+    <ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${which}</ul>
+    <div style="color:var(--ink-muted); font-size:13px;">
+      This is a configuration problem on our side, not a problem with anyone's data: recorded
+      verdicts no longer match <code>contract/calendar.yaml</code>. Restore the recorded value, or
+      declare the change as a correction${synthetic ? " - or, on this synthetic asset, regenerate its history" : ""}.
+      <code>mothman schedule check-agreement</code> names each change. New supplies are held until then.
+    </div>
+  </div>`;
+}
+
 function exhaustedMarker(count, status){
   if(!count) return "";
   if(count===1 && status==="exhausted") return "";
@@ -4543,11 +4596,14 @@ function outstandingKindLabel(kind){ return OUTSTANDING_KIND_LABEL[kind] || kind
 // view reproduces what a reader saw then (criterion 12). Both ends are
 // read on the asset's clock, the same day boundary the as-of picker uses.
 const BLOCKER_LABEL = {held:"Held", contested:"Two files, choose one",
-  refused:"Could not be loaded"};
+  refused:"Could not be loaded",
+  // REQ-PIPE-173: OURS, NOT THE SUPPLIER'S - worded as a configuration problem.
+  "agreement-refused":"Refused: the delivery agreement changed"};
 const BLOCKER_SAYS = {
   held:"no open period to file it to; waiting for a person",
   contested:"two files claim its table, waiting for a person to choose one",
-  refused:"its supply arrived and could not be loaded"};
+  refused:"its supply arrived and could not be loaded",
+  "agreement-refused":"a configuration problem on our side - its recorded judgements no longer match the agreement and no declared correction accounts for it"};
 function assetDateStrOf(value){
   try{
     const p = assetParts(value);
@@ -4609,7 +4665,21 @@ function blockerSays(b){
     : (BLOCKER_SAYS[b.kind] || "it cannot be read");
 }
 function blockerUntil(b){
+  if(b.kind === "agreement-refused") return "until the agreement is restored or the change is declared as a correction";
   return b.scheduleEnded ? "until its next delivery dates are added" : "until a person resolves it";
+}
+// THE AGREEMENT BACKSTOP'S REFUSAL of one dataset (REQ-PIPE-173), as the
+// build computed it from configuration and recorded verdicts - or null.
+function agreementRefusalOf(datasetId){
+  const raw = typeof rawRealDatasetById === "function" ? rawRealDatasetById(datasetId) : null;
+  return (raw && raw.agreementRefusal) || null;
+}
+function refusalReasonText(r){
+  const lines = (r.drifts||[]).map(d=>{
+    const said = (d.changes||[]).map(c=>`${c.item} was ${JSON.stringify(c.recorded)}, is now ${JSON.stringify(c.current)}`).join("; ");
+    return `${d.slot}: ${said}`;
+  });
+  return `${lines.join(". ")}. To fix: ${r.remedy}.`;
 }
 // A `command` in a recorded reason, shown as code rather than with its
 // backticks escaped into the text (#132 A3).
@@ -4763,6 +4833,7 @@ function fmtPeriodOrDay(name){
   return /^\d{4}-\d{2}-\d{2}$/.test(name) ? fmtDay(name) : name;
 }
 function blockerReceivedText(b){
+  if(!b.openedAt) return "since the agreement it was judged against changed";
   return b.count > 1
     ? `oldest received ${fmtInstant(b.openedAt)}, newest ${fmtInstant(b.newestAt)}`
     : `received ${fmtInstant(b.openedAt)}`;
@@ -5040,6 +5111,7 @@ function renderExec(view){
       <span><i class="red"></i>Red — fail band (${agencyCount("red")})</span>
       ${quietKeys}
     </div>
+    ${agreementNotice()}
     ${exhaustedNotice()}
     ${lowRunwayNotice()}
     ${outstandingQueue()}
@@ -5054,7 +5126,7 @@ function renderExec(view){
       <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
       ${spark}
-      ${exhaustedMarker(ag.exhaustedCount, ag.status)}
+      ${exhaustedMarker(ag.exhaustedCount, ag.status)}${refusedMarker(ag.refusedCount)}
       ${notCountedMarker(ag.status, ag.collections.flatMap(c=>c.datasets))}
       ${outstandingMarker("agency", ag.id, undefined, ag.noSupplyCount)}
       ${redPromotedMarker(ag)}
@@ -5125,7 +5197,7 @@ function renderAgency(view, agencyId){
   const wrap = document.getElementById("collections");
   wrap.innerHTML = ag.collections.map(col=>`
     <div class="collection-block">
-      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}</div>${notCountedMarker(col.status, col.datasets)}
+      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}${refusedMarker(col.refusedCount)}</div>${notCountedMarker(col.status, col.datasets)}
       ${outstandingMarker("collection", col.id, undefined, col.noSupplyCount)}
       ${redPromotedMarker(col)}
       ${acceptedGapsMarker(col.acceptedCount)}
@@ -5660,7 +5732,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <b>${escHtml(blockerLabel(ds.blocked))} — nothing is checked for this dataset ${blockerUntil(ds.blocked)}.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
           ${withCode(ds.blocked.reason)}<br><br>
-          ${ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
+          ${ds.blocked.kind === "agreement-refused" ? "New supplies are held, not checked," : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
           check below reads <b style="display:inline">No data</b> for this period: none of
           them ran, and no earlier supply's result stands in for it.
         </div>
@@ -5732,7 +5804,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       ${blockedBanner}
       ${outstandingQueue("dataset", ds.id)}
       <div class="sla-strip">
-        <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono">${fmtInstant(ds.blocked.openedAt)}</div></div>
+        <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono">${ds.blocked.openedAt ? fmtInstant(ds.blocked.openedAt) : "—"}</div></div>
         <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>
       </div>
       <div id="supply-history-wrap"></div>
@@ -5797,7 +5869,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     <div class="sla-strip">
       <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${cadenceLabel(ds.sla.cadence)}</div></div>
       ${ds.blocked ? `
-      <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono" title="When we received the supply that is waiting for a person">${fmtInstant(ds.blocked.openedAt)} (${escHtml(blockerLabel(ds.blocked))})</div></div>
+      <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono" title="When we received the supply that is waiting for a person">${ds.blocked.openedAt ? fmtInstant(ds.blocked.openedAt) : "—"} (${escHtml(blockerLabel(ds.blocked))})</div></div>
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">—</div></div>` : `
       <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)} <span title="${ARRIVAL_FOLLOWS_FILING}">${excuseInForce(ds.id, ds.lastArrival.run_id) && ds.lastArrival.arrivalStatus==="late" ? arrivalPillFor(ds.id, ds.lastArrival.run_id, "late", "sm") : (ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : "")}</span></div></div>

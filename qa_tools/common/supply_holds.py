@@ -159,6 +159,8 @@ def reason_for(decided: Assignment) -> dict:
                                      + (f" --year {year}" if year else ""))
         except Exception:  # noqa: BLE001 - the file alone is still the fix
             pass
+    if decided.agreement_refused:
+        reason.update(agreement_refused=True, refusal=decided.agreement_refused)
     return reason
 
 
@@ -200,7 +202,17 @@ class Held:
         if self.schedule_ended:
             return (f"add the next delivery dates to {SCHEDULE_FILE} - it files itself "
                     f"on the next processing pass",)
+        if self.agreement_refused:
+            # OURS TO FIX, IN CONFIGURATION (REQ-PIPE-173): it files itself
+            # once the agreement matches its recorded judgements again.
+            return ("restore the delivery agreement or declare the correction - it files "
+                    "itself on the next processing pass",)
         return RESPONSES.get(self.kind, ())
+
+    @property
+    def agreement_refused(self) -> bool:
+        """Held because its dataset is refused (REQ-PIPE-173) - from the record."""
+        return self.reason.get("agreement_refused") is True
 
     @property
     def schedule_ended(self) -> bool:
@@ -239,6 +251,12 @@ class Held:
                     f"there is no later date to file it to. Add dates to the dataset's "
                     f"calendar in {SCHEDULE_FILE}.{how} The next processing pass then "
                     f"files it by the rule. Raised by {self.raised_by}.")
+        if self.agreement_refused:
+            # OUR CONFIGURATION, NOT THE SUPPLIER (REQ-PIPE-173 criterion 2).
+            return (f"{self.supply_id} is held because its dataset is refused.\n"
+                    f"{self.reason.get('refusal', '')}\nThe next processing pass files it "
+                    f"by the rule once the agreement matches again. Raised by "
+                    f"{self.raised_by}.")
         reasons = "; ".join(f"{name}: {why}" for name, why in self.unavailable)
         why = (f"{self.supply_id} could not be placed - "
                 f"{reasons or 'no slot was open'}")

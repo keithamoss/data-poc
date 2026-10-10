@@ -7189,3 +7189,16 @@ twice. It deliberately did not re-find the `TypeError`.
       changelog line but not its approver, who is named only in
       calendar.yaml. REQ-PIPE-170's applied record is the natural place to
       carry the approver.
+
+144. **[done, 2026-10-11]** **[Testing & dev tooling]** **A half-written
+    reports/ file read by another worker** - CI on d6dce26 went red in the
+    test-deployment half. tests/test_history_rekey.py read
+    reports/results_cp.json while another xdist worker's dashboard build was
+    rewriting it, and parsed half a file ("Expecting ',' delimiter: line
+    63142"). This is the same class as plans/tooling.md #10. Fixed at the
+    writer, not the reader: qa_tools/common/atomic_file.write_json writes a
+    temporary file beside the target and renames it into place, so a reader
+    only ever sees the old file or the new one. Both results writers and
+    both dashboard-data builders use it. tests/test_atomic_file.py failed
+    first: an interrupted write leaves the previous file whole, and both
+    results writers go through it.

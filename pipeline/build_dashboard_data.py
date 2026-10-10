@@ -166,6 +166,15 @@ def _schedule_not_agreed(dataset_id: str) -> str | None:
     return schedule.no_calendar(dataset_id)
 
 
+
+def _agreement_refusal(dataset_id: str) -> dict | None:
+    """This dataset's REQ-PIPE-173 refusal as the page renders it, or None."""
+    from qa_tools.common import agreement_drift
+
+    found = agreement_drift.refusals(dataset_ids=[dataset_id]).get(dataset_id)
+    return found.as_record() if found else None
+
+
 def build() -> dict:
     with open(REAL_RESULTS_PATH) as f:
         payload = json.load(f)
@@ -542,6 +551,9 @@ def build() -> dict:
         # WHICH LATE SUPPLIES A PERSON EXCUSED (REQ-DASH-162), keyed by run,
         # each with its withdrawal and lapse - see pipeline/excuses.py.
         "excuses": excuses.for_dataset("birth-registrations"),
+        # REFUSED BY THE AGREEMENT BACKSTOP (REQ-PIPE-173 criterion 4), from
+        # configuration and recorded verdicts only - None where it is not.
+        "agreementRefusal": _agreement_refusal("birth-registrations"),
         "promotionState": promotion_state.state_for(
             "birth-registrations").as_record(),
         "arrivalHistory": arrival_history,
@@ -572,8 +584,9 @@ def build() -> dict:
 if __name__ == "__main__":
     data = build()
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
-    with open(OUT_PATH, "w") as f:
-        json.dump(data, f, indent=2, default=str)
+    # WHOLE OR NOT AT ALL: another process may be reading it (CI, 2026-10-11).
+    from qa_tools.common import atomic_file
+    atomic_file.write_json(OUT_PATH, data)
     print(f"Wrote {OUT_PATH} ({len(data['columns'])} columns)")
     # Criterion 16: a WARNING, and the build still publishes.
     for line in census.build_warnings():
