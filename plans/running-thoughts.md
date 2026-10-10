@@ -4856,3 +4856,41 @@ Belongs with batch 5's check work.
     as part of REQ-PIPE-164's draft (not yet signed off).
     **Answered 2026-10-08:** no reason on a trial (it records nothing); the
     shared implementation is agreed. Recorded in REQ-PIPE-164's decisions.
+
+75. **[todo, 2026-10-10]** **[Pipeline & publishing, QA checks & contract]**
+    **Pydantic for the config files, once the toolset is settled.** Keith,
+    2026-10-10, asking whether Pydantic would help. Answer given: the biggest
+    gains are load-time validation that names the file and field, typed
+    access in place of `dict.get` string keys, defaults declared in one
+    place (where the frozen-defaults table for the fingerprint would
+    otherwise be kept by hand), and a JSON Schema export for editors and
+    config authors. For the fingerprint alone the standard library and a
+    frozen table are enough; the wider value is validation across all the
+    config. Costs: one model per config format (dbt, Soda, the ODCS
+    contract, the calendar), and models only for the current shape, since
+    old config is never re-read under the fingerprint scheme. Not scoped.
+    **Waits until the toolset is chosen** (see #76): Pydantic models for a
+    format we later replace would be wasted work.
+
+76. **[todo, 2026-10-10]** **[Pipeline & publishing, QA checks & contract]**
+    **Build our own QA checks in Python instead of relying on third-party
+    tools - "how hard can it be?"** Keith, 2026-10-10. Raised as a genuine
+    alternative, not a decision. What the current tools do for us, so the
+    comparison has something to measure against: dbt runs the SQL model
+    tests, Soda runs the SodaCL checks and their thresholds, datacontract-cli
+    checks the ODCS contract, and Evidently computes drift. Each has its own
+    configuration format, its own result shape and its own failure modes,
+    and the fingerprint, check lifecycle and changelog gates were all built
+    on top of their outputs. Questions to answer before a comparison means
+    anything: how much of each tool's behaviour we actually use (the
+    `samples limit`, the failing-sample capture, the drift statistics), what
+    the replacement would have to reproduce exactly (the calendar and verdict
+    semantics are ours already, so the question is only the check
+    execution), and what each in-house check costs to maintain against a
+    third-party upgrade. The honest starting point is that the verdict
+    logic (status, thresholds, amber and red) is already ours; what the
+    tools supply is the evaluation of each check against the data, which is
+    where the hard parts sit (missing and distinct-value counts across
+    dialects, failing-row samples, drift). Worth a spike on one check type
+    before any decision. Pairs with #75: the toolset choice decides which
+    config formats Pydantic needs to model.
