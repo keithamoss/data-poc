@@ -807,12 +807,21 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
 
     from qa_tools.common import amber_setting
 
-    result = subprocess.run(["git", "log", "--reverse", "--format=%H %aI", f"{ref}..HEAD",
+    # THE COMMITTER INSTANT, FLOORED AT THE BASE COMMIT'S (REQ-PIPE-111
+    # criteria 12 and 28): the author date (%aI) can be set to anything,
+    # so a backdated commit could pass a version off as added before its
+    # date (plans/post-build-review.md #139).
+    from qa_tools.common import agreement_freeze
+
+    base_at = agreement_freeze.committer_instant(ref, root=ROOT)
+    result = subprocess.run(["git", "log", "--reverse", "--format=%H %cI", f"{ref}..HEAD",
                              "--", rel_path], cwd=ROOT, capture_output=True, text=True)
     if result.returncode != 0:
         return None
     for line in result.stdout.splitlines():
         sha, _, stamp = line.partition(" ")
+        if base_at is not None and datetime.fromisoformat(stamp) < base_at:
+            stamp = base_at.isoformat()
         content = _content_at(rel_path, sha)
         try:
             doc = yaml.safe_load(content or "") or {}
@@ -829,128 +838,85 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
     return None
 
 
-def _authored_dates(doc: dict) -> dict[tuple[str, str, str], str]:
-    """{(calendar, effective_from, period): date} across every version.
+def _freeze_errors(raw: dict, cal_raw: dict, src: Source,
+                   ref: str | None = None) -> list[ConfigError]:
+    """REQ-PIPE-111: a frozen item of the delivery agreement changes only by
+    a declared correction. Replaces REQ-PIPE-050's past-date guard, whose
+    route - any added changelog line licensed moving a past date - is
+    removed rather than kept beside it (criterion 6): an undeclared line is
+    the quiet edit the requirement exists to stop.
 
-    Keyed by the version too, because moving a date from one version to
-    another is a legitimate act - authoring a new version is exactly how
-    a schedule is meant to change - and only an edit WITHIN a version
-    rewrites history.
-    """
-    out: dict[tuple[str, str, str], str] = {}
-    for calendar in (doc.get("calendars") or []):
-        calendar = calendar or {}
-        name = calendar.get("name")
-        for version in (calendar.get("versions") or []):
-            version = version or {}
-            effective = str(version.get("effective_from"))
-            for entry in (version.get("dates") or []):
-                entry = entry or {}
-                period = entry.get("period")
-                if name and period:
-                    out[(str(name), effective, str(period))] = str(entry.get("date"))
-    return out
+    Compared against the base of the whole push (criterion 13; the
+    pre-commit hook sets that base to HEAD, so it compares the staged file);
+    a missing previous state passes (criterion 14)."""
+    from datetime import UTC, datetime
 
+    from qa_tools.common import agreement_freeze as freeze
 
-def _changelog_at(doc: dict, calendar_name: str, effective: str) -> list:
-    for calendar in (doc.get("calendars") or []):
-        if (calendar or {}).get("name") != calendar_name:
-            continue
-        for version in ((calendar or {}).get("versions") or []):
-            if str((version or {}).get("effective_from")) == effective:
-                return list((version or {}).get("changelog") or [])
-    return []
-
-
-def _retrospective_edit_errors(raw: dict, src: Source, today: date | None = None,
-                                ref: str | None = None) -> list[ConfigError]:
-    """A date in the PAST that changed, without its version saying so.
-
-    Thread E's rule is that config must never be edited to make red
-    history disappear - move last February's agreed date forward and
-    every supply that was late for it becomes on time, silently and
-    retroactively. That rule was going to be enforced by review alone
-    (Keith, 2026-09-22); he took the other option on 2026-09-23 once
-    the cost turned out to be one `git show` rather than a deep clone.
-
-    DELIBERATELY NARROW, because a gate that fires on legitimate work
-    gets turned off:
-      - Only dates already in the past. Next year's dates are meant to
-        be edited; that is what `mothman schedule candidate-dates` is
-        for.
-      - Only within one version. Authoring a NEW effective-dated
-        version is the sanctioned way to change a schedule, so a date
-        that differs between versions is the mechanism working.
-      - A NEW changelog entry on that version clears it. This is a
-        "say what you did" gate, not a freeze - Thread E allows a
-        correction, it just will not have one happen quietly. It has to
-        be an ADDED line, not merely a different one: the guard used to
-        accept any change to the list, so rewording an existing entry -
-        or deleting one - licensed moving a past date, which is the
-        opposite of what it is for. Same rule as the sibling gate's
-        `find_undocumented_changes()`, which has always required the
-        changelog to have grown (plans/post-build-review.md #44).
-      - Silent when there is no previous commit to compare against,
-        rather than failing. A shallow checkout or a first commit is
-        not a finding.
-
-    WHICH COMMIT "PREVIOUS" MEANS is `diff_base()`'s call, not this
-    module's - see that module for the multi-commit hole both gates
-    shared.
-    """
-    # The ASSET's clock, never the runner's. They are different
-    # calendar dates for ~8 hours of every day (Perth is UTC+8), and
-    # this function's whole job is deciding whether a date is in the
-    # past - so a UTC runner would let through an edit to yesterday's
-    # date for a third of the day, and only for pushes landing in that
-    # window. Same class as plans/post-build-review.md #59.
-    today = today or asset_time.local_date(asset_time.now())
     ref = ref or diff_base()
-    # contract/calendar.yaml since REQ-PIPE-110. The commit that creates it
-    # has no previous state to compare - the one commit this guard cannot
-    # see, which is why the move is pinned instead (its NFRs 3 and 4).
-    path = src.agreement_path
-    previous = _content_at(str(path.relative_to(ROOT)), ref) \
-        if path.is_relative_to(ROOT) else None
-    if previous is None:
-        return []
-    try:
-        old_doc = yaml.safe_load(previous) or {}
-    except yaml.YAMLError:
-        return []
-    if not isinstance(old_doc, dict):
-        return []
+    cal_path, asset_path = src.agreement_path, src.asset_path
 
-    was = _authored_dates(old_doc)
-    now = _authored_dates(raw)
-    out: list[ConfigError] = []
+    def rel(path: Path) -> str | None:
+        return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else None
 
-    for key, old_value in was.items():
-        calendar_name, effective, period = key
-        new_value = now.get(key)
-        if new_value == old_value:
-            continue
+    def previous(path: Path):
+        name = rel(path)
+        text = _content_at(name, ref) if name else None
+        if text is None:
+            return None
         try:
-            when = date.fromisoformat(old_value)
-        except ValueError:
-            continue
-        if when >= today:
-            continue  # a future date is meant to be editable
+            doc = yaml.safe_load(text) or {}
+        except yaml.YAMLError:
+            return None
+        return doc if isinstance(doc, dict) else None
 
-        old_changelog = _changelog_at(old_doc, calendar_name, effective)
-        new_changelog = _changelog_at(raw, calendar_name, effective)
-        if len(new_changelog) > len(old_changelog):
-            continue  # the version says what changed, which is all this asks
+    old_cal, old_asset = previous(cal_path), previous(asset_path)
+    if old_cal is None and old_asset is None:
+        return []
+    people = previous(ROOT / freeze.PEOPLE_REL) or {}
 
-        what = f"is now {new_value}" if new_value else "has been removed"
-        out.append(ConfigError(
-            src.calendar_name, f"calendar {calendar_name!r}",
-            f"period {period!r} was {old_value}, a date already in the past, and {what} - "
-            f"with no new changelog entry on the version effective {effective}.",
-            "Add a changelog entry saying what changed and why, or author a NEW "
-            "effective-dated version instead. Moving a past date rewrites whether "
-            "supplies already judged against it were on time."))
-    return out
+    # THE CLOCK (criterion 12): where the files on disk differ from HEAD the
+    # change is not committed yet - it is being made now. Otherwise each
+    # change dates from the committer instant of the commit that introduced
+    # it. Either way, floored at the base commit's own instant.
+    base_at = freeze.committer_instant(ref, root=ROOT) or datetime.now(UTC)
+    rels = tuple(r for r in (rel(cal_path), rel(asset_path)) if r)
+    dirty = bool(rels) and subprocess.run(
+        ["git", "diff", "--quiet", "HEAD", "--", *rels], cwd=ROOT).returncode != 0
+    now = datetime.now(UTC)
+    final = freeze.flatten(cal_raw, raw)
+    walked: list[tuple[datetime, dict]] = []
+
+    def states() -> list[tuple[datetime, dict]]:
+        # THE WALK HAPPENS ONLY WHEN A CHANGE TO SOMETHING FROZEN NEEDS
+        # DATING (NFR 5) - an ordinary push reads each file once at the base.
+        if not walked:
+            for sha, at in freeze.commits_since(ref, rels):
+                def doc_at(r, sha=sha):
+                    try:
+                        return yaml.safe_load(_content_at(r, sha) or "") or {}
+                    except yaml.YAMLError:
+                        return {}
+                cal_doc = doc_at(rel(cal_path)) if rel(cal_path) else {}
+                asset_doc = doc_at(rel(asset_path)) if rel(asset_path) else {}
+                walked.append((at, freeze.flatten(cal_doc, asset_doc)))
+        return walked
+
+    def instant_of(key: str) -> datetime:
+        if dirty or not states():
+            return max(now, base_at)
+        want = final.get(key)
+        for at, items in states():
+            got = items.get(key)
+            if (got is None and want is None) or (got is not None and want is not None
+                                                  and got.norm == want.norm):
+                return max(at, base_at)
+        return max(states()[-1][0], base_at)
+
+    findings = freeze.check(old_cal, cal_raw, old_asset, raw, people, instant_of=instant_of)
+    names = {"calendar.yaml": src.calendar_name, "data-asset.yaml": src.name}
+    return [ConfigError(names.get(f.file, f.file), f.scope, f.problem, f.fix)
+            for f in findings]
 
 
 # ---- the amber setting's past is frozen (REQ-PIPE-122) --------------
@@ -1317,7 +1283,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _participation_errors(cal_raw, raw, src)
     errors += _expects_nothing_errors(merged, cal_src)
     errors += _contract_errors(raw, src)
-    errors += _retrospective_edit_errors(cal_raw, src)
+    errors += _freeze_errors(raw, cal_raw, src)
     errors += _amber_setting_errors(raw, src)
     errors += _replacement_setting_errors(raw, src)
     if src.asset_path == DATA_ASSET_YAML and not errors:

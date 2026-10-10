@@ -70,6 +70,10 @@ repos:
     hooks:
       - id: mothman-check-schedule
         name: schedule configuration is valid
+        # At commit time the STAGED file is what is about to become
+        # history, so the freeze gate (REQ-PIPE-111 criterion 13) compares
+        # it against HEAD - diff_base() reads pre-commit's own PRE_COMMIT=1
+        # for that; CI compares the whole push.
         entry: uv run mothman check --only schedule
         language: system
         files: ^contract/.*\.ya?ml$

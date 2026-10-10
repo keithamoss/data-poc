@@ -65,4 +65,9 @@ def diff_base(fallback: str = FALLBACK) -> str:
     ref = (os.environ.get(ENV_VAR) or "").strip()
     if ref and _resolves(ref):
         return ref
+    # INSIDE A PRE-COMMIT HOOK the staged content is what is about to become
+    # history, so "before my change" is HEAD itself (REQ-PIPE-111 criterion
+    # 13). pre-commit sets PRE_COMMIT=1 for every hook it runs.
+    if os.environ.get("PRE_COMMIT") == "1" and _resolves("HEAD"):
+        return "HEAD"
     return fallback

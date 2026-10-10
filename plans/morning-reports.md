@@ -884,3 +884,30 @@ one or more component tags, and a date.
         today (one version each, Perth has no daylight saving), real the day
         either changes. One left for REQ-DASH-182: the delivery-time label
         ignores days_before.
+      - REQ-PIPE-111 BUILT (three halves deferred, below): once an item of
+        the agreement could govern a filing - a date, a calendar or
+        participation version, a not_expected entry, a timezone version - it
+        changes only by a declared correction appended to its owner's
+        `corrections:` list, naming change reference, date, author, approver,
+        reason and each item's old and new value, and matching what the file
+        actually did. The refusal is a paste-ready correction block naming
+        who may approve. Next year's dates appended late need no ceremony
+        unless they would move a filed supply; a synthetic asset may add
+        past-dated versions. REQ-PIPE-050's "any changelog line clears it"
+        guard is gone. Inside the pre-commit hook the gate compares the staged
+        file with HEAD. And REQ-PIPE-122's settings guard dates by the committer, not
+        the backdatable author (post-build-review #139; 122 c7 amended as 111
+        decision 28 said).
+        THREE PROVISIONALS FOR YOU: (1) who may approve - a real person in
+        people.yaml with the MANAGER role (the criterion says only "allowed
+        to approve"); (2) the item syntax a correction names, e.g.
+        `calendar quarterly version 2023-01-01 date 2024-Q1`; (3) an
+        uncommitted change (the hook) is dated "now".
+        DEFERRED, recorded as unmet: the CODEOWNERS half of the approver
+        check (REQ-GHUB-174 creates the file - none exists), naming the
+        impact preview command (REQ-PIPE-169), and collection defaults
+        (REQ-PIPE-181). REQ-PIPE-112's criterion 13 is now half met - the
+        freeze is built; re-judge, preview and backstop wait on 168/169/173.
+        THREAD C IS NOT DELETED: 110-113 are built, but REQ-PIPE-179/180/181
+        and REQ-DASH-182 came out of the same thread and are unbuilt, so by
+        CLAUDE.md's rule 4 it goes whole only after them.

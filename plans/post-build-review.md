@@ -7020,3 +7020,17 @@ twice. It deliberately did not re-find the `TypeError`.
       label ignores days_before - "by 22:00" for a supply due the evening
       before. It is the label REQ-DASH-182 owns, along with which version's
       label to show.
+
+139. **[done, 2026-10-11]** **[Pipeline & publishing]** **REQ-PIPE-122's
+    settings guard dated a version by the commit's AUTHOR date**, which a
+    person can set to anything - so a backdated commit could pass a new
+    amber-setting version off as added before its effective date. Found by
+    delivery-architect's pre-build review of REQ-PIPE-111 (2026-10-07, S6) and
+    decided by Keith the same day (REQ-PIPE-111 decision 28): fix it in the
+    change that builds REQ-PIPE-111, with REQ-PIPE-122 criterion 7 amended
+    alongside. **FIXED 2026-10-11 (overnight #3)**:
+    `validate_schedule._version_added_on` reads `%cI`, the committer
+    instant, floored at the base commit's own. FAILING TEST FIRST:
+    tests/test_agreement_freeze.py `TestTheSettingsGuardDatesByTheCommitter`
+    failed against the `%aI` code (a stamp a week before the base came back
+    as the added-on date) and passes now.

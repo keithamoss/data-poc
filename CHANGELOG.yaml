@@ -153,6 +153,14 @@ releases:
               never re-judges a slot that was already due. A supply can be due
               a whole number of days before its period - the evening before,
               for instance.
+          - headline: The agreement's past changes only on the record
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Once a date, a due time or a timezone has governed a supply, the
+              configuration gate refuses any change to it that is not a declared
+              correction - with a change reference, an approver and the old and
+              new values - and prints the correction ready to paste. Adding next
+              year's dates still needs nothing.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

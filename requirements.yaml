@@ -7887,7 +7887,7 @@ requirements:
     - qa_tools/common/validate_schedule.py::_dataset_errors
     - qa_tools/common/validate_schedule.py::_expects_nothing_errors
     - qa_tools/common/validate_schedule.py::_contract_errors
-    - qa_tools/common/validate_schedule.py::_retrospective_edit_errors
+    - qa_tools/common/validate_schedule.py::_freeze_errors
     - qa_tools/common/schemas.py::DataAsset
     - cli/schedule.py::validate_command
     evidence:
@@ -25336,7 +25336,44 @@ requirements:
       who approved it and under which change reference, so that a legitimate reassessment can happen visibly
       and under governance, and nobody can quietly make a breach disappear or invent one.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-11 (overnight #3): tests/test_agreement_freeze.py 30 passed, against the real committed calendar.yaml, data-asset.yaml and people.yaml with the commit instant fixed - unchanged, reordered and missing-previous states pass (criteria 14, 18); a future date edits freely (10); a past date moved or removed is refused with the item named in correction syntax, ''Nothing was committed'', a paste-ready entry, who may approve and the impact preview named (3, 15); a changelog line licenses nothing (6); a matching correction allows it, a mismatched one says ''you declared ... the file had ...'', a declared change the file does not make and one on the wrong owner are refused (3-5); a placeholder, a non-manager and an approver absent from the base people.yaml are refused (22, people half); editing a committed correction is refused (21); dates appended after the last are allowed late unless one would move a filed supply (8); a not_expected added for an open period is refused naming mark-not-supplied, ahead of it is free (decision 13); past participation versions and the daily calendar''s version are frozen, a synthetic asset may add a past-dated version and a non-synthetic one may not (6, 9, 17); a timezone version is corrected on the timezone in data-asset.yaml; nothing under data/ is opened (16); the settings guard dates by the committer instant floored at the base (28, failing first against the author-date code). tests/test_agreement.py: a correction missing any of its six fields is refused (4).'
+    - '2026-10-11: the schedule gate including the freeze check runs in 2.9s against the hierarchy gate''s 2.5s (criterion 19). The real configuration passes against its base. Inside the pre-commit hook diff_base() returns HEAD, read from pre-commit''s own PRE_COMMIT=1, so the staged file is compared against HEAD (criterion 13, tested); CI already passes the push''s base.'
+    implemented_by:
+    - qa_tools/common/agreement_freeze.py::check
+    - qa_tools/common/agreement_freeze.py::flatten
+    - qa_tools/common/agreement_freeze.py::freeze_instant
+    - qa_tools/common/agreement_freeze.py::approvers
+    - qa_tools/common/agreement_freeze.py::committer_instant
+    - qa_tools/common/validate_schedule.py::_freeze_errors
+    - qa_tools/common/validate_schedule.py::_version_added_on
+    - qa_tools/common/schemas.py::Correction
+    - qa_tools/common/agreement.py::from_doc
+    - qa_tools/common/diff_base.py::diff_base
+    linked_tests:
+    - tests/test_agreement_freeze.py
+    - tests/test_agreement.py
+    - tests/test_validate_schedule.py
+    unmet_criteria:
+    - criterion: 'Criterion 22''s code-owner half - checking the approver against CODEOWNERS as it stood at the base.'
+      owner: REQ-GHUB-174
+      why: 'REQ-GHUB-174 (signed, not built) creates the CODEOWNERS file; none exists yet. The people.yaml half is built: a real, non-placeholder person with the manager role, read at the base.'
+      blocked_by:
+        requirements:
+        - REQ-GHUB-174
+    - criterion: 'Criterion 15''s naming of the impact preview command.'
+      owner: REQ-PIPE-169
+      why: 'The preview is REQ-PIPE-169''s and does not exist; the refusal names it by requirement and says it is not built yet rather than naming a command that does not run.'
+      blocked_by:
+        requirements:
+        - REQ-PIPE-169
+    - criterion: 'Criterion 2''s collection default participation.'
+      owner: REQ-PIPE-181
+      why: 'Collection participation_defaults arrive with REQ-PIPE-181 (signed, not built); there is nothing of that shape to freeze until then, and the flattening will need it as an item.'
+      blocked_by:
+        requirements:
+        - REQ-PIPE-181
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -25530,6 +25567,12 @@ requirements:
     - 'THE BUILT SETTINGS GUARD IS FIXED IN THE SAME CHANGE (Keith, 2026-10-07): REQ-PIPE-122''s guard dates a settings version by the commit''s AUTHOR date (validate_schedule._version_added_on, %aI), which can be backdated - the hole this requirement closes for calendars by using the committer instant floored at the base commit. Both freeze rules move to the one clock in the change that builds this requirement, with REQ-PIPE-122 amended alongside and the defect recorded in plans/post-build-review.md.'
     - 'Keith, 2026-10-08: the pre-commit hook is the BACKSTOP, not the way people get a correction block. The usual route is the terminal''s draft-correction command (REQ-PIPE-169), run before committing; the hook and CI refuse only when someone skipped it. Both print the entry by one implementation, so they cannot disagree.'
     - 'TO BE AMENDED (Keith, 2026-10-10, approving the substance): a participation version''s effective_to gets its own freeze point - the earliest claim-opening instant of the first period it would stop the dataset owing - and is added to criterion 4''s list of what a dataset''s corrections cover. See REQ-PIPE-110''s decision of the same date. Wording to be shown to Keith before it replaces criterion 2.'
+    - 'BUILT AS ONE MODULE OVER FLATTENED ITEMS (2026-10-11, overnight #3): qa_tools/common/agreement_freeze.py flattens each state of calendar.yaml and data-asset.yaml''s timezone into items named in the syntax a correction uses - ''calendar quarterly version 2023-01-01 date 2024-Q1'', ''dataset cp-clients participation 2023-01-01'', ''dataset cp-clients not_expected 2025-Q2'', ''dataset X dates version E date P'', ''timezone version 1970-01-01'' (PROVISIONAL syntax) - compares parsed values, and computes each changed item''s freeze instant through slots.slot_instants in the state that held it. Changelog lines and corrections are not items. It replaces REQ-PIPE-050''s validate_schedule._retrospective_edit_errors outright (criterion 6); that guard''s tests went with it and their still-valid cases - a future date is editable, an unchanged file and a missing previous state pass - are tests/test_agreement_freeze.py''s.'
+    - 'THE CLOCK, AS BUILT (criterion 12): where the files differ from HEAD (the pre-commit hook, MOTHMAN_DIFF_BASE=HEAD) the change is being committed now, so the instant is now; otherwise each candidate refusal is dated by walking the commits after the base to the first whose flattened item matches the final state, taking its COMMITTER instant - and either way floored at the base commit''s committer instant. The walk runs only when a change to something frozen needs dating (NFR 5). PROVISIONAL: ''now'' for the uncommitted case, since the commit''s own instant does not exist yet.'
+    - 'WHO MAY APPROVE, PROVISIONAL (criterion 22): a person in people.yaml as it stood at the base, not a placeholder, not the synthetic history''s scripted person, holding the manager role - named by email or GitHub handle. The criterion says ''allowed to approve'' without naming a role; manager is the one that already signs things off. The CODEOWNERS half waits on REQ-GHUB-174, which creates the file.'
+    - 'THE APPEND CARVE-OUT, AS BUILT (criterion 8): dated entries added after a calendar''s latest previous date pass with no correction when, for every dataset on the calendar, the earliest appended entry''s claim-opening instant is no earlier than that dataset''s last slot''s closing instant in the previous state (REQ-PIPE-131''s closing, including its PROVISIONAL last-period measure). A date squeezed in just after the last one is refused, because its window would close a slot early.'
+    - 'SYNTHETIC ADDITIONS (criterion 9): on an asset synthetic before and after, adding a calendar, participation or timezone version with a past date needs no correction, and neither do the dated entries INSIDE a calendar version the same change adds - they arrive with it. Changing or removing anything frozen still needs one.'
+    - 'THE BUILT SETTINGS GUARD''S CLOCK IS FIXED IN THIS CHANGE (criterion 28): validate_schedule._version_added_on reads the committer instant (%cI), floored at the base commit, instead of the author date (%aI) that could be backdated - its test failed against the old code first. REQ-PIPE-122 criterion 7 amended alongside; recorded as plans/post-build-review.md #139.'
   - id: REQ-PIPE-112
     title: The asset's timezone is versioned, and every reader asks as at when
     date_written: '2026-09-28'
@@ -25568,12 +25611,14 @@ requirements:
     - tests-js/display-time.test.js
     - tests/test_dashboard_e2e.py::TestTodayIsTheAssetsToday
     unmet_criteria:
-    - criterion: Criterion 13 - protecting timezone versions with the freeze rule and the declared-correction route, and re-judging, previewing and backstopping a timezone correction.
-      owner: REQ-PIPE-111
-      why: 'The freeze and the correction route are REQ-PIPE-111''s, which is signed and not built (Keith, 2026-10-10: build REQ-PIPE-112 now with criterion 13 deferred). The versions this requirement adds are the thing it will freeze.'
+    - criterion: Criterion 13's second half - re-judging, previewing and backstopping a timezone correction. The first half, the freeze and the declared-correction route including the synthetic exception, is met since REQ-PIPE-111 was built (2026-10-11, tests/test_agreement_freeze.py TestTheTimezone).
+      owner: REQ-PIPE-168, REQ-PIPE-169, REQ-PIPE-173
+      why: 'A timezone correction is re-judged, previewed and backstopped exactly as any other correction, and none of those three requirements is built yet.'
       blocked_by:
         requirements:
-        - REQ-PIPE-111
+        - REQ-PIPE-168
+        - REQ-PIPE-169
+        - REQ-PIPE-173
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -27867,7 +27912,7 @@ requirements:
       - "THE SYSTEM SHALL hold the amber setting, at each level, as a series of versions, each with an effective date, in the same shape as a calendar's versions (REQ-PIPE-110), and SHALL resolve the value that applies to a supply from the version in effect at the instant the decision about it takes effect."
       - "THE SYSTEM SHALL derive every state shown for the past - an amber supply waiting under hold, a supply awaiting acknowledgement, an automatic replacement - from what was recorded on the decision at the time, and SHALL NOT recompute it from the setting in force now."
       - "THE SYSTEM SHALL refuse in CI a change that alters or removes a version of the setting whose effective date has passed, whatever changelog entry accompanies it - there is no correction route for a setting's past."
-      - 'THE SYSTEM SHALL refuse in CI a new version of the setting whose effective date is earlier than the day it was added - the date, on the data asset''s own clock, of the commit that introduced the version - so that when the gate runs does not matter. AMENDED 2026-10-05 (Keith): judged on the day the gate ran, a version added late at night and pushed after midnight went red.'
+      - 'THE SYSTEM SHALL refuse in CI a new version of the setting whose effective date is earlier than the day it was added - the date, on the data asset''s own clock, of the COMMITTER instant of the commit that introduced the version, floored at the base commit''s (amended by REQ-PIPE-111 criterion 28; the author date can be backdated) - so that when the gate runs does not matter. AMENDED 2026-10-05 (Keith): judged on the day the gate ran, a version added late at night and pushed after midnight went red.'
       - "WHERE a data asset's configuration declares it synthetic (the declaration REQ-GEN-135 already requires for scenario playback), THE SYSTEM SHALL allow a new version with a past effective date, and SHALL still refuse altering or removing an existing past version."
       - "IF the data asset level states no value, THEN THE SYSTEM SHALL refuse the configuration, and SHALL NOT assume a default."
       - "WHERE the resolved setting is hold, THE SYSTEM SHALL NOT promote an amber supply automatically, and SHALL leave it staged awaiting a person."

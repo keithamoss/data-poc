@@ -466,3 +466,21 @@ def test_the_runtime_refuses_older_months_against_a_cadence_rule_too(tmp_path):
     with pytest.raises(schedule.ScheduleConfigError, match="cadence rule"):
         schedule.periods_for_dataset("birth-registrations", until=date(2026, 9, 10),
                                      agreement=agreement.load(path))
+
+
+class TestACorrectionMustBeComplete:
+    """REQ-PIPE-111 criterion 4: every field, or the configuration is
+    refused."""
+
+    @pytest.mark.parametrize("missing", ["change_reference", "date", "author", "approver",
+                                         "reason", "changes"])
+    def test_each_field_is_required(self, broken, missing):
+        def mutate(doc):
+            correction = {"change_reference": "CAB-1", "date": "2026-10-11", "author": "a",
+                          "approver": "fpycnkgvmt@privaterelay.appleid.com", "reason": "r",
+                          "changes": [{"item": "x", "old": 1, "new": 2}]}
+            correction.pop(missing)
+            next(c for c in doc["calendars"] if c["name"] == "quarterly")["corrections"] = [
+                correction]
+        errors = broken(mutate)
+        assert any(missing in (e.problem + (e.field or "")) for e in errors), _text(errors)

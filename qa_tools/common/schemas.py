@@ -477,6 +477,8 @@ class CalendarConfig(_Strict):
     # window are the supplier agreement; this is an operational
     # threshold for when we want telling that they are running out.
     runway_warning_slots: int | None = Field(default=None, ge=1)
+    #: Declared corrections to this calendar's frozen items (REQ-PIPE-111).
+    corrections: list["Correction"] = Field(default_factory=list)
 
 
 class ConfigChangelogEntry(_Strict):
@@ -499,6 +501,8 @@ class TimezoneVersion(_Strict):
 
 class TimezoneConfig(_Strict):
     versions: list[TimezoneVersion] = Field(min_length=1)
+    #: Declared corrections to frozen timezone versions (REQ-PIPE-111).
+    corrections: list["Correction"] = Field(default_factory=list)
 
 
 #: THE AMBER SETTING'S THREE VALUES, STRICTEST FIRST (REQ-PIPE-122
@@ -645,6 +649,27 @@ class ParticipationVersionConfig(_Strict):
     changelog: list[ConfigChangelogEntry] = Field(min_length=1)
 
 
+class CorrectionChange(_Strict):
+    """One changed item in a declared correction (REQ-PIPE-111 criterion
+    4): the item in the syntax the gate names it, its old value and its
+    new one. `old` is null for an item the correction adds, `new` null for
+    one it removes."""
+    item: NonEmptyStr
+    old: object = None
+    new: object = None
+
+
+class Correction(_Strict):
+    """A declared correction to an item already frozen (REQ-PIPE-111
+    criterion 4) - every field required."""
+    change_reference: NonEmptyStr
+    date: str = Field(pattern=_DATE_PATTERN)
+    author: NonEmptyStr
+    approver: NonEmptyStr
+    reason: NonEmptyStr
+    changes: list[CorrectionChange] = Field(min_length=1)
+
+
 class Participation(_Strict):
     versions: list[ParticipationVersionConfig] = Field(min_length=1)
 
@@ -666,6 +691,8 @@ class DatasetAgreementConfig(_Strict):
     participation: Participation | None = None
     not_expected: list[NotExpectedPeriod] | None = None
     dates: OwnDates | None = None
+    #: Declared corrections to this dataset's frozen items (REQ-PIPE-111).
+    corrections: list[Correction] = Field(default_factory=list)
 
 
 class CollectionAgreementConfig(_Strict):
