@@ -753,3 +753,39 @@ one or more component tags, and a date.
         THEN, in this order:
         REQ-TEST-117 (CI reuses a bootstrapped database), then REQ-PIPE-152
         (the S3 Lambda handlers).
+
+3. **[in-progress, 2026-10-10]** **[Docs & process]** **Overnight 2026-10-10 to
+   11: two built-code defects, the excuse, the versioned timezone, the asset
+   manager, CI's cached bootstrap - and REQ-PIPE-110 signed.**
+
+      - THE PLAN, AGREED 23:00-23:30 PERTH, in order:
+        1. post-build-review #136 - a claim on each owed re-check, so no two
+           runners run the same one (REQ-PIPE-163 criterion 31's rule, built
+           for the code that exists today).
+        2. post-build-review #135 - a group whose every dataset is left out of
+           its rollup reads 'Not counted', never green. Only that half is
+           reachable today; 'Turned off' waits for REQ-PIPE-179.
+        3. REQ-PIPE-161 + REQ-DASH-162 - excusing a late supply, including the
+           criterion Keith added tonight: an excuse does not bar the gate
+           (plans/running-thoughts.md #78).
+        4. REQ-PIPE-112 - the versioned timezone. Criterion 13 (the freeze)
+           deferred to REQ-PIPE-111; the as-at lookup is built as the function
+           REQ-PIPE-110's one loader later takes over.
+        5. REQ-GHUB-171 - the people configuration names the data asset's
+           manager.
+        6. REQ-TEST-117 - CI reuses a bootstrapped database. Last, because each
+           CI round trip is 15-30 minutes.
+        If the queue finishes early: REQ-PIPE-110, signed tonight, pin first
+        (NFR 3 and 4) - otherwise it is first next session.
+      - KEITH'S TERMS (23:15), the same as overnight #2's: forks take the
+        recommended option, marked PROVISIONAL and listed below; at most one
+        full rebuild per item; my own dev and scratch database schemas may be
+        upgraded in place, a shared or real one never; commit and push each
+        finished item after the gate, CI checked at natural pauses; nothing
+        unsigned is built, today's batch included. Post-build critics after
+        each build, their fixes in before the next item.
+      - SIGNED TONIGHT: REQ-PIPE-110, at Keith's choice not re-walked - he
+        settled its open question (membership unversioned, #79), approved the
+        amendment wording, and accepted the scoper's boundary fixes. The
+        review batch's other ten requirements stay unsigned for a sign-off
+        session.

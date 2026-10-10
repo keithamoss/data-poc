@@ -4931,3 +4931,13 @@ Belongs with batch 5's check work.
     them beside re-file in REQ-PIPE-076 criterion 7. REQ-PIPE-161 is signed
     and not built, so this needs Keith before it is built: should an excuse
     also be exempt?
+
+79. **[todo, 2026-10-10]** **[Pipeline & publishing]** **Which calendar a dataset
+    or collection is on, and which collection a dataset belongs to, are not
+    versioned.** Raised by delivery-scoper in the REQ-PIPE-110 reviews; Keith,
+    2026-10-10, at REQ-PIPE-110's sign-off: not in REQ-PIPE-110 - settle it with
+    REQ-PIPE-111. Moving a dataset to another calendar or collection would
+    re-judge its whole history against the new one, with nothing to stop it.
+    The three answers on the table: refuse such a move once the dataset has a
+    slot; allow it only as a declared correction (REQ-PIPE-111); or version
+    membership like participation.

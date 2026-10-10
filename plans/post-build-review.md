@@ -6880,6 +6880,12 @@ twice. It deliberately did not re-find the `TypeError`.
     asked with the REQ-PIPE-110 review batch (a quiet "No data" pill with an
     "N datasets not counted" line, no pill at all with a line in words, or a
     new group-level status). Failing test first when it is fixed.
+    **Answered, and to be fixed tonight (Keith, 2026-10-10 night):** his
+    answer is REQ-DASH-180's - 'Turned off' where every dataset is turned off,
+    'Not counted' with a line saying why otherwise, never green. Only the
+    'Not counted' half is reachable today (no dataset can be turned off until
+    REQ-PIPE-179 is built), and that half is fixed in the overnight run,
+    failing test first (plans/morning-reports.md #3).
 
 136. **[todo, 2026-10-10]** **[Pipeline & publishing]** **Two runners can run
     the same owed re-check at once.** Found by delivery-architect reviewing
@@ -6900,3 +6906,5 @@ twice. It deliberately did not re-find the `TypeError`.
     finding one claimed skips it) and REQ-PIPE-177 criterion 16. Both are
     unsigned. The fix is a defect in BUILT code (re-file already reaches
     this path), so it does not have to wait for them.
+    **Keith, 2026-10-10 (night): fix it tonight**, failing test first, as part of
+    the overnight run (plans/morning-reports.md #3).
