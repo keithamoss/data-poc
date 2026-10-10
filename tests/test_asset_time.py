@@ -18,21 +18,31 @@ from qa_tools.common import asset_time
 
 @pytest.fixture(autouse=True)
 def _clear_cache():
-    asset_time.asset_timezone.cache_clear()
+    asset_time.timezone_versions.cache_clear()
     yield
-    asset_time.asset_timezone.cache_clear()
+    asset_time.timezone_versions.cache_clear()
 
 
 def _repoint(tmp_path, monkeypatch, text):
     path = tmp_path / "data-asset.yaml"
     path.write_text(text)
     monkeypatch.setattr(asset_time, "DATA_ASSET_YAML", path)
-    asset_time.asset_timezone.cache_clear()
+    asset_time.timezone_versions.cache_clear()
+
+
+def _versions(*pairs) -> str:
+    """A data-asset.yaml naming only timezone versions: (from, zone) pairs."""
+    body = "".join(
+        f"    - effective_from: \"{start}\"\n      zone: {zone}\n      changelog:\n"
+        f"        - {{date: \"{start}\", author: pytest, change: test}}\n"
+        for start, zone in pairs)
+    return f"data_asset_id: a\ntimezone:\n  versions:\n{body}"
 
 
 class TestTheConfiguredZone:
     def test_it_reads_the_real_asset_timezone(self):
-        assert asset_time.asset_timezone().key == "Australia/Perth"
+        assert asset_time.zone_on(date(2026, 9, 1)).key == "Australia/Perth"
+        assert asset_time.zone_now().key == "Australia/Perth"
 
     def test_now_is_aware_and_on_the_assets_clock(self):
         got = asset_time.now()
@@ -45,12 +55,12 @@ class TestTheConfiguredZone:
         put one back where nobody would look for it."""
         _repoint(tmp_path, monkeypatch, "data_asset_id: a\n")
         with pytest.raises(ValueError, match="timezone"):
-            asset_time.asset_timezone()
+            asset_time.zone_now()
 
     def test_a_zone_that_is_not_an_iana_name_is_named_in_the_error(self, tmp_path, monkeypatch):
-        _repoint(tmp_path, monkeypatch, "data_asset_id: a\ntimezone: AWST+8\n")
+        _repoint(tmp_path, monkeypatch, _versions(("1970-01-01", "AWST")))
         with pytest.raises(ValueError, match="AWST"):
-            asset_time.asset_timezone()
+            asset_time.zone_now()
 
 
 class TestParseInstant:
@@ -63,7 +73,7 @@ class TestParseInstant:
             datetime(2026, 9, 1, 6, 0, tzinfo=UTC)
 
     def test_an_aware_datetime_is_returned_as_is(self):
-        value = datetime(2026, 9, 1, 14, 0, tzinfo=asset_time.asset_timezone())
+        value = datetime(2026, 9, 1, 14, 0, tzinfo=asset_time.zone_on(date(2026, 9, 1)))
         assert asset_time.parse_instant(value, "x") is value
 
     def test_a_naive_value_raises_rather_than_being_guessed(self):
@@ -155,3 +165,105 @@ class TestIsoformat:
 
     def test_an_aware_instant_serialises_with_its_offset(self):
         assert asset_time.isoformat(datetime(2026, 9, 1, 6, 0, tzinfo=timezone.utc)).endswith("+00:00")
+
+
+class TestTheTimezoneIsVersioned:
+    """REQ-PIPE-112: every reader asks 'as at when', and a date no version
+    covers is an error rather than the nearest version."""
+
+    def test_a_single_unversioned_value_is_refused(self, tmp_path, monkeypatch):
+        """Criterion 1 - the old `timezone: <name>` shape is not read."""
+        _repoint(tmp_path, monkeypatch, "data_asset_id: a\ntimezone: Australia/Perth\n")
+        with pytest.raises(ValueError, match="effective-dated versions"):
+            asset_time.zone_now()
+
+    def test_a_fixed_utc_offset_is_refused(self, tmp_path, monkeypatch):
+        """Criterion 1 - an offset is one zone's answer for one moment."""
+        _repoint(tmp_path, monkeypatch, _versions(("1970-01-01", "+08:00")))
+        with pytest.raises(ValueError, match="fixed UTC offset"):
+            asset_time.zone_now()
+
+    def test_there_is_no_bare_lookup(self):
+        """Criterion 6 and NFR 2: removed, not deprecated."""
+        assert not hasattr(asset_time, "asset_timezone")
+
+    def test_each_date_reads_its_own_version(self, tmp_path, monkeypatch):
+        _repoint(tmp_path, monkeypatch, _versions(("2020-01-01", "Australia/Perth"),
+                                                  ("2027-01-01", "Australia/Sydney")))
+        assert asset_time.zone_on(date(2026, 12, 31)).key == "Australia/Perth"
+        assert asset_time.zone_on(date(2027, 1, 1)).key == "Australia/Sydney"
+        # A wall-clock time is read in the zone in force on ITS date (criterion 3).
+        assert asset_time.wall_clock(date(2026, 12, 31), "09:00").utcoffset() == timedelta(hours=8)
+        assert asset_time.wall_clock(date(2027, 1, 2), "09:00").utcoffset() == timedelta(hours=11)
+
+    def test_a_version_starts_at_the_start_of_its_own_day_in_its_own_zone(self, tmp_path,
+                                                                           monkeypatch):
+        """Criterion 2 - so every instant belongs to exactly one version.
+        Sydney is on +11:00 in January, so its 2027-01-01 begins at
+        2026-12-31T13:00Z, while Perth's 2027-01-01 would begin 16:00Z."""
+        _repoint(tmp_path, monkeypatch, _versions(("2020-01-01", "Australia/Perth"),
+                                                  ("2027-01-01", "Australia/Sydney")))
+        before = datetime(2026, 12, 31, 12, 59, tzinfo=UTC)
+        after = datetime(2026, 12, 31, 13, 0, tzinfo=UTC)
+        assert asset_time.zone_at(before).key == "Australia/Perth"
+        assert asset_time.zone_at(after).key == "Australia/Sydney"
+        # Shown and reduced to a date in the version in force AT it (criterion 4).
+        assert asset_time.local_date(after) == date(2027, 1, 1)
+        assert asset_time.local_date(before) == date(2026, 12, 31)
+
+    def test_a_date_before_every_version_fails_loudly(self, tmp_path, monkeypatch):
+        """Criterion 7 - never the oldest version instead."""
+        _repoint(tmp_path, monkeypatch, _versions(("2020-01-01", "Australia/Perth")))
+        with pytest.raises(asset_time.NoTimezoneVersion, match="2019-12-31"):
+            asset_time.zone_on(date(2019, 12, 31))
+        with pytest.raises(asset_time.NoTimezoneVersion):
+            asset_time.zone_at(datetime(2019, 12, 31, 12, tzinfo=UTC))
+
+    def test_a_stored_instant_keeps_its_meaning_when_a_version_is_added(self, tmp_path,
+                                                                        monkeypatch):
+        """Criterion 9 - only computed instants follow the versions."""
+        stored = "2026-06-01T09:00:00+08:00"
+        before = asset_time.parse_instant(stored, "x")
+        _repoint(tmp_path, monkeypatch, _versions(("2020-01-01", "Australia/Perth"),
+                                                  ("2026-07-01", "Australia/Sydney")))
+        assert asset_time.parse_instant(stored, "x") == before
+
+
+class TestDaylightSaving:
+    """NFR 4: a zone that observes daylight saving, since the real asset's
+    does not and so can never find these bugs. Sydney springs forward at
+    02:00 on 2026-10-04 and falls back at 03:00 on 2026-04-05."""
+
+    @pytest.fixture(autouse=True)
+    def sydney(self, tmp_path, monkeypatch):
+        _repoint(tmp_path, monkeypatch, _versions(("2020-01-01", "Australia/Sydney")))
+
+    def test_a_time_in_the_spring_forward_gap_does_not_exist(self):
+        assert "does not exist" in asset_time.wall_clock_problem(date(2026, 10, 4), "02:30")
+        with pytest.raises(ValueError, match="does not exist"):
+            asset_time.wall_clock(date(2026, 10, 4), "02:30")
+
+    def test_a_time_in_the_fall_back_overlap_occurs_twice(self):
+        assert "occurs twice" in asset_time.wall_clock_problem(date(2026, 4, 5), "02:30")
+        with pytest.raises(ValueError, match="occurs twice"):
+            asset_time.wall_clock(date(2026, 4, 5), "02:30")
+
+    def test_an_ordinary_time_on_a_transition_day_is_fine(self):
+        assert asset_time.wall_clock_problem(date(2026, 10, 4), "09:00") is None
+        assert asset_time.wall_clock(date(2026, 10, 4), "09:00").utcoffset() == timedelta(hours=11)
+        assert asset_time.wall_clock(date(2026, 10, 3), "09:00").utcoffset() == timedelta(hours=10)
+
+    def test_a_day_is_23_hours_on_spring_forward(self):
+        start = asset_time.start_of_day(date(2026, 10, 4))
+        end = asset_time.end_of_day(date(2026, 10, 4))
+        # IN UTC: Python subtracts two times sharing a tzinfo on the WALL
+        # clock, which would say 24 hours on a 23-hour day.
+        assert end.astimezone(UTC) - start.astimezone(UTC) == \
+            timedelta(hours=23) - timedelta(microseconds=1)
+
+    def test_a_version_change_across_a_transition(self, tmp_path, monkeypatch):
+        """Perth until the day after Sydney springs forward, then Sydney."""
+        _repoint(tmp_path, monkeypatch, _versions(("2020-01-01", "Australia/Perth"),
+                                                  ("2026-10-05", "Australia/Sydney")))
+        assert asset_time.wall_clock_problem(date(2026, 10, 4), "02:30") is None  # Perth that day
+        assert asset_time.wall_clock(date(2026, 10, 5), "09:00").utcoffset() == timedelta(hours=11)

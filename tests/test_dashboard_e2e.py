@@ -1454,13 +1454,16 @@ class TestTodayIsTheAssetsToday:
 
     def test_the_page_knows_which_zone_that_is(self, clean_page, built_dashboard_html):
         """Guards the assertions above against going green by accident.
-        With ASSET_TIMEZONE absent the page falls back to the viewer's
+        With ASSET_TIMEZONES absent the page falls back to the viewer's
         own clock, which agrees with the asset's for most of the day -
         so every test above would pass on the broken build for sixteen
         hours out of every twenty-four."""
         from qa_tools.common import asset_time
         _goto(clean_page, built_dashboard_html, {"tier": "executive"})
-        assert clean_page.evaluate("() => ASSET_TIMEZONE") == asset_time.asset_timezone().key
+        # EVERY VERSION (REQ-PIPE-112 criterion 11), as the config states them.
+        assert clean_page.evaluate("() => ASSET_TIMEZONES") == [
+            {"effective_from": v.effective_from.isoformat(), "zone": v.zone.key}
+            for v in asset_time.timezone_versions()]
 
 
 class TestAnExhaustedScheduleIsLoud:

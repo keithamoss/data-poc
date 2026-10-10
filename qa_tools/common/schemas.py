@@ -480,6 +480,28 @@ class CalendarConfig(_Strict):
     runway_warning_slots: int | None = Field(default=None, ge=1)
 
 
+class ConfigChangelogEntry(_Strict):
+    """One structured changelog entry in contract/data-asset.yaml - a date,
+    an author and what changed (REQ-PIPE-112 criteria 1 and 16). A plain
+    string is refused: it cannot be filtered or attributed, and two shapes
+    in one file is how a reader stops trusting either."""
+    date: str = Field(pattern=_DATE_PATTERN)
+    author: NonEmptyStr
+    change: NonEmptyStr
+
+
+class TimezoneVersion(_Strict):
+    """One effective-dated timezone (REQ-PIPE-112 criterion 1): an IANA
+    zone, in force from the start of its effective_from in its own zone."""
+    effective_from: str = Field(pattern=_DATE_PATTERN)
+    zone: NonEmptyStr
+    changelog: list[ConfigChangelogEntry] = Field(min_length=1)
+
+
+class TimezoneConfig(_Strict):
+    versions: list[TimezoneVersion] = Field(min_length=1)
+
+
 #: THE AMBER SETTING'S THREE VALUES, STRICTEST FIRST (REQ-PIPE-122
 #: criteria 1 and 2). This tuple is the one order; every list of them -
 #: an error message, a comment, the documentation - takes it from here.
@@ -492,7 +514,7 @@ class AmberSettingVersion(_Strict):
     change is authored as a new version rather than an edit."""
     effective_from: str = Field(pattern=_DATE_PATTERN)
     value: Literal[*AMBER_SETTINGS]  # type: ignore[valid-type]
-    changelog: list[NonEmptyStr] = Field(min_length=1)
+    changelog: list[ConfigChangelogEntry] = Field(min_length=1)
 
 
 class AmberSetting(_Strict):
@@ -510,7 +532,7 @@ class ReplacementSettingVersion(_Strict):
     setting's shape, by the same mechanism (REQ-PIPE-123 criterion 1)."""
     effective_from: str = Field(pattern=_DATE_PATTERN)
     value: Literal[*REPLACEMENT_SETTINGS]  # type: ignore[valid-type]
-    changelog: list[NonEmptyStr] = Field(min_length=1)
+    changelog: list[ConfigChangelogEntry] = Field(min_length=1)
 
 
 class ReplacementSetting(_Strict):
@@ -594,7 +616,7 @@ class HierarchyConfig(_Strict):
 
 class DataAsset(_Strict):
     data_asset_id: NonEmptyStr
-    timezone: NonEmptyStr
+    timezone: TimezoneConfig
     calendars: list[CalendarConfig] = Field(min_length=1)
     hierarchy: HierarchyConfig
     #: Which slots get a ticket (REQ-PIPE-083 criterion 21). Optional

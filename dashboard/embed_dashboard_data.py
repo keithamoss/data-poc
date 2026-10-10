@@ -289,11 +289,14 @@ def embed() -> None:
         col["datasets"].append({"id": entry.dataset_id, "name": entry.dataset_name})
     html = _replace_const(html, "HIERARCHY", json.dumps(tree, separators=(",", ":")))
 
-    # ASSET_TIMEZONE - REQ-PIPE-048. So the page answers "what day is
-    # it" on the asset's clock instead of the viewer's.
-    html = _replace_const(html, "ASSET_TIMEZONE",
-                           json.dumps(str(asset_time.asset_timezone().key)))
-    print(f"Re-embedded ASSET_TIMEZONE = {asset_time.asset_timezone().key}")
+    # ASSET_TIMEZONES - REQ-PIPE-048, versioned by REQ-PIPE-112. So the page
+    # answers "what day is it" on the asset's clock instead of the viewer's
+    # - EVERY version (criterion 11), so a past date is read in the zone in
+    # force on it, without asking a backend.
+    zones = [{"effective_from": v.effective_from.isoformat(), "zone": v.zone.key}
+             for v in asset_time.timezone_versions()]
+    html = _replace_const(html, "ASSET_TIMEZONES", json.dumps(zones, separators=(",", ":")))
+    print(f"Re-embedded ASSET_TIMEZONES = {', '.join(z['zone'] + ' from ' + z['effective_from'] for z in zones)}")
 
     # BUILT_AT - REQ-DASH-071 criterion 13. When THIS page was built,
     # which only the build knows. The masthead used to count seconds up

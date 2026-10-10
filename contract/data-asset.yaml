@@ -49,10 +49,30 @@ data_asset_id: data-asset-1
 # agreeing.
 #
 # Changing this does NOT reinterpret anything already stored: every
-# instant in qa_results/ carries its own offset, so it keeps the meaning
-# it was written with. That is the whole reason the offset is stored
-# alongside the value rather than inferred from this line at read time.
-timezone: Australia/Perth
+# instant recorded in the qa schema carries its own offset, so it keeps
+# the meaning it was written with. That is the whole reason the offset
+# is stored alongside the value rather than inferred from here at read
+# time.
+#
+# VERSIONED (REQ-PIPE-112): what that does not cover is an instant
+# COMPUTED from config - a due time is a wall-clock time on a date, and
+# reading it in today's zone for a date in 2024 would silently re-judge
+# the past. So each version is effective-dated, in force from the start
+# of its own effective_from in its own zone, and every reader asks for
+# the zone in force on the date or at the instant it is about. A date no
+# version covers is an error, never the nearest version. The first
+# version starts before any supply this asset holds.
+timezone:
+  versions:
+    - effective_from: "1970-01-01"
+      zone: Australia/Perth
+      changelog:
+        - date: "2026-09-23"
+          author: REQ-PIPE-048
+          change: The asset's own zone, replacing a hardcoded +08:00 offset in pipeline/cadence.py.
+        - date: "2026-10-11"
+          author: REQ-PIPE-112
+          change: Expressed as an effective-dated version; zone and meaning unchanged.
 
 # ---------------------------------------------------------------------
 # DELIVERY CALENDARS (REQ-PIPE-049) - what QA judges a supply against.
@@ -155,7 +175,9 @@ amber_setting:
     - effective_from: "2023-01-01"
       value: promote
       changelog:
-        - "2023-01-01: amber promotes itself into an unfilled slot - unchanged from before the setting existed (REQ-PIPE-075)."
+        - date: "2023-01-01"
+          author: not recorded - converted from a plain-string entry by REQ-PIPE-112
+          change: "amber promotes itself into an unfilled slot - unchanged from before the setting existed (REQ-PIPE-075)."
     # SYNTHETIC ERAS (REQ-GEN-136 criterion 14): switched at dates inside the
     # generated history so one history shows the behaviour before, during and
     # after - and back-dated, which only a synthetic asset may do. Each
@@ -163,15 +185,21 @@ amber_setting:
     - effective_from: "2026-09-01"
       value: hold
       changelog:
-        - "2026-09-01: synthetic era - amber waits for a person (TS-43, parked; the era's own amber supplies show it)."
+        - date: "2026-09-01"
+          author: not recorded - converted from a plain-string entry by REQ-PIPE-112
+          change: "synthetic era - amber waits for a person (TS-43, parked; the era's own amber supplies show it)."
     - effective_from: "2026-09-10"
       value: promote-and-acknowledge
       changelog:
-        - "2026-09-10: synthetic era - amber promotes and asks for an acknowledgement (TS-44 and TS-45, parked; the era's own amber supplies show it)."
+        - date: "2026-09-10"
+          author: not recorded - converted from a plain-string entry by REQ-PIPE-112
+          change: "synthetic era - amber promotes and asks for an acknowledgement (TS-44 and TS-45, parked; the era's own amber supplies show it)."
     - effective_from: "2026-09-18"
       value: promote
       changelog:
-        - "2026-09-18: synthetic era ends - amber promotes itself again."
+        - date: "2026-09-18"
+          author: not recorded - converted from a plain-string entry by REQ-PIPE-112
+          change: "synthetic era ends - amber promotes itself again."
 
 # WHETHER A RESUPPLY MAY REPLACE AN ALREADY-PROMOTED SUPPLY AUTOMATICALLY
 # (REQ-PIPE-123). One of:
@@ -187,17 +215,23 @@ replacement_setting:
     - effective_from: "2023-01-01"
       value: never
       changelog:
-        - "2023-01-01: a filled slot waits for a person - unchanged from before the setting existed (REQ-PIPE-075 criterion 4)."
+        - date: "2023-01-01"
+          author: not recorded - converted from a plain-string entry by REQ-PIPE-112
+          change: "a filled slot waits for a person - unchanged from before the setting existed (REQ-PIPE-075 criterion 4)."
     # SYNTHETIC ERA (REQ-GEN-136 criteria 7, 14 and 15): a green resend replaces
     # the promoted supply for four days, then never again.
     - effective_from: "2026-09-18"
       value: green
       changelog:
-        - "2026-09-18: synthetic era - a green resupply replaces the promoted supply (TS-46, parked; the era's own resends show it)."
+        - date: "2026-09-18"
+          author: not recorded - converted from a plain-string entry by REQ-PIPE-112
+          change: "synthetic era - a green resupply replaces the promoted supply (TS-46, parked; the era's own resends show it)."
     - effective_from: "2026-09-22"
       value: never
       changelog:
-        - "2026-09-22: synthetic era ends - a filled slot waits for a person again."
+        - date: "2026-09-22"
+          author: not recorded - converted from a plain-string entry by REQ-PIPE-112
+          change: "synthetic era ends - a filled slot waits for a person again."
 
 
 calendars:

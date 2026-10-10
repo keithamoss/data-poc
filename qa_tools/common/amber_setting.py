@@ -209,6 +209,35 @@ def _settings(doc: dict, key: str = KEY) -> dict[str, dict]:
     return out
 
 
+#: The author a converted plain-string changelog entry is given
+#: (REQ-PIPE-112 criterion 17): the old strings named nobody, and the
+#: conversion says so rather than inventing one.
+CONVERTED_AUTHOR = "not recorded - converted from a plain-string entry by REQ-PIPE-112"
+
+
+def normalised_changelog(entries) -> list[tuple[str, str, str]]:
+    """A changelog as (date, author, change) triples, whichever shape it is
+    written in - so the frozen-past guard compares MEANING, and the one-off
+    conversion from 'YYYY-MM-DD: text' strings to structured entries reads
+    as no change at all (REQ-PIPE-112 criterion 17; delivery-architect S1:
+    comparing the raw values refused the conversion as an altered past)."""
+    out = []
+    for entry in entries or []:
+        if isinstance(entry, dict):
+            out.append((str(entry.get("date")), str(entry.get("author")),
+                        str(entry.get("change"))))
+        else:
+            day, _, text = str(entry).partition(": ")
+            out.append((day, CONVERTED_AUTHOR, text))
+    return out
+
+
+def _appends_to(before: list, after: list) -> bool:
+    """An append-only changelog: every earlier entry still there, unchanged
+    and in order, with anything new after it."""
+    return after[:len(before)] == before
+
+
 def _versions(setting: dict) -> dict[str, dict]:
     return {str(v.get("effective_from")): v for v in (setting.get("versions") or [])
             if isinstance(v, dict)}
@@ -249,10 +278,14 @@ def past_change_problems(old: dict, new: dict, today: date, *,
             if start not in after:
                 problems.append((where, f"the version effective {start} has been removed, and "
                                         f"its date has passed"))
-            elif (after[start].get("value"), after[start].get("changelog")) != (
-                    version.get("value"), version.get("changelog")):
+            elif after[start].get("value") != version.get("value"):
                 problems.append((where, f"the version effective {start} has been altered, and "
                                         f"its date has passed"))
+            elif not _appends_to(normalised_changelog(version.get("changelog")),
+                                 normalised_changelog(after[start].get("changelog"))):
+                problems.append((where, f"a changelog entry of the version effective {start} has "
+                                        f"been changed or removed, and its date has passed - a "
+                                        f"changelog is append-only"))
     for where, setting in now.items():
         before = _versions(was.get(where) or {})
         for start in _versions(setting):

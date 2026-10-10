@@ -1159,18 +1159,61 @@ const _MONTH_FULL = ["January","February","March","April","May","June","July",
 
    So both halves throw. A page that will not draw a date is something
    somebody fixes; a page that draws the wrong one is not. */
-function assetTimezoneOrFail(){
-  const tz = ASSET_TIMEZONE;
-  if(typeof tz !== "string" || !tz.trim()){
+/* VERSIONED (REQ-PIPE-112 criterion 11): every timezone version is
+   embedded, each in force from the start of its own effective_from in its
+   own zone (criterion 2). An instant is shown in the version in force AT
+   it (criterion 4); a date is read in the version in force ON it
+   (criterion 3). A date or instant no version covers is an error, never
+   the nearest version (criterion 7). Resolved once per page (NFR 5): the
+   versions and their start instants are worked out on first use and
+   kept, so a lookup is a short loop over a handful of versions. */
+let _ZONE_VERSIONS = null;
+function zoneVersions(){
+  if(_ZONE_VERSIONS) return _ZONE_VERSIONS;
+  const list = ASSET_TIMEZONES;
+  if(!Array.isArray(list) || !list.length){
     throw new Error("no asset timezone is embedded (contract/data-asset.yaml -> "
       + "timezone), so no instant can be placed on the asset's clock");
   }
-  try { new Intl.DateTimeFormat("en-GB", {timeZone: tz}); }
-  catch(e){
-    throw new Error(`asset timezone "${tz}" is not a zone this browser knows, `
-      + "so no instant can be placed on the asset's clock");
-  }
-  return tz;
+  _ZONE_VERSIONS = list.map(v=>{
+    try { new Intl.DateTimeFormat("en-GB", {timeZone: v.zone}); }
+    catch(e){
+      throw new Error(`asset timezone "${v.zone}" is not a zone this browser knows, `
+        + "so no instant can be placed on the asset's clock");
+    }
+    return {from: v.effective_from, zone: v.zone, startsMs: zonedMidnightMs(v.effective_from, v.zone)};
+  }).sort((a,b)=> a.from < b.from ? -1 : a.from > b.from ? 1 : 0);
+  return _ZONE_VERSIONS;
+}
+// The offset of `zone` at the instant `ms`, asked of the platform through
+// the one formatter (assetParts) rather than a second Intl caller - every
+// zone offset is a whole number of minutes, so minute precision is exact.
+function zoneOffsetMs(zone, ms){
+  const minute = Math.floor(ms / 60000) * 60000;
+  const p = assetParts(new Date(minute), zone);
+  return Date.UTC(p.year, p.month-1, p.day, p.hour, p.minute) - minute;
+}
+// The first instant of a date in a zone - midnight exists on every day
+// in every zone this page could meet, so two passes settle the offset.
+function zonedMidnightMs(dateStr, zone){
+  const [y, m, d] = String(dateStr).split("-").map(Number);
+  const guess = Date.UTC(y, m-1, d);
+  const first = guess - zoneOffsetMs(zone, guess);
+  return guess - zoneOffsetMs(zone, first);
+}
+function assetZoneAt(value){
+  const ms = asInstant(value).getTime();
+  let found = null;
+  for(const v of zoneVersions()) if(v.startsMs <= ms) found = v;
+  if(!found) throw new Error(`no timezone version covers ${new Date(ms).toISOString()} - `
+    + "not falling back to the nearest one");
+  return found.zone;
+}
+function assetZoneOn(dateStr){
+  let found = null;
+  for(const v of zoneVersions()) if(v.from <= dateStr) found = v;
+  if(!found) throw new Error(`no timezone version covers ${dateStr} - not falling back to the nearest one`);
+  return found.zone;
 }
 
 // The asset's own clock, as the parts a format needs. Intl is what does
@@ -1193,9 +1236,9 @@ function asInstant(value){
   return at;
 }
 
-function assetParts(value){
+function assetParts(value, zone){
   const at = asInstant(value);
-  const tz = assetTimezoneOrFail();
+  const tz = zone || assetZoneAt(at);
   const f = new Intl.DateTimeFormat("en-GB", {timeZone: tz, weekday:"long",
     day:"numeric", month:"numeric", year:"numeric", hour:"numeric", minute:"2-digit",
     hour12:false});
@@ -1212,22 +1255,26 @@ function assetParts(value){
    Its Python twin, display_time.format_day, draws the same distinction
    on the type it is given. */
 const _PLAIN_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
-function fmtDay(value){
+function fmtDay(value, zone){
   const plain = typeof value === "string" && _PLAIN_DATE.exec(value.trim());
   if(plain){
     const [y, m, d] = [Number(plain[1]), Number(plain[2]), Number(plain[3])];
     const weekday = _WEEKDAY_FULL[new Date(Date.UTC(y, m-1, d)).getUTCDay()];
     return `${weekday}, ${d} ${_MONTH_FULL[m-1]} ${y}`;
   }
-  const p = assetParts(value);
+  const p = assetParts(value, zone);
   return `${p.weekday}, ${p.day} ${_MONTH_FULL[p.month-1]} ${p.year}`;
 }
 
-function fmtInstant(value){
-  const p = assetParts(value);
+// `zone` is for the one place an instant must be read in a version other
+// than the one in force at it: a receipt shown beside the due time it was
+// judged against renders in that due time's version (REQ-PIPE-112
+// criterion 18). Everywhere else it is left out.
+function fmtInstant(value, zone){
+  const p = assetParts(value, zone);
   const hour = p.hour % 12 || 12;           // 0 and 12 both read as 12
   const meridiem = p.hour < 12 ? "am" : "pm";
-  return `${hour}:${String(p.minute).padStart(2,"0")}${meridiem} ${fmtDay(value)}`;
+  return `${hour}:${String(p.minute).padStart(2,"0")}${meridiem} ${fmtDay(value, zone)}`;
 }
 
 /* `now` is REQUIRED and has no default, which is the point rather than
@@ -1270,7 +1317,8 @@ function fmtRelative(value, now){
    the asset's zone. */
 function assetEndOfDay(dateStr){
   const probe = new Date(dateStr+"T12:00:00Z");
-  const p = assetParts(probe);
+  // The zone in force ON the date (REQ-PIPE-112 criterion 3).
+  const p = assetParts(probe, assetZoneOn(dateStr));
   const offsetMs = Date.UTC(p.year, p.month-1, p.day, p.hour, p.minute) - probe.getTime();
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(Date.UTC(y, m-1, d, 23, 59, 59) - offsetMs);
@@ -1829,7 +1877,9 @@ const HIERARCHY = null;
 // to the viewer's zone any more (REQ-DASH-071 criterion 14): a built
 // dashboard whose zone is absent or unresolvable refuses to draw an
 // instant at all rather than drawing one from the wrong clock.
-const ASSET_TIMEZONE = null;
+// ASSET_TIMEZONES since REQ-PIPE-112: every version, [{effective_from,
+// zone}], so a past date is read in the zone in force on it.
+const ASSET_TIMEZONES = null;
 // BUILT_AT - REQ-DASH-071 criterion 13. The instant this page was
 // built, written by dashboard/embed_dashboard_data.py from the build
 // itself. NULL HERE is the raw template, which was never built, and the
@@ -2813,7 +2863,7 @@ function liveNowDateStr(){ return assetTodayDateStr(); }
 // fallback inside the formatter where it would also catch a real
 // misconfiguration. The as-of chrome, which is the only thing that
 // needs a date before any data is loaded, simply is not drawn.
-const HAS_ASSET_CLOCK = typeof ASSET_TIMEZONE === "string" && ASSET_TIMEZONE.trim() !== "";
+const HAS_ASSET_CLOCK = Array.isArray(ASSET_TIMEZONES) && ASSET_TIMEZONES.length > 0;
 function defaultInPlaceOn(){
   return HAS_ASSET_CLOCK ? liveNowDateStr() : null;
 }
@@ -5271,7 +5321,12 @@ function redPromotedMarker(scope){
   if(!found.length) return "";
   return `<div class="red-promoted-marker" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${found.length} red promoted: ${escHtml(found.map(d=> d.name).join(", "))}</span></div>`;
 }
-function renderSupplyCycleRows(entries, datasetId){
+function renderSupplyCycleRows(entries, datasetId, cycleStart){
+  // A RECEIPT BESIDE THE DUE TIME IT WAS JUDGED AGAINST renders in that
+  // due time's zone version (REQ-PIPE-112 criterion 18): the cycle's own
+  // date, read in the version in force on it.
+  const dueZone = (typeof cycleStart === "string" && _PLAIN_DATE.test(cycleStart))
+    ? assetZoneOn(cycleStart) : undefined;
   const raw = rawRealDatasetById(datasetId);
   const runsById = Object.fromEntries(((raw && raw.runs) || []).map(r=>[r.run_id, r]));
   return entries.map(e => {
@@ -5296,7 +5351,7 @@ function renderSupplyCycleRows(entries, datasetId){
       // e.arrivedAt used to be emitted RAW here - offset, microseconds
       // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
       // one column. REQ-DASH-071.
-      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPill(e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" title="${receivedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt) : ""}</span> ${waitedChip(e)} ${filedNote(e)}`;
+      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPill(e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" title="${receivedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt, dueZone) : ""}</span> ${waitedChip(e)} ${filedNote(e)}`;
     // data-run-id alongside data-run-date: run_date is NOT unique (a
     // resupply shares its base run's date - plans/conceptual-design.md
     // Thread A found 352 real BDM runs across only 123 distinct dates),
@@ -5410,7 +5465,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
       <div class="overflow-x">
       <table class="dataset-table supply-cycle-table">${SUPPLY_CYCLE_COLS}
         <thead><tr><th>Arrived</th><th>Status</th><th>Timing</th><th>Rows</th><th>Outcome</th><th></th></tr></thead>
-        <tbody>${renderSupplyCycleRows(c.entries, ds.id)}</tbody>
+        <tbody>${renderSupplyCycleRows(c.entries, ds.id, c.cycleStart)}</tbody>
       </table>
       </div>
     </div>`;

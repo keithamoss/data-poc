@@ -109,6 +109,35 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-11"
+    summary: >
+      A collection with nothing counted no longer reads green, one re-check
+      never runs twice, and the asset's clock can change without rewriting
+      the past.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Nothing counted, never green
+            components: ["Dashboard UI"]
+            description: >
+              A collection whose every dataset is left out of its status - none
+              has an agreed schedule yet - used to show green. It now reads Not
+              counted, with a line saying why.
+          - headline: One re-check, one run
+            components: ["Pipeline & publishing"]
+            description: >
+              The terminal and the processing pass could both start the same
+              re-check at once. Now whichever starts second says it is already
+              being run elsewhere and leaves it to finish there.
+      - category: Improved
+        items:
+          - headline: A clock that can move
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              The asset's timezone now has dated versions, so if it ever
+              changes, every past due time keeps the clock it was judged
+              against. A due time daylight saving would skip or repeat is
+              refused.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

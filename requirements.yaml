@@ -7259,8 +7259,11 @@ requirements:
       by: Keith
       date: "2026-09-22"
     acceptance_criteria:
-      - THE SYSTEM SHALL read the data asset's timezone from exactly one
-        configuration value.
+      - THE SYSTEM SHALL read the data asset's timezone from exactly one place in
+        configuration - its effective-dated versions in contract/data-asset.yaml -
+        and SHALL use the version in force on the date, or at the instant, in
+        question. AMENDED 2026-10-11 by REQ-PIPE-112 criterion 15; it read 'from
+        exactly one configuration value'.
       - THE SYSTEM SHALL derive every wall-clock computation from that
         value, and SHALL NOT carry a hardcoded offset anywhere.
       - THE SYSTEM SHALL write every stored timestamp with its own UTC
@@ -7302,7 +7305,9 @@ requirements:
       - tests/test_dataset_stats.py
       - tests/test_dashboard_e2e.py::TestTodayIsTheAssetsToday
     implemented_by:
-      - qa_tools/common/asset_time.py::asset_timezone
+      - qa_tools/common/asset_time.py::timezone_versions
+      - qa_tools/common/asset_time.py::zone_on
+      - qa_tools/common/asset_time.py::zone_at
       - qa_tools/common/asset_time.py::parse_instant
       - qa_tools/common/asset_time.py::record_source_instant
       - qa_tools/common/asset_time.py::now
@@ -22356,7 +22361,7 @@ requirements:
     - THE SYSTEM SHALL require an answer before filing a kept supply, SHALL accept `not known` as that answer, and SHALL record `not known` as such rather than as a time.
     - IF a non-interactive caller keeps a supply and states no original arrival, THEN THE SYSTEM SHALL refuse, say which flag is missing, and file nothing.
     - IF a stated original arrival is later than the command's own receipt instant, THEN THE SYSTEM SHALL refuse it, say why, and file nothing.
-    - WHERE a stated original arrival carries no UTC offset, THE SYSTEM SHALL read it on the asset's own clock (contract/data-asset.yaml's timezone) and SHALL record it with that offset.
+    - WHERE a stated original arrival carries no UTC offset, THE SYSTEM SHALL read it on the asset's own clock - the timezone version in force on its date (contract/data-asset.yaml, REQ-PIPE-112) - and SHALL record it with that offset, refusing one that daylight saving makes no moment or two. AMENDED 2026-10-11 by REQ-PIPE-112 criterion 15; it read '(contract/data-asset.yaml's timezone)'.
     - WHERE a kept supply was fetched from S3, THE SYSTEM SHALL offer each object's own LastModified instant as the default answer for that object - for an S3 delivery prefix, every object's own instant shown together as one set, which the person confirms in one step - and SHALL let the person instead give one answer, a time or `not known`, for every file, recording whichever they give, per file, only as the stated original arrival.
     - WHERE a delivery was received without a person filing it, THE SYSTEM SHALL record no stated original arrival, so that `never asked` stays distinguishable from `not known`.
     - WHEN a delivery carrying a stated original arrival is shown in `mothman supply deliveries`, in the hand-filing command's own closing message, or in the dashboard's arrival detail, THE SYSTEM SHALL show it beside the receipt, labelled as stated by the person who filed it, and SHALL NOT present it as the receipt.

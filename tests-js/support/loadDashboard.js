@@ -115,7 +115,7 @@ export const PERIOD_SEQUENCES_DEFAULT = {
   },
 };
 
-export function loadDashboard({ html, hierarchy, assetTimezone, periodSequences, url } = {}) {
+export function loadDashboard({ html, hierarchy, assetTimezone, assetTimezones, periodSequences, url } = {}) {
   let source = html ?? readFileSync(TEMPLATE_PATH, "utf-8");
   if (hierarchy !== undefined) {
     const line = `const HIERARCHY = ${JSON.stringify(hierarchy)};`;
@@ -135,17 +135,27 @@ export function loadDashboard({ html, hierarchy, assetTimezone, periodSequences,
   // contract/data-asset.yaml on every build. A test that left it out
   // would be exercising a page that cannot exist. Pass `null`
   // explicitly to get the other case: criterion 14's loud refusal.
+  //
+  // VERSIONED SINCE REQ-PIPE-112: the page embeds every timezone version.
+  // `assetTimezone` (one zone name) is the common case and becomes one
+  // version in force from 1970, as the real asset's is; `assetTimezones`
+  // passes a list of versions for a test about a zone changing.
   {
-    const tz = assetTimezone === undefined ? ASSET_TIMEZONE_DEFAULT : assetTimezone;
-    const pattern = /const ASSET_TIMEZONE = .*?;\n/;
+    let versions;
+    if (assetTimezones !== undefined) versions = assetTimezones;
+    else {
+      const tz = assetTimezone === undefined ? ASSET_TIMEZONE_DEFAULT : assetTimezone;
+      versions = tz === null ? null : [{ effective_from: "1970-01-01", zone: tz }];
+    }
+    const pattern = /const ASSET_TIMEZONES = .*?;\n/;
     // Checked by MATCHING, not by comparing before and after: passing
     // null substitutes the template's own value for itself, so an
     // unchanged string here would be a false alarm rather than a
     // missing const.
     if (!pattern.test(source)) {
-      throw new Error("could not find `const ASSET_TIMEZONE = ...;` to replace - has the template changed?");
+      throw new Error("could not find `const ASSET_TIMEZONES = ...;` to replace - has the template changed?");
     }
-    source = source.replace(pattern, `const ASSET_TIMEZONE = ${JSON.stringify(tz)};\n`);
+    source = source.replace(pattern, `const ASSET_TIMEZONES = ${JSON.stringify(versions)};\n`);
   }
 
   // Same mechanism again, for the embedded period sequences

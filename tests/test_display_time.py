@@ -117,7 +117,7 @@ class TestThereIsOnlyOneOfIt:
         hits = [ln.strip() for ln in code if "Intl.DateTimeFormat" in ln]
         assert len(hits) == 2, (
             "Intl.DateTimeFormat should appear exactly twice - once in "
-            "assetTimezoneOrFail() to validate the zone, once in assetParts() "
+            "zoneVersions() to validate each zone, once in assetParts() "
             f"to read it. Found {len(hits)}: {hits}")
 
 

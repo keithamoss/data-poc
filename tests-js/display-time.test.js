@@ -107,3 +107,43 @@ describe("with no asset clock it refuses to draw an instant at all", () => {
     expect(() => w.fmtInstant(INSTANT)).toThrow(/Australia\/Nowhere/);
   });
 });
+
+// REQ-PIPE-112: the page carries EVERY timezone version and reads each
+// instant in the version in force at it, each date in the version in
+// force on it. Perth until the end of 2026, then Sydney - which is on
+// +11:00 in January, so its 2027-01-01 begins at 2026-12-31T13:00Z.
+describe("the timezone is versioned", () => {
+  const VERSIONS = [
+    { effective_from: "2020-01-01", zone: "Australia/Perth" },
+    { effective_from: "2027-01-01", zone: "Australia/Sydney" },
+  ];
+  function loadVersioned() {
+    dashboard = loadDashboard({ assetTimezones: VERSIONS });
+    return dashboard.window;
+  }
+
+  it("shows each instant in the version in force at it (criterion 4)", () => {
+    const w = loadVersioned();
+    expect(w.fmtInstant("2026-12-31T12:59:00Z")).toBe("8:59pm Thursday, 31 December 2026");
+    expect(w.fmtInstant("2026-12-31T13:00:00Z")).toBe("12:00am Friday, 1 January 2027");
+  });
+
+  it("reads each date in the version in force on it (criterion 3)", () => {
+    const w = loadVersioned();
+    expect(w.assetZoneOn("2026-12-31")).toBe("Australia/Perth");
+    expect(w.assetZoneOn("2027-01-01")).toBe("Australia/Sydney");
+  });
+
+  it("refuses a date or instant before every version (criterion 7)", () => {
+    const w = loadVersioned();
+    expect(() => w.assetZoneOn("2019-12-31")).toThrow(/no timezone version covers 2019-12-31/);
+    expect(() => w.fmtInstant("2019-06-01T00:00:00Z")).toThrow(/no timezone version covers/);
+  });
+
+  it("renders a receipt in its due time's version when asked (criterion 18)", () => {
+    const w = loadVersioned();
+    // A receipt in Sydney's era, beside a due time judged in Perth's.
+    expect(w.fmtInstant("2027-01-01T01:00:00Z", w.assetZoneOn("2026-12-31")))
+      .toBe("9:00am Friday, 1 January 2027");
+  });
+});

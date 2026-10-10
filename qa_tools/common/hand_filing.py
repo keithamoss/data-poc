@@ -181,7 +181,15 @@ def resolve_original(answer: str, *, files, received_at: datetime,
                 f"as e.g. 2026-09-20 14:30 (read on the asset's own clock), with an "
                 f"offset if it was another, or `not-known`. Nothing was filed.") from None
         if when.tzinfo is None or when.utcoffset() is None:
-            when = when.replace(tzinfo=asset_time.asset_timezone())
+            # A WALL-CLOCK TIME ON ITS OWN DATE, read in the zone in force on
+            # that date (REQ-PIPE-112 criterion 3) - and refused rather than
+            # guessed where daylight saving makes it no instant or two.
+            problem = asset_time.wall_clock_problem(when.date(), when.strftime("%H:%M"))
+            if problem:
+                raise CannotFile(
+                    f"{text!r} {problem} on the asset's clock, so it is not one moment. "
+                    f"Give it with an offset, e.g. {text}+10:00. Nothing was filed.")
+            when = when.replace(tzinfo=asset_time.zone_on(when.date()))
         stated = {f: when for f in files}
     for f, when in stated.items():
         if when > received_at:

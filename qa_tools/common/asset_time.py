@@ -41,6 +41,7 @@ from __future__ import annotations
 import re
 
 import functools
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -59,39 +60,114 @@ class NaiveTimestampError(ValueError):
     """
 
 
+class NoTimezoneVersion(ValueError):
+    """No timezone version covers the date or instant asked about
+    (REQ-PIPE-112 criterion 7). Never answered with the newest or the
+    oldest version instead: a guess about which clock applied is the
+    thing versioning exists to stop."""
+
+
+@dataclass(frozen=True)
+class ZoneVersion:
+    """One effective-dated timezone version (REQ-PIPE-112 criterion 1)."""
+
+    effective_from: date
+    zone: ZoneInfo
+
+    @property
+    def starts_at(self) -> datetime:
+        """IN FORCE FROM THE START OF ITS OWN DAY IN ITS OWN ZONE
+        (criterion 2), so every instant belongs to exactly one version."""
+        return datetime.combine(self.effective_from, time.min, tzinfo=self.zone)
+
+
+def parse_timezone_versions(doc: dict, where: str = "contract/data-asset.yaml") -> tuple[ZoneVersion, ...]:
+    """The asset's timezone versions from a parsed data-asset.yaml, oldest
+    first. Refuses the old bare `timezone: <name>` form and a fixed UTC
+    offset (criterion 1) rather than reading either."""
+    block = doc.get("timezone")
+    if not block:
+        raise ValueError(
+            f"{where} declares no `timezone:`. It is required - REQ-PIPE-048 removed every "
+            f"hardcoded offset, so there is no fallback to fall back to.")
+    if not isinstance(block, dict) or not isinstance(block.get("versions"), list):
+        raise ValueError(
+            f"{where}: `timezone:` must be effective-dated versions (REQ-PIPE-112) - "
+            f"`timezone: {{versions: [{{effective_from: YYYY-MM-DD, zone: <IANA name>, "
+            f"changelog: [...]}}]}}` - not a single value.")
+    out = []
+    for i, version in enumerate(block["versions"]):
+        name = str((version or {}).get("zone") or "")
+        if re.fullmatch(r"(?i)(utc|gmt)?\s*[+-]\d{1,2}(:?\d{2})?", name.strip()):
+            raise ValueError(f"{where}: timezone version {i + 1} names {name!r}, a fixed UTC "
+                             f"offset. Name an IANA zone, like 'Australia/Perth' - an offset is "
+                             f"one zone's answer for one moment.")
+        try:
+            zone = ZoneInfo(name)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(
+                f"{where}: timezone {name!r} is not an IANA zone name "
+                f"(expected something like 'Australia/Perth') - {exc}") from None
+        out.append(ZoneVersion(date.fromisoformat(str(version.get("effective_from"))), zone))
+    out.sort(key=lambda v: v.effective_from)
+    return tuple(out)
+
+
 @functools.lru_cache(maxsize=1)
-def asset_timezone() -> ZoneInfo:
-    """The asset's timezone, from the one configuration value.
+def timezone_versions() -> tuple[ZoneVersion, ...]:
+    """Every timezone version the asset carries, oldest first.
 
     Cached like the hierarchy next door, and for the same reason: every
     consumer is a short-lived CLI or build process, and the file cannot
-    change mid-run.
+    change mid-run. THERE IS NO BARE LOOKUP (criterion 6, NFR 2): every
+    caller asks `zone_on(day)`, `zone_at(instant)` or `zone_now()`, so a
+    caller that has not thought about 'as at when' cannot quietly get
+    today's zone for a date in 2024.
     """
     with open(DATA_ASSET_YAML) as f:
         doc = config_yaml.parse(f) or {}
-    name = doc.get("timezone")
-    if not name:
-        raise ValueError(
-            f"{DATA_ASSET_YAML} declares no `timezone:`. It is required - "
-            f"REQ-PIPE-048 removed every hardcoded offset, so there is no "
-            f"fallback to fall back to.")
-    try:
-        return ZoneInfo(name)
-    except ZoneInfoNotFoundError as exc:
-        raise ValueError(
-            f"{DATA_ASSET_YAML}: timezone {name!r} is not an IANA zone name "
-            f"(expected something like 'Australia/Perth') - {exc}") from None
+    return parse_timezone_versions(doc, str(DATA_ASSET_YAML))
+
+
+def zone_on(day: date) -> ZoneInfo:
+    """The zone in force ON a date - for reading a wall-clock time on that
+    date as an instant (criterion 3)."""
+    found = [v for v in timezone_versions() if v.effective_from <= day]
+    if not found:
+        raise NoTimezoneVersion(
+            f"no timezone version covers {day.isoformat()} - the earliest starts "
+            f"{timezone_versions()[0].effective_from.isoformat()}. Not falling back to it.")
+    return found[-1].zone
+
+
+def zone_at(instant: datetime) -> ZoneInfo:
+    """The zone in force AT an instant - for showing it, or reducing it to
+    a date (criterion 4)."""
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise NaiveTimestampError(f"zone_at(): {instant!r} carries no UTC offset")
+    found = [v for v in timezone_versions() if v.starts_at <= instant]
+    if not found:
+        raise NoTimezoneVersion(
+            f"no timezone version covers {instant.isoformat()} - the earliest starts "
+            f"{timezone_versions()[0].starts_at.isoformat()}. Not falling back to it.")
+    return found[-1].zone
+
+
+def zone_now() -> ZoneInfo:
+    """The zone in force now (criterion 5) - the real now. A synthetic
+    replay's simulated now is an instant like any other: `zone_at` it."""
+    return zone_at(datetime.now(UTC))
 
 
 def now() -> datetime:
-    """The current instant, in the asset's own zone.
+    """The current instant, in the asset's own zone as in force now.
 
     Aware, always. Nothing in this repo should call `datetime.now()`
     without a timezone, and nothing should call it with `timezone.utc`
     either - a UTC instant is correct but reads as a foreign wall clock
     to whoever opens the file.
     """
-    return datetime.now(asset_timezone())
+    return datetime.now(UTC).astimezone(zone_now())
 
 
 def parse_instant(value, where: str) -> datetime:
@@ -115,10 +191,14 @@ def parse_instant(value, where: str) -> datetime:
         except ValueError as exc:
             raise ValueError(f"{where}: {text!r} is not an ISO timestamp - {exc}") from None
     if parsed.tzinfo is None or parsed.utcoffset() is None:
+        try:
+            zone = zone_on(parsed.date()).key
+        except (NoTimezoneVersion, ValueError):
+            zone = "the asset's own zone"
         raise NaiveTimestampError(
             f"{where}: timestamp {value!r} carries no UTC offset. It is not "
             f"assumed to be UTC and it is not assumed to be "
-            f"{asset_timezone().key} - REQ-PIPE-048 requires every stored "
+            f"{zone} - REQ-PIPE-048 requires every stored "
             f"instant to say what offset it is in. Fix it at the source.")
     return parsed
 
@@ -130,7 +210,8 @@ def localise(value: datetime) -> datetime:
     against, which is what makes a stored `+00:00` and a stored `+08:00`
     comparable without either being rewritten.
     """
-    return parse_instant(value, "localise()").astimezone(asset_timezone())
+    instant = parse_instant(value, "localise()")
+    return instant.astimezone(zone_at(instant))
 
 
 def wall_clock(day: date, hhmm: str) -> datetime:
@@ -140,14 +221,41 @@ def wall_clock(day: date, hhmm: str) -> datetime:
     Replaces `expected_moment_utc()`'s subtract-a-fixed-offset
     arithmetic. Same answer today, and a correct one in a zone that
     observes daylight saving.
+
+    In the zone in force ON that day (REQ-PIPE-112 criterion 3). A time
+    that does not exist that day, or exists twice, raises rather than
+    being guessed - the schedule gate refuses such a configuration first
+    (criterion 8), so reaching this is a configuration the gate never saw.
     """
+    problem = wall_clock_problem(day, hhmm)
+    if problem:
+        raise ValueError(f"{hhmm} on {day.isoformat()} {problem} in "
+                         f"{zone_on(day).key} - daylight saving; no instant is guessed")
     hour, minute = (int(x) for x in hhmm.split(":"))
-    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=asset_timezone())
+    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=zone_on(day))
+
+
+def wall_clock_problem(day: date, hhmm: str) -> str | None:
+    """Why `hhmm` on `day` is not exactly one instant in the zone in force
+    that day, or None (REQ-PIPE-112 criterion 8). Found by ROUND-TRIPPING
+    the wall-clock time through the zone rather than by consulting
+    offsets (decision 14): a time in a spring-forward gap does not come
+    back as itself, and one in a fall-back overlap has two offsets."""
+    hour, minute = (int(x) for x in hhmm.split(":"))
+    zone = zone_on(day)
+    first = datetime(day.year, day.month, day.day, hour, minute, tzinfo=zone, fold=0)
+    second = first.replace(fold=1)
+    back = first.astimezone(UTC).astimezone(zone)
+    if (back.hour, back.minute, back.date()) != (hour, minute, day):
+        return "does not exist (a daylight-saving gap)"
+    if first.utcoffset() != second.utcoffset():
+        return "occurs twice (a daylight-saving overlap)"
+    return None
 
 
 def start_of_day(day: date) -> datetime:
-    """The first instant of a date, in the asset's zone."""
-    return datetime.combine(day, time.min, tzinfo=asset_timezone())
+    """The first instant of a date, in the zone in force on that date."""
+    return datetime.combine(day, time.min, tzinfo=zone_on(day))
 
 
 def end_of_day(day: date) -> datetime:

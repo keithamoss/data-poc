@@ -1008,6 +1008,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _replacement_setting_errors(raw, src)
     if src.asset_path == DATA_ASSET_YAML and not errors:
         errors += _overlap_errors(src)
+        errors += _daylight_saving_errors(src)
     return _attribute(errors, raw)
 
 
@@ -1032,6 +1033,51 @@ def _overlap_errors(src: Source) -> list[ConfigError]:
             f"overlap by {o.by}, so a file arriving in between would belong to both.",
             f"Shorten this dataset's claim window or grace, or move its expected time, "
             f"until {o.later}'s window opens strictly after {o.earlier} stops being on time."))
+    return out
+
+
+#: How far ahead a CADENCE-RULE calendar's periods are checked for a due
+#: time that daylight saving makes no instant or two (REQ-PIPE-112
+#: criterion 8). An authored calendar is checked to its last date; a rule
+#: generates periods for ever, so the gate looks this far ahead of today -
+#: further than any configuration change is planned, and re-checked on
+#: every run as today moves.
+DAYLIGHT_SAVING_HORIZON_DAYS = 3 * 366
+
+
+def _daylight_saving_errors(src: Source) -> list[ConfigError]:
+    """REQ-PIPE-112 criterion 8: a dataset's expected time that does not
+    exist, or occurs twice, on a period's due date in the zone in force
+    then is refused, naming the dataset, the period and the time - choosing
+    one of two instants, or inventing one, would be a guess presented as a
+    due instant (decision 6).
+
+    Real configuration only, after everything above has passed, for the
+    reason `_overlap_errors` gives: it reads through the modules filing
+    uses."""
+    from datetime import timedelta
+
+    from qa_tools.common import hierarchy, slots
+
+    out = []
+    until = asset_time.local_date(asset_time.now()) + timedelta(days=DAYLIGHT_SAVING_HORIZON_DAYS)
+    for entry in hierarchy.all_datasets():
+        try:
+            expected_time = slots._contract_timing(entry.dataset_id)[0]
+            periods = schedule.periods_for_dataset(entry.dataset_id, until=until)
+        except Exception:  # noqa: BLE001 - no calendar, or reported by another gate
+            continue
+        for period in periods:
+            problem = asset_time.wall_clock_problem(period.date, expected_time)
+            if problem:
+                out.append(ConfigError(
+                    src.name, f"dataset {entry.dataset_id!r}",
+                    f"its expected time {expected_time} on period {period.period.name}'s due date "
+                    f"{period.date.isoformat()} {problem} in "
+                    f"{asset_time.zone_on(period.date).key}, so that period has no single "
+                    f"due instant.",
+                    "Move the dataset's expected time out of the daylight-saving change - an "
+                    "hour either side - so it names exactly one moment on every due date."))
     return out
 
 
