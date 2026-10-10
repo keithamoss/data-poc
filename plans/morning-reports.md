@@ -809,3 +809,14 @@ one or more component tags, and a date.
         and the shared status table. Two tests had pinned the false green as
         intended; they were turned into the failing tests. JS 576 tests and
         the e2e module (216, 6 minutes) green. Recorded on REQ-PIPE-106.
+      - REQ-PIPE-112 BUILT (criterion 13 deferred to REQ-PIPE-111, as agreed):
+        the timezone is effective-dated versions; every reader asks as at
+        a date or an instant; a time daylight saving makes no instant or two
+        is refused in the gate; the dashboard carries every version; the
+        settings changelogs are structured. PROVEN by a full rebuild (9m51s,
+        47 staged tables as before) and the arrival golden: no verdict or
+        instant moved. ONE PROVISIONAL FOR YOU: the first version starts
+        1970-01-01, so no date the system reads falls before every version.
+        ONE CORRECTION: the implementation commit's message said 582 JS
+        tests; the run said 581 - an added-up number, not a run. Recorded
+        in the requirement's evidence.

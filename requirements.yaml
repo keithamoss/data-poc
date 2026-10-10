@@ -25488,7 +25488,43 @@ requirements:
       was in force when the supply was due, so that moving an asset's clock does not silently re-judge everything
       that already happened.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-11 (overnight #3): pinned first - tests/test_asset_time_semantics.py (tests/fixtures/arrival_semantics_golden.json) passed before any change (43 tests with test_cli_cp.py), and was confirmed to bite by switching the zone to Australia/Sydney: the expected-moment boundary test failed and was restored. The golden comparison itself reads the RECORDED history, so it proves criterion 10 only after a rebuild: `mothman env reset-synthetic` then `mothman pipeline bootstrap` under the versioned clock (9m51s, 47 staged tables, the count before), `mothman dashboard rebuild`, then the golden''s 10 tests passed - no arrival changed its verdict or its instant.'
+    - '2026-10-11: tests/test_asset_time.py 43 passed (versions in Perth then Sydney, the start-of-own-day boundary at 2026-12-31T13:00Z, the loud failure before the first version, a fixed offset and the old single value refused, no bare lookup, daylight-saving gap and overlap on Sydney''s 2026 transition days, a 23-hour day measured in UTC); tests/test_timezone_versions.py 9 passed (the gate refuses 02:30 on 2026-10-04 and 2027-04-04 in Sydney, passes 09:00 and the real configuration; a plain-string settings changelog refused; the conversion reads as no change to the past; an edit to a past entry refused as append-only; an appended entry accepted); tests-js/display-time.test.js 33 passed (each instant in its own version, each date in its own, the refusal before the first version, a receipt rendered in its due time''s version).'
+    - '2026-10-11: full Python suite 4003 passed with 2 failures, both this change''s and both fixed (a guard keeping Intl.DateTimeFormat to two callers - the offset arithmetic now goes through assetParts; an e2e test reading the old ASSET_TIMEZONE constant), each rerun green; `npm test` 581 passed - the implementation commit 7328977 said 582, a number added up rather than run, corrected here; the dashboard e2e test of today''s zone 5 passed.'
+    implemented_by:
+    - qa_tools/common/asset_time.py::parse_timezone_versions
+    - qa_tools/common/asset_time.py::timezone_versions
+    - qa_tools/common/asset_time.py::zone_on
+    - qa_tools/common/asset_time.py::zone_at
+    - qa_tools/common/asset_time.py::zone_now
+    - qa_tools/common/asset_time.py::wall_clock
+    - qa_tools/common/asset_time.py::wall_clock_problem
+    - qa_tools/common/asset_time.py::ZoneVersion
+    - qa_tools/common/asset_time.py::NoTimezoneVersion
+    - qa_tools/common/validate_schedule.py::_daylight_saving_errors
+    - qa_tools/common/amber_setting.py::normalised_changelog
+    - qa_tools/common/amber_setting.py::past_change_problems
+    - qa_tools/common/schemas.py::TimezoneConfig
+    - qa_tools/common/schemas.py::ConfigChangelogEntry
+    - qa_tools/common/hand_filing.py::resolve_original
+    - dashboard/embed_dashboard_data.py::embed
+    - contract/data-asset.yaml
+    linked_tests:
+    - tests/test_asset_time.py
+    - tests/test_timezone_versions.py
+    - tests/test_asset_time_semantics.py
+    - tests/test_display_time.py
+    - tests-js/display-time.test.js
+    - tests/test_dashboard_e2e.py::TestTodayIsTheAssetsToday
+    unmet_criteria:
+    - criterion: Criterion 13 - protecting timezone versions with the freeze rule and the declared-correction route, and re-judging, previewing and backstopping a timezone correction.
+      owner: REQ-PIPE-111
+      why: 'The freeze and the correction route are REQ-PIPE-111''s, which is signed and not built (Keith, 2026-10-10: build REQ-PIPE-112 now with criterion 13 deferred). The versions this requirement adds are the thing it will freeze.'
+      blocked_by:
+        requirements:
+        - REQ-PIPE-111
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -25620,6 +25656,12 @@ requirements:
     - A RECEIPT AND THE DUE TIME IT WAS JUDGED AGAINST RENDER IN ONE ZONE VERSION (delivery-dashboard-ux
       pre-build review, 2026-10-07) - consistent with REQ-DASH-071's no-label rule, which stands (Keith,
       2026-10-07).
+    - 'THE FIRST VERSION STARTS 1970-01-01 (main session, 2026-10-11, building): criterion 7 makes a date before every version an error, so the first version must start before any date the system will ever read - generated history from 2022, tests reaching further back. Its changelog says it is in force from before any supply this asset holds. PROVISIONAL, for Keith: the alternative, the date the asset began, would fail loudly on any older date a tool or test happened to compute.'
+    - 'THE CONVERSION''S AUTHOR IS SAID PLAINLY (main session, 2026-10-11): the old settings changelog strings named nobody, so each converted entry''s author reads ''not recorded - converted from a plain-string entry by REQ-PIPE-112'' rather than an invented name; the guard normalises an old string to exactly that, which is what lets the conversion read as no change to the past.'
+    - 'THE DAYLIGHT-SAVING CHECK LOOKS THREE YEARS AHEAD FOR A CADENCE RULE (main session, 2026-10-11): an authored calendar is checked to its last date, but a rule generates periods for ever, so the gate checks every period up to today plus three years and re-checks as today moves. It runs on the real configuration only, after the rest of the gate passes, as the overlap check does, because it reads through the modules filing uses. Measured: half a second.'
+    - 'A RECEIPT IN SUPPLY HISTORY RENDERS IN ITS CYCLE''S VERSION (main session, 2026-10-11, criterion 18): the row''s due time is a wall-clock time on the cycle''s date, read in the version in force on that date, so the receipt beside it is shown in that same version. Everywhere else an instant is shown in the version in force at it (criterion 4); the formatter takes an optional zone for this one case only.'
+    - 'THE OFFSET ARITHMETIC GOES THROUGH THE ONE FORMATTER (main session, 2026-10-11): finding each version''s start instant needs a zone''s offset, and a test holds Intl.DateTimeFormat to two callers so there is one implementation of reading a clock. The offset is taken from assetParts at minute precision - every zone offset is a whole number of minutes - rather than adding a third caller.'
+    - 'NO PLANS PROSE DELETED (2026-10-11): plans/supply-model.md Thread C''s timezone material feeds REQ-PIPE-110 to 113 together, and under the 2026-09-22 rule a thread is deleted whole once its last dependent batch is built - REQ-PIPE-110, 111 and 113 are not.'
   - id: REQ-PIPE-113
     title: A slot's due instant comes from the participation in force on its period's date, and a later
       change never moves an earlier slot
