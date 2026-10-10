@@ -252,7 +252,7 @@ def warning_lines(as_of: date) -> list[str]:
                 f"EXHAUSTED (not failing the build, yet): calendar {runway.calendar_name!r} has NO "
                 f"future dates left - its last is {runway.last_period} on {runway.last_date}, "
                 f"and {datasets}. Author the next year's dates in "
-                f"contract/data-asset.yaml; `mothman schedule candidate-dates` proposes them. "
+                f"contract/calendar.yaml; `mothman schedule candidate-dates` proposes them. "
                 f"Until then those datasets cannot be processed.")
         else:
             # THE NUMBER AND THE PERIOD BELONG TO ONE DATASET, and the
@@ -273,7 +273,7 @@ def warning_lines(as_of: date) -> list[str]:
                 f"first for {runway.driving_dataset!r}, which has only {runway.remaining} "
                 f"future supply slot(s) left - its own last is {runway.driving_last_period} on "
                 f"{runway.driving_last_date}. {datasets[0].upper()}{datasets[1:]}."
-                f"{horizon} Author the next year's dates in contract/data-asset.yaml; "
+                f"{horizon} Author the next year's dates in contract/calendar.yaml; "
                 f"`mothman schedule candidate-dates` proposes them.")
     return lines
 

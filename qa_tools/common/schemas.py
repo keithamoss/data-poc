@@ -46,7 +46,6 @@ honestly stops the build rather than being quietly rendered wrong.
 from __future__ import annotations
 
 import re
-from datetime import date
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -464,7 +463,7 @@ class CalendarVersionConfig(_Strict):
     readably."""
 
     effective_from: str
-    changelog: list[NonEmptyStr]
+    changelog: list["ConfigChangelogEntry"] = Field(min_length=1)
     claim_window: str | None = None
     dates: list[CalendarDate] | None = None
     cadence: CadenceRule | None = None
@@ -552,39 +551,16 @@ class DatasetConfig(_Strict):
     id: NonEmptyStr
     name: NonEmptyStr
     table: NonEmptyStr
-    #: OPTIONAL HERE, AND ONLY HERE (REQ-PIPE-106 criteria 1 and 2). A
-    #: dataset either names a calendar or declares `no_calendar:`
-    #: DELIBERATELY, and this model cannot express "exactly one of these
-    #: two" - so the choice is enforced by validate_schedule.py, which
-    #: fails a dataset carrying neither, a dataset carrying both, and a
-    #: dataset whose declaration is not one of the two recognised values.
-    #:
-    #: WHY NOT LEAVE IT REQUIRED AND LET THE DECLARATION BE A SEPARATE
-    #: THING: pydantic would then reject a legitimately calendar-less
-    #: dataset before any of that reasoning ran, and the reader would get
-    #: "calendar is required and is not there" for a file that is
-    #: correct. The gate's own message is the one worth showing.
-    calendar: NonEmptyStr | None = None
-    #: The deliberate declaration that this dataset has NO calendar -
-    #: `not-yet-agreed` for sample data that will graduate, `never` for a
-    #: one-off extraction that has supplies and no cadence at all
-    #: (REQ-PIPE-106 criterion 3). The VALUE is checked by
-    #: validate_schedule.py rather than by a Literal here, so a mistyped
-    #: one gets a message explaining what the two mean.
-    no_calendar: NonEmptyStr | None = None
-    #: WHEN THIS DATASET GRADUATED - the date it started owing supplies
-    #: (REQ-PIPE-106 criterion 16). Absent for every dataset that has
-    #: always had a calendar, which today is all seven.
-    owes_from: date | None = None
+    #: The delivery agreement - which calendar, participation, not_expected,
+    #: a dataset's own dates and the no-calendar declaration - lives in
+    #: contract/calendar.yaml since REQ-PIPE-110, and none of it is accepted
+    #: here: a key stated in two files is two answers that can disagree.
     #: How this dataset's files are named, as a regular expression
     #: (REQ-PIPE-058). Optional HERE because a dataset can coherently
     #: exist while its pattern is being added; whether a dataset that is
     #: owed supplies may go without one is the arrival-pattern gate's
     #: question, and it fails on exactly that.
     arrival_pattern: NonEmptyStr | None = None
-    delivery_months: list[NonEmptyStr] | None = None
-    dates: list[CalendarDate] | None = None
-    not_expected: list[NotExpectedPeriod] | None = None
     amber_setting: AmberSetting | None = None
     replacement_setting: ReplacementSetting | None = None
 
@@ -617,7 +593,6 @@ class HierarchyConfig(_Strict):
 class DataAsset(_Strict):
     data_asset_id: NonEmptyStr
     timezone: TimezoneConfig
-    calendars: list[CalendarConfig] = Field(min_length=1)
     hierarchy: HierarchyConfig
     #: Which slots get a ticket (REQ-PIPE-083 criterion 21). Optional
     #: with a default, because an asset that has never thought about
@@ -646,3 +621,58 @@ class DataAsset(_Strict):
     #: setting's reason: the one rule that lets automation displace accepted
     #: data is never switched on, or off, by saying nothing.
     replacement_setting: ReplacementSetting
+
+
+# ---------------------------------------------------------------------
+# contract/calendar.yaml (REQ-PIPE-110) - the whole delivery agreement.
+
+
+class ParticipationVersionConfig(_Strict):
+    """One effective-dated version of a dataset's participation. Every key
+    but the date and the changelog is optional HERE; which must be stated is
+    the gate's rule - the restate rule, and an expected time and grace for
+    every period owed - because 'exactly these, given history' is not a
+    schema statement."""
+    effective_from: str = Field(pattern=_DATE_PATTERN)
+    participates: list[NonEmptyStr] | Literal["all"] | None = None
+    reason: NonEmptyStr | None = None
+    expected_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
+    grace: str | None = None
+    claim_window: str | None = None
+    changelog: list[ConfigChangelogEntry] = Field(min_length=1)
+
+
+class Participation(_Strict):
+    versions: list[ParticipationVersionConfig] = Field(min_length=1)
+
+
+class OwnDatesVersion(_Strict):
+    effective_from: str = Field(pattern=_DATE_PATTERN)
+    changelog: list[ConfigChangelogEntry] = Field(min_length=1)
+    dates: list[CalendarDate] = Field(min_length=1)
+
+
+class OwnDates(_Strict):
+    versions: list[OwnDatesVersion] = Field(min_length=1)
+
+
+class DatasetAgreementConfig(_Strict):
+    id: NonEmptyStr
+    calendar: NonEmptyStr | None = None
+    no_calendar: NonEmptyStr | None = None
+    participation: Participation | None = None
+    not_expected: list[NotExpectedPeriod] | None = None
+    dates: OwnDates | None = None
+
+
+class CollectionAgreementConfig(_Strict):
+    id: NonEmptyStr
+    calendar: NonEmptyStr | None = None
+
+
+class CalendarFile(_Strict):
+    #: May be empty where every dataset declares no calendar (criterion 36)
+    #: - the project-extraction asset shape.
+    calendars: list[CalendarConfig] = Field(default_factory=list)
+    collections: list[CollectionAgreementConfig] = Field(default_factory=list)
+    datasets: list[DatasetAgreementConfig] = Field(default_factory=list)

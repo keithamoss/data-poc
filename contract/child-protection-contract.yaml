@@ -1542,58 +1542,6 @@ schema:
             value: >
               self-evident
 
-slaProperties:
-  # frequency here was stale at "7 d" (weekly) - a leftover from before
-  # this collection's real cadence was migrated to calendar quarters
-  # (2026-09-16) and then re-anchored to Feb/May/Aug/Nov (2026-09-17,
-  # plans/qa-pipeline.md) - neither migration updated this value, since
-  # nothing downstream ever actually read it. Corrected here alongside
-  # adding the real, computable cadence below.
-  - property: frequency
-    value: 3
-    unit: mo
-    element: cp_clients
-  # Real, computable cadence (Phase 5j) - replaces AS_OF_OFFSET_DAYS'
-  # flat global staleness offset and the dashboard's own former
-  # decorative "within 24h of extract"/"latencyHours: 24" text, neither
-  # of which anything ever actually checked. Parsed by pipeline/
-  # cadence.py's parse_cadence_from_contract() - see that module's own
-  # docstring for exactly how each property below is used.
-  # cadenceAnchorMonths/cadenceDayOfMonth mirror generator/generate_cp_
-  # runs.py's own _quarter_start() anchor exactly (Feb/May/Aug/Nov,
-  # day 1) - this is the same real cadence rule the data is actually
-  # generated against, not a separate, potentially-drifting copy of it.
-  # latency (8 business hours) is deliberately much larger than BDM's
-  # daily 60 min - Keith's own call: a quarterly refresh's own latency
-  # tolerance is a real but much less pressing concern than a daily
-  # feed's.
-  #
-  # These five carry NO `element:`, which now means something rather
-  # than nothing (REQ-PIPE-049, 2026-09-23). A property without an
-  # element is a contract-wide DEFAULT applying to every dataset in it;
-  # one naming an element overrides the default for that dataset alone.
-  #
-  # They used to say `element: cp_clients` while applying, in practice,
-  # to all six - because pipeline/cadence.py keyed on `property` alone
-  # and threw the element away. The right answer and the wrong answer
-  # coincided, since all six genuinely do share one quarterly cadence,
-  # which is why nothing noticed. Declaring them contract-wide says what
-  # is actually true; a dataset that ever needs its own expectedTime or
-  # latency adds an entry naming its own element, and that now wins.
-  - property: cadenceType
-    value: quarterly
-  - property: cadenceAnchorMonths
-    value: "2,5,8,11"
-  - property: cadenceDayOfMonth
-    value: 1
-  - property: expectedTime
-    value: "09:00"
-    description: Agreed quarterly delivery time, AWST.
-  - property: latency
-    value: 480
-    unit: min
-    description: How late (past expectedTime) a delivery can arrive before it counts as late rather than on time.
-
 customProperties:
   - property: currentDeliveryFormat
     value: csv

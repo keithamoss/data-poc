@@ -218,9 +218,14 @@ class TestTheRetiredDerivations:
         """Criterion 2. It could only look BACKWARDS from the arrival
         date, so it could never see a slot that had not started - which
         is why 'early' was unreachable through it."""
-        from pipeline import cadence
+        # pipeline/cadence.py itself is gone since REQ-PIPE-110, which
+        # moved what was left of it to qa_tools/common/agreement.py.
+        import importlib.util
 
-        assert not hasattr(cadence, "classify_arrival")
+        from qa_tools.common import agreement
+
+        assert importlib.util.find_spec("pipeline.cadence") is None
+        assert not hasattr(agreement, "classify_arrival")
 
     def test_the_builders_no_longer_derive_it(self):
         """Criterion 3. Blanking was a workaround for the derivation

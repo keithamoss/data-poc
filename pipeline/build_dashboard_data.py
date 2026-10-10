@@ -33,9 +33,8 @@ from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common import schedule_ended
 from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common.validate_check_lifecycle import collect_checks
-from pipeline.cadence import parse_cadence_from_contract
+from qa_tools.common import agreement
 from qa_tools.common import asset_time
-from qa_tools.common import hierarchy
 from pipeline import (acknowledgements, closed_slots, file_check_panel, recorded_arrival,
                       red_promoted, slot_timeline)
 from qa_tools.common import promotion_state
@@ -459,10 +458,9 @@ def build() -> dict:
     # and extract_timestamp data.
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
 
-    # Named explicitly even though this contract holds one dataset -
-    # its slaProperties carry `element: birth_registrations`, and since
-    # REQ-PIPE-049 that means something rather than being ignored.
-    cadence = parse_cadence_from_contract(CONTRACT_PATH, element=hierarchy.dataset("birth-registrations").table)
+    # From the dataset's participation in contract/calendar.yaml
+    # (REQ-PIPE-110), named by dataset id.
+    cadence = agreement.cadence("birth-registrations")
 
     # READ, NOT COMPUTED (REQ-PIPE-080 criteria 1 and 2). This block
     # used to call cadence.classify_arrival() twice - once here and

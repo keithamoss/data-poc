@@ -28,7 +28,7 @@ class TestAnOverlapIsFound:
         """A 100-day claim window on a quarterly calendar reaches back
         over the previous quarter's due date."""
         monkeypatch.setattr(schedule, "claim_window",
-                            lambda dataset_id, override=None, on=None: timedelta(days=100))
+                            lambda dataset_id, override=None, on=None, agreement=None: timedelta(days=100))
 
     def test_every_pair_is_reported_not_the_first(self, wide_window):
         found = period_overlap.overlaps_for("cp-clients")
@@ -50,9 +50,9 @@ class TestAnOverlapIsFound:
     def test_touching_is_still_an_overlap(self, monkeypatch):
         """'Strictly after': a window opening at the very instant the
         earlier period stops being on time leaves one instant in both."""
-        monkeypatch.setattr(slots, "_contract_timing", lambda d: ("09:00", 0, None))
+        monkeypatch.setattr(slots, "_timing", lambda d, agreement=None: ("09:00", 0, None))
         monkeypatch.setattr(schedule, "claim_window",
-                            lambda dataset_id, override=None, on=None: timedelta(days=1))
+                            lambda dataset_id, override=None, on=None, agreement=None: timedelta(days=1))
         found = period_overlap.overlaps_for("birth-registrations")
         assert found and all(o.by == timedelta(0) for o in found)
 
@@ -67,6 +67,6 @@ class TestEveryCalendarPeriodCounts:
         all_periods = schedule.periods_for_calendar(calendar.name)
         assert len(all_periods) > len(owed), "precondition: it skips some quarters"
         monkeypatch.setattr(schedule, "claim_window",
-                            lambda dataset_id, override=None, on=None: timedelta(days=100))
+                            lambda dataset_id, override=None, on=None, agreement=None: timedelta(days=100))
         pairs = {(o.earlier, o.later) for o in period_overlap.overlaps_for("cp-case-workers")}
         assert len(pairs) == len(all_periods) - 1

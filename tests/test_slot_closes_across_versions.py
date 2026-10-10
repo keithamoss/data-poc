@@ -9,40 +9,28 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
-import yaml
 
-from qa_tools.common import hierarchy, schedule, slots
+import agreement_split
+from qa_tools.common import hierarchy, slots
 
 PERTH = timezone(timedelta(hours=8))
 
 
 @pytest.fixture
 def calendar(tmp_path, monkeypatch):
-    import pipeline.cadence as cadence
-
-    monkeypatch.setattr(cadence, "parse_cadence_from_contract",
-                        lambda path, element=None: {"expected_time": "09:00",
-                                                    "latency_minutes": 0})
-    monkeypatch.setattr(cadence, "parse_claim_window_from_contract",
-                        lambda path, element=None: None)
-    path = tmp_path / "data-asset.yaml"
-
     def use(versions, extra=None):
+        # 09:00, no grace, no override - the timing under test is the
+        # calendar's (agreement_split's default participation).
         ds = {"id": "d", "name": "D", "table": "t", "calendar": "c", **(extra or {})}
-        path.write_text(yaml.safe_dump({
-            "data_asset_id": "data-asset-1", "timezone": "Australia/Perth",
+        agreement_split.repoint(monkeypatch, tmp_path, {
+            "data_asset_id": "data-asset-1",
             "calendars": [{"name": "c", "versions": versions}],
             "hierarchy": {"agencies": [{"id": "a", "name": "A", "collections": [
-                {"id": "col", "name": "Col", "contract": "c.yaml", "datasets": [ds]}]}]}}))
-        monkeypatch.setattr(schedule, "DATA_ASSET_YAML", path)
-        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", path)
-        schedule._load.cache_clear()
-        schedule._dataset_schedules.cache_clear()
-        hierarchy._load.cache_clear()
+                {"id": "col", "name": "Col", "contract": "c.yaml", "datasets": [ds]}]}]}},
+            base={})
 
     yield use
-    schedule._load.cache_clear()
-    schedule._dataset_schedules.cache_clear()
+    agreement_split.clear_caches()
     hierarchy._load.cache_clear()
 
 

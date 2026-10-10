@@ -1374,7 +1374,7 @@ function sampleFinePrint(toolRef, shown, failing){
 // same " · " separator this UI already uses elsewhere.
 function fmtArrival(lastArrival){ return fmtInstant(lastArrival.arrivedAt); }
 // Phase 5j: a human-readable label for a dataset's own real cadence
-// config (ds.sla.cadence - pipeline/cadence.py/contract slaProperties:),
+// config (ds.sla.cadence - agreement.cadence(), from contract/calendar.yaml),
 // replacing the old hand-authored sla.frequency/expectedBy display text.
 const WEEKDAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1764,8 +1764,9 @@ function groupChecksByCategory(checks){
    current" (a quarterly dataset's real ~92-day gap between deliveries
    made it read "no data" for roughly two-thirds of every quarter, even
    when nothing was wrong). Replaced by real per-dataset cadence config
-   living in each dataset's own ODCS contract (`slaProperties:`), parsed
-   by pipeline/cadence.py and already folded into REAL_BIRTH_REG_DATA/
+   now in each dataset's participation in contract/calendar.yaml (the
+   contract's `slaProperties:` until REQ-PIPE-110), read by
+   qa_tools/common/agreement.py and already folded into REAL_BIRTH_REG_DATA/
    REAL_CP_DATA's own `sla.cadence` field by the two build_*_dashboard_
    data.py scripts. The page used to carry its own JS port of
    pipeline/cadence.py's cycle_start() to turn that cadence into a period

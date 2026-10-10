@@ -15,8 +15,9 @@ whenever the pipeline is regenerated.
 `const AS_OF_OFFSET_DAYS` used to be re-embedded here too, from
 `contract/data-asset.yaml` (Thread C, plans/publishing-and-history.md) -
 removed entirely 2026-09-17 (plans/qa-pipeline.md Phase 5j), replaced
-by real per-dataset cadence config living in each dataset's own ODCS
-contract (`slaProperties:`, read by pipeline/cadence.py and already
+by real per-dataset cadence config - each dataset's participation in
+contract/calendar.yaml since REQ-PIPE-110 (the contracts' `slaProperties:`
+before it), read by qa_tools/common/agreement.py's cadence() and already
 folded into REAL_BIRTH_REG_DATA/REAL_CP_DATA's own `sla.cadence` field
 by the two build_*_dashboard_data.py scripts above - nothing left for
 this script to separately embed).

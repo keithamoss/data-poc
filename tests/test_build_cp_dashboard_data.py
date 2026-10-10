@@ -26,9 +26,8 @@ FIXTURE_RUNS = [
 
 FIXTURE_DATASET_STATS = {
     # earliest_extract values deliberately placed relative to CP's real
-    # quarterly cadence (contract/child-protection-contract.yaml's
-    # slaProperties: - Feb/May/Aug/Nov day 1, 09:00 AWST, 8h latency
-    # grace) rather than each run's own run_date, so
+    # quarterly cadence (contract/calendar.yaml - Feb/May/Aug/Nov day 1,
+    # 09:00 AWST, 8h grace) rather than each run's own run_date, so
     # test_arrival_status_is_genuinely_computed_from_real_cadence below
     # can tell a real onTime/late classification apart from a hardcoded
     # one - see that test's own docstring.

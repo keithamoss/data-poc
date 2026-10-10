@@ -128,7 +128,7 @@ class Holds:
 
 
 #: Where a dataset's delivery dates are authored (REQ-PIPE-154 criterion 3).
-SCHEDULE_FILE = "contract/data-asset.yaml"
+SCHEDULE_FILE = "contract/calendar.yaml"
 
 
 def reason_for(decided: Assignment) -> dict:

@@ -56,17 +56,14 @@ retroactively make a past supply late.
 from __future__ import annotations
 
 import calendar as _calendar
-import functools
 import re
 from dataclasses import dataclass
 from datetime import date, timedelta
-from pathlib import Path
 
-from qa_tools.common import config_yaml
+
 
 from qa_tools.common import hierarchy
 
-DATA_ASSET_YAML = Path(__file__).resolve().parent.parent.parent / "contract" / "data-asset.yaml"
 
 # Full month names, lower-cased for comparison. Full names ONLY: an
 # abbreviation or a number is a second accepted form, and two forms
@@ -309,67 +306,50 @@ def _as_date(value, where: str) -> date:
         raise ScheduleConfigError(f"{where}: {value!r} is not an ISO date (YYYY-MM-DD)") from None
 
 
-@functools.lru_cache(maxsize=1)
-def _load() -> dict[str, Calendar]:
-    with open(DATA_ASSET_YAML) as f:
-        doc = config_yaml.parse(f) or {}
-    raw_calendars = doc.get("calendars")
-    if not raw_calendars:
-        raise ScheduleConfigError(f"{DATA_ASSET_YAML} defines no `calendars:`")
-
-    out: dict[str, Calendar] = {}
-    for raw in raw_calendars:
-        name = raw.get("name")
-        if not name:
-            raise ScheduleConfigError(f"{DATA_ASSET_YAML}: a calendar has no `name:`")
-        if name in out:
-            raise ScheduleConfigError(f"{DATA_ASSET_YAML}: calendar {name!r} is defined twice")
-        versions = [_parse_version(v, name, i) for i, v in enumerate(raw.get("versions") or [])]
-        if not versions:
-            raise ScheduleConfigError(f"calendar {name!r} has no versions")
-        versions.sort(key=lambda v: v.effective_from)
-        runway = raw.get("runway_warning_slots")
-        if runway is not None and (not isinstance(runway, int) or isinstance(runway, bool)
-                                    or runway < 1):
-            raise ScheduleConfigError(
-                f"calendar {name!r}: runway_warning_slots is {runway!r}. It counts SLOTS, so it "
-                f"has to be a whole number of at least 1 - a threshold of 0 is a warning that "
-                f"only ever fires once the schedule has already run out.")
-        out[name] = Calendar(name=name, description=(raw.get("description") or "").strip(),
-                              versions=tuple(versions), runway_warning_slots=runway)
-    return out
+def parse_calendar(raw: dict) -> Calendar:
+    """One calendar from its config - read by `agreement.load`, the one loader."""
+    name = raw.get("name")
+    versions = [_parse_version(v, name, i) for i, v in enumerate(raw.get("versions") or [])]
+    if not versions:
+        raise ScheduleConfigError(f"calendar {name!r} has no versions")
+    versions.sort(key=lambda v: v.effective_from)
+    runway = raw.get("runway_warning_slots")
+    if runway is not None and (not isinstance(runway, int) or isinstance(runway, bool)
+                                or runway < 1):
+        raise ScheduleConfigError(
+            f"calendar {name!r}: runway_warning_slots is {runway!r}. It counts SLOTS, so it "
+            f"has to be a whole number of at least 1 - a threshold of 0 is a warning that "
+            f"only ever fires once the schedule has already run out.")
+    return Calendar(name=name, description=(raw.get("description") or "").strip(),
+                    versions=tuple(versions), runway_warning_slots=runway)
 
 
-def calendars() -> list[Calendar]:
-    return list(_load().values())
+def _agreement(agreement=None):
+    """The agreement to read: the one passed, or the committed one
+    (REQ-PIPE-110 criterion 31 - every reader takes it as an argument)."""
+    if agreement is not None:
+        return agreement
+    from qa_tools.common import agreement as agreement_mod
+
+    return agreement_mod.current()
 
 
-def calendar(name: str) -> Calendar:
+def _load(agreement=None) -> dict[str, Calendar]:
+    calendars = dict(_agreement(agreement).calendars)
+    return calendars
+
+
+def calendars(agreement=None) -> list[Calendar]:
+    return list(_load(agreement).values())
+
+
+def calendar(name: str, agreement=None) -> Calendar:
     try:
-        return _load()[name]
+        return _load(agreement)[name]
     except KeyError:
         raise UnknownCalendarError(
-            f"{name!r} is not a calendar in {DATA_ASSET_YAML.name}. "
-            f"Known: {', '.join(sorted(_load()))}") from None
-
-
-@functools.lru_cache(maxsize=1)
-def _dataset_schedules() -> dict[str, dict]:
-    """Each dataset's raw schedule config, keyed by dataset id.
-
-    Read straight from the hierarchy block rather than duplicated
-    elsewhere, so a dataset named in one and absent from the other is a
-    detectable error rather than a silent mismatch - which is
-    REQ-QAC-039's criterion, applied here.
-    """
-    with open(DATA_ASSET_YAML) as f:
-        doc = config_yaml.parse(f) or {}
-    out = {}
-    for agency in (doc.get("hierarchy") or {}).get("agencies") or []:
-        for collection in agency.get("collections") or []:
-            for dataset in collection.get("datasets") or []:
-                out[dataset["id"]] = dataset
-    return out
+            f"{name!r} is not a calendar in contract/calendar.yaml. "
+            f"Known: {', '.join(sorted(_load(agreement)))}") from None
 
 
 #: The key a dataset uses to say it has NO calendar, DELIBERATELY
@@ -422,7 +402,7 @@ class NoCalendarAgreed(Exception):
             f"({NO_CALENDAR_KEY}: {kind}). It owes no supply and is filed to no period.")
 
 
-def no_calendar(dataset_id: str) -> str | None:
+def no_calendar(dataset_id: str, agreement=None) -> str | None:
     """Which kind of no-calendar dataset this is, or None where it has one.
 
     Reads the declaration and validates it here rather than only in the
@@ -430,8 +410,8 @@ def no_calendar(dataset_id: str) -> str | None:
     by accident - which would be the quiet direction.
     """
     hierarchy.dataset(dataset_id)
-    raw = _dataset_schedules()[dataset_id]
-    declared = raw.get(NO_CALENDAR_KEY)
+    entry = _agreement(agreement).dataset(dataset_id)
+    declared = entry.no_calendar if entry else None
     if declared is None:
         return None
     if declared not in NO_CALENDAR_VALUES:
@@ -440,9 +420,9 @@ def no_calendar(dataset_id: str) -> str | None:
             f"{', '.join(NO_CALENDAR_VALUES)}. {NOT_YET_AGREED} means sample data before a "
             f"schedule is agreed, and it will graduate; {NEVER} means a one-off extraction "
             f"that has supplies and no cadence at all.")
-    if raw.get("calendar"):
+    if entry.calendar:
         raise ScheduleConfigError(
-            f"dataset {dataset_id!r} declares both `calendar: {raw['calendar']}` and "
+            f"dataset {dataset_id!r} declares both `calendar: {entry.calendar}` and "
             f"`{NO_CALENDAR_KEY}: {declared}`. One of those is wrong and this will not guess "
             f"which - a dataset either has an agreed schedule or says it has none.")
     return declared
@@ -457,7 +437,7 @@ def will_graduate(dataset_id: str) -> bool:
     return no_calendar(dataset_id) == NOT_YET_AGREED
 
 
-def owes_from(dataset_id: str) -> date | None:
+def owes_from(dataset_id: str, agreement=None) -> date | None:
     """The date a graduated dataset started owing supplies, or None.
 
     CRITERION 16'S RECORD OF WHEN IT GRADUATED, and it is CONFIGURATION
@@ -473,16 +453,19 @@ def owes_from(dataset_id: str) -> date | None:
     graduated in November must not be reported as having owed supplies
     all year, and this is what every period before that date is judged
     against.
+
+    FOLDED INTO PARTICIPATION (REQ-PIPE-110 criterion 27): it is the
+    effective date of the dataset's first participation version, never a
+    key of its own.
     """
     hierarchy.dataset(dataset_id)
-    raw = _dataset_schedules()[dataset_id]
-    value = raw.get("owes_from")
-    if value is None:
+    entry = _agreement(agreement).dataset(dataset_id)
+    if entry is None or not entry.participation:
         return None
-    return _as_date(value, f"dataset {dataset_id!r} owes_from")
+    return entry.participation[0].effective_from
 
 
-def calendar_for_dataset(dataset_id: str) -> Calendar:
+def calendar_for_dataset(dataset_id: str, agreement=None) -> Calendar:
     """The calendar a dataset names, resolved through the hierarchy.
 
     Raises for a dataset the hierarchy does not define, and for a
@@ -496,39 +479,42 @@ def calendar_for_dataset(dataset_id: str) -> Calendar:
     somebody got it wrong.
     """
     hierarchy.dataset(dataset_id)  # raises UnknownDatasetError, naming the known ids
-    declared = no_calendar(dataset_id)
+    declared = no_calendar(dataset_id, agreement)
     if declared is not None:
         raise NoCalendarAgreed(dataset_id, declared)
-    raw = _dataset_schedules()[dataset_id]
-    name = raw.get("calendar")
+    name = _agreement(agreement).calendar_name_for(dataset_id)
     if not name:
         raise ScheduleConfigError(
             f"dataset {dataset_id!r} names no `calendar:` and does not declare "
             f"`{NO_CALENDAR_KEY}:` either. Every dataset does one or the other - without "
             f"either there is nothing to judge its supplies against, and a typo'd calendar "
             f"name would leave it silently expecting nothing.")
-    return calendar(name)
+    return calendar(name, agreement)
 
 
-def delivery_months(dataset_id: str) -> tuple[int, ...] | None:
+def delivery_months(dataset_id: str, on: date | None = None,
+                    agreement=None) -> tuple[int, ...] | None:
     """The months a dataset participates in, as 1-12 numbers, or None
     for "all of them".
 
     None and "every month" are deliberately the same answer: a dataset
     that says nothing participates in everything its calendar generates,
     which is the reading that makes ~30 datasets tolerable to configure.
+
+    READ FROM PARTICIPATION (REQ-PIPE-110): the `participates` list of the
+    participation version in force on `on` - the period's own date - or of
+    the newest version where `on` is not given.
     """
-    raw = _dataset_schedules()[dataset_id]
-    months = raw.get("delivery_months")
-    if months is None:
+    entry = _agreement(agreement).dataset(dataset_id)
+    if entry is None or not entry.participation:
         return None
-    where = f"dataset {dataset_id!r} delivery_months"
-    if not isinstance(months, list) or not months:
-        raise ScheduleConfigError(f"{where}: expected a non-empty list of full month names")
-    return tuple(parse_month_name(m, where) for m in months)
+    if on is None:
+        return entry.participation[-1].participates
+    version = _agreement(agreement).participation_on(dataset_id, on)
+    return version.participates if version else None
 
 
-def not_expected_periods(dataset_id: str) -> dict[str, str]:
+def not_expected_periods(dataset_id: str, agreement=None) -> dict[str, str]:
     """{period name: reason} for periods a dataset declares no supply
     for.
 
@@ -537,48 +523,44 @@ def not_expected_periods(dataset_id: str) -> dict[str, str]:
     somebody having forgotten to configure November - and those are
     opposite problems.
     """
-    raw = _dataset_schedules()[dataset_id]
-    entries = raw.get("not_expected") or []
-    out: dict[str, str] = {}
-    for entry in entries:
-        name, reason = entry.get("period"), (entry.get("reason") or "").strip()
-        where = f"dataset {dataset_id!r} not_expected"
-        if not name:
-            raise ScheduleConfigError(f"{where}: an entry has no `period:` - got {entry!r}")
-        if not reason:
-            raise ScheduleConfigError(
-                f"{where}: period {name!r} has no `reason:`. A period with no supply and no "
-                f"reason is indistinguishable from one somebody forgot to configure.")
-        out[name] = reason
-    return out
+    entry = _agreement(agreement).dataset(dataset_id)
+    return dict(entry.not_expected) if entry else {}
 
 
-def dataset_dates_override(dataset_id: str) -> tuple[Period, ...] | None:
+def dataset_dates_override(dataset_id: str, agreement=None) -> tuple[Period, ...] | None:
     """A dataset's OWN authored dates, replacing its calendar's.
 
     Overriding is a different act from subsetting, and both exist
-    deliberately (criterion 7). No dataset needs this today - everything
-    is aligned to one of the four agreed days - but it is cheap now and
-    awkward to retrofit once thirty datasets assume subsetting is the
-    only shape.
+    deliberately. No dataset needs this today - everything is aligned to
+    one of the four agreed days - but it is cheap now and awkward to
+    retrofit once thirty datasets assume subsetting is the only shape.
+    VERSIONED LIKE A CALENDAR (REQ-PIPE-110 criterion 25): each version
+    contributes only the periods inside its own period of effect.
     """
-    raw = _dataset_schedules()[dataset_id]
-    dates = raw.get("dates")
-    if not dates:
+    entry = _agreement(agreement).dataset(dataset_id)
+    own = entry.own_dates if entry else None
+    if own is None:
         return None
-    where = f"dataset {dataset_id!r} dates"
-    if raw.get("delivery_months"):
+    if any(v.participates is not None for v in entry.participation):
         raise ScheduleConfigError(
-            f"{where}: a dataset states EITHER its own `dates:` (overriding its calendar) OR "
-            f"`delivery_months:` (subsetting it), never both - the two mean different things "
-            f"and carrying both leaves no way to tell which the author meant.")
-    out = []
-    for entry in dates:
-        name, when = entry.get("period"), entry.get("date")
-        if not name or not when:
-            raise ScheduleConfigError(f"{where}: every date needs a `period:` and a `date:`")
-        out.append(Period(name=name, date=_as_date(when, f"{where} period {name!r}")))
-    return tuple(out)
+            f"dataset {dataset_id!r} dates: a dataset states EITHER its own `dates:` "
+            f"(overriding its calendar) OR a `participates:` list of months (subsetting it), "
+            f"never both - the two mean different things and carrying both leaves no way to "
+            f"tell which was meant.")
+    return tuple(_calendar_periods(own))
+
+
+def _calendar_periods(cal: "Calendar", until: date | None = None) -> list[Period]:
+    """An authored calendar's periods, version by version - each version
+    contributing only the periods inside its own period of effect."""
+    out: list[Period] = []
+    for version, start, end in _effect_windows(cal):
+        for period in version.periods:
+            if period.date < start or (end is not None and period.date >= end):
+                continue
+            out.append(period)
+    out.sort(key=lambda p: p.date)
+    return [p for p in out if until is None or p.date <= until]
 
 
 def _effect_windows(cal: Calendar) -> list[tuple[CalendarVersion, date, date | None]]:
@@ -592,7 +574,8 @@ def _effect_windows(cal: Calendar) -> list[tuple[CalendarVersion, date, date | N
             for i, v in enumerate(cal.versions)]
 
 
-def periods_for_calendar(calendar_name: str, until: date | None = None) -> list[Period]:
+def periods_for_calendar(calendar_name: str, until: date | None = None,
+                         agreement=None) -> list[Period]:
     """One calendar's full period sequence, in date order (REQ-PIPE-051).
 
     DERIVED VERSION BY VERSION, and that is the whole point rather than
@@ -613,7 +596,7 @@ def periods_for_calendar(calendar_name: str, until: date | None = None) -> list[
     window, named by its date, so a calendar can legitimately change
     from a rule to authored dates or back.
     """
-    cal = calendar(calendar_name)
+    cal = calendar(calendar_name, agreement)
     out: list[Period] = []
     for version, start, end in _effect_windows(cal):
         stop = end - timedelta(days=1) if end is not None else until
@@ -664,11 +647,12 @@ def schema_name(period: Period) -> str:
     return f"period_{folded}"
 
 
-def periods_for_dataset(dataset_id: str, until: date | None = None) -> list[DatasetPeriod]:
+def periods_for_dataset(dataset_id: str, until: date | None = None,
+                        agreement=None) -> list[DatasetPeriod]:
     """Every period this dataset's schedule produces, in date order.
 
-    An authored calendar's periods, filtered to the dataset's own
-    delivery_months, or the dataset's own dates where it overrides the
+    An authored calendar's periods, filtered to the months the dataset's
+    participation owes on each period's date, or the dataset's own dates where it overrides the
     calendar outright. A cadence-rule calendar generates one period per
     day up to `until`, which is required there - "every day" has no end
     of its own, so the caller has to say where it stops.
@@ -676,24 +660,39 @@ def periods_for_dataset(dataset_id: str, until: date | None = None) -> list[Data
     Periods the dataset declares not-expected are RETURNED, flagged,
     never dropped - see DatasetPeriod.
     """
-    cal = calendar_for_dataset(dataset_id)
-    months = delivery_months(dataset_id)
+    cal = calendar_for_dataset(dataset_id, agreement)
+    months = delivery_months(dataset_id, agreement=agreement)
     version = cal.current
-    skipped = not_expected_periods(dataset_id)
+    skipped = not_expected_periods(dataset_id, agreement)
+    begins = owes_from(dataset_id, agreement)
 
     def _decorate(periods):
         return [DatasetPeriod(period=p, expected=p.name not in skipped,
                                not_expected_reason=skipped.get(p.name))
                 for p in periods]
 
-    override = dataset_dates_override(dataset_id)
+    def _owed(periods):
+        """NOT YET OWING before the first participation version (criterion
+        30), and each period filtered by the participation in force ON ITS
+        OWN DATE."""
+        out = []
+        for p in periods:
+            if begins is not None and p.date < begins:
+                continue
+            on = delivery_months(dataset_id, p.date, agreement)
+            if on is not None and p.date.month not in on:
+                continue
+            out.append(p)
+        return out
+
+    override = dataset_dates_override(dataset_id, agreement)
     if override is not None:
-        return _decorate([p for p in override if until is None or p.date <= until])
+        return _decorate(_owed([p for p in override if until is None or p.date <= until]))
 
     if version.is_cadence_rule and months is not None:
         raise ScheduleConfigError(
             f"dataset {dataset_id!r} names calendar {cal.name!r}, which is a cadence rule, "
-            f"AND names delivery_months. Months only mean something against authored dates; "
+            f"AND its participation names months. Months only mean something against authored dates; "
             f"a dataset on a cadence rule participates in every period the rule generates. "
             f"Rejected rather than ignored, because a key that is accepted and discarded is "
             f"how a dataset ends up expecting something other than what its author wrote.")
@@ -706,14 +705,12 @@ def periods_for_dataset(dataset_id: str, until: date | None = None) -> list[Data
     # then this dataset's own participation applied to it. Derived here
     # rather than re-read from `version` so that a dataset sees every
     # period its calendar ever had, not only the newest version's.
-    periods = periods_for_calendar(cal.name, until=until)
-    if months is not None:
-        periods = [p for p in periods if p.date.month in months]
-    return _decorate(periods)
+    periods = periods_for_calendar(cal.name, until=until, agreement=agreement)
+    return _decorate(_owed(periods))
 
 
 def claim_window(dataset_id: str, contract_value: str | None = None,
-                  on: date | None = None) -> timedelta:
+                  on: date | None = None, agreement=None) -> timedelta:
     """How long BEFORE a slot's due instant its claim window opens.
 
     `on` IS THE PERIOD'S OWN DATE, and passing it is what makes the
@@ -740,11 +737,10 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
 
     qa_tools/common/slots.py is what applies it.
 
-    The CALENDAR carries the default and a dataset may override it in
-    its own contract - say nothing, get the default. `contract_value` is
-    that dataset's own `claimWindow` slaProperty if it has one
-    (pipeline.cadence.parse_claim_window_from_contract reads it), or
-    None to take the calendar's.
+    The CALENDAR carries the default and a dataset's participation
+    version may override it in contract/calendar.yaml - say nothing, get
+    the default (REQ-PIPE-110; it used to be a `claimWindow` slaProperty
+    in the dataset's own contract).
 
     WHY THE DEFAULT SITS ON THE CALENDAR rather than on the asset root,
     which is where an earlier answer put it: a quarterly calendar's
@@ -773,7 +769,13 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
     """
     if contract_value is not None:
         return parse_duration(contract_value, f"dataset {dataset_id!r} claimWindow")
-    cal = calendar_for_dataset(dataset_id)
+    # A PARTICIPATION VERSION MAY OVERRIDE IT (REQ-PIPE-110 criterion 4).
+    version = (_agreement(agreement).participation_on(dataset_id, on) if on is not None
+               else (lambda e: e.participation[-1] if e and e.participation else None)(
+                   _agreement(agreement).dataset(dataset_id)))
+    if version is not None and version.claim_window is not None:
+        return version.claim_window
+    cal = calendar_for_dataset(dataset_id, agreement)
     if on is None:
         return cal.current.claim_window
     return _version_in_force(cal, on).claim_window

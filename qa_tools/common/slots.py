@@ -23,21 +23,18 @@ asked of the schedule and the slot's current state, not a flag some
 sweep sets - see is_overdue() for why that matters. Same for
 whether a slot is open or closed.
 
-WHY THIS IMPORTS pipeline.cadence, which is worth naming rather than
-leaving as an oddity: a dataset's expected time of day, grace allowance
-and claim window all live in its own ODCS contract's slaProperties, and
-that array is parsed in exactly one place. Reading it a second time
-here would be two parsers for one file, which is the shape this repo
-keeps removing. The layering is untidy - qa_tools/common/ reaching into
-pipeline/ - and the tidier fix, moving contract parsing out of
-pipeline/, is a refactor this requirement does not need.
+A dataset's expected time of day, grace allowance and claim window come
+from its participation in contract/calendar.yaml, read through the one
+loader (qa_tools/common/agreement.py, REQ-PIPE-110). They used to live in
+each ODCS contract's slaProperties, parsed by pipeline/cadence.py, which
+this module had to reach into from qa_tools/common/.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from qa_tools.common import asset_time, hierarchy, schedule
+from qa_tools.common import asset_time, schedule
 from qa_tools.common.schedule import Period
 
 
@@ -93,25 +90,27 @@ class Slot:
         return self.due_at + self.grace
 
 
-def _contract_timing(dataset_id: str) -> tuple[str, int, str | None]:
-    """(expected time of day, grace minutes, claim-window override) for
-    one dataset, from its own contract.
+def _timing(dataset_id: str, agreement=None) -> tuple[str, int, str | None]:
+    """(expected time of day, grace minutes, claim-window override) for one
+    dataset, from its participation in contract/calendar.yaml (REQ-PIPE-110).
 
-    Read per ELEMENT, which is the whole reason Child Protection's six
-    datasets can differ: a slaProperty naming an element overrides the
-    contract-wide default for that one dataset. That discriminator was
-    being parsed and discarded until REQ-PIPE-049 fixed it.
+    THE NEWEST PARTICIPATION VERSION'S. Taking each period's own version is
+    REQ-PIPE-113's; until it lands every dataset carries one version, so the
+    answer is the same. The claim-window override is not returned here: it
+    lives on the participation version, and schedule.claim_window reads it
+    there, effective-dated, so the third value is always None.
     """
-    from pipeline.cadence import parse_cadence_from_contract, parse_claim_window_from_contract
+    entry = schedule._agreement(agreement).dataset(dataset_id)
+    version = entry.participation[-1] if entry and entry.participation else None
+    if version is None or version.expected_time is None or version.grace is None:
+        raise schedule.ScheduleConfigError(
+            f"dataset {dataset_id!r} has no participation version stating an expected time and "
+            f"a grace allowance in contract/calendar.yaml, so none of its slots has a due "
+            f"instant.")
+    return version.expected_time, int(version.grace.total_seconds() // 60), None
 
-    dataset = hierarchy.dataset(dataset_id)
-    contract_path = hierarchy.contract_path(dataset.collection_id)
-    cadence = parse_cadence_from_contract(contract_path, element=dataset.table)
-    override = parse_claim_window_from_contract(contract_path, element=dataset.table)
-    return cadence["expected_time"], int(cadence["latency_minutes"]), override
 
-
-def claimable_until(dataset_id: str, at: date) -> date:
+def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
     """How far ahead to generate slots for a supply arriving on `at`
     (post-build-review #73).
 
@@ -144,10 +143,10 @@ def claimable_until(dataset_id: str, at: date) -> date:
     slot whose window has not opened is offered and not chosen - the behaviour the daily feed has always had for
     the current day. This only stops a claimable slot being absent.
     """
-    return at + claim_window(dataset_id)
+    return at + claim_window(dataset_id, agreement)
 
 
-def claim_window(dataset_id: str) -> timedelta:
+def claim_window(dataset_id: str, agreement=None) -> timedelta:
     """This dataset's claim window, as things stand today.
 
     NOT EFFECTIVE-DATED, deliberately, and the difference from
@@ -159,11 +158,12 @@ def claim_window(dataset_id: str) -> timedelta:
     and generating a period too many costs nothing because the slot it
     makes is still filtered on its own `claim_opens_at`.
     """
-    _, _, override = _contract_timing(dataset_id)
-    return schedule.claim_window(dataset_id, override)
+    _, _, override = _timing(dataset_id, agreement)
+    return schedule.claim_window(dataset_id, override, agreement=agreement)
 
 
-def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
+def slots_for_dataset(dataset_id: str, until: date | None = None,
+                      agreement=None) -> list[Slot]:
     """Every slot this dataset has, oldest first.
 
     One per period it PARTICIPATES in. A period the dataset declares
@@ -174,7 +174,8 @@ def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
     is still RETURNED by the schedule, flagged, so the dashboard can
     show "no November file, agreed" rather than a silent gap.
     """
-    expected_time, grace_minutes, window_override = _contract_timing(dataset_id)
+    agreement = schedule._agreement(agreement)
+    expected_time, grace_minutes, window_override = _timing(dataset_id, agreement)
     grace = timedelta(minutes=grace_minutes)
 
     def claim_opens(period_date: date) -> datetime:
@@ -184,14 +185,15 @@ def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
         # _effect_windows() already prevents for the dates themselves
         # (post-build-review #42). A zero window opens at the due
         # instant, which is REQ-PIPE-131 criterion 3 for free.
-        window = schedule.claim_window(dataset_id, window_override, on=period_date)
+        window = schedule.claim_window(dataset_id, window_override, on=period_date,
+                                       agreement=agreement)
         return asset_time.wall_clock(period_date, expected_time) - window
 
     # THE CALENDAR'S periods, not only the ones this dataset owes, so a
     # slot closes when the NEXT CALENDAR PERIOD's window opens
     # (REQ-PIPE-131 criterion 1). Read by index, never by walking the
     # sequence per slot (NFR 1).
-    sequence = _calendar_periods(dataset_id, until)
+    sequence = _calendar_periods(dataset_id, until, agreement)
     following = {p.name: sequence[i + 1].date for i, p in enumerate(sequence[:-1])}
     preceding = {p.name: sequence[i - 1].date for i, p in enumerate(sequence) if i > 0}
 
@@ -210,7 +212,8 @@ def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
         return opens + (opens - claim_opens(prev)) if prev is not None else None
 
     out = []
-    for dataset_period in schedule.periods_for_dataset(dataset_id, until=until):
+    for dataset_period in schedule.periods_for_dataset(dataset_id, until=until,
+                                                       agreement=agreement):
         if not dataset_period.expected:
             continue
         opens = claim_opens(dataset_period.date)
@@ -227,18 +230,18 @@ def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
 SLOT_LOOKUP_YEARS = 3
 
 
-def slot_named(dataset_id: str, period: str) -> Slot | None:
+def slot_named(dataset_id: str, period: str, agreement=None) -> Slot | None:
     """This dataset's slot for `period`, or None where its calendar has no
     such period it takes part in."""
     from qa_tools.common import asset_time
 
     horizon = asset_time.local_date(asset_time.now())
     horizon = horizon.replace(year=horizon.year + SLOT_LOOKUP_YEARS)
-    return next((s for s in slots_for_dataset(dataset_id, until=horizon)
+    return next((s for s in slots_for_dataset(dataset_id, until=horizon, agreement=agreement)
                  if s.name == period), None)
 
 
-def _calendar_periods(dataset_id: str, until: date | None) -> list[Period]:
+def _calendar_periods(dataset_id: str, until: date | None, agreement=None) -> list[Period]:
     """The full period sequence a dataset's slots close against - its
     calendar's, or its own dates where it overrides the calendar - with
     the period AFTER `until` included, so the last slot generated still
@@ -249,12 +252,12 @@ def _calendar_periods(dataset_id: str, until: date | None) -> list[Period]:
     authored calendar is finite, so it is read whole where the next
     period lies beyond that.
     """
-    override = schedule.dataset_dates_override(dataset_id)
+    override = schedule.dataset_dates_override(dataset_id, agreement)
     if override is not None:
         return sorted(override, key=lambda p: p.date)
-    cal = schedule.calendar_for_dataset(dataset_id)
+    cal = schedule.calendar_for_dataset(dataset_id, agreement)
     if until is None:
-        return schedule.periods_for_calendar(cal.name)
+        return schedule.periods_for_calendar(cal.name, agreement=agreement)
     # FAR ENOUGH TO REACH THE NEXT PERIOD: a day for a cadence rule, or -
     # where `until` sits in an authored stretch - the start of the next
     # calendar version, which is where a following cadence rule's first
@@ -263,16 +266,17 @@ def _calendar_periods(dataset_id: str, until: date | None) -> list[Period]:
     # closing instant at all).
     # Tried with a day FIRST, so a daily calendar with a far-future version
     # never generates the years in between.
-    periods = schedule.periods_for_calendar(cal.name, until=until + timedelta(days=1))
+    periods = schedule.periods_for_calendar(cal.name, until=until + timedelta(days=1),
+                                            agreement=agreement)
     if periods and periods[-1].date > until:
         return periods
     later = [v.effective_from for v in cal.versions if v.effective_from > until]
     if later:
-        periods = schedule.periods_for_calendar(cal.name, until=min(later))
+        periods = schedule.periods_for_calendar(cal.name, until=min(later), agreement=agreement)
         if periods and periods[-1].date > until:
             return periods
     if not cal.current.is_cadence_rule:
-        periods = schedule.periods_for_calendar(cal.name)
+        periods = schedule.periods_for_calendar(cal.name, agreement=agreement)
     return periods
 
 

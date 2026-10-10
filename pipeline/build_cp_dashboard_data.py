@@ -37,7 +37,7 @@ from qa_tools.common import hierarchy, promotion_state, qa_store
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
-from pipeline.cadence import parse_cadence_from_contract
+from qa_tools.common import agreement
 from qa_tools.common import asset_time
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
@@ -568,7 +568,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
     # expectedTime and latency win over the contract-wide defaults.
     # Before this the element was parsed and discarded, so all six
     # inherited cp_clients' values whether or not they had their own.
-    cadence = parse_cadence_from_contract(CONTRACT_PATH, element=table)
+    cadence = agreement.cadence(dataset_id)
 
     # READ, NOT COMPUTED (REQ-PIPE-080 criteria 1 and 2) - see
     # build_dashboard_data.py's identical block for the full account of

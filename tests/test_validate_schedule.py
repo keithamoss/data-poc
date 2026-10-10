@@ -22,6 +22,7 @@ import pytest
 import yaml
 
 from qa_tools.common import validate_schedule
+import agreement_split
 from qa_tools.common.validate_schedule import Source, validate
 
 REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
@@ -37,9 +38,11 @@ def config(tmp_path):
     src = Source(asset_path, contract_dir)
 
     def apply(mutate):
-        doc = yaml.safe_load(asset_path.read_text())
+        # Mutated in the one-file shape and written out as the two files
+        # REQ-PIPE-110 split it into - see tests/agreement_split.py.
+        doc = agreement_split.merged_view(contract_dir)
         mutate(doc)
-        asset_path.write_text(yaml.safe_dump(doc, sort_keys=False))
+        agreement_split.write(contract_dir, doc)
         return validate(src)
 
     apply.src = src
@@ -283,17 +286,21 @@ class TestTheContractsOnTheOtherSide:
         assert any("checked by nothing" in e.fix for e in errors), _messages(errors)
 
     def test_a_negative_grace_allowance_is_rejected(self, config):
-        path = config.contract_dir / "child-protection-contract.yaml"
-        doc = yaml.safe_load(path.read_text())
-        for item in doc["slaProperties"]:
-            if item.get("property") == "latency":
-                item["value"] = -30
-                break
-        path.write_text(yaml.safe_dump(doc, sort_keys=False))
+        """Grace moved from the contract's slaProperties to the dataset's
+        participation in contract/calendar.yaml (REQ-PIPE-110); the rule
+        did not change."""
         errors = config(lambda d: None)
-        assert any("negative" in e.problem for e in errors), _messages(errors)
-        assert any("late\nbefore it is due" in e.fix or "before it is due" in e.fix
-                    for e in errors), _messages(errors)
+        assert errors == []
+        path = config.contract_dir / "calendar.yaml"
+        doc = yaml.safe_load(path.read_text())
+        entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
+        entry["participation"]["versions"][0]["grace"] = "-30m"
+        path.write_text(yaml.safe_dump(doc, sort_keys=False))
+        errors = validate(config.src)
+        # A duration has no sign, so a negative one is refused as not a
+        # duration at all - still refused, still naming the dataset.
+        assert any("-30m" in e.problem and "grace" in e.problem
+                   and "cp-clients" in (e.scope or "") for e in errors), _messages(errors)
 
 
 class TestHowItReports:
@@ -381,9 +388,9 @@ def _run(mutate):
     contract_dir = tmp / "contract"
     shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
     asset_path = contract_dir / "data-asset.yaml"
-    doc = yaml.safe_load(asset_path.read_text())
+    doc = agreement_split.merged_view(contract_dir)
     mutate(doc)
-    asset_path.write_text(yaml.safe_dump(doc, sort_keys=False))
+    agreement_split.write(contract_dir, doc)
     try:
         return validate(Source(asset_path, contract_dir))
     finally:
@@ -426,7 +433,7 @@ class TestAPastDateCannotMoveQuietly:
     def _run(self, monkeypatch, tmp_path, mutate, today=None):
         from qa_tools.common import validate_schedule as mod
 
-        real = yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
+        real = agreement_split.merged_view(REAL_CONTRACT_DIR)
         new_doc = self._edit(real, mutate)
         monkeypatch.setattr(mod, "_content_at",
                              lambda rel_path, ref: yaml.safe_dump(real, sort_keys=False))
@@ -503,7 +510,7 @@ class TestAPastDateCannotMoveQuietly:
         from qa_tools.common import validate_schedule as mod
 
         monkeypatch.setattr(mod, "_content_at", lambda rel_path, ref: None)
-        real = yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
+        real = agreement_split.merged_view(REAL_CONTRACT_DIR)
         src = Source(mod.ROOT / "contract" / "data-asset.yaml", REAL_CONTRACT_DIR)
         assert mod._retrospective_edit_errors(real, src) == []
 
@@ -511,7 +518,7 @@ class TestAPastDateCannotMoveQuietly:
         from qa_tools.common import validate_schedule as mod
 
         monkeypatch.setattr(mod, "_content_at", lambda rel_path, ref: "{{ not yaml")
-        real = yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
+        real = agreement_split.merged_view(REAL_CONTRACT_DIR)
         src = Source(mod.ROOT / "contract" / "data-asset.yaml", REAL_CONTRACT_DIR)
         assert mod._retrospective_edit_errors(real, src) == []
 
@@ -532,9 +539,12 @@ class TestAPastDateCannotMoveQuietly:
         monkeypatch.setattr(mod.subprocess, "run", watching)
         validate()
         git_calls = [c for c in calls if c and c[0] == "git"]
-        assert len(git_calls) == 1, git_calls
-        assert git_calls[0][1] == "show"
-        assert git_calls[0][2].startswith("HEAD~1:")
+        # One `git show` per configuration file, at one ref - the
+        # agreement in contract/calendar.yaml (REQ-PIPE-110) and the
+        # asset's own versioned settings in contract/data-asset.yaml.
+        assert all(c[1] == "show" and c[2].startswith("HEAD~1:") for c in git_calls), git_calls
+        files = [c[2].split(":", 1)[1] for c in git_calls]
+        assert sorted(files) == ["contract/calendar.yaml", "contract/data-asset.yaml"], git_calls
 
 
 class TestTheSuccessLineDoesNotContradictTheWarningBelowIt:
@@ -616,11 +626,11 @@ class TestOneTypoReadsAsOneTypo:
         contract_dir = tmp_path / "contract"
         shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
         path = contract_dir / "data-asset.yaml"
-        doc = yaml.safe_load(path.read_text())
+        doc = agreement_split.merged_view(contract_dir)
         for calendar in doc["calendars"]:
             if calendar["name"] == "quarterly":
                 calendar["name"] = "quarterley"
-        path.write_text(yaml.safe_dump(doc))
+        agreement_split.write(contract_dir, doc)
         return Source(path, contract_dir)
 
     def _errors(self, src):
@@ -667,11 +677,11 @@ class TestOneTypoReadsAsOneTypo:
         contract_dir = tmp_path / "contract"
         shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
         path = contract_dir / "data-asset.yaml"
-        doc = yaml.safe_load(path.read_text())
+        doc = agreement_split.merged_view(contract_dir)
         for _dataset, _collection in validate_schedule._walk_datasets(doc):
             if _dataset.get("id") == "cp-carers":
                 _dataset["calendar"] = "fortnightly"
-        path.write_text(yaml.safe_dump(doc))
+        agreement_split.write(contract_dir, doc)
 
         validate_schedule.main(Source(path, contract_dir))
         err = capsys.readouterr().err
@@ -702,11 +712,11 @@ class TestTheGateActuallyFailsTheBuild:
         contract_dir = tmp_path / "contract"
         shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
         path = contract_dir / "data-asset.yaml"
-        doc = yaml.safe_load(path.read_text())
+        doc = agreement_split.merged_view(contract_dir)
         for calendar in doc["calendars"]:
             if calendar["name"] == "quarterly":
                 calendar["name"] = "quarterley"
-        path.write_text(yaml.safe_dump(doc))
+        agreement_split.write(contract_dir, doc)
 
         assert validate_schedule.main(Source(path, contract_dir)) == 1
 
@@ -736,14 +746,14 @@ class TestOneMistakeIsOneError:
     """
 
     def _doc(self, **version):
-        doc = yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
+        doc = agreement_split.merged_view(REAL_CONTRACT_DIR)
         doc["calendars"][0]["versions"][0].update(version)
         return doc
 
     def _errors(self, doc, tmp_path):
         from qa_tools.common import validate_schedule as mod
         path = tmp_path / "data-asset.yaml"
-        path.write_text(yaml.safe_dump(doc))
+        agreement_split.write(tmp_path, doc)
         return mod.validate(Source(path, REAL_CONTRACT_DIR))
 
     def test_a_bare_number_claim_window_produces_one_error_not_two(self, tmp_path):
@@ -794,7 +804,7 @@ class TestTheHeaderCountIsTheNumberOfDatasetsActuallyAffected:
     """
 
     def _doc(self):
-        return yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
+        return agreement_split.merged_view(REAL_CONTRACT_DIR)
 
     def _report(self, errors, capsys):
         from qa_tools.common import validate_schedule as mod
@@ -840,7 +850,7 @@ class TestTheHeaderCountIsTheNumberOfDatasetsActuallyAffected:
             if calendar["name"] == "quarterly":
                 calendar["name"] = "quarterley"
         path = tmp_path / "data-asset.yaml"
-        path.write_text(yaml.safe_dump(doc))
+        agreement_split.write(tmp_path, doc)
         src = Source(path, REAL_CONTRACT_DIR)
         errors = mod.validate(src)
         affected = set()
@@ -910,7 +920,7 @@ class TestTheGuardIsNotAsNarrowAsItLooked:
     CAL = "quarterly"
 
     def _docs(self, mutate, old_mutate=None):
-        old = yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
+        old = agreement_split.merged_view(REAL_CONTRACT_DIR)
         if old_mutate:
             old_mutate(old)
         new = copy.deepcopy(old)

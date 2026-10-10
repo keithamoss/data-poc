@@ -649,7 +649,7 @@ requirements:
       - A date before any real history shows "no data," never a
         misleading blank or stale-but-colored view.
     linked_tests:
-      - tests/test_cadence.py
+      - tests/test_agreement.py
       - tests/test_dashboard_e2e.py::TestInPlaceOnDatePicking::test_a_date_before_any_real_history_shows_no_data
     evidence:
       - >
@@ -667,8 +667,8 @@ requirements:
       - >
         Replaced by per-dataset cadence declared in each dataset's own ODCS contract, so 'no data' means nothing has landed in the CURRENT expected cycle rather than the last delivery being more than N days old.
     implemented_by:
-      - pipeline/cadence.py::parse_cadence_from_contract
-      - pipeline/cadence.py::cycle_start
+      - qa_tools/common/agreement.py::cadence
+      - qa_tools/common/schedule.py::periods_for_calendar
       - pipeline/recorded_arrival.py::for_run
       - contract/data-asset.yaml
 
@@ -7301,7 +7301,7 @@ requirements:
     linked_tests:
       - tests/test_asset_time.py
       - tests/test_asset_time_semantics.py
-      - tests/test_cadence.py
+      - tests/test_agreement.py
       - tests/test_dataset_stats.py
       - tests/test_dashboard_e2e.py::TestTodayIsTheAssetsToday
     implemented_by:
@@ -7313,7 +7313,7 @@ requirements:
       - qa_tools/common/asset_time.py::now
       - qa_tools/common/asset_time.py::wall_clock
       - qa_tools/common/asset_time.py::end_of_day
-      - pipeline/cadence.py::expected_moment
+      - qa_tools/common/asset_time.py::wall_clock
       - qa_tools/common/arrival_classification.py::classify
       - qa_tools/bdm/dataset_stats.py::_arrival
       - contract/data-asset.yaml
@@ -7465,9 +7465,10 @@ requirements:
         rule.
       - THE SYSTEM SHALL express a schedule that genuinely is "every
         day" as a cadence rule rather than as an enumerated date list.
-      - THE SYSTEM SHALL let a dataset name which of an authored
-        calendar's delivery months it participates in, and SHALL treat a
-        dataset saying nothing as participating in all of them.
+      - THE SYSTEM SHALL let a dataset state, under participates in
+        contract/calendar.yaml, which of an authored calendar's delivery
+        months it participates in, and SHALL treat a dataset stating none
+        as participating in all of them.
       - IF a dataset naming a cadence-rule calendar also names delivery
         months, THEN THE SYSTEM SHALL reject the configuration rather
         than ignoring the months.
@@ -7477,10 +7478,11 @@ requirements:
       - THE SYSTEM SHALL let a dataset override its calendar with its own
         authored dates instead of subsetting it.
       - THE SYSTEM SHALL carry each dataset's own expected time of day
-        and its own grace allowance in that dataset's own contract.
+        and grace allowance on its participation versions in
+        contract/calendar.yaml.
       - THE SYSTEM SHALL carry a default claim window on each calendar,
-        and SHALL let a dataset override it in that dataset's own
-        contract.
+        and SHALL let a dataset's participation version in
+        contract/calendar.yaml override it.
       - THE SYSTEM SHALL express a claim window as a duration carrying
         its own unit, so that the same property reads naturally at both a
         quarterly and a daily scale.
@@ -7526,7 +7528,7 @@ requirements:
     linked_tests:
       - tests/test_schedule.py
       - tests/test_cli_schedule.py
-      - tests/test_cadence.py
+      - tests/test_agreement.py
       - tests/test_daily_batch.py
     implemented_by:
       - qa_tools/common/schedule.py::calendar_for_dataset
@@ -7539,8 +7541,8 @@ requirements:
       - qa_tools/common/schedule.py::parse_month_name
       - qa_tools/common/schedule.py::candidate_dates
       - qa_tools/common/schedule.py::Calendar::version_in_force
-      - pipeline/cadence.py::_sla_properties_to_dict
-      - pipeline/cadence.py::parse_claim_window_from_contract
+      - qa_tools/common/agreement.py::load
+      - qa_tools/common/schedule.py::claim_window
       - cli/schedule.py::show_command
       - cli/schedule.py::candidate_dates_command
       - contract/data-asset.yaml
@@ -7750,8 +7752,8 @@ requirements:
     - IF a configuration error would leave a dataset expecting nothing at all, THEN THE SYSTEM SHALL exit
       non-zero.
     - THE SYSTEM SHALL reject an unrecognised configuration key rather than ignoring it.
-    - THE SYSTEM SHALL reject a month name that is not a real, full month name.
-    - THE SYSTEM SHALL reject a dataset naming a delivery month for which its own calendar has no date.
+    - THE SYSTEM SHALL reject a month name in participates that is not a real, full month name.
+    - THE SYSTEM SHALL reject a participates list naming a delivery month for which the dataset's own calendar has no date.
     - THE SYSTEM SHALL reject schedule versions that overlap or are out of order on their effective-from
       dates.
     - THE SYSTEM SHALL reject duplicate calendar names, duplicate dates within a calendar, and duplicate
@@ -7765,7 +7767,7 @@ requirements:
     - THE SYSTEM SHALL validate configuration without opening or querying anything under data/.
     - THE SYSTEM SHALL be invoked as a mothman subcommand.
     - THE SYSTEM SHALL reject a dataset naming a calendar the asset does not define.
-    - THE SYSTEM SHALL reject a dataset that names delivery months against a cadence-rule calendar.
+    - THE SYSTEM SHALL reject a participates list of delivery months against a cadence-rule calendar.
     - THE SYSTEM SHALL reject a claim window that is not a duration with a recognised unit, and SHALL NOT
       coerce one.
     - THE SYSTEM SHALL be invoked as a command in a schedule command group, and SHALL NOT be placed in a
@@ -8126,9 +8128,9 @@ requirements:
       - THE SYSTEM SHALL track each dataset's slot sequence
         independently of every other dataset's.
       - THE SYSTEM SHALL give each slot its own claim window, taken from
-        its dataset's own contract where one is declared and from the
-        version of its calendar in force on that period's own date
-        otherwise.
+        its dataset's participation version in force on that period's
+        date where it overrides one, and from the version of its calendar
+        in force on that date otherwise.
     non_functional_requirements:
       - Slot count multiplies - ~30 datasets on the quarterly asset,
         several of them multi-table collections, times four periods a
@@ -23791,7 +23793,9 @@ requirements:
       - >
         WHEN a dataset gains a calendar, THE SYSTEM SHALL graduate it -
         from that point it owes supplies, is filed to periods, and is
-        rolled up like any other - and SHALL record when it graduated.
+        rolled up like any other - and SHALL record when it graduated,
+        that date being the effective date of its first participation
+        version.
       - >
         WHEN a person discards a dataset's pre-graduation data from the
         terminal, THE SYSTEM SHALL remove it from the sample schema, and
@@ -28912,7 +28916,7 @@ requirements:
     source: 'Keith, 2026-10-04 (''PERIODS MUST NOT OVERLAP, ENFORCED''; ''134 agreed, constraint after due time plus grace'', plans/road-testing.md #16). Checked 2026-10-04: validate_schedule.py checks dates, months and grace, never one period''s windows against the next. Scoped by delivery-scoper 2026-10-04; signed off by Keith 2026-10-04.'
     acceptance_criteria:
     - THE SYSTEM SHALL require, for every dataset and every pair of consecutive periods of that dataset's calendar - whether or not the dataset participates in either - that the claim-opening instant the dataset would have for the later period is strictly after the late-after instant (due instant plus grace) the dataset would have for the earlier one.
-    - THE SYSTEM SHALL compute those instants exactly as filing does - the dataset's own expected time, grace and claim window from its contract, and the calendar's dates, each as effective on that period's date.
+    - THE SYSTEM SHALL compute those instants exactly as filing does - the dataset's expected time, grace and claim window from its participation version in contract/calendar.yaml, and the calendar's dates, each as effective on that period's date.
     - THE SYSTEM SHALL apply the check across the transition between two calendar versions, comparing the last period under the earlier version with the first under the later one.
     - THE SYSTEM SHALL apply the check over every period the configuration generates - every authored date, and for a cadence-rule calendar every period to the same horizon the runway warning uses.
     - IF the check fails, THEN THE SYSTEM SHALL fail the configuration gate naming the dataset, both periods, the two instants and by how much they overlap, and SHALL NOT stop at the first failure.
@@ -30952,8 +30956,8 @@ requirements:
     - qa_tools/common/config_yaml.py::parse
     - qa_tools/common/config_yaml.py::load
     - qa_tools/common/config_yaml.py::clear
-    - pipeline/cadence.py::parse_cadence_from_contract
-    - pipeline/cadence.py::parse_claim_window_from_contract
+    - qa_tools/common/agreement.py::load
+    - qa_tools/common/schedule.py::claim_window
     - qa_tools/common/postgres_version.py::_data_asset_doc
     - qa_tools/common/environments.py::_load
     linked_tests:
@@ -30965,7 +30969,7 @@ requirements:
       date: '2026-10-06'
     acceptance_criteria:
     - THE SYSTEM SHALL read every YAML configuration file on the pipeline's run path (the ODCS contracts,
-      the Soda checks files, and contract/data-asset.yaml, environments.yaml, file-checks.yaml and scripted_decisions.yaml)
+      the Soda checks files, and contract/data-asset.yaml, contract/calendar.yaml, environments.yaml, file-checks.yaml and scripted_decisions.yaml)
       through one shared loader.
     - WHEN the loader is asked for a file whose path and byte content match an earlier parse in the same
       process, THE SYSTEM SHALL return that result without parsing again.

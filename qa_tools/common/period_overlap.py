@@ -14,7 +14,7 @@ window opening on it, because REQ-PIPE-131 closes Q1 when Q2's window
 opens whether or not anything is owed for Q2.
 
 COMPUTED AS FILING COMPUTES IT (criterion 2) - the same contract timing
-(slots._contract_timing) and the same effective-dated claim window
+(slots._timing) and the same effective-dated claim window
 (schedule.claim_window(on=the period's own date)) - so this check and
 filing can never disagree about where a boundary falls. Across a change
 of calendar version the two neighbours are compared like any others
@@ -60,27 +60,29 @@ def horizon(today: date | None = None) -> date:
     return date(today.year + 1, 12, 31)
 
 
-def overlaps_for(dataset_id: str, until: date | None = None) -> list[Overlap]:
+def overlaps_for(dataset_id: str, until: date | None = None,
+                 agreement=None) -> list[Overlap]:
     """Every overlapping pair of consecutive periods for one dataset."""
     from qa_tools.common import slots
 
     try:
-        calendar = schedule.calendar_for_dataset(dataset_id)
+        calendar = schedule.calendar_for_dataset(dataset_id, agreement)
     except schedule.NoCalendarAgreed:
         return []
-    expected_time, grace_minutes, window_override = slots._contract_timing(dataset_id)
+    expected_time, grace_minutes, window_override = slots._timing(dataset_id, agreement)
     grace = timedelta(minutes=grace_minutes)
     bound = (until or horizon()) if calendar.current.is_cadence_rule else until
     # The CALENDAR's periods, not only the ones this dataset owes - see
     # the module docstring. periods_for_calendar, unlike
-    # periods_for_dataset, does not apply delivery_months.
-    periods = schedule.periods_for_calendar(calendar.name, until=bound)
+    # periods_for_dataset, does not apply the dataset's participation.
+    periods = schedule.periods_for_calendar(calendar.name, until=bound, agreement=agreement)
 
     found: list[Overlap] = []
     previous = None
     for period in periods:
         due = asset_time.wall_clock(period.date, expected_time)
-        window = schedule.claim_window(dataset_id, window_override, on=period.date)
+        window = schedule.claim_window(dataset_id, window_override, on=period.date,
+                                       agreement=agreement)
         opens = due - window
         if previous is not None:
             earlier, earlier_due = previous
@@ -93,10 +95,10 @@ def overlaps_for(dataset_id: str, until: date | None = None) -> list[Overlap]:
     return found
 
 
-def overlaps(until: date | None = None) -> list[Overlap]:
+def overlaps(until: date | None = None, agreement=None) -> list[Overlap]:
     """Every overlap for every dataset - all of them, never the first
     alone (criterion 5)."""
     out: list[Overlap] = []
     for dataset in hierarchy.all_datasets():
-        out.extend(overlaps_for(dataset.dataset_id, until=until))
+        out.extend(overlaps_for(dataset.dataset_id, until=until, agreement=agreement))
     return out

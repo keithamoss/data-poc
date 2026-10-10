@@ -42,7 +42,7 @@ class TestTheGateRefusesADueTimeDaylightSavingBreaks:
     def test_a_time_in_the_spring_forward_gap_is_refused(self, sydney, monkeypatch):
         # Birth Registrations is daily from 2026-08-24, so 2026-10-04 -
         # Sydney's spring-forward day - is one of its periods.
-        monkeypatch.setattr(slots, "_contract_timing",
+        monkeypatch.setattr(slots, "_timing",
                             lambda dataset_id: ("02:30", 0, None))
         errors = vs._daylight_saving_errors(vs.Source.default())
         gap = [e for e in errors if "2026-10-04" in e.problem]
@@ -51,13 +51,13 @@ class TestTheGateRefusesADueTimeDaylightSavingBreaks:
         assert "birth" in gap[0].scope
 
     def test_a_time_in_the_fall_back_overlap_is_refused(self, sydney, monkeypatch):
-        monkeypatch.setattr(slots, "_contract_timing",
+        monkeypatch.setattr(slots, "_timing",
                             lambda dataset_id: ("02:30", 0, None))
         errors = vs._daylight_saving_errors(vs.Source.default())
         assert any("2027-04-04" in e.problem and "occurs twice" in e.problem for e in errors)
 
     def test_an_ordinary_time_passes_in_a_daylight_saving_zone(self, sydney, monkeypatch):
-        monkeypatch.setattr(slots, "_contract_timing",
+        monkeypatch.setattr(slots, "_timing",
                             lambda dataset_id: ("09:00", 0, None))
         assert vs._daylight_saving_errors(vs.Source.default()) == []
 

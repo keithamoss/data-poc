@@ -107,14 +107,13 @@ class TestItIsWhatTheRunPathReads:
     def test_the_run_path_never_calls_safe_load(self, monkeypatch):
         from datetime import date
 
-        from qa_tools.common import (asset_time, environments, hierarchy, postgres_version,
-                                     schedule, slots)
+        from qa_tools.common import (agreement, asset_time, environments, hierarchy,
+                                     postgres_version, slots)
 
         def refuse(*a, **k):
             raise AssertionError("yaml.safe_load was called on the run path")
         monkeypatch.setattr(yaml, "safe_load", refuse)
-        for cached in (hierarchy._load, schedule._load, schedule._dataset_schedules,
-                       asset_time.timezone_versions):
+        for cached in (hierarchy._load, agreement.current, asset_time.timezone_versions):
             cached.cache_clear()
         try:
             assert slots.slots_for_dataset("cp-clients", until=date(2024, 1, 1))
@@ -123,8 +122,7 @@ class TestItIsWhatTheRunPathReads:
             postgres_version.declared_major()
             assert asset_time.timezone_versions()
         finally:
-            for cached in (hierarchy._load, schedule._load, schedule._dataset_schedules,
-                           asset_time.timezone_versions):
+            for cached in (hierarchy._load, agreement.current, asset_time.timezone_versions):
                 cached.cache_clear()
 
     def test_it_uses_the_c_loader_where_it_exists(self):

@@ -80,10 +80,20 @@ class Source:
 
     asset_path: Path
     contract_dir: Path
+    #: contract/calendar.yaml beside the asset file unless given (REQ-PIPE-110).
+    calendar_path: Path | None = None
 
     @property
     def name(self) -> str:
         return self.asset_path.name
+
+    @property
+    def agreement_path(self) -> Path:
+        return self.calendar_path or self.asset_path.parent / "calendar.yaml"
+
+    @property
+    def calendar_name(self) -> str:
+        return self.agreement_path.name
 
     @classmethod
     def default(cls) -> "Source":
@@ -221,39 +231,76 @@ def _duration_error(value, what: str) -> str | None:
 
 # ---- schema ---------------------------------------------------------
 
-def _schema_errors(raw: dict, src: Source) -> list[ConfigError]:
+#: Keys the delivery agreement used to carry, and what replaced each
+#: (REQ-PIPE-110 criteria 14, 16 and 28). Named rather than left to the
+#: schema's generic "not a key", so the refusal says where the fact lives now.
+RETIRED_KEYS = {
+    "delivery_months": "participates, on the dataset's participation in contract/calendar.yaml",
+    "owes_from": "the effective_from of the dataset's first participation version in "
+                 "contract/calendar.yaml",
+}
+
+
+def _retired_key_errors(docs: list[tuple[dict, str]]) -> list[ConfigError]:
+    """delivery_months or owes_from stated ANYWHERE, in either file, refused
+    by name with what replaced it."""
+    out: list[ConfigError] = []
+
+    def walk(node, file_name, path):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in RETIRED_KEYS:
+                    out.append(ConfigError(
+                        file_name, None,
+                        f"{'.'.join(path + [key])} states `{key}`, which no longer exists.",
+                        f"Write it as {RETIRED_KEYS[key]}.", field=".".join(path + [key]),
+                        layer="semantic"))
+                walk(value, file_name, path + [str(key)])
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                walk(value, file_name, path + [str(i)])
+    for doc, file_name in docs:
+        walk(doc, file_name, [])
+    return out
+
+
+def _schema_errors(raw: dict, src: Source, model=None, file_name: str | None = None) -> list[ConfigError]:
     """Shape, via the declared model. Every pydantic error is rewritten
     with somewhere to file it and something to do about it - the raw
     location path is accurate and unreadable."""
     from pydantic import ValidationError
 
+    model = model or DataAsset
+    file_name = file_name or src.name
     try:
-        DataAsset.model_validate(raw)
+        model.model_validate(raw)
     except ValidationError as exc:
         out = []
         for err in exc.errors():
             loc = [str(p) for p in err["loc"]]
+            if err["type"] == "extra_forbidden" and loc and loc[-1] in RETIRED_KEYS:
+                continue  # refused by name, with its replacement, by _retired_key_errors
             scope = _scope_from_loc(raw, err["loc"])
             where = " -> ".join(loc) or "(top level)"
             field = ".".join(loc) or None
             shape = _shape_of(loc)
             if err["type"] == "extra_forbidden":
                 out.append(ConfigError(
-                    src.name, scope,
+                    file_name, scope,
                     f"{where} is not a key this configuration has.",
                     "Remove it, or correct the spelling - an unknown key is accepted "
                     "nowhere here precisely because a dropped one is invisible.",
                     field=field, layer="schema"))
             elif err["type"] == "missing":
                 out.append(ConfigError(
-                    src.name, scope,
+                    file_name, scope,
                     f"{where} is required and is not there.",
                     f"Add it: {shape}." if shape
                     else "Add it - see the other entries at this level for the form.",
                     field=field, layer="schema"))
             else:
                 out.append(ConfigError(
-                    src.name, scope,
+                    file_name, scope,
                     f"{where}: {err['msg']}.",
                     f"Write {shape}." if shape
                     else "Correct the value - see the other entries at this level "
@@ -270,6 +317,10 @@ def _scope_from_loc(raw: dict, loc: tuple) -> str | None:
     model did not validate - that is why there is an error.
     """
     parts = list(loc)
+    if parts and parts[0] == "datasets" and len(parts) > 1 and isinstance(parts[1], int):
+        entries = raw.get("datasets") or []
+        if parts[1] < len(entries):
+            return f"dataset {(entries[parts[1]] or {}).get('id')!r}"
     if parts and parts[0] == "calendars" and len(parts) > 1 and isinstance(parts[1], int):
         entries = raw.get("calendars") or []
         if parts[1] < len(entries):
@@ -488,7 +539,7 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
                     src.name, scope,
                     f"declares `{schedule.NO_CALENDAR_KEY}: {declared_none}` and still "
                     f"subsets or overrides a calendar.",
-                    "`delivery_months:` and `dates:` both describe which of a calendar's "
+                    "`participates:` and `dates:` both describe which of a calendar's "
                     "periods this dataset takes part in, and there is no calendar here to "
                     "take part in."))
             continue
@@ -496,8 +547,10 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
         if not named:
             out.append(ConfigError(
                 src.name, scope,
-                "names no `calendar:`.",
-                f"Add one of: {options}, or declare "
+                f"names no `calendar:` - neither in {src.calendar_name}, on the dataset or its "
+                f"collection, nor a deliberate no-calendar declaration.",
+                f"In {src.calendar_name}, name one of: {options} on the dataset or its "
+                f"collection, or declare "
                 f"`{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}` if no schedule has "
                 f"been agreed for it yet (or `{schedule.NEVER}` for a one-off extraction). "
                 f"Without either there is nothing to judge this dataset's supplies against, "
@@ -519,7 +572,7 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
         if months and overrides:
             out.append(ConfigError(
                 src.name, scope,
-                "carries BOTH `delivery_months:` and its own `dates:`.",
+                "carries BOTH a `participates:` list and its own `dates:`.",
                 "Keep one. Subsetting a calendar and replacing it are different acts, and "
                 "carrying both leaves no way to tell which was meant."))
 
@@ -534,8 +587,8 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
         if months is not None and not months:
             out.append(ConfigError(
                 src.name, scope,
-                "has a `delivery_months:` key with nothing in it.",
-                "Remove the key to take every period, or name the months. As written this "
+                "has a `participates:` list with nothing in it.",
+                "Write `participates: all` to take every period, or name the months. As written this "
                 "dataset expects nothing."))
     return out
 
@@ -550,9 +603,9 @@ def _month_errors(scope: str, calendar_name: str, calendar: dict, months, src: S
     if rule_driven:
         out.append(ConfigError(
             src.name, scope,
-            f"names delivery_months against {calendar_name!r}, which is a cadence RULE "
+            f"names delivery months under `participates:` against {calendar_name!r}, which is a cadence RULE "
             f"rather than an authored date list.",
-            "Remove delivery_months. A rule-driven calendar has no months to pick from, and "
+            "Write `participates: all`. A rule-driven calendar has no months to pick from, and "
             "a dataset that 'participates in February' of a daily feed is asking for "
             "something the model cannot honour."))
         return out
@@ -570,12 +623,12 @@ def _month_errors(scope: str, calendar_name: str, calendar: dict, months, src: S
         if number is None:
             out.append(ConfigError(
                 src.name, scope,
-                f"names delivery month {value!r}, which is not a month.",
+                f"names {value!r} under `participates:`, which is not a month.",
                 f"Write the full English month name - one of: {', '.join(_MONTHS)}."))
         elif available and number not in available:
             out.append(ConfigError(
                 src.name, scope,
-                f"names delivery month {value!r}, which calendar {calendar_name!r} has no "
+                f"names month {value!r} under `participates:`, which calendar {calendar_name!r} has no "
                 f"date in.",
                 f"Use a month the calendar actually carries "
                 f"({', '.join(_MONTHS[m - 1] for m in sorted(available))}), or author a date "
@@ -637,7 +690,7 @@ def _expects_nothing_errors(raw: dict, src: Source) -> list[ConfigError]:
             out.append(ConfigError(
                 src.name, f"dataset {dataset_id!r}",
                 "expects no supply in any period at all.",
-                "Something in this dataset's calendar, delivery_months, dates or "
+                "Something in this dataset's calendar, participation, dates or "
                 "not_expected leaves nothing behind. A dataset expecting nothing sits "
                 "green forever - which is the exhausted-schedule state arriving by "
                 "accident."))
@@ -680,7 +733,10 @@ def _contract_errors(raw: dict, src: Source) -> list[ConfigError]:
             doc = yaml.safe_load(path.read_text()) or {}
         except yaml.YAMLError:
             continue  # reported by the yamllint gate, not twice here
-        if not isinstance(doc, dict) or "slaProperties" not in doc:
+        if not isinstance(doc, dict) or doc.get("kind") != "DataContract":
+            # DETECTED BY `kind: DataContract` (REQ-PIPE-110 criterion 32): it
+            # used to be the presence of slaProperties, which this change
+            # deletes - and that would have switched this check off silently.
             continue  # a checks file or similar, not a dataset contract
         out.append(ConfigError(
             path.name, None,
@@ -688,40 +744,28 @@ def _contract_errors(raw: dict, src: Source) -> list[ConfigError]:
             "Add a `contract:` line to the collection it describes, or delete it. A "
             "contract nothing points at is checked by nothing."))
 
-    out.extend(_grace_errors(declared, src))
+    out.extend(_sla_properties_errors(src))
     return out
 
 
-def _grace_errors(declared: dict[str, str], src: Source) -> list[ConfigError]:
-    """A negative grace allowance is a deadline before the deadline."""
+def _sla_properties_errors(src: Source) -> list[ConfigError]:
+    """An ODCS contract stating slaProperties is refused (REQ-PIPE-110
+    criterion 16), and nothing is ever read from it: a dataset's cadence,
+    expected time and grace live in contract/calendar.yaml, and a second
+    copy nobody reads is a second copy somebody edits."""
     out: list[ConfigError] = []
-    for filename in sorted(declared):
-        path = src.contract_dir / filename
-        if not path.exists():
-            continue
+    for path in sorted(src.contract_dir.glob("*.yaml")):
         try:
             doc = yaml.safe_load(path.read_text()) or {}
         except yaml.YAMLError:
             continue
-        for item in (doc.get("slaProperties") or []):
-            if (item or {}).get("property") != "latency":
-                continue
-            element = item.get("element")
-            scope = f"element {element!r}" if element else None
-            try:
-                minutes = int(item.get("value"))
-            except (TypeError, ValueError):
-                out.append(ConfigError(
-                    filename, scope,
-                    f"latency is {item.get('value')!r}, which is not a number of minutes.",
-                    "Write a whole number of minutes."))
-                continue
-            if minutes < 0:
-                out.append(ConfigError(
-                    filename, scope,
-                    f"latency is {minutes}, which is negative.",
-                    "Write zero or more. A negative grace allowance makes a supply late "
-                    "before it is due."))
+        if isinstance(doc, dict) and "slaProperties" in doc:
+            out.append(ConfigError(
+                path.name, None,
+                "states slaProperties, which no longer exist.",
+                "Delete the block. A dataset's cadence, expected time and grace live on its "
+                "participation in contract/calendar.yaml, and nothing reads them from a "
+                "contract any more."))
     return out
 
 
@@ -799,13 +843,13 @@ def _authored_dates(doc: dict) -> dict[tuple[str, str, str], str]:
     return out
 
 
-def _changelog_at(doc: dict, calendar_name: str, effective: str) -> list[str]:
+def _changelog_at(doc: dict, calendar_name: str, effective: str) -> list:
     for calendar in (doc.get("calendars") or []):
         if (calendar or {}).get("name") != calendar_name:
             continue
         for version in ((calendar or {}).get("versions") or []):
             if str((version or {}).get("effective_from")) == effective:
-                return [str(x) for x in ((version or {}).get("changelog") or [])]
+                return list((version or {}).get("changelog") or [])
     return []
 
 
@@ -853,8 +897,12 @@ def _retrospective_edit_errors(raw: dict, src: Source, today: date | None = None
     # window. Same class as plans/post-build-review.md #59.
     today = today or asset_time.local_date(asset_time.now())
     ref = ref or diff_base()
-    previous = _content_at(str(src.asset_path.relative_to(ROOT)), ref) \
-        if src.asset_path.is_relative_to(ROOT) else None
+    # contract/calendar.yaml since REQ-PIPE-110. The commit that creates it
+    # has no previous state to compare - the one commit this guard cannot
+    # see, which is why the move is pinned instead (its NFRs 3 and 4).
+    path = src.agreement_path
+    previous = _content_at(str(path.relative_to(ROOT)), ref) \
+        if path.is_relative_to(ROOT) else None
     if previous is None:
         return []
     try:
@@ -887,7 +935,7 @@ def _retrospective_edit_errors(raw: dict, src: Source, today: date | None = None
 
         what = f"is now {new_value}" if new_value else "has been removed"
         out.append(ConfigError(
-            src.name, f"calendar {calendar_name!r}",
+            src.calendar_name, f"calendar {calendar_name!r}",
             f"period {period!r} was {old_value}, a date already in the past, and {what} - "
             f"with no new changelog entry on the version effective {effective}.",
             "Add a changelog entry saying what changed and why, or author a NEW "
@@ -968,6 +1016,155 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
         for where, problem in problems]
 
 
+# ---- the delivery agreement, contract/calendar.yaml (REQ-PIPE-110) ----
+
+def _merged_view(raw: dict, cal_raw: dict) -> dict:
+    """The asset file with each dataset's agreement filled in from
+    calendar.yaml, in the shape the calendar and dataset checks above read:
+    its calendar (its own, else its collection's), its newest version's
+    participates as `delivery_months`, not_expected, its own dates flattened,
+    and its no-calendar declaration. A VIEW FOR CHECKING ONLY - nothing
+    writes it back, and the two files stay the only statements."""
+    import copy
+
+    merged = copy.deepcopy(raw)
+    merged["calendars"] = list(cal_raw.get("calendars") or [])
+    by_dataset = {(d or {}).get("id"): (d or {}) for d in (cal_raw.get("datasets") or [])}
+    by_collection = {(c or {}).get("id"): (c or {}) for c in (cal_raw.get("collections") or [])}
+    for dataset, collection in _walk_datasets(merged):
+        entry = by_dataset.get((dataset or {}).get("id"), {})
+        own = entry.get("calendar")
+        if entry.get(schedule.NO_CALENDAR_KEY) is not None:
+            dataset[schedule.NO_CALENDAR_KEY] = entry[schedule.NO_CALENDAR_KEY]
+            if own:
+                dataset["calendar"] = own
+        else:
+            named = own or by_collection.get((collection or {}).get("id"), {}).get("calendar")
+            if named:
+                dataset["calendar"] = named
+        versions = ((entry.get("participation") or {}).get("versions")) or []
+        months = (versions[-1] or {}).get("participates") if versions else None
+        if isinstance(months, list):
+            dataset["delivery_months"] = months
+        if entry.get("not_expected"):
+            dataset["not_expected"] = entry["not_expected"]
+        own_dates = [d for v in (((entry.get("dates") or {}).get("versions")) or [])
+                     for d in ((v or {}).get("dates") or [])]
+        if own_dates:
+            dataset["dates"] = own_dates
+    return merged
+
+
+#: What a participation version may state, for the restate rule (criterion 33).
+_RESTATED = ("participates", "reason", "expected_time", "grace", "claim_window")
+
+
+def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]:
+    """REQ-PIPE-110's rules about each dataset's participation."""
+    out: list[ConfigError] = []
+    file_name = src.calendar_name
+    hierarchy_ids = {(d or {}).get("id") for d, _c in _walk_datasets(raw)}
+    collection_ids = {(c or {}).get("id") for _d, c in _walk_datasets(raw)}
+    calendars = {(c or {}).get("name"): (c or {}) for c in (cal_raw.get("calendars") or [])}
+    collections = {(c or {}).get("id"): (c or {}) for c in (cal_raw.get("collections") or [])}
+
+    # CRITERION 18 - both files agree about what exists.
+    for c in collections:
+        if c not in collection_ids:
+            out.append(ConfigError(
+                file_name, f"collection {c!r}",
+                f"is named in {file_name} and is not a collection in {src.name}'s hierarchy.",
+                f"Correct the id, or add the collection to {src.name}. The two files have to "
+                f"agree about what exists."))
+    own_names: set[str] = set()
+    for entry in (cal_raw.get("datasets") or []):
+        entry = entry or {}
+        ds = entry.get("id")
+        scope = f"dataset {ds!r}"
+        if ds not in hierarchy_ids:
+            out.append(ConfigError(
+                file_name, scope,
+                f"is named in {file_name} and is not a dataset in {src.name}'s hierarchy.",
+                f"Correct the id, or add the dataset to {src.name}. The two files have to "
+                f"agree about what exists."))
+            continue
+        for v in (((entry.get("dates") or {}).get("versions")) or []):
+            own_names |= {str((d or {}).get("period")) for d in ((v or {}).get("dates") or [])}
+        if entry.get(schedule.NO_CALENDAR_KEY) is not None:
+            continue
+        versions = [(v or {}) for v in (((entry.get("participation") or {}).get("versions")) or [])]
+        if not versions:
+            out.append(ConfigError(
+                file_name, scope,
+                "is on a calendar and has no participation versions.",
+                "Add `participation: {versions: [...]}` with at least one version, stating its "
+                "effective_from, expected_time and grace (criterion 3)."))
+            continue
+        starts = []
+        for i, version in enumerate(versions, start=1):
+            starts.append(str(version.get("effective_from")))
+            months = version.get("participates")
+            # CRITERION 8: a list of some months needs a reason.
+            if isinstance(months, list) and not version.get("reason"):
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"participation version {i} owes only {', '.join(map(str, months))} and gives "
+                    f"no reason.",
+                    "Add `reason:` saying why. A month owed nothing with nothing beside it is "
+                    "indistinguishable, six months later, from somebody forgetting it."))
+            # CRITERION 29: an expected time and grace for every period owed.
+            for key, what in (("expected_time", "an expected time"), ("grace", "a grace allowance")):
+                if version.get(key) is None:
+                    out.append(ConfigError(
+                        file_name, scope,
+                        f"participation version {i} (effective {version.get('effective_from')}) "
+                        f"states no {key}, so every period it governs has no {what} - and no "
+                        f"other level states one.",
+                        f"Add `{key}:` to this version. A period owed with no {what} has no due "
+                        f"instant to judge a supply against."))
+            if version.get("grace") is not None:
+                problem = _duration_error(version.get("grace"), f"{scope} grace")
+                if problem:
+                    out.append(ConfigError(file_name, scope,
+                                           f"participation version {i}'s grace {problem}",
+                                           "Write a duration with its unit, like 1h or 2d."))
+            if version.get("claim_window") is not None:
+                problem = _duration_error(version.get("claim_window"), f"{scope} claim_window")
+                if problem:
+                    out.append(ConfigError(file_name, scope,
+                                           f"participation version {i}'s claim_window {problem}",
+                                           "Write a duration with its unit, like 14d or 4h."))
+            # CRITERION 33: restate everything the previous version stated.
+            if i > 1:
+                previous = versions[i - 2]
+                dropped = [k for k in _RESTATED if k in previous and k not in version]
+                if dropped:
+                    out.append(ConfigError(
+                        file_name, scope,
+                        f"participation version {i} (effective {version.get('effective_from')}) "
+                        f"leaves out " + ", ".join(f"{k} (the previous version stated "
+                                                   f"{previous[k]!r})" for k in dropped) + ".",
+                        "Restate each value on this version. Every version reads as complete "
+                        "on its own, so a value is never silently dropped to a default."))
+        # CRITERION 34: one date per version, in order.
+        for a, b in zip(starts, starts[1:]):
+            if b <= a:
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"participation versions take effect {a} then {b}, which is not after it.",
+                    "Put the versions in effective_from order, oldest first, with no two "
+                    "sharing a date - otherwise there is no single version in force."))
+    # CRITERION 35: a dataset's own period names are not a calendar's.
+    calendar_names = {str((d or {}).get("period")) for c in calendars.values()
+                      for v in (c.get("versions") or []) for d in ((v or {}).get("dates") or [])}
+    for clash in sorted(own_names & calendar_names):
+        out.append(ConfigError(
+            file_name, None,
+            f"period name {clash!r} is used by a dataset's own dates and by a calendar.",
+            "Name the dataset's own period differently - one name, one period, one schema."))
+    return out
+
+
 # ---- the gate -------------------------------------------------------
 
 def validate(src: Source | None = None) -> list[ConfigError]:
@@ -998,18 +1195,39 @@ def validate(src: Source | None = None) -> list[ConfigError]:
                              "The file's top level is keys like data_asset_id, calendars and "
                              "hierarchy.")]
 
-    errors = _schema_errors(raw, src)
-    errors += _calendar_errors(raw, src)
-    errors += _dataset_errors(raw, src)
-    errors += _expects_nothing_errors(raw, src)
+    # THE DELIVERY AGREEMENT IS ITS OWN FILE (REQ-PIPE-110).
+    cal_path = src.agreement_path
+    if not cal_path.exists():
+        return [ConfigError(cal_path.name, None, "does not exist.",
+                            "This file holds the delivery agreement - the calendars and each "
+                            "dataset's participation; nothing is owed without it.")]
+    try:
+        cal_raw = yaml.safe_load(cal_path.read_text()) or {}
+    except yaml.YAMLError as exc:
+        mark = getattr(exc, "problem_mark", None)
+        where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
+        return [ConfigError(cal_path.name, None,
+                             f"could not be parsed{where}: {getattr(exc, 'problem', exc)}.",
+                             "Fix the YAML syntax; nothing below it can be checked until then.")]
+    from qa_tools.common.schemas import CalendarFile
+
+    merged = _merged_view(raw, cal_raw)
+    cal_src = replace(src, asset_path=cal_path, calendar_path=cal_path)
+    errors = _retired_key_errors([(raw, src.name), (cal_raw, cal_path.name)])
+    errors += _schema_errors(raw, src)
+    errors += _schema_errors(cal_raw, src, CalendarFile, cal_path.name)
+    errors += _calendar_errors(cal_raw, cal_src)
+    errors += _dataset_errors(merged, cal_src)
+    errors += _participation_errors(cal_raw, raw, src)
+    errors += _expects_nothing_errors(merged, cal_src)
     errors += _contract_errors(raw, src)
-    errors += _retrospective_edit_errors(raw, src)
+    errors += _retrospective_edit_errors(cal_raw, src)
     errors += _amber_setting_errors(raw, src)
     errors += _replacement_setting_errors(raw, src)
     if src.asset_path == DATA_ASSET_YAML and not errors:
         errors += _overlap_errors(src)
         errors += _daylight_saving_errors(src)
-    return _attribute(errors, raw)
+    return _attribute(errors, merged)
 
 
 def _overlap_errors(src: Source) -> list[ConfigError]:
@@ -1063,7 +1281,7 @@ def _daylight_saving_errors(src: Source) -> list[ConfigError]:
     until = asset_time.local_date(asset_time.now()) + timedelta(days=DAYLIGHT_SAVING_HORIZON_DAYS)
     for entry in hierarchy.all_datasets():
         try:
-            expected_time = slots._contract_timing(entry.dataset_id)[0]
+            expected_time = slots._timing(entry.dataset_id)[0]
             periods = schedule.periods_for_dataset(entry.dataset_id, until=until)
         except Exception:  # noqa: BLE001 - no calendar, or reported by another gate
             continue

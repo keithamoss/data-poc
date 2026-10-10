@@ -16,6 +16,7 @@ from datetime import date
 
 import pytest
 
+import agreement_split
 from qa_tools.common import hierarchy, runway, schedule
 
 # The real quarterly calendar's last authored date. Written as a
@@ -94,7 +95,7 @@ class TestTheWarningNeverFailsAnything:
 
     def test_a_warning_names_the_file_a_person_must_edit(self):
         for line in runway.warning_lines(date(2026, 9, 23)):
-            assert "contract/data-asset.yaml" in line
+            assert "contract/calendar.yaml" in line
             assert "candidate-dates" in line, "and how to get the dates proposed"
 
 
@@ -127,11 +128,10 @@ class TestItWarnsOncePerCalendarNotOncePerDataset:
     def test_the_summary_counts_calendars_when_more_than_one_is_low(self, tmp_path, monkeypatch):
         import shutil
 
-        import yaml
 
         contract_dir = tmp_path / "contract"
         shutil.copytree("contract", contract_dir)
-        doc = yaml.safe_load((contract_dir / "data-asset.yaml").read_text())
+        doc = agreement_split.merged_view(contract_dir)
         # A second authored calendar, also nearly out, with one dataset
         # on it. NEARLY out rather than fully out, and the dates below
         # were extended to 2028 on 2026-09-24 to make that true: it used
@@ -148,18 +148,12 @@ class TestItWarnsOncePerCalendarNotOncePerDataset:
                                       for y in range(2023, 2029)]}]})
         doc["hierarchy"]["agencies"][0]["collections"][0]["datasets"].append(
             {"id": "extra", "name": "Extra", "table": "extra", "calendar": "annual"})
-        (contract_dir / "data-asset.yaml").write_text(yaml.safe_dump(doc))
-        monkeypatch.setattr(schedule, "DATA_ASSET_YAML", contract_dir / "data-asset.yaml")
-        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", contract_dir / "data-asset.yaml")
-        schedule._load.cache_clear()
-        schedule._dataset_schedules.cache_clear()
-        hierarchy._load.cache_clear()
+        agreement_split.repoint(monkeypatch, contract_dir, doc)
         try:
             note = runway.summary(date(2026, 9, 23))
             assert "2 calendar(s) low on runway" in note
         finally:
-            schedule._load.cache_clear()
-            schedule._dataset_schedules.cache_clear()
+            agreement_split.clear_caches()
             hierarchy._load.cache_clear()
 
 
@@ -200,25 +194,17 @@ class TestTheThresholdIsConfigurable:
     def test_a_calendar_may_set_its_own(self, tmp_path, monkeypatch):
         import shutil
 
-        import yaml
 
         contract_dir = tmp_path / "contract"
         shutil.copytree("contract", contract_dir)
-        path = contract_dir / "data-asset.yaml"
-        doc = yaml.safe_load(path.read_text())
+        doc = agreement_split.merged_view(contract_dir)
         next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_slots"] = 1
-        path.write_text(yaml.safe_dump(doc))
-        monkeypatch.setattr(schedule, "DATA_ASSET_YAML", path)
-        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", path)
-        schedule._load.cache_clear()
-        schedule._dataset_schedules.cache_clear()
-        hierarchy._load.cache_clear()
+        agreement_split.repoint(monkeypatch, contract_dir, doc)
         try:
             # Two slots left, threshold now 1 - so no longer low.
             assert runway.low_runway(date(2026, 9, 23)) == []
         finally:
-            schedule._load.cache_clear()
-            schedule._dataset_schedules.cache_clear()
+            agreement_split.clear_caches()
             hierarchy._load.cache_clear()
 
     def test_a_threshold_of_zero_is_rejected(self, tmp_path, monkeypatch):
@@ -226,21 +212,17 @@ class TestTheThresholdIsConfigurable:
         out is a warning with nothing left to warn about."""
         import shutil
 
-        import yaml
 
         contract_dir = tmp_path / "contract"
         shutil.copytree("contract", contract_dir)
-        path = contract_dir / "data-asset.yaml"
-        doc = yaml.safe_load(path.read_text())
+        doc = agreement_split.merged_view(contract_dir)
         next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_slots"] = 0
-        path.write_text(yaml.safe_dump(doc))
-        monkeypatch.setattr(schedule, "DATA_ASSET_YAML", path)
-        schedule._load.cache_clear()
+        agreement_split.repoint(monkeypatch, contract_dir, doc)
         try:
             with pytest.raises(schedule.ScheduleConfigError, match="runway_warning_slots"):
                 schedule.calendars()
         finally:
-            schedule._load.cache_clear()
+            agreement_split.clear_caches()
 
 
 class TestItTouchesNoData:

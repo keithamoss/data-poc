@@ -64,7 +64,6 @@ from pathlib import Path
 
 import pytest
 
-from pipeline import cadence
 from qa_tools.common import asset_time
 
 # NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
@@ -355,7 +354,9 @@ class TestTheClassificationBoundaries:
                "day_of_month": None, "expected_time": "14:00", "latency_minutes": 60}
 
     def _expected(self, run_date):
-        return cadence.expected_moment(self.CADENCE, cadence.cycle_start(self.CADENCE, run_date))
+        # A daily cycle starts on the run date itself; the expected
+        # moment is the wall-clock time on it in the asset's zone.
+        return asset_time.wall_clock(run_date, self.CADENCE["expected_time"])
 
     def _verdict(self, run_date, arrived):
         """Early / on time / late against this cadence's own expected

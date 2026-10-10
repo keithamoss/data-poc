@@ -17,14 +17,13 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pytest
-import yaml
 
+import agreement_split
 from qa_tools.common import asset_time, hierarchy, schedule, slots
 
 
 def _clear():
-    schedule._load.cache_clear()
-    schedule._dataset_schedules.cache_clear()
+    agreement_split.clear_caches()
     hierarchy._load.cache_clear()
 
 
@@ -44,11 +43,7 @@ def _repoint(tmp_path, monkeypatch, doc):
     only one of the two would be testing a state the real system cannot
     reach.
     """
-    path = tmp_path / "data-asset.yaml"
-    path.write_text(yaml.safe_dump(doc))
-    monkeypatch.setattr(schedule, "DATA_ASSET_YAML", path)
-    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", path)
-    _clear()
+    agreement_split.repoint(monkeypatch, tmp_path, doc, base={})
 
 
 def _calendar_doc(**version_overrides):
@@ -312,7 +307,8 @@ class TestVersioningAndEffectiveDates:
         _repoint(tmp_path, monkeypatch, doc)
         cal = schedule.calendar("c")
         assert cal.current.effective_from == date(2027, 1, 1)
-        assert cal.version_in_force(date(2024, 1, 1)).changelog == ("earlier",)
+        # Changelog entries are structured since REQ-PIPE-110 criterion 12.
+        assert [e["change"] for e in cal.version_in_force(date(2024, 1, 1)).changelog] == ["earlier"]
 
 
 class TestPeriodsAreDerivedVersionByVersion:
@@ -516,7 +512,8 @@ class TestNothingIsComputedFromAHolidayCalendar:
         ARE the agreement. A calendar library predicts what was probably
         agreed; it does not constitute it."""
         import yaml as _yaml
-        raw = _yaml.safe_load(schedule.DATA_ASSET_YAML.read_text())
+        from qa_tools.common import agreement
+        raw = _yaml.safe_load(agreement.CALENDAR_YAML.read_text())
         authored = [(d["period"], str(d["date"]))
                     for c in raw["calendars"] if c["name"] == "quarterly"
                     for d in c["versions"][0]["dates"]]
@@ -525,7 +522,7 @@ class TestNothingIsComputedFromAHolidayCalendar:
         assert loaded == authored
 
     def test_no_holiday_library_is_imported_by_this_module(self):
-        source = schedule.DATA_ASSET_YAML.parent.parent / "qa_tools" / "common" / "schedule.py"
+        source = hierarchy.DATA_ASSET_YAML.parent.parent / "qa_tools" / "common" / "schedule.py"
         text = source.read_text()
         for banned in ("import holidays", "from holidays", "workalendar", "business_calendar"):
             assert banned not in text, f"{banned} would make evaluation depend on a holiday library"

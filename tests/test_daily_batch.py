@@ -20,9 +20,7 @@ from generator.daily_batch import (
     _draw_arrival_base_offset_hours,
     generate_daily_batch,
 )
-from pipeline.cadence import expected_moment, parse_cadence_from_contract
-
-CONTRACT_PATH = "contract/bdm-birth-registrations-contract.yaml"
+from qa_tools.common import agreement, asset_time
 
 
 def test_arrival_offset_distribution_matches_the_real_calibration_target():
@@ -60,12 +58,14 @@ def test_generated_extract_timestamps_never_violate_the_real_ordering_check():
 
 def test_real_bdm_cadence_classifies_the_on_time_window_as_on_time():
     """End-to-end sanity check tying this file's calibration directly to
-    the real contract's own cadence config (not a hand-copied number
+    the real delivery agreement's own participation (not a hand-copied number
     that could quietly drift from it): a run whose extract_timestamp
     falls inside _draw_arrival_base_offset_hours' on-time range must
     genuinely classify as "onTime" via the real parsed cadence, not just
     by this test's own assumptions about what "on time" means."""
-    cadence = parse_cadence_from_contract(CONTRACT_PATH, element="birth_registrations")
+    # contract/calendar.yaml since REQ-PIPE-110, not the contract's
+    # retired slaProperties.
+    cadence = agreement.cadence("birth-registrations")
     run_date = date(2026, 6, 1)
 
     # Aware instants, in UTC. This file's own calibration comment above
@@ -85,7 +85,7 @@ def test_real_bdm_cadence_classifies_the_on_time_window_as_on_time():
     # bands - so the comparison is spelled out rather than borrowed
     # from whichever module currently owns a classifier.
     from datetime import timedelta
-    expected = expected_moment(cadence, run_date)
+    expected = asset_time.wall_clock(run_date, cadence["expected_time"])
     grace = timedelta(minutes=cadence["latency_minutes"])
     assert expected <= on_time_extract <= expected + grace
     assert early_extract < expected

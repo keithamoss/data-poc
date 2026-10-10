@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+import agreement_split
 from qa_tools.common import hierarchy, schedule, slots
 
 PERTH = timezone(timedelta(hours=8))
@@ -158,16 +159,28 @@ class TestTheClaimWindowOpensEarlyAndClosesWithTheNextPeriod:
         with pytest.raises(Exception):
             slots.is_open(slot, datetime(2026, 2, 1, 9, 0))
 
-    def test_a_contract_override_wins_over_the_calendar_default(self, monkeypatch):
+    def test_a_participation_override_wins_over_the_calendar_default(self, tmp_path,
+                                                                     monkeypatch):
         """Criterion 10. No dataset declares one today, so the wiring
         is what is under test - a default that could never be overridden
-        would look identical until the day somebody needed it."""
-        import pipeline.cadence as cadence
+        would look identical until the day somebody needed it. The
+        override moved from the ODCS contract to the dataset's
+        participation in contract/calendar.yaml (REQ-PIPE-110 criterion 4)."""
+        import yaml
 
-        monkeypatch.setattr(cadence, "parse_claim_window_from_contract",
-                             lambda path, element=None: "2h")
-        slot = slots.slots_for_dataset("cp-clients")[0]
-        assert slot.claim_opens_at == slot.due_at - timedelta(hours=2)
+        base = yaml.safe_load((agreement_split.REAL_CONTRACT_DIR / "calendar.yaml").read_text())
+        entry = next(d for d in base["datasets"] if d["id"] == "cp-clients")
+        entry["participation"]["versions"][0] = {
+            **entry["participation"]["versions"][0], "claim_window": "2h"}
+        agreement_split.repoint(monkeypatch, tmp_path / "contract",
+                                agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR),
+                                base=base)
+        try:
+            slot = slots.slots_for_dataset("cp-clients")[0]
+            assert slot.claim_opens_at == slot.due_at - timedelta(hours=2)
+        finally:
+            agreement_split.clear_caches()
+            hierarchy._load.cache_clear()
 
 
 class TestNotExpectedMeansNoSlot:
@@ -177,7 +190,6 @@ class TestNotExpectedMeansNoSlot:
     def test_a_not_expected_period_produces_no_slot(self, tmp_path, monkeypatch):
         import shutil
 
-        import yaml
 
         # A whole copy of the contract directory, not just the asset
         # file: hierarchy.contract_path() resolves a collection's
@@ -186,20 +198,14 @@ class TestNotExpectedMeansNoSlot:
         # not beside it.
         contract_dir = tmp_path / "contract"
         shutil.copytree("contract", contract_dir)
-        doc = yaml.safe_load(open("contract/data-asset.yaml").read())
+        doc = agreement_split.merged_view(contract_dir)
         for agency in doc["hierarchy"]["agencies"]:
             for collection in agency["collections"]:
                 for dataset in collection["datasets"]:
                     if dataset["id"] == "cp-clients":
                         dataset["not_expected"] = [
                             {"period": "2026-Q1", "reason": "agency shutdown"}]
-        path = contract_dir / "data-asset.yaml"
-        path.write_text(yaml.safe_dump(doc))
-        monkeypatch.setattr(schedule, "DATA_ASSET_YAML", path)
-        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", path)
-        schedule._load.cache_clear()
-        schedule._dataset_schedules.cache_clear()
-        hierarchy._load.cache_clear()
+        agreement_split.repoint(monkeypatch, contract_dir, doc)
         try:
             names = [s.name for s in slots.slots_for_dataset("cp-clients")]
             assert "2026-Q1" not in names
@@ -209,8 +215,7 @@ class TestNotExpectedMeansNoSlot:
             assert periods["2026-Q1"].expected is False
             assert periods["2026-Q1"].not_expected_reason == "agency shutdown"
         finally:
-            schedule._load.cache_clear()
-            schedule._dataset_schedules.cache_clear()
+            agreement_split.clear_caches()
             hierarchy._load.cache_clear()
 
 
@@ -295,28 +300,15 @@ class TestTheClaimWindowIsEffectiveDated:
                     {"id": "col", "name": "Col", "contract": "c.yaml", "datasets": [
                         {"id": "d", "name": "D", "table": "t", "calendar": "c"}]}]}]}}
 
-    def _repoint(self, tmp_path, monkeypatch):
+    def _repoint(self, tmp_path, monkeypatch, base=None):
         import shutil
-
-        import yaml
 
         contract_dir = tmp_path / "contract"
         shutil.copytree("contract", contract_dir)
-        path = contract_dir / "data-asset.yaml"
-        path.write_text(yaml.safe_dump(self._two_windows()))
-        monkeypatch.setattr(schedule, "DATA_ASSET_YAML", path)
-        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", path)
-        schedule._load.cache_clear()
-        schedule._dataset_schedules.cache_clear()
-        hierarchy._load.cache_clear()
-        # The fixture's contract is a stand-in; the timing that matters
-        # here comes from the calendar, so pin the contract side flat.
-        import pipeline.cadence as cadence
-        monkeypatch.setattr(cadence, "parse_cadence_from_contract",
-                             lambda path, element=None: {"expected_time": "09:00",
-                                                          "latency_minutes": 0})
-        monkeypatch.setattr(cadence, "parse_claim_window_from_contract",
-                             lambda path, element=None: None)
+        # The participation is a stand-in - 09:00, no grace, no override -
+        # because the timing that matters here comes from the calendar.
+        agreement_split.repoint(monkeypatch, contract_dir, self._two_windows(),
+                                base=base if base is not None else {})
 
     def test_a_past_slot_keeps_the_window_that_was_in_force_on_its_own_date(
             self, tmp_path, monkeypatch):
@@ -328,8 +320,7 @@ class TestTheClaimWindowIsEffectiveDated:
                 "the 2024 slot took the 2027 version's 7-day window - authoring a new "
                 "calendar version moved a claim window that history was filed under")
         finally:
-            schedule._load.cache_clear()
-            schedule._dataset_schedules.cache_clear()
+            agreement_split.clear_caches()
             hierarchy._load.cache_clear()
 
     def test_a_current_slot_takes_the_current_version(self, tmp_path, monkeypatch):
@@ -341,21 +332,18 @@ class TestTheClaimWindowIsEffectiveDated:
             new = by_period["2027-Q1"]
             assert new.claim_opens_at == new.due_at - timedelta(days=7)
         finally:
-            schedule._load.cache_clear()
-            schedule._dataset_schedules.cache_clear()
+            agreement_split.clear_caches()
             hierarchy._load.cache_clear()
 
-    def test_a_contract_override_still_wins_at_every_date(self, tmp_path, monkeypatch):
-        """Criterion 10's override is declared in the ODCS contract, not
-        in the calendar, so it is not versioned and must not become so."""
-        self._repoint(tmp_path, monkeypatch)
-        import pipeline.cadence as cadence
-        monkeypatch.setattr(cadence, "parse_claim_window_from_contract",
-                             lambda path, element=None: "2h")
+    def test_a_participation_override_wins_at_every_date(self, tmp_path, monkeypatch):
+        """Criterion 10's override, on the dataset's participation version
+        since REQ-PIPE-110 - in force over every calendar version it
+        overlaps."""
+        self._repoint(tmp_path, monkeypatch,
+                      base=agreement_split.participation("d", claim_window="2h"))
         try:
             for slot in slots.slots_for_dataset("d"):
                 assert slot.claim_opens_at == slot.due_at - timedelta(hours=2)
         finally:
-            schedule._load.cache_clear()
-            schedule._dataset_schedules.cache_clear()
+            agreement_split.clear_caches()
             hierarchy._load.cache_clear()

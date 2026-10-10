@@ -48,7 +48,7 @@ class _KnownChoice(click.ParamType):
     (post-build-review #30).
 
     RESOLVED LAZILY rather than at import: the values come from
-    `contract/data-asset.yaml`, and reading it while the module is
+    `contract/data-asset.yaml` and `contract/calendar.yaml`, and reading it while the module is
     being imported would make every `mothman --help` - including the
     ones that never touch a schedule - depend on that file parsing.
     A gate exists to tell you it does not; the help should not be the
@@ -195,8 +195,15 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
     months = schedule.delivery_months(dataset)
     console.print(f"\n[bold]{entry.dataset_name}[/bold] ({entry.dataset_id})")
     console.print(f"  calendar: {cal.name}")
-    console.print(f"  delivery months: "
-                   f"{', '.join(schedule.MONTH_NAMES[m - 1] for m in months) if months else 'all'}")
+    # Said in the file's own words - the key is `participates` since
+    # REQ-PIPE-110, and a subset carries the reason its version states.
+    from qa_tools.common import agreement as agreement_mod
+    from qa_tools.common import asset_time as _at
+    in_force = agreement_mod.current().participation_on(dataset, _at.local_date(_at.now()))
+    console.print(f"  participates: "
+                   f"{', '.join(schedule.MONTH_NAMES[m - 1] for m in months) if months else 'all'}"
+                   + (f" [dim]- {in_force.reason}[/dim]" if months and in_force and in_force.reason
+                      else ""))
     # Shown in the form the config authors it in - `14d`, not
     # `14 days, 0:00:00` (post-build-review #27).
     console.print(f"  claim window: {schedule.format_duration(schedule.claim_window(dataset))} "
@@ -232,7 +239,11 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
         # A not-expected period is SHOWN, with its reason - never
         # dropped. "We agreed there would be no November file" and "we
         # forgot to configure November" must not look the same.
-        expected = "yes" if p.expected else f"no - {p.not_expected_reason}"
+        # ITS KIND AND ITS REASON (REQ-PIPE-110 criterion 37): the only
+        # owed-nothing period this table lists is a not_expected one;
+        # periods outside the dataset's participation are not rows at
+        # all, and the footer says which and why.
+        expected = "yes" if p.expected else f"no (not expected) - {p.not_expected_reason}"
         slot = by_period.get(p.name)
         # The reader's actual question is "is my next supply due, and am
         # I past it?" - so the next one owed is marked rather than left
@@ -242,7 +253,7 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
             marker = "->" if p.name == _next_owed(shown, by_period, today) else ""
         # THE PERIOD'S DATE IS A CONFIG ECHO and keeps its written form
         # (criterion 8) - a reader comparing this table against
-        # contract/data-asset.yaml is comparing those two columns. The
+        # contract/calendar.yaml is comparing those two columns. The
         # DUE and CLAIMABLE instants are not in any file: this computes
         # them, so they are written the way everything else a person
         # reads is written (REQ-DASH-071).
@@ -264,8 +275,10 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
         on_calendar = len(schedule.periods_for_calendar(cal.name, until=stop))
         if on_calendar > len(periods):
             named = ", ".join(schedule.MONTH_NAMES[m - 1] for m in months)
-            footer += (f". The calendar has {on_calendar}; this dataset takes "
-                        f"delivery in {named} only")
+            footer += (f". The calendar has {on_calendar}; this dataset participates in "
+                        f"{named} only")
+            if in_force and in_force.reason:
+                footer += f" - {in_force.reason}"
     console.print(footer + "[/dim]")
     if hidden:
         console.print(f"  [dim]{hidden} further period(s) not shown - "
@@ -317,7 +330,7 @@ def candidate_dates_command(calendar_name: str, year: int, as_yaml: bool) -> Non
     These are CANDIDATES and nothing evaluates against them. The dates
     in the calendar ARE the supplier agreement; this only saves somebody
     typing out four dates and working out which ones fall on a weekend.
-    Copy what you want into contract/data-asset.yaml, as a NEW version
+    Copy what you want into contract/calendar.yaml, as a NEW version
     with its own effective_from and changelog entry.
     """
     from qa_tools.common import schedule
@@ -361,11 +374,15 @@ def candidate_dates_command(calendar_name: str, year: int, as_yaml: bool) -> Non
 
     if as_yaml:
         # THE THING THE HELP TELLS YOU TO COPY. It said "copy what you
-        # want into contract/data-asset.yaml" and printed a Rich table
+        # want into contract/calendar.yaml" and printed a Rich table
         # (post-build-review #28). Printed bare, so it can be piped.
         import yaml as _yaml
         body = {"effective_from": f"{year}-01-01",
-                 "changelog": [f"{year}-01-01: authored {year} dates"],
+                 # STRUCTURED, because a plain-string entry is refused
+                 # (REQ-PIPE-110 criterion 13); the author is the one
+                 # thing this cannot know.
+                 "changelog": [{"date": f"{year}-01-01", "author": "YOUR NAME",
+                                "change": f"authored {year} dates"}],
                  "dates": [{"period": period.name, "date": period.date.isoformat()}
                             for period, _note in proposals]}
         print(_yaml.safe_dump(body, sort_keys=False))

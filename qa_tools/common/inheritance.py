@@ -114,7 +114,7 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
 
         names = [calendar.month_name[m] for m in months]
         return True, (f"{dataset_id} is delivered in {' and '.join(names)} only "
-                      f"(delivery_months), so nothing is owed for {period_name}")
+                      f"(its participation in contract/calendar.yaml), so nothing is owed for {period_name}")
     return False, ""
 
 

@@ -14,10 +14,10 @@ checks and generated data behind it for no additional coverage here.
 """
 from __future__ import annotations
 
-import yaml
 
 import pytest
 
+import agreement_split
 from qa_tools.common import qa_store, sample_data, schedule, supply_db
 from qa_tools.common.qa_results_writer import write_qa_result
 
@@ -27,8 +27,7 @@ def _clear():
     tests/test_no_calendar.py's identical helper for why there are three."""
     from qa_tools.common import hierarchy as hierarchy_mod
 
-    schedule._load.cache_clear()
-    schedule._dataset_schedules.cache_clear()
+    agreement_split.clear_caches()
     hierarchy_mod._load.cache_clear()
 
 
@@ -53,7 +52,7 @@ GRADUATED = dict(AGREED, id="cp-referrals", name="Referrals", table="cp_referral
 def _asset_with(datasets: list[dict], tmp_path, monkeypatch):
     """The real asset with its datasets replaced - see
     tests/test_no_calendar.py's identical helper."""
-    doc = yaml.safe_load(schedule.DATA_ASSET_YAML.read_text())
+    doc = agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR)
     agency = doc["hierarchy"]["agencies"][0]
     agency["collections"] = [{
         "id": "civil-registration", "name": "Civil Registration",
@@ -62,13 +61,7 @@ def _asset_with(datasets: list[dict], tmp_path, monkeypatch):
         "datasets": datasets,
     }]
     doc["hierarchy"]["agencies"] = [agency]
-    path = tmp_path / "data-asset.yaml"
-    path.write_text(yaml.safe_dump(doc, sort_keys=False))
-    monkeypatch.setattr(schedule, "DATA_ASSET_YAML", path)
-    from qa_tools.common import hierarchy as hierarchy_mod
-    monkeypatch.setattr(hierarchy_mod, "DATA_ASSET_YAML", path)
-    _clear()
-    return path
+    return agreement_split.repoint(monkeypatch, tmp_path, doc)
 
 
 def _result(dataset_id: str, check_id: str, status: str = "fail", **extra) -> dict:

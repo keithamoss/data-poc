@@ -19,6 +19,7 @@ import yaml
 
 import pytest
 
+import agreement_split
 from qa_tools.common import schedule
 
 
@@ -30,7 +31,7 @@ def _asset_with(datasets: list[dict], tmp_path, monkeypatch):
     ones - a stub would test this code against an asset that does not
     exist.
     """
-    doc = yaml.safe_load(schedule.DATA_ASSET_YAML.read_text())
+    doc = agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR)
     agency = doc["hierarchy"]["agencies"][0]
     agency["collections"] = [{
         "id": "civil-registration", "name": "Civil Registration",
@@ -39,27 +40,17 @@ def _asset_with(datasets: list[dict], tmp_path, monkeypatch):
         "datasets": datasets,
     }]
     doc["hierarchy"]["agencies"] = [agency]
-    path = tmp_path / "data-asset.yaml"
-    path.write_text(yaml.safe_dump(doc, sort_keys=False))
-    monkeypatch.setattr(schedule, "DATA_ASSET_YAML", path)
-    from qa_tools.common import hierarchy as hierarchy_mod
-    monkeypatch.setattr(hierarchy_mod, "DATA_ASSET_YAML", path)
-    _clear()
-    return path
+    return agreement_split.repoint(monkeypatch, tmp_path, doc)
 
 
 def _clear():
-    """Every lru_cache that holds a parsed data-asset.yaml.
-
-    THREE OF THEM, and missing one is how a fixture silently tests the real
-    asset instead of its own: schedule._load for the calendars,
-    schedule._dataset_schedules for the per-dataset block, and
-    hierarchy._load for the tree.
+    """Every cache holding a parsed copy of either file - the
+    agreement (contract/calendar.yaml) and the hierarchy - since missing one
+    is how a fixture silently tests the real asset instead of its own.
     """
     from qa_tools.common import hierarchy as hierarchy_mod
 
-    schedule._load.cache_clear()
-    schedule._dataset_schedules.cache_clear()
+    agreement_split.clear_caches()
     hierarchy_mod._load.cache_clear()
 
 
@@ -210,12 +201,16 @@ class TestWhenItGraduated:
         _asset_with([{**AGREED, "owes_from": "2026-11-01"}], tmp_path, monkeypatch)
         assert schedule.owes_from("birth-registrations") == datetime.date(2026, 11, 1)
 
-    def test_a_dataset_that_never_graduated_has_no_such_date(
+    def test_a_dataset_always_on_a_calendar_owes_from_its_first_participation(
             self, tmp_path, monkeypatch):
-        """Every dataset that has always had a calendar - which today is
-        all seven - answers None rather than a guess at its first period."""
+        """REQ-PIPE-110 criterion 27, amending REQ-PIPE-106 criterion 16:
+        there is no separate owes_from any more, and the date a dataset
+        began owing is its first participation version's effective_from -
+        authored, never a guess at its first period."""
+        import datetime
+
         _asset_with([AGREED], tmp_path, monkeypatch)
-        assert schedule.owes_from("birth-registrations") is None
+        assert schedule.owes_from("birth-registrations") == datetime.date(2026, 8, 24)
 
     def test_a_date_that_is_not_a_date_is_refused(self, tmp_path, monkeypatch):
         _asset_with([{**AGREED, "owes_from": "November"}], tmp_path, monkeypatch)
@@ -436,7 +431,6 @@ def test_ci_installs_what_the_rollup_comparison_runs():
     dashboard's JS dependencies before its tests, or it checks nothing."""
     from pathlib import Path
 
-    import yaml
 
     workflow = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "test.yml"
     steps = yaml.safe_load(workflow.read_text())["jobs"]["test"]["steps"]
