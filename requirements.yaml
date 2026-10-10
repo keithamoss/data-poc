@@ -25940,6 +25940,8 @@ requirements:
     open_questions:
     - Confirm the scoper's PROVISIONAL decision that a promoted supply is re-checked but NOT re-gated (criteria 7-8); Keith's 2026-10-08 words ('it's just a reassessment') point that way but were not a direct answer.
     - Confirm that `mothman supply decide` leaves a re-check owed rather than waiting for it, as Keith chose for a placement on REQ-PIPE-163.
+    - '(2026-10-10 split review round) BLOCKER (architect): a re-check is a person''s decision, so rejection.decided_by_a_person() would then stop the gate auto-promoting the supply for ever - contradicting criterion 7. Should a re-check be excluded from ''a person decided'', as re-file is (REQ-PIPE-141 c8)? Recommended yes; amends REQ-PIPE-076 c7.'
+    - '(2026-10-10 split review round) To apply: recheck.run must skip the gate and write no decision for a supply already promoted (architect 2); a per-owed-item claim as a session advisory try-lock in recheck.run (architect 3, see post-build-review #136); an outcome panel giving old and new verdict; Ctrl-C ends without a traceback; name `mothman pipeline process` and say it runs all owed work (cli-ux 1-3); move ''what the run covers'' into c2 and narrow c12 to waiting/promoted (scoper 15-16); add REQ-PIPE-074 and 151 to dependencies. Optional `--wait` on decide (cli-ux Q3).'
   - id: REQ-QAC-176
     title: Every check result records a fingerprint of the check's definition that survives settings being added
     date_written: '2026-10-10'
@@ -25976,6 +25978,9 @@ requirements:
     - Drop the committed baseline file (criterion 10)? It rested on the main session's mistaken claim that the gate would see every hash change; the architect recommends dropping it and relying on the golden test (criterion 11). Keith approved the file 'in principle' before that was known.
     - Results recorded before fingerprints existed carry none. Treat them as differing (the first bulk re-check selects all history once), exclude them (old history only reachable by single re-check), or refuse a pre-fingerprint database until regenerated (fine for synthetic, impossible for a real asset)?
     - Store the full 64-hex SHA-256 (architect's recommendation) rather than today's 16-hex truncation?
+    - (2026-10-10 split review round) Which code beyond a check's own definition counts as part of it? (a, architect's recommendation) the macro behind each generic test plus macros named in a singular test (lexical scan; matches_regex.sql backs 11 checks today and no singular test calls a macro); (b) also each test's staging model SQL; (c) singular tests only, as written.
+    - '(2026-10-10 split review round) Should the Evidently comparison column and method move into the check''s config with the thresholds (architect: yes - one place, and a column change is a definition change)?'
+    - '(2026-10-10 split review round) To apply: thresholds as literals in CHECK_LIFECYCLE, runners read them by check_id (the gate execs lifecycle modules at the old ref, so importing constants would hide a change); source files read through an injected read(path, ref); one append-only frozen-defaults list shared across scheme versions; both result writers stamp (record_results and record_file_results), map cached per process and raising on parse failure, synthesised not-evaluated records stamped too; state 64 hex; split bundled criteria; amend REQ-QAC-006 and depend on it.'
   - id: REQ-PIPE-177
     title: A person can have every supply checked under an old definition of a fixed check re-checked at once
     date_written: '2026-10-10'
@@ -26024,6 +26029,10 @@ requirements:
     - 'A CHECK ADDED AFTER A SUPPLY WAS CHECKED IS NOT A FIX TO IT: a supply with no result for the check is never selected. REJECTED selecting supplies with no result (delivery-scoper second pass).'
     open_questions:
     - 'On the flag route (`mothman supply recheck --yes`), what happens above 10 supplies: always run in the foreground, always hand off to the processing pass, or a `--hand-off` flag defaulting to the foreground?'
+    - (2026-10-10 split review round) Each bulk re-check decision's record of the check's current changelog entry was dropped in the split by the main session's mistake, not by decision. Restore it (one entry id per decision, so the dashboard can say 'after we corrected <check> (<date>)'), or record the check only?
+    - (2026-10-10 split review round) When several checks have supplies to re-check, does the queue nudge read as one summary line leading to a check chooser (cli-ux recommendation, scales to 30 datasets) or one line per check?
+    - (2026-10-10 split review round) Blocked on REQ-QAC-176's question about results with no fingerprint, which decides whether c2 and c16 select all existing history on day one.
+    - '(2026-10-10 split review round) To apply: one panel and one choice instead of stacked prompts (cli-ux 6); ''Ctrl-C stops'' and a summary listing changed supplies (cli-ux 7-8); restore the changelog display on both routes (scoper 2); restore the rejected red/amber-only selection (scoper 3); a criterion for promoted supplies back red (scoper 6); apply decisions in sorted slot order and a recheck_check_id column (architect 10); acknowledge key over every covered supply (architect 11); run_all_owed honours the pass deadline and the TUI runs only its own owed ids (architect 12); one grouped nudge query (architect 13).'
   - id: REQ-PIPE-178
     title: A person can try a bulk re-check on a few supplies first, and nothing is recorded
     date_written: '2026-10-10'
@@ -26051,6 +26060,8 @@ requirements:
     - REQ-QAC-176
     - REQ-PIPE-103
     - REQ-PIPE-161
+    open_questions:
+    - '(2026-10-10 split review round) BLOCKER (architect 14): REQ-PIPE-103''s trial identity stages its own files into its own schema, so a re-check trial cannot see the real supply''s staged table; it needs a re-check-trial identity that reads shared staging read-only and writes nothing there. Also: trial run records supply_id NULL and scope arrival so it can never become a current run (architect 15); split promotion.after_run into plan/apply so the prediction is the gate''s own plan (architect 16); trial offered inside the bulk flow and shows current beside trial verdict (cli-ux 12-13); refusals for --reason/--acknowledge/--hand-off (cli-ux 14); refuse when the real run would cover nothing (scoper 19).'
     decisions:
     - 'SPLIT 2026-10-10 (Keith, on the delivery-scoper second pass): REQ-PIPE-164 had grown to 38 criteria across four concerns, so it became four requirements - REQ-PIPE-164 single re-check, REQ-QAC-176 the check-definition fingerprint, REQ-PIPE-177 bulk re-check, REQ-PIPE-178 trial - each reviewed and signed off on its own. Decisions travelled with the criteria they explain.'
     - 'TRIAL SHAPE (Keith, 2026-10-08): supplies chosen from a list, several at once, or a period range; the verdict and the gate''s outcome are shown; nothing is recorded. NO CAP on how many supplies a trial runs - Keith''s reason: a trial that refuses past some number pushes people into the real run to get round it. The trial states how many it will run and asks the person to confirm, as the real run does. NO REASON REQUIRED on a trial (Keith, 2026-10-08): it records nothing and requires nothing. AGREED (Keith, 2026-10-08): the trial and the real run share one implementation, differing only in whether results are kept - ''that''s actually perfect''.'

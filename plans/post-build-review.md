@@ -6875,3 +6875,18 @@ twice. It deliberately did not re-find the `TypeError`.
     asked with the REQ-PIPE-110 review batch (a quiet "No data" pill with an
     "N datasets not counted" line, no pill at all with a line in words, or a
     new group-level status). Failing test first when it is fixed.
+
+136. **[todo, 2026-10-10]** **[Pipeline & publishing]** **Two runners can run
+    the same owed re-check at once.** Found by delivery-architect reviewing
+    the REQ-PIPE-164 split, and the shape confirmed by the main session
+    reading `qa_tools/common/recheck.py::run` (lines 214-245): it reads the
+    owed item and whether it is cleared, then mints a run id passing the
+    item's own `run_key` as `taken`, with no lock or claim. So the terminal's
+    immediate run after a re-file (`filing_tui._run_owed`) and a processing
+    pass that reaches the same owed item can both execute it under one run
+    key, and one's schema tidy-up can drop the other's views mid-run. NOT
+    REPRODUCED - an analysis of the code, not a failure seen. Proposed fix
+    (architect): a session advisory try-lock keyed by owed id in
+    `recheck.run`, skipping rather than waiting, as `arrival_lock` does in
+    processing_pass.py. Carried into REQ-PIPE-164/177's open questions; a
+    failing test (two concurrent runs of one owed id) comes first when fixed.
