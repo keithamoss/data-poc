@@ -470,11 +470,14 @@ class TestEveryOperationIsReachableFromSomeDoor:
     reach it.
     """
 
-    def _offered_by(self, flow, state, monkeypatch):
-        """What this door would put in front of somebody, for this slot."""
+    def _offered_by(self, flow, state, monkeypatch, excuse_offers=()):
+        """What this door would put in front of somebody, for this slot.
+        `excuse_offers` stands in for the recorded punctuality the excuse
+        offer reads (REQ-PIPE-161 criterion 10), which needs a database."""
         seen = {}
         monkeypatch.setattr(filing_tui, "open_log",
                              lambda: __import__("contextlib").nullcontext(None))
+        monkeypatch.setattr(filing_queue, "excuse_offers", lambda conn, s: excuse_offers)
         monkeypatch.setattr(filing_queue, "awaiting", lambda *a, **k: [state])
         monkeypatch.setattr(filing_queue, "slots_of", lambda *a, **k: [state])
         monkeypatch.setattr(filing_queue, "closed_gaps", lambda *a, **k: [])
@@ -506,9 +509,10 @@ class TestEveryOperationIsReachableFromSomeDoor:
         assert not offered & set(fd.PERIOD_SCOPED)
         assert fd.PROMOTE in offered
 
-    def test_between_the_two_doors_all_twelve_are_reachable(self, monkeypatch):
+    def test_between_the_two_doors_all_of_them_are_reachable(self, monkeypatch):
         """Eight, mark as not supplied on a CLOSED period (REQ-PIPE-132),
-        and acknowledge on a promotion owing one (REQ-PIPE-122)."""
+        acknowledge on a promotion owing one (REQ-PIPE-122), and excuse
+        lateness and its withdrawal on a late supply (REQ-PIPE-161)."""
         reachable = set()
         for flow, states in (
                 (filing_tui.queue_flow, [(slot_state.AWAITING_DECISION, False),
@@ -522,6 +526,11 @@ class TestEveryOperationIsReachableFromSomeDoor:
             for name, closed in states:
                 reachable |= self._offered_by(
                     flow, _state(name, supply="cp-carers@1", closed=closed), monkeypatch)
+        for offers in ((fd.EXCUSE_LATENESS,), (fd.WITHDRAW_EXCUSE,)):
+            reachable |= self._offered_by(
+                filing_tui.queue_flow,
+                _state(slot_state.AWAITING_DECISION, supply="cp-carers@1"), monkeypatch,
+                excuse_offers=offers)
         assert reachable == set(fd.OPERATIONS)
 
 

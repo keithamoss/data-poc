@@ -397,10 +397,6 @@ def approvers(people_doc: dict) -> list[dict]:
             and p.get("email") in managers]
 
 
-def _is_approver(name: str, allowed: list[dict]) -> bool:
-    return _person_named(name, allowed) is not None
-
-
 def _person_named(name: str, allowed: list[dict]) -> dict | None:
     name = str(name).strip().lower()
     return next((p for p in allowed
@@ -411,20 +407,42 @@ def _person_named(name: str, allowed: list[dict]) -> dict | None:
 def _pattern_matches(pattern: str, path: str) -> bool:
     """One CODEOWNERS pattern against a repository-relative path, in
     GitHub's terms: a leading `/` anchors it to the root, a trailing `/`
-    names a directory, `*` globs, and an unanchored pattern without a `/`
-    matches at any depth."""
-    from fnmatch import fnmatchcase
+    names a directory, an unanchored pattern without a `/` matches at any
+    depth, a plain path also owns everything under it, and `*` never
+    crosses a `/` - only `**` does (delivery-critic on 174, M4: fnmatch's
+    `*` crossed it, so `/*.yaml` owned contract/calendar.yaml, which on
+    GitHub it does not).
+    """
+    import re
 
     anchored = pattern.startswith("/")
     pat = pattern.lstrip("/")
     if not pat:
         return False
-    if pat.endswith("/"):
-        return path.startswith(pat) if anchored else f"/{pat}" in f"/{path}"
-    if anchored or "/" in pat:
-        return fnmatchcase(path, pat) or path.startswith(pat.rstrip("*") + "/") and \
-            not any(c in pat for c in "*?[")
-    return any(fnmatchcase(part, pat) for part in path.split("/"))
+    directory = pat.endswith("/")
+    pat = pat.rstrip("/")
+    globbed = any(c in pat for c in "*?[")
+
+    def rx(text: str) -> str:
+        out, k = "", 0
+        while k < len(text):
+            if text.startswith("**", k):
+                out, k = out + ".*", k + 2
+            elif text[k] == "*":
+                out, k = out + "[^/]*", k + 1
+            elif text[k] == "?":
+                out, k = out + "[^/]", k + 1
+            else:
+                out, k = out + re.escape(text[k]), k + 1
+        return out
+
+    body = rx(pat)
+    if not anchored and "/" not in pat:
+        body = f"(?:.*/)?{body}"
+    # A PLAIN PATH OR A DIRECTORY owns what is under it; a glob owns only
+    # what it matches (GitHub: `docs/*` does not own docs/a/b.md).
+    under = "(?:/.*)?" if (directory or not globbed) else ""
+    return re.fullmatch(body + under, path) is not None
 
 
 def code_owners(codeowners_text: str | None, path: str) -> set[str]:
@@ -438,7 +456,8 @@ def code_owners(codeowners_text: str | None, path: str) -> set[str]:
             continue
         pattern, *who = line.split()
         if _pattern_matches(pattern, path):
-            owners = {w[1:].lower() for w in who if w.startswith("@") and "/" not in w}
+            owners = {w[1:].lower() for w in who
+                      if w.startswith("@") and len(w) > 1 and "/" not in w}
     return owners
 
 
@@ -649,9 +668,14 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
 
     for owner, rows in needs.items():
         file = "data-asset.yaml" if owner[0] == "timezone" else "calendar.yaml"
+        # WHO MAY APPROVE IS WHO THE GATE WILL ACCEPT (delivery-critic on 174,
+        # L1): the asset's managers who are also code owners of this file.
+        owners = code_owners(base_codeowners, ASSET_REL if owner[0] == "timezone"
+                             else CALENDAR_REL)
+        may = [p for p in allowed if str(p.get("github", "")).lower() in owners]
         for item, old, new, frozen_at in rows:
             verb = "added" if old is None else ("removed" if new is None else "changed")
-            fix = _paste_ready(owner, [(item.key, old, new)], allowed, today)
+            fix = _paste_ready(owner, [(item.key, old, new)], may, today)
             if item.kind == "not_expected":
                 fix += ("\nIf the period simply was not supplied, record that after the fact "
                         f"instead: `{MARK_NOT_SUPPLIED}`.")

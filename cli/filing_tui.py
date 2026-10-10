@@ -93,6 +93,10 @@ _WHAT_IT_DOES = {
                                  "it is kept, and can be brought back"),
     filing_decisions.UN_SUPERSEDE: ("un-supersede - bring a superseded version back to be "
                                     "checked again"),
+    filing_decisions.EXCUSE_LATENESS: ("excuse lateness - it stays late, shown as excused, "
+                                       "with your reason"),
+    filing_decisions.WITHDRAW_EXCUSE: ("withdraw the excuse - it reads late and not excused "
+                                       "again"),
 }
 
 #: The same operations on ANOTHER VERSION WAITING in a promoted period
@@ -112,11 +116,18 @@ _WHAT_IT_DOES_TO_ANOTHER_VERSION = {
 _NAMES_THE_SUPPLY = (filing_decisions.PROMOTE, filing_decisions.REJECT,
                      filing_decisions.DEMOTE, filing_decisions.SUPERSEDE,
                      filing_decisions.UN_SUPERSEDE, filing_decisions.ACKNOWLEDGE,
-                     filing_decisions.REFILE)
+                     filing_decisions.REFILE, filing_decisions.EXCUSE_LATENESS,
+                     filing_decisions.WITHDRAW_EXCUSE)
 
 #: How an operation reads as a NOUN in a prompt - "this acknowledge" was
 #: the verb doing a noun's job (#107).
-_NOUN = {filing_decisions.ACKNOWLEDGE: "acknowledgement", filing_decisions.REFILE: "re-file"}
+_NOUN = {filing_decisions.ACKNOWLEDGE: "acknowledgement", filing_decisions.REFILE: "re-file",
+         filing_decisions.EXCUSE_LATENESS: "excuse",
+         filing_decisions.WITHDRAW_EXCUSE: "withdrawal of the excuse"}
+
+#: Decisions whose reason is PUBLISHED beside the supply on the dashboard
+#: (REQ-PIPE-161 criterion 18), said when the reason is asked for.
+_PUBLISHED_REASON = (filing_decisions.EXCUSE_LATENESS, filing_decisions.WITHDRAW_EXCUSE)
 
 _HOW_IT_READS = {
     slot_state.NOT_YET_DUE: "[dim]not yet due[/dim]",
@@ -228,7 +239,8 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
                    to_period: str | None = None, reason: str | None = None,
                    actor: dict | None = None,
                    yes: bool = False,
-                   acknowledged: str | None = None) -> filing_decisions.Outcome | None:
+                   acknowledged: str | None = None,
+                   through_period: str | None = None) -> filing_decisions.Outcome | None:
     """Collect what is missing, confirm, apply, and say what happened.
 
     RETURNS None WHERE NOTHING WAS APPENDED and an Outcome where the
@@ -257,26 +269,30 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
     try:
         _consequences(filing_decisions.Request(
             operation=operation, dataset_id=dataset_id, actor=actor, reason="",
-            period=period, to_period=to_period, supply=supply, stands_on=stands_on))
+            period=period, to_period=to_period, supply=supply, stands_on=stands_on,
+            through_period=through_period))
     except decision_log.DecisionRefused as exc:
         _show(str(exc), title=f"{operation} refused", style="red")
         return None
 
     if reason is None:
         reason = common.text_prompt(
-            f"Why are you recording this {_NOUN.get(operation, operation)}?",
+            f"Why are you recording this {_NOUN.get(operation, operation)}?"
+            + (" It is published beside the supply on the dashboard."
+               if operation in _PUBLISHED_REASON else ""),
             flag_hint=_FLAG_HINT)
         if reason is None:
             console.print("No reason given - nothing recorded.", style="yellow")
             return None
 
-    where = f"{dataset_id} {period}" + (f" -> {to_period}" if to_period else "")
+    where = f"{dataset_id} {period}" + (f" -> {to_period}" if to_period else "") \
+        + (f" to {through_period}" if through_period else "")
     if supply and operation in _NAMES_THE_SUPPLY:
         where += f" (the supply that arrived {arrived(supply)})"
     request = filing_decisions.Request(
         operation=operation, dataset_id=dataset_id, actor=actor, reason=reason,
         period=period, to_period=to_period, supply=supply, stands_on=stands_on,
-        confirmed=True, acknowledged=acknowledged)
+        confirmed=True, acknowledged=acknowledged, through_period=through_period)
 
     # ONE WARNING PANEL ABOVE THE ONE CONFIRMATION (REQ-PIPE-128 criterion
     # 6): what this decision does beyond its own slot, and how each is
@@ -482,6 +498,16 @@ def _pick_slot(states, message: str) -> slot_state.SlotState | None:
     return by_label.get(choice) if choice else None
 
 
+def _excuse_offers(state: slot_state.SlotState) -> tuple[str, ...]:
+    """REQ-PIPE-161 criterion 10: excuse (or withdraw) where the slot's
+    current supply is late - read from the log, so it needs a connection."""
+    try:
+        with open_log() as conn:
+            return filing_queue.excuse_offers(conn, state)
+    except filing_queue.LogUnreachable:
+        return ()
+
+
 def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
     """Offer this slot's operations and carry one out.
 
@@ -581,7 +607,7 @@ def queue_flow(collection_id: str) -> None:
     if state is None:
         return
     supply_scoped, _period_scoped = filing_queue.operations_for(state)
-    _decide_on(state, offer=supply_scoped)
+    _decide_on(state, offer=supply_scoped + _excuse_offers(state))
 
 
 def period_flow(collection_id: str) -> None:
@@ -615,7 +641,7 @@ def period_flow(collection_id: str) -> None:
     if state is None:
         return
     supply_scoped, period_scoped = filing_queue.operations_for(state)
-    _decide_on(state, offer=supply_scoped + period_scoped)
+    _decide_on(state, offer=supply_scoped + _excuse_offers(state) + period_scoped)
 
 
 def standing_view(collection_id: str, dataset_id: str | None = None) -> None:
@@ -732,4 +758,4 @@ def offer_after_run(collection_id: str, run_key: str) -> None:
     if state is None:
         return
     supply_scoped, _period_scoped = filing_queue.operations_for(state)
-    _decide_on(state, offer=supply_scoped)
+    _decide_on(state, offer=supply_scoped + _excuse_offers(state))

@@ -236,3 +236,73 @@ class TestReJudgement:
             assert table in source
         for forbidden in ("staging", "period_tables", "rows_of", "supply_rows"):
             assert forbidden not in source
+
+
+def _move_q3_to_july_25(doc):
+    quarterly = next(c for c in doc["calendars"] if c["name"] == "quarterly")
+    for version in quarterly["versions"]:
+        for d in version.get("dates") or []:
+            if d["period"] == "2023-Q3":
+                d["date"] = "2023-07-25"
+
+
+def _grace_seven_hours(doc):
+    _cp_clients(doc)["grace"] = "7h"
+
+
+class TestCriticFindingsOn168:
+    """delivery-critic on REQ-PIPE-168 (51df202), post-build-review #143.
+    Each failed before its fix."""
+
+    def test_H1_a_corrected_date_is_rejudged(self, clean):
+        """A correction moving 2023-Q3 to 2023-07-25 makes the 12:00 supply
+        late (late after 07-25 17:00) - it was skipped, because the old
+        date resolved to the same fingerprint."""
+        _file()
+        [found] = verdict.rejudged(clean, DATASET, _agreement(_move_q3_to_july_25))
+        assert found.new.classification == classify_mod.LATE
+        assert found.new.inputs["period_date"] == "2023-07-25"
+
+    def test_M1_only_a_changed_verdict_is_listed(self, clean):
+        """Grace 8h -> 7h leaves the 12:00 supply on time: nothing changes."""
+        _file()
+        assert verdict.rejudged(clean, DATASET, _agreement(_grace_seven_hours)) == []
+
+    def test_M3_a_second_verdict_must_name_a_correction(self, clean):
+        _file()
+        v = verdict.current(clean, DATASET, "s")
+        with pytest.raises(Exception, match="verdict_first_once|duplicate key"):
+            verdict.record(clean, v["filing_id"], DATASET, "s",
+                           verdict.Judged("late", None, None), recorded_at=RECEIVED)
+
+    def test_M3_a_verdict_names_its_own_filings_supply(self, clean):
+        _file()
+        v = verdict.current(clean, DATASET, "s")
+        with pytest.raises(Exception, match="does not match its filing"):
+            verdict.record(clean, v["filing_id"], "birth-registrations", "zzz",
+                           verdict.Judged("late", None, None), recorded_at=RECEIVED,
+                           correction_ref="C", correction_changelog="c", supersedes=v["id"])
+
+    def test_M3_it_supersedes_a_verdict_of_the_same_filing_once(self, clean):
+        _file(supply_id="a")
+        _file(supply_id="b", received_at=RECEIVED + timedelta(minutes=1))
+        a, b = (verdict.current(clean, DATASET, s) for s in ("a", "b"))
+        with pytest.raises(Exception, match="does not match its filing"):
+            verdict.record(clean, a["filing_id"], DATASET, "a",
+                           verdict.Judged("late", None, None), recorded_at=RECEIVED,
+                           correction_ref="C", correction_changelog="c", supersedes=b["id"])
+        verdict.record(clean, a["filing_id"], DATASET, "a", verdict.Judged("late", None, None),
+                       recorded_at=RECEIVED, correction_ref="C", correction_changelog="c",
+                       supersedes=a["id"])
+        with pytest.raises(Exception, match="verdict_supersedes_once|duplicate key"):
+            verdict.record(clean, a["filing_id"], DATASET, "a",
+                           verdict.Judged("late", None, None), recorded_at=RECEIVED,
+                           correction_ref="D", correction_changelog="d", supersedes=a["id"])
+
+    def test_M3_an_empty_reference_is_refused_by_the_database(self, clean):
+        _file()
+        v = verdict.current(clean, DATASET, "s")
+        with pytest.raises(Exception, match="check"):
+            verdict.record(clean, v["filing_id"], DATASET, "s",
+                           verdict.Judged("late", None, None), recorded_at=RECEIVED,
+                           correction_ref="", correction_changelog="c", supersedes=v["id"])

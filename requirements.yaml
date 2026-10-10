@@ -12333,7 +12333,7 @@ requirements:
       by: Keith
       date: "2026-09-26"
     acceptance_criteria:
-      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede and un-supersede - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9.
+      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13.
       - >
         THE SYSTEM SHALL record, with each entry, the actor, the instant
         the decision took effect, the instant the entry was written, the
@@ -13114,7 +13114,7 @@ requirements:
       - >
         THE SYSTEM SHALL distinguish, among staged supplies, one nobody
         has decided on from one a person has looked at and returned.
-      - WHERE any decision has been recorded against a supply by a person, THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT un-supersede and re-file, the person-decisions after which the gate may still promote automatically, and the supersede un-supersede undoes (REQ-PIPE-120 criterion 4, REQ-PIPE-141 criterion 8). AMENDED 2026-10-05 by REQ-PIPE-120 criterion 9 and REQ-PIPE-141 criterion 19.
+      - WHERE any decision has been recorded against a supply by a person, THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT un-supersede, re-file and an excuse of lateness or its withdrawal, the person-decisions after which the gate may still promote automatically, and the supersede un-supersede undoes (REQ-PIPE-120 criterion 4, REQ-PIPE-141 criterion 8, REQ-PIPE-161 criterion 19). AMENDED 2026-10-05 by REQ-PIPE-120 criterion 9 and REQ-PIPE-141 criterion 19, and 2026-10-11 by REQ-PIPE-161 criterion 19.
       - THE SYSTEM SHALL leave a red supply nobody has decided on in staging UNTIL a later version of its table for the same period supersedes it (REQ-PIPE-118), and SHALL NOT move it to the rejected schema. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 16.
       - >
         THE SYSTEM SHALL allow a rejection to be reversed by a later
@@ -15449,7 +15449,7 @@ requirements:
       the write path 2026-09-22. Scoped by delivery-scoper, batch 4,
       2026-09-26.
     acceptance_criteria:
-      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede and un-supersede as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those twelve. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede).
+      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fourteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), and 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse).
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
@@ -25908,7 +25908,7 @@ requirements:
       record stops counting it against the supplier while the agreement and the verdict computed from it
       stay exactly as they are.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-08"
@@ -25958,6 +25958,29 @@ requirements:
     - 'A RE-FILE DOES NOT CARRY THE EXCUSE: classification follows the filing (REQ-PIPE-141 criterion 2), so a supply re-filed to another period is judged afresh against that slot; an excuse written about the old slot says nothing about the new one.'
     - OPERATION IDS AS ONE FAMILY - excuse-lateness, withdraw-excuse, and REQ-PIPE-166's withdraw-acknowledgement and withdraw-not-supplied (delivery-cli-ux pre-build review, 2026-10-07). The range reuses the consequences panel and --acknowledge KEY rather than a new confirmation shape.
     - 'AN EXCUSE DOES NOT BAR THE GATE (Keith, 2026-10-10, approving this criterion after sign-off, plans/running-thoughts.md #78, option A): as built, rejection.decided_by_a_person() bars the gate from promoting any supply a person decided, exempting only supersede, un-supersede and re-file - so an excused late supply still waiting could never promote itself. An excuse is about punctuality, not quality. Added to this signed requirement with Keith''s explicit approval in conversation. REJECTED leaving the excused supply to be promoted by hand.'
+    - 'BUILT 2026-10-11 (overnight #3). THE RANGE FLAGS ARE --from-period AND --through-period (PROVISIONAL - criterion 15 names a shared pair without naming it): never --to-period, which is a re-file''s target, and refused with any operation but excuse-lateness or alongside --period. The range runs over supplies CURRENTLY FILED in those periods, by each one''s slot - late and not yet excused are excused, one entry each; everything else is listed as skipped with why.'
+    - 'A REPEAT EXCUSE IS REFUSED, NOT A NO-OP (criterion 3 says refuse and say why), unlike REQ-GHUB-082 criterion 26''s already-done success for other decisions. Excusing again after a withdrawal is allowed: the withdrawal ended the first.'
+    - 'CRITERION 11 HOLDS BY CONSTRUCTION, checked 2026-10-11: no state in REQ-PIPE-083''s needs-action set exists because a filed supply is late (OVERDUE is a slot with nothing arrived; AWAITING_DECISION is a waiting supply, whatever its punctuality), so lateness is never a slot''s only reason to be there and an excuse needs nothing removed.'
+    - 'LAPSE IS DERIVED, NOT RECORDED: an excuse whose slot is no longer the supply''s current filing, or whose supply no longer reads late (a correction''s re-judgement, REQ-PIPE-168), reads lapsed with the instant of the re-file decision or the re-judgement - nothing is written or deleted. The GitHub route takes the single-supply form through the same implementation; the range form is the terminal''s and the flags'' (criterion 10), and the GitHub route is disabled.'
+    linked_tests:
+    - tests/test_excuse.py
+    - tests/test_filing_decisions.py
+    - tests/test_cli_filing_tui.py
+    implemented_by:
+    - qa_tools/common/excuse.py::why_not_excusable
+    - qa_tools/common/excuse.py::why_not_withdrawable
+    - qa_tools/common/excuse.py::history
+    - qa_tools/common/excuse.py::in_force
+    - qa_tools/common/excuse.py::range_plan
+    - qa_tools/common/decision_log.py::EXCUSE_LATENESS
+    - qa_tools/common/filing_decisions.py::_range_consequences
+    - qa_tools/common/filing_decisions.py::_apply_one
+    - qa_tools/common/filing_queue.py::excuse_offers
+    - qa_tools/common/rejection.py::decided_by_a_person
+    - cli/supply.py::decide_command
+    - cli/filing_tui.py::apply_decision
+    evidence:
+    - '2026-10-11 (overnight #3): tests/test_excuse.py, test_filing_decisions.py and test_cli_filing_tui.py 98 passed against the real cp-clients and cp-carers agreement - one excuse is one person entry naming dataset, period and supply, the filing and verdict unchanged and still late (c2, c4, c5); not late, already excused, the wrong period and no reason are refused with why (c3); a rule is refused (c6); a re-file lapses it and does not carry it (c7); a withdrawal is its own entry after which it reads late and can be excused again (c8); a range shows what it excuses and skips, needs the key, records one entry each, and is refused when it would excuse nothing or runs backwards (c9, c16, c17); offered on a late slot and withdrawal once excused, every operation reachable from a door (c10); the flags route single and range forms, the pair is refused for any other operation (c14, c15); the reason prompt says it is published (c18); neither the excuse nor its withdrawal bars the gate (c19).'
   - id: REQ-DASH-162
     title: The dashboard shows an excused late supply as late and excused, naming the reason
     date_written: '2026-10-07'
@@ -25966,7 +25989,7 @@ requirements:
       for our own calendar mistake nor lose sight of the fact that the file did arrive after the agreed
       time.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-08"
@@ -26016,6 +26039,18 @@ requirements:
     - 'NO PUNCTUALITY FIGURE IS ADDED NOW (delivery-dashboard-ux pre-build review, 2026-10-07): checked
       2026-10-07, the page shows punctuality on three surfaces (the dataset list pill, the supply-history
       row, the latest-arrival tile) and counts it nowhere.'
+    - 'BUILT 2026-10-11 (overnight #3). The three surfaces use one function, arrivalPillFor, which returns the neutral tag only for a LATE classification with an excuse in force on the date on show, and the plain pill otherwise - so a surface that does not call it degrades to Late. The history row carries the excuse as text (person, instant, reason), its withdrawal beside it, or ''Excuse lapsed - <why>''. The lapse instant travels so an in-place-on date before the lapse still shows the excuse. The reason in the pill''s title attribute is attribute-escaped; a reason is free text a person typed.'
+    - 'NOT YET SEEN IN THE REAL BUILT DASHBOARD: the synthetic history has no excuse, so the shapes are proven in jsdom against the real template rather than end to end. Adding one to contract/scripted_decisions.yaml is the way to show it (REQ-GEN-135), left for Keith to say whether he wants it.'
+    linked_tests:
+    - tests-js/excuse.test.js
+    - tests/test_excuse.py
+    implemented_by:
+    - pipeline/excuses.py::for_dataset
+    - dashboard/qa-reporting-dashboard.template.html::excuseInForce
+    - dashboard/qa-reporting-dashboard.template.html::arrivalPillFor
+    - dashboard/qa-reporting-dashboard.template.html::excuseNote
+    evidence:
+    - '2026-10-11 (overnight #3): tests-js/excuse.test.js 10 passed against the real template - a neutral Late (excused) pill tag, never green or the red Late pill, unlike an unexcused late one, never on a supply that is not late (c1, c2, c7); reason, person and instant as visible text (c1); a withdrawal reads late again and is shown with its excuse (c3); nothing before it was recorded (c5); lapsed re-filed and re-judged by a named correction (c8); a reason carrying quotes or markup cannot break out of the title or the note. tests/test_excuse.py TestTheDashboardEmbed: the embed keys excuses by run with the person by name, from qa.decision, qa.filing_current and qa.verdict only (c6).'
   - id: REQ-PIPE-163
     title: A person can place a held supply into a period, from the terminal
     date_written: '2026-10-07'
@@ -26617,7 +26652,7 @@ requirements:
     - 'BUILT 2026-10-11 (overnight #3) AS ITS OWN TABLE, qa.verdict, not columns on qa.filing: a re-judgement must not be a new filing (criterion 7), so a filing can have several verdicts and they need rows of their own. qa.filing.classification stays the verdict as first recorded; qa.filing_current''s classification is the newest verdict for that filing, so every existing reader (recorded_arrival, the dashboard build, the census) sees a re-judgement without changing. Schema 34; regenerate, never migrate.'
     - 'THE FINGERPRINT (PROVISIONAL): a hash of the participation version in force on the period''s date (effective_from, participates, expected_time, grace, claim window override, days_before), the calendar version''s OWN settings (name, effective_from, default claim window, cadence rule - never its dates) and the timezone version on the due date. Changelog lines are left out: adding one changes nothing a verdict depends on. REQ-PIPE-173 compares exactly this.'
     - 'CRITERIA 3 AND 5 WAIT ON REQ-PIPE-170 (PROVISIONAL, overnight): applying is the confirmation''s act, and building an apply step without it would be the unconfirmed application criterion 3 forbids. What 170 calls is built - rejudged() computes, record_rejudgement() records, refusing a stale computation.'
-    - 'RE-JUDGED BY PERIOD, NOT BY SUPPLY (NFR 2): current verdicts are grouped by the period they were judged for, the configuration resolved once per period, and only a period whose fingerprint moved is judged supply by supply.'
+    - 'RE-JUDGED BY SLOT, NOT BY REPLAY (NFR 2): the configuration is resolved once per slot NAME under the agreement given - its date and fingerprint compared with what was recorded, so a corrected date is re-judged as well as a changed version (post-build-review #143, H1) - and only a supply whose slot moved is judged, listed only where its verdict changes (M1).'
     linked_tests:
     - tests/test_verdict_record.py
     - tests/test_recorded_arrival_classification.py

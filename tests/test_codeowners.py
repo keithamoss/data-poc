@@ -63,3 +63,41 @@ class TestTheParser:
 
     def test_none_owns_nothing(self):
         assert freeze.code_owners(None, "contract/calendar.yaml") == set()
+
+
+class TestCriticFindingsOn174:
+    """delivery-critic on REQ-GHUB-174 (51df202), post-build-review #143."""
+
+    @pytest.mark.parametrize("pattern,path,owned", [
+        ("/*.yaml", "contract/calendar.yaml", False),     # M4: root files only
+        ("/*.yaml", "calendar.yaml", True),
+        ("docs/*", "docs/a/b.md", False),                 # GitHub's own example
+        ("docs/*", "docs/a.md", True),
+        ("/contract/**", "contract/calendar.yaml", True),
+    ])
+    def test_M4_a_star_does_not_cross_a_slash(self, pattern, path, owned):
+        assert bool(freeze.code_owners(f"{pattern} @someone", path)) is owned
+
+    def test_M4_a_bare_at_is_not_an_owner(self):
+        assert freeze.code_owners("/contract/calendar.yaml @", "contract/calendar.yaml") == set()
+
+    def test_L1_may_approve_names_only_who_the_gate_accepts(self):
+        """The paste-ready block's "May approve" must not name a manager the
+        gate then refuses as not a code owner."""
+        import copy
+        from datetime import date, datetime, timedelta, timezone
+
+        cal = yaml.safe_load((ROOT / "contract" / "calendar.yaml").read_text())
+        asset = yaml.safe_load((ROOT / "contract" / "data-asset.yaml").read_text())
+        people_doc = yaml.safe_load((ROOT / "contract" / "people.yaml").read_text())
+        new = copy.deepcopy(cal)
+        quarterly = next(c for c in new["calendars"] if c["name"] == "quarterly")
+        for d in quarterly["versions"][-1]["dates"]:
+            if d["period"] == "2024-Q1":
+                d["date"] = "2024-02-05"
+        at = datetime(2026, 10, 11, 3, tzinfo=timezone(timedelta(hours=8)))
+        found = freeze.check(cal, new, asset, asset, people_doc, instant_of=lambda k: at,
+                             today=date(2026, 10, 11),
+                             base_codeowners="/contract/calendar.yaml @someone-else\n")
+        text = "\n".join(f.fix for f in found)
+        assert "May approve: nobody" in text, text

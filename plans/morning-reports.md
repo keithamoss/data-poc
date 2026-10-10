@@ -996,3 +996,33 @@ one or more component tags, and a date.
         the SLA tile and `schedule show` now use each slot's DUE date. Two
         low items are left dormant until a dataset actually declares
         days_before.
+      - REQ-PIPE-161 + REQ-DASH-162 BUILT (the excuse): `excuse-lateness` and
+        `withdraw-excuse` are filing decisions, offered in the terminal on
+        any slot whose supply reads late and through `mothman supply
+        decide`. A supply stays late, reads "Late (excused)" on the dataset
+        list, the latest-arrival tile and the supply-history row, and shows
+        who, when and why. A range form excuses every late supply filed in a
+        span of periods, one entry each, after a panel lists what it excuses
+        and skips. An excuse never bars the gate. It lapses (never deleted)
+        on a re-file or a correction that re-judges the supply on time.
+        REQ-GHUB-082 c1, REQ-PIPE-074 c1 and REQ-PIPE-076 c7 are amended as
+        161 requires. PROVISIONAL: the range flags are `--from-period` and
+        `--through-period`. ONE QUESTION: should the scripted synthetic
+        history include an excuse, so it shows in the real dashboard? Today
+        it is proven against the template only. Schema 35, so the sandbox
+        was rebuilt once.
+      - REQ-PIPE-168/REQ-GHUB-174 CRITIC (post-build-review #143): one real
+        defect, fixed. Re-judgement missed a correction that moves a DATE,
+        which is the main kind. Also fixed: it listed verdicts that would
+        not change; the database accepted malformed verdicts; and CODEOWNERS
+        `*` crossed directories. ONE POINT FOR YOU: the verdict record names
+        a correction's reference but not its approver - REQ-PIPE-170's
+        applied record could carry it.
+      - CI ON 51df202 WENT RED IN THE on-demand JOB ONLY - my slip. The
+        checkpoint-resume and bootstrap-equivalence comparison
+        (tests/equiv_support.py) compares every qa table. It did not know
+        the new qa.verdict table carries a wall-clock stamp and surrogate
+        ids, so a resume and a full replay "differed" in two rows. That job
+        is not part of `mothman check`, which is why the local gate was
+        green. Fixed: verdict is now compared by what its ids name. All 8
+        on-demand tests pass locally, and the fix is in the next push.

@@ -29,7 +29,7 @@ import json
 import os
 from datetime import datetime
 
-from pipeline import (acknowledgements, closed_slots, file_check_panel, recorded_arrival,
+from pipeline import (acknowledgements, closed_slots, excuses, file_check_panel, recorded_arrival,
                       red_promoted, slot_timeline)
 from qa_tools.common import schedule_ended
 from qa_tools.common import amber_setting, census, drift_reference
@@ -595,7 +595,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # the point at 30 datasets: a marker on every tile is noise that
         # trains people to stop reading markers.
         "scheduleNotAgreed": _schedule_not_agreed(dataset_id),
-        "lastArrival": {"run_date": _run_date(latest_entry), **latest_block},
+        "lastArrival": {"run_date": _run_date(latest_entry),
+                        "run_id": latest_entry.get("run_id"), **latest_block},
         # WHAT ARRIVED VERSUS WHAT IS PROMOTED (REQ-DASH-056). From
         # the recorded filing and the recorded decision, never from
         # supply rows - both are facts somebody WROTE DOWN, which is
@@ -643,6 +644,9 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # WHICH PROMOTED AMBER SUPPLIES WERE ACKNOWLEDGED (REQ-PIPE-122
         # criterion 21), keyed by run - see pipeline/acknowledgements.py.
         "acknowledgements": acknowledgements.for_dataset(dataset_id),
+        # WHICH LATE SUPPLIES A PERSON EXCUSED (REQ-DASH-162), keyed by run,
+        # each with its withdrawal and lapse - see pipeline/excuses.py.
+        "excuses": excuses.for_dataset(dataset_id),
         "promotionState": promotion_state.state_for(dataset_id).as_record(),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,

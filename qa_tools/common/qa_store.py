@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 34
+SCHEMA_VERSION = 35
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -587,10 +587,43 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".verdict (
     supersedes     bigint REFERENCES "{SCHEMA}".verdict (id),
     recorded_at    timestamptz NOT NULL DEFAULT now(),
     CHECK ((correction_ref IS NULL) = (supersedes IS NULL)),
-    CHECK ((correction_ref IS NULL) = (correction_changelog IS NULL))
+    CHECK ((correction_ref IS NULL) = (correction_changelog IS NULL)),
+    -- A NAMED correction, never an empty one (delivery-critic on 168, M3d).
+    CHECK (correction_ref IS NULL OR btrim(correction_ref) <> ''),
+    CHECK (correction_changelog IS NULL OR btrim(correction_changelog) <> '')
 );
 CREATE INDEX IF NOT EXISTS verdict_filing ON "{SCHEMA}".verdict (filing_id, id);
 CREATE INDEX IF NOT EXISTS verdict_supply ON "{SCHEMA}".verdict (dataset_id, supply_id, id);
+--   ONE UNNAMED VERDICT PER FILING - the first - so any later one names its
+--   correction (criterion 4; delivery-critic on 168, M3c).
+CREATE UNIQUE INDEX IF NOT EXISTS verdict_first_once
+    ON "{SCHEMA}".verdict (filing_id) WHERE supersedes IS NULL;
+--   A VERDICT IS SUPERSEDED ONCE, so two re-judgements racing over the same
+--   verdict cannot both land (M3).
+CREATE UNIQUE INDEX IF NOT EXISTS verdict_supersedes_once
+    ON "{SCHEMA}".verdict (supersedes) WHERE supersedes IS NOT NULL;
+
+-- A VERDICT DESCRIBES ITS OWN FILING'S SUPPLY, and supersedes a verdict of
+-- that same filing (M3a, M3b): otherwise current() - joined by filing - and
+-- history() - by dataset and supply - could disagree about one supply.
+CREATE OR REPLACE FUNCTION "{SCHEMA}".verdict_matches_its_filing()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM "{SCHEMA}".filing f WHERE f.id = NEW.filing_id
+                   AND f.dataset_id = NEW.dataset_id AND f.supply_id = NEW.supply_id)
+       OR (NEW.supersedes IS NOT NULL AND NOT EXISTS (
+           SELECT 1 FROM "{SCHEMA}".verdict v WHERE v.id = NEW.supersedes
+           AND v.filing_id = NEW.filing_id)) THEN
+        RAISE EXCEPTION 'qa.verdict row does not match its filing: a verdict names '
+            'its own filing''s dataset and supply, and supersedes a verdict of that '
+            'filing (REQ-PIPE-168)';
+    END IF;
+    RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS verdict_matches_filing ON "{SCHEMA}".verdict;
+CREATE TRIGGER verdict_matches_filing
+    BEFORE INSERT ON "{SCHEMA}".verdict
+    FOR EACH ROW EXECUTE FUNCTION "{SCHEMA}".verdict_matches_its_filing();
 
 -- APPEND-ONLY (criterion 2), as qa.filing is: UPDATE and DELETE refused.
 CREATE OR REPLACE FUNCTION "{SCHEMA}".verdict_is_append_only()
@@ -799,7 +832,7 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
                       'inherit', 'inherit-refused', 'un-inherit',
                       'promotion-withheld', 'mark-not-supplied', 'acknowledge',
                       'supersede', 'un-supersede', 'still-failing',
-                      'promotion-refused'));
+                      'promotion-refused', 'excuse-lateness', 'withdraw-excuse'));
 -- WHICH NEWER SUPPLY SUPERSEDED THIS ONE (REQ-PIPE-118 criterion 10).
 -- Schema 22, additive. Schema 23 relaxed the shape for a PERSON's
 -- supersession (REQ-PIPE-120), which names no newer supply - shipped first

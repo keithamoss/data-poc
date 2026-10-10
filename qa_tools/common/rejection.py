@@ -145,12 +145,16 @@ def decided_by_a_person(conn: supply_db.SupplyConnection,
     rows = conn.execute(
         f"SELECT 1 FROM {decision_log.TABLE} "
         "WHERE dataset_id = ? AND supply = ? AND actor_kind = ? "
-        "AND action NOT IN (?, ?, ?) LIMIT 1",
+        "AND action NOT IN (?, ?, ?, ?, ?) LIMIT 1",
         # NOR DOES A RE-FILE (REQ-PIPE-141 criterion 8): the supply is
         # checked again in its new period and the gate decides, exactly as
         # for a first arrival - a person moving it is not a person deciding it.
+        # NOR AN EXCUSE OR ITS WITHDRAWAL (REQ-PIPE-161 criterion 19): an
+        # excuse is about punctuality, not quality, so an excused supply
+        # still waiting may promote itself under the gate.
         [dataset_id, supply, decision_log.PERSON, decision_log.SUPERSEDE,
-         decision_log.UN_SUPERSEDE, decision_log.REFILE]).fetchall()
+         decision_log.UN_SUPERSEDE, decision_log.REFILE, decision_log.EXCUSE_LATENESS,
+         decision_log.WITHDRAW_EXCUSE]).fetchall()
     return bool(rows)
 
 

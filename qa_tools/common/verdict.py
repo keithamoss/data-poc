@@ -209,14 +209,23 @@ class Rejudgement:
 
 def rejudged(conn, dataset_id: str, agreement=None) -> list[Rejudgement]:
     """Every supply of a dataset whose recorded verdict the given
-    configuration would judge differently - computed, never written.
+    configuration would CHANGE - computed, never written.
 
-    FROM RECORDED INPUTS BY VERSION, NOT A REPLAY (NFR 2). Current verdicts
-    are grouped by the period and fingerprint they were judged under; the
-    configuration's fingerprint is resolved ONCE per period, and only a
-    group whose fingerprint differs is re-judged supply by supply. A
-    correction to one participation version therefore costs the periods
-    that version governs, never a dataset's whole history.
+    THE SLOT IS FOUND BY NAME UNDER THE GIVEN AGREEMENT (delivery-critic on
+    168, H1, post-build-review #143): a correction can move a period's DATE,
+    which the fingerprint deliberately leaves out, so resolving the old
+    recorded date compared an unchanged fingerprint and skipped exactly the
+    correction REQ-PIPE-111 exists for. Each slot name is looked up in the
+    configuration's own periods, and both its date and its fingerprint are
+    compared with what was recorded. A slot name the configuration no longer
+    has is not judged here - where the supply goes then is REQ-PIPE-170's.
+
+    ONLY A CHANGED VERDICT IS LISTED (H1's sibling, M1): a correction that
+    moves an input without changing the answer re-judges nothing.
+
+    FROM RECORDED INPUTS BY VERSION, NOT A REPLAY (NFR 2). The configuration
+    is resolved ONCE per slot, and a supply is judged only where its slot's
+    date or fingerprint moved.
 
     RECEIPT INSTANTS AND CONFIGURATION ONLY (criterion 8): the receipt is
     read from qa.supply_receipt, the slot is rebuilt from configuration.
@@ -237,27 +246,45 @@ def rejudged(conn, dataset_id: str, agreement=None) -> list[Rejudgement]:
         "WHERE f.dataset_id = ? AND v.fingerprint IS NOT NULL "
         "ORDER BY f.supply_id",
         [dataset_id]).fetchall()
-    by_period: dict[str, tuple[dict, str] | None] = {}
+    if not rows:
+        return []
+    parsed = [(s, name, vid, cls, json.loads(i) if isinstance(i, str) else i, fp, rec)
+              for s, name, vid, cls, i, fp, rec in rows]
+    # Where each slot name falls under THIS configuration - generated to a
+    # year past the latest recorded period, which a cadence rule needs.
+    horizon = max(date.fromisoformat(i["period_date"]) for *_, i, _, _ in parsed) \
+        + timedelta(days=400)
+    try:
+        dated = {p.name: p.date for p in
+                 schedule.periods_for_dataset(dataset_id, until=horizon, agreement=agreement)}
+    except Exception:  # noqa: BLE001 - no schedule now: nothing can be re-judged against it
+        return []
+    by_slot: dict[str, tuple[dict, str, slots.SlotInstants] | None] = {}
     out = []
-    for supply_id, slot_name, vid, classification, inputs, fingerprint, received in rows:
-        if isinstance(inputs, str):
-            inputs = json.loads(inputs)
-        period = inputs["period_date"]
-        if period not in by_period:
+    for supply_id, slot_name, vid, classification, inputs, fingerprint, received in parsed:
+        if slot_name not in by_slot:
+            when = dated.get(slot_name)
             try:
-                by_period[period] = resolved(dataset_id, date.fromisoformat(period), agreement)
+                by_slot[slot_name] = None if when is None else (
+                    *resolved(dataset_id, when, agreement),
+                    slots.slot_instants(dataset_id, when, agreement))
             except Exception:  # noqa: BLE001 - an unbuildable slot is not a re-judgement
-                by_period[period] = None
-        now = by_period[period]
-        if now is None or now[1] == fingerprint or received is None:
+                by_slot[slot_name] = None
+        now = by_slot[slot_name]
+        if now is None or received is None:
             continue
-        new_inputs, new_fingerprint = now
-        instants = slots.slot_instants(dataset_id, date.fromisoformat(period), agreement)
+        new_inputs, new_fingerprint, instants = now
+        if (new_fingerprint == fingerprint
+                and new_inputs["period_date"] == inputs.get("period_date")):
+            continue
         slot = slots.Slot(dataset_id=dataset_id,
-                          period=schedule.Period(name=slot_name, date=date.fromisoformat(period)),
+                          period=schedule.Period(name=slot_name, date=dated[slot_name]),
                           due_at=instants.due_at, grace=instants.grace,
                           claim_opens_at=instants.claim_opens_at)
-        new = Judged(arrival_classification.classify(received, slot), new_inputs, new_fingerprint)
+        new_class = arrival_classification.classify(received, slot)
+        if new_class == classification:
+            continue
+        new = Judged(new_class, new_inputs, new_fingerprint)
         old = {"id": vid, "classification": classification, "inputs": inputs,
                "fingerprint": fingerprint}
         out.append(Rejudgement(dataset_id, supply_id, slot_name, old, new))

@@ -35,7 +35,7 @@ from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from qa_tools.common import agreement
 from qa_tools.common import asset_time
-from pipeline import (acknowledgements, closed_slots, file_check_panel, recorded_arrival,
+from pipeline import (acknowledgements, closed_slots, excuses, file_check_panel, recorded_arrival,
                       red_promoted, slot_timeline)
 from qa_tools.common import promotion_state
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
@@ -494,7 +494,8 @@ def build() -> dict:
         # the point at 30 datasets: a marker on every tile is noise that
         # trains people to stop reading markers.
         "scheduleNotAgreed": _schedule_not_agreed("birth-registrations"),
-        "lastArrival": {"run_date": _run_date(latest_entry), **latest_block},
+        "lastArrival": {"run_date": _run_date(latest_entry),
+                        "run_id": latest_entry.get("run_id"), **latest_block},
         # See build_cp_dashboard_data.py's identical block
         # (REQ-DASH-056).
         # WHAT EACH SLOT HELD, AND WHEN THAT CHANGED (REQ-PIPE-081
@@ -538,6 +539,9 @@ def build() -> dict:
         # WHICH PROMOTED AMBER SUPPLIES WERE ACKNOWLEDGED (REQ-PIPE-122
         # criterion 21), keyed by run - see pipeline/acknowledgements.py.
         "acknowledgements": acknowledgements.for_dataset("birth-registrations"),
+        # WHICH LATE SUPPLIES A PERSON EXCUSED (REQ-DASH-162), keyed by run,
+        # each with its withdrawal and lapse - see pipeline/excuses.py.
+        "excuses": excuses.for_dataset("birth-registrations"),
         "promotionState": promotion_state.state_for(
             "birth-registrations").as_record(),
         "arrivalHistory": arrival_history,

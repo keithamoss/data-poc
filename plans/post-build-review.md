@@ -7137,3 +7137,55 @@ twice. It deliberately did not re-find the `TypeError`.
     - Not a defect, test gap noted: the embed's unit test has no
       day-boundary case and ends with an `assert slots` that checks
       nothing.
+
+143. **[done, 2026-10-11]** **[Pipeline & publishing]** **[GitHub workflow &
+    people]** **The delivery critic on REQ-PIPE-168 and REQ-GHUB-174 as built
+    (51df202)** - overnight #3; report saved in the session's
+    reviews/2026-10-11-critic-168-174.md. Each finding was checked against the
+    code. Each fix has a test that failed first
+    (tests/test_verdict_record.py `TestCriticFindingsOn168`,
+    tests/test_codeowners.py `TestCriticFindingsOn174`):
+    - **H1, FIXED - a corrected DATE was never re-judged.** `verdict.rejudged`
+      resolved the OLD recorded period date and compared a fingerprint that
+      deliberately leaves dates out. So moving 2023-Q3 from 1 August to
+      25 July re-judged nothing, and that is the correction REQ-PIPE-111
+      exists for. Each slot is now found by NAME under the agreement given,
+      and both its date and its fingerprint are compared. This also covers a
+      dataset's own dates, whose versions carry nothing else.
+    - **M1, FIXED:** a correction that moved an input without changing the
+      answer was listed as a re-judgement. Only a changed verdict is listed
+      now.
+    - **M3, FIXED (schema 35):** the database now refuses each of these:
+      - an empty correction reference;
+      - a second verdict for a filing that names no correction;
+      - a verdict whose dataset or supply is not its filing's;
+      - superseding another filing's verdict;
+      - superseding one verdict twice.
+    - **M4, FIXED:** CODEOWNERS `*` crossed `/`, so `/*.yaml` owned
+      contract/calendar.yaml, which GitHub's matching does not. Matching now
+      follows GitHub's rules: `*` stays in one directory and `**` crosses.
+      A plain path owns what is under it; a glob owns only what it matches.
+      A bare `@` is no owner.
+    - **L1, FIXED:** "May approve:" listed every asset manager. It now lists
+      only those who are also code owners of the file, so it never names
+      someone the gate then refuses.
+    - **L3, PART FIXED:** the dead `_is_approver` was removed.
+      `filing.classification_of` is left in place: it is only reached from
+      tests/test_refiling.py and predates the recorded verdict.
+    - **M2, LEFT AS DECIDED:** TRUNCATE on qa.verdict is not refused. This
+      is the same rule as Keith's 2026-10-05 call for qa.filing ("UPDATE and
+      DELETE refused, TRUNCATE not"), which the test fixtures rely on.
+    - **L2, LEFT:** on a branch's first push the base falls back to HEAD~1,
+      so commit 1 could add an approver that commit 2 then uses. This is the
+      existing, documented diff_base fallback. Required review in a real
+      deployment closes it.
+    - **L4, NOTED:** for a daily feed, resolving per slot is resolving per
+      supply. It was measured at 15ms for Birth Registrations' whole
+      history.
+    - **L5, NOTED:** the critic listed uncovered paths. No committed test
+      checks a timezone correction against data-asset.yaml's owners; the
+      critic probed it by hand and it worked.
+    - **NFR 1, FOR KEITH:** qa.verdict records a re-judgement's reference and
+      changelog line but not its approver, who is named only in
+      calendar.yaml. REQ-PIPE-170's applied record is the natural place to
+      carry the approver.

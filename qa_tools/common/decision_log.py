@@ -165,10 +165,17 @@ STILL_FAILING = "still-failing"
 #: without keeping a marker of its own.
 PROMOTION_REFUSED = "promotion-refused"
 
+#: A PERSON EXCUSES ONE SUPPLY'S LATENESS against the slot it is filed to
+#: (REQ-PIPE-161), and withdraws an excuse. Both ANNOTATE: they change no
+#: data and nothing a period resolves to, so qa.slot_holds ignores them by
+#: construction, as it ignores acknowledge. The verdict stays late.
+EXCUSE_LATENESS = "excuse-lateness"
+WITHDRAW_EXCUSE = "withdraw-excuse"
+
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
            INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
            MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE, STILL_FAILING,
-           PROMOTION_REFUSED)
+           PROMOTION_REFUSED, EXCUSE_LATENESS, WITHDRAW_EXCUSE)
 
 #: Actions that name no supply - each is about one that is not there, or
 #: (STILL_FAILING) about several.
@@ -323,6 +330,20 @@ def _check_shape(decision: Decision) -> None:
             raise DecisionRefused(
                 "an acknowledgement needs a reason - what you looked at and why "
                 "the amber is acceptable. That is what makes it more than a click.")
+    if decision.action in (EXCUSE_LATENESS, WITHDRAW_EXCUSE):
+        # NEVER BY A RULE (REQ-PIPE-161 criterion 6): an excuse is a
+        # person's judgement about a supplier's performance.
+        if decision.actor_kind != PERSON:
+            raise DecisionRefused(
+                f"only a person records {decision.action} - forgiving lateness is a "
+                f"judgement, which a rule must never make on its own.")
+        if not decision.to_slot:
+            raise DecisionRefused(
+                f"{decision.action} names the period the supply is filed to.")
+        if not (decision.reason or "").strip():
+            raise DecisionRefused(
+                f"{decision.action} needs a reason - it is published beside the "
+                f"supply, and is what makes the excuse more than a click.")
     if (decision.action == SUPERSEDE and decision.actor_kind == RULE
             and not (decision.superseded_by or "").strip()):
         raise DecisionRefused(
@@ -614,6 +635,21 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
                 f"{decision.supply} is superseded, which already takes it out of the "
                 f"queue - there is nothing waiting to reject. `mothman supply superseded "
                 f"--collection {collection} --dataset {decision.dataset_id}` lists it.")
+
+    if decision.action in (EXCUSE_LATENESS, WITHDRAW_EXCUSE):
+        # REQ-PIPE-161 criteria 3 and 8, judged inside the transaction.
+        from qa_tools.common import excuse
+
+        if decision.action == EXCUSE_LATENESS:
+            why = excuse.why_not_excusable(conn, decision.dataset_id, decision.supply,
+                                           decision.to_slot)
+            if why:
+                raise DecisionRefused(f"{decision.supply} cannot be excused: {why}.")
+        else:
+            why = excuse.why_not_withdrawable(conn, decision.dataset_id, decision.supply,
+                                              decision.to_slot)
+            if why:
+                raise DecisionRefused(f"nothing to withdraw: {why}.")
 
     if decision.action == ACKNOWLEDGE:
         # REQ-PIPE-122 criterion 14: only a supply that OWES one, and the

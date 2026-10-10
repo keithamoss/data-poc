@@ -63,13 +63,21 @@ ACKNOWLEDGE = decision_log.ACKNOWLEDGE
 SUPERSEDE = decision_log.SUPERSEDE
 UN_SUPERSEDE = decision_log.UN_SUPERSEDE
 
+#: The thirteenth and fourteenth (REQ-PIPE-161 criteria 1 and 14): excuse a
+#: late supply's lateness, and withdraw an excuse. Supply-scoped, person
+#: only, reason required, change no data - the verdict stays late.
+EXCUSE_LATENESS = decision_log.EXCUSE_LATENESS
+WITHDRAW_EXCUSE = decision_log.WITHDRAW_EXCUSE
+
 OPERATIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
-              INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE)
+              INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
+              EXCUSE_LATENESS, WITHDRAW_EXCUSE)
 
 #: The four that act on a SUPPLY - "what do I do with this thing that
 #: arrived" - and so belong in the queue of supplies awaiting a decision
 #: (criterion 16).
-SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE)
+SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
+                 EXCUSE_LATENESS, WITHDRAW_EXCUSE)
 
 #: The four that act on a PERIOD - how it is filled when a supply for it
 #: never came. None of them answers a question about an arriving supply,
@@ -129,6 +137,9 @@ class Request:
     #: The period a substitution stands on.
     stands_on: str | None = None
     confirmed: bool = False
+    #: The LAST period of a range excuse (REQ-PIPE-161 criteria 9 and 15);
+    #: `period` is its first. None for every other decision.
+    through_period: str | None = None
     #: The key of the consequences the person was shown and confirmed
     #: (REQ-PIPE-128 criteria 6 and 9) - None where nothing was shown.
     acknowledged: str | None = None
@@ -253,7 +264,39 @@ def consequences(conn, request: Request) -> Consequences:
             done.append(f"The substitution of {period} onto {h.stands_on} was removed.")
     if request.operation == REFILE and request.supply and request.to_period:
         lines, done = _refile_consequences(conn, request)
+    if request.operation == EXCUSE_LATENESS and request.through_period:
+        lines, done = _range_consequences(conn, request)
     return Consequences(lines=tuple(lines), done=tuple(done))
+
+
+def _range_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
+    """A range excuse's warning: which supplies it excuses and which it
+    skips and why (REQ-PIPE-161 criterion 16), from the same plan the
+    decision applies - so the key changes if the set does. A range that
+    would excuse nothing is refused here, before anyone confirms
+    (criterion 17)."""
+    from qa_tools.common import excuse
+
+    plan = excuse.range_plan(conn, request.dataset_id, request.period,
+                             request.through_period)
+    span = f"{request.period} to {request.through_period}"
+    if not plan.excuse:
+        skipped = "".join(f"\n  - {s} ({slot}): {why}" for s, slot, why in plan.skipped)
+        raise decision_log.DecisionRefused(
+            f"nothing in {span} for {request.dataset_id} can be excused, so nothing was "
+            f"done." + (f" Every supply filed there was skipped:{skipped}" if skipped
+                        else " No supply is filed in those periods."))
+    lines = [f"Excuses {len(plan.excuse)} late supply/supplies of {request.dataset_id} "
+             f"in {span}, one entry each, with this reason:"]
+    lines += [f"  excuse {s} ({slot})" for s, slot in plan.excuse]
+    if plan.skipped:
+        lines.append(f"Skips {len(plan.skipped)}:")
+        lines += [f"  skip {s} ({slot}) - {why}" for s, slot, why in plan.skipped]
+    lines.append("Each stays late, shown as excused. To undo one: "
+                 "mothman supply decide --operation withdraw-excuse "
+                 f"--dataset {request.dataset_id} --period <period> --supply <supply> "
+                 "--reason '<why>'")
+    return lines, [f"{len(plan.excuse)} supply/supplies excused."]
 
 
 def _refile_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
@@ -499,6 +542,26 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> int
                 actor_kind=decision_log.PERSON, effective_at=effective_at,
                 to_slot=request.period, reason=reason)):
             pass
+    elif request.operation in (EXCUSE_LATENESS, WITHDRAW_EXCUSE):
+        # CHANGES NO DATA (REQ-PIPE-161 criterion 4): one entry per supply,
+        # nothing moved, nothing re-run. A range is one decision recorded
+        # as one excuse per late supply in it (criterion 9).
+        from qa_tools.common import excuse
+
+        if request.operation == EXCUSE_LATENESS and request.through_period:
+            plan = excuse.range_plan(conn, request.dataset_id, request.period,
+                                     request.through_period)
+            targets = list(plan.excuse)
+        else:
+            targets = [(request.supply, request.period)]
+        for supply, slot in targets:
+            with decision_log.apply_decision(conn, decision_log.Decision(
+                    agency_id=entry.agency_id, collection_id=entry.collection_id,
+                    dataset_id=request.dataset_id, action=request.operation,
+                    supply=supply, actor=request.actor_name,
+                    actor_kind=decision_log.PERSON, effective_at=effective_at,
+                    to_slot=slot, reason=reason)):
+                pass
     elif request.operation in (SUPERSEDE, UN_SUPERSEDE):
         from qa_tools.common import supersession
 

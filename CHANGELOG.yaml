@@ -187,6 +187,14 @@ releases:
               correction is refused unless its approver is one of them. Making
               GitHub require their review is a repository setting; the new
               docs/code-owner-review.md says how to turn it on.
+          - headline: Excuse a late supply
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              When a supplier was late for a reason you accept, you can now
+              excuse that supply with a reason, one at a time or across a range
+              of periods. It still counts as late, and the dashboard shows it as
+              Late (excused) with who excused it and why. An excuse can be
+              withdrawn.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

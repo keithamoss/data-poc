@@ -289,6 +289,22 @@ def from_run(conn: supply_db.SupplyConnection, collection_id: str, run_key: str,
             if s.supply and arrival_key_of(s.supply) in keys]
 
 
+def excuse_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:
+    """Excuse lateness where this slot's current supply classifies as late
+    and is not excused; withdraw the excuse where it is (REQ-PIPE-161
+    criterion 10). Separate from operations_for because punctuality is a
+    recorded fact read from the database, not part of the slot's state."""
+    from qa_tools.common import excuse
+
+    if not state.supply:
+        return ()
+    if excuse.in_force(conn, state.dataset_id, state.supply) is not None:
+        return (filing_decisions.WITHDRAW_EXCUSE,)
+    if excuse.why_not_excusable(conn, state.dataset_id, state.supply, state.period) is None:
+        return (filing_decisions.EXCUSE_LATENESS,)
+    return ()
+
+
 def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """(supply-scoped, period-scoped) - what is worth offering on this slot.
 

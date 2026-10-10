@@ -933,7 +933,15 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
                type=click.Choice(list(filing_decisions.OPERATIONS), case_sensitive=False),
                help="Which filing decision to record.")
 @click.option("--dataset", "dataset_id", required=True, help="The dataset.")
-@click.option("--period", required=True, help="The period the decision is about.")
+@click.option("--period", default=None,
+               help="The period the decision is about. Required, except for a range "
+                    "excuse, which takes --from-period and --through-period instead.")
+@click.option("--from-period", "from_period", default=None,
+               help="For excuse-lateness over a RANGE: the first period. Every late "
+                    "supply filed from here to --through-period is excused, one entry "
+                    "each, after a panel shows which and which are skipped.")
+@click.option("--through-period", "through_period", default=None,
+               help="For excuse-lateness over a range: the last period, inclusive.")
 @click.option("--supply", default=None,
                help="The supply being acted on, where the operation acts on one. "
                     "Taken from the slot when omitted.")
@@ -950,7 +958,8 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
 @click.option("--acknowledge", "acknowledged", default=None, metavar="KEY",
                help="Confirm a decision's consequences beyond its own slot, by the key "
                     "its warning showed - needed with --yes where there are any.")
-def decide_command(operation: str, dataset_id: str, period: str,
+def decide_command(operation: str, dataset_id: str, period: str | None,
+                    from_period: str | None, through_period: str | None,
                     supply: str | None, stands_on: str | None,
                     to_period: str | None, reason: str | None, yes: bool,
                     acknowledged: str | None) -> None:
@@ -967,6 +976,26 @@ def decide_command(operation: str, dataset_id: str, period: str,
     """
     from cli import filing_tui
     from qa_tools.common import filing_queue
+
+    # ONE SHARED PAIR OF RANGE FLAGS (REQ-PIPE-161 criterion 15), never
+    # --to-period, which is a re-file's target.
+    ranged = from_period is not None or through_period is not None
+    if ranged:
+        if operation.lower() != filing_decisions.EXCUSE_LATENESS:
+            raise click.UsageError("--from-period and --through-period are for "
+                                   "--operation excuse-lateness only.")
+        if from_period is None or through_period is None or period is not None:
+            raise click.UsageError("a range excuse takes both --from-period and "
+                                   "--through-period, and no --period.")
+        outcome = filing_tui.apply_decision(
+            operation=operation.lower(), dataset_id=dataset_id, period=from_period,
+            through_period=through_period, reason=reason, yes=yes,
+            acknowledged=acknowledged)
+        if outcome is None:
+            raise SystemExit(1)
+        return
+    if period is None:
+        raise click.UsageError("--period is required.")
 
     if supply is None:
         try:

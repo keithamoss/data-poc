@@ -79,9 +79,12 @@ class TestWhatASlotOffers:
     """Criterion 2 read against criterion 31 - all eight are reachable,
     and the four period-scoped ones are never reached from the queue."""
 
-    def test_every_one_of_the_twelve_is_offered_by_some_slot(self):
+    def test_every_one_but_the_excuse_is_offered_by_some_slot(self):
         """Mark as not supplied is offered on a CLOSED period (REQ-PIPE-132),
-        acknowledge on a promotion owing one (REQ-PIPE-122)."""
+        acknowledge on a promotion owing one (REQ-PIPE-122). The excuse and
+        its withdrawal (REQ-PIPE-161) depend on recorded punctuality, not on
+        the slot's state, so they come from excuse_offers - covered in
+        tests/test_excuse.py."""
         offered = set()
         for state, closed in ((slot_state.AWAITING_DECISION, False),
                               (slot_state.AWAITING_ACKNOWLEDGEMENT, False),
@@ -91,7 +94,7 @@ class TestWhatASlotOffers:
             supply_scoped, period_scoped = filing_queue.operations_for(
                 _state(state, supply="cp-carers@1", closed=closed))
             offered |= set(supply_scoped) | set(period_scoped)
-        assert offered == set(fd.OPERATIONS)
+        assert offered == set(fd.OPERATIONS) - {fd.EXCUSE_LATENESS, fd.WITHDRAW_EXCUSE}
 
     def test_the_queue_half_is_only_ever_supply_scoped(self):
         """Criterion 31 made mechanical: whatever a slot is in, the first

@@ -118,6 +118,8 @@ CLOCK_COLUMNS = {
     "census": {"taken_at"},
     "identity": {"marked_at"},
     "owed_run": {"owed_at"},
+    # REQ-PIPE-168's verdict rows, stamped like the filing they belong to.
+    "verdict": {"recorded_at"},
 }
 
 #: SURROGATE IDS WITH NO ORDER WORTH KEEPING, dropped outright. Rows that
@@ -126,6 +128,7 @@ SURROGATE_COLUMNS = {
     "census": {"id"},
     "filing": {"id"},
     "owed_run": {"id"},
+    "verdict": {"id"},
 }
 
 #: SURROGATE KEYS, replaced rather than dropped. A bigserial id differs
@@ -164,6 +167,14 @@ DERIVED_COLUMNS = {
                  "run_key": r"regexp_replace(run_key, '(__r|knock-on/)[0-9]+$', '\1#')",
                  "cleared_by_run": r"regexp_replace(cleared_by_run, '(__r|knock-on/)[0-9]+$', "
                                    r"'\1#')"},
+    # A verdict names its filing and the verdict it superseded by surrogate
+    # id; compare WHICH filing and WHICH verdict (REQ-PIPE-168).
+    "verdict": {"filing_id": "(SELECT f.dataset_id || '|' || f.supply_id || '|' || "
+                             "coalesce(f.slot, '') || '|' || CASE WHEN f.refiled_by IS NULL THEN 'rule' ELSE 'person' END "
+                             "FROM qa.filing f WHERE f.id = t.filing_id)",
+                "supersedes": "(SELECT v.dataset_id || '|' || v.supply_id || '|' || "
+                              "coalesce(v.classification, '') FROM qa.verdict v "
+                              "WHERE v.id = t.supersedes)"},
     "hold": {"resolved_at": "resolved_at IS NOT NULL",
              # resolved_by is a decision's surrogate id; compare WHICH
              # decision resolved it instead.
