@@ -789,8 +789,15 @@ one or more component tags, and a date.
         amendment wording, and accepted the scoper's boundary fixes. The
         review batch's other ten requirements stay unsigned for a sign-off
         session.
-      - ALSO SIGNED (23:40): REQ-PIPE-181, settled the same way - four
+      - ALSO SIGNED (23:28): REQ-PIPE-181, settled the same way - four
         amendment wordings approved (110 c33, 113 c2, 131 c2, 111 c4). With
         110 and 181 signed, the whole signed calendar chain is buildable in
         order; what stays unsigned is REQ-DASH-182 and the turn-off pair
         REQ-PIPE-179 / REQ-DASH-180, for a fresh sign-off session.
+      - QUEUE REORDERED (Keith, 23:30, option B - calendar first): the two
+        defects (#136, #135), then REQ-PIPE-112, then REQ-PIPE-110 with its
+        behaviour-preserving pin FIRST, then REQ-PIPE-113 and REQ-PIPE-111 as
+        far as the night goes. The excuse (161/162), REQ-GHUB-171 and
+        REQ-TEST-117 move to the next night. Signing more of the calendar
+        group would not have let more be built tonight - the limit is the
+        build order, not sign-off.
