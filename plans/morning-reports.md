@@ -911,3 +911,15 @@ one or more component tags, and a date.
         THREAD C IS NOT DELETED: 110-113 are built, but REQ-PIPE-179/180/181
         and REQ-DASH-182 came out of the same thread and are unbuilt, so by
         CLAUDE.md's rule 4 it goes whole only after them.
+      - CI TONIGHT, honestly: e4507a3 (110 in progress) and 9bc389e (110
+        built) went red - the in-progress stage before its tests were
+        converted, and the two e2e assertions described above. de3f45a (113)
+        went red on something NOT tonight's code: 25 errors in the fast half,
+        all `DuplicateTable: relation "cp_carers" already exists` from
+        tests/conftest.py's `_file_and_overlay_cp`, promoting the reference
+        Child Protection supply into period_2026_q1 where worker gw0's test
+        database already had one - a test-isolation hazard that depends on how
+        xdist hands out files, which is why the same slot code passed on
+        70bdbe2 and 99d5a3f. Not chased overnight; worth a look: the fixture
+        assumes its worker's period schemas are empty. 70bdbe2 and 99d5a3f are
+        green on both workflows.

@@ -507,7 +507,7 @@ one when this line suggests it matters.
   - *touches:* `qa_tools/common/arrival_lifecycle.py`, `qa_tools/common/period_overlap.py`, `tests/test_slot_holds.py`
 - **#2** `done` 2026-10-05 - Overnight 2026-10-05 to 06: sprints 13 and 14, the critics' findings and Keith's morning answers. - OVERNIGHT...
 - **#3** `in-progress` 2026-10-10 - Overnight 2026-10-10 to 11: two built-code defects, the excuse, the versioned timezone, the asset manager, CI's cached...
-  - *touches:* `contract/calendar.yaml`, `tests/test_dbt_worker.py`
+  - *touches:* `contract/calendar.yaml`, `tests/test_dbt_worker.py`, `tests/conftest.py`
 
 ## plans/post-build-review.md
 
