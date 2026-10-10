@@ -115,7 +115,7 @@ export const PERIOD_SEQUENCES_DEFAULT = {
   },
 };
 
-export function loadDashboard({ html, hierarchy, assetTimezone, assetTimezones, periodSequences, url } = {}) {
+export function loadDashboard({ html, hierarchy, assetTimezone, assetTimezones, periodSequences, slotDueDates, url } = {}) {
   let source = html ?? readFileSync(TEMPLATE_PATH, "utf-8");
   if (hierarchy !== undefined) {
     const line = `const HIERARCHY = ${JSON.stringify(hierarchy)};`;
@@ -178,6 +178,15 @@ export function loadDashboard({ html, hierarchy, assetTimezone, assetTimezones, 
       throw new Error("could not find `const PERIOD_SEQUENCES = ...;` to replace - has the template changed?");
     }
     source = source.replace(pattern, `const PERIOD_SEQUENCES = ${JSON.stringify(value)};\n`);
+  }
+  // SLOT_DUE_DATES (REQ-PIPE-167 criterion 5): only replaced when a test
+  // passes one, so a template that predates it still loads.
+  if (slotDueDates !== undefined) {
+    const pattern = /const SLOT_DUE_DATES = .*?;\n/;
+    if (!pattern.test(source)) {
+      throw new Error("could not find `const SLOT_DUE_DATES = ...;` to replace - has the template changed?");
+    }
+    source = source.replace(pattern, `const SLOT_DUE_DATES = ${JSON.stringify(slotDueDates)};\n`);
   }
 
   const errors = [];

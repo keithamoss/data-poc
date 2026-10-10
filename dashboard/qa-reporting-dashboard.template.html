@@ -1949,6 +1949,10 @@ const SCHEDULE_RUNWAY = null;
 // nothing has happened yet, so why project forward?"). So the picker's
 // covered range has an end without anybody choosing a horizon.
 const PERIOD_SEQUENCES = null;
+// SLOT_DUE_DATES - REQ-PIPE-167 criterion 5: per dataset, period date ->
+// the slot's own due date, ONLY where the two differ (a dataset due days
+// before its period's date). Empty for an asset where none does.
+const SLOT_DUE_DATES = {};
 // OUTSTANDING — REQ-DASH-070: everything that needs a person, in one
 // place with one count. Built by qa_tools/common/outstanding.py from
 // committed history alone (delivery_log/, processing_log/,
@@ -2448,11 +2452,16 @@ function buildSupplyHistory(d){
     }))
     .sort((a,b)=> sortKey(b).localeCompare(sortKey(a)));
 }
-function cycleLabel(cadence, cycleStartStr){
+function cycleLabel(cadence, cycleStartStr, datasetId){
   // No period rather than an invented one (REQ-PIPE-106). The heading
   // has to say something, and what it must not say is a date computed
   // from a schedule nobody has agreed.
   if(cycleStartStr==null) return "No agreed supply period";
+  // THE SLOT'S OWN DUE DATE where it is not the period's (REQ-PIPE-167
+  // criterion 5): a following-period dataset is due weeks earlier, and
+  // heading its cycle with the period's date names the wrong day.
+  const due = ((SLOT_DUE_DATES || {})[datasetId] || {})[cycleStartStr];
+  if(due) return `Cycle due ${fmtDay(due)} (period dated ${fmtDay(cycleStartStr)})`;
   const label = fmtDay(cycleStartStr);
   if(cadence.type==="daily") return label;
   if(cadence.type==="weekly") return `Week of ${label}`;
@@ -5459,7 +5468,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   const cycleBlock = c => `
     <div class="supply-cycle">
       <div class="supply-cycle-label">
-        <b>${cycleLabel(ds.sla.cadence, c.cycleStart)}</b>
+        <b>${cycleLabel(ds.sla.cadence, c.cycleStart, ds.id)}</b>
         ${isCurrent(c) ? '<span class="pill tag sm"><span class="ico"></span>Current cycle</span>' : ""}
         <span style="color:var(--ink-faint);">${c.entries.length} ${pluralize(c.entries.length,"delivery","deliveries")}</span>
       </div>

@@ -421,3 +421,30 @@ def test_the_schedule_ended_notice_names_the_file_dates_are_authored_in(monkeypa
     assert match, "SCHEDULE_RUNWAY const not found in built output"
     assert json.loads(match.group(1))["configFile"] == "contract/calendar.yaml"
     assert supply_holds.SCHEDULE_FILE == "contract/calendar.yaml"
+
+
+def test_slot_due_dates_carry_only_the_slots_due_off_their_period_date(monkeypatch, tmp_path):
+    """REQ-PIPE-167 criterion 5: the page is told a slot's own due date
+    wherever it differs from the period's date - and today, with no
+    dataset due ahead of its period, that is nowhere."""
+    out_html = tmp_path / "out.html"
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    edd.embed()
+    match = re.search(r"const SLOT_DUE_DATES = (.*?);\n", out_html.read_text())
+    assert match, "SLOT_DUE_DATES const not found in built output"
+    assert json.loads(match.group(1)) == {}
+
+
+def test_slot_due_dates_name_a_following_period_datasets_due_date():
+    from qa_tools.common import slots
+
+    class Slot:
+        def __init__(self, period_date, due):
+            from datetime import date, datetime, timezone
+            self.date = date.fromisoformat(period_date)
+            self.due_at = datetime.fromisoformat(due).replace(tzinfo=timezone.utc)
+
+    got = edd._slot_due_dates({"cp-early": [Slot("2026-02-01", "2026-01-04T01:00:00"),
+                                            Slot("2026-05-01", "2026-05-01T01:00:00")]})
+    assert got == {"cp-early": {"2026-02-01": "2026-01-04"}}
+    assert slots  # imported for the shape the real call passes

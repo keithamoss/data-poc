@@ -151,3 +151,64 @@ class TestADecisionCanRequireARole:
         """REQ-PIPE-170's confirmation is the first; until it is built
         nothing in this table refuses anybody who could act before."""
         assert filing_decisions.REQUIRED_ROLE == {}
+
+
+class TestCriticFindingsOn171:
+    """delivery-critic, 2026-10-11, on REQ-GHUB-171 as built (9ce807f).
+    Each test failed before its fix."""
+
+    def test_a_corrections_approver_is_the_asset_manager_not_any_manager(self):
+        """Finding 1 (PROVISIONAL): an agency's manager, once real, could
+        approve a correction to the whole asset's agreement."""
+        from qa_tools.common import agreement_freeze
+
+        doc = yaml.safe_load(REAL.read_text())
+        arthur = next(p for p in doc["people"] if p["email"] == "arthur.pendragon@example.com")
+        arthur.pop("placeholder", None)
+        arthur["github"] = "arthur-real"
+        approvers = [p["email"] for p in agreement_freeze.approvers(doc)]
+        assert approvers == [KEITH]
+
+    def test_an_asset_manager_for_another_asset_is_not_this_ones(self):
+        """Finding 2: the data_asset: value is checked at runtime too."""
+        config = copy.deepcopy(people.parse_people_config())
+        for record in config["asset_assignments"]:
+            record["data_asset"] = "some-other-asset"
+        assert people.asset_managers(config) == []
+        assert not people.holds(people.person_by_email(KEITH), "manager",
+                                people.DATA_ASSET, config=config)
+
+    def test_an_unidentified_actor_is_refused_when_a_role_is_required(self, monkeypatch):
+        """Finding 3: a role check skipped for a non-record actor fails open."""
+        monkeypatch.setitem(filing_decisions.REQUIRED_ROLE, filing_decisions.PROMOTE,
+                            ("manager", people.DATA_ASSET))
+        request = filing_decisions.Request(
+            operation=filing_decisions.PROMOTE, dataset_id="cp-clients",
+            actor=KEITH, reason="r", period="2026-Q1", supply="s", confirmed=True)
+        with pytest.raises(people.UnknownActor):
+            filing_decisions.apply(request, effective_at="2026-10-11T03:00:00+08:00")
+
+    def test_an_empty_people_list_fails_the_gate(self, tmp_path):
+        """Finding 5: criterion 6 with nobody at all."""
+        def mutate(doc):
+            doc["people"] = []
+            doc["assignments"] = []
+        assert any("data-asset level" in p for p in _problems(tmp_path, mutate))
+
+    def test_every_required_role_names_a_level_a_decision_can_require(self):
+        """Finding 6: a 'dataset' level, or an agency requirement with no
+        agency, is a refusal naming the problem - never a traceback."""
+        stranger = {"email": "someone@example.com"}
+        with pytest.raises(people.RoleRefused, match="data-asset or agency"):
+            people.require_role(stranger, "manager", "dataset")
+        with pytest.raises(people.RoleRefused, match="which agency"):
+            people.require_role(stranger, "manager", "agency", None)
+
+
+def test_an_assigned_role_must_be_one_the_person_holds(tmp_path):
+    """Finding 1's other half: two statements of who is a manager must
+    agree, or which one is read decides the answer."""
+    def mutate(doc):
+        keith = next(p for p in doc["people"] if p["email"] == KEITH)
+        keith["roles"] = [r for r in keith["roles"] if r != "manager"]
+    assert any("does not hold" in p and "manager" in p for p in _problems(tmp_path, mutate))

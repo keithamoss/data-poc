@@ -604,7 +604,10 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
             f"which can raise a decision only while a synthetic history is being "
             f"played back.")
     required = REQUIRED_ROLE.get(request.operation)
-    if required and isinstance(request.actor, dict):
+    if required:
+        # A NON-RECORD ACTOR IS REFUSED, not waved past (delivery-critic on
+        # 171, #3): require_role refuses anything that is not an identified
+        # person.
         role, level = required
         agency = hierarchy.dataset(request.dataset_id).agency_id if level == "agency" else None
         people.require_role(request.actor, role, level, agency)

@@ -26458,7 +26458,18 @@ requirements:
       falls in, I want its participation to say its slot is due ahead of the period's date, so that its
       supplies file to the period they are for without the never-claim-forward rule gaining an exception.
     moscow: should
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-11 (overnight #3): tests/test_slot_instants.py TestAFollowingPeriodDataset 4 passed - with days_before 60 a supply arriving 1 June 2025 finds 2025-Q3''s slot already open through the unchanged assignment.open_slot rule, inside its window and before its due instant (criteria 1-3); sixty days early does not overlap and the overlap gate checks it through the same instants, while a version moving due instants 80 days earlier from 2025-06-01 is caught as an overlap at 2025-Q3 (4); a February-and-August dataset due 60 days early still participates in February and August, its 2026-Q1 slot due in December (6). Criterion 5: tests-js/slot-due-dates.test.js 2 passed (the cycle heading shows the slot''s due date where it differs, and is unchanged where it does not) and tests/test_embed_dashboard_data.py''s two SLOT_DUE_DATES tests passed (the embed carries only differing due dates; for today''s asset, none).'
+    implemented_by:
+    - qa_tools/common/slots.py::slot_instants
+    - qa_tools/common/slots.py::claimable_until
+    - dashboard/embed_dashboard_data.py::_slot_due_dates
+    - dashboard/embed_dashboard_data.py::embed
+    linked_tests:
+    - tests/test_slot_instants.py
+    - tests-js/slot-due-dates.test.js
+    - tests/test_embed_dashboard_data.py
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -26523,6 +26534,8 @@ requirements:
       earlier.
     - THE CLAIM REACH MUST INCLUDE days_before, or such a supply is held (REQ-PIPE-113's horizon criterion;
       delivery-architect S4).
+    - 'BUILT ON REQ-PIPE-113''s days_before, WITH ONE ADDITION (2026-10-11, overnight #3): the schedule already expressed it - a following-period dataset is days_before made large, its window opening from the earlier due instant and every horizon reaching past it - so criteria 1-4 and 6 are tests over the slot-instants function and the unchanged open-slot rule. The addition is criterion 5: the build embeds SLOT_DUE_DATES, each slot''s own due date where it is not its period''s date, and the supply-history cycle heading reads ''Cycle due <due date> (period dated <period date>)'' there. The terminal''s schedule show already shows each slot''s due instant.'
+    - 'NFR 1''s COLLECTION DEFAULT IS REQ-PIPE-181''s (2026-10-11): a collection stating a default days before, nearest wins, is the collection participation_defaults that requirement builds; this one''s dataset-level value is what it will default.'
   - id: REQ-PIPE-168
     title: An arrival verdict is a recorded fact naming the agreement that judged it, and a correction re-judges
       it visibly

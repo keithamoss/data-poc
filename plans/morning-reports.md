@@ -947,3 +947,17 @@ one or more component tags, and a date.
         another calendar re-judges its whole history, and nothing stopped it.
         It now needs a declared correction on each dataset moved. Your other
         options: refuse such a move outright, or version membership.
+      - REQ-GHUB-171 CRITIC: real findings, fixed test-first
+        (post-build-review #141). The one that touches you: "who is a
+        manager" had two answers. A correction's approver (111) came from a
+        person's own roles, so once a real AGENCY manager exists they could
+        have approved a correction to the whole asset. I made the approver the
+        ASSET manager - PROVISIONAL, and it answers the question I put to you
+        above, the strict way. Say if an agency manager should approve
+        corrections to their own agency's datasets instead.
+      - REQ-PIPE-167 BUILT: a dataset whose supply is for the FOLLOWING period
+        is just a large days_before - its slot is open when the supply
+        arrives, with no exception to never-claim-forward - and the supply
+        history's cycle heading now names the slot's own due date where it
+        differs from the period's. No dataset needs it today. Its collection
+        default waits for REQ-PIPE-181.

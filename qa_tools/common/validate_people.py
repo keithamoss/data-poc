@@ -131,6 +131,14 @@ def problems(path: Path | str = PEOPLE_YAML) -> list[str]:
         if declared and role not in declared:
             found.append(f"an assignment of {entry.get('person')!r} names role {role!r}, "
                          f"which `roles:` does not declare ({', '.join(sorted(declared))})")
+        # THE ROLE IS ONE THE PERSON HOLDS (delivery-critic on 171, #1): two
+        # statements of who is a manager must agree, or which one a reader
+        # consults decides the answer.
+        holder = next((p for p in doc.get("people") or []
+                       if (p or {}).get("email") == entry.get("person")), None)
+        if holder is not None and role and role not in ((holder or {}).get("roles") or []):
+            found.append(f"{entry.get('person')} is assigned role {role!r}, which their own "
+                         f"`roles:` does not hold - add it there, or remove the assignment")
         # EXACTLY ONE LEVEL (criterion 2).
         levels = [k for k in LEVELS if k in entry]
         if len(levels) != 1:
@@ -147,7 +155,9 @@ def problems(path: Path | str = PEOPLE_YAML) -> list[str]:
     # correction can be confirmed without one (decision 3).
     real = {(p or {}).get("email") for p in doc.get("people") or []
             if not (p or {}).get("placeholder") and not (p or {}).get("synthetic")}
-    if doc.get("people") and not [p for p in asset_managers if p in real]:
+    # An empty people list fails too (delivery-critic on 171, #5) - only a
+    # MISSING file passes, as on a fresh clone.
+    if not [p for p in asset_managers if p in real]:
         found.append("no real person holds the manager role at data-asset level - add an "
                      "assignment `data_asset: <the data_asset_id>`, `role: manager` for the "
                      "person accountable for the whole asset. Without one no correction's "

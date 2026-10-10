@@ -167,6 +167,12 @@ releases:
               The people file now lists the roles a person can hold and names
               the manager of the whole data asset, and the configuration check
               fails if there is none. A decision can be limited to that person.
+          - headline: Due ahead of its period
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A dataset whose supply arrives weeks before the period it is for
+              can now say so in its schedule, and the supply history heads that
+              cycle with the day it is actually due.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

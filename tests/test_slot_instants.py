@@ -267,3 +267,53 @@ class TestCriticFindingsOn113:
         errors = vs._daylight_saving_errors(vs.Source.default())
         assert any("cp-case-workers" in (e.scope or "") for e in errors), \
             [e.problem for e in errors][:3]
+
+
+class TestAFollowingPeriodDataset:
+    """REQ-PIPE-167: a supply for the NEXT period, delivered weeks ahead of
+    that period's date, is said by the schedule - days_before - and the
+    never-claim-forward rule takes no exception."""
+
+    @pytest.fixture
+    def early(self, tmp_path):
+        # Due sixty days before each period's date: 2025-Q3 (1 August) is
+        # due 2 June, its window opening 19 May.
+        return _with(tmp_path, first={"days_before": 60})
+
+    def test_it_files_to_the_period_it_is_for_with_the_slot_already_open(self, early):
+        """Criteria 1 and 2, through the unchanged open-slot rule (3)."""
+        from qa_tools.common import assignment
+
+        arrived = _perth(2025, 6, 1, 10, 0)
+        until = slots.claimable_until("cp-clients", arrived.date(), early)
+        found = slots.slots_for_dataset("cp-clients", until=until, agreement=early)
+        slot = assignment.open_slot(found, arrived)
+        assert slot is not None and slot.name == "2025-Q3"
+        assert slot.claim_opens_at <= arrived < slot.due_at
+
+    def test_its_slots_are_checked_for_overlap_like_any_other(self, early):
+        """Criterion 4: sixty days ahead of an 89-to-92-day quarter does not
+        overlap - and the overlap gate checks it, through the same
+        instants."""
+        assert period_overlap.overlaps_for("cp-clients", agreement=early) == []
+
+    def test_a_version_change_that_moves_due_instants_most_of_a_period_is_checked(self, tmp_path):
+        """Criterion 4's harder half: from 2025-06-01 the dataset is due 80
+        days early, so 2025-Q3's window opens before 2025-Q2 stops being on
+        time - an overlap the gate must name."""
+        moved = _with(tmp_path, versions=[
+            {"effective_from": "2023-01-01"},
+            {"effective_from": "2025-06-01", "days_before": 80}])
+        found = period_overlap.overlaps_for("cp-clients", agreement=moved)
+        assert any(o.later == "2025-Q3" for o in found), found
+
+    def test_participates_names_the_calendar_dates_month(self, tmp_path):
+        """Criterion 6: February's period is owed in February's name even
+        when it is due in December."""
+        due_early = _with(tmp_path, dataset_id="cp-case-workers",
+                          first={"days_before": 60})
+        periods = schedule.periods_for_dataset("cp-case-workers", agreement=due_early)
+        assert {p.date.month for p in periods} == {2, 8}
+        q1 = next(s for s in slots.slots_for_dataset("cp-case-workers", agreement=due_early)
+                  if s.name == "2026-Q1")
+        assert q1.due_at.month == 12

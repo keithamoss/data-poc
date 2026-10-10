@@ -258,6 +258,36 @@ def _replace_const(html: str, const_name: str, value_json: str) -> str:
     return html
 
 
+def _slots_by_dataset() -> dict:
+    """Every dataset's slots to a year past today - configuration only."""
+    from datetime import timedelta
+
+    from qa_tools.common import asset_time, hierarchy, schedule, slots
+
+    until = asset_time.local_date(asset_time.now()) + timedelta(days=366)
+    out = {}
+    for entry in hierarchy.all_datasets():
+        try:
+            out[entry.dataset_id] = slots.slots_for_dataset(entry.dataset_id, until=until)
+        except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed):
+            continue
+    return out
+
+
+def _slot_due_dates(by_dataset: dict) -> dict:
+    """{dataset: {period date: due date}} for the slots due on a day other
+    than their period's date, read on the asset clock."""
+    from qa_tools.common import asset_time
+
+    out: dict = {}
+    for dataset_id, found in by_dataset.items():
+        for slot in found:
+            due = asset_time.local_date(slot.due_at)
+            if due != slot.date:
+                out.setdefault(dataset_id, {})[slot.date.isoformat()] = due.isoformat()
+    return out
+
+
 def embed() -> None:
     with open(TEMPLATE_HTML) as f:
         html = f.read()
@@ -466,6 +496,11 @@ def embed() -> None:
             # misconfigured calendar, which is the one thing the schedule
             # gate exists to make loud.
             sequences["datasetCalendar"][entry.dataset_id] = None
+    # SLOT_DUE_DATES (REQ-PIPE-167 criterion 5): each slot's own due date
+    # where it is not its period's date - configuration only, through the
+    # one slot-instants function filing uses.
+    html = _replace_const(html, "SLOT_DUE_DATES", json.dumps(
+        _slot_due_dates(_slots_by_dataset()), separators=(",", ":")))
     html = _replace_const(html, "PERIOD_SEQUENCES",
                            json.dumps(sequences, separators=(",", ":")))
     print("Re-embedded PERIOD_SEQUENCES = "

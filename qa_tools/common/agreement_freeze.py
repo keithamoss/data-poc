@@ -376,10 +376,24 @@ def _owner_label(owner: tuple) -> str:
 def approvers(people_doc: dict) -> list[dict]:
     """Who may approve a correction, as people.yaml stood at the base of the
     change (criterion 22): a real person - not a placeholder, not the
-    synthetic history's scripted one - holding the approving role."""
+    synthetic history's scripted one - ASSIGNED the manager role AT
+    DATA-ASSET LEVEL for this asset (REQ-GHUB-171 criterion 4).
+
+    PROVISIONAL (overnight #3, post-build-review #141): the first build read
+    each person's own `roles:` list, so a real AGENCY manager could approve a
+    correction to the whole asset's agreement, and removing `manager` from
+    the asset manager's roles left the gate green and nobody able to approve.
+    The level of the assignment, not the name of the role, says whose
+    decision it is (REQ-GHUB-171 decision 2)."""
+    from qa_tools.common import people as people_mod
+
+    asset = people_mod.this_asset_id()
+    managers = {(a or {}).get("person") for a in (people_doc or {}).get("assignments") or []
+                if (a or {}).get(people_mod.DATA_ASSET) == asset
+                and (a or {}).get("role") == APPROVER_ROLE}
     return [p for p in ((people_doc or {}).get("people") or [])
             if not p.get("placeholder") and not p.get("synthetic")
-            and APPROVER_ROLE in (p.get("roles") or [])]
+            and p.get("email") in managers]
 
 
 def _is_approver(name: str, allowed: list[dict]) -> bool:

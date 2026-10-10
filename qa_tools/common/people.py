@@ -270,6 +270,17 @@ def github_usernames_for(dataset_id: str, agency_id: str, config: dict) -> list[
     return sorted({p["github"] for p in assignees_for(dataset_id, agency_id, config) if p.get("github")})
 
 
+def this_asset_id() -> str | None:
+    """This deployment's data_asset_id, from contract/data-asset.yaml - what
+    a `data_asset:` assignment must name to count (delivery-critic on 171,
+    #2: an assignment copied from another asset's file granted nothing at
+    the gate but everything at runtime)."""
+    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+
+    with open(DATA_ASSET_YAML) as f:
+        return (config_yaml.parse(f) or {}).get("data_asset_id")
+
+
 def _asset_is_synthetic() -> bool:
     """Whether contract/data-asset.yaml declares this asset synthetic - read
     here rather than through the module that resets synthetic history,
@@ -291,9 +302,12 @@ def asset_managers(config: dict | None = None) -> list[dict]:
     REQ-PIPE-170's confirmation requires. Per-agency managers are not
     among them; they remain in force for their own agency's decisions."""
     config = parse_people_config() if config is None else config
+    asset = this_asset_id()
     out = []
     for record in config.get("asset_assignments") or []:
         person = (config["people"] or {}).get(record["email"])
+        if record.get(DATA_ASSET) != asset:
+            continue  # another asset's manager (delivery-critic on 171, #2)
         if record.get("role") == MANAGER and person and not is_placeholder(person) \
                 and not is_synthetic(person):
             out.append(person)
@@ -307,13 +321,13 @@ def holds(person: dict, role: str, level: str, agency_id: str | None = None,
     config = parse_people_config() if config is None else config
     email = (person or {}).get("email")
     if level == DATA_ASSET:
-        return any(r["email"] == email and r.get("role") == role
+        asset = this_asset_id()
+        return any(r["email"] == email and r.get("role") == role and r.get(DATA_ASSET) == asset
                    for r in config.get("asset_assignments") or [])
     if level == "agency":
         return any(r["email"] == email and r.get("role") == role
                    for r in (config.get("agency_assignments") or {}).get(agency_id, []))
-    raise ValueError(f"a decision may require a role at data-asset or agency level, not "
-                     f"{level!r}")
+    return False
 
 
 def require_role(person: dict, role: str, level: str, agency_id: str | None = None,
@@ -325,6 +339,19 @@ def require_role(person: dict, role: str, level: str, agency_id: str | None = No
     synthetic actor holds the asset manager role DURING PLAYBACK ONLY, and
     only on an asset that declares itself synthetic (criterion 7, decision
     5) - so a generated history can include a confirmed correction."""
+    # A REQUIREMENT THAT CANNOT BE MET IS REFUSED, NEVER A TRACEBACK
+    # (delivery-critic on 171, #6): only the two levels a decision may
+    # require, and an agency requirement names its agency.
+    if level not in (DATA_ASSET, "agency"):
+        raise RoleRefused(f"a decision may require a role at data-asset or agency level, not "
+                          f"{level!r} - the decision's own definition is wrong.")
+    if level == "agency" and not agency_id:
+        raise RoleRefused(f"this decision requires the {role} role at agency level and no "
+                          f"agency was given to say which agency - the decision's own "
+                          f"definition is wrong.")
+    if not isinstance(person, dict):
+        raise RoleRefused(f"{person!r} is not an identified person, so no role can be "
+                          f"checked for it.")
     if is_placeholder(person):
         raise RoleRefused(f"{person.get('email')!r} is a placeholder and holds no role.")
     if is_synthetic(person):

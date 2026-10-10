@@ -7075,3 +7075,32 @@ twice. It deliberately did not re-find the `TypeError`.
       over a dirty tree dates everything now - errs strict). The multi-commit
       walk and the invalid-zone fallback still have no test of their own; the
       critic exercised the walk end to end in a scratch clone.
+
+141. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-GHUB-171 as built (9ce807f)** - overnight #3; report saved
+    in the session's reviews/2026-10-11-critic-171.md. Failing tests first
+    (tests/test_roles.py `TestCriticFindingsOn171` plus
+    `test_an_assigned_role_must_be_one_the_person_holds`), then:
+    - **#1, FIXED PROVISIONALLY - two answers to "who is a manager".** A
+      correction's approver (REQ-PIPE-111) was read from each person's own
+      `roles:`, the asset manager from the assignments, and the gate never
+      made the two agree - so a real AGENCY manager could approve a
+      correction to the whole asset's agreement, and dropping `manager` from
+      the asset manager's roles left the gate green and nobody able to
+      approve. Now the approver must be the asset manager (assigned manager
+      at data-asset level for this asset), and the gate refuses an assignment
+      of a role the person's own `roles:` does not hold. This answers, the
+      strict way and provisionally, the question the morning report put to
+      Keith about who may approve.
+    - **#2, FIXED:** a `data_asset:` assignment naming another asset granted
+      the role at runtime; it now counts only for this asset's id.
+    - **#3, FIXED:** a decision requiring a role, raised by an actor that is
+      not an identified person, is refused rather than waved past.
+    - **#5, FIXED:** an empty `people:` list fails the gate (only a MISSING
+      file passes, as on a fresh clone).
+    - **#6, FIXED:** a role required at an impossible level, or at agency
+      level with no agency, is a refusal naming the definition as wrong,
+      never a traceback.
+    - **#4, LEFT (dormant):** the terminal asks for a reason and a
+      confirmation before apply() refuses on role. Nothing requires a role
+      yet; REQ-PIPE-170, which adds the first, should check it up front.
