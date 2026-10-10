@@ -6854,3 +6854,24 @@ twice. It deliberately did not re-find the `TypeError`.
     moves both freeze rules to the committer instant floored at the base
     commit. REQ-PIPE-122 carries a pending-amendment decision saying so.
     Failing test first when it is built.
+
+135. **[todo, 2026-10-10]** **[Dashboard]** **A collection whose every dataset
+    is left out of the rollup reads GREEN - a latent false green.** Found by
+    delivery-dashboard-ux reviewing REQ-PIPE-110's turn-off design, and
+    checked against the code by the main session: `rollup()` in
+    `dashboard/qa-reporting-dashboard.template.html` (~line 2626) filters
+    out `inNoRollup` datasets, and when nothing is left it returns
+    `counted.length ? "nodata" : "green"` - so an empty `counted` is green.
+    `inNoRollup` today is only `scheduleNotAgreed` ("No delivery schedule
+    agreed yet"), so a collection made up only of such datasets would read
+    green with nothing checked. Neither real collection is in that state
+    today, so nothing on the published page is wrong yet; a turned-off
+    dataset (the coming split of REQ-PIPE-110) would join `inNoRollup` and
+    make the case reachable for a collection whose datasets are all off.
+    Same review, related: `unagreedMarker` is rendered only in the dataset
+    header, never on the collection row, so an unagreed red dataset sits
+    inside a green collection with nothing saying why.
+    WHAT IT SHOULD SHOW INSTEAD is a status-semantics question for Keith,
+    asked with the REQ-PIPE-110 review batch (a quiet "No data" pill with an
+    "N datasets not counted" line, no pill at all with a line in words, or a
+    new group-level status). Failing test first when it is fixed.
