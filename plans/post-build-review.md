@@ -6871,7 +6871,12 @@ twice. It deliberately did not re-find the `TypeError`.
     Same review, related: `unagreedMarker` is rendered only in the dataset
     header, never on the collection row, so an unagreed red dataset sits
     inside a green collection with nothing saying why.
-    WHAT IT SHOULD SHOW INSTEAD is a status-semantics question for Keith,
+    ANSWERED BY KEITH, 2026-10-10 (REQ-PIPE-110's Q-J decisions): a group
+    whose datasets are all turned off reads a new 'Turned off' status; a group
+    where nothing is counted for any other reason, or a mix, reads a quiet
+    'Not counted' status with a line saying why. Never green. To be built with
+    the turn-off DASH requirement; the not-agreed half can be fixed sooner.
+    WHAT IT SHOULD SHOW INSTEAD was a status-semantics question for Keith,
     asked with the REQ-PIPE-110 review batch (a quiet "No data" pill with an
     "N datasets not counted" line, no pill at all with a line in words, or a
     new group-level status). Failing test first when it is fixed.
