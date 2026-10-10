@@ -12333,7 +12333,7 @@ requirements:
       by: Keith
       date: "2026-09-26"
     acceptance_criteria:
-      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13.
+      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse and keep - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming a calendar correction records each re-file, hold and keep it makes as its own entry here).
       - >
         THE SYSTEM SHALL record, with each entry, the actor, the instant
         the decision took effect, the instant the entry was written, the
@@ -15449,14 +15449,17 @@ requirements:
       the write path 2026-09-22. Scoped by delivery-scoper, batch 4,
       2026-09-26.
     acceptance_criteria:
-      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fourteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), and 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse).
+      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fourteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), and 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse). Keep, and the confirmation of a calendar correction's moves, are filing decisions too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11.
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
       - >
         THE SYSTEM SHALL write an identical decision-log entry whichever
         route raised the decision, and SHALL NOT give either route an
-        operation the other lacks.
+        operation the other lacks, except the confirmation of a calendar
+        correction's moves and the keeps it records, which is offered on
+        the terminal route only (REQ-PIPE-170 criterion 10). AMENDED
+        2026-10-11 by REQ-PIPE-170 criterion 11.
       - >
         THE SYSTEM SHALL take the actor from the authenticated author of
         a GitHub-raised decision, and SHALL NOT accept an actor stated
@@ -26791,7 +26794,7 @@ requirements:
       where they are, so that genuinely early data is not moved by a rule while everything else is put right
       without a decision per file.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -26895,6 +26898,43 @@ requirements:
     - 'COMPUTED LIVE AT CONFIRMATION, NOT BY THE PASS (Keith, 2026-10-07, collapsing the pass''s step into the terminal''s): after a correction merges the processing pass only notes it - affected datasets read ''awaiting confirmation'' and it sits in needs-action - and the terminal works out the verdict changes and moves when the asset manager opens it, by the impact preview''s own implementation, then applies them on confirmation. Nothing stored can go stale; the CAB''s preview, the confirmation screen and the apply are one computation; there is no stored trial or pending-moves table to build. This criterion''s own trial-and-list wording (criteria 1-3) is read through this decision: the ''trial'' is the live computation at confirmation. Supplies arriving meanwhile are judged against the corrected agreement now in force, and the backstop treats the declared, unapplied correction as accounting for the difference.'
     - 'Keith, 2026-10-08: the awaiting-confirmation marking cannot go stale, because the pass derives it from configuration alone - a merged correction with no applied record, and the datasets its declared changes name - and never stores a list of moves; the moves are computed live when the asset manager opens it, so a re-file between merge and confirmation is simply seen where it now is. Rejected: showing the asset manager what changed since the preview the approver saw (supplies filed or received after the preview instant), and blocking confirmation on such drift. The approver approves the intent of the correction, not an exact list of moves. Instead, Keith the same day: the terminal prints what was actually applied, in the preview''s own form, and tells the person to attach it to the change reference and share it with the approver, who compares it against what they approved by eye - drift is caught by process and a person, not by the system.'
     - 'Keith, 2026-10-08, signing off the route: test scenarios TS-57..TS-64 show the shapes of a correction - re-judged with no move, moved, kept, held, blocked, awaiting confirmation, a dataset turned off, an undeclared change refused. Injecting them needs the generator to make a correction part way through a history and confirm it later, which it cannot today; REQ-PIPE-111 already lets a synthetic asset add past-dated versions, so how the generator stages the merge and the confirmation is for the builder.'
+    - 'BUILT 2026-10-11 (overnight #3, into the Saturday morning). qa_tools/common/correction_apply.py: pending() is every declared correction with no qa.correction_applied row (schema 36, append-only, one per change reference, carrying what was applied); trial_for() computes its moves and verdict changes LIVE by correction_trial.trial (REQ-PIPE-169''s computation, criterion 20); confirm() applies them in one decision transaction and writes the applied record.'
+    - 'THE AGREEMENT BEFORE THE CORRECTION IS REBUILT FROM THE CORRECTION ITSELF (PROVISIONAL): agreement_freeze.revert() puts each declared change''s old value back, so no git history is read - a shallow CI clone and the synthetic generator have none. Round-trip tested for every kind of item the gate names. Rejected: the parent of the commit that introduced the correction, which needs history this project''s own CI does not fetch.'
+    - 'OLDEST FIRST (PROVISIONAL): each pending correction is trialled against the configuration with every LATER pending correction reverted, so one confirmation applies that correction''s consequence and nothing else.'
+    - 'A MOVE is refiling.apply - REQ-PIPE-141''s person re-file, the asset manager as actor, the correction named in the reason - owing a re-check the next processing pass runs and re-gates (criterion 7, PROVISIONAL that ''automatically'' is the next pass, as for every person''s re-file). A HELD supply the corrected calendar now covers is PLACED by the rule, as REQ-PIPE-154''s drain places one, naming who confirmed it - the decision log lets only the rule re-file a supply with no period to leave. A filed supply the corrected calendar offers NO period is HELD (criterion 8): a person''s re-file naming only the period it leaves (the decision log relaxed for exactly that), its tables back in staging where it was promoted, and a hold whose reason names the correction and reads so in the queue.'
+    - 'KEEP is its own decision-log action (criterion 6, 15), person only, naming the period the supply stays in and a mandatory reason; one reason covers several, recorded on each. qa.slot_holds ignores it, as it ignores acknowledge.'
+    - 'A BLOCKED MOVE MUST BE CLEARED OR KEPT BEFORE CONFIRMING (criteria 9 and 19, PROVISIONAL reading): the confirmation is refused while any blocked move is neither, naming each and why - so the correction stays pending, and needing action, until every move is moved or kept, and nothing is dropped silently.'
+    - 'RE-JUDGED IN PLACE AFTER THE MOVES (criterion 20): a moved supply is judged against its new period by its new filing; every other affected supply whose verdict the corrected agreement changes gets a new verdict naming the change reference (REQ-PIPE-168).'
+    - 'THE ROLE IS CHECKED IN correction_apply.confirm, not filing_decisions.REQUIRED_ROLE: a confirmation is asset-wide, not a slot operation. The terminal and the command both refuse before any choice or reason, naming the role, its level and who holds it (criterion 18); anyone allowlisted may view (criterion 17).'
+    - 'THE CONSEQUENCES'' KEY is a hash of every proposed move and verdict change, so --yes needs --acknowledge KEY and a list that changed since it was shown is refused (criterion 16); the production confirmation is common.confirm_change''s, as for every person''s change. The list itself is the impact preview''s report rather than the filing menu''s warning panel (PROVISIONAL - it is a report of many moves, not one decision''s side effects).'
+    - 'NEEDS ACTION is an outstanding item per pending correction (kind pending-correction, asset-wide, naming the datasets it affects), and the processing pass says which are pending - noted from configuration and the applied record, never computed (criterion 20). Saying so on each affected dataset in the dashboard is REQ-DASH-172 criterion 4.'
+    - 'ONE CORRECTION PER CHANGE REFERENCE (delivery-critic on 170, D1, post-build-review #148): the gate makes each changed item be declared on its own owner, so a collection moved to another calendar, or a date and a grace changed together, is several entries sharing one reference. They are gathered into ONE pending correction, trialled, listed and applied as one - the first build applied only the first owner''s part and then marked the whole reference applied.'
+    - 'A HELD SUPPLY LEAVES ITS PERIOD (D2): qa.slot_holds compares a re-file''s slot with IS NOT DISTINCT FROM, so a re-file naming only the period it leaves empties that period; `=` made the row NULL and the period went on reading as promoted by a supply that had left it. A supply held before is held AGAIN (D4, supply_holds.raise_again reopens its one row). A take_out finding no table refuses, as refiling.apply does.'
+    - 'KEEP NEVER RESOLVES A HOLD AND NEVER BARS THE GATE (D3, D5): a held supply kept is kept held, its entry naming the period it was not placed into as from_slot; rejection.decided_by_a_person leaves keep out, as it leaves out re-file and the excuse.'
+    - 'WHAT A KEPT SUPPLY BECOMES IS SHOWN BEFORE ANYONE KEEPS IT (D6): each proposed move carries its verdict if kept, shown beside it and in the consequences'' key.'
+    - 'APPLIED UNDER THIS CORRECTION''S OWN AGREEMENT (D9): correction_trial.configured() stands the given agreement in for agreement.current() as well as the timezone, and the whole confirmation runs inside it - a re-file, its plan and every verdict otherwise resolved slots from the files on disk, which hold every merged correction, a later pending one included.'
+    - 'THE APPLIED SUMMARY SAYS WHAT WAS DONE (D8): report(applied=True) words the preview''s own layout in the past tense.'
+    unmet_criteria:
+    - criterion: 'Criterion 23, first half - TS-57 to TS-63 GENERATED INTO THE SYNTHETIC HISTORY. Each has a unit test (TestScenarioRegister; TS-64 in tests/test_correction_trial.py), except TS-63, which needs REQ-PIPE-179 (unsigned).'
+      why: 'Generating a correction part way through a history needs the pipeline, during playback, to file arrivals before the correction''s merge instant against the agreement WITHOUT it - a time-versioned agreement during replay, which nothing has yet. revert() is the piece that makes it possible; wiring it into playback touches agreement loading everywhere and is a design choice for Keith, not a night''s PROVISIONAL.'
+      owner: 'a follow-up sprint, after Keith decides how playback stages the merge'
+      blocked_by:
+        unowned: true
+    linked_tests:
+    - tests/test_correction_apply.py
+    - tests/test_correction_revert.py
+    implemented_by:
+    - qa_tools/common/correction_apply.py::pending
+    - qa_tools/common/correction_apply.py::trial_for
+    - qa_tools/common/correction_apply.py::confirm
+    - qa_tools/common/correction_apply.py::summary
+    - qa_tools/common/agreement_freeze.py::revert
+    - qa_tools/common/outstanding.py::_from_pending_corrections
+    - cli/supply.py::corrections_command
+    - cli/supply.py::confirm_correction_command
+    - cli/filing_tui.py::corrections_flow
+    evidence:
+    - 'tests/test_correction_apply.py (40 tests, run 2026-10-11, ten of them the critic''s findings, each failing first): pending until applied, once; the agreement before rebuilt from its own old values; only the asset manager confirms, refused before anything is worked out; a move is a person''s re-file naming the correction with an owed re-check; kept supplies stay with a KEEP entry and need a reason; a blocked move must be cleared or kept; a supply with no period is held naming the correction; a verdict re-judged in place naming it; a changed list refused; the summary in the preview''s form with what was kept; the two commands (list, one in full summary first, refusal naming who may, --yes needs the key, applied with the key and told to attach it, an unknown keep refused); the filing menu offering corrections above the collections, view-only for anyone else, keep-one-confirm-the-rest; the pass and needs-action noting it; and TS-57 to TS-62 each. tests/test_correction_revert.py (12): revert round-trips every kind of item.'
   - id: REQ-GHUB-171
     title: The people configuration names the data asset's manager, and a decision can require that role
     date_written: '2026-10-07'

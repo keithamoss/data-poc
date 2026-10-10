@@ -172,10 +172,17 @@ PROMOTION_REFUSED = "promotion-refused"
 EXCUSE_LATENESS = "excuse-lateness"
 WITHDRAW_EXCUSE = "withdraw-excuse"
 
+#: THE ASSET MANAGER KEEPS ONE SUPPLY WHERE IT IS when confirming a
+#: correction's moves (REQ-PIPE-170 criteria 6 and 15): recorded, so the
+#: next reader does not take it for an oversight and propose the move again.
+#: It changes nothing a period resolves to, so qa.slot_holds ignores it, as
+#: it ignores acknowledge and the excuse.
+KEEP = "keep"
+
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
            INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
            MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE, STILL_FAILING,
-           PROMOTION_REFUSED, EXCUSE_LATENESS, WITHDRAW_EXCUSE)
+           PROMOTION_REFUSED, EXCUSE_LATENESS, WITHDRAW_EXCUSE, KEEP)
 
 #: Actions that name no supply - each is about one that is not there, or
 #: (STILL_FAILING) about several.
@@ -330,6 +337,19 @@ def _check_shape(decision: Decision) -> None:
             raise DecisionRefused(
                 "an acknowledgement needs a reason - what you looked at and why "
                 "the amber is acceptable. That is what makes it more than a click.")
+    if decision.action == KEEP:
+        # REQ-PIPE-170 criterion 6: a person's call on what a file really is.
+        if decision.actor_kind != PERSON:
+            raise DecisionRefused("only a person keeps a supply where it is - whether a "
+                                  "file is really that period's data is a person's call.")
+        # A FILED supply is kept in its period (to_slot); a HELD one is kept
+        # held, naming the period it was not placed into (from_slot) - D3.
+        if not (decision.to_slot or decision.from_slot):
+            raise DecisionRefused("keep names the period the supply stays in, or - for a "
+                                  "held supply - the period it is kept out of.")
+        if not (decision.reason or "").strip():
+            raise DecisionRefused("keep needs a reason - why this supply stays where it is "
+                                  "when the corrected calendar would move it.")
     if decision.action in (EXCUSE_LATENESS, WITHDRAW_EXCUSE):
         # NEVER BY A RULE (REQ-PIPE-161 criterion 6): an excuse is a
         # person's judgement about a supplier's performance.
@@ -362,8 +382,12 @@ def _check_shape(decision: Decision) -> None:
     # A HELD SUPPLY HAS NO SLOT TO LEAVE - and only the filing rule re-files
     # one, once dates cover it (REQ-PIPE-154 criterion 7). A person places a
     # held supply by promoting it.
-    if decision.action == REFILE and not (decision.to_slot and (
-            decision.from_slot or decision.actor_kind == RULE)):
+    # AND A FILED SUPPLY IS HELD by a re-file that names only the period it
+    # leaves - a confirmed correction whose calendar offers it no period
+    # (REQ-PIPE-170 criterion 8), a person's confirmation with a reason.
+    if decision.action == REFILE and not (
+            (decision.to_slot and (decision.from_slot or decision.actor_kind == RULE))
+            or (decision.from_slot and decision.actor_kind == PERSON)):
         raise DecisionRefused(
             "a re-file names both slots: the one the supply is in and the one it "
             "is moving to. One entry, not a demotion followed by a promotion.")
@@ -903,7 +927,9 @@ def apply_decision(conn: supply_db.SupplyConnection,
         # EXCEPT A REFUSAL (REQ-PIPE-151 criterion 5): the gate saying "held -
         # no open period" is a record ABOUT the hold, and resolving the hold
         # with it would close the very thing it reports.
-        if decision.action not in RECORDS_A_REFUSAL:
+        # NOR A KEEP (delivery-critic on 170, D3): keeping a held supply where
+        # it is keeps it held, which is the opposite of resolving its hold.
+        if decision.action not in RECORDS_A_REFUSAL and decision.action != KEEP:
             supply_holds.resolve_for_supply(
                 conn, dataset_id=decision.dataset_id, supply=decision.supply or "",
                 decision_id=entry_id)

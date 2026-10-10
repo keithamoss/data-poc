@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 35
+SCHEMA_VERSION = 36
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -638,6 +638,32 @@ CREATE TRIGGER verdict_append_only
     BEFORE UPDATE OR DELETE ON "{SCHEMA}".verdict
     FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".verdict_is_append_only();
 
+-- A CORRECTION, ONCE APPLIED (REQ-PIPE-170, schema 36). A declared
+-- correction with no row here is PENDING: the pass notes it and the asset
+-- manager confirms it. The row is the applied record criterion 20 reads -
+-- never a stored list of moves, which the terminal computes live - and
+-- carries what was actually applied (criterion 22) as the summary the
+-- person was shown. One per change reference; append-only.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".correction_applied (
+    id               bigserial PRIMARY KEY,
+    change_reference text NOT NULL UNIQUE CHECK (change_reference <> ''),
+    owner            text NOT NULL,
+    actor            text NOT NULL CHECK (actor <> ''),
+    applied_at       timestamptz NOT NULL,
+    summary          jsonb NOT NULL
+);
+CREATE OR REPLACE FUNCTION "{SCHEMA}".correction_applied_is_append_only()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION
+        'qa.correction_applied is append-only: a % is not permitted. A correction '
+        'is applied once (REQ-PIPE-170)', TG_OP;
+END $$;
+DROP TRIGGER IF EXISTS correction_applied_append_only ON "{SCHEMA}".correction_applied;
+CREATE TRIGGER correction_applied_append_only
+    BEFORE UPDATE OR DELETE ON "{SCHEMA}".correction_applied
+    FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".correction_applied_is_append_only();
+
 -- A SUPPLY'S CURRENT FILING, DEFINED ONCE (REQ-PIPE-141 criterion 2 and
 -- NFR 6): its newest row. Every reader of "the" filing reads this.
 --
@@ -832,7 +858,8 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
                       'inherit', 'inherit-refused', 'un-inherit',
                       'promotion-withheld', 'mark-not-supplied', 'acknowledge',
                       'supersede', 'un-supersede', 'still-failing',
-                      'promotion-refused', 'excuse-lateness', 'withdraw-excuse'));
+                      'promotion-refused', 'excuse-lateness', 'withdraw-excuse',
+                      'keep'));
 -- WHICH NEWER SUPPLY SUPERSEDED THIS ONE (REQ-PIPE-118 criterion 10).
 -- Schema 22, additive. Schema 23 relaxed the shape for a PERSON's
 -- supersession (REQ-PIPE-120), which names no newer supply - shipped first
@@ -1223,7 +1250,11 @@ WITH RECURSIVE named AS (
       -- A RE-FILE NEVER FILLS THE SLOT IT GOES TO (REQ-PIPE-141 criteria
       -- 4 and 9): the supply waits in staging there, checked again, and
       -- the gate decides - so only its leaving the OLD slot is a step.
-      AND NOT (d.action = 'refile' AND s.slot = d.to_slot)
+      -- IS NOT DISTINCT FROM (delivery-critic on 170, D2): a re-file that
+      -- names only the period it leaves (a supply a correction holds) has a
+      -- NULL to_slot, and `=` made its leaving row NULL - so the period went
+      -- on reading as held by a supply that had left it.
+      AND NOT (d.action = 'refile' AND s.slot IS NOT DISTINCT FROM d.to_slot)
 ), step AS (
     -- What one entry does to a slot, given what the slot held before:
     -- `skips` where it is about a supply other than the one holding it.

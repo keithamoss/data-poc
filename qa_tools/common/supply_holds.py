@@ -207,7 +207,18 @@ class Held:
             # once the agreement matches its recorded judgements again.
             return ("restore the delivery agreement or declare the correction - it files "
                     "itself on the next processing pass",)
+        if self.correction:
+            # REQ-PIPE-170 criterion 8: a confirmed correction left it no period.
+            # PROMOTE, not re-file (delivery-critic on 170, D7): a held
+            # supply has no period to leave, so a re-file is refused.
+            return ("promote it into the period it belongs to - or declare a correction "
+                    "adding a date that covers its receipt",)
         return RESPONSES.get(self.kind, ())
+
+    @property
+    def correction(self) -> str | None:
+        """The confirmed correction that held it (REQ-PIPE-170), from the record."""
+        return self.reason.get("correction")
 
     @property
     def agreement_refused(self) -> bool:
@@ -234,6 +245,11 @@ class Held:
         this is that record read back, and it says what to do about it
         because a hold nobody can clear is indistinguishable from a bug.
         """
+        if self.correction:
+            return (f"Held when correction {self.correction} was confirmed: the corrected "
+                    f"calendar offers it no period"
+                    + (f" ({self.reason.get('correction_reason')})"
+                       if self.reason.get("correction_reason") else "") + ".")
         if self.schedule_ended:
             # THE FIX IS OURS, NOT THE SUPPLIER'S (REQ-PIPE-154 criteria 1
             # and 3), so the reason says where to make it.
@@ -330,6 +346,22 @@ def raise_hold(conn, *, dataset_id: str, supply_id: str, kind: str,
         [dataset_id, supply_id, kind, json.dumps(reason), raised_by, delivery,
          _replay_clock.now()]).fetchall()
     return bool(rows)
+
+
+def raise_again(conn, *, dataset_id: str, supply_id: str, kind: str, reason: dict,
+                raised_by: str) -> None:
+    """Hold a supply that may have been held before (REQ-PIPE-170 criterion
+    8; delivery-critic on 170, D4): a hold is one row per supply for all
+    time, so raise_hold's ON CONFLICT DO NOTHING left a supply whose earlier
+    hold was resolved filed nowhere with no hold open. A resolved row is
+    reopened with the new reason; an open one is left as it is."""
+    conn.execute(
+        f"INSERT INTO {TABLE} (dataset_id, supply_id, kind, reason, raised_by, raised_at) "
+        "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO UPDATE SET "
+        "kind = EXCLUDED.kind, reason = EXCLUDED.reason, raised_by = EXCLUDED.raised_by, "
+        "raised_at = EXCLUDED.raised_at, resolved_by = NULL, resolved_at = NULL "
+        f"WHERE {TABLE}.resolved_by IS NOT NULL",
+        [dataset_id, supply_id, kind, json.dumps(reason), raised_by, _replay_clock.now()])
 
 
 def resolve(conn, *, dataset_id: str, supply_id: str, decision_id: int) -> bool:

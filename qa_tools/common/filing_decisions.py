@@ -94,9 +94,10 @@ NEEDS_CONFIRMATION = (REFILE, DE_SUBSTITUTE, UN_INHERIT)
 
 #: WHICH DECISIONS REQUIRE A ROLE, and at which level (REQ-GHUB-171 criterion
 #: 3): operation -> (role, people.DATA_ASSET or "agency"). Checked here, in the
-#: one implementation every route shares (its NFR 1). EMPTY TODAY on purpose:
-#: the first decision to need one is REQ-PIPE-170's confirmation of a
-#: correction's filing moves, by the asset manager, which is not built yet.
+#: one implementation every route shares (its NFR 1). EMPTY TODAY: the one
+#: decision that needs a role - REQ-PIPE-170's confirmation of a correction's
+#: moves, by the asset manager - is asset-wide rather than a slot operation,
+#: so it is not among these and checks the role in correction_apply.confirm.
 REQUIRED_ROLE: dict[str, tuple[str, str]] = {}
 
 

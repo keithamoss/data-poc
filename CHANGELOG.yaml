@@ -212,6 +212,15 @@ releases:
               another period or be held, and writes it as Markdown to attach.
               `mothman schedule draft-correction` prints the entry to declare,
               and a new Calendar menu shows each dataset's agreement.
+          - headline: Confirm a calendar correction's moves at once
+            components: ["Pipeline & publishing"]
+            description: >
+              Once a correction is merged, the data asset's manager sees every
+              supply it would move, hold or re-judge, and confirms them in one
+              step, keeping any that should stay where they are with a reason.
+              `mothman supply corrections` lists what is waiting, and the
+              filing menu offers it first. What was applied prints for the
+              change reference.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

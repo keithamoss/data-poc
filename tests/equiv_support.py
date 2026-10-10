@@ -120,6 +120,8 @@ CLOCK_COLUMNS = {
     "owed_run": {"owed_at"},
     # REQ-PIPE-168's verdict rows, stamped like the filing they belong to.
     "verdict": {"recorded_at"},
+    # REQ-PIPE-170's applied record, stamped when the person confirmed.
+    "correction_applied": {"applied_at"},
 }
 
 #: SURROGATE IDS WITH NO ORDER WORTH KEEPING, dropped outright. Rows that
@@ -129,6 +131,7 @@ SURROGATE_COLUMNS = {
     "filing": {"id"},
     "owed_run": {"id"},
     "verdict": {"id"},
+    "correction_applied": {"id"},
 }
 
 #: SURROGATE KEYS, replaced rather than dropped. A bigserial id differs

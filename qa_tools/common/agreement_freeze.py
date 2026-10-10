@@ -41,6 +41,7 @@ slot arithmetic - no database and nothing under data/.
 """
 from __future__ import annotations
 
+import copy
 import json
 import subprocess
 from dataclasses import dataclass, field
@@ -782,3 +783,120 @@ def drafts(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asse
                                 reference=reference, author=author, approver=approver,
                                 reason=reason))
     return out
+
+
+# ---- putting a declared correction back (REQ-PIPE-170) ---------------------
+
+def _own(container: dict, key: str, default):
+    """`container[key]`, a copy of its own - the file shares participation
+    versions between datasets through YAML anchors, and deepcopy keeps that
+    sharing, so an edit to one would reach every dataset sharing it."""
+    container[key] = copy.deepcopy(container.get(key) if container.get(key) is not None
+                                   else default)
+    return container[key]
+
+
+def _version(versions: list, eff: str) -> dict | None:
+    return next((v for v in versions if str((v or {}).get("effective_from")) == eff), None)
+
+
+def _set_settings(versions: list, eff: str, old, *, keep: tuple) -> None:
+    """A versioned item's settings back to `old`: removed where `old` is
+    None (it was added), restored where it was removed, else replaced -
+    keeping the keys an item does not hold (its dates, changelog)."""
+    found = _version(versions, eff)
+    if old is None:
+        if found is not None:
+            versions.remove(found)
+        return
+    if found is None:
+        versions.append({"effective_from": eff, **copy.deepcopy(old)})
+        versions.sort(key=lambda v: str(v.get("effective_from")))
+        return
+    for k in [k for k in found if k not in keep and k != "effective_from"]:
+        del found[k]
+    found.update(copy.deepcopy(old))
+
+
+def _set_period(versions: list, period: str, old) -> None:
+    """A dated period back to `old`: removed where `old` is None, else moved
+    or restored - into the version whose window holds the old date."""
+    for v in versions:
+        v["dates"] = [d for d in (v.get("dates") or []) if str((d or {}).get("period")) != period]
+    if old is None:
+        return
+    when = str(old)
+    holder = None
+    for v in sorted(versions, key=lambda v: str(v.get("effective_from"))):
+        if str(v.get("effective_from")) <= when:
+            holder = v
+    holder = holder or versions[0]
+    holder.setdefault("dates", []).append({"period": period, "date": when})
+    holder["dates"].sort(key=lambda d: str(d.get("date")))
+
+
+def revert(cal_doc: dict, asset_doc: dict,
+           changes: list[tuple[str, object, object]]) -> tuple[dict, dict]:
+    """The two files as they stood before `changes` - each (item key, old,
+    new), as a declared correction lists them - copies, never the documents
+    given. Raises ValueError for an item key it does not know, rather than
+    leave a change silently in place.
+
+    Versions before their dates and periods: a removed version comes back
+    first, so its restored dates have somewhere to go."""
+    cal, asset = copy.deepcopy(cal_doc), copy.deepcopy(asset_doc)
+    calendars = {str((c or {}).get("name")): c for c in cal.get("calendars") or []}
+    entries = {str((e or {}).get("id")): e for e in cal.setdefault("datasets", [])}
+
+    def entry(ds: str) -> dict:
+        if ds not in entries:
+            entries[ds] = {"id": ds}
+            cal["datasets"].append(entries[ds])
+        return entries[ds]
+
+    def order(change):
+        parts = change[0].split()
+        return 0 if "version" in parts else 1
+
+    for key, old, _new in sorted(changes, key=order):
+        p = key.split()
+        if len(p) == 4 and p[0] == "calendar" and p[2] in ("version", "period") \
+                and p[1] in calendars:
+            versions = _own(calendars[p[1]], "versions", [])
+            if p[2] == "version":
+                _set_settings(versions, p[3], old, keep=("dates",) + _SKIPPED)
+            else:
+                _set_period(versions, p[3], old)
+        elif len(p) == 4 and p[0] == "dataset" and p[2] == "participation":
+            part = _own(entry(p[1]), "participation", {})
+            _set_settings(part.setdefault("versions", []), p[3], old, keep=_SKIPPED)
+        elif len(p) == 4 and p[0] == "dataset" and p[2] == "not_expected":
+            listed = [n for n in _own(entry(p[1]), "not_expected", [])
+                      if str((n or {}).get("period")) != p[3]]
+            if old is not None:
+                listed.append({"period": p[3], "reason": old})
+            entry(p[1])["not_expected"] = listed
+        elif len(p) == 5 and p[0] == "dataset" and p[2] == "dates" and p[3] in ("version", "period"):
+            versions = _own(entry(p[1]), "dates", {}).setdefault("versions", [])
+            if p[3] == "version":
+                _set_settings(versions, p[4], old, keep=("dates",) + _SKIPPED)
+            else:
+                _set_period(versions, p[4], old)
+        elif len(p) == 3 and p[0] == "dataset" and p[2] == "calendar":
+            e = entry(p[1])
+            e.pop("calendar", None)
+            e.pop("no_calendar", None)
+            text = "" if old is None else str(old)
+            if text.startswith("no calendar (") and text.endswith(")"):
+                e["no_calendar"] = text[len("no calendar ("):-1]
+            elif old is not None:
+                e["calendar"] = old
+        elif len(p) == 3 and p[:2] == ["timezone", "version"]:
+            tz = asset.setdefault("timezone", {})
+            versions = tz.setdefault("versions", [])
+            _set_settings(versions, p[2], None if old is None else {"zone": old},
+                          keep=_SKIPPED)
+        else:
+            raise ValueError(f"{key!r} cannot be reverted - it is not an item the schedule gate "
+                             f"names, so the agreement before this correction cannot be rebuilt")
+    return cal, asset

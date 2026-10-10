@@ -7360,3 +7360,53 @@ twice. It deliberately did not re-find the `TypeError`.
       nothing records which correction caused which change, which 170 c2's
       "grouped by correction" needs; and _blocked should share refiling's
       rules rather than mirror them.
+
+148. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-PIPE-170 as built (before its first commit)** - overnight
+    #3, into Saturday morning; report saved in the session's
+    reviews/2026-10-11-critic-170.md, with the critic's own probes kept
+    beside it. Fixed in the same commit as the build, each with a test
+    that failed first (tests/test_correction_apply.py
+    `TestCriticFindingsOn170`):
+    - **D1 CRITICAL, FIXED - a correction declared on several owners was
+      applied for the first owner only, then marked done.** The gate
+      makes each changed item be declared on its own owner, so one
+      reference can span a calendar and its datasets. Entries sharing a
+      reference are now one correction.
+    - **D2, FIXED - holding a promoted supply left its period reading as
+      promoted by it.** qa.slot_holds compared a re-file's slot with `=`,
+      which a re-file naming no target made NULL. Now IS NOT DISTINCT
+      FROM. Schema 36 is not yet pushed, so the sandbox had the DDL
+      re-applied rather than a version bump.
+    - **D3, FIXED - keeping a held supply named the wrong period and
+      cleared its hold.** A keep never resolves a hold; a held supply is
+      kept held, naming the period it was not placed into.
+    - **D4, FIXED - a supply held once before was not held again** (one
+      hold row per supply). supply_holds.raise_again reopens it.
+    - **D5, FIXED - a keep barred the supply from automatic promotion.**
+    - **D6, FIXED - a kept supply's re-judgement was neither shown nor
+      keyed.** Each move now shows its verdict if kept.
+    - **D8, FIXED - the applied summary said "Nothing was recorded".**
+    - **D9, FIXED - with two corrections pending, moves were judged with
+      the later one in force too.** The confirmation runs under this
+      correction's own agreement.
+    - **L1, L2, L3, FIXED:** a missing promoted table refuses; the
+      terminal says when corrections cannot be read; a clearer "already
+      applied" message.
+    - **D7, FIXED IN PART:** a correction-held supply's advice now says
+      promote, which works. FOR KEITH: a supply a confirmed correction
+      moved or held is recorded as a person's re-file, so a LATER
+      correction treats it as a person's and does not propose moving it
+      back. Should a correction's moves count as the rule's?
+    - **J1-J4, FOR KEITH:**
+      - J1: a held supply placed by a confirmation is recorded as the
+        rule's, naming the asset manager;
+      - J2: the list is the preview's report, not the filing menu's
+        warning panel;
+      - J3: a blocked move must be KEPT to confirm the rest, so its
+        correct move is then lost for good;
+      - J4: ties in "oldest first" go by file order (calendars, then
+        datasets, then the timezone).
+    - **Gate history:** none of these came from the gate. The first full
+      gate on this build was stopped part way when the critic's report
+      arrived, because the fixes would invalidate it.

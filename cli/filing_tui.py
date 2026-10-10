@@ -53,6 +53,8 @@ import re
 
 import sys
 
+import rich_click as click
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -704,8 +706,24 @@ def filing_menu() -> None:
     what people stop reading.
     """
     collections = _collections()
-    collection_id = (collections[0] if len(collections) == 1 else
-                      common.select("Which collection?", collections, flag_hint=_FLAG_HINT))
+    # PENDING CORRECTIONS ABOVE THE CHOICE OF COLLECTION (REQ-PIPE-170
+    # criterion 13): a correction is asset-wide, so it cannot wait inside one.
+    waiting = _pending_corrections()
+    if waiting:
+        console.print(f"{len(waiting)} calendar correction(s) await the data asset's "
+                      f"manager: {', '.join(p.reference for p in waiting)}.", style="yellow",
+                      markup=False)
+        entry = f"{_MENU_CORRECTIONS} ({len(waiting)})"
+        picked = common.select("Which collection - or the pending corrections?",
+                               [entry] + collections, flag_hint=_FLAG_HINT)
+        if picked == entry:
+            corrections_flow(waiting)
+            return
+        collection_id = picked
+    else:
+        collection_id = (collections[0] if len(collections) == 1 else
+                          common.select("Which collection?", collections,
+                                        flag_hint=_FLAG_HINT))
     if collection_id is None:
         return
     while True:
@@ -722,6 +740,87 @@ def filing_menu() -> None:
         else:
             standing_view(collection_id)
         console.print()
+
+
+_MENU_CORRECTIONS = "Calendar corrections awaiting confirmation"
+_KEEP_DONE = "Done - confirm the rest"
+
+
+def _pending_corrections() -> list:
+    """Pending corrections, or none where they cannot be read - the filing
+    menu still works without them, and `mothman supply corrections` says why."""
+    from qa_tools.common import correction_apply
+
+    try:
+        with supply_db.connect(read_only=True, label="mothman:corrections") as conn:
+            return correction_apply.pending(conn)
+    except Exception as exc:  # noqa: BLE001 - see the docstring
+        # SAID, not hidden (delivery-critic on 170, L2).
+        console.print(f"Pending calendar corrections could not be read ({exc}) - "
+                      f"`mothman supply corrections` says more.", style="dim", markup=False)
+        return []
+
+
+def corrections_flow(waiting: list) -> None:
+    """One pending correction: its moves summary first, each supply, then -
+    for the asset manager only - choose any to keep, give one reason, and
+    confirm the rest in one step (REQ-PIPE-170 criteria 2, 5, 14-17)."""
+    from cli import supply as supply_cli
+    from qa_tools.common import correction_apply
+
+    p = waiting[0] if len(waiting) == 1 else None
+    if p is None:
+        labels = {f"{w.reference} ({w.date}) on {w.label}: {w.reason}": w for w in waiting}
+        choice = common.select("Which correction? (oldest first - confirm them in order)",
+                               list(labels), flag_hint="mothman supply corrections")
+        if choice is None:
+            return
+        p = labels[choice]
+    actor = actor_at_the_keyboard()
+    with supply_db.connect(label="mothman:confirm-correction") as conn:
+        from qa_tools.common import correction_trial
+
+        try:
+            p, t = correction_apply.trial_for(conn, p.reference)
+        except (decision_log.DecisionRefused, correction_trial.Unreadable) as exc:
+            _show(str(exc), title="Cannot open it", style="red")
+            return
+        key = supply_cli._show_correction(p, t)
+        # VIEW FOR ALL, CONFIRM FOR ONE (criteria 17 and 18): said before any
+        # choice or reason is asked for.
+        why = supply_cli.manager_refusal(actor)
+        if why:
+            _show(why, title="You can look; only the asset manager confirms", style="yellow")
+            return
+        keep: set = set()
+        moves = {f"Keep {m.dataset_id} {m.supply_id} where it is "
+                 f"({m.from_period or 'held'} -> {m.to_period or 'held'})"
+                 + (" - BLOCKED" if m.blocked else ""): (m.dataset_id, m.supply_id)
+                 for m in t.moves}
+        while moves:
+            choice = common.select("Keep any where they are? Each one you keep is recorded as "
+                                   "kept.", [_KEEP_DONE] + [k for k in moves
+                                                            if moves[k] not in keep],
+                                   flag_hint="--keep <supply>")
+            if choice is None:
+                return
+            if choice == _KEEP_DONE:
+                break
+            keep.add(moves[choice])
+        keep_reason = None
+        if keep:
+            keep_reason = common.text_prompt(
+                f"Why do the {len(keep)} kept supplies stay where they are? (one reason, "
+                f"recorded on each)", flag_hint="--keep-reason")
+            if not keep_reason:
+                console.print("No reason - nothing applied.", style="yellow")
+                return
+        try:
+            supply_cli.apply_correction(conn, p, t, actor=actor, keep=keep,
+                                        keep_reason=keep_reason, acknowledged=key, yes=False,
+                                        output=None)
+        except click.ClickException as exc:
+            _show(exc.message, title="Not applied", style="red")
 
 
 def offer_after_run(collection_id: str, run_key: str) -> None:

@@ -1128,3 +1128,51 @@ one or more component tags, and a date.
             one per item. Which do you want?
         (m) A correction that changes no verdict reads "pending" until
             REQ-PIPE-170 records one. OK until then?
+      - REQ-PIPE-170 BUILT (confirming a correction), into Saturday morning:
+        - `mothman supply corrections` lists the corrections waiting for
+          you, oldest first, and shows one in full - the preview's own
+          report, worked out from what is filed now.
+        - `mothman supply confirm-correction` applies it in one step, with
+          `--keep` and one `--keep-reason`. The filing menu offers the same
+          above the choice of collection.
+        - Only the asset manager confirms, refused before anything else,
+          naming who holds the role. Anyone allowlisted may look.
+        - What each kind of supply becomes:
+          - a moved supply is your re-file naming the correction, re-checked
+            by the next pass;
+          - a held supply the corrected calendar now covers is placed by
+            the rule;
+          - a supply left with no period is held, its hold naming the
+            correction;
+          - a kept one gets a KEEP entry with your reason;
+          - every other verdict is re-judged naming the change reference.
+        - The pass and the needs-action list both note a pending
+          correction.
+        - Schema 36 (an applied-corrections record, and the keep action),
+          so the sandbox was rebuilt once.
+        PROVISIONALS:
+        - the agreement before a correction is rebuilt by putting the
+          correction's own old values back, with no git history needed;
+        - corrections are confirmed oldest first;
+        - a blocked move must be cleared or kept before confirming;
+        - "re-checked automatically" means by the next pass.
+        NOT BUILT, AND A QUESTION FOR YOU (n): putting TS-57 to TS-63 into
+        the generated history. Before the correction's merge date the
+        replay has to file against the agreement WITHOUT it - a
+        time-versioned agreement during playback. revert() is the piece
+        that makes it possible, but wiring it in touches how every module
+        loads the agreement. How do you want playback to stage the merge?
+        Each scenario has a unit test meanwhile (TS-63 waits on REQ-PIPE-179,
+        unsigned).
+      - REQ-PIPE-170 CRITIC (post-build-review #148): one critical defect
+        and seven others, all fixed before the first commit. The critical
+        one: a correction declared across several owners was applied only
+        for the first of them. THREE QUESTIONS FOR YOU:
+        (o) Should a supply moved or held by a confirmed correction count as
+            the rule's rather than a person's, so a later correction can
+            move it back?
+        (p) A blocked move must be kept to confirm the rest, which loses its
+            correct move for good. Would you rather the correction stay
+            open until the blocker is cleared?
+        (q) The list you confirm is the preview's report rather than the
+            filing menu's warning panel. OK?

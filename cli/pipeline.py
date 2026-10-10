@@ -217,6 +217,11 @@ def _say_pass(report) -> None:
         console.print(f"{len(report.refiled_cleared)} supply/supplies held while their dataset "
                       f"was refused were filed now that the agreement matches again.",
                       style="green")
+    # REQ-PIPE-170 criterion 20: noted, never worked out by the pass.
+    if report.pending_corrections:
+        console.print(f"{len(report.pending_corrections)} calendar correction(s) await the data "
+                      f"asset's manager to confirm: {', '.join(report.pending_corrections)}. "
+                      f"`mothman supply corrections` shows each one's moves.", style="yellow")
     # REQ-PIPE-173 criterion 4: a refused dataset is stated in the summary.
     if report.refused:
         console.print(f"REFUSED {len(report.refused)} dataset(s) - recorded judgements no "

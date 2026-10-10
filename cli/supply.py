@@ -44,12 +44,16 @@ than by a checkout that may be a week old.
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import rich_click as click
 from rich.console import Console
 from rich.table import Table
 
 from cli import common
-from qa_tools.common import arrivals, delivery, filing_decisions, hierarchy
+from qa_tools.common import (arrivals, asset_time, decision_log, delivery,
+                             filing_decisions, hierarchy, people, supply_db)
 
 console = Console()
 
@@ -1029,3 +1033,185 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     # on the ordinary case of two people working the same slot.
     if outcome is None:
         raise SystemExit(1)
+
+
+@supply_group.command("corrections")
+@click.option("--reference", default=None,
+              help="Show one pending correction's moves and verdict changes in full.")
+def corrections_command(reference: str | None) -> None:
+    """Calendar corrections awaiting the data asset's manager (REQ-PIPE-170).
+
+    \b
+    Examples:
+      mothman supply corrections
+      mothman supply corrections --reference CAB-123
+
+    A correction declared in contract/calendar.yaml (or the timezone's in
+    contract/data-asset.yaml) is pending until the asset manager confirms
+    it. With --reference, its moves and verdict changes are worked out NOW,
+    from what is filed today - by the same computation as the impact preview
+    the change board saw - summary by dataset first. Anyone allowlisted may
+    look; only the asset manager confirms (`mothman supply
+    confirm-correction`). Reads the database; changes nothing.
+    """
+    from qa_tools.common import correction_apply, correction_trial
+
+    with supply_db.connect(read_only=True, label="mothman:corrections") as conn:
+        try:
+            found = correction_apply.pending(conn)
+        except correction_trial.Unreadable as exc:
+            raise click.ClickException(str(exc)) from exc
+        if not found:
+            console.print("No corrections are waiting to be confirmed.", style="green")
+            return
+        if reference is None:
+            console.print(f"{len(found)} correction(s) waiting for the data asset's "
+                          f"manager to confirm, oldest first:", style="bold")
+            docs = correction_trial.working()
+            for p in found:
+                affected = correction_apply.affected_datasets(p, docs[0])
+                console.print(f"  {p.reference} ({p.date}) on {p.label}: {p.reason}",
+                              markup=False, highlight=False)
+                console.print(f"      affects {', '.join(affected) or 'no dataset'}",
+                              style="dim", markup=False)
+            console.print(f"\nSee one in full: mothman supply corrections --reference "
+                          f"{found[0].reference}", style="dim", markup=False)
+            return
+        try:
+            p, t = correction_apply.trial_for(conn, reference)
+        except decision_log.DecisionRefused as exc:
+            raise click.ClickException(str(exc)) from exc
+        _show_correction(p, t)
+
+
+def _show_correction(p, t) -> str:
+    """The moves summary first (criterion 14), then each supply, then the
+    key a scripted confirmation acknowledges. Returns the key."""
+    from qa_tools.common import correction_apply, correction_trial
+
+    text = correction_trial.report(t, as_at=asset_time.now(),
+                                   database=correction_trial.database_label(),
+                                   against=f"the agreement before {p.reference}",
+                                   title=f"Correction {p.reference}: what confirming it does")
+    console.print(text, markup=False, highlight=False, soft_wrap=True)
+    key = correction_apply.key(t)
+    console.print(f"Confirm all of it, keeping any supply where it is:\n  mothman supply "
+                  f"confirm-correction --reference {p.reference} --yes --acknowledge {key} "
+                  f"[--keep <supply> ... --keep-reason '<why>']", style="dim", markup=False,
+                  soft_wrap=True)
+    return key
+
+
+@supply_group.command("confirm-correction")
+@click.option("--reference", required=True, help="The correction's change reference.")
+@click.option("--keep", "keeps", multiple=True, metavar="SUPPLY",
+              help="A supply to KEEP where it is rather than move. Repeat for each.")
+@click.option("--keep-reason", "keep_reason", default=None,
+              help="Why the kept supplies stay - one reason covers them all, recorded on "
+                   "each.")
+@click.option("--yes", is_flag=True, help="Skip the confirmation prompt; needs --acknowledge.")
+@click.option("--acknowledge", "acknowledged", default=None, metavar="KEY",
+              help="The key `mothman supply corrections --reference` showed, so a list "
+                   "that changed since is refused.")
+@click.option("--output", type=click.Path(dir_okay=False), default=None,
+              help="Write what was applied as Markdown, to attach to the change reference.")
+def confirm_correction_command(reference: str, keeps: tuple[str, ...],
+                               keep_reason: str | None, yes: bool,
+                               acknowledged: str | None, output: str | None) -> None:
+    """Confirm a calendar correction's moves - the data asset's manager only.
+
+    \b
+    Examples:
+      mothman supply confirm-correction --reference CAB-123
+      mothman supply confirm-correction --reference CAB-123 --keep cp-clients@2024... \\
+          --keep-reason 'genuinely Q3 data, sent early' --yes --acknowledge 1a2b3c4d
+
+    Applies every move and verdict change the correction makes, in one step:
+    each moved supply is re-filed (and re-checked by the next pass), one the
+    corrected calendar offers no period is held, and every verdict is
+    re-judged against the period it ends up in. A kept supply stays where it
+    is, recorded as kept. A blocked move must be cleared or kept first.
+    Prints what was applied, to attach to the change reference.
+    """
+    from cli import filing_tui
+    from qa_tools.common import correction_apply, correction_trial
+
+    actor = filing_tui.actor_at_the_keyboard()
+    # REFUSED BEFORE ANY REASON IS ASKED FOR (criterion 18), naming the role,
+    # its level and who holds it.
+    why = manager_refusal(actor)
+    if why:
+        raise click.ClickException(why)
+    with supply_db.connect(label="mothman:confirm-correction") as conn:
+        try:
+            p, t = correction_apply.trial_for(conn, reference)
+        except (decision_log.DecisionRefused, correction_trial.Unreadable) as exc:
+            raise click.ClickException(str(exc)) from exc
+        key = _show_correction(p, t)
+        keep = _resolve_keeps(t, keeps)
+        if keep and not keep_reason and not yes:
+            keep_reason = common.text_prompt("Why do the kept supplies stay where they are?",
+                                             flag_hint="--keep-reason")
+        if yes and acknowledged is None:
+            raise click.ClickException(f"--yes confirms without asking, so it needs the key "
+                                       f"of what it confirms: --acknowledge {key}.")
+        apply_correction(conn, p, t, actor=actor, keep=keep, keep_reason=keep_reason,
+                         acknowledged=acknowledged if yes else key, yes=yes, output=output)
+
+
+def manager_refusal(actor) -> str | None:
+    """Why this person may not confirm a correction, naming the role, its
+    level and who holds it (criterion 18) - or None."""
+    try:
+        people.require_role(actor, people.MANAGER, people.DATA_ASSET)
+    except people.RoleRefused as exc:
+        holders = ", ".join(people.actor_name(m) for m in people.asset_managers()) or "nobody"
+        return (f"{exc} Confirming a correction needs the manager role at "
+                f"{people.LEVEL_WORDS[people.DATA_ASSET]}, held by: {holders}.")
+    return None
+
+
+def apply_correction(conn, p, t, *, actor: dict, keep: set, keep_reason: str | None,
+                     acknowledged: str, yes: bool, output: str | None) -> bool:
+    """Confirm, apply, then print what was applied and where it goes - the
+    flag route's and the terminal's one body (criteria 10, 16, 22)."""
+    from qa_tools.common import correction_apply, correction_trial
+
+    if not common.confirm_change(
+            f"Apply correction {p.reference} - {len(t.moves) - len(keep)} move(s), "
+            f"{len(keep)} kept - as {people.actor_name(actor)}?",
+            yes=yes, default=False, flag_hint=f"pass --yes --acknowledge {acknowledged}"):
+        console.print("Not applied.", style="yellow")
+        return False
+    try:
+        done = correction_apply.confirm(
+            conn, p.reference, actor=actor, keep=keep, keep_reason=keep_reason,
+            acknowledge=acknowledged, effective_at=asset_time.now().isoformat())
+    except (decision_log.DecisionRefused, people.RoleRefused) as exc:
+        raise click.ClickException(str(exc)) from exc
+    text = correction_apply.summary(p, t, done, as_at=asset_time.now(),
+                                    database=correction_trial.database_label())
+    console.print(text, markup=False, highlight=False, soft_wrap=True)
+    if output is None and sys.stdin.isatty():
+        output = common.path_prompt("Write this to a file to attach? A path, or blank to skip:",
+                                    flag_hint="--output")
+    if output:
+        Path(output).write_text(text)
+        console.print(f"Written to {output}.", style="green", markup=False)
+    console.print(f"Attach it to {p.reference} and share it with the correction's approver"
+                  f"{f' ({p.approver})' if p.approver else ''}, who compares it with what they "
+                  f"approved. Moved supplies are re-checked and re-gated by the next "
+                  f"processing pass.", style="bold", markup=False, soft_wrap=True)
+    return True
+
+
+def _resolve_keeps(t, keeps: tuple[str, ...]) -> set[tuple[str, str]]:
+    """Each --keep, as (dataset, supply) among the proposed moves."""
+    by_supply = {m.supply_id: m.dataset_id for m in t.moves}
+    out = set()
+    for raw in keeps:
+        if raw not in by_supply:
+            raise click.ClickException(f"{raw} is not among this correction's proposed moves, "
+                                       f"so there is nothing to keep.")
+        out.add((by_supply[raw], raw))
+    return out

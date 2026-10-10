@@ -119,6 +119,12 @@ INHERITANCE_REFUSED = "inheritance-refused"
 #: 2026-10-06, post-build-review #123 B2). The dashboard used to leave
 #: them out while `mothman supply queue` listed about twenty.
 AWAITING_DECISION = "awaiting-decision"
+#: A declared calendar correction no one has confirmed yet (REQ-PIPE-170
+#: criteria 3 and 19): ASSET-WIDE, one item per correction, and needs-action
+#: until the asset manager confirms it - its affected supplies keep their
+#: filing and verdict meanwhile. From configuration and the applied record
+#: alone; its moves are worked out when it is opened, never here.
+PENDING_CORRECTION = "pending-correction"
 
 
 @dataclass(frozen=True)
@@ -573,6 +579,33 @@ def _from_inheritance_refusals() -> list[Item]:
     return items
 
 
+def _from_pending_corrections(conn=None) -> list[Item]:
+    """REQ-PIPE-170 criterion 3 - each pending correction, needing action."""
+    from qa_tools.common import correction_apply
+
+    try:
+        with delivery_log._db(conn) as db:
+            found = correction_apply.pending(db)
+            from qa_tools.common import correction_trial
+
+            cal = correction_trial.working()[0]
+            affected = {p.reference: correction_apply.affected_datasets(p, cal) for p in found}
+    except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
+        print(f"note: could not read pending corrections ({type(exc).__name__}: {exc}) - "
+              f"the rest of the queue is unaffected.")
+        return []
+    return [Item(
+        kind=PENDING_CORRECTION, severity=NEEDS_ACTION, blocking=False,
+        headline=f"Calendar correction {p.reference} awaits the data asset's manager",
+        detail=(f"Declared {p.date} on {p.label}: {p.reason}. Until it is confirmed, the "
+                f"supplies it affects keep their period and verdict - "
+                f"{', '.join(affected[p.reference]) or 'no dataset'} - and the moves it makes "
+                f"are worked out when it is opened."),
+        responses=(f"see its moves: mothman supply corrections --reference {p.reference}",
+                   "the data asset's manager confirms it, keeping any supply where it is"))
+        for p in found]
+
+
 def _sort_key(item: Item) -> tuple:
     return (0 if item.blocking else 1,
             SEVERITY_ORDER.index(item.severity) if item.severity in SEVERITY_ORDER else 9,
@@ -595,6 +628,7 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
               + _from_loads(dataset_blockers.refused_in_a_contest(conn))
               + _from_inheritance_refusals()
               + _from_awaiting_decisions(conn)
+              + _from_pending_corrections(conn)
               + _from_unfilled_periods(conn)
               + _from_in_flight(observations_dir))
     return Outstanding(items=tuple(sorted(items, key=_sort_key)),

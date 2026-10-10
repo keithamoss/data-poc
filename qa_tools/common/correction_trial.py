@@ -95,6 +95,9 @@ class Move:
     #: Its recorded verdict now (delivery-critic on 169, F1) - criterion 3
     #: asks for old and new, and a move changes both period and verdict.
     old_verdict: str | None = None
+    #: Its verdict if it is KEPT where it is, under the corrected agreement
+    #: (delivery-critic on 170, D6) - shown before anyone chooses to keep it.
+    if_kept: str | None = None
 
     @property
     def held(self) -> bool:
@@ -171,12 +174,19 @@ def configured(cal_doc: dict, asset_doc: dict):
     from qa_tools.common import agreement, asset_time
 
     zones = asset_time.parse_timezone_versions(asset_doc or {})
-    saved = asset_time.timezone_versions
+    agr = agreement.from_doc(cal_doc)
+    saved_zones, saved_current = asset_time.timezone_versions, agreement.current
     asset_time.timezone_versions = lambda: zones
+    # AND THE AGREEMENT ITSELF (delivery-critic on 170, D9): a re-file, its
+    # plan and a verdict resolve slots through agreement.current() - the
+    # files on disk - so applying a correction outside this read every
+    # merged correction at once.
+    agreement.current = lambda: agr
     try:
-        yield agreement.from_doc(cal_doc)
+        yield agr
     finally:
-        asset_time.timezone_versions = saved
+        asset_time.timezone_versions = saved_zones
+        agreement.current = saved_current
 
 
 def frozen_changes(base: tuple[dict, dict], work: tuple[dict, dict],
@@ -294,6 +304,7 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
             with configured(*work) as agr:
                 new_slots = _slots(ds, until, agr)
                 rejudged = verdict.rejudged(conn, ds, agr)
+                in_place = {r.supply_id: r.new.classification for r in rejudged}
                 proposed = []
                 for supply, period, received, by_person in filed:
                     was = assignment.open_slot(old_slots, received)
@@ -309,9 +320,11 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
                         continue
                     judged = verdict.judge(ds, now, received, agr) if now else None
                     held_now = verdict.current(conn, ds, supply)
+                    was_said = (held_now or {}).get("classification")
                     proposed.append(Move(ds, supply, period, now_name,
                                          judged.classification if judged else None,
-                                         old_verdict=(held_now or {}).get("classification")))
+                                         old_verdict=was_said,
+                                         if_kept=in_place.get(supply, was_said)))
         except (ValueError, KeyError, LookupError) as exc:
             # One dataset's schedule that cannot be built is said, not fatal
             # - ScheduleConfigError and a missing timezone version are both
@@ -336,7 +349,7 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
                      for r in rejudged if r.supply_id not in moving]
         moves += [Move(m.dataset_id, m.supply_id, m.from_period, m.to_period, m.verdict,
                        _blocked(conn, ds, m.supply_id, m.from_period, m.to_period),
-                       m.old_verdict)
+                       m.old_verdict, m.if_kept)
                   for m in proposed]
     return Trial(changes, tuple(slot_moves), tuple(obligations), tuple(verdicts),
                  tuple(moves), tuple(skipped), tuple(unbuildable))
@@ -372,12 +385,16 @@ def database_label() -> str:
 
 
 def report(t: Trial, *, as_at: datetime, database: str, against: str,
-           title: str = "Impact of the correction") -> str:
+           title: str = "Impact of the correction", applied: bool = False) -> str:
     """The preview as Markdown, summary first (criterion 7, NFR 1) - in the
-    dashboard's words, for a reader who does not know the file."""
-    lines = [f"# {title}", "",
+    dashboard's words, for a reader who does not know the file. `applied`
+    words the same layout as what WAS done (REQ-PIPE-170 criterion 22;
+    delivery-critic on 170, D8) rather than what would be."""
+    intro = (f"Applied against {against}, as at {_when(as_at)}, and recorded in the database "
+             f"{database}." if applied else
              f"Compared the working copy against `{against}`, as at {_when(as_at)}, reading "
-             f"recorded facts from the database {database}. Nothing was recorded.", ""]
+             f"recorded facts from the database {database}. Nothing was recorded.")
+    lines = [f"# {title}", "", intro, ""]
     if t.nothing_frozen_changed:
         lines.append("Nothing frozen changed, so nothing would be re-judged or moved.")
         return "\n".join(lines) + "\n"
@@ -401,7 +418,8 @@ def report(t: Trial, *, as_at: datetime, database: str, against: str,
         lines += ["", "## Datasets that could not be compared", ""]
         lines += [f"- {ds}: {why}" for ds, why in t.unbuildable]
     if t.moves:
-        lines += ["", "## Supplies that would move or be held", ""]
+        lines += ["", "## Supplies moved or held" if applied
+                  else "## Supplies that would move or be held", ""]
         for m in t.moves:
             if m.held:
                 to = "held - no period would take it"
@@ -411,12 +429,15 @@ def report(t: Trial, *, as_at: datetime, database: str, against: str,
                 to = f"{m.to_period}, {_said(m.verdict).lower()}"
             was = (f"{m.from_period} ({_said(m.old_verdict)})" if m.from_period else "held")
             line = f"- {m.dataset_id} `{m.supply_id}`: {was} -> {to}"
+            if not applied and m.from_period and m.if_kept != m.old_verdict:
+                line += f" (if kept in {m.from_period}: {_said(m.if_kept).lower()})"
             if m.blocked:
                 # Indented, so a multi-line reason stays inside its bullet (F5).
                 line += ". BLOCKED: " + m.blocked.replace("\n", "\n  ")
             lines.append(line)
     if t.verdicts:
-        lines += ["", "## Verdicts that would change, in the same period", ""]
+        lines += ["", "## Verdicts changed, in the same period" if applied
+                  else "## Verdicts that would change, in the same period", ""]
         lines += [f"- {v.dataset_id} `{v.supply_id}` in {v.slot}: {_said(v.old)} -> "
                   f"{_said(v.new)}" for v in t.verdicts]
     if t.obligations:

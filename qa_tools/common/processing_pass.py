@@ -261,6 +261,10 @@ class PassReport:
     refused: list = field(default_factory=list)
     #: What it re-filed once a dataset was no longer refused.
     refiled_cleared: list = field(default_factory=list)
+    #: Declared calendar corrections awaiting the asset manager (REQ-PIPE-170
+    #: criterion 20) - noted, never computed: their moves are worked out when
+    #: one is opened.
+    pending_corrections: list = field(default_factory=list)
 
     @property
     def nothing_to_do(self) -> bool:
@@ -376,6 +380,19 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
                 say(refusal.message())
     except Exception as exc:  # noqa: BLE001 - the next pass evaluates it again
         failed("agreement backstop", exc)
+    # A MERGED CORRECTION IS ONLY NOTED (REQ-PIPE-170 criterion 20): which
+    # are pending, from configuration and the applied record. Nothing about
+    # its moves is computed or stored here.
+    try:
+        from qa_tools.common import correction_apply, supply_db as _db
+
+        with _db.connect(read_only=True, label="mothman:pending-corrections") as conn:
+            report.pending_corrections = [p.reference for p in correction_apply.pending(conn)]
+        if report.pending_corrections:
+            say(f"{len(report.pending_corrections)} calendar correction(s) await the data "
+                f"asset's manager: {', '.join(report.pending_corrections)}.")
+    except Exception as exc:  # noqa: BLE001 - noting is not processing; say it and go on
+        say(f"note: could not read pending corrections ({type(exc).__name__}: {exc}).")
     # AFTER THE BACKSTOP, AND NEVER FOR A REFUSED DATASET (delivery-critic
     # on 173, #2): a rule re-file of a schedule-ended hold files a supply
     # against the changed terms exactly as a new arrival would.
