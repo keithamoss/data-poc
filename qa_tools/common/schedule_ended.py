@@ -79,11 +79,14 @@ def _covering_slot(dataset_id: str, received_at):
     return slot
 
 
-def refile_covered(*, say=print) -> list[tuple[str, str, str]]:
+def refile_covered(*, say=print, skip=frozenset()) -> list[tuple[str, str, str]]:
     """Re-file every schedule-ended hold whose receipt the calendar now
-    covers, oldest receipt first. Returns (dataset, supply, period) for each."""
+    covers, oldest receipt first. Returns (dataset, supply, period) for each.
+
+    `skip` names datasets not to touch - a refused one (REQ-PIPE-173)."""
     return refile_holds(
-        lambda conn: [h for h in supply_holds.outstanding(conn) if h.schedule_ended],
+        lambda conn: [h for h in supply_holds.outstanding(conn)
+                      if h.schedule_ended and h.dataset_id not in skip],
         lambda h, slot: (f"Held because {h.dataset_id}'s schedule had ended; dates now "
                          f"cover its receipt, so the rule files it to {slot}."),
         lambda h, slot: (f"{h.supply_id}: its schedule now has {slot}, so it is filed "

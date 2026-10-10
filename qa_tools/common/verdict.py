@@ -269,6 +269,9 @@ class Compared:
     now: tuple | None
     #: Why `now` is None - the slot is gone, or could not be built.
     missing: str | None = None
+    #: When the verdict was recorded - a correction declared before it was
+    #: part of the terms it was judged under (REQ-PIPE-173).
+    recorded_at: object = None
 
     @property
     def moved(self) -> bool:
@@ -294,9 +297,10 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
     agreement = schedule._agreement(agreement)
     rows = conn.execute(
         f"SELECT f.supply_id, f.slot, v.id, v.classification, v.inputs, v.fingerprint, "
-        f"r.received_instant "
+        f"r.received_instant, v.recorded_at "
         f'FROM "{qa_store.SCHEMA}".filing_current f '
-        f"JOIN LATERAL (SELECT w.id, w.classification, w.inputs, w.fingerprint "
+        f"JOIN LATERAL (SELECT w.id, w.classification, w.inputs, w.fingerprint, "
+        f"w.recorded_at "
         f"FROM {TABLE} w WHERE w.filing_id = f.id ORDER BY w.id DESC LIMIT 1) v ON true "
         f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt r '
         f"ON r.dataset_id = f.dataset_id AND r.supply_id = f.supply_id "
@@ -305,11 +309,11 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
         [dataset_id]).fetchall()
     if not rows:
         return []
-    parsed = [(s, name, vid, cls, json.loads(i) if isinstance(i, str) else i, fp, rec)
-              for s, name, vid, cls, i, fp, rec in rows]
+    parsed = [(s, name, vid, cls, json.loads(i) if isinstance(i, str) else i, fp, rec, at)
+              for s, name, vid, cls, i, fp, rec, at in rows]
     # Where each slot name falls under THIS configuration - generated to a
     # year past the latest recorded period, which a cadence rule needs.
-    horizon = max(date.fromisoformat(i["period_date"]) for *_, i, _, _ in parsed) \
+    horizon = max(date.fromisoformat(i["period_date"]) for *_, i, _, _, _ in parsed) \
         + timedelta(days=400)
     try:
         dated = {p.name: p.date for p in
@@ -320,7 +324,7 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
         no_schedule = None
     by_slot: dict[str, tuple] = {}
     out = []
-    for supply_id, slot_name, vid, classification, inputs, fingerprint, received in parsed:
+    for supply_id, slot_name, vid, classification, inputs, fingerprint, received, at in parsed:
         if slot_name not in by_slot:
             when = dated.get(slot_name)
             if when is None:
@@ -335,7 +339,7 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
                     by_slot[slot_name] = (None, f"{slot_name} cannot be built now ({exc})")
         now, missing = by_slot[slot_name]
         out.append(Compared(supply_id, slot_name, vid, classification, inputs, fingerprint,
-                            received, now, missing))
+                            received, now, missing, at))
     return out
 
 

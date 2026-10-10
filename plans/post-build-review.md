@@ -7253,3 +7253,57 @@ twice. It deliberately did not re-find the `TypeError`.
       newest-twenty listing on a shared worker. The decision log is
       append-only and shared, so that test now lists with a limit covering
       the whole log rather than assuming it is alone.
+
+146. **[done, 2026-10-11]** **[Pipeline & publishing]** **[Dashboard UI]**
+    **The delivery critic on REQ-PIPE-173 as built (534a398)** - overnight
+    #3; report saved in the session's reviews/2026-10-11-critic-173.md.
+    Each fix has a test that failed first (tests/test_agreement_drift.py
+    `TestCriticFindingsOn173`; tests/test_schedule_ended_hold.py
+    `test_a_refused_dataset_is_left_held`; tests-js/agreement-refusal.test.js
+    "the wording"):
+    - **#1 HIGH, FIXED PROVISIONALLY - an unrelated correction silenced
+      the backstop.** Any declared correction naming any of a slot's
+      shared items (a timezone version, the dataset's membership) with its
+      current value counted, and corrections are append-only, so one old
+      entry silenced the slot for good. An undeclared grace change went
+      through. A correction now counts only if its item is of a kind that
+      can move the input that differs, it carries the current value, and
+      it is dated on or after the verdict was recorded. The rule is
+      recorded on REQ-PIPE-173 and goes to Keith.
+    - **#2 HIGH, FIXED IN PART - a refused dataset was still processed.**
+      Schedule-ended re-files ran before the backstop and filed against
+      the changed terms. The backstop now runs first and those re-files
+      skip a refused dataset. FOR KEITH: should owed re-checks and the
+      gate also stop for a refused dataset? They re-run checks and apply
+      verdicts already recorded, so nothing is re-judged; today they
+      continue.
+    - **#3, LEFT FOR KEITH:** re-filing a cleared refusal hold goes
+      through the shared re-file loop, not assign(). It records no
+      resupply link, does no REQ-PIPE-118 supersession, and names the
+      branch as a person's re-file. The schedule-ended hold has always
+      drained the same way, so this is a question about both holds.
+    - **#4, FIXED - a supply the rule would hold anyway was labelled
+      refused,** and that hold would never clear into the right one. The
+      rule now runs first, and the refusal replaces a filing only.
+    - **#5, FIXED - test order dependency.** Verdicts that
+      tests/test_schedule_ended_hold.py left on a worker made
+      tests/test_processing_pass.py see a refusal. The pass tests now stub
+      the backstop, which tests/test_agreement_drift.py covers.
+    - **#6, LEFT FOR KEITH:** a retroactive not_expected on an already
+      judged period is not detected, because the fingerprint leaves it out.
+    - **#7, LEFT:** the message grows by about 91 characters per slot; a
+      timezone change over three years of a daily feed is around 100KB,
+      stored in each hold reason. Worth summarising by run of slots;
+      measured, not fixed.
+    - **#8, FOR KEITH:** the refusal is red on every as-of date, and it
+      replaces another blocker's banner rather than sitting beside it.
+    - **#9, FIXED - a dataset that cannot be evaluated was silently
+      skipped.** The pass now reports it as a failure. check-agreement
+      reports it and exits 2, and refuses an unknown `--dataset` by name;
+      before, it said "nothing refused" and exited 0.
+    - **#10, FIXED - wording.** A missing slot reads "2023-Q3: no longer
+      a period of its schedule (it was dated 2023-08-01)". A refusal-only
+      pass no longer says a recorded result is red, though its exit status
+      still does. The banner lost its stray comma. The notice names
+      `contract/data-asset.yaml` for the timezone.
+    - **#11, FOR KEITH:** a refusal exits 1, the same as red data.

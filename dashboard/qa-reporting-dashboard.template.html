@@ -3567,7 +3567,8 @@ function agreementNotice(data){
     <ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${which}</ul>
     <div style="color:var(--ink-muted); font-size:13px;">
       This is a configuration problem on our side, not a problem with anyone's data: recorded
-      verdicts no longer match <code>contract/calendar.yaml</code>. Restore the recorded value, or
+      verdicts no longer match <code>contract/calendar.yaml</code> (or, for the timezone,
+      <code>contract/data-asset.yaml</code>). Restore the recorded value, or
       declare the change as a correction${synthetic ? " - or, on this synthetic asset, regenerate its history" : ""}.
       <code>mothman schedule check-agreement</code> names each change. New supplies are held until then.
     </div>
@@ -5737,7 +5738,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <b>${escHtml(blockerLabel(ds.blocked))} — nothing is checked for this dataset ${blockerUntil(ds.blocked)}.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
           ${withCode(ds.blocked.reason)}<br><br>
-          ${ds.blocked.kind === "agreement-refused" ? "New supplies are held, not checked," : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
+          ${ds.blocked.kind === "agreement-refused" ? "New supplies are held and not checked" : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
           check below reads <b style="display:inline">No data</b> for this period: none of
           them ran, and no earlier supply's result stands in for it.
         </div>

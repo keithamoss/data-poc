@@ -361,20 +361,20 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
             supply_id = _supply_id_for(arrival, dataset_id)
             if filing_for(dataset_id, supply_id) is not None:
                 continue
-            if dataset_id in refused:
-                decided = Assignment(
-                    dataset_id=dataset_id, supply_id=supply_id, slot=None,
-                    branch=assign_mod.HELD, considered=(), received_at=arrival.received_at,
-                    agreement_refused=refused[dataset_id].message())
-                with _connect("mothman:filing-record") as conn:
-                    record(decided, arrival.delivery_name, conn=conn)
-                _raise_assignment_hold(arrival, decided)
-                written.append(decided)
-                continue
             decided = assign_mod.assign(
                 dataset_id=dataset_id, supply_id=supply_id,
                 at=arrival.received_at, slots=slots_by_dataset[horizon],
                 filled=filled_slots(dataset_id), final_period=final_period_for(dataset_id))
+            # THE RULE FIRST, THE REFUSAL ONLY OVER A FILING (delivery-critic
+            # on 173, #4): a supply the rule would hold anyway keeps its own
+            # hold - schedule-ended says how it is fixed; a refusal hold
+            # over it would clear into a hold nobody was told about.
+            if dataset_id in refused and decided.slot and not decided.is_held:
+                decided = Assignment(
+                    dataset_id=dataset_id, supply_id=supply_id, slot=None,
+                    branch=assign_mod.HELD, considered=decided.considered,
+                    received_at=arrival.received_at,
+                    agreement_refused=refused[dataset_id].message())
             # FILED AND SUPERSEDING IN ONE TRANSACTION (REQ-PIPE-118's
             # reliability NFR): a crash leaves the old state or the new one,
             # never two waiting versions of one table in one period.

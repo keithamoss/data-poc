@@ -472,18 +472,33 @@ def check_agreement_command(dataset_id: str | None) -> None:
     judged it, and this compares that with the agreement as it stands. A
     difference no declared correction accounts for refuses the dataset -
     its new supplies are held until the agreement is restored or the change
-    is declared. Exits 1 where any dataset is refused.
+    is declared. Exits 1 where any dataset is refused, 2 where any could not
+    be checked at all.
     """
     # REQ-PIPE-173: the backstop's own report, the same computation the
     # pass and the dashboard build make.
-    from qa_tools.common import agreement_drift, supply_db
+    from qa_tools.common import agreement_drift, hierarchy, supply_db
 
+    known = {d.dataset_id for d in hierarchy.all_datasets()}
+    if dataset_id and dataset_id not in known:
+        # delivery-critic on 173, #9: an unknown dataset is not "nothing
+        # refused" - it is nothing checked.
+        console.print(f"{dataset_id} is not a dataset of this asset, so nothing was checked. "
+                      f"Datasets: {', '.join(sorted(known))}.", style="red")
+        raise SystemExit(2)
+    errors: list = []
     try:
-        found = agreement_drift.refusals(dataset_ids=[dataset_id] if dataset_id else None)
+        found = agreement_drift.refusals(dataset_ids=[dataset_id] if dataset_id else None,
+                                         errors=errors)
     except supply_db.SupplyDbError as exc:
         console.print(f"The database cannot be read, so nothing was checked: {exc}",
                       style="red")
         raise SystemExit(2) from exc
+    for ds, exc in errors:
+        console.print(f"{ds} could not be checked, so it is neither refused nor cleared: "
+                      f"{exc}", style="red", markup=False)
+    if errors and not found:
+        raise SystemExit(2)
     if not found:
         console.print("Every recorded judgement matches the delivery agreement, or a "
                       "declared correction accounts for the difference. Nothing is refused.",

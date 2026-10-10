@@ -32,6 +32,7 @@ qa.verdict and qa.supply_receipt, never a schema holding supply rows.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 
 #: Input fields named when they differ, in the order a reader thinks in.
 _FIELDS = ("period_date", "due_date", "expected_time", "days_before", "grace_seconds",
@@ -53,7 +54,8 @@ class Drift:
     def describe(self) -> str:
         if not self.changes:
             return f"{self.slot}: no longer judged the way it was"
-        said = "; ".join(f"{item} was {old!r}, is now {new!r}"
+        said = "; ".join(item if old is None and new is None
+                         else f"{item} was {old!r}, is now {new!r}"
                          for item, old, new in self.changes)
         return f"{self.slot}: {said}"
 
@@ -128,30 +130,87 @@ def _sources(dataset_id: str, slot: str, period_date, agreement, asset_doc) -> s
     return keys
 
 
-def _declared(cal_doc: dict, asset_doc: dict) -> dict[str, list]:
-    """Every declared correction change's new value, by item key."""
+def _kind(key: str) -> str | None:
+    """Which kind of slot input a freeze-gate item key names."""
+    parts = key.split()
+    if parts[:2] == ["timezone", "version"]:
+        return "tz_version"
+    if parts and parts[0] == "calendar" and len(parts) >= 3:
+        return {"version": "cal_version", "period": "cal_date"}.get(parts[2])
+    if parts and parts[0] == "dataset" and len(parts) >= 3:
+        if parts[2] == "calendar":
+            return "membership"
+        if parts[2] == "participation":
+            return "participation"
+        if parts[2] == "not_expected":
+            return "not_expected"
+        if parts[2] == "dates":
+            return "own_date"
+    return None
+
+
+#: Which kinds of declared correction can account for each input that
+#: differs (delivery-critic on 173, #1). A grace change is a participation
+#: change and nothing else; a timezone change is a timezone version's.
+_KINDS_FOR = {
+    "period_date": {"cal_date", "own_date", "membership", "participation", "cal_version"},
+    "due_date": {"cal_date", "own_date", "membership", "participation", "cal_version"},
+    "expected_time": {"participation"},
+    "days_before": {"participation"},
+    "grace_seconds": {"participation"},
+    "claim_window_seconds": {"participation", "cal_version"},
+    "timezone": {"tz_version"},
+}
+#: A version's own settings changed with no input moving.
+_FINGERPRINT_KINDS = {"participation", "cal_version", "tz_version", "membership"}
+#: The slot is no longer a period of the dataset's schedule.
+_MISSING_KINDS = {"cal_date", "own_date", "membership", "not_expected", "cal_version",
+                  "participation"}
+
+
+def _declared(cal_doc: dict, asset_doc: dict) -> dict[str, list[tuple[object, date | None]]]:
+    """Every declared correction change's (new value, correction date), by
+    item key."""
     from qa_tools.common import agreement_freeze
 
     out: dict[str, list] = {}
     for entries in agreement_freeze._corrections_by_owner(cal_doc, asset_doc).values():
         for corr in entries:
-            for change in (corr or {}).get("changes") or []:
+            corr = corr or {}
+            when = corr.get("date")
+            try:
+                when = when if isinstance(when, date) else date.fromisoformat(str(when))
+            except ValueError:
+                when = None
+            for change in corr.get("changes") or []:
                 change = change or {}
-                out.setdefault(str(change.get("item")), []).append(change.get("new"))
+                out.setdefault(str(change.get("item")), []).append((change.get("new"), when))
     return out
 
 
-def _accounted(sources: set[str], declared: dict[str, list], items) -> bool:
-    """Whether a declared correction names one of these items with the value
-    the configuration now holds (criterion 2)."""
+def _accounted(sources: set[str], declared: dict, items, kinds: set[str],
+               judged_on: date | None) -> bool:
+    """Whether a declared correction accounts for one differing input
+    (criterion 2, tightened by delivery-critic on 173, #1, PROVISIONAL).
+
+    It must name one of the slot's own input items, OF A KIND that can move
+    this input; carry the value the configuration now holds (or, for a
+    declared removal, the item must be gone); and be dated ON OR AFTER the
+    asset date the verdict was recorded - corrections are append-only, so
+    one already declared then was part of the terms it was judged under."""
     from qa_tools.common import agreement_freeze
 
     for key in sources & set(declared):
+        if _kind(key) not in kinds:
+            continue
         now = items.get(key)
-        for new in declared[key]:
-            if (now is None and new is None) or (
-                    now is not None and new is not None
-                    and agreement_freeze._norm(new) == now.norm):
+        for new, when in declared[key]:
+            if when is None or (judged_on is not None and when < judged_on):
+                continue
+            if now is None and new is None:
+                return True
+            if now is not None and new is not None \
+                    and agreement_freeze._norm(new) == now.norm:
                 return True
     return False
 
@@ -178,7 +237,7 @@ def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
     slot is what REQ-PIPE-168's comparison already does, measured at 15ms
     for Birth Registrations' whole history).
     """
-    from qa_tools.common import agreement, agreement_freeze, verdict
+    from qa_tools.common import agreement, agreement_freeze, asset_time, verdict
 
     if cal_doc is None or asset_doc is None:
         cal_doc, asset_doc = _load_docs()
@@ -186,27 +245,35 @@ def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
     items = agreement_freeze.flatten(cal_doc, asset_doc)
     declared = _declared(cal_doc, asset_doc)
     by_slot: dict[str, Drift] = {}
+    sources: dict[str, set[str]] = {}
     for c in verdict.compared(conn, dataset_id, agr):
         if not c.moved:
+            continue
+        if c.now is None:
+            changes = ((f"no longer a period of its schedule (it was dated "
+                        f"{c.inputs.get('period_date')})", None, None),)
+            needed = [_MISSING_KINDS]
+        else:
+            changes = tuple((f, c.inputs.get(f), c.now[0].get(f)) for f in _FIELDS
+                            if c.inputs.get(f) != c.now[0].get(f))
+            needed = [_KINDS_FOR[f] for f, _, _ in changes]
+            if not changes:
+                changes = (("the participation, calendar or timezone version's own "
+                            "settings (e.g. which months it owes, or when it took effect)",
+                            "as recorded", "changed"),)
+                needed = [_FINGERPRINT_KINDS]
+        if c.slot not in sources:
+            when = c.now[3] if c.now else date.fromisoformat(c.inputs["period_date"])
+            sources[c.slot] = _sources(dataset_id, c.slot, when, agr, asset_doc)
+        judged_on = asset_time.local_date(c.recorded_at) if c.recorded_at else None
+        # EVERY differing input must be accounted for, not any one of them.
+        if all(_accounted(sources[c.slot], declared, items, kinds, judged_on)
+               for kinds in needed):
             continue
         if c.slot in by_slot:
             d = by_slot[c.slot]
             by_slot[c.slot] = Drift(d.dataset_id, d.slot, d.changes, d.supplies + 1)
             continue
-        from datetime import date
-
-        when = c.now[3] if c.now else date.fromisoformat(c.inputs["period_date"])
-        if _accounted(_sources(dataset_id, c.slot, when, agr, asset_doc), declared, items):
-            continue
-        if c.now is None:
-            changes = ((c.missing or "the period", c.inputs.get("period_date"), None),)
-        else:
-            changes = tuple((f, c.inputs.get(f), c.now[0].get(f)) for f in _FIELDS
-                            if c.inputs.get(f) != c.now[0].get(f))
-            if not changes:
-                changes = (("the participation, calendar or timezone version's own "
-                            "settings (e.g. which months it owes, or when it took effect)",
-                            "as recorded", "changed"),)
         by_slot[c.slot] = Drift(dataset_id, c.slot, changes)
     if not by_slot:
         return None
@@ -214,20 +281,27 @@ def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
                    synthetic=bool((asset_doc or {}).get("synthetic")))
 
 
-def refusals(conn=None, dataset_ids=None) -> dict[str, Refusal]:
-    """Every refused dataset of the asset, by id (criterion 3: each alone)."""
+def refusals(conn=None, dataset_ids=None, *, errors: list | None = None) -> dict[str, Refusal]:
+    """Every refused dataset of the asset, by id (criterion 3: each alone).
+
+    A dataset that cannot be EVALUATED is not refused - one dataset's broken
+    configuration is not another's refusal - but it is not silently passed
+    either (delivery-critic on 173, #9): each is appended to `errors`, where
+    given, as (dataset_id, exception), for the caller to report."""
     from qa_tools.common import hierarchy, supply_db
 
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:agreement-drift") as opened:
-            return refusals(opened, dataset_ids)
+            return refusals(opened, dataset_ids, errors=errors)
     cal_doc, asset_doc = _load_docs()
     ids = dataset_ids or [d.dataset_id for d in hierarchy.all_datasets()]
     out = {}
     for ds in ids:
         try:
             found = refusal_for(conn, ds, cal_doc=cal_doc, asset_doc=asset_doc)
-        except Exception:  # noqa: BLE001 - one dataset's failure is not another's refusal
+        except Exception as exc:  # noqa: BLE001 - one dataset's failure is not another's refusal
+            if errors is not None:
+                errors.append((ds, exc))
             continue
         if found is not None:
             out[ds] = found

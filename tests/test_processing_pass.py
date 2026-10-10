@@ -17,6 +17,18 @@ COLLECTION = "child-protection"
 WHEN = "2026-09-28T10:00:00+08:00"
 
 
+
+@pytest.fixture(autouse=True)
+def _no_agreement_backstop(monkeypatch):
+    """The pass's own stages, without the REQ-PIPE-173 backstop - which reads
+    every verdict on this worker's database, so a refusal left behind by
+    another module on the same worker reached into these (delivery-critic on
+    173, #5). tests/test_agreement_drift.py tests the backstop itself."""
+    from qa_tools.common import agreement_drift
+
+    monkeypatch.setattr(agreement_drift, "refusals", lambda *a, **k: {})
+    monkeypatch.setattr(agreement_drift, "refile_cleared", lambda **k: [])
+
 @pytest.fixture
 def conn(supply_dsn):
     with supply_db.connect(label="test-processing-pass") as c:
@@ -389,7 +401,7 @@ class TestThePassItself:
         from qa_tools.common import schedule_ended
 
         monkeypatch.setattr(schedule_ended, "refile_covered",
-                            lambda say: world.processed.append("held refiled") or [])
+                            lambda say, **k: world.processed.append("held refiled") or [])
         pp.run_pass(run_by="me", say=lambda m: None)
         assert world.processed[0] == "held refiled", world.processed
 

@@ -174,6 +174,23 @@ class TestAddingDatesFilesWhatWasHeld:
         done = schedule_ended.refile_covered(say=lambda line: None)
         assert [s for _, s, _ in done] == [first, second]
 
+    def test_a_refused_dataset_is_left_held(self, conn, monkeypatch):
+        """delivery-critic on 173, #2: a rule re-file files against the
+        changed terms exactly as a new arrival would, so a dataset the
+        agreement backstop refused keeps its schedule-ended hold."""
+        from qa_tools.common import schedule_ended
+
+        supply = f"cp-carers@{AFTER:%Y%m%d}r"
+        self._held(conn, supply, AFTER)
+        later = SLOTS + [_slot("2030-Q1", datetime(2030, 1, 1, tzinfo=UTC),
+                               datetime(2030, 4, 1, tzinfo=UTC))]
+        monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None: later)
+        monkeypatch.setattr(schedule_ended, "_on_calendar", lambda dataset_id, period: True)
+        done = schedule_ended.refile_covered(say=lambda line: None,
+                                             skip=frozenset({"cp-carers"}))
+        assert supply not in [s for _, s, _ in done]
+        assert supply_holds.hold_on(conn, "cp-carers", supply) is not None
+
 
 class TestThePassSaysSo:
     """Criterion 6: a pass that holds supplies because a schedule ended says

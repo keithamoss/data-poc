@@ -234,3 +234,92 @@ def test_the_pass_summary_states_a_refusal_and_a_cleared_refile(capsys):
     out = capsys.readouterr().out
     assert "REFUSED 1 dataset(s)" in out and "cp-clients" in out
     assert "held while their dataset was refused were filed" in out
+
+
+class TestCriticFindingsOn173:
+    """delivery-critic on REQ-PIPE-173 (534a398), post-build-review #146.
+    Each failed before its fix."""
+
+    def _grace_one_hour(self):
+        cal, asset = _docs()
+        _clients(cal)["participation"]["versions"][0]["grace"] = "1h"
+        return cal, asset
+
+    def _correction(self, item, new, date="2026-10-11"):
+        return {"change_reference": "OLD-1", "date": date, "author": "a test",
+                "approver": "keithamoss", "reason": "r",
+                "changes": [{"item": item, "old": None, "new": new}]}
+
+    def test_1_an_old_timezone_correction_does_not_silence_a_grace_change(self, conn):
+        cal, asset = self._grace_one_hour()
+        asset["timezone"]["corrections"] = [
+            self._correction("timezone version 1970-01-01", "Australia/Perth")]
+        assert _refusal(conn, cal, asset) is not None
+
+    def test_1_a_membership_correction_does_not_either(self, conn):
+        cal, asset = self._grace_one_hour()
+        _clients(cal)["corrections"] = [self._correction("dataset cp-clients calendar",
+                                                         "quarterly")]
+        assert _refusal(conn, cal, asset) is not None
+
+    def test_1_a_correction_declared_before_the_verdict_accounts_for_nothing(self, conn):
+        """Corrections are append-only: one in force when the verdict was
+        recorded was part of the terms it was judged under."""
+        cal, asset = self._grace_one_hour()
+        key = "dataset cp-clients participation 2023-01-01"
+        now = agreement_freeze.flatten(cal, asset)[key].value
+        _clients(cal)["corrections"] = [self._correction(key, now, date="2020-01-01")]
+        assert _refusal(conn, cal, asset) is not None
+
+    def test_4_a_supply_the_rule_would_hold_anyway_keeps_its_own_hold(self, conn, monkeypatch):
+        """Past the schedule's end: held as schedule-ended, which says how it
+        is fixed - not as refused, which would never clear."""
+        from types import SimpleNamespace
+
+        from qa_tools.common import filing, supply_holds
+        cal, asset = self._grace_one_hour()
+        monkeypatch.setattr(agreement_drift, "_load_docs", lambda: (cal, asset))
+        at = datetime(2035, 3, 1, 10, tzinfo=PERTH)
+        filing_support.ensure_delivery("pytest-drift-2035", "cp-clients", at)
+        arrival = SimpleNamespace(files_by_dataset={"cp-clients": ["a"]}, received_at=at,
+                                  delivery_name="pytest-drift-2035", run_id="drift-2035")
+        monkeypatch.setattr(filing, "_supply_id_for", lambda arr, ds: f"{ds}@drift2035")
+        [decided] = filing.file_arrivals([arrival])
+        assert decided.is_held and not decided.agreement_refused
+        [held] = [h for h in supply_holds.outstanding(conn)
+                  if h.supply_id == "cp-clients@drift2035"]
+        assert held.schedule_ended and not held.agreement_refused
+
+    def test_9_a_dataset_that_cannot_be_evaluated_is_said_not_skipped(self, conn, monkeypatch):
+        cal, asset = self._grace_one_hour()
+        monkeypatch.setattr(agreement_drift, "_load_docs", lambda: (cal, asset))
+        monkeypatch.setattr(agreement_drift, "refusal_for",
+                            lambda *a, **k: (_ for _ in ()).throw(ValueError("bad grace")))
+        errors = []
+        assert agreement_drift.refusals(conn, ["cp-clients"], errors=errors) == {}
+        assert errors and "bad grace" in str(errors[0][1])
+
+    def test_9_check_agreement_refuses_an_unknown_dataset(self):
+        from click.testing import CliRunner
+
+        from cli import schedule as schedule_cli
+        got = CliRunner().invoke(schedule_cli.schedule_group,
+                                 ["check-agreement", "--dataset", "no-such-dataset"])
+        assert got.exit_code != 0 and "no-such-dataset" in got.output
+
+    def test_10_a_missing_slot_reads_plainly(self, conn):
+        cal, asset = _docs()
+        q = next(c for c in cal["calendars"] if c["name"] == "quarterly")
+        q["versions"][-1]["dates"] = [d for d in q["versions"][-1]["dates"]
+                                      if d["period"] != "2023-Q3"]
+        text = _refusal(conn, cal, asset).message()
+        assert "2023-Q3: no longer a period of its schedule (it was dated 2023-08-01)" in text
+
+    def test_10_a_refusal_only_pass_does_not_say_a_result_is_red(self, capsys):
+        from cli import pipeline
+        from qa_tools.common import processing_pass
+
+        report = processing_pass.PassReport(refused=["cp-clients"])
+        pipeline._say_pass(report)
+        assert "recorded result is red" not in capsys.readouterr().out
+        assert report.exit_status == processing_pass.EXIT_RED

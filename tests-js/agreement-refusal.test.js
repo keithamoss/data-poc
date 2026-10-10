@@ -64,3 +64,10 @@ describe("one asset-level notice (criterion 7)", () => {
     expect(w.refusedMarker(3)).toContain("3\n    refused: agreement changed");
   });
 });
+
+describe("the wording (delivery-critic on 173, #10)", () => {
+  it("names data-asset.yaml as well as calendar.yaml", () => {
+    const w = withRefusal({"cp-clients": REFUSAL});
+    expect(w.agreementNotice(DATA_)).toContain("contract/data-asset.yaml");
+  });
+});

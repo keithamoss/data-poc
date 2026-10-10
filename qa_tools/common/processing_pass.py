@@ -274,7 +274,7 @@ class PassReport:
         """Criterion 20: a failure outranks a red result."""
         if self.failures:
             return EXIT_FAILED
-        return EXIT_RED if self.red else EXIT_OK
+        return EXIT_RED if self.red or self.refused else EXIT_OK
 
 
 def _red(results) -> bool:
@@ -352,11 +352,6 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
     # receipt order broke across the two (post-build-review #131 D7). Still
     # before the owed work, so the re-check each is owed runs - and applies
     # the gate - in this same pass.
-    try:
-        from qa_tools.common import schedule_ended
-        report.refiled.extend(schedule_ended.refile_covered(say=say))
-    except Exception as exc:  # noqa: BLE001 - the holds are durable; the next pass retries
-        failed("schedule-ended holds", exc)
     # THE AGREEMENT BACKSTOP (REQ-PIPE-173): a dataset whose recorded
     # judgements no longer match the agreement, with nothing declared to
     # account for it, is refused - said here, held at filing - and one
@@ -364,11 +359,16 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
     try:
         from qa_tools.common import agreement_drift
         report.refiled_cleared.extend(agreement_drift.refile_cleared(say=say))
-        found = agreement_drift.refusals()
+        errors: list = []
+        found = agreement_drift.refusals(errors=errors)
         report.refused = sorted(found)
+        # A DATASET THAT COULD NOT BE EVALUATED is a failure of this pass,
+        # never a silent pass (delivery-critic on 173, #9).
+        for ds, exc in errors:
+            failed(f"agreement backstop for {ds}", exc)
         # RED, as the dashboard shows it (criterion 4; PROVISIONAL: the
-        # exit status a scheduler reads says so too).
-        report.red = report.red or bool(found)
+        # exit status a scheduler reads says so too) - through exit_status,
+        # not `red`, which says a recorded RESULT is red (#10).
         line = agreement_drift.pass_line(found)
         if line:
             say(line)
@@ -376,6 +376,15 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
                 say(refusal.message())
     except Exception as exc:  # noqa: BLE001 - the next pass evaluates it again
         failed("agreement backstop", exc)
+    # AFTER THE BACKSTOP, AND NEVER FOR A REFUSED DATASET (delivery-critic
+    # on 173, #2): a rule re-file of a schedule-ended hold files a supply
+    # against the changed terms exactly as a new arrival would.
+    try:
+        from qa_tools.common import schedule_ended
+        report.refiled.extend(schedule_ended.refile_covered(
+            say=say, skip=frozenset(report.refused)))
+    except Exception as exc:  # noqa: BLE001 - the holds are durable; the next pass retries
+        failed("schedule-ended holds", exc)
 
     # STAGED FIRST, as the batch stages first: a delivery's later files are
     # candidates the overlay sees when its first is checked. Only what is

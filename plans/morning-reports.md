@@ -1063,3 +1063,27 @@ one or more component tags, and a date.
             Today it is flags only.
         (d) The excuse doesn't reach the slot's GitHub ticket; I've left
             that until the GitHub route is back on.
+      - REQ-PIPE-173 CRITIC (post-build-review #146), fixed test-first:
+        - one real hole, now closed: an old, unrelated correction (a
+          timezone or membership one) silenced the backstop for good. A
+          correction now has to be about the kind of thing that changed,
+          carry today's value, and be dated no earlier than the verdict;
+        - the rule files a new supply first, and the refusal hold applies
+          only where it would have been filed;
+        - schedule-ended re-files no longer go ahead for a refused dataset;
+        - a dataset that cannot be checked is reported as a failure, not
+          passed in silence;
+        - an unknown `--dataset` is refused;
+        - wording fixes.
+        FIVE QUESTIONS FOR YOU:
+        (e) Is that accounting rule right? It is PROVISIONAL.
+        (f) Should a refusal also stop owed re-checks and the promotion gate
+            for that dataset? Today they continue, on verdicts already
+            recorded.
+        (g) Should the refusal show only on as-of dates on or after the
+            affected period, and beside another blocker rather than over
+            it?
+        (h) Should a refusal exit with its own status rather than 1, the
+            same as red data?
+        (i) A retroactive not_expected entry isn't caught. Should the
+            fingerprint include it?
