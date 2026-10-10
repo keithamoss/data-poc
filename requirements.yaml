@@ -24987,6 +24987,8 @@ requirements:
     - REQ-PIPE-050
     - REQ-PIPE-051
     - REQ-PIPE-052
+    open_questions:
+    - '(2026-10-10 round 2: scoper, architect, dashboard UX, CLI UX on d343bca) T9: split REQ-PIPE-110 (46 criteria) further - into the file move (PIPE), collection defaults with inherit (new PIPE, possibly should), and owed-nothing display (new DASH) - as the scoper recommends, or move only the dashboard criteria out, or keep as is?'
     decisions:
     - THE PROBLEM THIS SOLVES is that the same facts are configured twice. Calendars live in contract/data-asset.yaml while each dataset's cadence, expected time and grace live in its ODCS contract under slaProperties. The two can disagree, nothing checks that they do not, and slaProperties cannot be versioned - so changing a due time silently re-judges history.
     - Decided slaProperties is DELETED rather than left as a deprecated copy. A second copy nobody reads is a second copy somebody edits.
@@ -25099,6 +25101,13 @@ requirements:
     - 'THE TURNED-OFF HOLD REUSES REQ-PIPE-064''S KIND WITH A FLAG (delivery-architect, 2026-10-10), as schedule-ended holds do: no new hold kind. A hold is written once (ON CONFLICT DO NOTHING), so its label is worked out from current configuration when shown - otherwise a schedule-ended hold raised before a turn-off would advise adding dates for ever.'
     open_questions:
     - Does a supply held as turned off count among the states needing a person, or show only as a quiet count on the dataset? (The dashboard reviewer recommended the quiet count; Keith's Q-B answer settled what can happen to it, not how it is counted.)
+    - '(2026-10-10 round 2: scoper, architect, dashboard UX, CLI UX on d343bca) T1 BLOCKER: a collection is turned off but a dataset in it has its own participation version that started before - is it off? Recommended (scoper and architect): yes - on/off follows the most recent version at either level; only a dataset version starting inside the gap brings it back; a later collection version never ends a dataset''s own turn-off.'
+    - '(2026-10-10 round 2: scoper, architect, dashboard UX, CLI UX on d343bca) T2: after the last owed slot before a gap closes, does anything still unresolved about that owed period (closed unfilled, red, a resupply waiting) keep counting? Recommended: needs-action keeps counting until resolved; the dataset leaves the colour rollup once its last slot has closed and nothing is waiting.'
+    - '(2026-10-10 round 2: scoper, architect, dashboard UX, CLI UX on d343bca) T3: does a supply held as turned off need a person? Recommended by three reviewers: no, anywhere - a quiet ''N received while turned off, earliest <date>'' line (amends built REQ-PIPE-064 c5 and REQ-PIPE-083 c21). REQ-DASH-180 c10 already drafts this.'
+    - '(2026-10-10 round 2: scoper, architect, dashboard UX, CLI UX on d343bca) T4: is a hold''s turned-off label the flag recorded when it was raised (cheap; label can disagree with what is re-filed) or recomputed from current configuration everywhere it is used - display, re-file, counts (architect recommends recompute; amends REQ-PIPE-154 c2/c6, REQ-PIPE-064 c8)?'
+    - '(2026-10-10 round 2: scoper, architect, dashboard UX, CLI UX on d343bca) T5: for a following-period dataset (days_before), keep ''owed by the period''s date'' and label holds by slot rather than receipt date (architect recommends), or owe a period if it is DUE on or before effective_to?'
+    - '(2026-10-10 round 2: scoper, architect, dashboard UX, CLI UX on d343bca) T6: a permanent turn-off placed after the calendar''s last authored date - accept it (the ''gap must contain a period'' refusal applying only where a later version follows; recommended by scoper and CLI UX) or refuse until the next dates are authored?'
+    - '(2026-10-10 round 2: scoper, architect, dashboard UX, CLI UX on d343bca) T7: fixing a typo in turned_off_reason after the turn-off has taken effect - a declared correction (consistent) or a wording-only edit allowed (a line a gate cannot check)?'
   - id: REQ-DASH-180
     title: 'The dashboard shows a turned-off dataset honestly: its real verdict, a marker, and nothing owed gone quiet'
     date_written: '2026-10-10'
@@ -25133,6 +25142,8 @@ requirements:
     - REQ-PIPE-110
     - REQ-DASH-071
     - REQ-DASH-155
+    open_questions:
+    - '(2026-10-10 round 2: scoper, architect, dashboard UX, CLI UX on d343bca) T8: the ''Turning off - last supply owed'' marker when the last owed period is ALREADY FILLED (it would tell a reader to chase a supply already delivered): one marker ''Turned off since 1 Apr - February open for resupply until 15 Apr'', two wordings by filled/unfilled, or as drafted?'
     decisions:
     - 'SPLIT FROM REQ-PIPE-110, 2026-10-10 (Keith), as REQ-DASH-155 was split from REQ-PIPE-154: the decision and its record are one reviewable unit, the rendering another.'
     - 'A TURNED-OFF DATASET KEEPS ITS REAL VERDICT, WITH A ''TURNED OFF'' MARKER BESIDE IT (Keith, 2026-10-10, on the delivery-dashboard-ux review): its status pill shows what the checks found, red included, with a quiet outline marker reading ''Turned off since <date>'' and the reason - the pattern unagreedMarker already uses for ''No delivery schedule agreed yet'' - and the dataset is left out of every collection and asset rollup and every needs-action count. Criterion 1 here is that rewording: not red BECAUSE it is turned off, never hiding a verdict the data in place earned. REJECTED letting ''Turned off'' replace the status pill: a red period still holding data people may query would be hidden one click down - a false quiet.'
