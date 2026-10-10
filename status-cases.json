@@ -69,7 +69,8 @@
     "amber",
     "red",
     "exhausted",
-    "inactive"
+    "inactive",
+    "notcounted"
    ]
   },
   "unordered": {
@@ -83,7 +84,8 @@
     "'green', and green is how item 74 happened."
    ],
    "exhausted": "The dataset's authored delivery dates have run out relative to the selected as-of date (REQ-PIPE-053). Not red: a supplier's clean dataset reading red because WE forgot to type next year's dates is an attribution error. Not nodata: nodata is filtered before every rollup, so it would vanish above the tile.",
-   "inactive": "No automated quality rule is defined for this column at all - neither the ODCS contract nor the Soda/dbt check files name one (post-build-review #4). Not green: green is a verdict, and a column nobody checks has not passed anything - it was the honest label being four clicks deep that made an unchecked column read as a healthy one everywhere above the check panel. Not amber or red either: nothing is failing and nobody is being asked to act on the DATA. It is INACTIVE, which is a state a reader already has a vocabulary for, and which cannot be mistaken for a verdict."
+   "inactive": "No automated quality rule is defined for this column at all - neither the ODCS contract nor the Soda/dbt check files name one (post-build-review #4). Not green: green is a verdict, and a column nobody checks has not passed anything - it was the honest label being four clicks deep that made an unchecked column read as a healthy one everywhere above the check panel. Not amber or red either: nothing is failing and nobody is being asked to act on the DATA. It is INACTIVE, which is a state a reader already has a vocabulary for, and which cannot be mistaken for a verdict.",
+   "notcounted": "A GROUP's status when every dataset in it is left out of its rollup (post-build-review #135, Keith 2026-10-10). Before it existed such a group rolled up GREEN - 'nothing here counts' read as 'everything here is fine'. Quiet and last in precedence: exhausted, inactive, nodata, then notcounted."
   }
  },
  "check_cases": [
@@ -422,6 +424,32 @@
     "id": "nodata-alone-still-reports-nodata",
     "why": "Adding a third quiet state must not disturb the existing two. Recorded because precedence lists are exactly where that happens.",
     "statuses": [
+     "nodata"
+    ],
+    "expect": "nodata"
+   },
+   {
+    "id": "not-counted-alone-reads-not-counted",
+    "why": "post-build-review #135: a group whose every member was left out rolled up green. A collection reading notcounted must roll its agency up as notcounted too, not green.",
+    "statuses": [
+     "notcounted"
+    ],
+    "expect": "notcounted"
+   },
+   {
+    "id": "not-counted-loses-to-a-real-verdict",
+    "why": "A collection with nothing counted must not drag its agency down, nor lift it - a real verdict beside it wins.",
+    "statuses": [
+     "notcounted",
+     "amber"
+    ],
+    "expect": "amber"
+   },
+   {
+    "id": "not-counted-is-last-of-the-quiet-states",
+    "why": "Order agreed with REQ-DASH-180: exhausted, inactive, nodata, notcounted. 'No data yet' is something a reader may wait on; 'nothing counted' is the least to act on.",
+    "statuses": [
+     "notcounted",
      "nodata"
     ],
     "expect": "nodata"

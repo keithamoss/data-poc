@@ -136,15 +136,26 @@ describe("a dataset with no agreed schedule is in no rollup", () => {
     expect(w.inNoRollup(redUnagreed)).toBe(true);
   });
 
-  it("a collection of only unagreed datasets reports green, not their verdicts", () => {
+  it("a collection of only unagreed datasets reads Not counted - never green", () => {
     const w = load();
-    // NO FALLBACK, unlike nodata and exhausted - those come back if they
-    // are all there is, because "every dataset here has ended" is a real
-    // answer about the group. A collection whose only member is one
-    // somebody is still developing checks against has nothing to say
-    // about the asset's quality.
+    // post-build-review #135 (Keith, 2026-10-10). This used to expect
+    // green, which pinned the false green itself. Their verdicts still do
+    // not count (REQ-PIPE-106 criterion 9), but a group with nothing
+    // counted must not claim to be healthy either.
     expect(w.rollup([ds("a", "red", { scheduleNotAgreed: "not-yet-agreed" }),
-                      ds("b", "amber", { scheduleNotAgreed: "never" })])).toBe("green");
+                      ds("b", "amber", { scheduleNotAgreed: "never" })])).toBe("notcounted");
+  });
+
+  it("a Not counted group says why, in words, by reason - and nothing else does", () => {
+    const w = load();
+    // post-build-review #135: the pill never stands alone. Counts by
+    // reason, never a list of names.
+    const group = [ds("a", "red", { scheduleNotAgreed: "not-yet-agreed" }),
+                   ds("b", "amber", { scheduleNotAgreed: "not-yet-agreed" }),
+                   ds("c", "green", { scheduleNotAgreed: "never" })];
+    const line = w.notCountedMarker("notcounted", group).replace(/\s+/g, " ");
+    expect(line).toContain("3 datasets not counted: 2 no schedule agreed yet, 1 one-off extraction");
+    expect(w.notCountedMarker("green", group)).toBe("");
   });
 
   it("an ordinary dataset is unaffected", () => {

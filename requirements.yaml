@@ -24154,6 +24154,7 @@ requirements:
         file it to the first period, discard it, or leave it in its own
         schema - are a real fork, and it belongs with the promotion
         side rather than being guessed now.
+      - 'A GROUP WITH NOTHING COUNTED READS ''NOT COUNTED'', NEVER GREEN (post-build-review #135, fixed 2026-10-11 overnight with Keith''s approval of 2026-10-10): criterion 9''s exclusion was built so that a collection whose every dataset is left out of the rollup returned green - and two tests pinned that green as intended. It was a false green: ''nothing here counts'' read as ''everything here is fine''. Such a group now reads a quiet `notcounted` status, last of the quiet states (exhausted, inactive, nodata, notcounted), with a line saying why (''3 datasets not counted: 2 no schedule agreed yet, 1 one-off extraction''); the excluded datasets'' verdicts still never count, which is what criterion 9 asks. Both implementations and status-cases.json changed together. Keith''s answer is REQ-DASH-180''s (unsigned) ''Not counted'' half; its ''Turned off'' half waits for REQ-PIPE-179.'
 
   - id: REQ-PIPE-107
     title: A checkout refuses to act against a database belonging to another data asset or environment

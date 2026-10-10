@@ -72,7 +72,9 @@ ORDERED_STATUSES = {"nodata": -1, "green": 0, "amber": 1, "red": 2}
 # it loses every rollup and vanishes; high, and an unasked question
 # outranks a real failure (post-build-review #4). rollup_statuses()
 # below is where a caller handles it explicitly instead.
-UNORDERED_STATUSES = {"exhausted", "inactive"}
+# `notcounted` is a GROUP's status: every dataset in it is left out of its
+# rollup (post-build-review #135). It replaced a false green.
+UNORDERED_STATUSES = {"exhausted", "inactive", "notcounted"}
 
 RECOGNISED_STATUSES = set(ORDERED_STATUSES) | UNORDERED_STATUSES
 
@@ -183,7 +185,7 @@ _DASHBOARD_STATUS_BY_TOOL_STATUS = {
 #: headline; "nobody defined a rule" is a standing fact somebody can act
 #: on; "no run within tolerance as of this date" is temporal and may
 #: resolve itself tomorrow.
-_QUIET_PRECEDENCE = ("exhausted", "inactive", "nodata")
+_QUIET_PRECEDENCE = ("exhausted", "inactive", "nodata", "notcounted")
 
 
 def rollup_statuses(statuses) -> str:
@@ -247,13 +249,18 @@ def rollup_datasets(datasets) -> str:
     the reduce, which is also what makes "by construction" true of the
     ordering rather than only of the storage.
     """
+    datasets = list(datasets)
     counted = [d for d in datasets if not in_no_rollup(d)]
     live = [d for d in counted
             if not d.get("noDataInPlaceOn") and not d.get("scheduleExhausted")]
     if not live:
         if any(d.get("scheduleExhausted") for d in counted):
             return "exhausted"
-        return "nodata" if counted else "green"
+        if counted:
+            return "nodata"
+        # EVERY DATASET HERE IS LEFT OUT (post-build-review #135): this
+        # returned "green", the false green. Only an empty group stays green.
+        return "notcounted" if datasets else "green"
     return rollup_statuses([rollup_statuses(
         [c.get("status") for c in (d.get("columns") or [])]) for d in live])
 

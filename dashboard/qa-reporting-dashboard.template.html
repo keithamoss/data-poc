@@ -222,6 +222,13 @@ button{font:inherit; color:inherit;}
 .pill.inactive .ico::after{content:""; position:absolute; left:-1px; right:-1px; top:50%;
   height:1.5px; background:var(--ink-muted); transform:rotate(-45deg);}
 
+/* A GROUP WITH NOTHING COUNTED (post-build-review #135). A quiet status,
+   never a verdict: an outline with a SOLID border (on this page dashed
+   means "not yet"), and a hollow marker - not the inactive status's
+   struck-through one, which says "switched off". Said in words. */
+.pill.notcounted{background:transparent; color:var(--ink-muted); border:1px solid var(--ink-faint);}
+.pill.notcounted .ico{background:transparent; border:1.5px solid var(--ink-muted); border-radius:50%;}
+
 /* A dataset nobody has agreed a delivery schedule for (REQ-PIPE-106
    criterion 8). NOT A STATUS - it sits BESIDE the real red/amber/green
    verdict its checks found, because developing a check means seeing
@@ -393,6 +400,8 @@ button{font:inherit; color:inherit;}
    like a colour in the same family as the verdicts (#4). */
 .legend-key i.inactive{background:transparent; border:1.5px solid var(--ink-muted);
   border-radius:50%;}
+.legend-key i.notcounted{background:transparent; border:1.5px solid var(--ink-faint);
+  border-radius:50%;}
 
 /* ============ Plans tab (running-thoughts.md #10) ============ */
 .plans-filterbar{margin-top:16px; padding:14px; background:var(--surface-alt); border:1px solid var(--line); border-radius:var(--radius-md);}
@@ -509,6 +518,7 @@ button{font:inherit; color:inherit;}
    was tried first and rejected for lowering it to 2.76. */
 .dataset-table tbody tr:hover .pill.nodata,
 .dataset-table tbody tr:hover .pill.inactive,
+.dataset-table tbody tr:hover .pill.notcounted,
 .dataset-table tbody tr:hover .pill.exhausted{background:var(--surface);}
 .dataset-name{font-weight:600;}
 .dataset-provider{color:var(--ink-muted); font-size:12px; margin-top:2px;}
@@ -1517,7 +1527,8 @@ function fmtMetric(x, unit){
 // all read green.
 const STATUS_ORDER = {nodata:-1, green:0, amber:1, red:2};
 const STATUS_LABEL = {nodata:"No data", green:"Green", amber:"Amber", red:"Red",
-                       exhausted:"Schedule ended", inactive:"No rule defined"};
+                       exhausted:"Schedule ended", inactive:"No rule defined",
+                       notcounted:"Not counted"};
 // REQ-QAC-047. The vocabulary above and its Python twin in
 // qa_tools/common/dataset_status.py are held to the SAME committed table
 // - status-cases.json at the repo root, read by tests-js/
@@ -1533,7 +1544,12 @@ const STATUS_LABEL = {nodata:"No data", green:"Green", amber:"Amber", red:"Red",
 // every rollup and vanish; ranking it high makes an unasked question
 // outrank a real failure. Both are wrong, so it is surfaced by
 // rollupStatuses() explicitly instead (post-build-review #4).
-const UNORDERED_STATUSES = ["exhausted", "inactive"];
+// `notcounted` is a GROUP's status, never a dataset's or a check's own:
+// every dataset in the group is left out of its rollup (post-build-review
+// #135, Keith 2026-10-10). Before it existed such a group rolled up GREEN -
+// "nothing here counts" read as "everything here is fine". Unordered for
+// the same reason as the others: it is not a verdict.
+const UNORDERED_STATUSES = ["exhausted", "inactive", "notcounted"];
 // Recognition is scoped to WHERE a status was read from. `exhausted` is
 // a property of a dataset's SCHEDULE - a check result carrying one means
 // something upstream wrote a dataset-level status onto a check, and a
@@ -2637,7 +2653,12 @@ function rollup(datasets){
     || (!d.noDataInPlaceOn && !d.scheduleExhausted));
   if(!live.length){
     if(counted.some(d=>d.scheduleExhausted)) return "exhausted";
-    return counted.length ? "nodata" : "green";
+    if(counted.length) return "nodata";
+    // EVERY DATASET HERE IS LEFT OUT (post-build-review #135, Keith
+    // 2026-10-10). This returned "green" - the false green: a group with
+    // nothing counted claimed to be healthy. Only an empty group, which
+    // has nothing to say at all, stays green.
+    return datasets.length ? "notcounted" : "green";
   }
   // Both levels roll rather than order, for the same reason: a column
   // whose only check has no rule is `inactive`, and a collection of
@@ -2652,7 +2673,8 @@ function rollup(datasets){
 // that surface (STATUS_ORDER.nodata is below green, so it can only ever
 // lose a reduce that starts from "green").
 function rollupStatuses(statuses){
-  const live = statuses.filter(s=> s!=="nodata" && s!=="exhausted" && s!=="inactive");
+  const live = statuses.filter(s=> s!=="nodata" && s!=="exhausted" && s!=="inactive"
+    && s!=="notcounted");
   if(!live.length){
     // THE QUIET STATES, IN ORDER OF WHAT A READER CAN DO ABOUT THEM.
     // An ended schedule is why nothing is happening at all, so it stays
@@ -2666,7 +2688,11 @@ function rollupStatuses(statuses){
     // placeholder's own recorded status and nothing above the check
     // panel distinguished "no rule" from "rule passed".
     if(statuses.includes("inactive")) return "inactive";
-    return statuses.length ? "nodata" : "green";
+    if(statuses.includes("nodata")) return "nodata";
+    // Last of the quiet states: a group with nothing counted is not a
+    // verdict and not "nothing yet" either - and never green (#135).
+    if(statuses.includes("notcounted")) return "notcounted";
+    return "green";
   }
   // Note what this does NOT do: an inactive column sitting beside real
   // ones contributes nothing at all. It must not drag a dataset down -
@@ -3393,6 +3419,28 @@ function exhaustedMarker(count, status){
   return `<div style="margin-top:6px; font-size:12px; color:var(--ink); display:flex;
     align-items:center; gap:5px;"><span class="pill exhausted sm"><span class="ico"></span>${count}
     schedule${count===1?"":"s"} ended</span></div>`;
+}
+
+// WHY A GROUP IS NOT COUNTED, in words (post-build-review #135): shown only
+// when the group's own status is `notcounted`, so the pill never stands
+// alone. Counts by reason, never a list of names - at thirty datasets a
+// list is noise.
+function notCountedReasons(datasets){
+  const by = {};
+  (datasets||[]).filter(inNoRollup).forEach(d=>{
+    const why = d.scheduleNotAgreed === "never" ? "one-off extraction" : "no schedule agreed yet";
+    by[why] = (by[why]||0) + 1;
+  });
+  return by;
+}
+function notCountedMarker(status, datasets){
+  if(status !== "notcounted") return "";
+  const by = notCountedReasons(datasets);
+  const total = Object.values(by).reduce((a,b)=>a+b, 0);
+  if(!total) return "";
+  const parts = Object.keys(by).sort().map(k=> `${by[k]} ${k}`).join(", ");
+  return `<div class="not-counted-why" style="margin-top:6px; font-size:12px; color:var(--ink-muted);">${total}
+    dataset${total===1?"":"s"} not counted: ${parts}</div>`;
 }
 
 function pill(status, size){ return `<span class="pill ${status} ${size||""}"><span class="ico"></span>${STATUS_LABEL[status]}</span>`; }
@@ -4857,7 +4905,7 @@ function renderExec(view){
   // when they are real (post-build-review #4, and #56 on the legend
   // naming three of five). Listing a state nobody is in is noise; not
   // naming one somebody IS in is the thing the legend exists to stop.
-  const quietKeys = ["nodata","exhausted","inactive"]
+  const quietKeys = ["nodata","exhausted","inactive","notcounted"]
     .filter(s=> agencyCount(s) > 0)
     .map(s=> `<span><i class="${s}"></i>${STATUS_LABEL[s]} (${agencyCount(s)})</span>`)
     .join("");
@@ -4899,6 +4947,7 @@ function renderExec(view){
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
       ${spark}
       ${exhaustedMarker(ag.exhaustedCount, ag.status)}
+      ${notCountedMarker(ag.status, ag.collections.flatMap(c=>c.datasets))}
       ${outstandingMarker("agency", ag.id, undefined, ag.noSupplyCount)}
       ${redPromotedMarker(ag)}
       ${acceptedGapsMarker(ag.acceptedCount)}
@@ -4968,7 +5017,7 @@ function renderAgency(view, agencyId){
   const wrap = document.getElementById("collections");
   wrap.innerHTML = ag.collections.map(col=>`
     <div class="collection-block">
-      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}</div>
+      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}</div>${notCountedMarker(col.status, col.datasets)}
       ${outstandingMarker("collection", col.id, undefined, col.noSupplyCount)}
       ${redPromotedMarker(col)}
       ${acceptedGapsMarker(col.acceptedCount)}

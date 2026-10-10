@@ -804,3 +804,8 @@ one or more component tags, and a date.
       - #136 DONE: every runner of an owed re-check claims it first; a claimed
         one is skipped and stays owed. Failing test first. Written up in
         plans/post-build-review.md #136.
+      - #135 DONE: a group whose every dataset is left out reads 'Not
+        counted' with a line saying why, never green - both implementations
+        and the shared status table. Two tests had pinned the false green as
+        intended; they were turned into the failing tests. JS 576 tests and
+        the e2e module (216, 6 minutes) green. Recorded on REQ-PIPE-106.

@@ -367,16 +367,19 @@ class TestItIsInNoRollup:
         assert ds.in_no_rollup(sample) is True
         assert ds.rollup_statuses([c["status"] for c in sample["columns"]]) == "red"
 
-    def test_a_collection_of_only_unagreed_datasets_says_nothing(self):
-        """NO FALLBACK, unlike nodata and exhausted - those come back if
-        they are all there is, because "every dataset here has ended" is a
-        real answer about the group. This is not."""
+    def test_a_collection_of_only_unagreed_datasets_reads_not_counted(self):
+        """NEVER GREEN (post-build-review #135, Keith 2026-10-10). This test
+        used to assert green, which pinned the false green itself: a group
+        with nothing counted said 'healthy'. It now reads `notcounted` - a
+        quiet status of its own, with a line saying why - which still says
+        nothing about the asset's quality, the reason the datasets are left
+        out (criterion 9), without claiming the group is fine."""
         from qa_tools.common import dataset_status as ds
 
         assert ds.rollup_datasets([
             self._ds("a", "red", scheduleNotAgreed="not-yet-agreed"),
             self._ds("b", "amber", scheduleNotAgreed="never"),
-        ]) == "green"
+        ]) == "notcounted"
 
     def test_an_exhausted_schedule_still_comes_back(self):
         """The contrast, asserted so the new exclusion cannot be mistaken

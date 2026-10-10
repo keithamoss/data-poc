@@ -6855,7 +6855,7 @@ twice. It deliberately did not re-find the `TypeError`.
     commit. REQ-PIPE-122 carries a pending-amendment decision saying so.
     Failing test first when it is built.
 
-135. **[todo, 2026-10-10]** **[Dashboard]** **A collection whose every dataset
+135. **[done, 2026-10-10]** **[Dashboard]** **A collection whose every dataset
     is left out of the rollup reads GREEN - a latent false green.** Found by
     delivery-dashboard-ux reviewing REQ-PIPE-110's turn-off design, and
     checked against the code by the main session: `rollup()` in
@@ -6886,6 +6886,19 @@ twice. It deliberately did not re-find the `TypeError`.
     'Not counted' half is reachable today (no dataset can be turned off until
     REQ-PIPE-179 is built), and that half is fixed in the overnight run,
     failing test first (plans/morning-reports.md #3).
+    **FIXED 2026-10-11 (overnight #3).** `rollup()` and its Python mirror
+    `rollup_datasets()` return `notcounted` where every dataset is left out
+    (an empty group alone stays green); `rollupStatuses()`/`rollup_statuses()`
+    treat it as the last quiet state, so an agency of not-counted
+    collections reads `notcounted` too and one beside a real verdict loses to
+    it. A solid-outlined, hollow-marker pill labelled 'Not counted' (not
+    inactive's struck one), a legend key, and a line on the collection and
+    agency card saying why, by reason. FAILING TEST FIRST: the two tests that
+    pinned the green - tests/test_no_calendar.py and
+    tests-js/status-rollups.test.js - were turned to expect `notcounted` and
+    failed against the old code; status-cases.json gained the vocabulary entry
+    and three rollup cases both sides now pass. Recorded as a decision on
+    REQ-PIPE-106, whose exclusion this was.
 
 136. **[done, 2026-10-10]** **[Pipeline & publishing]** **Two runners can run
     the same owed re-check at once.** Found by delivery-architect reviewing
