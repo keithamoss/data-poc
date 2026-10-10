@@ -50,7 +50,13 @@ class TestAnOverlapIsFound:
     def test_touching_is_still_an_overlap(self, monkeypatch):
         """'Strictly after': a window opening at the very instant the
         earlier period stops being on time leaves one instant in both."""
-        monkeypatch.setattr(slots, "_timing", lambda d, agreement=None: ("09:00", 0, None))
+        import dataclasses
+
+        real = slots._participation_for
+        monkeypatch.setattr(slots, "_participation_for",
+                            lambda d, on, a: dataclasses.replace(real(d, on, a),
+                                                                 expected_time="09:00",
+                                                                 grace=timedelta(0)))
         monkeypatch.setattr(schedule, "claim_window",
                             lambda dataset_id, override=None, on=None, agreement=None: timedelta(days=1))
         found = period_overlap.overlaps_for("birth-registrations")

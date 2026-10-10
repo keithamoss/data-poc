@@ -309,3 +309,28 @@ class TestAnAssetWithNoCalendarsAtAll:
                                for d in hierarchy.all_datasets()]
         errors = broken(mutate)
         assert errors == [], _text(errors)
+
+
+class TestDaysBeforeAtTheGate:
+    """REQ-PIPE-113 criterion 1's whole number of days, at the gate."""
+
+    @pytest.mark.parametrize("value", [-1, "1", 1.5])
+    def test_a_value_that_is_not_a_whole_number_is_refused(self, broken, value):
+        def mutate(doc):
+            _first(doc, "cp-clients")["days_before"] = value
+        errors = broken(mutate)
+        assert any("days_before" in (e.problem + (e.field or "")) for e in errors), _text(errors)
+
+    def test_a_version_that_drops_days_before_is_refused(self, broken):
+        """REQ-PIPE-110 criterion 33, now that days before exists."""
+        def mutate(doc):
+            first = _first(doc, "cp-clients")
+            first["days_before"] = 1
+            second = {k: v for k, v in first.items() if k != "days_before"}
+            second["effective_from"] = "2026-01-01"
+            second["changelog"] = [{"date": "2026-01-01", "author": "a test",
+                                    "change": "dropped days before"}]
+            _entry(doc, "cp-clients")["participation"]["versions"].append(second)
+        errors = broken(mutate)
+        assert any("leaves out" in e.problem and "days_before" in e.problem
+                   for e in errors), _text(errors)

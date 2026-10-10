@@ -532,13 +532,12 @@ _ALSO: dict[str, tuple[str, ...]] = {}
 #: workaround.
 #:
 #: THE ONES THAT NEED A DIFFERENT DUE TIME ARE NOT HERE YET. TS-3c, TS-3d
-#: and TS-10 all need the supply for day D due 22:00 on D-1, which no
-#: effective-dated calendar version can currently express: the claim
-#: window is versioned on the calendar, and the due TIME, since REQ-PIPE-110
-#: on each dataset's participation versions in contract/calendar.yaml, is
-#: not yet read per period (REQ-PIPE-113). Criteria 8 to 11 are that
-#: work, and it is a real fork about what becomes authoritative rather
-#: than an implementation detail - see this requirement's own decisions.
+#: and TS-10 all need the supply for day D due 22:00 on D-1. The
+#: configuration can say it since REQ-PIPE-113 - a participation version in
+#: contract/calendar.yaml with expected_time "22:00" and days_before 1,
+#: read on each period's own date - so what remains is REQ-GEN-044's
+#: criteria 8 to 11: the generated history stating its eras as such
+#: versions.
 INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-1",

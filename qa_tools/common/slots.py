@@ -90,24 +90,71 @@ class Slot:
         return self.due_at + self.grace
 
 
-def _timing(dataset_id: str, agreement=None) -> tuple[str, int, str | None]:
-    """(expected time of day, grace minutes, claim-window override) for one
-    dataset, from its participation in contract/calendar.yaml (REQ-PIPE-110).
+@dataclass(frozen=True)
+class SlotInstants:
+    """A slot's three computed instants-and-durations, from configuration
+    alone (REQ-PIPE-113 criterion 8)."""
 
-    THE NEWEST PARTICIPATION VERSION'S. Taking each period's own version is
-    REQ-PIPE-113's; until it lands every dataset carries one version, so the
-    answer is the same. The claim-window override is not returned here: it
-    lives on the participation version, and schedule.claim_window reads it
-    there, effective-dated, so the third value is always None.
+    due_at: datetime
+    grace: timedelta
+    claim_opens_at: datetime
+
+
+def _participation_for(dataset_id: str, period_date: date, agreement):
+    """The participation version that governs a period: the one in force on
+    the period's OWN date (REQ-PIPE-113 criterion 2).
+
+    A calendar period before the dataset's first version is never owed
+    (REQ-PIPE-110 criterion 30), but it is still asked about - the period
+    after a slot is what that slot closes against (REQ-PIPE-131) - so it
+    takes the first version, the only one that could describe it.
     """
-    entry = schedule._agreement(agreement).dataset(dataset_id)
-    version = entry.participation[-1] if entry and entry.participation else None
-    if version is None or version.expected_time is None or version.grace is None:
+    entry = agreement.dataset(dataset_id)
+    if entry is None or not entry.participation:
         raise schedule.ScheduleConfigError(
-            f"dataset {dataset_id!r} has no participation version stating an expected time and "
-            f"a grace allowance in contract/calendar.yaml, so none of its slots has a due "
-            f"instant.")
-    return version.expected_time, int(version.grace.total_seconds() // 60), None
+            f"dataset {dataset_id!r} has no participation version in contract/calendar.yaml, "
+            f"so none of its slots has a due instant.")
+    version = agreement.participation_on(dataset_id, period_date) or entry.participation[0]
+    if version.expected_time is None or version.grace is None:
+        raise schedule.ScheduleConfigError(
+            f"dataset {dataset_id!r}'s participation version effective "
+            f"{version.effective_from.isoformat()} states no expected time or no grace, so the "
+            f"period on {period_date.isoformat()} has no due instant.")
+    return version
+
+
+def slot_instants(dataset_id: str, period_date: date, agreement=None) -> SlotInstants:
+    """THE ONE SLOT-INSTANTS FUNCTION (REQ-PIPE-113 criterion 10): filing,
+    the overlap gate (REQ-PIPE-134), the daylight-saving gate and the
+    dashboard build all ask this, so none can check a different schedule
+    from the one supplies are filed against.
+
+    Every input is taken AS AT THE PERIOD'S OWN DATE - the participation
+    version for the expected time, days before, grace and claim-window
+    override, the calendar version for the default claim window - so a
+    later version never moves an earlier slot (criterion 3). The due
+    instant is the period's date LESS days before, at the expected time,
+    in the timezone version in force on the day that falls on (criterion
+    1): "due the evening before" is one day before at that evening's time
+    (criterion 5), with no rule to reinterpret the arrival afterwards.
+    The claim window counts back from the due instant, so widening it
+    changes how early a supply may arrive and never the due instant
+    (criterion 6).
+    """
+    agreement = schedule._agreement(agreement)
+    version = _participation_for(dataset_id, period_date, agreement)
+    due_at = asset_time.wall_clock(period_date - timedelta(days=version.days_before),
+                                   version.expected_time)
+    window = schedule.claim_window(dataset_id, on=period_date, agreement=agreement)
+    return SlotInstants(due_at=due_at, grace=version.grace, claim_opens_at=due_at - window)
+
+
+def max_days_before(dataset_id: str, agreement=None) -> int:
+    """The largest days before any of a dataset's participation versions
+    states - what every slot-generation horizon has to reach past
+    (REQ-PIPE-113 criterion 11)."""
+    entry = schedule._agreement(agreement).dataset(dataset_id)
+    return max((v.days_before for v in (entry.participation if entry else ())), default=0)
 
 
 def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
@@ -143,7 +190,10 @@ def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
     slot whose window has not opened is offered and not chosen - the behaviour the daily feed has always had for
     the current day. This only stops a claimable slot being absent.
     """
-    return at + claim_window(dataset_id, agreement)
+    # PLUS THE LARGEST days_before (REQ-PIPE-113 criterion 11): a supply
+    # due ninety days ahead of its period's date has to find that period.
+    return at + claim_window(dataset_id, agreement) + timedelta(
+        days=max_days_before(dataset_id, agreement))
 
 
 def claim_window(dataset_id: str, agreement=None) -> timedelta:
@@ -158,8 +208,7 @@ def claim_window(dataset_id: str, agreement=None) -> timedelta:
     and generating a period too many costs nothing because the slot it
     makes is still filtered on its own `claim_opens_at`.
     """
-    _, _, override = _timing(dataset_id, agreement)
-    return schedule.claim_window(dataset_id, override, agreement=agreement)
+    return schedule.claim_window(dataset_id, agreement=agreement)
 
 
 def slots_for_dataset(dataset_id: str, until: date | None = None,
@@ -175,19 +224,18 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
     show "no November file, agreed" rather than a silent gap.
     """
     agreement = schedule._agreement(agreement)
-    expected_time, grace_minutes, window_override = _timing(dataset_id, agreement)
-    grace = timedelta(minutes=grace_minutes)
 
     def claim_opens(period_date: date) -> datetime:
         # Resolved PER PERIOD, on that period's own date. Hoisting this
         # out of the loop is what made a new calendar version move every
         # historical slot's claim_opens_at - the same retroactivity
         # _effect_windows() already prevents for the dates themselves
-        # (post-build-review #42). A zero window opens at the due
-        # instant, which is REQ-PIPE-131 criterion 3 for free.
-        window = schedule.claim_window(dataset_id, window_override, on=period_date,
-                                       agreement=agreement)
-        return asset_time.wall_clock(period_date, expected_time) - window
+        # (post-build-review #42), and since REQ-PIPE-113 the expected
+        # time, days before and grace resolve the same way. A zero window
+        # opens at the due instant, which is REQ-PIPE-131 criterion 3 for
+        # free. The NEXT period's opening uses the next period's own
+        # inputs (REQ-PIPE-113 criterion 4).
+        return slot_instants(dataset_id, period_date, agreement).claim_opens_at
 
     # THE CALENDAR'S periods, not only the ones this dataset owes, so a
     # slot closes when the NEXT CALENDAR PERIOD's window opens
@@ -216,10 +264,10 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
                                                        agreement=agreement):
         if not dataset_period.expected:
             continue
-        opens = claim_opens(dataset_period.date)
-        due_at = asset_time.wall_clock(dataset_period.date, expected_time)
+        instants = slot_instants(dataset_id, dataset_period.date, agreement)
+        opens = instants.claim_opens_at
         out.append(Slot(dataset_id=dataset_id, period=dataset_period.period,
-                         due_at=due_at, grace=grace, claim_opens_at=opens,
+                         due_at=instants.due_at, grace=instants.grace, claim_opens_at=opens,
                          closes_at=closes(dataset_period.period, opens)))
     return out
 

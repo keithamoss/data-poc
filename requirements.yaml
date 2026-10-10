@@ -8110,8 +8110,10 @@ requirements:
       - THE SYSTEM SHALL create one slot per dataset per period, so that
         a collection of six datasets in one period has six slots.
       - THE SYSTEM SHALL give each slot its own due instant, computed
-        from its period's date and its own dataset's expected time of
-        day in the asset's timezone.
+        from its period's date less the days before and the expected
+        time of day of its dataset's participation version in force on
+        that period's date, in the timezone version in force on the day
+        that falls on (amended by REQ-PIPE-113).
       - THE SYSTEM SHALL give each slot its own grace allowance, taken
         from its own dataset's contract.
       - THE SYSTEM SHALL open a slot's claim window a configured
@@ -25072,6 +25074,7 @@ requirements:
     - 'TESTS WRITTEN AGAINST THE ONE-FILE SHAPE WERE KEPT, NOT REWRITTEN (2026-10-11): tests/agreement_split.py writes a one-file-shaped configuration out as the two files, so roughly sixty schedule tests keep asserting the rule they are named for; the new file''s own rules are tested against the two files directly in tests/test_agreement.py, never through the helper. tests/test_cadence.py tested pipeline/cadence.py''s slaProperties parser and went with it.'
     - 'WHAT STILL SAYS slaProperties IS HISTORY (2026-10-11): present-tense comments were repointed (builders, generator, dashboard template, embed docstring); sentences recording what used to be true were left, since the register''s own rule is that history is rewritten rather than deleted. No plans prose was deleted: plans/supply-model.md Thread C feeds REQ-PIPE-110 to 113 together and goes whole once the last of them is built.'
     - 'THE EXHAUSTED-SCHEDULE NOTICE NAMED THE WRONG FILE (found 2026-10-11 in the build''s own review, fixed test-first): dashboard/embed_dashboard_data.py hardcoded contract/data-asset.yaml as SCHEDULE_RUNWAY.configFile and the template fell back to the same string, so after the move the page would have sent a person to a file holding no delivery dates. The embed now takes supply_holds.SCHEDULE_FILE - the one constant the hold reason and the terminal already use - and the fallback names contract/calendar.yaml. Criterion 17''s ''no hardcoded configuration-file name'' is why it counted.'
+    - 'SUPERSEDED BY REQ-PIPE-113 THE SAME NIGHT: the ''newest participation version, for now'' decision above held from 9bc389e until 113 was built; slots and the overlap gate now resolve every input on the period''s own date.'
   - id: REQ-PIPE-179
     title: A dataset, or a whole collection, can be turned off for a time or for good, and nothing still owed goes quiet
     date_written: '2026-10-10'
@@ -25714,7 +25717,28 @@ requirements:
       computed from the agreement in force on that period's own date, so that changing a dataset's due time,
       grace or claim window going forward never re-judges a slot that has already been due.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-11 (overnight #3): tests/test_slot_instants.py 19 passed - two participation eras give earlier slots the old due time and grace and later ones the new (criteria 2, 3); an override of the claim window from a later version applies only from its date; the last slot before the boundary closes on the next period''s own new inputs (criterion 4); days_before 1 at 22:00 puts the due instant on the evening before and opens the claim window from it (criteria 1, 5); widening the claim window moves no due instant (criterion 6); a non-whole days_before is refused; the claim reach and the overlap horizon both add the largest days_before (criterion 11); the overlap gate''s instants equal filing''s (criterion 10); nothing under data/ is opened (criterion 8). tests/test_agreement.py adds the gate refusals for days_before and its restate rule.'
+    - '2026-10-11: the behaviour pin (tests/test_calendar_move_pin.py, every slot''s instants to 2028) passed unchanged, so per-period resolution changes nothing for today''s one-version agreement. Full `mothman check` 4044 passed with 2 failures - two e2e tests still asserting contract/data-asset.yaml in the schedule-ended notice, left over from REQ-PIPE-110''s configFile fix - both corrected and the class rerun green (11 passed); `npm test` 581 passed.'
+    implemented_by:
+    - qa_tools/common/slots.py::slot_instants
+    - qa_tools/common/slots.py::_participation_for
+    - qa_tools/common/slots.py::max_days_before
+    - qa_tools/common/slots.py::slots_for_dataset
+    - qa_tools/common/slots.py::claimable_until
+    - qa_tools/common/in_force.py::version_on
+    - qa_tools/common/agreement.py::Agreement
+    - qa_tools/common/agreement.py::ParticipationVersion
+    - qa_tools/common/period_overlap.py::overlaps_for
+    - qa_tools/common/validate_schedule.py::_daylight_saving_errors
+    - qa_tools/common/schemas.py::ParticipationVersionConfig
+    linked_tests:
+    - tests/test_slot_instants.py
+    - tests/test_agreement.py
+    - tests/test_calendar_move_pin.py
+    - tests/test_period_overlap.py
+    - tests/test_timezone_versions.py
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -25813,6 +25837,12 @@ requirements:
     - 'GENERATION HORIZONS ADD THE LARGEST days_before (delivery-architect pre-build review, 2026-10-07),
       S4, verified: slots.claimable_until is arrival plus claim window, so a supply due ninety days ahead
       of its period would be held. period_overlap''s horizon has the same gap.'
+    - 'ONE SLOT-INSTANTS FUNCTION, BUILT AS slots.slot_instants (2026-10-11, overnight #3): due instant, grace and claim-opening instant for one dataset and one period date, every input taken as at that date. slots_for_dataset, the closing instant of the period before (criterion 4), the overlap gate (REQ-PIPE-134) and the daylight-saving gate (REQ-PIPE-112 criterion 8) all call it; slots._timing, the per-dataset newest-version shortcut REQ-PIPE-110 left behind, is deleted, so nothing can ask the old question. The overlap gate also now walks slots._calendar_periods - the sequence filing closes slots against - so a dataset''s own authored dates are checked rather than ignored (decision 10).'
+    - 'ONE ''IN FORCE ON'' HELPER, BY BISECTION (NFR 2 and 3): qa_tools/common/in_force.py''s version_on() - bisect_right with key=, so no list of dates is built per call - now answers for participation versions (agreement.participation_on), calendar versions (Calendar.version_in_force and schedule._version_in_force) and timezone versions (asset_time.zone_on and zone_at). Each caller keeps its own meaning of ''nothing in force yet'': a dataset not yet owing, a calendar falling back to its first version, a timezone failing loudly. NOT MOVED ONTO IT: amber_setting._in_effect, whose versions are raw, unsorted dicts and are not among the three NFR 2 names.'
+    - 'A PERIOD BEFORE THE FIRST PARTICIPATION VERSION TAKES THE FIRST VERSION''S INPUTS (2026-10-11, PROVISIONAL): such a period is never owed (REQ-PIPE-110 criterion 30), but the slot before it - or the calendar period after a gap - still needs its claim-opening instant to close against, and the first version is the only one that could describe it. REJECTED raising, which would leave a dataset''s first slot with no closing instant whenever its first version starts mid-calendar.'
+    - 'days_before IS A WHOLE NUMBER, REFUSED OTHERWISE IN TWO PLACES (2026-10-11): the schema (StrictInt, ge=0) for the gate''s file-and-field message, and the loader for anything that bypasses the gate. A bool, a string or a fraction is refused rather than coerced. It joins the restate rule''s list (REQ-PIPE-110 criterion 33), which that criterion said would happen once days before existed.'
+    - 'THE LAST SLOT BEFORE A VERSION BOUNDARY CLOSES ON THE NEW INPUTS, AND THAT IS CRITERION 4 RATHER THAN A BREACH OF CRITERION 3 (2026-10-11): criterion 3 protects an earlier slot''s due instant, grace and claim-opening instant; its closing instant is the next period''s claim opening, computed from that next period''s own version. tests/test_slot_instants.py asserts exactly that split - the first draft of the test compared whole slots and failed on 2025-Q2''s closes_at, which is the rule working.'
+    - 'NO REBUILD FOR THIS ONE (2026-10-11): every dataset carries one participation version with days before zero, so per-period resolution gives the same inputs as the newest-version shortcut it replaces; the behaviour pin (tests/test_calendar_move_pin.py, every slot''s instants to 2028) passing unchanged is the proof, and the recorded history cannot differ because no input to it did. The night''s rebuild budget stayed with REQ-PIPE-110, whose move changed the file every input is read from.'
   - id: REQ-PIPE-161
     title: A person can excuse a late supply, with a reason, without changing the calendar it was judged
       against

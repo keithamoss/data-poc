@@ -51,6 +51,9 @@ class ParticipationVersion:
     grace: timedelta | None
     claim_window: timedelta | None
     changelog: tuple[tuple[str, str, str], ...]
+    #: Whole days before the period's date the supply is due (REQ-PIPE-113
+    #: criterion 1); zero unless stated.
+    days_before: int = 0
     #: The keys this version wrote, for the restate rule (criterion 33).
     stated: frozenset[str] = frozenset()
 
@@ -92,9 +95,10 @@ class Agreement:
     def participation_on(self, dataset_id: str, on: date) -> ParticipationVersion | None:
         """The participation version in force on a date, or None where the
         dataset's first version has not begun - NOT YET OWING (criterion 30)."""
+        from qa_tools.common import in_force
+
         entry = self.dataset(dataset_id)
-        versions = [v for v in (entry.participation if entry else ()) if v.effective_from <= on]
-        return versions[-1] if versions else None
+        return in_force.version_on(entry.participation, on) if entry else None
 
 
 def _changelog(raw, where: str) -> tuple[tuple[str, str, str], ...]:
@@ -126,6 +130,13 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
             f"like [February, August].")
     grace = raw.get("grace")
     window = raw.get("claim_window")
+    days_before = raw.get("days_before", 0)
+    # A WHOLE NUMBER, never a duration or a string - "the evening before"
+    # is one day before at that evening's time (REQ-PIPE-113 criterion 5).
+    if isinstance(days_before, bool) or not isinstance(days_before, int) or days_before < 0:
+        raise schedule.ScheduleConfigError(
+            f"{where}: days_before is {days_before!r} - write a whole number of days, 0 or "
+            f"more, like 1 for a supply due the evening before its period's date.")
     return ParticipationVersion(
         effective_from=schedule._as_date(raw.get("effective_from"), f"{where} effective_from"),
         participates=participates,
@@ -135,6 +146,7 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
         claim_window=(schedule.parse_duration(window, f"{where} claim_window")
                       if window is not None else None),
         changelog=_changelog(raw.get("changelog"), where),
+        days_before=days_before,
         stated=stated)
 
 

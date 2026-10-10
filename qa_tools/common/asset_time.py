@@ -132,12 +132,14 @@ def timezone_versions() -> tuple[ZoneVersion, ...]:
 def zone_on(day: date) -> ZoneInfo:
     """The zone in force ON a date - for reading a wall-clock time on that
     date as an instant (criterion 3)."""
-    found = [v for v in timezone_versions() if v.effective_from <= day]
-    if not found:
+    from qa_tools.common import in_force
+
+    found = in_force.version_on(timezone_versions(), day)
+    if found is None:
         raise NoTimezoneVersion(
             f"no timezone version covers {day.isoformat()} - the earliest starts "
             f"{timezone_versions()[0].effective_from.isoformat()}. Not falling back to it.")
-    return found[-1].zone
+    return found.zone
 
 
 def zone_at(instant: datetime) -> ZoneInfo:
@@ -145,12 +147,14 @@ def zone_at(instant: datetime) -> ZoneInfo:
     a date (criterion 4)."""
     if instant.tzinfo is None or instant.utcoffset() is None:
         raise NaiveTimestampError(f"zone_at(): {instant!r} carries no UTC offset")
-    found = [v for v in timezone_versions() if v.starts_at <= instant]
-    if not found:
+    from qa_tools.common import in_force
+
+    found = in_force.version_on(timezone_versions(), instant, key=lambda v: v.starts_at)
+    if found is None:
         raise NoTimezoneVersion(
             f"no timezone version covers {instant.isoformat()} - the earliest starts "
             f"{timezone_versions()[0].starts_at.isoformat()}. Not falling back to it.")
-    return found[-1].zone
+    return found.zone
 
 
 def zone_now() -> ZoneInfo:

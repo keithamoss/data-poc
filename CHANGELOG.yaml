@@ -145,6 +145,14 @@ releases:
               live together in contract/calendar.yaml, in dated versions. The
               data contracts no longer carry delivery timing, and the old
               delivery_months key is refused with the name of its replacement.
+          - headline: A due time that can change going forward
+            components: ["Pipeline & publishing"]
+            description: >
+              Each slot now takes its due time, grace and claim window from
+              the agreement in force on its own date, so changing a due time
+              never re-judges a slot that was already due. A supply can be due
+              a whole number of days before its period - the evening before,
+              for instance.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

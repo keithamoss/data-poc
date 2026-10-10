@@ -36,14 +36,23 @@ def sydney(tmp_path, monkeypatch):
     asset_time.timezone_versions.cache_clear()
 
 
+def _expected_time(monkeypatch, hhmm):
+    """Every participation version reads `hhmm` as its expected time -
+    the input slots.slot_instants takes per period (REQ-PIPE-113)."""
+    import dataclasses
+
+    real = slots._participation_for
+    monkeypatch.setattr(slots, "_participation_for",
+                        lambda d, on, a: dataclasses.replace(real(d, on, a), expected_time=hhmm))
+
+
 class TestTheGateRefusesADueTimeDaylightSavingBreaks:
     """Criterion 8 - named by dataset, period and time."""
 
     def test_a_time_in_the_spring_forward_gap_is_refused(self, sydney, monkeypatch):
         # Birth Registrations is daily from 2026-08-24, so 2026-10-04 -
         # Sydney's spring-forward day - is one of its periods.
-        monkeypatch.setattr(slots, "_timing",
-                            lambda dataset_id: ("02:30", 0, None))
+        _expected_time(monkeypatch, "02:30")
         errors = vs._daylight_saving_errors(vs.Source.default())
         gap = [e for e in errors if "2026-10-04" in e.problem]
         assert gap, [e.problem for e in errors][:3]
@@ -51,14 +60,12 @@ class TestTheGateRefusesADueTimeDaylightSavingBreaks:
         assert "birth" in gap[0].scope
 
     def test_a_time_in_the_fall_back_overlap_is_refused(self, sydney, monkeypatch):
-        monkeypatch.setattr(slots, "_timing",
-                            lambda dataset_id: ("02:30", 0, None))
+        _expected_time(monkeypatch, "02:30")
         errors = vs._daylight_saving_errors(vs.Source.default())
         assert any("2027-04-04" in e.problem and "occurs twice" in e.problem for e in errors)
 
     def test_an_ordinary_time_passes_in_a_daylight_saving_zone(self, sydney, monkeypatch):
-        monkeypatch.setattr(slots, "_timing",
-                            lambda dataset_id: ("09:00", 0, None))
+        _expected_time(monkeypatch, "09:00")
         assert vs._daylight_saving_errors(vs.Source.default()) == []
 
     def test_the_real_configuration_passes(self):

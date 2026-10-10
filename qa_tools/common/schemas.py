@@ -48,7 +48,7 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
 
 from qa_tools.common.vocab import (
     CHANGELOG_CATEGORIES,
@@ -639,6 +639,9 @@ class ParticipationVersionConfig(_Strict):
     expected_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
     grace: str | None = None
     claim_window: str | None = None
+    #: A whole number of days before the period's date the supply is due
+    #: (REQ-PIPE-113 criterion 1) - zero unless stated.
+    days_before: StrictInt | None = Field(default=None, ge=0)
     changelog: list[ConfigChangelogEntry] = Field(min_length=1)
 
 

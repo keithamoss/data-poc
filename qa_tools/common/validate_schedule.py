@@ -1056,7 +1056,7 @@ def _merged_view(raw: dict, cal_raw: dict) -> dict:
 
 
 #: What a participation version may state, for the restate rule (criterion 33).
-_RESTATED = ("participates", "reason", "expected_time", "grace", "claim_window")
+_RESTATED = ("participates", "reason", "expected_time", "grace", "claim_window", "days_before")
 
 
 def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]:
@@ -1281,18 +1281,26 @@ def _daylight_saving_errors(src: Source) -> list[ConfigError]:
     until = asset_time.local_date(asset_time.now()) + timedelta(days=DAYLIGHT_SAVING_HORIZON_DAYS)
     for entry in hierarchy.all_datasets():
         try:
-            expected_time = slots._timing(entry.dataset_id)[0]
             periods = schedule.periods_for_dataset(entry.dataset_id, until=until)
+            agreement = schedule._agreement()
         except Exception:  # noqa: BLE001 - no calendar, or reported by another gate
             continue
         for period in periods:
-            problem = asset_time.wall_clock_problem(period.date, expected_time)
+            # The participation version in force on the period's own date,
+            # and the day its due instant falls on (REQ-PIPE-113).
+            try:
+                version = slots._participation_for(entry.dataset_id, period.date, agreement)
+            except schedule.ScheduleConfigError:
+                continue  # reported by the participation checks
+            expected_time = version.expected_time
+            due_day = period.date - timedelta(days=version.days_before)
+            problem = asset_time.wall_clock_problem(due_day, expected_time)
             if problem:
                 out.append(ConfigError(
                     src.name, f"dataset {entry.dataset_id!r}",
                     f"its expected time {expected_time} on period {period.period.name}'s due date "
-                    f"{period.date.isoformat()} {problem} in "
-                    f"{asset_time.zone_on(period.date).key}, so that period has no single "
+                    f"{due_day.isoformat()} {problem} in "
+                    f"{asset_time.zone_on(due_day).key}, so that period has no single "
                     f"due instant.",
                     "Move the dataset's expected time out of the daylight-saving change - an "
                     "hour either side - so it names exactly one moment on every due date."))

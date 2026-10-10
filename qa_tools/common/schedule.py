@@ -170,12 +170,14 @@ class Calendar:
         dating. Editing next year's dates must never retroactively move
         a date a past supply was already judged against.
         """
-        applicable = [v for v in self.versions if v.effective_from <= on]
-        if not applicable:
+        from qa_tools.common import in_force
+
+        version = in_force.version_on(self.versions, on)
+        if version is None:
             raise ScheduleConfigError(
                 f"calendar {self.name!r} has no version in force on {on.isoformat()} - "
                 f"its earliest is {self.versions[0].effective_from.isoformat()}")
-        return applicable[-1]
+        return version
 
     @property
     def current(self) -> CalendarVersion:
@@ -790,13 +792,9 @@ def _version_in_force(cal: Calendar, on: date) -> CalendarVersion:
     answer that does not turn "this calendar was authored later than
     its own earliest data" into an error nobody can act on.
     """
-    chosen = cal.versions[0]
-    for version, start, end in _effect_windows(cal):
-        if on >= start and (end is None or on < end):
-            return version
-        if on >= start:
-            chosen = version
-    return chosen
+    from qa_tools.common import in_force
+
+    return in_force.version_on(cal.versions, on) or cal.versions[0]
 
 
 def candidate_dates(calendar_name: str, year: int) -> list[tuple[Period, str]]:

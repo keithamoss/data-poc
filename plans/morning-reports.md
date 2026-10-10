@@ -835,3 +835,35 @@ one or more component tags, and a date.
         participation version - every dataset has one, so nothing moves -
         and each period's own version is REQ-PIPE-113, next. Thread C stays
         until 113 is built, then goes whole.
+      - A SLIP OF MINE ON 110, said plainly: I made the configFile fix after
+        110's full run and re-ran only the fast gate and the targeted tests,
+        so 9bc389e went out with two e2e tests still asserting the old file
+        name - its commit message's "4019 passed" was true of the tree before
+        that fix, not of the tree committed. Caught by the next full run and
+        fixed in the 113 commit. The rule I broke is CLAUDE.md's "the last
+        edit must come BEFORE the last gate run".
+      - REQ-PIPE-113 BUILT: every slot takes its expected time, days before,
+        grace and claim-window override from the participation version in
+        force on its own period's date, through one slot-instants function
+        that filing, the overlap gate and the daylight-saving gate all call;
+        a new `days_before` (whole days) expresses "due the evening before";
+        every horizon reaches past the largest one; one bisecting "in force
+        on" helper now serves participation, calendar and timezone versions.
+        No rebuild - the pin proves nothing moved for today's one-version
+        agreement. ONE PROVISIONAL: a calendar period before a dataset's
+        first participation version takes that first version's inputs, so
+        the slot before it still has something to close against.
+        ONE QUESTION FOR YOU (wording of a built requirement, so yours):
+        REQ-PIPE-052 criterion 4 still says a slot's grace is "taken from its
+        own dataset's contract". 113 required amending criterion 3 only.
+        Proposed: "THE SYSTEM SHALL give each slot its own grace allowance,
+        taken from its dataset's participation version in force on that
+        period's date." Not applied until you say.
+      - REQ-PIPE-110 CRITIC came back with real findings (saved in the
+        session's reviews/2026-10-11-critic-110.md): a dataset listed twice in
+        calendar.yaml passes and the last one wins; criterion 7 is checked
+        against the newest participation version only; a dataset missing
+        from calendar.yaml whose collection names a calendar passes the
+        participation checks; three mistakes raise tracebacks instead of
+        gate errors; and weaker messages. The HIGH ones are defects against
+        signed criteria - fixing them next, test-first, before REQ-PIPE-111.
