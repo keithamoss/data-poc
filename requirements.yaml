@@ -25902,6 +25902,7 @@ requirements:
       criterion 3 is amended to name it beside REQ-PIPE-170's confirmation, rather than broken silently.
     - PLACE REUSES --to-period, NOT --period; PERIODS ARE CHOSEN, NOT TYPED, for place and re-file alike;
       held supplies are grouped in the waiting-on-a-decision queue (delivery-cli-ux pre-build review, 2026-10-07).
+    - 'PLACEMENT RUNS QA EXACTLY AS A RE-FILE DOES (Keith, 2026-10-10, on the delivery-architect''s review): the placement, the hold''s resolution and an owed re-check commit in one transaction; the terminal then runs the owed check straight away while the person waits (filing_tui._run_owed), and the processing pass finishes it if the terminal is interrupted. No QA runs inside filing_decisions. REJECTED running QA inside the placement''s own transaction: the four tools open their own connections and cannot see uncommitted work, the decision''s locks would be held for the whole run, and a tool failure would roll back the person''s decision. This replaces the 2026-10-08 wording ''run inline on the terminal''s own connection'', which described the existing re-file behaviour as though it were new.'
   - id: REQ-PIPE-164
     title: A person can have a supply's checks run again without moving it, singly or for every supply a
       fixed check affects
